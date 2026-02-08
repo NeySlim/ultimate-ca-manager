@@ -11,17 +11,12 @@ import {
 } from '@phosphor-icons/react'
 import { 
   Card, Button, Badge, Modal, Input, Select, Textarea, EmptyState, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent, ConfirmModal
 } from '../../components'
 import * as Tabs from '@radix-ui/react-tabs'
 import { useNotification } from '../../contexts/NotificationContext'
 import { apiClient } from '../../services/apiClient'
-
-const PROVIDER_TYPES = [
-  { value: 'ldap', label: 'LDAP / Active Directory', icon: Database },
-  { value: 'oauth2', label: 'OAuth2 / OIDC', icon: Globe },
-  { value: 'saml', label: 'SAML 2.0', icon: Shield },
-]
+import { useTranslation } from 'react-i18next'
 
 const PROVIDER_ICONS = {
   ldap: Database,
@@ -30,6 +25,7 @@ const PROVIDER_ICONS = {
 }
 
 export default function SSOSettingsSection() {
+  const { t } = useTranslation()
   const [providers, setProviders] = useState([])
   const [selectedProvider, setSelectedProvider] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -37,6 +33,7 @@ export default function SSOSettingsSection() {
   const [modalMode, setModalMode] = useState('create')
   const [testing, setTesting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null)
   const { showSuccess, showError } = useNotification()
 
   useEffect(() => {
@@ -48,7 +45,7 @@ export default function SSOSettingsSection() {
       const response = await apiClient.get('/sso/providers')
       setProviders(response.data || [])
     } catch (error) {
-      showError('Failed to load SSO providers')
+      showError(t('sso.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -66,25 +63,27 @@ export default function SSOSettingsSection() {
     setShowModal(true)
   }
 
-  const handleDelete = async (provider) => {
-    if (!confirm(`Delete SSO provider "${provider.name}"?`)) return
+  const handleDelete = async () => {
+    if (!confirmDelete) return
     try {
-      await apiClient.delete(`/sso/providers/${provider.id}`)
-      showSuccess('Provider deleted')
+      await apiClient.delete(`/sso/providers/${confirmDelete.id}`)
+      showSuccess(t('sso.deleteSuccess'))
       loadProviders()
       setSelectedProvider(null)
     } catch (error) {
-      showError('Failed to delete provider')
+      showError(t('sso.deleteFailed'))
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
   const handleToggle = async (provider) => {
     try {
       await apiClient.post(`/sso/providers/${provider.id}/toggle`)
-      showSuccess(`Provider ${provider.enabled ? 'disabled' : 'enabled'}`)
+      showSuccess(t('sso.toggleSuccess', { action: provider.enabled ? t('sso.disabled').toLowerCase() : t('sso.enabled').toLowerCase() }))
       loadProviders()
     } catch (error) {
-      showError('Failed to toggle provider')
+      showError(t('sso.toggleFailed'))
     }
   }
 
@@ -93,12 +92,12 @@ export default function SSOSettingsSection() {
     try {
       const response = await apiClient.post(`/sso/providers/${provider.id}/test`)
       if (response.data?.status === 'success') {
-        showSuccess(response.data.message || 'Connection successful')
+        showSuccess(response.data.message || t('sso.testSuccess'))
       } else {
-        showError(response.message || 'Test failed')
+        showError(response.message || t('sso.testFailed'))
       }
     } catch (error) {
-      showError(error.message || 'Connection test failed')
+      showError(error.message || t('sso.testFailed'))
     } finally {
       setTesting(false)
     }
@@ -108,15 +107,15 @@ export default function SSOSettingsSection() {
     try {
       if (modalMode === 'create') {
         await apiClient.post('/sso/providers', formData)
-        showSuccess('Provider created')
+        showSuccess(t('sso.createSuccess'))
       } else {
         await apiClient.put(`/sso/providers/${selectedProvider.id}`, formData)
-        showSuccess('Provider updated')
+        showSuccess(t('sso.updateSuccess'))
       }
       setShowModal(false)
       loadProviders()
     } catch (error) {
-      showError(error.message || 'Failed to save provider')
+      showError(error.message || t('sso.saveFailed'))
     }
   }
 
@@ -137,31 +136,27 @@ export default function SSOSettingsSection() {
     <DetailContent>
       <DetailHeader
         icon={Key}
-        title="Single Sign-On"
-        subtitle="Configure LDAP, OAuth2, or SAML providers for centralized authentication"
+        title={t('sso.title')}
+        subtitle={t('sso.subtitle')}
         actions={[
-          { label: 'Add Provider', icon: Plus, onClick: handleCreate }
+          { label: t('sso.addProvider'), icon: Plus, onClick: handleCreate }
         ]}
       />
 
-      <HelpCard variant="info" title="SSO Providers" className="mb-4">
-        Connect UCM to your identity provider for seamless authentication. 
-        Users can login with their corporate credentials.
+      <HelpCard variant="info" title={t('sso.helpTitle')} className="mb-4">
+        {t('sso.helpDescription')}
       </HelpCard>
 
       {/* Search */}
       {providers.length > 0 && (
         <div className="mb-4">
-          <div className="relative max-w-sm">
-            <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
-            <input
-              type="text"
-              placeholder="Search providers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm bg-bg-tertiary border border-border rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
-            />
-          </div>
+          <Input
+            icon={MagnifyingGlass}
+            placeholder={t('sso.searchProviders')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
         </div>
       )}
 
@@ -169,9 +164,9 @@ export default function SSOSettingsSection() {
       {filteredProviders.length === 0 ? (
         <EmptyState
           icon={Key}
-          title={searchTerm ? "No matches" : "No SSO providers"}
-          description={searchTerm ? "Try a different search" : "Add LDAP, OAuth2, or SAML providers"}
-          action={!searchTerm ? { label: 'Add Provider', onClick: handleCreate } : undefined}
+          title={searchTerm ? t('sso.noMatches') : t('sso.noProviders')}
+          description={searchTerm ? t('sso.tryDifferentSearch') : t('sso.noProvidersDescription')}
+          action={!searchTerm ? { label: t('sso.addProvider'), onClick: handleCreate } : undefined}
         />
       ) : (
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
@@ -219,14 +214,15 @@ export default function SSOSettingsSection() {
 
       {/* Selected Provider Details */}
       {selectedProvider && (
-        <DetailSection title="Provider Details" className="mt-6">
+        <DetailSection title={t('sso.providerDetails')} className="mt-6">
           <ProviderDetails 
             provider={selectedProvider}
             onEdit={() => handleEdit(selectedProvider)}
-            onDelete={() => handleDelete(selectedProvider)}
+            onDelete={() => setConfirmDelete(selectedProvider)}
             onToggle={() => handleToggle(selectedProvider)}
             onTest={() => handleTest(selectedProvider)}
             testing={testing}
+            t={t}
           />
         </DetailSection>
       )}
@@ -239,11 +235,24 @@ export default function SSOSettingsSection() {
           onClose={() => setShowModal(false)}
         />
       )}
+
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <ConfirmModal
+          open={true}
+          onClose={() => setConfirmDelete(null)}
+          onConfirm={handleDelete}
+          title={t('common.confirmDelete')}
+          message={t('sso.deleteConfirm', { name: confirmDelete.name })}
+          confirmText={t('common.delete')}
+          variant="danger"
+        />
+      )}
     </DetailContent>
   )
 }
 
-function ProviderDetails({ provider, onEdit, onDelete, onToggle, onTest, testing }) {
+function ProviderDetails({ provider, onEdit, onDelete, onToggle, onTest, testing, t }) {
   const Icon = PROVIDER_ICONS[provider.provider_type] || Key
   
   return (
@@ -261,11 +270,11 @@ function ProviderDetails({ provider, onEdit, onDelete, onToggle, onTest, testing
         <div className="flex items-center gap-2">
           <Button size="sm" variant="secondary" onClick={onTest} disabled={testing}>
             {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-            Test
+            {t('sso.test')}
           </Button>
           <Button size="sm" variant="secondary" onClick={onToggle}>
             <Lightning size={14} />
-            {provider.enabled ? 'Disable' : 'Enable'}
+            {provider.enabled ? t('sso.disable') : t('sso.enable')}
           </Button>
           <Button size="sm" variant="secondary" onClick={onEdit}>
             <PencilSimple size={14} />
@@ -277,36 +286,36 @@ function ProviderDetails({ provider, onEdit, onDelete, onToggle, onTest, testing
       </div>
 
       <DetailGrid columns={2}>
-        <DetailField label="Status" value={
+        <DetailField label={t('sso.status')} value={
           <Badge variant={provider.enabled ? 'success' : 'secondary'}>
-            {provider.enabled ? 'Enabled' : 'Disabled'}
+            {provider.enabled ? t('sso.enabled') : t('sso.disabled')}
           </Badge>
         } />
-        <DetailField label="Default Role" value={provider.default_role || 'viewer'} />
-        <DetailField label="Auto-create Users" value={provider.auto_create_users ? 'Yes' : 'No'} />
-        <DetailField label="Auto-update Users" value={provider.auto_update_users ? 'Yes' : 'No'} />
+        <DetailField label={t('sso.defaultRole')} value={t(`sso.roles.${provider.default_role}`) || provider.default_role} />
+        <DetailField label={t('sso.autoCreateUsers')} value={provider.auto_create_users ? t('common.yes') : t('common.no')} />
+        <DetailField label={t('sso.autoUpdateUsers')} value={provider.auto_update_users ? t('common.yes') : t('common.no')} />
       </DetailGrid>
 
       {provider.provider_type === 'ldap' && (
         <DetailGrid columns={2}>
-          <DetailField label="Server" value={`${provider.ldap_server}:${provider.ldap_port}`} mono />
-          <DetailField label="SSL/TLS" value={provider.ldap_use_ssl ? 'Enabled' : 'Disabled'} />
-          <DetailField label="Base DN" value={provider.ldap_base_dn} mono fullWidth />
+          <DetailField label={t('sso.ldapServer')} value={`${provider.ldap_server}:${provider.ldap_port}`} mono />
+          <DetailField label="SSL/TLS" value={provider.ldap_use_ssl ? t('sso.enabled') : t('sso.disabled')} />
+          <DetailField label={t('sso.baseDn')} value={provider.ldap_base_dn} mono fullWidth />
         </DetailGrid>
       )}
 
       {provider.provider_type === 'oauth2' && (
         <DetailGrid columns={2}>
-          <DetailField label="Client ID" value={provider.oauth2_client_id} mono />
-          <DetailField label="Scopes" value={provider.oauth2_scopes?.join(', ')} />
-          <DetailField label="Auth URL" value={provider.oauth2_auth_url} mono fullWidth />
+          <DetailField label={t('sso.clientId')} value={provider.oauth2_client_id} mono />
+          <DetailField label={t('sso.scopes')} value={provider.oauth2_scopes?.join(', ')} />
+          <DetailField label={t('sso.authUrl')} value={provider.oauth2_auth_url} mono fullWidth />
         </DetailGrid>
       )}
 
       {provider.provider_type === 'saml' && (
         <DetailGrid columns={2}>
-          <DetailField label="Entity ID" value={provider.saml_entity_id} mono fullWidth />
-          <DetailField label="SSO URL" value={provider.saml_sso_url} mono fullWidth />
+          <DetailField label={t('sso.entityId')} value={provider.saml_entity_id} mono fullWidth />
+          <DetailField label={t('sso.ssoURL')} value={provider.saml_sso_url} mono fullWidth />
         </DetailGrid>
       )}
     </div>
@@ -314,6 +323,7 @@ function ProviderDetails({ provider, onEdit, onDelete, onToggle, onTest, testing
 }
 
 function ProviderModal({ provider, onSave, onClose }) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
@@ -346,6 +356,18 @@ function ProviderModal({ provider, onSave, onClose }) {
   
   const [activeTab, setActiveTab] = useState('general')
 
+  const PROVIDER_TYPES = [
+    { value: 'ldap', label: t('sso.ldap'), icon: Database },
+    { value: 'oauth2', label: t('sso.oauth2'), icon: Globe },
+    { value: 'saml', label: t('sso.saml'), icon: Shield },
+  ]
+
+  const ROLE_OPTIONS = [
+    { value: 'admin', label: t('sso.roles.admin') },
+    { value: 'operator', label: t('sso.roles.operator') },
+    { value: 'viewer', label: t('sso.roles.viewer') },
+  ]
+
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -363,28 +385,28 @@ function ProviderModal({ provider, onSave, onClose }) {
     <Modal
       open={true}
       onClose={onClose}
-      title={provider ? 'Edit SSO Provider' : 'New SSO Provider'}
+      title={provider ? t('sso.editProvider') : t('sso.newProvider')}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <Tabs.List className="flex gap-1 border-b border-border mb-4">
-            <Tabs.Trigger value="general" className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary data-[state=active]:text-accent-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-primary">General</Tabs.Trigger>
-            <Tabs.Trigger value="connection" className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary data-[state=active]:text-accent-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-primary">Connection</Tabs.Trigger>
-            <Tabs.Trigger value="provisioning" className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary data-[state=active]:text-accent-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-primary">Provisioning</Tabs.Trigger>
+            <Tabs.Trigger value="general" className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary data-[state=active]:text-accent-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-primary">{t('sso.tabs.general')}</Tabs.Trigger>
+            <Tabs.Trigger value="connection" className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary data-[state=active]:text-accent-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-primary">{t('sso.tabs.connection')}</Tabs.Trigger>
+            <Tabs.Trigger value="provisioning" className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary data-[state=active]:text-accent-primary data-[state=active]:border-b-2 data-[state=active]:border-accent-primary">{t('sso.tabs.provisioning')}</Tabs.Trigger>
           </Tabs.List>
 
           <Tabs.Content value="general" className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
-              <Input label="Provider Name" value={formData.name} onChange={e => handleChange('name', e.target.value)} required placeholder="e.g., corporate-ldap" />
-              <Input label="Display Name" value={formData.display_name} onChange={e => handleChange('display_name', e.target.value)} placeholder="e.g., Corporate Directory" />
+              <Input label={t('sso.providerName')} value={formData.name} onChange={e => handleChange('name', e.target.value)} required placeholder={t('sso.providerNamePlaceholder')} />
+              <Input label={t('sso.displayName')} value={formData.display_name} onChange={e => handleChange('display_name', e.target.value)} placeholder={t('sso.displayNamePlaceholder')} />
             </div>
             {!provider && (
-              <Select label="Provider Type" value={formData.provider_type} onChange={value => handleChange('provider_type', value)} options={PROVIDER_TYPES} />
+              <Select label={t('sso.providerType')} value={formData.provider_type} onChange={value => handleChange('provider_type', value)} options={PROVIDER_TYPES} />
             )}
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={formData.enabled} onChange={e => handleChange('enabled', e.target.checked)} className="rounded" />
-              Enable provider
+            <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+              <input type="checkbox" checked={formData.enabled} onChange={e => handleChange('enabled', e.target.checked)} className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50" />
+              <span className="text-sm text-text-primary">{t('sso.enableProvider')}</span>
             </label>
           </Tabs.Content>
 
@@ -392,60 +414,56 @@ function ProviderModal({ provider, onSave, onClose }) {
             {formData.provider_type === 'ldap' && (
               <>
                 <div className="grid grid-cols-3 gap-4">
-                  <Input label="LDAP Server" value={formData.ldap_server} onChange={e => handleChange('ldap_server', e.target.value)} placeholder="ldap.example.com" className="col-span-2" />
-                  <Input label="Port" type="number" value={formData.ldap_port} onChange={e => handleChange('ldap_port', parseInt(e.target.value))} />
+                  <Input label={t('sso.ldapServer')} value={formData.ldap_server} onChange={e => handleChange('ldap_server', e.target.value)} placeholder="ldap.example.com" className="col-span-2" />
+                  <Input label={t('sso.ldapPort')} type="number" value={formData.ldap_port} onChange={e => handleChange('ldap_port', parseInt(e.target.value))} />
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={formData.ldap_use_ssl} onChange={e => handleChange('ldap_use_ssl', e.target.checked)} className="rounded" />
-                  Use SSL/TLS
+                <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+                  <input type="checkbox" checked={formData.ldap_use_ssl} onChange={e => handleChange('ldap_use_ssl', e.target.checked)} className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50" />
+                  <span className="text-sm text-text-primary">{t('sso.ldapUseSsl')}</span>
                 </label>
-                <Input label="Bind DN" value={formData.ldap_bind_dn} onChange={e => handleChange('ldap_bind_dn', e.target.value)} placeholder="cn=admin,dc=example,dc=com" />
-                <Input label="Bind Password" type="password" value={formData.ldap_bind_password} onChange={e => handleChange('ldap_bind_password', e.target.value)} placeholder={provider ? '••••••• (leave empty to keep)' : ''} />
-                <Input label="Base DN" value={formData.ldap_base_dn} onChange={e => handleChange('ldap_base_dn', e.target.value)} placeholder="dc=example,dc=com" />
-                <Input label="User Filter" value={formData.ldap_user_filter} onChange={e => handleChange('ldap_user_filter', e.target.value)} placeholder="(uid={username})" />
+                <Input label={t('sso.bindDn')} value={formData.ldap_bind_dn} onChange={e => handleChange('ldap_bind_dn', e.target.value)} placeholder={t('sso.bindDnPlaceholder')} />
+                <Input label={t('sso.bindPassword')} type="password" value={formData.ldap_bind_password} onChange={e => handleChange('ldap_bind_password', e.target.value)} placeholder={provider ? t('sso.keepExisting') : ''} />
+                <Input label={t('sso.baseDn')} value={formData.ldap_base_dn} onChange={e => handleChange('ldap_base_dn', e.target.value)} placeholder={t('sso.baseDnPlaceholder')} />
+                <Input label={t('sso.userFilter')} value={formData.ldap_user_filter} onChange={e => handleChange('ldap_user_filter', e.target.value)} placeholder={t('sso.userFilterPlaceholder')} />
               </>
             )}
             {formData.provider_type === 'oauth2' && (
               <>
-                <Input label="Client ID" value={formData.oauth2_client_id} onChange={e => handleChange('oauth2_client_id', e.target.value)} />
-                <Input label="Client Secret" type="password" value={formData.oauth2_client_secret} onChange={e => handleChange('oauth2_client_secret', e.target.value)} placeholder={provider ? '••••••• (leave empty to keep)' : ''} />
-                <Input label="Authorization URL" value={formData.oauth2_auth_url} onChange={e => handleChange('oauth2_auth_url', e.target.value)} placeholder="https://provider.com/oauth/authorize" />
-                <Input label="Token URL" value={formData.oauth2_token_url} onChange={e => handleChange('oauth2_token_url', e.target.value)} placeholder="https://provider.com/oauth/token" />
-                <Input label="Scopes" value={formData.oauth2_scopes} onChange={e => handleChange('oauth2_scopes', e.target.value)} placeholder="openid profile email" />
+                <Input label={t('sso.clientId')} value={formData.oauth2_client_id} onChange={e => handleChange('oauth2_client_id', e.target.value)} />
+                <Input label={t('sso.clientSecret')} type="password" value={formData.oauth2_client_secret} onChange={e => handleChange('oauth2_client_secret', e.target.value)} placeholder={provider ? t('sso.keepExisting') : ''} />
+                <Input label={t('sso.authUrl')} value={formData.oauth2_auth_url} onChange={e => handleChange('oauth2_auth_url', e.target.value)} placeholder={t('sso.authUrlPlaceholder')} />
+                <Input label={t('sso.tokenUrl')} value={formData.oauth2_token_url} onChange={e => handleChange('oauth2_token_url', e.target.value)} placeholder={t('sso.tokenUrlPlaceholder')} />
+                <Input label={t('sso.scopes')} value={formData.oauth2_scopes} onChange={e => handleChange('oauth2_scopes', e.target.value)} placeholder={t('sso.scopesPlaceholder')} />
               </>
             )}
             {formData.provider_type === 'saml' && (
               <>
-                <Input label="Entity ID" value={formData.saml_entity_id} onChange={e => handleChange('saml_entity_id', e.target.value)} placeholder="https://idp.example.com/saml/metadata" />
-                <Input label="SSO URL" value={formData.saml_sso_url} onChange={e => handleChange('saml_sso_url', e.target.value)} placeholder="https://idp.example.com/saml/sso" />
-                <Input label="SLO URL (optional)" value={formData.saml_slo_url} onChange={e => handleChange('saml_slo_url', e.target.value)} placeholder="https://idp.example.com/saml/slo" />
-                <Textarea label="IdP Certificate (PEM)" value={formData.saml_certificate} onChange={e => handleChange('saml_certificate', e.target.value)} rows={6} placeholder="-----BEGIN CERTIFICATE-----..." className="font-mono text-xs" />
+                <Input label={t('sso.entityId')} value={formData.saml_entity_id} onChange={e => handleChange('saml_entity_id', e.target.value)} placeholder="https://idp.example.com/saml/metadata" />
+                <Input label={t('sso.ssoURL')} value={formData.saml_sso_url} onChange={e => handleChange('saml_sso_url', e.target.value)} placeholder="https://idp.example.com/saml/sso" />
+                <Input label={t('sso.sloURL')} value={formData.saml_slo_url} onChange={e => handleChange('saml_slo_url', e.target.value)} placeholder="https://idp.example.com/saml/slo" />
+                <Textarea label={t('sso.certificate')} value={formData.saml_certificate} onChange={e => handleChange('saml_certificate', e.target.value)} rows={6} placeholder="-----BEGIN CERTIFICATE-----..." className="font-mono text-xs" />
               </>
             )}
           </Tabs.Content>
 
           <Tabs.Content value="provisioning" className="space-y-4 mt-4">
-            <Select label="Default Role" value={formData.default_role} onChange={value => handleChange('default_role', value)} options={[
-              { value: 'admin', label: 'Admin' },
-              { value: 'operator', label: 'Operator' },
-              { value: 'viewer', label: 'Viewer' },
-            ]} />
+            <Select label={t('sso.defaultRole')} value={formData.default_role} onChange={value => handleChange('default_role', value)} options={ROLE_OPTIONS} />
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={formData.auto_create_users} onChange={e => handleChange('auto_create_users', e.target.checked)} className="rounded" />
-                Auto-create users on first login
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+                <input type="checkbox" checked={formData.auto_create_users} onChange={e => handleChange('auto_create_users', e.target.checked)} className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50" />
+                <span className="text-sm text-text-primary">{t('sso.autoCreateUsers')}</span>
               </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={formData.auto_update_users} onChange={e => handleChange('auto_update_users', e.target.checked)} className="rounded" />
-                Update user info on each login
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+                <input type="checkbox" checked={formData.auto_update_users} onChange={e => handleChange('auto_update_users', e.target.checked)} className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50" />
+                <span className="text-sm text-text-primary">{t('sso.autoUpdateUsers')}</span>
               </label>
             </div>
           </Tabs.Content>
         </Tabs.Root>
 
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit">{provider ? 'Update' : 'Create'} Provider</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>{t('sso.cancel')}</Button>
+          <Button type="submit">{provider ? t('sso.update') : t('sso.create')} Provider</Button>
         </div>
       </form>
     </Modal>
