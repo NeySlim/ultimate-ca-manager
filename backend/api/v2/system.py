@@ -288,13 +288,14 @@ def regenerate_https_cert():
         is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
         
         if is_docker:
+            # In Docker, SIGTERM to gunicorn master - Docker will auto-restart
             try:
-                os.kill(os.getppid(), signal.SIGHUP)
-            except Exception:
-                pass
-            return success_response(message="Certificate regenerated. Reload signal sent.")
+                os.kill(os.getppid(), signal.SIGTERM)
+            except Exception as e:
+                current_app.logger.warning(f"Failed to send restart signal: {e}")
+            return success_response(message="Certificate regenerated. Container restarting...")
         else:
-            subprocess.Popen(['sudo', 'systemctl', 'restart', 'ucm'],
+            subprocess.Popen(['sudo', '/usr/bin/systemctl', 'restart', 'ucm'],
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
             return success_response(message="Certificate regenerated. Service restarting...")
@@ -375,13 +376,16 @@ def apply_https_cert():
         is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
         
         if is_docker:
-            # In Docker, send SIGHUP to gunicorn master to reload
-            # The container orchestrator handles restarts
+            # In Docker, we need to restart the container for SSL cert changes
+            # SIGHUP doesn't reload SSL certs in gunicorn
+            # Send SIGTERM to master - Docker will auto-restart the container
             try:
-                os.kill(os.getppid(), signal.SIGHUP)
-            except Exception:
-                pass
-            return success_response(message="Certificate applied. Reload signal sent.")
+                import sys
+                # Kill gunicorn master (parent of worker) - Docker restart policy will restart
+                os.kill(os.getppid(), signal.SIGTERM)
+            except Exception as e:
+                current_app.logger.warning(f"Failed to send restart signal: {e}")
+            return success_response(message="Certificate applied. Container restarting...")
         else:
             # On systemd systems, restart the service
             # Use subprocess.run for better error handling
