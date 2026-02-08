@@ -1,12 +1,13 @@
 /**
  * Multi-Method Login Page
  * Flow: Username → mTLS/WebAuthn → Password (fallback)
+ * Supports SSO: OAuth2, SAML, LDAP
  * Remembers last username in localStorage
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, Link } from 'react-router-dom'
-import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe } from '@phosphor-icons/react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe, SignIn } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
 import { languages } from '../i18n'
 import { useAuth, useNotification } from '../contexts'
@@ -16,15 +17,38 @@ import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'ucm_last_username'
 
+// SSO provider icons based on type or name
+const getSSOIcon = (provider) => {
+  const name = provider.name?.toLowerCase() || ''
+  const type = provider.provider_type
+  
+  // Common providers
+  if (name.includes('google')) return '🔵'
+  if (name.includes('microsoft') || name.includes('azure') || name.includes('entra')) return '🟦'
+  if (name.includes('github')) return '⚫'
+  if (name.includes('gitlab')) return '🟠'
+  if (name.includes('okta')) return '🔷'
+  if (name.includes('keycloak')) return '🔐'
+  if (name.includes('auth0')) return '🔴'
+  
+  // By type
+  if (type === 'ldap') return '📁'
+  if (type === 'saml') return '🔒'
+  if (type === 'oauth2') return '🔑'
+  
+  return '🔐'
+}
+
 export default function LoginPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { login } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const passwordRef = useRef(null)
   
-  // Login flow step: 'username' | 'auth'
+  // Login flow step: 'username' | 'auth' | 'ldap'
   const [step, setStep] = useState('username')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -36,11 +60,15 @@ export default function LoginPage() {
   const [emailConfigured, setEmailConfigured] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [langMenuOpen, setLangMenuOpen] = useState(false)
+  
+  // SSO state
+  const [ssoProviders, setSsoProviders] = useState([])
+  const [selectedLdapProvider, setSelectedLdapProvider] = useState(null)
 
   // Get current language
   const currentLang = languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en')) || languages[0]
 
-  // Load last username on mount + check email config
+  // Load SSO providers, last username, check email config
   useEffect(() => {
     const lastUsername = localStorage.getItem(STORAGE_KEY)
     if (lastUsername) {
@@ -53,7 +81,32 @@ export default function LoginPage() {
       .then(res => res.json())
       .then(data => setEmailConfigured(data.configured || false))
       .catch(() => setEmailConfigured(false))
-  }, [])
+    
+    // Load SSO providers
+    fetch('/api/v2/sso/available')
+      .then(res => res.json())
+      .then(data => {
+        if (data.data && Array.isArray(data.data)) {
+          setSsoProviders(data.data)
+        }
+      })
+      .catch(() => setSsoProviders([]))
+    
+    // Check for SSO errors in URL
+    const error = searchParams.get('error')
+    if (error) {
+      const errorMessages = {
+        'provider_disabled': t('auth.ssoProviderDisabled'),
+        'invalid_state': t('auth.ssoInvalidState'),
+        'token_exchange_failed': t('auth.ssoTokenFailed'),
+        'userinfo_failed': t('auth.ssoUserinfoFailed'),
+        'no_username': t('auth.ssoNoUsername'),
+        'user_creation_failed': t('auth.ssoUserCreationFailed'),
+        'callback_error': t('auth.ssoCallbackError'),
+      }
+      showError(errorMessages[error] || t('auth.ssoError'))
+    }
+  }, [searchParams, showError, t])
 
   // Focus password field when switching to password auth
   useEffect(() => {
@@ -208,6 +261,7 @@ export default function LoginPage() {
     setAuthMethod(null)
     setPassword('')
     setStatusMessage('')
+    setSelectedLdapProvider(null)
   }
 
   // Change user (clear username)
@@ -215,6 +269,61 @@ export default function LoginPage() {
     setUsername('')
     localStorage.removeItem(STORAGE_KEY)
     handleBack()
+  }
+
+  // SSO: Initiate OAuth2/SAML login (redirect)
+  const handleSSOLogin = (provider) => {
+    if (provider.provider_type === 'ldap') {
+      // LDAP requires username/password form
+      setSelectedLdapProvider(provider)
+      setStep('ldap')
+    } else {
+      // OAuth2/SAML - redirect to backend
+      window.location.href = `/api/v2/sso/login/${provider.id}`
+    }
+  }
+
+  // SSO: LDAP login (direct auth)
+  const handleLDAPLogin = async (e) => {
+    e.preventDefault()
+    
+    if (!username || !password) {
+      showError(t('auth.enterCredentials'))
+      return
+    }
+
+    setLoading(true)
+    setStatusMessage(t('auth.authenticating'))
+    
+    try {
+      const response = await fetch('/api/v2/sso/ldap/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          password,
+          provider_id: selectedLdapProvider?.id
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.message || t('auth.invalidCredentials'))
+      }
+      
+      // Login successful
+      saveUsername(username)
+      await login(username, null, data.data)
+      showSuccess(t('auth.welcomeBackUser', { username }))
+      navigate('/dashboard')
+    } catch (error) {
+      showError(error.message || t('auth.ldapFailed'))
+      setPassword('')
+    } finally {
+      setLoading(false)
+      setStatusMessage('')
+    }
   }
 
   return (
@@ -320,6 +429,31 @@ export default function LoginPage() {
                   )}
                 </Button>
               </form>
+            )}
+            
+            {/* SSO Providers */}
+            {ssoProviders.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-text-tertiary uppercase tracking-wider">{t('auth.orContinueWith')}</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                
+                <div className="grid gap-2">
+                  {ssoProviders.map((provider) => (
+                    <button
+                      key={provider.id}
+                      onClick={() => handleSSOLogin(provider)}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary hover:border-accent/50 transition-all text-text-primary font-medium"
+                    >
+                      <span className="text-lg">{provider.icon || getSSOIcon(provider)}</span>
+                      <span>{provider.display_name || provider.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -491,6 +625,81 @@ export default function LoginPage() {
               <Key size={12} weight="fill" />
               <span>{t('auth.password')}</span>
             </div>
+          </div>
+        )}
+
+        {/* Step 3: LDAP Login */}
+        {step === 'ldap' && selectedLdapProvider && (
+          <div className="space-y-3 sm:space-y-5">
+            {/* Provider header */}
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
+              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg text-xl">
+                  {selectedLdapProvider.icon || getSSOIcon(selectedLdapProvider)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInWith')}</p>
+                  <p className="text-base sm:text-lg font-semibold text-text-primary truncate">
+                    {selectedLdapProvider.display_name || selectedLdapProvider.name}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* LDAP Login form */}
+            <form onSubmit={handleLDAPLogin} className="space-y-3 sm:space-y-4">
+              <Input
+                label={t('auth.username')}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={t('auth.ldapUsername')}
+                disabled={loading}
+                autoComplete="username"
+                autoFocus
+                icon={<User size={18} />}
+              />
+              
+              <Input
+                label={t('auth.password')}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('auth.enterPassword')}
+                disabled={loading}
+                autoComplete="current-password"
+                icon={<Key size={18} />}
+              />
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !username || !password}
+              >
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span>{statusMessage || t('auth.signingIn')}</span>
+                  </>
+                ) : (
+                  <>
+                    <SignIn size={18} weight="bold" />
+                    <span>{t('auth.login')}</span>
+                  </>
+                )}
+              </Button>
+            </form>
+
+            {/* Back button */}
+            <button
+              onClick={handleBack}
+              className="w-full text-sm text-text-secondary hover:text-text-primary transition-colors py-1.5 sm:py-2 flex items-center justify-center gap-1"
+              disabled={loading}
+            >
+              <ArrowLeft size={14} />
+              <span>{t('common.back')}</span>
+            </button>
           </div>
         )}
 

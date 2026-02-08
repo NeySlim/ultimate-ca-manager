@@ -290,7 +290,21 @@
     "touchSecurityKey": "Touchez votre clé de sécurité...",
     "securityKeyCancelled": "Clé de sécurité annulée. Utilisez le mot de passe.",
     "welcomeBackUser": "Bon retour, {{username}} !",
-    "usePasswordInstead": "Utiliser le mot de passe"
+    "usePasswordInstead": "Utiliser le mot de passe",
+    "orContinueWith": "ou continuer avec",
+    "signingInWith": "Connexion avec",
+    "ldapUsername": "Votre nom d'utilisateur LDAP",
+    "ldapFailed": "Échec de l'authentification LDAP",
+    "enterCredentials": "Veuillez entrer votre nom d'utilisateur et mot de passe",
+    "authenticating": "Authentification...",
+    "ssoProviderDisabled": "Ce fournisseur SSO est désactivé",
+    "ssoInvalidState": "État SSO invalide. Veuillez réessayer.",
+    "ssoTokenFailed": "Échec de l'échange de token SSO",
+    "ssoUserinfoFailed": "Impossible de récupérer les informations utilisateur",
+    "ssoNoUsername": "SSO : Impossible de déterminer le nom d'utilisateur",
+    "ssoUserCreationFailed": "Impossible de créer le compte utilisateur",
+    "ssoCallbackError": "Erreur d'authentification SSO",
+    "ssoError": "Échec de l'authentification SSO"
   },
   "cas": {
     "title": "Autorités de certification",

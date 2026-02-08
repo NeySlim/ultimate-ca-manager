@@ -187,7 +187,21 @@
     "touchSecurityKey": "Touch your security key...",
     "securityKeyCancelled": "Security key cancelled. Use password instead.",
     "welcomeBackUser": "Welcome back, {{username}}!",
-    "usePasswordInstead": "Use password instead"
+    "usePasswordInstead": "Use password instead",
+    "orContinueWith": "or continue with",
+    "signingInWith": "Signing in with",
+    "ldapUsername": "Your LDAP username",
+    "ldapFailed": "LDAP authentication failed",
+    "enterCredentials": "Please enter username and password",
+    "authenticating": "Authenticating...",
+    "ssoProviderDisabled": "SSO provider is disabled",
+    "ssoInvalidState": "Invalid SSO state. Please try again.",
+    "ssoTokenFailed": "SSO token exchange failed",
+    "ssoUserinfoFailed": "Failed to get user information",
+    "ssoNoUsername": "SSO: Could not determine username",
+    "ssoUserCreationFailed": "Failed to create user account",
+    "ssoCallbackError": "SSO authentication error",
+    "ssoError": "SSO authentication failed"
   },
   "dashboard": {
     "title": "Dashboard",
