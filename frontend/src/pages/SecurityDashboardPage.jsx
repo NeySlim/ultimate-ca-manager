@@ -2,7 +2,7 @@
  * Security Dashboard Page
  * Displays security status, anomalies, and admin tools
  * 
- * Pro feature - shows secrets status, rotation, anomaly detection, audit integrity
+ * Advanced feature - shows secrets status, rotation, anomaly detection, audit integrity
  */
 
 import { useState, useEffect } from 'react'
@@ -19,12 +19,12 @@ import {
   User,
   Globe
 } from '@phosphor-icons/react'
-import ResponsiveLayout from '../../components/ui/responsive/ResponsiveLayout'
-import { CompactSection, CompactGrid } from '../../components/DetailCard'
-import { Button } from '../../components/Button'
-import { apiClient } from '../../services/apiClient'
-import { useNotification } from '../../contexts/NotificationContext'
-import { cn } from '../../lib/utils'
+import ResponsiveLayout from '../components/ui/responsive/ResponsiveLayout'
+import { CompactSection, CompactGrid } from '../components/DetailCard'
+import { Button } from '../components/Button'
+import { apiClient } from '../services/apiClient'
+import { useNotification } from '../contexts/NotificationContext'
+import { cn } from '../lib/utils'
 
 export default function SecurityDashboardPage() {
   const { t } = useTranslation()

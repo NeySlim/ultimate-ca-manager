@@ -1,13 +1,13 @@
 /**
  * Sidebar Component - 56px navigation sidebar
- * Supports Pro features when license is active (dynamic import)
+ * All features are now available (community edition)
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Crown, Lock, FileX, Vault, Wrench, Detective
+  UsersThree, Shield, Lock, FileX, Vault, Wrench, Detective
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -18,7 +18,6 @@ import { Logo } from './Logo'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { useMobile } from '../contexts/MobileContext'
 import { certificatesService } from '../services'
-import { loadProModule } from '../proLoader.jsx'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
@@ -51,27 +50,6 @@ export function Sidebar({ activePage }) {
   // Sizes based on screen width (smaller icons for refined look)
   const iconSize = isLargeScreen ? 20 : 16
   const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-9 h-9'
-  
-  // Dynamic Pro module loading
-  const [proModule, setProModule] = useState(null)
-  const [license, setLicense] = useState({ isPro: false, loading: true })
-  
-  useEffect(() => {
-    // Try to dynamically import Pro module
-    loadProModule()
-      .then(mod => {
-        setProModule(mod)
-        // Pro module loaded = Pro features enabled (no license check needed)
-        setLicense({ isPro: true, loading: false })
-      })
-      .catch(() => {
-        // Pro module not available - community version
-        setLicense({ isPro: false, loading: false })
-      })
-  }, [])
-  
-  // Pro is enabled by module presence, no API call needed
-  // (keeping this effect empty for backwards compatibility)
 
   const pages = [
     { id: '', icon: House, labelKey: 'nav.dashboard', path: '/' },
@@ -88,11 +66,7 @@ export function Sidebar({ activePage }) {
     { id: 'tools', icon: Wrench, labelKey: 'nav.tools', path: '/tools' },
     { id: 'audit', icon: ClockCounterClockwise, labelKey: 'nav.audit', path: '/audit' },
     { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
-  ]
-
-  // Pro-only pages (only shown when license is active)
-  // SSO is now in Settings, Groups is now in Users
-  const proPages = [
+    // Advanced features (formerly Pro)
     { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
     { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
     { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security' },
@@ -151,42 +125,6 @@ export function Sidebar({ activePage }) {
           </Link>
         )
       })}
-
-      {/* Pro Pages - only show if license is active */}
-      {license.isPro && !license.loading && (
-        <>
-          <div className="w-7 border-t border-border/60 my-1" />
-          {proPages.map(page => {
-            const Icon = page.icon
-            const isActive = activePage === page.id
-            const label = t(page.labelKey)
-            return (
-              <Link
-                key={page.id}
-                to={page.path}
-                className={cn(
-                  buttonSize,
-                  "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
-                  isActive
-                    ? "bg-accent-pro/20 text-accent-pro border border-accent-pro/30" 
-                    : "text-accent-pro/60 hover:bg-accent-pro/10 hover:text-accent-pro"
-                )}
-                title={`${label} (${t('common.pro')})`}
-              >
-                <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
-                {isActive && (
-                  <div className="absolute left-0 w-0.5 h-5 bg-accent-pro rounded-r-full" />
-                )}
-                {/* Tooltip */}
-                <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-accent-pro/30 rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 flex items-center gap-1.5">
-                  <Crown size={12} className="text-accent-pro" />
-                  {label}
-                </div>
-              </Link>
-            )
-          })}
-        </>
-      )}
 
       <div className="flex-1" />
 

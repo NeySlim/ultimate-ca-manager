@@ -22,9 +22,9 @@ const AccountPage = lazy(() => import('./pages/AccountPage'))
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
 const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
 const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
-
-// Pro pages - dynamically loaded (no stubs needed in Community edition)
-import { RBACPage, HSMPage, SecurityDashboardPage } from './proLoader.jsx'
+const RBACPage = lazy(() => import('./pages/RBACPage'))
+const HSMPage = lazy(() => import('./pages/HSMPage'))
+const SecurityDashboardPage = lazy(() => import('./pages/SecurityDashboardPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {

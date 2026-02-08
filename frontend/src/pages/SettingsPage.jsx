@@ -27,9 +27,9 @@ import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
-import { loadProSettings } from '../proLoader.jsx'
+import { advancedSettingsCategories } from '../pro/settings.js'
 
-// Base settings categories (Community)
+// Base settings categories
 // Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
   { id: 'general', labelKey: 'settings.tabs.general', icon: Gear, color: 'icon-bg-blue' },
@@ -236,9 +236,6 @@ export default function SettingsPage() {
   const [selectedHttpsCert, setSelectedHttpsCert] = useState('')
   const [cas, setCas] = useState([])
   
-  // Pro settings categories (dynamically loaded)
-  const [proCategories, setProCategories] = useState([])
-  
   // Selected category - read from URL param or default to 'general'
   const [selectedCategory, setSelectedCategory] = useState(
     searchParams.get('tab') || 'general'
@@ -266,17 +263,12 @@ export default function SettingsPage() {
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
 
-  // Dynamically load Pro settings categories
-  useEffect(() => {
-    loadProSettings().then(setProCategories)
-  }, [])
-
-  // Merge base + Pro categories
+  // Merge base + advanced categories (all now available)
   const SETTINGS_CATEGORIES = useMemo(() => [
     ...BASE_SETTINGS_CATEGORIES.slice(0, 4), // general, email, security, backup
-    ...proCategories,                         // SSO (Pro) - empty in Community
-    ...BASE_SETTINGS_CATEGORIES.slice(4),     // audit, database, https
-  ], [proCategories])
+    ...advancedSettingsCategories,           // SSO
+    ...BASE_SETTINGS_CATEGORIES.slice(4),    // audit, database, https
+  ], [])
 
   useEffect(() => {
     loadSettings()
@@ -1203,7 +1195,7 @@ export default function SettingsPage() {
     label: t(cat.labelKey),
     icon: cat.icon,
     color: cat.color,
-    badge: cat.pro ? { label: t('common.pro'), variant: 'info' } : undefined
+    badge: undefined  // All features now community
   }))
 
   return (

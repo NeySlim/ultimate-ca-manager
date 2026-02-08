@@ -21,7 +21,6 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { useAuth } from '../contexts/AuthContext'
 import { certificatesService } from '../services'
-import { loadProModule } from '../proLoader.jsx'
 
 // Mobile navigation items (grid menu) - labels are i18n keys
 const mobileNavItems = [
@@ -40,11 +39,11 @@ const mobileNavItems = [
   { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
 ]
 
-// Pro items (added dynamically) - labels are i18n keys
-const proNavItems = [
-  { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security', pro: true },
-  { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac', pro: true },
-  { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm', pro: true },
+// Advanced features (formerly Pro) - labels are i18n keys
+const advancedNavItems = [
+  { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security' },
+  { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
+  { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
 ]
 
 export function AppShell() {
@@ -58,7 +57,6 @@ export function AppShell() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [isPro, setIsPro] = useState(false)
   const { showWarning } = useNotification()
   
   // Extract current page from pathname (empty string for dashboard)
@@ -91,13 +89,6 @@ export function AppShell() {
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
-  }, [])
-
-  // Check for Pro module
-  useEffect(() => {
-    loadProModule()
-      .then(() => setIsPro(true))
-      .catch(() => setIsPro(false))
   }, [])
   
   // Check for expiring certificates on mount (once per session)
@@ -144,7 +135,7 @@ export function AppShell() {
   })
 
   // All nav items (including Pro if available)
-  const allNavItems = isPro ? [...mobileNavItems, ...proNavItems] : mobileNavItems
+  const allNavItems = [...mobileNavItems, ...advancedNavItems]
 
   return (
     <div className="flex h-full w-full overflow-hidden justify-center items-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -355,7 +346,6 @@ export function AppShell() {
       <CommandPalette 
         open={commandPaletteOpen} 
         onOpenChange={setCommandPaletteOpen}
-        isPro={isPro}
       />
       
       {/* Mobile Help Modal */}
