@@ -132,6 +132,7 @@ export default function LoginPage() {
         'userinfo_failed': t('auth.ssoUserinfoFailed'),
         'no_username': t('auth.ssoNoUsername'),
         'user_creation_failed': t('auth.ssoUserCreationFailed'),
+        'auto_create_disabled': t('auth.ssoAutoCreateDisabled'),
         'callback_error': t('auth.ssoCallbackError'),
       }
       showError(errorMessages[error] || t('auth.ssoError'))

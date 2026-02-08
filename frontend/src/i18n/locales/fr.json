@@ -303,6 +303,7 @@
     "ssoUserinfoFailed": "Impossible de récupérer les informations utilisateur",
     "ssoNoUsername": "SSO : Impossible de déterminer le nom d'utilisateur",
     "ssoUserCreationFailed": "Impossible de créer le compte utilisateur",
+    "ssoAutoCreateDisabled": "Utilisateur non trouvé. La création automatique de comptes est désactivée. Contactez votre administrateur.",
     "ssoCallbackError": "Erreur d'authentification SSO",
     "ssoError": "Échec de l'authentification SSO"
   },
