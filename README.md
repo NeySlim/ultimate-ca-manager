@@ -138,23 +138,23 @@ wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pac
 ### Debian/Ubuntu Package
 
 ```bash
-# Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm_2.0.0_all.deb
+# Download from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_2.0.1_all.deb
 
 # Install
 sudo apt install -y python3-venv python3-pip  # Required dependencies
-sudo dpkg -i ucm_2.0.0_all.deb
+sudo dpkg -i ucm_*.deb
 sudo systemctl enable --now ucm
 ```
 
 ### RHEL/Rocky/Fedora Package
 
 ```bash
-# Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm-2.0.0-1.fc43.noarch.rpm
+# Download from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-2.0.1-1.fc43.noarch.rpm
 
 # Install
-sudo dnf install ./ucm-2.0.0-1.fc43.noarch.rpm
+sudo dnf install ./ucm-*.rpm
 sudo systemctl enable --now ucm
 ```
 
@@ -279,7 +279,7 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 
 ---
 
-## 📦 Package Locations (v2.0.0+)
+## 📦 Package Locations (v2.x+)
 
 ### DEB/RPM (Harmonized)
 - **Application:** `/opt/ucm/` (backend, frontend, venv)
@@ -298,20 +298,18 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 
 ## 🔄 Upgrade
 
-### Upgrading from v1.8.x to v2.0.0
+### Upgrading from v1.8.x to v2.x
 
 Data and configuration are **automatically migrated**. A backup is created in `/opt/ucm/data/backups/`.
 
 ```bash
-# Debian/Ubuntu
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm_2.0.0_all.deb
+# Debian/Ubuntu - download from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
 sudo apt install -y python3-venv python3-pip
-sudo dpkg -i ucm_2.0.0_all.deb
+sudo dpkg -i ucm_*.deb
 sudo systemctl restart ucm
 
-# RHEL/Rocky/Fedora
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm-2.0.0-1.fc43.noarch.rpm
-sudo dnf install ./ucm-2.0.0-1.fc43.noarch.rpm
+# RHEL/Rocky/Fedora - download from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
+sudo dnf install ./ucm-*.rpm
 sudo systemctl restart ucm
 ```
 
@@ -400,9 +398,9 @@ Comprehensive technical documentation is available in the [`/docs`](/docs) direc
 - **[API Wiring Audit](/docs/API-WIRING-AUDIT.md)** - Frontend/backend integration audit and bug reports
 - **[Documentation Overview](/docs/README.md)** - Architecture, conventions, and contribution guidelines
 
-**Current Status:** 🚧 **Beta** - v2.0.0 with new React frontend
+**Current Status:** 🚧 **Beta** - v2.x with new React frontend
 
-## ⚡ What's New in v2.0.0
+## ⚡ What's New in v2.x
 
 ### Complete UI Redesign
 - **Modern React 18 UI** - Responsive, accessible, mobile-friendly
