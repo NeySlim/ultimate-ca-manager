@@ -418,7 +418,8 @@
     "notes": "Notes",
     "commonNamePlaceholder": "exemple.com",
     "sanPlaceholder": "DNS:exemple.com\nDNS:www.exemple.com\nIP:192.168.1.1",
-    "validityPlaceholder": "365"
+    "validityPlaceholder": "365",
+    "privateKeyPEM": "Private Key (PEM)"
   },
   "common": {
     "save": "Enregistrer",
@@ -543,7 +544,8 @@
     "enterPassword": "Entrer le mot de passe",
     "unknown": "Inconnu",
     "unnamed": "Sans nom",
-    "na": "N/A"
+    "na": "N/A",
+    "daysAgo": "{{count}}d ago"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1331,7 +1333,14 @@
   "settings": {
     "title": "Paramètres",
     "general": "Général",
-    "appearance": "Apparence",
+    "appearance": {
+      "theme": "Thème",
+      "colorTheme": "Thème de couleur",
+      "appearance": "Apparence",
+      "followSystem": "Suivre le système",
+      "dark": "Sombre",
+      "light": "Clair"
+    },
     "email": "Email",
     "security": "Sécurité",
     "backup": "Sauvegarde & Restauration",
@@ -1552,7 +1561,8 @@
     "applyCertificate": "Appliquer le certificat",
     "applyAndRestart": "Appliquer et redémarrer",
     "regenerateCertConfirm": "Régénérer le certificat HTTPS ? Cela redémarrera le serveur.",
-    "regenerateAndRestart": "Régénérer et redémarrer"
+    "regenerateAndRestart": "Régénérer et redémarrer",
+    "applyImportedCertConfirm": "Apply this imported certificate as HTTPS certificate? This will restart the server."
   },
   "sso": {
     "title": "Authentification unique",
@@ -1845,7 +1855,15 @@
     "securityNote": "Note de sécurité",
     "securityNoteDesc": "Soyez prudent lors de l'ajout de certificats tiers.",
     "syncedCerts": "{{count}} certificats synchronisés",
-    "syncFailed": "Échec de la synchronisation depuis le système"
+    "syncFailed": "Échec de la synchronisation depuis le système",
+    "caTrust": "CA Trust",
+    "caTrustDesc": "Trusted for issuing certificates",
+    "clientAuthDesc": "Trusted for client authentication",
+    "codeSigningDesc": "Trusted for code signing",
+    "emailTrust": "Email",
+    "emailTrustDesc": "Trusted for S/MIME",
+    "tlsTrust": "TLS Trust",
+    "tlsTrustDesc": "Trusted for TLS/SSL connections"
   },
   "users": {
     "title": "Utilisateurs",
