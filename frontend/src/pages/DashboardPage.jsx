@@ -424,7 +424,7 @@ export default function DashboardPage() {
                           </Badge>
                         </div>
                         <div className="text-xs text-text-tertiary mt-0.5">
-                          {formatRelativeTime(cert.created_at)}
+                          {formatRelativeTime(cert.created_at, t)}
                         </div>
                       </div>
                     </div>
@@ -505,7 +505,7 @@ export default function DashboardPage() {
                   <SystemStat 
                     icon={Clock} 
                     label={t('dashboard.lastUpdate')} 
-                    value={formatRelativeTime(lastUpdate)} 
+                    value={formatRelativeTime(lastUpdate, t)} 
                     status="online" 
                   />
                   <SystemStat 
@@ -620,7 +620,7 @@ export default function DashboardPage() {
                             <span className="text-[10px] text-text-secondary font-medium">{activity.user || 'System'}</span>
                             <span className="text-text-tertiary text-[10px]">•</span>
                             <span className="text-[10px] text-text-tertiary">
-                              {formatRelativeTime(activity.timestamp)}
+                              {formatRelativeTime(activity.timestamp, t)}
                             </span>
                           </div>
                         </div>

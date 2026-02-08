@@ -1095,18 +1095,15 @@ function DesktopTable({
                 <th
                   key={col.key}
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
-                  style={{
-                    ...style,
-                    // Column separator in header - visible
-                    ...(!isLast && { borderRight: '1px solid rgba(128, 128, 128, 0.4)' })
-                  }}
+                  style={style}
                   className={cn(
                     'text-left text-2xs font-medium text-text-tertiary tracking-wide',
                     'relative group',
                     dStyle.header,
                     'transition-colors duration-200',
                     sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
-                    sort?.key === col.key && 'text-accent-primary'
+                    sort?.key === col.key && 'text-accent-primary',
+                    !isLast && 'table-col-separator'
                   )}
                 >
                   <div className="flex items-center gap-1.5 truncate pr-3">
@@ -1141,7 +1138,7 @@ function DesktopTable({
         </thead>
         
         {/* Body */}
-        <tbody className="divide-y divide-border/50 border-b border-border">
+        <tbody className="border-b border-border">
           {loading ? (
             <tr>
               <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-12 text-center">
@@ -1156,7 +1153,6 @@ function DesktopTable({
               <tr
                 key={row.id || idx}
                 onClick={() => onRowClick?.(row)}
-                style={{ borderBottom: '1px solid rgba(128, 128, 128, 0.25)' }}
                 className={cn(
                   'group transition-all duration-200 table-row-hover',
                   onRowClick && 'cursor-pointer',
@@ -1174,8 +1170,8 @@ function DesktopTable({
                         dStyle.cell,
                         "transition-colors duration-200",
                         col.className,
-                        // Subtle column separator - very discrete
-                        !isLast && 'border-r border-border/10'
+                        // Subtle column separator
+                        !isLast && 'table-col-separator-subtle'
                       )}
                     >
                       <div 
