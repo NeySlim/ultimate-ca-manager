@@ -56,17 +56,17 @@ class RateLimitConfig:
         if cls._limits_loaded:
             return
         
-        # Auth limits
-        auth_rpm = _get_env_int('RATE_LIMIT_AUTH_RPM', 10)
-        auth_burst = _get_env_int('RATE_LIMIT_AUTH_BURST', 3)
+        # Auth limits - more permissive defaults
+        auth_rpm = _get_env_int('RATE_LIMIT_AUTH_RPM', 30)
+        auth_burst = _get_env_int('RATE_LIMIT_AUTH_BURST', 10)
         
         # Heavy operation limits
-        heavy_rpm = _get_env_int('RATE_LIMIT_HEAVY_RPM', 30)
-        heavy_burst = _get_env_int('RATE_LIMIT_HEAVY_BURST', 5)
+        heavy_rpm = _get_env_int('RATE_LIMIT_HEAVY_RPM', 60)
+        heavy_burst = _get_env_int('RATE_LIMIT_HEAVY_BURST', 15)
         
-        # Standard API limits
-        standard_rpm = _get_env_int('RATE_LIMIT_STANDARD_RPM', 120)
-        standard_burst = _get_env_int('RATE_LIMIT_STANDARD_BURST', 20)
+        # Standard API limits - higher for normal browsing
+        standard_rpm = _get_env_int('RATE_LIMIT_STANDARD_RPM', 300)
+        standard_burst = _get_env_int('RATE_LIMIT_STANDARD_BURST', 50)
         
         # Protocol limits (ACME, SCEP, OCSP, CDP)
         protocol_rpm = _get_env_int('RATE_LIMIT_PROTOCOL_RPM', 500)
@@ -77,6 +77,9 @@ class RateLimitConfig:
             '/api/v2/auth/login': {'rpm': auth_rpm, 'burst': auth_burst},
             '/api/v2/auth/register': {'rpm': auth_rpm // 2, 'burst': auth_burst - 1},
             '/api/v2/auth/reset-password': {'rpm': auth_rpm // 2, 'burst': auth_burst - 1},
+            # Public auth endpoints - no rate limit (read-only checks)
+            '/api/v2/auth/email-configured': {'rpm': 1000, 'burst': 100},
+            '/api/v2/sso/available': {'rpm': 1000, 'burst': 100},
             
             # Heavy operations - moderate limits
             '/api/v2/certificates/issue': {'rpm': heavy_rpm, 'burst': heavy_burst},

@@ -159,7 +159,7 @@ class AuthManager:
         try:
             # Get user
             user = User.query.get(payload['user_id'])
-            if not user or not user.is_active:
+            if not user or not user.active:
                 return None
             
             return {
@@ -255,7 +255,13 @@ class AuthManager:
         if expires_in is None:
             expires_in = self.jwt_expiry
         
-        exp = datetime.utcnow() + timedelta(seconds=expires_in)
+        # Handle both timedelta and int for expires_in
+        if isinstance(expires_in, timedelta):
+            exp = datetime.utcnow() + expires_in
+            expires_seconds = int(expires_in.total_seconds())
+        else:
+            exp = datetime.utcnow() + timedelta(seconds=expires_in)
+            expires_seconds = expires_in
         
         payload = {
             'user_id': user_id,
@@ -267,9 +273,30 @@ class AuthManager:
         
         return {
             'token': token,
-            'expires_in': expires_in,
+            'expires_in': expires_seconds,
             'expires_at': exp.isoformat()
         }
+
+
+def create_tokens_for_user(user):
+    """
+    Helper function to create JWT tokens for a user object.
+    Used by SSO callback to establish session.
+    
+    Args:
+        user: User model instance
+    
+    Returns:
+        dict: {'access_token': str, 'expires_in': int}
+    """
+    auth = AuthManager()
+    token_data = auth.create_jwt(user.id)
+    
+    return {
+        'access_token': token_data['token'],
+        'expires_in': token_data['expires_in'],
+        'user': user.to_dict() if hasattr(user, 'to_dict') else {'id': user.id, 'username': user.username}
+    }
 
 
 def require_auth(permissions=None):

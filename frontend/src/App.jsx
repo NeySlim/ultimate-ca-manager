@@ -63,6 +63,10 @@ function AppRoutes() {
           path="/login" 
           element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} 
         />
+        <Route 
+          path="/login/sso-complete" 
+          element={<LoginPage />} 
+        />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
