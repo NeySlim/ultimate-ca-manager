@@ -142,6 +142,27 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
     
+    # Version - single source of truth from frontend/package.json
+    @staticmethod
+    def _get_version():
+        """Read version from package.json - single source of truth"""
+        try:
+            import json
+            pkg_path = BASE_DIR / "frontend" / "package.json"
+            if pkg_path.exists():
+                with open(pkg_path) as f:
+                    return json.load(f).get("version", "2.0.0")
+            # Docker: package.json might be elsewhere
+            docker_pkg = Path("/app/frontend/package.json")
+            if docker_pkg.exists():
+                with open(docker_pkg) as f:
+                    return json.load(f).get("version", "2.0.0")
+        except Exception:
+            pass
+        return os.getenv("APP_VERSION", "2.0.0")
+    
+    APP_VERSION = _get_version.__func__()
+    
     # SECRET_KEY and JWT_SECRET_KEY validation - deferred to runtime
     _secret_key = os.getenv("SECRET_KEY")
     _jwt_secret = os.getenv("JWT_SECRET_KEY")

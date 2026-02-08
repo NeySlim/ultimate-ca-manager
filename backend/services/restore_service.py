@@ -16,6 +16,7 @@ from cryptography.hazmat.backends import default_backend
 from models import db, User, CA, Certificate, SystemConfig
 from models.acme_models import AcmeAccount
 from models.webauthn import WebAuthnCredential
+from config.settings import Config
 
 
 class RestoreService:
@@ -28,7 +29,7 @@ class RestoreService:
     SALT_SIZE = 32
     
     def __init__(self):
-        self.current_version = os.environ.get('APP_VERSION', '1.9.0')
+        self.current_version = Config.APP_VERSION
     
     def restore_backup(
         self,

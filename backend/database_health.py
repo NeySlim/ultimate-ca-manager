@@ -48,10 +48,11 @@ def check_and_repair_database(app):
 def ensure_system_config_defaults(app):
     """Ensure default system config entries exist - handles race conditions"""
     from sqlalchemy.exc import IntegrityError
+    from config.settings import Config
     
     defaults = [
         ('app.initialized', 'true', 'Application initialized'),
-        ('app.version', app.config.get('APP_VERSION', '1.8.0'), 'Application version'),
+        ('app.version', Config.APP_VERSION, 'Application version'),
         ('https.enabled', 'true', 'HTTPS enforcement enabled'),
     ]
     

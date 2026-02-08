@@ -11,6 +11,7 @@ from typing import Dict, Any, Tuple, Optional
 from models import db
 from services.acme import AcmeService
 from models.acme_models import AcmeAccount, AcmeOrder, AcmeChallenge
+from config.settings import Config
 
 # Create blueprint
 acme_bp = Blueprint('acme', __name__, url_prefix='/acme')
@@ -772,7 +773,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "service": "ACME Server",
-        "version": "1.8.0-beta",
+        "version": Config.APP_VERSION,
         "timestamp": datetime.utcnow().isoformat() + 'Z'
     })
 
