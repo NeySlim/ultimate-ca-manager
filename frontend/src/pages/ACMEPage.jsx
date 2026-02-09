@@ -13,7 +13,7 @@ import {
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, ArrowSquareOut, FilePem, LockKey
+  DownloadSimple, Eye, ArrowSquareOut, FilePem, LockKey, GlobeHemisphereWest
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -46,8 +46,10 @@ export default function ACMEPage() {
   const [clientSettings, setClientSettings] = useState({})
   const [dnsProviders, setDnsProviders] = useState([])
   const [dnsProviderTypes, setDnsProviderTypes] = useState([])
+  const [acmeDomains, setAcmeDomains] = useState([])
   const [selectedClientOrder, setSelectedClientOrder] = useState(null)
   const [selectedDnsProvider, setSelectedDnsProvider] = useState(null)
+  const [selectedAcmeDomain, setSelectedAcmeDomain] = useState(null)
   
   // UI states
   const [loading, setLoading] = useState(true)
@@ -57,6 +59,7 @@ export default function ACMEPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [showDnsProviderModal, setShowDnsProviderModal] = useState(false)
+  const [showDomainModal, setShowDomainModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [proxyEmail, setProxyEmail] = useState('')
   
@@ -75,7 +78,7 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
@@ -83,7 +86,8 @@ export default function ACMEPage() {
         acmeService.getClientOrders().catch(() => ({ data: [] })),
         acmeService.getClientSettings().catch(() => ({ data: {} })),
         acmeService.getDnsProviders().catch(() => ({ data: [] })),
-        acmeService.getDnsProviderTypes().catch(() => ({ data: [] }))
+        acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
+        acmeService.getDomains().catch(() => ({ data: [] }))
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
@@ -93,6 +97,7 @@ export default function ACMEPage() {
       setClientSettings(clientSettingsRes.data || {})
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
+      setAcmeDomains(domainsRes.data || [])
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.ACME)
     } finally {
@@ -373,6 +378,63 @@ export default function ACMEPage() {
     }
   }
 
+  // ==========================================================================
+  // ACME Domains Handlers
+  // ==========================================================================
+
+  const handleCreateDomain = async (data) => {
+    try {
+      await acmeService.createDomain(data)
+      showSuccess(t('acme.domainCreatedSuccess'))
+      setShowDomainModal(false)
+      setSelectedAcmeDomain(null)
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.domainCreateFailed'))
+    }
+  }
+
+  const handleUpdateDomain = async (data) => {
+    if (!selectedAcmeDomain) return
+    try {
+      await acmeService.updateDomain(selectedAcmeDomain.id, data)
+      showSuccess(t('acme.domainUpdatedSuccess'))
+      setShowDomainModal(false)
+      setSelectedAcmeDomain(null)
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.domainUpdateFailed'))
+    }
+  }
+
+  const handleDeleteDomain = async (domain) => {
+    const confirmed = await showConfirm(
+      t('acme.confirmDeleteDomain', { domain: domain.domain }),
+      {
+        title: t('acme.deleteDomain'),
+        confirmText: t('common.delete'),
+        variant: 'danger'
+      }
+    )
+    if (!confirmed) return
+    try {
+      await acmeService.deleteDomain(domain.id)
+      showSuccess(t('acme.domainDeletedSuccess'))
+      loadData()
+    } catch (error) {
+      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+    }
+  }
+
+  const handleTestDomainAccess = async (domain) => {
+    try {
+      const result = await acmeService.testDomainAccess(domain.domain)
+      showSuccess(result.message || t('acme.domainTestSuccess'))
+    } catch (error) {
+      showError(error.message || t('acme.domainTestFailed'))
+    }
+  }
+
   // Computed stats
   const stats = useMemo(() => ({
     total: accounts.length,
@@ -453,6 +515,7 @@ export default function ACMEPage() {
   const tabs = [
     { id: 'letsencrypt', label: t('acme.letsEncrypt'), icon: Globe },
     { id: 'dns', label: t('acme.dnsProviders'), icon: PlugsConnected, count: dnsProviders.length },
+    { id: 'domains', label: t('acme.domains'), icon: GlobeHemisphereWest, count: acmeDomains.length },
     { id: 'config', label: t('acme.server'), icon: Gear },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
     { id: 'history', label: t('acme.history'), icon: ClockCounterClockwise, count: history.length }
@@ -476,6 +539,12 @@ export default function ACMEPage() {
         <Button size="sm" onClick={() => setShowCreateModal(true)}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.newAccount')}</span>
+        </Button>
+      )}
+      {activeTab === 'domains' && (
+        <Button size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
+          <Plus size={14} />
+          <span className="hidden sm:inline">{t('acme.addDomain')}</span>
         </Button>
       )}
     </>
@@ -981,6 +1050,109 @@ export default function ACMEPage() {
             </Card>
           ))}
         </div>
+      )}
+    </div>
+  )
+
+  // Domains content - Map domains to DNS providers for ACME Proxy
+  const domainsContent = (
+    <div className="p-4 space-y-4">
+      <HelpCard variant="info" title={t('acme.domainsHelp')} compact>
+        {t('acme.domainsHelpDesc')}
+      </HelpCard>
+
+      {acmeDomains.length === 0 ? (
+        <Card className="p-8 text-center">
+          <GlobeHemisphereWest size={48} className="mx-auto text-text-tertiary mb-4" />
+          <h3 className="text-lg font-medium text-text-primary mb-2">
+            {t('acme.noDomainsYet')}
+          </h3>
+          <p className="text-sm text-text-secondary mb-4">
+            {t('acme.noDomainsDesc')}
+          </p>
+          <Button onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
+            <Plus size={14} />
+            {t('acme.addDomain')}
+          </Button>
+        </Card>
+      ) : (
+        <ResponsiveDataTable
+          data={acmeDomains}
+          columns={[
+            {
+              key: 'domain',
+              label: t('acme.domain'),
+              sortable: true,
+              render: (val) => (
+                <span className="font-mono text-sm">{val}</span>
+              )
+            },
+            {
+              key: 'dns_provider_name',
+              label: t('acme.dnsProvider'),
+              sortable: true,
+              render: (val, row) => (
+                <div className="flex items-center gap-2">
+                  <PlugsConnected size={14} className="text-accent-primary" />
+                  <span>{val || row.dns_provider_type}</span>
+                </div>
+              )
+            },
+            {
+              key: 'is_wildcard_allowed',
+              label: t('acme.wildcard'),
+              render: (val) => (
+                <Badge variant={val ? 'success' : 'secondary'}>
+                  {val ? t('common.yes') : t('common.no')}
+                </Badge>
+              )
+            },
+            {
+              key: 'auto_approve',
+              label: t('acme.autoApprove'),
+              render: (val) => (
+                <Badge variant={val ? 'success' : 'warning'}>
+                  {val ? t('common.auto') : t('common.manual')}
+                </Badge>
+              )
+            },
+            {
+              key: 'actions',
+              label: '',
+              render: (_, row) => (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); handleTestDomainAccess(row) }}
+                    title={t('acme.testDnsAccess')}
+                  >
+                    <Play size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); setSelectedAcmeDomain(row); setShowDomainModal(true) }}
+                    title={t('common.edit')}
+                  >
+                    <Gear size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteDomain(row) }}
+                    title={t('common.delete')}
+                    className="text-status-error hover:text-status-error"
+                  >
+                    <Trash size={14} />
+                  </Button>
+                </div>
+              )
+            }
+          ]}
+          onRowClick={(row) => { setSelectedAcmeDomain(row); setShowDomainModal(true) }}
+          emptyMessage={t('acme.noDomains')}
+        />
       )}
     </div>
   )
@@ -1593,6 +1765,7 @@ export default function ACMEPage() {
       >
         {activeTab === 'letsencrypt' && letsEncryptContent}
         {activeTab === 'dns' && dnsProvidersContent}
+        {activeTab === 'domains' && domainsContent}
         {activeTab === 'config' && configContent}
         {activeTab === 'accounts' && accountsContent}
         {activeTab === 'history' && historyContent}
@@ -1637,6 +1810,20 @@ export default function ACMEPage() {
           providerTypes={dnsProviderTypes}
           onSubmit={handleSaveDnsProvider}
           onCancel={() => { setShowDnsProviderModal(false); setSelectedDnsProvider(null) }}
+        />
+      </Modal>
+
+      {/* Domain Modal */}
+      <Modal
+        open={showDomainModal}
+        onClose={() => { setShowDomainModal(false); setSelectedAcmeDomain(null) }}
+        title={selectedAcmeDomain ? t('acme.editDomain') : t('acme.addDomain')}
+      >
+        <DomainForm
+          domain={selectedAcmeDomain}
+          dnsProviders={dnsProviders}
+          onSubmit={selectedAcmeDomain ? handleUpdateDomain : handleCreateDomain}
+          onCancel={() => { setShowDomainModal(false); setSelectedAcmeDomain(null) }}
         />
       </Modal>
     </>
@@ -1969,6 +2156,83 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
         <Button type="submit">
           <FloppyDisk size={14} />
           {provider ? t('acme.update') : t('acme.create')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// Domain Form Component
+function DomainForm({ domain, dnsProviders, onSubmit, onCancel }) {
+  const { t } = useTranslation()
+  const [formData, setFormData] = useState({
+    domain: domain?.domain || '',
+    dns_provider_id: domain?.dns_provider_id || (dnsProviders[0]?.id || ''),
+    is_wildcard_allowed: domain?.is_wildcard_allowed ?? true,
+    auto_approve: domain?.auto_approve ?? true,
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <Input
+        label={t('acme.domainName')}
+        value={formData.domain}
+        onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value.toLowerCase() }))}
+        required
+        placeholder="example.com"
+        helperText={t('acme.domainNameHelper')}
+        disabled={!!domain}
+      />
+      
+      <Select
+        label={t('acme.dnsProvider')}
+        value={formData.dns_provider_id}
+        onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: parseInt(val) }))}
+        options={dnsProviders.map(p => ({
+          value: p.id,
+          label: `${p.name} (${p.provider_type})`
+        }))}
+        required
+      />
+
+      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+        <input
+          type="checkbox"
+          checked={formData.is_wildcard_allowed}
+          onChange={(e) => setFormData(prev => ({ ...prev, is_wildcard_allowed: e.target.checked }))}
+          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+        />
+        <div>
+          <span className="text-sm text-text-primary">{t('acme.allowWildcard')}</span>
+          <p className="text-xs text-text-tertiary">{t('acme.allowWildcardDesc')}</p>
+        </div>
+      </label>
+
+      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+        <input
+          type="checkbox"
+          checked={formData.auto_approve}
+          onChange={(e) => setFormData(prev => ({ ...prev, auto_approve: e.target.checked }))}
+          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+        />
+        <div>
+          <span className="text-sm text-text-primary">{t('acme.autoApproveRequests')}</span>
+          <p className="text-xs text-text-tertiary">{t('acme.autoApproveDesc')}</p>
+        </div>
+      </label>
+      
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit">
+          <FloppyDisk size={14} />
+          {domain ? t('common.update') : t('common.create')}
         </Button>
       </div>
     </form>
