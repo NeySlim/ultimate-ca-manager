@@ -19,6 +19,7 @@ from models.auth_certificate import AuthCertificate
 from models.crl import CRLMetadata
 from models.ocsp import OCSPResponse
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
+from models.hsm import HsmProvider, HsmKey
 
 
 class UserSession(db.Model):
@@ -936,5 +937,5 @@ __all__ = [
     "db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", 
     "AuditLog", "CRLMetadata", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce",
-    "DnsProvider", "AcmeClientOrder", "AcmeDomain"
+    "DnsProvider", "AcmeClientOrder", "AcmeDomain", "HsmProvider", "HsmKey"
 ]
