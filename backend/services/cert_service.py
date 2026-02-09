@@ -113,11 +113,14 @@ class CertificateService:
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         
         # Decrypt CA private key if encrypted
-        ca_prv_decrypted = decrypt_private_key(ca.prv)
-        ca_key_pem = base64.b64decode(ca_prv_decrypted)
-        ca_private_key = serialization.load_pem_private_key(
-            ca_key_pem, password=None, backend=default_backend()
-        )
+        try:
+            ca_prv_decrypted = decrypt_private_key(ca.prv)
+            ca_key_pem = base64.b64decode(ca_prv_decrypted)
+            ca_private_key = serialization.load_pem_private_key(
+                ca_key_pem, password=None, backend=default_backend()
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to load CA private key: {e}. Check that KEY_ENCRYPTION_KEY is set correctly.")
         
         # Build subject
         subject = TrustStoreService.build_subject(dn)

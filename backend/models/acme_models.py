@@ -341,6 +341,7 @@ class AcmeClientOrder(db.Model):
     dns_records_created = db.Column(db.Text)  # JSON array of record IDs
     client_jwk_thumbprint = db.Column(db.String(64))
     upstream_order_url = db.Column(db.Text)
+    upstream_authz_urls = db.Column(db.Text)  # JSON array of authorization URLs
     
     # Timestamps
     expires_at = db.Column(db.DateTime)  # Order expiration

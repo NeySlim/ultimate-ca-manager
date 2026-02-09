@@ -35,8 +35,8 @@ def get_acme_settings():
             # Try by ID
             try:
                 ca = CA.query.get(int(ca_id))
-            except:
-                pass
+            except (ValueError, TypeError):
+                pass  # ca_id is not a valid integer
         if ca:
             ca_name = ca.common_name
     
