@@ -16,6 +16,7 @@
   --accent-success: #34D399;
   --accent-warning: #FBBF24;
   --accent-danger: #F87171;
+  --accent-purple: #A78BFA;
   --border: #3A4555;
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.12);
@@ -126,6 +127,7 @@
   --accent-success: #10B981;
   --accent-warning: #F59E0B;
   --accent-danger: #EF4444;
+  --accent-purple: #8B5CF6;
   --border: #E5E7EB;
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-strong: rgba(0, 0, 0, 0.12);
@@ -463,10 +465,10 @@ html, body, #root {
 }
 
 /* Purple (HSM/special) */
-.status-purple-bg { background-color: color-mix(in srgb, var(--accent-pro) 15%, transparent); }
-.status-purple-bg-solid { background-color: var(--accent-pro); }
-.status-purple-text { color: var(--accent-pro); }
-.status-purple-border { border-color: color-mix(in srgb, var(--accent-pro) 30%, transparent); }
+.status-purple-bg { background-color: color-mix(in srgb, var(--accent-purple) 15%, transparent); }
+.status-purple-bg-solid { background-color: var(--accent-purple); }
+.status-purple-text { color: var(--accent-purple); }
+.status-purple-border { border-color: color-mix(in srgb, var(--accent-purple) 30%, transparent); }
 
 /* Orange (expiring soon) */
 .status-orange-bg { background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent); }
@@ -493,7 +495,7 @@ html, body, #root {
 .border-l-accent-warning { border-left-color: var(--accent-warning); }
 .border-l-accent-danger { border-left-color: var(--accent-danger); }
 .border-l-accent-primary { border-left-color: var(--accent-primary); }
-.border-l-accent-purple { border-left-color: var(--accent-pro); }
+.border-l-accent-purple { border-left-color: var(--accent-purple); }
 
 /* Combined bg+text utility classes */
 .status-success-badge { @apply status-success-bg status-success-text status-success-border border; }
@@ -1284,8 +1286,8 @@ input:focus, select:focus, textarea:focus {
   color: var(--accent-danger);
 }
 .icon-box-purple {
-  background: color-mix(in srgb, var(--accent-pro) 15%, transparent);
-  color: var(--accent-pro);
+  background: color-mix(in srgb, var(--accent-purple) 15%, transparent);
+  color: var(--accent-purple);
 }
 .icon-box-neutral {
   background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);

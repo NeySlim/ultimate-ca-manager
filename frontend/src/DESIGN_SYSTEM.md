@@ -46,7 +46,7 @@
 | Token | Usage |
 |-------|-------|
 | `text-accent-primary` / `bg-accent-primary` | Primary actions, links |
-| `text-accent-pro` / `bg-accent-pro` | Pro features badge |
+| `text-accent-secondary` / `bg-accent-secondary` | Secondary highlights |
 
 ### Status with Opacity
 ```jsx

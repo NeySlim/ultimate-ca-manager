@@ -88,7 +88,7 @@ function AppRoutes() {
           <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
           <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
           
-          {/* Pro Routes */}
+          {/* Security & Administration */}
           <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />
           <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
