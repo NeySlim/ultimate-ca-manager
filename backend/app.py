@@ -547,6 +547,9 @@ def init_database(app):
                 ('entry_hash', 'VARCHAR(64)', None),
                 ('prev_hash', 'VARCHAR(64)', None),
             ],
+            'notification_log': [
+                ('retry_count', 'INTEGER', '0'),
+            ],
         }
         
         for table, columns in expected_columns.items():
