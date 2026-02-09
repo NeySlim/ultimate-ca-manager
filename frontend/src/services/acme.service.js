@@ -113,6 +113,10 @@ export const acmeService = {
     return apiClient.delete(`/acme/client/orders/${orderId}`)
   },
 
+  async deleteOrder(orderId) {
+    return apiClient.delete(`/acme/client/orders/${orderId}`)
+  },
+
   // =========================================================================
   // DNS Providers
   // =========================================================================
