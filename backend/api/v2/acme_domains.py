@@ -77,7 +77,7 @@ def create_domain():
     return success_response(
         data=domain.to_dict(),
         message=f'Domain {domain_name} registered successfully',
-        status_code=201
+        status=201
     )
 
 
