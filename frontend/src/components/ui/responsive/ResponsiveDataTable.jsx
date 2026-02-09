@@ -370,7 +370,11 @@ export function ResponsiveDataTable({
   // Build pagination props for PaginationBar
   const paginationProps = useMemo(() => {
     if (useExternalPagination) {
-      return pagination
+      // Normalize: accept both onChange and onPageChange for compatibility
+      return {
+        ...pagination,
+        onChange: pagination.onChange || pagination.onPageChange
+      }
     }
     if (useAutoPagination) {
       return {
