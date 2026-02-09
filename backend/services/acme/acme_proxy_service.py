@@ -489,9 +489,10 @@ class AcmeProxyService:
         return order
 
     def get_certificate(self, cert_id_b64):
-        """Proxy certificate download with DNS cleanup"""
-        from models import AcmeClientOrder
+        """Proxy certificate download with DNS cleanup and storage"""
+        from models import AcmeClientOrder, Certificate
         from services.acme.dns_providers import create_provider
+        from services.cert_service import CertificateService
         
         cert_id_b64_padded = cert_id_b64 + '=' * (4 - len(cert_id_b64) % 4)
         cert_url = base64.urlsafe_b64decode(cert_id_b64_padded).decode()
@@ -502,8 +503,43 @@ class AcmeProxyService:
         link_header = resp.headers.get('Link')
         
         if resp.status_code == 200:
-            # Certificate obtained successfully - cleanup DNS records
-            # Find the order and cleanup
+            # Certificate obtained successfully
+            cert_pem = resp.content.decode('utf-8') if isinstance(resp.content, bytes) else resp.content
+            
+            # Store the certificate in the database
+            try:
+                # The response usually contains full chain, extract first cert
+                certs = cert_pem.split('-----END CERTIFICATE-----')
+                if certs and certs[0].strip():
+                    first_cert = certs[0].strip() + '\n-----END CERTIFICATE-----\n'
+                    # Build chain from remaining certs
+                    remaining = [c.strip() + '\n-----END CERTIFICATE-----\n' for c in certs[1:] if c.strip()]
+                    chain = ''.join(remaining) if remaining else None
+                    
+                    # Extract CN for description
+                    from cryptography import x509
+                    cert_obj = x509.load_pem_x509_certificate(first_cert.encode(), default_backend())
+                    cn = cert_obj.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+                    descr = cn[0].value if cn else "Let's Encrypt Certificate"
+                    
+                    print(f"[ACME Proxy] Storing LE certificate: {descr}")
+                    
+                    # Import the certificate with source='letsencrypt'
+                    stored_cert = CertificateService.import_certificate(
+                        descr=descr,
+                        cert_pem=first_cert,
+                        chain_pem=chain,
+                        source='letsencrypt',
+                        username='acme_proxy'
+                    )
+                    print(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
+            except Exception as e:
+                # Log but don't fail - cert was obtained
+                print(f"[ACME Proxy] Error storing certificate: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            # Cleanup DNS records
             order = AcmeClientOrder.query.filter(
                 AcmeClientOrder.is_proxy_order == True,
                 AcmeClientOrder.status == 'pending'

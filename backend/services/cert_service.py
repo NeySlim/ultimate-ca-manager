@@ -427,7 +427,9 @@ class CertificateService:
         descr: str,
         cert_pem: str,
         key_pem: Optional[str] = None,
-        username: str = 'system'
+        username: str = 'system',
+        source: str = None,
+        chain_pem: str = None
     ) -> Certificate:
         """
         Import an existing certificate
@@ -468,11 +470,15 @@ class CertificateService:
         except x509.ExtensionNotFound:
             pass  # No SAN extension
         
-        # Create certificate record
+        # Create certificate record - include chain in crt if provided
+        full_cert = cert_pem
+        if chain_pem:
+            full_cert = cert_pem.strip() + '\n' + chain_pem.strip()
+        
         certificate = Certificate(
             refid=str(uuid.uuid4()),
             descr=descr,
-            crt=base64.b64encode(cert_pem.encode() if isinstance(cert_pem, str) else cert_pem).decode('utf-8'),
+            crt=base64.b64encode(full_cert.encode() if isinstance(full_cert, str) else full_cert).decode('utf-8'),
             prv=base64.b64encode(key_pem.encode()).decode('utf-8') if key_pem else None,
             subject=cert.subject.rfc4514_string(),
             issuer=cert.issuer.rfc4514_string(),
@@ -484,7 +490,8 @@ class CertificateService:
             san_ip=json.dumps(san_ip_list) if san_ip_list else None,
             san_email=json.dumps(san_email_list) if san_email_list else None,
             san_uri=json.dumps(san_uri_list) if san_uri_list else None,
-            imported_from='manual',
+            imported_from='manual' if not source else source,
+            source=source,
             created_by=username
         )
         
