@@ -19,6 +19,9 @@ from .hetzner import HetznerDnsProvider
 from .gandi import GandiDnsProvider
 from .digitalocean import DigitalOceanDnsProvider
 from .infomaniak import InfomaniakDnsProvider
+from .route53 import Route53DnsProvider
+from .scaleway import ScalewayDnsProvider
+from .ionos import IonosDnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +37,12 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'hetzner': HetznerDnsProvider,
     'gandi': GandiDnsProvider,
     'infomaniak': InfomaniakDnsProvider,
+    'scaleway': ScalewayDnsProvider,
+    'ionos': IonosDnsProvider,
     # International providers
     'cloudflare': CloudflareDnsProvider,
     'digitalocean': DigitalOceanDnsProvider,
-    # Future providers (uncomment when implemented)
-    # 'route53': Route53DnsProvider,
-    # 'bookmyname': BookMyNameDnsProvider,
-    # 'scaleway': ScalewayDnsProvider,
-    # 'ionos': IonosDnsProvider,
+    'route53': Route53DnsProvider,
 }
 
 
