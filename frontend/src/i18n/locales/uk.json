@@ -631,6 +631,9 @@
     "daysAgo": "{{count}}d ago",
     "unknown": "Unknown",
     "unnamed": "Unnamed",
+    "set": "Встановлено",
+    "configured": "Налаштовано",
+    "enterNewToChange": "Введіть нове значення для зміни",
     "na": "N/A"
   },
   "compare": {

@@ -1,10 +1,12 @@
 /**
  * Input Component - Text input with label, error, and enhanced focus
  * Supports password fields with show/hide toggle and strength indicator
+ * Supports credential fields with "already set" indicator
  */
 import { forwardRef, useState, useMemo } from 'react'
-import { Eye, EyeSlash } from '@phosphor-icons/react'
+import { Eye, EyeSlash, CheckCircle } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
+import { useTranslation } from 'react-i18next'
 
 // Password strength calculation
 const getPasswordStrength = (password) => {
@@ -37,8 +39,10 @@ export const Input = forwardRef(function Input({
   className,
   type,
   showStrength,
+  hasExistingValue,  // Shows "Set" badge and "enter new to change" hint
   ...props 
 }, ref) {
+  const { t } = useTranslation()
   const [showPassword, setShowPassword] = useState(false)
   const [internalValue, setInternalValue] = useState('')
   
@@ -56,12 +60,25 @@ export const Input = forwardRef(function Input({
     return getPasswordStrength(props.value ?? internalValue)
   }, [isPassword, showStrength, props.value, internalValue])
 
+  // Determine placeholder for existing secret values
+  const effectivePlaceholder = hasExistingValue && isPassword && !props.placeholder
+    ? '••••••••••••'
+    : props.placeholder
+
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
         <label className="block text-xs font-medium text-text-secondary">
-          {label}
-          {props.required && <span className="status-danger-text ml-1">*</span>}
+          <span className="flex items-center gap-2">
+            {typeof label === 'string' ? label : label}
+            {hasExistingValue && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-status-success/20 text-status-success rounded">
+                <CheckCircle size={10} weight="fill" />
+                {t('common.set')}
+              </span>
+            )}
+          </span>
+          {props.required && !hasExistingValue && <span className="status-danger-text ml-1">*</span>}
         </label>
       )}
       
@@ -94,6 +111,8 @@ export const Input = forwardRef(function Input({
             e.target.style.boxShadow = '';
           }}
           onChange={handleChange}
+          placeholder={effectivePlaceholder}
+          required={props.required && !hasExistingValue}
           {...props}
         />
         
@@ -134,7 +153,12 @@ export const Input = forwardRef(function Input({
         <p className="text-xs status-danger-text">{error}</p>
       )}
       
-      {helperText && !error && (
+      {/* Helper text - show "enter new to change" for existing values */}
+      {hasExistingValue && !error && (
+        <p className="text-xs text-text-tertiary italic">{t('common.enterNewToChange')}</p>
+      )}
+      
+      {helperText && !error && !hasExistingValue && (
         <p className="text-xs text-text-tertiary">{helperText}</p>
       )}
     </div>

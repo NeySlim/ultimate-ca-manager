@@ -631,6 +631,9 @@
     "daysAgo": "{{count}}d ago",
     "unknown": "Unknown",
     "unnamed": "Unnamed",
+    "set": "已设置",
+    "configured": "已配置",
+    "enterNewToChange": "输入新值以更改",
     "na": "N/A"
   },
   "compare": {

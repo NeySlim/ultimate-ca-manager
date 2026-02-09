@@ -557,7 +557,7 @@ function ProviderModal({ provider, onSave, onClose }) {
             <Input label={t('hsm.pkcs11Config.slotId')} type="number" value={formData.pkcs11_slot_id} onChange={e => handleChange('pkcs11_slot_id', e.target.value ? parseInt(e.target.value) : '')} />
             <Input label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
           </div>
-          <Input label={t('hsm.pkcs11Config.pin')} type="password" value={formData.pkcs11_pin} onChange={e => handleChange('pkcs11_pin', e.target.value)} placeholder={provider ? t('hsm.pkcs11Config.pinKeep') : ''} />
+          <Input label={t('hsm.pkcs11Config.pin')} type="password" value={formData.pkcs11_pin === '***' ? '' : (formData.pkcs11_pin || '')} onChange={e => handleChange('pkcs11_pin', e.target.value)} hasExistingValue={provider?.pkcs11_pin === '***'} />
         </div>
       )}
 
@@ -569,11 +569,11 @@ function ProviderModal({ provider, onSave, onClose }) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.awsConfig.accessKey')} value={formData.aws_access_key} onChange={e => handleChange('aws_access_key', e.target.value)} />
-            <Input label={t('hsm.awsConfig.secretKey')} type="password" value={formData.aws_secret_key} onChange={e => handleChange('aws_secret_key', e.target.value)} />
+            <Input label={t('hsm.awsConfig.secretKey')} type="password" value={formData.aws_secret_key === '***' ? '' : (formData.aws_secret_key || '')} onChange={e => handleChange('aws_secret_key', e.target.value)} hasExistingValue={provider?.aws_secret_key === '***'} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.awsConfig.cryptoUser')} value={formData.aws_crypto_user} onChange={e => handleChange('aws_crypto_user', e.target.value)} />
-            <Input label={t('hsm.awsConfig.cryptoPassword')} type="password" value={formData.aws_crypto_password} onChange={e => handleChange('aws_crypto_password', e.target.value)} />
+            <Input label={t('hsm.awsConfig.cryptoPassword')} type="password" value={formData.aws_crypto_password === '***' ? '' : (formData.aws_crypto_password || '')} onChange={e => handleChange('aws_crypto_password', e.target.value)} hasExistingValue={provider?.aws_crypto_password === '***'} />
           </div>
         </div>
       )}
@@ -585,7 +585,7 @@ function ProviderModal({ provider, onSave, onClose }) {
             <Input label={t('hsm.azureConfig.tenantId')} value={formData.azure_tenant_id} onChange={e => handleChange('azure_tenant_id', e.target.value)} />
             <Input label={t('hsm.azureConfig.clientId')} value={formData.azure_client_id} onChange={e => handleChange('azure_client_id', e.target.value)} />
           </div>
-          <Input label={t('hsm.azureConfig.clientSecret')} type="password" value={formData.azure_client_secret} onChange={e => handleChange('azure_client_secret', e.target.value)} />
+          <Input label={t('hsm.azureConfig.clientSecret')} type="password" value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} />
         </div>
       )}
 

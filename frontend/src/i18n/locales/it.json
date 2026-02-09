@@ -631,6 +631,9 @@
     "daysAgo": "{{count}}d ago",
     "unknown": "Unknown",
     "unnamed": "Unnamed",
+    "set": "Impostato",
+    "configured": "Configurato",
+    "enterNewToChange": "Inserisci un nuovo valore per modificare",
     "na": "N/A"
   },
   "compare": {
