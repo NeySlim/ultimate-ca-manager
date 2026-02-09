@@ -376,6 +376,7 @@ def get_acme_history():
             'serial': cert.serial_number,
             'issuer': issuer_name,
             'source': cert.source,
+            'status': order_data.get('status', 'valid'),  # Default to 'valid' if cert exists
             'challenge_type': order_data.get('challenge_type'),
             'environment': order_data.get('environment'),
             'dns_provider': order_data.get('dns_provider'),
