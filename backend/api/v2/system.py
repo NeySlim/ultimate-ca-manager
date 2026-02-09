@@ -965,6 +965,15 @@ def rotate_secrets():
             # Write updated .env
             env_path.write_text('\n'.join(new_lines) + '\n')
             
+            # Save rotation timestamp to data file
+            import json
+            rotation_file = Path('/opt/ucm/data/jwt_rotation.json')
+            rotation_file.parent.mkdir(parents=True, exist_ok=True)
+            rotation_file.write_text(json.dumps({
+                'rotated_at': datetime.now().isoformat(),
+                'previous_expires_hours': 24
+            }))
+            
             # Log the rotation
             from services.audit_service import AuditService
             AuditService.log_action(
@@ -992,7 +1001,8 @@ def rotate_secrets():
                 data={
                     'rotated': True,
                     'backup': str(backup_path),
-                    'note': 'Service is restarting. You will need to log in again.'
+                    'previous_expires_in': '24 hours',
+                    'note': 'Service is restarting. You will need to log in again. Old tokens remain valid for 24 hours.'
                 },
                 message='JWT secret rotated successfully. Service restarting.'
             )
@@ -1032,17 +1042,38 @@ def rotate_secrets():
 def secrets_status():
     """Get status of secret keys (without revealing them)"""
     from config.settings import Config
+    import json
+    from datetime import datetime, timedelta
     
     jwt_configured = bool(os.getenv('JWT_SECRET_KEY')) and Config.JWT_SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
     jwt_previous = bool(os.getenv('JWT_SECRET_KEY_PREVIOUS'))
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
     encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY'))
     
+    # Check rotation timestamp from data file
+    rotation_info = {}
+    rotation_file = Path('/opt/ucm/data/jwt_rotation.json')
+    if rotation_file.exists():
+        try:
+            rotation_info = json.loads(rotation_file.read_text())
+        except:
+            pass
+    
+    rotated_at = rotation_info.get('rotated_at')
+    expires_previous = None
+    if rotated_at and jwt_previous:
+        rotated_dt = datetime.fromisoformat(rotated_at)
+        # Previous key expires 24 hours after rotation
+        expires_dt = rotated_dt + timedelta(hours=24)
+        expires_previous = expires_dt.isoformat()
+    
     return success_response(data={
         'jwt_secret': {
             'configured': jwt_configured,
             'has_previous': jwt_previous,
-            'rotation_in_progress': jwt_previous
+            'rotated_at': rotated_at,
+            'previous_expires_at': expires_previous,
+            'rotation_in_progress': False
         },
         'session_secret': {
             'configured': session_configured

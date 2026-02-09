@@ -151,10 +151,12 @@ export default function SecurityDashboardPage() {
                   <div className="text-sm text-text-secondary">
                     {secretsStatus.jwt_secret?.configured ? t('securityDashboard.secrets.configured') : t('securityDashboard.secrets.notConfigured')}
                   </div>
-                  {secretsStatus.jwt_secret?.rotation_in_progress && (
-                    <div className="mt-1 text-xs text-status-warning flex items-center gap-1">
-                      <ArrowsClockwise size={12} className="animate-spin" />
-                      {t('securityDashboard.secrets.rotationInProgress')}
+                  {secretsStatus.jwt_secret?.has_previous && secretsStatus.jwt_secret?.previous_expires_at && (
+                    <div className="mt-1 text-xs text-status-info flex items-center gap-1">
+                      <Clock size={12} />
+                      {t('securityDashboard.secrets.previousKeyExpires', { 
+                        date: new Date(secretsStatus.jwt_secret.previous_expires_at).toLocaleString() 
+                      })}
                     </div>
                   )}
                 </div>

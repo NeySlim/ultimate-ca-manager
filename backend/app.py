@@ -367,6 +367,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register JWT rotation cleanup task (runs hourly)
+        try:
+            from services.jwt_rotation_service import scheduled_jwt_cleanup
+            scheduler.register_task(
+                name="jwt_rotation_cleanup",
+                func=scheduled_jwt_cleanup,
+                interval=3600,  # 1 hour
+                description="Clean up previous JWT key after rotation grace period"
+            )
+            app.logger.info("Registered JWT rotation cleanup task (hourly)")
+        except ImportError:
+            pass
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
         app.logger.info("Scheduler service started with all tasks")

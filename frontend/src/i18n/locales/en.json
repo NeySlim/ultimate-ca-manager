@@ -1855,7 +1855,8 @@
       "notSet": "Not set (keys encrypted)",
       "rotationInProgress": "Rotation in progress",
       "rotationSuccess": "New secret generated - follow instructions to apply",
-      "rotationInstructions": "Rotation Instructions"
+      "rotationInstructions": "Rotation Instructions",
+      "previousKeyExpires": "Previous key expires: {{date}}"
     },
     "audit": {
       "integrityVerified": "Integrity Verified",
