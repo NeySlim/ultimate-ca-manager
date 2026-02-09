@@ -717,6 +717,7 @@
     "server": "Local ACME",
     "letsEncryptAbout": "Let's Encrypt Certificates",
     "letsEncryptAboutDesc": "Request free SSL/TLS certificates from Let's Encrypt. Certificates are valid for 90 days and can be automatically renewed.",
+    "viewHistoryForCertificates": "Issued certificates are displayed in the History tab.",
     "requestCertificate": "Request Certificate",
     "requestCertificateTitle": "Request Let's Encrypt Certificate",
     "noClientOrders": "No certificate requests",
