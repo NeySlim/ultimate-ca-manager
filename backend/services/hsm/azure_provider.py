@@ -28,13 +28,14 @@ try:
     AZURE_AVAILABLE = True
     
     # Algorithm mappings (only defined if azure is available)
+    # Note: Azure SDK uses p_256, p_384, p_521 (with underscore)
     ALGORITHM_TO_AZURE = {
         'RSA-2048': (KeyType.rsa_hsm, 2048),
         'RSA-3072': (KeyType.rsa_hsm, 3072),
         'RSA-4096': (KeyType.rsa_hsm, 4096),
-        'EC-P256': (KeyType.ec_hsm, KeyCurveName.p256),
-        'EC-P384': (KeyType.ec_hsm, KeyCurveName.p384),
-        'EC-P521': (KeyType.ec_hsm, KeyCurveName.p521),
+        'EC-P256': (KeyType.ec_hsm, KeyCurveName.p_256),
+        'EC-P384': (KeyType.ec_hsm, KeyCurveName.p_384),
+        'EC-P521': (KeyType.ec_hsm, KeyCurveName.p_521),
     }
     
     # Signature algorithms
@@ -198,9 +199,9 @@ class AzureKeyVaultProvider(BaseHsmProvider):
             elif key_type in (KeyType.ec, KeyType.ec_hsm):
                 curve = key.key.crv if hasattr(key.key, 'crv') else 'P-256'
                 curve_map = {
-                    KeyCurveName.p256: 'EC-P256',
-                    KeyCurveName.p384: 'EC-P384',
-                    KeyCurveName.p521: 'EC-P521',
+                    KeyCurveName.p_256: 'EC-P256',
+                    KeyCurveName.p_384: 'EC-P384',
+                    KeyCurveName.p_521: 'EC-P521',
                     'P-256': 'EC-P256',
                     'P-384': 'EC-P384',
                     'P-521': 'EC-P521',
@@ -323,9 +324,9 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                 from cryptography.hazmat.primitives.asymmetric import ec
                 
                 curve_map = {
-                    KeyCurveName.p256: ec.SECP256R1(),
-                    KeyCurveName.p384: ec.SECP384R1(),
-                    KeyCurveName.p521: ec.SECP521R1(),
+                    KeyCurveName.p_256: ec.SECP256R1(),
+                    KeyCurveName.p_384: ec.SECP384R1(),
+                    KeyCurveName.p_521: ec.SECP521R1(),
                 }
                 
                 x = int.from_bytes(jwk.x, 'big')
