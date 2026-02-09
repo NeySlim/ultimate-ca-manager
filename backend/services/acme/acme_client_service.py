@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from models import db, SystemConfig, Certificate, DnsProvider, AcmeClientOrder
 from services.acme.dns_providers import create_provider, get_provider_class
+from utils.safe_requests import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class AcmeClientService:
         self.directory = None
         self.account_key = None
         self.account_url = None
-        self.session = requests.Session()
+        self.session = create_session()
         self.session.headers['User-Agent'] = 'UCM-ACME-Client/2.1'
         
     # =========================================================================

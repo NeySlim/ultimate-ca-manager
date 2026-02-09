@@ -3,21 +3,17 @@ OPNsense Import Service
 Generic service to import CAs and Certificates from OPNsense Trust module
 Configurable via API for any OPNsense instance
 """
-import requests
 import base64
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import urllib3
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import db, CA, Certificate, SystemConfig
-
-# Disable SSL warnings for self-signed certs
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from utils.safe_requests import create_session
 
 
 class OPNsenseImportService:
@@ -64,8 +60,7 @@ class OPNsenseImportService:
         """
         import sys
         try:
-            self.session = requests.Session()
-            self.session.verify = self.verify_ssl
+            self.session = create_session(verify_ssl=self.verify_ssl)
             
             sys.stderr.write(f"DEBUG OPNsense connect: Trying {self.base_url} (API mode: {self.use_api})\n")
             sys.stderr.flush()

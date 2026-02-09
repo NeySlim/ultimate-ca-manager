@@ -5,12 +5,12 @@ https://freedns.afraid.org/
 
 Based on: https://gist.github.com/AnthonyWharton/a0e8faae7195a5c1dea210466eda1c92
 """
-import requests
 import re
 from typing import Tuple, Dict, Any, Optional
 import logging
 
 from .base import BaseDnsProvider
+from utils.safe_requests import create_session
 
 logger = logging.getLogger(__name__)
 
@@ -39,17 +39,17 @@ class FreeDnsDnsProvider(BaseDnsProvider):
         self._domain_cache: Dict[str, str] = {}  # domain -> domain_id
         self._txt_record_cache: Dict[str, str] = {}  # record_name -> data_id
     
-    def _get_session(self) -> requests.Session:
+    def _get_session(self):
         """Get or create authenticated session"""
         if self._session is None:
-            self._session = requests.Session()
+            self._session = create_session()
             self._login()
         return self._session
     
     def _login(self) -> Tuple[bool, str]:
         """Login to FreeDNS"""
         if self._session is None:
-            self._session = requests.Session()
+            self._session = create_session()
         
         try:
             response = self._session.post(

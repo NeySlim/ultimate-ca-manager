@@ -2,6 +2,11 @@
 # This file is used when gunicorn is started with -c gunicorn_config.py
 # For systemd service, configuration is in /etc/systemd/system/ucm.service
 
+# Monkey-patch BEFORE any other imports to avoid gevent + Python 3.13
+# SSLContext/SSLSocket recursion bugs (super() closure captures wrong class)
+from gevent import monkey
+monkey.patch_all()
+
 import multiprocessing
 import os
 
@@ -53,37 +58,6 @@ tmp_upload_dir = None
 def on_starting(server):
     """Called just before the master process is initialized."""
     server.log.info("Starting UCM with Gunicorn")
-
-def post_worker_init(worker):
-    """Called just after a worker has initialized the application.
-    
-    Fix gevent + Python 3.13 SSLContext.minimum_version recursion bug.
-    gevent monkey-patches ssl.SSLContext, causing the property setter
-    to infinitely recurse through super() between gevent and stdlib classes.
-    """
-    import ssl
-    if hasattr(ssl, '_SSLContext') and ssl.SSLContext is not ssl._SSLContext:
-        _CBase = ssl._SSLContext
-        _min_desc = _CBase.__dict__.get('minimum_version')
-        _max_desc = _CBase.__dict__.get('maximum_version')
-        
-        if _min_desc is not None:
-            def _safe_set_min(self, value):
-                _min_desc.__set__(self, value)
-            
-            cur = type.__dict__['__dict__'].__get__(ssl.SSLContext).get('minimum_version')
-            if cur and hasattr(cur, 'fget'):
-                ssl.SSLContext.minimum_version = cur.setter(_safe_set_min)
-        
-        if _max_desc is not None:
-            def _safe_set_max(self, value):
-                _max_desc.__set__(self, value)
-            
-            cur = type.__dict__['__dict__'].__get__(ssl.SSLContext).get('maximum_version')
-            if cur and hasattr(cur, 'fget'):
-                ssl.SSLContext.maximum_version = cur.setter(_safe_set_max)
-        
-        worker.log.info("Applied SSL recursion workaround for gevent + Python 3.13")
 
 def on_reload(server):
     """Called to recycle workers during a reload via SIGHUP."""
