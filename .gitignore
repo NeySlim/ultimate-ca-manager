@@ -87,3 +87,4 @@ logs/
 /test_*.py
 /migrate_*.py
 data/
+CLAUDE.md
