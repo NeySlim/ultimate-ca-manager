@@ -161,8 +161,8 @@ echo -e "${BLUE}📁 Setting up directories...${NC}"
 
 # Create necessary directories
 mkdir -p /app/backend/data/{cas,certs,backups,logs,temp}
-chmod 755 /app/backend/data
-chmod 700 /app/backend/data/{cas,certs,backups}
+chmod 755 /app/backend/data 2>/dev/null || true
+chmod 700 /app/backend/data/{cas,certs,backups} 2>/dev/null || true
 
 # Fix permissions to ensure UCM user can write
 echo -e "${BLUE}🔧 Checking file permissions...${NC}"

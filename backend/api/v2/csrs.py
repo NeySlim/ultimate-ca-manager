@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db, Certificate
 from services.cert_service import CertificateService
+from services.audit_service import AuditService
 import datetime
 import base64
 import uuid
@@ -116,7 +117,7 @@ def get_csr(csr_id):
     if cert.csr:
         try:
             data['csr_pem'] = base64.b64decode(cert.csr).decode('utf-8')
-        except:
+        except Exception:
             data['csr_pem'] = cert.csr
     
     return success_response(data=data)
@@ -155,6 +156,15 @@ def create_csr():
             key_type=key_type,
             san_dns=data.get('sans', []),
             username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin' # TODO: Get real user
+        )
+        
+        AuditService.log_action(
+            action='csr_create',
+            resource_type='csr',
+            resource_id=str(cert.id),
+            resource_name=data['cn'],
+            details=f'Created CSR for: {data["cn"]}',
+            success=True
         )
         
         return created_response(
@@ -381,6 +391,14 @@ def delete_csr(csr_id):
     """Delete a CSR"""
     try:
         if CertificateService.delete_certificate(csr_id):
+            AuditService.log_action(
+                action='csr_delete',
+                resource_type='csr',
+                resource_id=str(csr_id),
+                resource_name=f'CSR {csr_id}',
+                details=f'Deleted CSR {csr_id}',
+                success=True
+            )
             return no_content_response()
         else:
             return error_response("CSR not found", 404)

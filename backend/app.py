@@ -401,10 +401,12 @@ def create_app(config_name=None):
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         
         # Add security headers if not present
+        if 'Strict-Transport-Security' not in response.headers:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         if 'X-Content-Type-Options' not in response.headers:
             response.headers['X-Content-Type-Options'] = 'nosniff'
         if 'X-Frame-Options' not in response.headers:
-            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+            response.headers['X-Frame-Options'] = 'DENY'
         if 'X-XSS-Protection' not in response.headers:
             response.headers['X-XSS-Protection'] = '1; mode=block'
         

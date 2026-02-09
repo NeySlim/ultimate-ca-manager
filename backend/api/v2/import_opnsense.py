@@ -7,6 +7,7 @@ from functools import wraps
 import requests
 import logging
 from utils.safe_requests import create_session
+from services.audit_service import AuditService
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -307,7 +308,7 @@ def import_items():
                     issuer = x509_cert.issuer.rfc4514_string()
                     valid_from = x509_cert.not_valid_before
                     valid_to = x509_cert.not_valid_after
-                except:
+                except Exception:
                     subject = ''
                     issuer = ''
                     valid_from = None
@@ -388,7 +389,7 @@ def import_items():
                                 san_uri_list.append(name.value)
                     except x509.ExtensionNotFound:
                         pass
-                except:
+                except Exception:
                     pass
                 
                 # Create certificate
@@ -417,6 +418,14 @@ def import_items():
         
         # Commit all changes
         db.session.commit()
+        
+        AuditService.log_action(
+            action='opnsense_import',
+            resource_type='import',
+            resource_name=f'OPNsense ({host})',
+            details=f'Imported from OPNsense: {stats["cas_imported"]} CAs, {stats["certs_imported"]} certificates',
+            success=True
+        )
         
         logger.info(f"OpnSense import complete: {stats['cas_imported']} CAs, {stats['certs_imported']} certificates imported, {stats['cas_skipped'] + stats['certs_skipped']} skipped")
         

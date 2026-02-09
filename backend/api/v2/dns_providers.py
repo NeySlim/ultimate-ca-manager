@@ -7,6 +7,7 @@ from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, DnsProvider
+from services.audit_service import AuditService
 from services.acme.dns_providers import (
     get_available_providers, 
     is_valid_provider_type,
@@ -82,6 +83,15 @@ def create_dns_provider():
     db.session.add(provider)
     db.session.commit()
     
+    AuditService.log_action(
+        action='dns_provider_create',
+        resource_type='dns_provider',
+        resource_id=str(provider.id),
+        resource_name=provider.name,
+        details=f'Created DNS provider: {provider.name} ({provider_type})',
+        success=True
+    )
+    
     return success_response(
         data=provider.to_dict(),
         message='DNS provider created',
@@ -147,6 +157,15 @@ def update_provider(provider_id):
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='dns_provider_update',
+        resource_type='dns_provider',
+        resource_id=str(provider_id),
+        resource_name=provider.name,
+        details=f'Updated DNS provider: {provider.name}',
+        success=True
+    )
+    
     return success_response(
         data=provider.to_dict(),
         message='DNS provider updated'
@@ -169,8 +188,18 @@ def delete_provider(provider_id):
             400
         )
     
+    provider_name = provider.name
     db.session.delete(provider)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='dns_provider_delete',
+        resource_type='dns_provider',
+        resource_id=str(provider_id),
+        resource_name=provider_name,
+        details=f'Deleted DNS provider: {provider_name}',
+        success=True
+    )
     
     return success_response(message='DNS provider deleted')
 

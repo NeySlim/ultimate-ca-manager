@@ -161,7 +161,7 @@ def list_cas_tree():
                     ca['status'] = 'Expired'
                 else:
                     ca['status'] = 'Active'
-            except:
+            except Exception:
                 ca['status'] = 'Active'
         else:
             ca['status'] = 'Active'
@@ -496,7 +496,7 @@ def get_ca(ca_id):
         if crl_info and crl_info.get('exists'):
             crl_status = 'Active'
             next_crl_update = crl_info.get('next_update', 'N/A')
-    except:
+    except Exception:
         pass
     
     # Get parsed certificate details

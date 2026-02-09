@@ -10,6 +10,7 @@ from auth.unified import AuthManager, require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models.api_key import APIKey
 from models import db
+from services.audit_service import AuditService
 from datetime import datetime
 
 bp = Blueprint('account_v2', __name__)
@@ -131,15 +132,14 @@ def change_password():
     db.session.commit()
     
     # Audit log
-    try:
-        from services.audit_service import AuditService
-        AuditService.log(
-            action='password_changed',
-            user_id=user.id,
-            details={'user_id': user.id}
-        )
-    except Exception:
-        pass
+    AuditService.log_action(
+        action='password_change',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Password changed by user: {user.username}',
+        success=True
+    )
     
     return success_response(
         message='Password changed successfully'
@@ -234,6 +234,14 @@ def create_api_key():
             expires_days=expires_days
         )
         
+        AuditService.log_action(
+            action='apikey_create',
+            resource_type='api_key',
+            resource_name=data['name'],
+            details=f'Created API key: {data["name"]}',
+            success=True
+        )
+        
         return created_response(
             data=key_info,
             message='API key created successfully. Save the key now - it won\'t be shown again!'
@@ -310,7 +318,17 @@ def delete_api_key(key_id):
     
     # Soft delete (set is_active=False)
     api_key.is_active = False
+    key_name = api_key.name
     db.session.commit()
+    
+    AuditService.log_action(
+        action='apikey_delete',
+        resource_type='api_key',
+        resource_id=str(key_id),
+        resource_name=key_name,
+        details=f'Revoked API key: {key_name}',
+        success=True
+    )
     
     return success_response(message='API key revoked')
 
@@ -348,6 +366,15 @@ def regenerate_api_key(key_id):
         # Revoke old key
         old_key.is_active = False
         db.session.commit()
+        
+        AuditService.log_action(
+            action='apikey_regenerate',
+            resource_type='api_key',
+            resource_id=str(key_id),
+            resource_name=old_key.name,
+            details=f'Regenerated API key: {old_key.name}',
+            success=True
+        )
         
         return created_response(
             data=new_key_info,
@@ -438,6 +465,15 @@ def confirm_2fa():
     user.backup_codes = ','.join(backup_codes)
     db.session.commit()
     
+    AuditService.log_action(
+        action='mfa_enable',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'2FA enabled for user: {user.username}',
+        success=True
+    )
+    
     return success_response(
         data={'backup_codes': backup_codes},
         message='2FA enabled successfully. Save backup codes!'
@@ -484,6 +520,15 @@ def disable_2fa():
     user.totp_secret = None
     user.backup_codes = None
     db.session.commit()
+    
+    AuditService.log_action(
+        action='mfa_disable',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'2FA disabled for user: {user.username}',
+        success=True
+    )
     
     return success_response(message='2FA disabled successfully')
 
@@ -584,6 +629,15 @@ def revoke_session(session_id):
     
     db.session.delete(session)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='session_revoke',
+        resource_type='session',
+        resource_id=str(session_id),
+        resource_name=f'Session {session_id}',
+        details=f'Revoked session {session_id}',
+        success=True
+    )
     
     return success_response(message='Session revoked successfully')
 

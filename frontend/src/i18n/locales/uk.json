@@ -558,6 +558,7 @@
     "filter": "Фільтр",
     "copy": "Копіювати",
     "copied": "Скопійовано!",
+    "clickToCopy": "Натисніть, щоб скопіювати",
     "yes": "Так",
     "no": "Ні",
     "ok": "OK",
@@ -1214,6 +1215,16 @@
     "noMatchingMembers": "No matching members",
     "noMembersYet": "No members yet",
     "dragOrUseButtons": "Drag users between lists or use the buttons"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
+    "noCommandsFound": "Команди не знайдено",
+    "noResultsInDatabase": "Результатів у базі даних не знайдено",
+    "favorites": "Обрані",
+    "recent": "Останні",
+    "navigate": "Навігація",
+    "select": "Вибрати",
+    "close": "Закрити"
   },
   "nav": {
     "dashboard": "Панель",

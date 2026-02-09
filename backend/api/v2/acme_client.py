@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import AcmeClientService
+from services.audit_service import AuditService
 
 bp = Blueprint('acme_client', __name__)
 
@@ -78,6 +79,14 @@ def update_settings():
         updates.append('renewal_days')
     
     db.session.commit()
+    
+    AuditService.log_action(
+        action='acme_client_settings_update',
+        resource_type='acme_client',
+        resource_name='ACME Client Settings',
+        details=f'Updated ACME client settings: {", ".join(updates)}' if updates else 'No changes',
+        success=True
+    )
     
     return success_response(
         message=f'Settings updated: {", ".join(updates)}' if updates else 'No changes'
@@ -201,6 +210,15 @@ def request_certificate():
         if not success:
             return error_response(message, 400)
         
+        AuditService.log_action(
+            action='acme_request',
+            resource_type='acme_order',
+            resource_id=str(order.id),
+            resource_name=', '.join(domains),
+            details=f'Requested certificate for {", ".join(domains)} ({environment})',
+            success=True
+        )
+        
         # Set up DNS challenges if using dns-01
         challenge_info = {}
         if challenge_type == 'dns-01':
@@ -315,6 +333,15 @@ def finalize_order(order_id):
             # Clean up DNS records
             client.cleanup_dns_challenge(order)
             
+            AuditService.log_action(
+                action='acme_finalize',
+                resource_type='acme_order',
+                resource_id=str(order_id),
+                resource_name=f'Order {order_id}',
+                details=f'Finalized ACME order {order_id}, certificate ID: {cert_id}',
+                success=True
+            )
+            
             return success_response(
                 data={
                     'order': order.to_dict(),
@@ -345,8 +372,18 @@ def cancel_order(order_id):
         except Exception:
             pass  # Best effort cleanup
     
+    order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
     db.session.delete(order)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='acme_order_cancel',
+        resource_type='acme_order',
+        resource_id=str(order_id),
+        resource_name=order_domains,
+        details=f'Cancelled/deleted ACME order {order_id}',
+        success=True
+    )
     
     return success_response(message='Order deleted')
 
@@ -368,6 +405,14 @@ def renew_order(order_id):
         success, message = renew_certificate(order)
         
         if success:
+            AuditService.log_action(
+                action='acme_renew',
+                resource_type='acme_order',
+                resource_id=str(order_id),
+                resource_name=f'Order {order_id}',
+                details=f'Renewed ACME order {order_id}',
+                success=True
+            )
             return success_response(
                 data={'order': order.to_dict()},
                 message=message
@@ -415,6 +460,14 @@ def register_account():
             # Save email as default
             _set_config('acme.client.email', email, 'ACME client contact email')
             db.session.commit()
+            
+            AuditService.log_action(
+                action='acme_account_register',
+                resource_type='acme_account',
+                resource_name=email,
+                details=f'Registered ACME account for {email} ({environment})',
+                success=True
+            )
             
             return success_response(
                 data={'account_url': account_url},

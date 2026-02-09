@@ -7,6 +7,7 @@ from flask import Blueprint, request, current_app, jsonify, send_from_directory
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, Certificate, CA, CRL, OCSPResponse
+from services.audit_service import AuditService
 from pathlib import Path
 import os
 import subprocess
@@ -55,6 +56,13 @@ def optimize_db():
     try:
         db.session.execute(db.text("VACUUM"))
         db.session.execute(db.text("ANALYZE"))
+        AuditService.log_action(
+            action='system_optimize',
+            resource_type='system',
+            resource_name='Database',
+            details='Database optimized (VACUUM + ANALYZE)',
+            success=True
+        )
         return success_response(message="Database optimized successfully")
     except Exception as e:
         return error_response(f"Optimization failed: {str(e)}")
@@ -286,6 +294,14 @@ def regenerate_https_cert():
         
         current_app.logger.info(f"Regenerated HTTPS certificate for {common_name}")
         
+        AuditService.log_action(
+            action='https_regenerate',
+            resource_type='system',
+            resource_name='HTTPS Certificate',
+            details=f'Regenerated self-signed HTTPS certificate for {common_name}',
+            success=True
+        )
+        
         # Restart service - method depends on environment
         is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
         
@@ -375,6 +391,15 @@ def apply_https_cert():
         
         current_app.logger.info(f"Applied certificate {cert.refid} as HTTPS cert")
         
+        AuditService.log_action(
+            action='https_apply',
+            resource_type='system',
+            resource_id=str(cert_id),
+            resource_name=cert.descr or cert.refid,
+            details=f'Applied certificate {cert.refid} as HTTPS certificate',
+            success=True
+        )
+        
         # Restart service - method depends on environment
         is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
         
@@ -448,6 +473,14 @@ def create_backup():
         filepath = os.path.join(backup_dir, filename)
         with open(filepath, 'wb') as f:
             f.write(backup_bytes)
+        
+        AuditService.log_action(
+            action='system_backup',
+            resource_type='system',
+            resource_name=filename,
+            details=f'Created backup: {filename}',
+            success=True
+        )
         
         # Format size
         size = len(backup_bytes)
@@ -536,6 +569,13 @@ def delete_backup(filename):
             return error_response("Backup file not found", 404)
         
         os.remove(filepath)
+        AuditService.log_action(
+            action='backup_delete',
+            resource_type='system',
+            resource_name=filename,
+            details=f'Deleted backup: {filename}',
+            success=True
+        )
         return success_response(message="Backup deleted successfully")
     except Exception as e:
         return error_response(f"Failed to delete backup: {str(e)}", 500)
@@ -565,6 +605,14 @@ def restore_backup():
         
         service = BackupService()
         results = service.restore_backup(backup_bytes, password)
+        
+        AuditService.log_action(
+            action='system_restore',
+            resource_type='system',
+            resource_name='Backup Restore',
+            details='Restored from backup file',
+            success=True
+        )
         
         return success_response(
             message="Backup restored successfully",
@@ -645,6 +693,15 @@ def encrypt_all_keys():
         dry_run = data.get('dry_run', True)
         
         encrypted, skipped, errors = do_encrypt(dry_run=dry_run)
+        
+        if not dry_run:
+            AuditService.log_action(
+                action='system_encrypt',
+                resource_type='system',
+                resource_name='Private Keys',
+                details=f'Encrypted {encrypted} private keys, skipped {skipped}',
+                success=True
+            )
         
         message = f"Encrypted {encrypted} keys, skipped {skipped} (already encrypted)"
         if dry_run:
@@ -1056,7 +1113,7 @@ def secrets_status():
     if rotation_file.exists():
         try:
             rotation_info = json.loads(rotation_file.read_text())
-        except:
+        except Exception:
             pass
     
     rotated_at = rotation_info.get('rotated_at')

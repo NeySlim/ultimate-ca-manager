@@ -7,6 +7,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, AcmeDomain, DnsProvider
+from services.audit_service import AuditService
 
 bp = Blueprint('acme_domains', __name__)
 
@@ -74,6 +75,15 @@ def create_domain():
     db.session.add(domain)
     db.session.commit()
     
+    AuditService.log_action(
+        action='acme_domain_create',
+        resource_type='acme_domain',
+        resource_id=str(domain.id),
+        resource_name=domain_name,
+        details=f'Registered ACME domain: {domain_name}',
+        success=True
+    )
+    
     return success_response(
         data=domain.to_dict(),
         message=f'Domain {domain_name} registered successfully',
@@ -107,6 +117,15 @@ def update_domain(domain_id):
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='acme_domain_update',
+        resource_type='acme_domain',
+        resource_id=str(domain_id),
+        resource_name=domain.domain,
+        details=f'Updated ACME domain: {domain.domain}',
+        success=True
+    )
+    
     return success_response(
         data=domain.to_dict(),
         message='Domain updated successfully'
@@ -122,6 +141,15 @@ def delete_domain(domain_id):
     
     db.session.delete(domain)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='acme_domain_delete',
+        resource_type='acme_domain',
+        resource_id=str(domain_id),
+        resource_name=domain_name,
+        details=f'Removed ACME domain: {domain_name}',
+        success=True
+    )
     
     return success_response(message=f'Domain {domain_name} removed')
 

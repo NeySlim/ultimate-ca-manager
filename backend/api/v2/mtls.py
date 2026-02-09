@@ -6,6 +6,7 @@ Manage client certificates for mutual TLS authentication
 from flask import Blueprint, jsonify, request, current_app, g, Response
 from api.v2.auth import require_auth
 from models import User, Certificate, CA, db
+from services.audit_service import AuditService
 import json
 from datetime import datetime, timezone
 
@@ -84,6 +85,15 @@ def create_mtls_certificate():
             extended_key_usage=['clientAuth']
         )
         
+        AuditService.log_action(
+            action='mtls_cert_create',
+            resource_type='certificate',
+            resource_id=str(cert_data['id']),
+            resource_name=f'{user.username}@mtls',
+            details=f'Created mTLS certificate for user: {user.username}',
+            success=True
+        )
+        
         return jsonify({
             'data': {
                 'id': cert_data['id'],
@@ -121,6 +131,15 @@ def revoke_mtls_certificate(cert_id):
     cert.revoked_at = datetime.now(timezone.utc)
     cert.revocation_reason = 'User requested'
     db.session.commit()
+    
+    AuditService.log_action(
+        action='mtls_cert_revoke',
+        resource_type='certificate',
+        resource_id=str(cert_id),
+        resource_name=f'{user.username}@mtls',
+        details=f'Revoked mTLS certificate {cert_id} for user: {user.username}',
+        success=True
+    )
     
     return jsonify({'message': 'Certificate revoked'})
 

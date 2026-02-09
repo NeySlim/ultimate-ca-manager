@@ -11,6 +11,7 @@ import {
   Spinner, Database, Wrench
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
+import { useTranslation } from 'react-i18next'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
 
@@ -44,6 +45,7 @@ const COMMANDS = [
 
 export function CommandPalette({ open, onOpenChange }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [searchResults, setSearchResults] = useState(null)
@@ -249,7 +251,7 @@ export function CommandPalette({ open, onOpenChange }) {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search commands, certificates, CAs, users..."
+              placeholder={t('commandPalette.searchPlaceholder')}
               className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
             />
             <kbd className="px-1.5 py-0.5 text-2xs bg-bg-tertiary border border-border rounded text-text-tertiary">
@@ -411,7 +413,7 @@ export function CommandPalette({ open, onOpenChange }) {
                  searchResults.csrs?.length === 0 && (
                   <div className="px-3 py-4 text-center text-text-tertiary text-sm">
                     <Database size={24} className="mx-auto mb-2 opacity-50" />
-                    No results found in database
+                    {t('commandPalette.noResultsInDatabase')}
                   </div>
                 )}
 
@@ -429,7 +431,7 @@ export function CommandPalette({ open, onOpenChange }) {
               <div className="mb-2">
                 <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                   <Star size={10} weight="fill" className="text-status-warning" />
-                  Favorites
+                  {t('commandPalette.favorites')}
                 </div>
                 {filteredFavorites.map(item => {
                   const Icon = getTypeIcon(item.type)
@@ -461,7 +463,7 @@ export function CommandPalette({ open, onOpenChange }) {
               <div className="mb-2">
                 <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                   <Clock size={10} />
-                  Recent
+                  {t('commandPalette.recent')}
                 </div>
                 {filteredRecent.map(item => {
                   const Icon = getTypeIcon(item.type)
@@ -490,7 +492,7 @@ export function CommandPalette({ open, onOpenChange }) {
             
             {filteredCommands.length === 0 && filteredRecent.length === 0 && filteredFavorites.length === 0 ? (
               <div className="px-3 py-8 text-center text-text-tertiary text-sm">
-                No commands found
+                {t('commandPalette.noCommandsFound')}
               </div>
             ) : (
               Object.entries(groupedCommands).map(([category, commands]) => (
@@ -532,15 +534,15 @@ export function CommandPalette({ open, onOpenChange }) {
           <div className="px-4 py-2 border-t border-border bg-bg-tertiary/50 flex items-center gap-4 text-2xs text-text-tertiary">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">↑↓</kbd>
-              Navigate
+              {t('commandPalette.navigate')}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">↵</kbd>
-              Select
+              {t('commandPalette.select')}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">esc</kbd>
-              Close
+              {t('commandPalette.close')}
             </span>
           </div>
         </Dialog.Content>

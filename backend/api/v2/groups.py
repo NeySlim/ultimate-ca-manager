@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db, User
 from models.group import Group, GroupMember
+from services.audit_service import AuditService
 
 bp = Blueprint('groups_v2', __name__)
 
@@ -107,6 +108,14 @@ def create_group():
     try:
         db.session.add(group)
         db.session.commit()
+        AuditService.log_action(
+            action='group_create',
+            resource_type='group',
+            resource_id=str(group.id),
+            resource_name=group.name,
+            details=f'Created group: {group.name}',
+            success=True
+        )
         return created_response(data=group.to_dict(), message="Group created")
     except Exception as e:
         db.session.rollback()
@@ -155,6 +164,14 @@ def update_group(group_id):
     
     try:
         db.session.commit()
+        AuditService.log_action(
+            action='group_update',
+            resource_type='group',
+            resource_id=str(group_id),
+            resource_name=group.name,
+            details=f'Updated group: {group.name}',
+            success=True
+        )
         return success_response(data=group.to_dict(), message="Group updated")
     except Exception as e:
         db.session.rollback()
@@ -172,9 +189,18 @@ def delete_group(group_id):
     if not group:
         return error_response('Group not found', 404)
     
+    group_name = group.name
     try:
         db.session.delete(group)
         db.session.commit()
+        AuditService.log_action(
+            action='group_delete',
+            resource_type='group',
+            resource_id=str(group_id),
+            resource_name=group_name,
+            details=f'Deleted group: {group_name}',
+            success=True
+        )
         return no_content_response(message="Group deleted")
     except Exception as e:
         db.session.rollback()
@@ -225,6 +251,14 @@ def add_group_member(group_id):
     try:
         db.session.add(member)
         db.session.commit()
+        AuditService.log_action(
+            action='group_member_add',
+            resource_type='group',
+            resource_id=str(group_id),
+            resource_name=group.name,
+            details=f'Added user {user.username} to group {group.name}',
+            success=True
+        )
         return created_response(data=member.to_dict(), message="Member added")
     except Exception as e:
         db.session.rollback()
@@ -242,9 +276,18 @@ def remove_group_member(group_id, user_id):
     if not member:
         return error_response('Member not found', 404)
     
+    group = Group.query.get(group_id)
     try:
         db.session.delete(member)
         db.session.commit()
+        AuditService.log_action(
+            action='group_member_remove',
+            resource_type='group',
+            resource_id=str(group_id),
+            resource_name=group.name if group else str(group_id),
+            details=f'Removed user {user_id} from group {group_id}',
+            success=True
+        )
         return no_content_response(message="Member removed")
     except Exception as e:
         db.session.rollback()

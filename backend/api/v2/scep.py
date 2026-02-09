@@ -7,6 +7,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, SCEPRequest, SystemConfig, CA
+from services.audit_service import AuditService
 from datetime import datetime, timezone
 import secrets
 
@@ -64,6 +65,14 @@ def update_scep_config():
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='scep_config_update',
+        resource_type='scep',
+        resource_name='SCEP Configuration',
+        details='Updated SCEP configuration',
+        success=True
+    )
+    
     return success_response(message='SCEP configuration saved')
 
 
@@ -102,6 +111,15 @@ def approve_scep_request(request_id):
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='scep_approve',
+        resource_type='scep_request',
+        resource_id=str(request_id),
+        resource_name=f'SCEP request {request_id}',
+        details=f'Approved SCEP request {request_id}',
+        success=True
+    )
+    
     return success_response(
         data=scep_req.to_dict(),
         message='SCEP request approved'
@@ -130,6 +148,15 @@ def reject_scep_request(request_id):
     scep_req.approved_at = datetime.now(timezone.utc)
     
     db.session.commit()
+    
+    AuditService.log_action(
+        action='scep_reject',
+        resource_type='scep_request',
+        resource_id=str(request_id),
+        resource_name=f'SCEP request {request_id}',
+        details=f'Rejected SCEP request {request_id}: {reason}',
+        success=True
+    )
     
     return success_response(
         data=scep_req.to_dict(),
@@ -182,6 +209,15 @@ def regenerate_challenge_password(ca_id):
     new_challenge = secrets.token_urlsafe(24)
     set_config(f'scep_challenge_{ca_id}', new_challenge)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='scep_challenge_regenerate',
+        resource_type='scep',
+        resource_id=str(ca_id),
+        resource_name=ca.descr,
+        details=f'Regenerated SCEP challenge password for CA: {ca.descr}',
+        success=True
+    )
     
     return success_response(
         data={'challenge': new_challenge},

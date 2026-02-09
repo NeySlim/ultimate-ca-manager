@@ -7,6 +7,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response
 from models import db, SystemConfig
+from services.audit_service import AuditService
 from datetime import datetime, timezone
 
 bp = Blueprint('settings_v2', __name__)
@@ -68,6 +69,14 @@ def update_general_settings():
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='settings_update',
+        resource_type='settings',
+        resource_name='General Settings',
+        details='Updated general settings',
+        success=True
+    )
+    
     return success_response(message='Settings saved successfully')
 
 
@@ -117,6 +126,14 @@ def create_backup():
         filepath = os.path.join(backup_dir, filename)
         with open(filepath, 'wb') as f:
             f.write(backup_bytes)
+        
+        AuditService.log_action(
+            action='system_backup',
+            resource_type='system',
+            resource_name=filename,
+            details=f'Created backup: {filename}',
+            success=True
+        )
         
         response_data = {
             'filename': filename,
@@ -169,6 +186,14 @@ def restore_backup():
         service.restore_backup(tmp_path, password)
         
         os.unlink(tmp_path)
+        
+        AuditService.log_action(
+            action='system_restore',
+            resource_type='system',
+            resource_name=file.filename,
+            details=f'Restored from backup: {file.filename}',
+            success=True
+        )
         
         return success_response(
             data={'filename': file.filename, 'restored': True},
@@ -244,6 +269,14 @@ def delete_backup(filename):
     if backup_file.exists():
         backup_file.unlink()
     
+    AuditService.log_action(
+        action='backup_delete',
+        resource_type='system',
+        resource_name=safe_filename,
+        details=f'Deleted backup: {safe_filename}',
+        success=True
+    )
+    
     return no_content_response()
 
 
@@ -313,6 +346,14 @@ def update_email_settings():
         smtp.smtp_from = data['from_email']  # Model uses smtp_from
     
     db.session.commit()
+    
+    AuditService.log_action(
+        action='settings_update',
+        resource_type='settings',
+        resource_name='Email/SMTP Settings',
+        details='Updated email/SMTP settings',
+        success=True
+    )
     
     return success_response(
         data={'id': smtp.id},
@@ -407,6 +448,14 @@ def update_notification_settings():
         config.cooldown_hours = int(data['cooldown_hours'])
     
     db.session.commit()
+    
+    AuditService.log_action(
+        action='settings_update',
+        resource_type='settings',
+        resource_name='Notification Settings',
+        details='Updated notification settings',
+        success=True
+    )
     
     return success_response(
         data={'id': config.id},
@@ -541,6 +590,14 @@ def update_ldap_settings():
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='settings_update',
+        resource_type='settings',
+        resource_name='LDAP Settings',
+        details='Updated LDAP settings',
+        success=True
+    )
+    
     return success_response(
         data=data,
         message='LDAP settings updated successfully'
@@ -588,7 +645,7 @@ def get_webhooks():
     if config and config.value:
         try:
             return json.loads(config.value)
-        except:
+        except Exception:
             return []
     return []
 
@@ -647,6 +704,15 @@ def create_webhook():
     webhooks.append(new_webhook)
     save_webhooks(webhooks)
     
+    AuditService.log_action(
+        action='webhook_create',
+        resource_type='webhook',
+        resource_id=str(new_id),
+        resource_name=new_webhook['name'],
+        details=f'Created webhook: {new_webhook["name"]}',
+        success=True
+    )
+    
     return created_response(
         data=new_webhook,
         message='Webhook created successfully'
@@ -660,6 +726,15 @@ def delete_webhook(webhook_id):
     webhooks = get_webhooks()
     webhooks = [w for w in webhooks if w.get('id') != webhook_id]
     save_webhooks(webhooks)
+    
+    AuditService.log_action(
+        action='webhook_delete',
+        resource_type='webhook',
+        resource_id=str(webhook_id),
+        resource_name=f'Webhook {webhook_id}',
+        details=f'Deleted webhook {webhook_id}',
+        success=True
+    )
     
     from utils.response import no_content_response
     return no_content_response()

@@ -51,7 +51,7 @@ function CustomTooltip({ active, payload, label }) {
     <div className="bg-bg-secondary border border-border rounded-lg px-3 py-2 shadow-lg">
       <p className="text-xs text-text-secondary mb-1">{label}</p>
       {payload.map((entry, i) => (
-        <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
+        <p key={entry.name || i} className="text-sm font-medium" style={{ color: entry.color }}>
           {entry.name}: {entry.value}
         </p>
       ))}
@@ -164,7 +164,7 @@ export function StatusPieChart({ data = {}, height = 150 }) {
           strokeWidth={0}
         >
           {chartData.map((entry, index) => (
-            <Cell key={index} fill={entry.color} />
+            <Cell key={entry.name} fill={entry.color} />
           ))}
         </Pie>
         <Tooltip content={<CustomTooltip />} />

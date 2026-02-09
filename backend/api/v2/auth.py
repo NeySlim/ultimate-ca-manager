@@ -340,7 +340,7 @@ def _is_email_configured():
     try:
         smtp_host = SystemConfig.get('smtp_host')
         return bool(smtp_host and smtp_host.strip())
-    except:
+    except Exception:
         return False
 
 
@@ -455,7 +455,7 @@ def reset_password():
             details={'method': 'email_reset'},
             user_id=user.id
         )
-    except:
+    except Exception:
         pass
     
     return success_response(message='Password has been reset successfully')

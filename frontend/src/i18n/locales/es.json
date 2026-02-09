@@ -558,6 +558,7 @@
     "filter": "Filtrar",
     "copy": "Copiar",
     "copied": "¡Copiado!",
+    "clickToCopy": "Haz clic para copiar",
     "yes": "Sí",
     "no": "No",
     "ok": "OK",
@@ -1214,6 +1215,16 @@
     "noMatchingMembers": "No matching members",
     "noMembersYet": "No members yet",
     "dragOrUseButtons": "Drag users between lists or use the buttons"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",
+    "noCommandsFound": "No se encontraron comandos",
+    "noResultsInDatabase": "No se encontraron resultados en la base de datos",
+    "favorites": "Favoritos",
+    "recent": "Recientes",
+    "navigate": "Navegar",
+    "select": "Seleccionar",
+    "close": "Cerrar"
   },
   "nav": {
     "dashboard": "Panel",

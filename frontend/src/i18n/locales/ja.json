@@ -558,6 +558,7 @@
     "filter": "フィルター",
     "copy": "コピー",
     "copied": "コピーしました！",
+    "clickToCopy": "クリックしてコピー",
     "yes": "はい",
     "no": "いいえ",
     "ok": "OK",
@@ -1214,6 +1215,16 @@
     "noMatchingMembers": "No matching members",
     "noMembersYet": "No members yet",
     "dragOrUseButtons": "Drag users between lists or use the buttons"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
+    "noCommandsFound": "コマンドが見つかりません",
+    "noResultsInDatabase": "データベースに結果が見つかりません",
+    "favorites": "お気に入り",
+    "recent": "最近",
+    "navigate": "ナビゲート",
+    "select": "選択",
+    "close": "閉じる"
   },
   "nav": {
     "dashboard": "ダッシュボード",

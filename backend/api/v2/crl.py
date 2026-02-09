@@ -8,6 +8,7 @@ from utils.response import success_response, error_response
 from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
+from services.audit_service import AuditService
 
 bp = Blueprint('crl_v2', __name__)
 
@@ -75,6 +76,15 @@ def regenerate_crl(ca_id):
         
     try:
         crl_metadata = CRLService.generate_crl(ca.id, username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin')
+        
+        AuditService.log_action(
+            action='crl_regenerate',
+            resource_type='crl',
+            resource_id=str(ca_id),
+            resource_name=ca.descr,
+            details=f'Regenerated CRL for CA: {ca.descr}',
+            success=True
+        )
         
         data = crl_metadata.to_dict() if crl_metadata else None
         if data:

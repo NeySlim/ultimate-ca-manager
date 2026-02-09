@@ -132,7 +132,7 @@ export function FileUpload({
         <div className="space-y-2">
           {files.map((file, index) => (
             <div
-              key={index}
+              key={file.name}
               className="flex items-center gap-3 p-3 bg-bg-tertiary border border-border rounded-lg"
             >
               <FileText size={20} className="text-text-secondary flex-shrink-0" />

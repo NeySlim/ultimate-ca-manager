@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.certificate_template import CertificateTemplate
+from services.audit_service import AuditService
 from datetime import datetime
 import json
 
@@ -140,6 +141,15 @@ def create_template():
         db.session.add(template)
         db.session.commit()
         
+        AuditService.log_action(
+            action='template_create',
+            resource_type='template',
+            resource_id=str(template.id),
+            resource_name=template.name,
+            details=f'Created template: {template.name} ({template.template_type})',
+            success=True
+        )
+        
         return created_response(
             data=template.to_dict(),
             message=f'Template {template.name} created successfully'
@@ -226,6 +236,14 @@ def update_template(template_id):
     
     try:
         db.session.commit()
+        AuditService.log_action(
+            action='template_update',
+            resource_type='template',
+            resource_id=str(template_id),
+            resource_name=template.name,
+            details=f'Updated template: {template.name}',
+            success=True
+        )
         return success_response(
             data=template.to_dict(),
             message=f'Template {template.name} updated successfully'
@@ -256,6 +274,15 @@ def delete_template(template_id):
     try:
         db.session.delete(template)
         db.session.commit()
+        
+        AuditService.log_action(
+            action='template_delete',
+            resource_type='template',
+            resource_id=str(template_id),
+            resource_name=template_name,
+            details=f'Deleted template: {template_name}',
+            success=True
+        )
         
         return no_content_response(
             message=f'Template {template_name} deleted successfully'
@@ -416,6 +443,14 @@ def import_template():
                 imported.append(template.name)
         
         db.session.commit()
+        
+        AuditService.log_action(
+            action='template_import',
+            resource_type='template',
+            resource_name='Template Import',
+            details=f'Imported {len(imported)} templates, updated {len(updated)}, skipped {len(skipped)}',
+            success=True
+        )
         
         # Build message
         msg_parts = []

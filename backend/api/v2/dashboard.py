@@ -25,13 +25,13 @@ def get_public_stats():
         # Try ACME accounts table
         try:
             acme_accounts = db.session.execute(text("SELECT COUNT(*) FROM acme_accounts")).scalar() or 0
-        except:
+        except Exception:
             acme_accounts = 0
         
         # Active users
         try:
             active_users = db.session.execute(text("SELECT COUNT(*) FROM users WHERE is_active = 1")).scalar() or 0
-        except:
+        except Exception:
             active_users = 1  # At least one user should exist
         
         return success_response(data={
@@ -81,7 +81,7 @@ def get_dashboard_stats():
         pending_csrs = db.session.execute(
             text("SELECT COUNT(*) FROM certificate_requests WHERE status = 'pending'")
         ).scalar() or 0
-    except:
+    except Exception:
         pass
     
     # Count ACME renewals (last 30 days)
@@ -92,7 +92,7 @@ def get_dashboard_stats():
             text("SELECT COUNT(*) FROM acme_orders WHERE created_at >= :date"),
             {'date': thirty_days_ago}
         ).scalar() or 0
-    except:
+    except Exception:
         pass
     
     return success_response(data={
@@ -295,7 +295,7 @@ def get_system_status():
     try:
         db.session.execute(text('SELECT 1'))
         status['database'] = {'status': 'online', 'message': 'Connected'}
-    except:
+    except Exception:
         status['database'] = {'status': 'offline', 'message': 'Connection failed'}
     
     # Check ACME service - check config first, then accounts
@@ -310,7 +310,7 @@ def get_system_status():
                 status['acme'] = {'status': 'online', 'message': 'Enabled'}
         else:
             status['acme'] = {'status': 'offline', 'message': 'Disabled'}
-    except:
+    except Exception:
         status['acme'] = {'status': 'offline', 'message': 'Not configured'}
     
     # SCEP is always available if UCM is running

@@ -96,7 +96,7 @@ export function useWebSocket(options = {}) {
     });
     
     socket.on('connect', () => {
-      console.log('[WebSocket] Connected');
+      if (import.meta.env.DEV) console.log('[WebSocket] Connected');
       setConnectionState(ConnectionState.CONNECTED);
       if (showToasts) {
         toast.success('Real-time updates enabled', { duration: 2000 });
@@ -104,22 +104,22 @@ export function useWebSocket(options = {}) {
     });
     
     socket.on('disconnect', (reason) => {
-      console.log('[WebSocket] Disconnected:', reason);
+      if (import.meta.env.DEV) console.log('[WebSocket] Disconnected:', reason);
       setConnectionState(ConnectionState.DISCONNECTED);
     });
     
     socket.on('connect_error', (error) => {
-      console.error('[WebSocket] Connection error:', error);
+      if (import.meta.env.DEV) console.error('[WebSocket] Connection error:', error);
       setConnectionState(ConnectionState.ERROR);
     });
     
     socket.on('connected', (data) => {
-      console.log('[WebSocket] Server confirmed connection:', data);
+      if (import.meta.env.DEV) console.log('[WebSocket] Server confirmed connection:', data);
     });
     
     // Main event handler
     socket.on('event', (payload) => {
-      console.log('[WebSocket] Event received:', payload);
+      if (import.meta.env.DEV) console.log('[WebSocket] Event received:', payload);
       setLastEvent(payload);
       
       // Call global event handler

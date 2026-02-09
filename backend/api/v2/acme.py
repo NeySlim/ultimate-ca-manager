@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, SystemConfig, CA, Certificate
 from models.acme_models import DnsProvider
+from services.audit_service import AuditService
 
 bp = Blueprint('acme_v2', __name__)
 
@@ -83,6 +84,14 @@ def update_acme_settings():
         proxy_cfg.value = 'true' if data['proxy_enabled'] else 'false'
     
     db.session.commit()
+    
+    AuditService.log_action(
+        action='acme_settings_update',
+        resource_type='acme',
+        resource_name='ACME Settings',
+        details='Updated ACME server settings',
+        success=True
+    )
     
     return success_response(
         data=data,
@@ -268,6 +277,14 @@ def register_proxy_account():
     proxy_cfg.value = email
     db.session.commit()
     
+    AuditService.log_action(
+        action='acme_proxy_register',
+        resource_type='acme',
+        resource_name='ACME Proxy',
+        details=f'Registered ACME proxy account: {email}',
+        success=True
+    )
+    
     return success_response(
         data={'registered': True, 'email': email},
         message='Proxy account registered'
@@ -282,6 +299,14 @@ def unregister_proxy_account():
     if proxy_cfg:
         db.session.delete(proxy_cfg)
         db.session.commit()
+    
+    AuditService.log_action(
+        action='acme_proxy_unregister',
+        resource_type='acme',
+        resource_name='ACME Proxy',
+        details='Unregistered ACME proxy account',
+        success=True
+    )
     
     return success_response(
         data={'registered': False},

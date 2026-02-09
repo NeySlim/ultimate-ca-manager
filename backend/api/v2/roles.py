@@ -6,6 +6,7 @@ Manage user roles and RBAC permissions
 from flask import Blueprint, jsonify, request
 from api.v2.auth import require_auth
 from models import User, db
+from services.audit_service import AuditService
 
 bp = Blueprint('roles', __name__, url_prefix='/api/v2/roles')
 
@@ -106,6 +107,15 @@ def create_role():
     db.session.add(role)
     db.session.commit()
     
+    AuditService.log_action(
+        action='role_create',
+        resource_type='role',
+        resource_id=str(role.id),
+        resource_name=role.name,
+        details=f'Created custom role: {role.name}',
+        success=True
+    )
+    
     return jsonify({'data': role.to_dict(), 'message': 'Role created successfully'}), 201
 
 
@@ -145,6 +155,15 @@ def update_role(role_id):
     
     db.session.commit()
     
+    AuditService.log_action(
+        action='role_update',
+        resource_type='role',
+        resource_id=str(role_id),
+        resource_name=role.name,
+        details=f'Updated role: {role.name}',
+        success=True
+    )
+    
     return jsonify({'data': role.to_dict(), 'message': 'Role updated successfully'})
 
 
@@ -164,8 +183,18 @@ def delete_role(role_id):
     if role.is_system:
         return jsonify({'error': True, 'message': 'System roles cannot be deleted'}), 403
     
+    role_name = role.name
     db.session.delete(role)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='role_delete',
+        resource_type='role',
+        resource_id=str(role_id),
+        resource_name=role_name,
+        details=f'Deleted custom role: {role_name}',
+        success=True
+    )
     
     return jsonify({'message': 'Role deleted successfully'})
 
@@ -194,6 +223,15 @@ def toggle_user_active(user_id):
     
     user.is_active = not user.is_active
     db.session.commit()
+    
+    AuditService.log_action(
+        action='user_activate' if user.is_active else 'user_deactivate',
+        resource_type='user',
+        resource_id=str(user_id),
+        resource_name=user.username,
+        details=f'User {"activated" if user.is_active else "deactivated"}: {user.username}',
+        success=True
+    )
     
     return jsonify({
         'data': user.to_dict(),

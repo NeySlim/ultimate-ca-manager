@@ -9,6 +9,7 @@ Endpoints:
 from flask import Blueprint, request, jsonify
 from auth.unified import require_auth
 from services.smart_import import SmartImporter
+from services.audit_service import AuditService
 
 bp = Blueprint('smart_import', __name__)
 
@@ -115,6 +116,14 @@ def execute_import():
     try:
         importer = SmartImporter()
         result = importer.execute(content, password, options, username)
+        
+        AuditService.log_action(
+            action='smart_import',
+            resource_type='import',
+            resource_name='Smart Import',
+            details=f'Smart import by {username}: {result.to_dict().get("summary", "")}',
+            success=result.success
+        )
         
         return jsonify({
             "success": result.success,

@@ -558,6 +558,7 @@
     "filter": "筛选",
     "copy": "复制",
     "copied": "已复制！",
+    "clickToCopy": "点击复制",
     "yes": "是",
     "no": "否",
     "ok": "确定",
@@ -1214,6 +1215,16 @@
     "noMatchingMembers": "No matching members",
     "noMembersYet": "No members yet",
     "dragOrUseButtons": "Drag users between lists or use the buttons"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "搜索命令、证书、CA、用户...",
+    "noCommandsFound": "未找到命令",
+    "noResultsInDatabase": "数据库中未找到结果",
+    "favorites": "收藏",
+    "recent": "最近",
+    "navigate": "导航",
+    "select": "选择",
+    "close": "关闭"
   },
   "nav": {
     "dashboard": "仪表板",

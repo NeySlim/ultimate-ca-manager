@@ -4,6 +4,7 @@
  * Theme-aware soft color palette
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import { 
   Copy, Check, CaretDown,
@@ -331,6 +332,7 @@ export function DetailField({
 }) {
   const [copied, setCopied] = useState(false)
   const { isMobile } = useMobile()
+  const { t } = useTranslation()
   
   const handleCopy = () => {
     if (copyable && value) {
@@ -359,7 +361,7 @@ export function DetailField({
           copyable && "cursor-pointer hover:text-accent-primary transition-colors flex items-center gap-2"
         )}
         onClick={copyable ? handleCopy : undefined}
-        title={copyable ? (copied ? "Copié!" : "Cliquer pour copier") : undefined}
+        title={copyable ? (copied ? t('common.copied') : t('common.clickToCopy')) : undefined}
       >
         {value !== undefined && value !== null && value !== '' ? value : <span className="text-text-tertiary">—</span>}
         {copyable && (

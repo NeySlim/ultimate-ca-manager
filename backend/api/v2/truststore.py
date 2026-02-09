@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.truststore import TrustedCertificate
+from services.audit_service import AuditService
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
@@ -254,6 +255,15 @@ def add_trusted_certificate():
         db.session.add(trusted_cert)
         db.session.commit()
         
+        AuditService.log_action(
+            action='truststore_add',
+            resource_type='truststore',
+            resource_id=str(trusted_cert.id),
+            resource_name=trusted_cert.name,
+            details=f'Added certificate to trust store: {trusted_cert.name}',
+            success=True
+        )
+        
         return created_response(
             data=trusted_cert.to_dict(),
             message=f'Certificate {trusted_cert.name} added to trust store'
@@ -291,6 +301,15 @@ def remove_trusted_certificate(cert_id):
     try:
         db.session.delete(cert)
         db.session.commit()
+        
+        AuditService.log_action(
+            action='truststore_remove',
+            resource_type='truststore',
+            resource_id=str(cert_id),
+            resource_name=cert_name,
+            details=f'Removed certificate from trust store: {cert_name}',
+            success=True
+        )
         
         return no_content_response(
             message=f'Certificate {cert_name} removed from trust store'

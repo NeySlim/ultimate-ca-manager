@@ -54,12 +54,12 @@ def get_logs():
         if request.args.get('date_from'):
             try:
                 date_from = datetime.fromisoformat(request.args.get('date_from').replace('Z', '+00:00'))
-            except:
+            except (ValueError, AttributeError):
                 pass
         if request.args.get('date_to'):
             try:
                 date_to = datetime.fromisoformat(request.args.get('date_to').replace('Z', '+00:00'))
-            except:
+            except (ValueError, AttributeError):
                 pass
         
         # Get logs
@@ -153,12 +153,12 @@ def export_logs():
     if request.args.get('date_from'):
         try:
             date_from = datetime.fromisoformat(request.args.get('date_from').replace('Z', '+00:00'))
-        except:
+        except (ValueError, AttributeError):
             pass
     if request.args.get('date_to'):
         try:
             date_to = datetime.fromisoformat(request.args.get('date_to').replace('Z', '+00:00'))
-        except:
+        except (ValueError, AttributeError):
             pass
     
     data = AuditService.export_logs(

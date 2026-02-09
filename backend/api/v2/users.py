@@ -7,6 +7,7 @@ from flask import Blueprint, request, jsonify, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db, User
+from services.audit_service import AuditService
 from datetime import datetime
 import csv
 import io
@@ -216,6 +217,15 @@ def create_user():
         db.session.add(user)
         db.session.commit()
         
+        AuditService.log_action(
+            action='user_create',
+            resource_type='user',
+            resource_id=str(user.id),
+            resource_name=user.username,
+            details=f'Created user: {user.username} (role: {role})',
+            success=True
+        )
+        
         return created_response(
             data=user.to_dict(),
             message=f'User {user.username} created successfully'
@@ -299,6 +309,14 @@ def update_user(user_id):
     
     try:
         db.session.commit()
+        AuditService.log_action(
+            action='user_update',
+            resource_type='user',
+            resource_id=str(user_id),
+            resource_name=user.username,
+            details=f'Updated user: {user.username}',
+            success=True
+        )
         return success_response(
             data=user.to_dict(),
             message=f'User {user.username} updated successfully'
@@ -335,6 +353,14 @@ def delete_user(user_id):
     
     try:
         db.session.commit()
+        AuditService.log_action(
+            action='user_deactivate',
+            resource_type='user',
+            resource_id=str(user_id),
+            resource_name=username,
+            details=f'Deactivated user: {username}',
+            success=True
+        )
         return success_response(
             message=f'User {username} deactivated successfully'
         )
@@ -380,6 +406,15 @@ def reset_user_password(user_id):
     try:
         db.session.commit()
         
+        AuditService.log_action(
+            action='password_change',
+            resource_type='user',
+            resource_id=str(user_id),
+            resource_name=user.username,
+            details=f'Password reset for user: {user.username}',
+            success=True
+        )
+        
         # Send password changed notification
         try:
             from services.notification_service import NotificationService
@@ -423,6 +458,14 @@ def toggle_user_status(user_id):
     
     try:
         db.session.commit()
+        AuditService.log_action(
+            action='user_activate' if user.active else 'user_deactivate',
+            resource_type='user',
+            resource_id=str(user_id),
+            resource_name=user.username,
+            details=f'User {user.username} {status}',
+            success=True
+        )
         return success_response(
             data=user.to_dict(),
             message=f'User {user.username} {status} successfully'
@@ -513,6 +556,14 @@ def import_users():
             imported += 1
         
         db.session.commit()
+        
+        AuditService.log_action(
+            action='user_import',
+            resource_type='user',
+            resource_name='CSV Import',
+            details=f'Imported {imported} users, skipped {skipped}',
+            success=True
+        )
         
         return success_response(
             data={

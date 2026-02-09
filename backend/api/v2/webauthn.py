@@ -9,6 +9,7 @@ from api.v2.auth import require_auth
 from models import db
 from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
+from services.audit_service import AuditService
 
 bp = Blueprint('webauthn', __name__, url_prefix='/api/v2/webauthn')
 
@@ -32,6 +33,15 @@ def delete_credential(credential_id):
     if not success:
         return jsonify({'error': True, 'message': message}), 404
     
+    AuditService.log_action(
+        action='webauthn_delete',
+        resource_type='webauthn',
+        resource_id=str(credential_id),
+        resource_name=f'WebAuthn credential {credential_id}',
+        details=f'Deleted WebAuthn credential {credential_id}',
+        success=True
+    )
+    
     return jsonify({'message': message})
 
 
@@ -47,6 +57,15 @@ def toggle_credential(credential_id):
     
     if not success:
         return jsonify({'error': True, 'message': message}), 404
+    
+    AuditService.log_action(
+        action='webauthn_toggle',
+        resource_type='webauthn',
+        resource_id=str(credential_id),
+        resource_name=f'WebAuthn credential {credential_id}',
+        details=f'{"Enabled" if enabled else "Disabled"} WebAuthn credential {credential_id}',
+        success=True
+    )
     
     return jsonify({'message': message})
 
@@ -79,6 +98,15 @@ def verify_registration():
     
     if not success:
         return jsonify({'error': True, 'message': message}), 400
+    
+    AuditService.log_action(
+        action='webauthn_register',
+        resource_type='webauthn',
+        resource_id=str(credential.id) if credential else None,
+        resource_name=credential_name,
+        details=f'Registered WebAuthn credential: {credential_name}',
+        success=True
+    )
     
     return jsonify({
         'message': message,

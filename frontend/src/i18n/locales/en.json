@@ -18,6 +18,7 @@
     "filter": "Filter",
     "copy": "Copy",
     "copied": "Copied!",
+    "clickToCopy": "Click to copy",
     "yes": "Yes",
     "no": "No",
     "ok": "OK",
@@ -129,6 +130,16 @@
     "auto": "Auto",
     "manual": "Manual",
     "update": "Update"
+  },
+  "commandPalette": {
+    "searchPlaceholder": "Search commands, certificates, CAs, users...",
+    "noCommandsFound": "No commands found",
+    "noResultsInDatabase": "No results found in database",
+    "favorites": "Favorites",
+    "recent": "Recent",
+    "navigate": "Navigate",
+    "select": "Select",
+    "close": "Close"
   },
   "nav": {
     "dashboard": "Dashboard",
