@@ -40,6 +40,7 @@ export const Input = forwardRef(function Input({
   type,
   showStrength,
   hasExistingValue,  // Shows "Set" badge and "enter new to change" hint
+  placeholder,
   ...props 
 }, ref) {
   const { t } = useTranslation()
@@ -61,9 +62,9 @@ export const Input = forwardRef(function Input({
   }, [isPassword, showStrength, props.value, internalValue])
 
   // Determine placeholder for existing secret values
-  const effectivePlaceholder = hasExistingValue && isPassword && !props.placeholder
+  const effectivePlaceholder = hasExistingValue && isPassword
     ? '••••••••••••'
-    : props.placeholder
+    : placeholder
 
   return (
     <div className={cn("space-y-1.5", className)}>
