@@ -232,8 +232,6 @@
     "recentCAs": "Recent CAs",
     "statusDistribution": "Status Distribution",
     "recentActivity": "Recent Activity",
-    "expiringCertificates": "{{count}} certificate expiring soon",
-    "expiringCertificates_plural": "{{count}} certificates expiring soon",
     "clickToRenew": "Click to view and renew",
     "customizeDashboard": "Customize dashboard",
     "allSystemsOperational": "All systems operational",
@@ -268,7 +266,9 @@
     "widgetCertificateAuthorities": "Certificate Authorities",
     "widgetAcmeAccounts": "ACME Accounts",
     "showOrHideWidgets": "Show or hide widgets",
-    "loadFailed": "Failed to load dashboard"
+    "loadFailed": "Failed to load dashboard",
+    "expiringCertificates_one": "{{count}} certificate expiring soon",
+    "expiringCertificates_other": "{{count}} certificates expiring soon"
   },
   "certificates": {
     "title": "Certificates",
@@ -322,7 +322,9 @@
     "privateKeyPEM": "Private Key (PEM)",
     "commonNamePlaceholder": "example.com",
     "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
-    "validityPlaceholder": "365"
+    "validityPlaceholder": "365",
+    "subtitle_one": "{{count}} certificate",
+    "subtitle_other": "{{count}} certificates"
   },
   "cas": {
     "title": "Certificate Authorities",
@@ -382,7 +384,9 @@
     "passwordTooShort": "Password must be at least 4 characters",
     "exportedAs": "CA exported as {{format}}",
     "createFailed": "Failed to create CA",
-    "unnamedCA": "Unnamed CA"
+    "unnamedCA": "Unnamed CA",
+    "subtitle_one": "{{count}} CA",
+    "subtitle_other": "{{count}} CAs"
   },
   "csrs": {
     "title": "Certificate Signing Requests",
@@ -558,7 +562,9 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "pathLength": "Path Length",
-    "caCertificate": "CA Certificate"
+    "caCertificate": "CA Certificate",
+    "subtitle_one": "{{count}} template",
+    "subtitle_other": "{{count}} templates"
   },
   "users": {
     "title": "Users",
@@ -590,7 +596,9 @@
     "confirmResetPassword": "Reset password for \"{{name}}\"?",
     "newPassword": "New password: {{password}}",
     "checkEmail": "Check email",
-    "resetPasswordFailed": "Failed to reset password"
+    "resetPasswordFailed": "Failed to reset password",
+    "subtitle_one": "{{count}} user",
+    "subtitle_other": "{{count}} users"
   },
   "groups": {
     "title": "Groups",
@@ -604,7 +612,11 @@
     "noGroups": "No groups found",
     "namePlaceholder": "developers",
     "descriptionPlaceholder": "Development team",
-    "confirmDelete": "Delete group \"{{name}}\"?"
+    "confirmDelete": "Delete group \"{{name}}\"?",
+    "subtitle_one": "{{count}} group",
+    "subtitle_other": "{{count}} groups",
+    "memberCount_one": "{{count}} member",
+    "memberCount_other": "{{count}} members"
   },
   "acme": {
     "title": "ACME Protocol",
@@ -832,7 +844,9 @@
     "domainDeletedSuccess": "Domain removed successfully",
     "confirmDeleteDomain": "Remove domain \"{{domain}}\"? ACME Proxy will no longer accept certificate requests for this domain.",
     "domainTestSuccess": "DNS access test successful",
-    "domainTestFailed": "DNS access test failed"
+    "domainTestFailed": "DNS access test failed",
+    "subtitle_one": "{{count}} account",
+    "subtitle_other": "{{count}} accounts"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -1009,8 +1023,6 @@
     "serial": "Serial",
     "signature": "Signature",
     "subject": "Subject",
-    "subtitle": "{{count}} certificate",
-    "subtitle_plural": "{{count}} certificates",
     "sync": "Sync",
     "syncConfirm": "This will import up to 50 certificates from the system. Continue?",
     "syncFromSystem": "Sync from system",
@@ -1023,7 +1035,9 @@
     "valid": "Valid",
     "validFrom": "Valid From",
     "validUntil": "Valid Until",
-    "validity": "Validity"
+    "validity": "Validity",
+    "subtitle_one": "{{count}} certificate",
+    "subtitle_other": "{{count}} certificates"
   },
   "importExport": {
     "title": "Import / Export",
@@ -1598,8 +1612,6 @@
   },
   "rbac": {
     "title": "Role-Based Access Control",
-    "subtitle": "{{count}} role",
-    "subtitle_plural": "{{count}} roles",
     "roles": "Roles",
     "createRole": "Create Role",
     "createCustomRole": "Create Custom Role",
@@ -1653,12 +1665,12 @@
       "system": "System",
       "custom": "Custom",
       "users": "Users"
-    }
+    },
+    "subtitle_one": "{{count}} role",
+    "subtitle_other": "{{count}} roles"
   },
   "hsm": {
     "title": "HSM Management",
-    "subtitle": "{{count}} provider",
-    "subtitle_plural": "{{count}} providers",
     "addHSM": "Add HSM",
     "newProvider": "New Provider",
     "configureHSM": "Configure HSM",
@@ -1745,7 +1757,9 @@
       "disabled": "Disabled",
       "keys": "Keys",
       "cloud": "Cloud"
-    }
+    },
+    "subtitle_one": "{{count}} provider",
+    "subtitle_other": "{{count}} providers"
   },
   "sso": {
     "title": "Single Sign-On",
@@ -1841,8 +1855,6 @@
     "chainInvalid": "Hash chain integrity compromised",
     "noAnomalies": "No anomalies detected",
     "noAnomaliesDescription": "Last 24 hours activity looks normal",
-    "anomaliesDetected": "{{count}} anomaly detected",
-    "anomaliesDetected_plural": "{{count}} anomalies detected",
     "alerts": "{{count}} alerts",
     "unknownAnomaly": "Unknown anomaly",
     "userNumber": "User #{{id}}",
@@ -1883,7 +1895,9 @@
       "auditVerified": "Audit integrity verified ({{count}} entries)"
     },
     "anomalies": "Login Anomalies",
-    "auditVerify": "Audit Verification"
+    "auditVerify": "Audit Verification",
+    "anomaliesDetected_one": "{{count}} anomaly detected",
+    "anomaliesDetected_other": "{{count}} anomalies detected"
   },
   "notifications": {
     "certificateIssued": "Certificate issued: {{name}}",
@@ -1928,16 +1942,16 @@
   },
   "time": {
     "justNow": "Just now",
-    "minutesAgo": "{{count}} minute ago",
-    "minutesAgo_plural": "{{count}} minutes ago",
-    "hoursAgo": "{{count}} hour ago",
-    "hoursAgo_plural": "{{count}} hours ago",
-    "daysAgo": "{{count}} day ago",
-    "daysAgo_plural": "{{count}} days ago",
     "today": "Today",
     "yesterday": "Yesterday",
     "thisWeek": "This week",
-    "thisMonth": "This month"
+    "thisMonth": "This month",
+    "minutesAgo_one": "{{count}} minute ago",
+    "minutesAgo_other": "{{count}} minutes ago",
+    "hoursAgo_one": "{{count}} hour ago",
+    "hoursAgo_other": "{{count}} hours ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago"
   },
   "validation": {
     "required": "This field is required",
@@ -2032,11 +2046,11 @@
     "swap": "Swap certificates",
     "field": "Field",
     "identical": "Identical",
-    "differences": "{{count}} difference",
-    "differences_plural": "{{count}} differences",
     "identicalDescription": "These certificates have identical properties",
     "differencesDescription": "Differences are highlighted in orange",
-    "selectTwoToCompare": "Select two certificates to compare"
+    "selectTwoToCompare": "Select two certificates to compare",
+    "differences_one": "{{count}} difference",
+    "differences_other": "{{count}} differences"
   },
   "members": {
     "manageMembers": "Manage Members",

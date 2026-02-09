@@ -341,7 +341,9 @@
     "proxyUsage": "Usage with certbot:",
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
-    "source": "Source"
+    "source": "Source",
+    "subtitle_one": "{{count}} account",
+    "subtitle_other": "{{count}} account"
   },
   "audit": {
     "title": "Log di audit",
@@ -483,7 +485,9 @@
     "deleteFailed": "Failed to delete CA",
     "exportFailed": "Failed to export CA",
     "createFailed": "Failed to create CA",
-    "passwordTooShort": "Password must be at least 4 characters"
+    "passwordTooShort": "Password must be at least 4 characters",
+    "subtitle_one": "{{count}} CA",
+    "subtitle_other": "{{count}} CA"
   },
   "certificates": {
     "title": "Certificati",
@@ -537,7 +541,9 @@
     "commonNamePlaceholder": "esempio.com",
     "sanPlaceholder": "DNS:esempio.com\nDNS:www.esempio.com\nIP:192.168.1.1",
     "validityPlaceholder": "365",
-    "privateKeyPEM": "Private Key (PEM)"
+    "privateKeyPEM": "Private Key (PEM)",
+    "subtitle_one": "{{count}} certificato",
+    "subtitle_other": "{{count}} certificati"
   },
   "common": {
     "save": "Salva",
@@ -680,11 +686,11 @@
     "swap": "Swap certificates",
     "field": "Field",
     "identical": "Identical",
-    "differences": "{{count}} difference",
-    "differences_plural": "{{count}} differences",
     "identicalDescription": "These certificates have identical properties",
     "differencesDescription": "Differences are highlighted in orange",
-    "selectTwoToCompare": "Select two certificates to compare"
+    "selectTwoToCompare": "Select two certificates to compare",
+    "differences_one": "{{count}} differenza",
+    "differences_other": "{{count}} differenze"
   },
   "crlOcsp": {
     "title": "CRL e OCSP",
@@ -851,8 +857,6 @@
     "recentCAs": "CA recenti",
     "statusDistribution": "Distribuzione stati",
     "recentActivity": "Attività recente",
-    "expiringCertificates": "{{count}} certificato in scadenza",
-    "expiringCertificates_plural": "{{count}} certificati in scadenza",
     "clickToRenew": "Clicca per visualizzare e rinnovare",
     "customizeDashboard": "Personalizza dashboard",
     "allSystemsOperational": "Tutti i sistemi operativi",
@@ -887,7 +891,9 @@
     "widgetCertificateAuthorities": "Autorità di certificazione",
     "widgetAcmeAccounts": "Account ACME",
     "showOrHideWidgets": "Mostra o nascondi widget",
-    "loadFailed": "Failed to load dashboard"
+    "loadFailed": "Failed to load dashboard",
+    "expiringCertificates_one": "{{count}} certificato in scadenza",
+    "expiringCertificates_other": "{{count}} certificati in scadenza"
   },
   "details": {
     "subject": "Subject",
@@ -976,7 +982,11 @@
     "noGroups": "Nessun gruppo trovato",
     "namePlaceholder": "sviluppatori",
     "descriptionPlaceholder": "Team di sviluppo",
-    "confirmDelete": "Delete group \"{{name}}\"?"
+    "confirmDelete": "Delete group \"{{name}}\"?",
+    "subtitle_one": "{{count}} gruppo",
+    "subtitle_other": "{{count}} gruppi",
+    "memberCount_one": "{{count}} membro",
+    "memberCount_other": "{{count}} membri"
   },
   "help": {
     "aboutCertificates": "Informazioni sui certificati",
@@ -1012,8 +1022,6 @@
     "disconnected": "Disconnesso",
     "testConnection": "Test connessione",
     "noHSM": "Nessun HSM configurato",
-    "subtitle": "{{count}} provider",
-    "subtitle_plural": "{{count}} providers",
     "newProvider": "New Provider",
     "editProvider": "Edit HSM Provider",
     "deleteProvider": "Delete Provider",
@@ -1089,7 +1097,9 @@
       "disabled": "Disabled",
       "keys": "Keys",
       "cloud": "Cloud"
-    }
+    },
+    "subtitle_one": "{{count}} fornitore",
+    "subtitle_other": "{{count}} fornitori"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1295,8 +1305,6 @@
     "permissions": "Permessi",
     "assignedUsers": "Utenti assegnati",
     "noRoles": "Nessun ruolo definito",
-    "subtitle": "{{count}} role",
-    "subtitle_plural": "{{count}} roles",
     "createCustomRole": "Create Custom Role",
     "roleType": "Type",
     "permissionCount": "{{count}} perms",
@@ -1342,7 +1350,9 @@
       "system": "Sistema",
       "custom": "Custom",
       "users": "Utenti"
-    }
+    },
+    "subtitle_one": "{{count}} ruolo",
+    "subtitle_other": "{{count}} ruoli"
   },
   "scep": {
     "title": "Protocollo SCEP",
@@ -1421,8 +1431,6 @@
     "chainValid": "Catena hash valida",
     "chainInvalid": "Integrità catena compromessa",
     "noAnomalies": "Nessuna anomalia rilevata",
-    "anomaliesDetected": "{{count}} anomalia rilevata",
-    "anomaliesDetected_plural": "{{count}} anomalie rilevate",
     "subtitle": "Monitor security status and manage secrets",
     "anomalyDetection": "Rilevamento anomalie",
     "auditLogIntegrity": "Integrità log di audit",
@@ -1466,7 +1474,9 @@
     },
     "success": {
       "auditVerified": "Audit integrity verified ({{count}} entries)"
-    }
+    },
+    "anomaliesDetected_one": "{{count}} anomalia rilevata",
+    "anomaliesDetected_other": "{{count}} anomalie rilevate"
   },
   "session": {
     "expiring": "Session Expiring",
@@ -1863,20 +1873,22 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "pathLength": "Path Length",
-    "caCertificate": "CA Certificate"
+    "caCertificate": "CA Certificate",
+    "subtitle_one": "{{count}} modello",
+    "subtitle_other": "{{count}} modelli"
   },
   "time": {
     "justNow": "Proprio ora",
-    "minutesAgo": "{{count}} minuto fa",
-    "minutesAgo_plural": "{{count}} minuti fa",
-    "hoursAgo": "{{count}} ora fa",
-    "hoursAgo_plural": "{{count}} ore fa",
-    "daysAgo": "{{count}} giorno fa",
-    "daysAgo_plural": "{{count}} giorni fa",
     "today": "Oggi",
     "yesterday": "Ieri",
     "thisWeek": "Questa settimana",
-    "thisMonth": "Questo mese"
+    "thisMonth": "Questo mese",
+    "minutesAgo_one": "{{count}} minuto fa",
+    "minutesAgo_other": "{{count}} minuti fa",
+    "hoursAgo_one": "{{count}} ora fa",
+    "hoursAgo_other": "{{count}} ore fa",
+    "daysAgo_one": "{{count}} giorno fa",
+    "daysAgo_other": "{{count}} giorni fa"
   },
   "tools": {
     "title": "Strumenti certificati",
@@ -2019,8 +2031,6 @@
     "system": "Sistema",
     "custom": "Personalizzato",
     "noCertificates": "Nessun certificato fidato",
-    "subtitle": "{{count}} certificato",
-    "subtitle_plural": "{{count}} certificati",
     "addTrustedCertificate": "Add Trusted Certificate",
     "syncing": "Syncing...",
     "sync": "Sync",
@@ -2079,7 +2089,9 @@
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
     "emailTrust": "Email",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle_one": "{{count}} certificato",
+    "subtitle_other": "{{count}} certificati"
   },
   "users": {
     "title": "Utenti",
@@ -2111,7 +2123,9 @@
     "confirmResetPassword": "Reset password for \"{{name}}\"?",
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
-    "newPassword": "New password: {{password}}"
+    "newPassword": "New password: {{password}}",
+    "subtitle_one": "{{count}} utente",
+    "subtitle_other": "{{count}} utenti"
   },
   "validation": {
     "required": "Questo campo è obbligatorio",

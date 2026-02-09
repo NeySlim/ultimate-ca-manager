@@ -341,7 +341,9 @@
     "domainDeletedSuccess": "Domaine supprimé avec succès",
     "confirmDeleteDomain": "Supprimer le domaine \"{{domain}}\" ? Le proxy ACME n'acceptera plus les demandes de certificats pour ce domaine.",
     "domainTestSuccess": "Test d'accès DNS réussi",
-    "domainTestFailed": "Échec du test d'accès DNS"
+    "domainTestFailed": "Échec du test d'accès DNS",
+    "subtitle_one": "{{count}} compte",
+    "subtitle_other": "{{count}} comptes"
   },
   "audit": {
     "title": "Journaux d'audit",
@@ -483,7 +485,9 @@
     "passwordTooShort": "Le mot de passe doit contenir au moins 4 caractères",
     "exportedAs": "AC exportée en {{format}}",
     "createFailed": "Échec de la création de l'AC",
-    "unnamedCA": "AC sans nom"
+    "unnamedCA": "AC sans nom",
+    "subtitle_one": "{{count}} AC",
+    "subtitle_other": "{{count}} AC"
   },
   "certificates": {
     "title": "Certificats",
@@ -537,7 +541,9 @@
     "commonNamePlaceholder": "exemple.com",
     "sanPlaceholder": "DNS:exemple.com\nDNS:www.exemple.com\nIP:192.168.1.1",
     "validityPlaceholder": "365",
-    "privateKeyPEM": "Private Key (PEM)"
+    "privateKeyPEM": "Private Key (PEM)",
+    "subtitle_one": "{{count}} certificat",
+    "subtitle_other": "{{count}} certificats"
   },
   "common": {
     "save": "Enregistrer",
@@ -680,11 +686,11 @@
     "swap": "Swap certificates",
     "field": "Field",
     "identical": "Identical",
-    "differences": "{{count}} difference",
-    "differences_plural": "{{count}} differences",
     "identicalDescription": "These certificates have identical properties",
     "differencesDescription": "Differences are highlighted in orange",
-    "selectTwoToCompare": "Select two certificates to compare"
+    "selectTwoToCompare": "Select two certificates to compare",
+    "differences_one": "{{count}} différence",
+    "differences_other": "{{count}} différences"
   },
   "crlOcsp": {
     "title": "CRL & OCSP",
@@ -851,8 +857,6 @@
     "recentCAs": "AC récentes",
     "statusDistribution": "Distribution des statuts",
     "recentActivity": "Activité récente",
-    "expiringCertificates": "{{count}} certificat expire bientôt",
-    "expiringCertificates_plural": "{{count}} certificats expirent bientôt",
     "clickToRenew": "Cliquez pour voir et renouveler",
     "customizeDashboard": "Personnaliser le tableau de bord",
     "allSystemsOperational": "Tous les systèmes opérationnels",
@@ -887,7 +891,9 @@
     "widgetCertificateAuthorities": "Autorités de certification",
     "widgetAcmeAccounts": "Comptes ACME",
     "showOrHideWidgets": "Afficher ou masquer les widgets",
-    "loadFailed": "Échec du chargement du tableau de bord"
+    "loadFailed": "Échec du chargement du tableau de bord",
+    "expiringCertificates_one": "{{count}} certificat expirant bientôt",
+    "expiringCertificates_other": "{{count}} certificats expirant bientôt"
   },
   "details": {
     "subject": "Sujet",
@@ -976,7 +982,11 @@
     "noGroups": "Aucun groupe trouvé",
     "namePlaceholder": "développeurs",
     "descriptionPlaceholder": "Équipe de développement",
-    "confirmDelete": "Supprimer le groupe \"{{name}}\" ?"
+    "confirmDelete": "Supprimer le groupe \"{{name}}\" ?",
+    "subtitle_one": "{{count}} groupe",
+    "subtitle_other": "{{count}} groupes",
+    "memberCount_one": "{{count}} membre",
+    "memberCount_other": "{{count}} membres"
   },
   "help": {
     "aboutCertificates": "À propos des certificats",
@@ -1012,8 +1022,6 @@
     "disconnected": "Déconnecté",
     "testConnection": "Tester la connexion",
     "noHSM": "Aucun fournisseur HSM",
-    "subtitle": "{{count}} fournisseur",
-    "subtitle_plural": "{{count}} fournisseurs",
     "newProvider": "Nouveau fournisseur",
     "editProvider": "Modifier le fournisseur HSM",
     "deleteProvider": "Supprimer le fournisseur",
@@ -1089,7 +1097,9 @@
       "disabled": "Désactivé",
       "keys": "Clés",
       "cloud": "Cloud"
-    }
+    },
+    "subtitle_one": "{{count}} fournisseur",
+    "subtitle_other": "{{count}} fournisseurs"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1295,8 +1305,6 @@
     "permissions": "Permissions",
     "assignedUsers": "Utilisateurs assignés",
     "noRoles": "Aucun rôle trouvé",
-    "subtitle": "{{count}} rôle",
-    "subtitle_plural": "{{count}} rôles",
     "createCustomRole": "Créer un rôle personnalisé",
     "roleType": "Type",
     "permissionCount": "{{count}} perms",
@@ -1342,7 +1350,9 @@
       "system": "Système",
       "custom": "Personnalisé",
       "users": "Utilisateurs"
-    }
+    },
+    "subtitle_one": "{{count}} rôle",
+    "subtitle_other": "{{count}} rôles"
   },
   "scep": {
     "title": "Protocole SCEP",
@@ -1421,8 +1431,6 @@
     "chainValid": "La chaîne de hachage est valide",
     "chainInvalid": "Intégrité de la chaîne de hachage compromise",
     "noAnomalies": "Aucune anomalie détectée",
-    "anomaliesDetected": "{{count}} anomalie détectée",
-    "anomaliesDetected_plural": "{{count}} anomalies détectées",
     "subtitle": "Surveiller l'état de sécurité et gérer les secrets",
     "anomalyDetection": "Détection d'anomalies",
     "auditLogIntegrity": "Intégrité des journaux d'audit",
@@ -1466,7 +1474,9 @@
     },
     "success": {
       "auditVerified": "Intégrité d'audit vérifiée ({{count}} entrées)"
-    }
+    },
+    "anomaliesDetected_one": "{{count}} anomalie détectée",
+    "anomaliesDetected_other": "{{count}} anomalies détectées"
   },
   "session": {
     "expiring": "Session Expiring",
@@ -1863,20 +1873,22 @@
     "fixedCN": "CN fixe",
     "cnRequired": "CN requis",
     "pathLength": "Longueur du chemin",
-    "caCertificate": "Certificat CA"
+    "caCertificate": "Certificat CA",
+    "subtitle_one": "{{count}} modèle",
+    "subtitle_other": "{{count}} modèles"
   },
   "time": {
     "justNow": "À l'instant",
-    "minutesAgo": "Il y a {{count}} minute",
-    "minutesAgo_plural": "Il y a {{count}} minutes",
-    "hoursAgo": "Il y a {{count}} heure",
-    "hoursAgo_plural": "Il y a {{count}} heures",
-    "daysAgo": "Il y a {{count}} jour",
-    "daysAgo_plural": "Il y a {{count}} jours",
     "today": "Aujourd'hui",
     "yesterday": "Hier",
     "thisWeek": "Cette semaine",
-    "thisMonth": "Ce mois-ci"
+    "thisMonth": "Ce mois-ci",
+    "minutesAgo_one": "il y a {{count}} minute",
+    "minutesAgo_other": "il y a {{count}} minutes",
+    "hoursAgo_one": "il y a {{count}} heure",
+    "hoursAgo_other": "il y a {{count}} heures",
+    "daysAgo_one": "il y a {{count}} jour",
+    "daysAgo_other": "il y a {{count}} jours"
   },
   "tools": {
     "title": "Outils certificats",
@@ -2019,8 +2031,6 @@
     "system": "Système",
     "custom": "Personnalisé",
     "noCertificates": "Aucun certificat de confiance",
-    "subtitle": "{{count}} certificat",
-    "subtitle_plural": "{{count}} certificats",
     "addTrustedCertificate": "Ajouter un certificat de confiance",
     "syncing": "Synchronisation...",
     "sync": "Sync",
@@ -2079,7 +2089,9 @@
     "emailTrust": "Email",
     "emailTrustDesc": "Trusted for S/MIME",
     "tlsTrust": "TLS Trust",
-    "tlsTrustDesc": "Trusted for TLS/SSL connections"
+    "tlsTrustDesc": "Trusted for TLS/SSL connections",
+    "subtitle_one": "{{count}} certificat",
+    "subtitle_other": "{{count}} certificats"
   },
   "users": {
     "title": "Utilisateurs",
@@ -2111,7 +2123,9 @@
     "confirmResetPassword": "Réinitialiser le mot de passe pour \"{{name}}\" ?",
     "newPassword": "Nouveau mot de passe : {{password}}",
     "checkEmail": "Vérifiez votre email",
-    "resetPasswordFailed": "Échec de la réinitialisation du mot de passe"
+    "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
+    "subtitle_one": "{{count}} utilisateur",
+    "subtitle_other": "{{count}} utilisateurs"
   },
   "validation": {
     "required": "Ce champ est requis",

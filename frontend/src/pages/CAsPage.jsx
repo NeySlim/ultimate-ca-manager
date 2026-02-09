@@ -333,7 +333,7 @@ export default function CAsPage() {
     <>
       <ResponsiveLayout
         title={t('cas.title')}
-        subtitle={`${cas.length} CA${cas.length !== 1 ? 's' : ''}`}
+        subtitle={t('cas.subtitle', { count: cas.length })}
         icon={ShieldCheck}
         stats={stats}
         helpPageKey="cas"

@@ -637,7 +637,7 @@ export default function CertificatesPage() {
     <>
       <ResponsiveLayout
         title={t('certificates.title')}
-        subtitle={`${total} ${t('certificates.certificate')}${total !== 1 ? 's' : ''}`}
+        subtitle={t('certificates.subtitle', { count: total })}
         icon={Certificate}
         stats={stats}
         onStatClick={handleStatClick}

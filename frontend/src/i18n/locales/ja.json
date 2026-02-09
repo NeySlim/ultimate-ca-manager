@@ -341,7 +341,9 @@
     "proxyUsage": "Usage with certbot:",
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
-    "source": "Source"
+    "source": "Source",
+    "subtitle_one": "{{count}} 件のアカウント",
+    "subtitle_other": "{{count}} 件のアカウント"
   },
   "audit": {
     "title": "監査ログ",
@@ -483,7 +485,9 @@
     "deleteFailed": "Failed to delete CA",
     "exportFailed": "Failed to export CA",
     "createFailed": "Failed to create CA",
-    "passwordTooShort": "Password must be at least 4 characters"
+    "passwordTooShort": "Password must be at least 4 characters",
+    "subtitle_one": "{{count}} 件の CA",
+    "subtitle_other": "{{count}} 件の CA"
   },
   "certificates": {
     "title": "証明書",
@@ -537,7 +541,9 @@
     "commonNamePlaceholder": "example.com",
     "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
     "validityPlaceholder": "365",
-    "privateKeyPEM": "Private Key (PEM)"
+    "privateKeyPEM": "Private Key (PEM)",
+    "subtitle_one": "{{count}} 件の証明書",
+    "subtitle_other": "{{count}} 件の証明書"
   },
   "common": {
     "save": "保存",
@@ -680,11 +686,11 @@
     "swap": "Swap certificates",
     "field": "Field",
     "identical": "Identical",
-    "differences": "{{count}} difference",
-    "differences_plural": "{{count}} differences",
     "identicalDescription": "These certificates have identical properties",
     "differencesDescription": "Differences are highlighted in orange",
-    "selectTwoToCompare": "Select two certificates to compare"
+    "selectTwoToCompare": "Select two certificates to compare",
+    "differences_one": "{{count}} 件の相違",
+    "differences_other": "{{count}} 件の相違"
   },
   "crlOcsp": {
     "title": "CRL & OCSP",
@@ -851,8 +857,6 @@
     "recentCAs": "最近のCA",
     "statusDistribution": "ステータス分布",
     "recentActivity": "最近のアクティビティ",
-    "expiringCertificates": "{{count}}件の証明書がまもなく期限切れ",
-    "expiringCertificates_plural": "{{count}}件の証明書がまもなく期限切れ",
     "clickToRenew": "クリックして表示・更新",
     "customizeDashboard": "ダッシュボードをカスタマイズ",
     "allSystemsOperational": "すべてのシステムが正常",
@@ -887,7 +891,9 @@
     "widgetCertificateAuthorities": "認証局",
     "widgetAcmeAccounts": "ACMEアカウント",
     "showOrHideWidgets": "ウィジェットの表示/非表示",
-    "loadFailed": "Failed to load dashboard"
+    "loadFailed": "Failed to load dashboard",
+    "expiringCertificates_one": "{{count}} 件の証明書が間もなく期限切れ",
+    "expiringCertificates_other": "{{count}} 件の証明書が間もなく期限切れ"
   },
   "details": {
     "subject": "Subject",
@@ -976,7 +982,11 @@
     "noGroups": "グループが見つかりません",
     "namePlaceholder": "開発者",
     "descriptionPlaceholder": "開発チーム",
-    "confirmDelete": "Delete group \"{{name}}\"?"
+    "confirmDelete": "Delete group \"{{name}}\"?",
+    "subtitle_one": "{{count}} 件のグループ",
+    "subtitle_other": "{{count}} 件のグループ",
+    "memberCount_one": "{{count}} 人のメンバー",
+    "memberCount_other": "{{count}} 人のメンバー"
   },
   "help": {
     "aboutCertificates": "証明書について",
@@ -1012,8 +1022,6 @@
     "disconnected": "切断",
     "testConnection": "接続テスト",
     "noHSM": "HSMが設定されていません",
-    "subtitle": "{{count}} provider",
-    "subtitle_plural": "{{count}} providers",
     "newProvider": "New Provider",
     "editProvider": "Edit HSM Provider",
     "deleteProvider": "Delete Provider",
@@ -1089,7 +1097,9 @@
       "disabled": "Disabled",
       "keys": "Keys",
       "cloud": "Cloud"
-    }
+    },
+    "subtitle_one": "{{count}} 件のプロバイダー",
+    "subtitle_other": "{{count}} 件のプロバイダー"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1295,8 +1305,6 @@
     "permissions": "権限",
     "assignedUsers": "割り当てられたユーザー",
     "noRoles": "定義されたロールなし",
-    "subtitle": "{{count}} role",
-    "subtitle_plural": "{{count}} roles",
     "createCustomRole": "Create Custom Role",
     "roleType": "Type",
     "permissionCount": "{{count}} perms",
@@ -1342,7 +1350,9 @@
       "system": "システム",
       "custom": "Custom",
       "users": "ユーザー"
-    }
+    },
+    "subtitle_one": "{{count}} 件のロール",
+    "subtitle_other": "{{count}} 件のロール"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -1421,8 +1431,6 @@
     "chainValid": "ハッシュチェーンは有効です",
     "chainInvalid": "ハッシュチェーンの整合性が損なわれています",
     "noAnomalies": "異常は検出されませんでした",
-    "anomaliesDetected": "{{count}}件の異常が検出されました",
-    "anomaliesDetected_plural": "{{count}}件の異常が検出されました",
     "subtitle": "Monitor security status and manage secrets",
     "anomalyDetection": "異常検出",
     "auditLogIntegrity": "監査ログの整合性",
@@ -1466,7 +1474,9 @@
     },
     "success": {
       "auditVerified": "Audit integrity verified ({{count}} entries)"
-    }
+    },
+    "anomaliesDetected_one": "{{count}} 件の異常を検出",
+    "anomaliesDetected_other": "{{count}} 件の異常を検出"
   },
   "session": {
     "expiring": "Session Expiring",
@@ -1863,20 +1873,22 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "pathLength": "Path Length",
-    "caCertificate": "CA Certificate"
+    "caCertificate": "CA Certificate",
+    "subtitle_one": "{{count}} 件のテンプレート",
+    "subtitle_other": "{{count}} 件のテンプレート"
   },
   "time": {
     "justNow": "たった今",
-    "minutesAgo": "{{count}}分前",
-    "minutesAgo_plural": "{{count}}分前",
-    "hoursAgo": "{{count}}時間前",
-    "hoursAgo_plural": "{{count}}時間前",
-    "daysAgo": "{{count}}日前",
-    "daysAgo_plural": "{{count}}日前",
     "today": "今日",
     "yesterday": "昨日",
     "thisWeek": "今週",
-    "thisMonth": "今月"
+    "thisMonth": "今月",
+    "minutesAgo_one": "{{count}} 分前",
+    "minutesAgo_other": "{{count}} 分前",
+    "hoursAgo_one": "{{count}} 時間前",
+    "hoursAgo_other": "{{count}} 時間前",
+    "daysAgo_one": "{{count}} 日前",
+    "daysAgo_other": "{{count}} 日前"
   },
   "tools": {
     "title": "証明書ツール",
@@ -2019,8 +2031,6 @@
     "system": "システム",
     "custom": "カスタム",
     "noCertificates": "信頼された証明書なし",
-    "subtitle": "{{count}}件の証明書",
-    "subtitle_plural": "{{count}}件の証明書",
     "addTrustedCertificate": "Add Trusted Certificate",
     "syncing": "Syncing...",
     "sync": "Sync",
@@ -2079,7 +2089,9 @@
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
     "emailTrust": "Email",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle_one": "{{count}} 件の証明書",
+    "subtitle_other": "{{count}} 件の証明書"
   },
   "users": {
     "title": "ユーザー",
@@ -2111,7 +2123,9 @@
     "confirmResetPassword": "Reset password for \"{{name}}\"?",
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
-    "newPassword": "New password: {{password}}"
+    "newPassword": "New password: {{password}}",
+    "subtitle_one": "{{count}} 人のユーザー",
+    "subtitle_other": "{{count}} 人のユーザー"
   },
   "validation": {
     "required": "この項目は必須です",

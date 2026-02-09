@@ -341,7 +341,9 @@
     "proxyUsage": "Usage with certbot:",
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
-    "source": "Source"
+    "source": "Source",
+    "subtitle_one": "{{count}} 个账户",
+    "subtitle_other": "{{count}} 个账户"
   },
   "audit": {
     "title": "审计日志",
@@ -483,7 +485,9 @@
     "deleteFailed": "Failed to delete CA",
     "exportFailed": "Failed to export CA",
     "createFailed": "Failed to create CA",
-    "passwordTooShort": "Password must be at least 4 characters"
+    "passwordTooShort": "Password must be at least 4 characters",
+    "subtitle_one": "{{count}} 个 CA",
+    "subtitle_other": "{{count}} 个 CA"
   },
   "certificates": {
     "title": "证书",
@@ -537,7 +541,9 @@
     "commonNamePlaceholder": "example.com",
     "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
     "validityPlaceholder": "365",
-    "privateKeyPEM": "Private Key (PEM)"
+    "privateKeyPEM": "Private Key (PEM)",
+    "subtitle_one": "{{count}} 个证书",
+    "subtitle_other": "{{count}} 个证书"
   },
   "common": {
     "save": "保存",
@@ -680,11 +686,11 @@
     "swap": "Swap certificates",
     "field": "Field",
     "identical": "Identical",
-    "differences": "{{count}} difference",
-    "differences_plural": "{{count}} differences",
     "identicalDescription": "These certificates have identical properties",
     "differencesDescription": "Differences are highlighted in orange",
-    "selectTwoToCompare": "Select two certificates to compare"
+    "selectTwoToCompare": "Select two certificates to compare",
+    "differences_one": "{{count}} 个差异",
+    "differences_other": "{{count}} 个差异"
   },
   "crlOcsp": {
     "title": "CRL和OCSP",
@@ -851,8 +857,6 @@
     "recentCAs": "最近的CA",
     "statusDistribution": "状态分布",
     "recentActivity": "最近活动",
-    "expiringCertificates": "{{count}}个证书即将过期",
-    "expiringCertificates_plural": "{{count}}个证书即将过期",
     "clickToRenew": "点击查看并续期",
     "customizeDashboard": "自定义仪表板",
     "allSystemsOperational": "所有系统正常",
@@ -887,7 +891,9 @@
     "widgetCertificateAuthorities": "证书颁发机构",
     "widgetAcmeAccounts": "ACME账户",
     "showOrHideWidgets": "显示或隐藏小部件",
-    "loadFailed": "Failed to load dashboard"
+    "loadFailed": "Failed to load dashboard",
+    "expiringCertificates_one": "{{count}} 个证书即将过期",
+    "expiringCertificates_other": "{{count}} 个证书即将过期"
   },
   "details": {
     "subject": "Subject",
@@ -976,7 +982,11 @@
     "noGroups": "未找到组",
     "namePlaceholder": "开发人员",
     "descriptionPlaceholder": "开发团队",
-    "confirmDelete": "Delete group \"{{name}}\"?"
+    "confirmDelete": "Delete group \"{{name}}\"?",
+    "subtitle_one": "{{count}} 个组",
+    "subtitle_other": "{{count}} 个组",
+    "memberCount_one": "{{count}} 个成员",
+    "memberCount_other": "{{count}} 个成员"
   },
   "help": {
     "aboutCertificates": "关于证书",
@@ -1012,8 +1022,6 @@
     "disconnected": "已断开",
     "testConnection": "测试连接",
     "noHSM": "没有配置HSM",
-    "subtitle": "{{count}} provider",
-    "subtitle_plural": "{{count}} providers",
     "newProvider": "New Provider",
     "editProvider": "Edit HSM Provider",
     "deleteProvider": "Delete Provider",
@@ -1089,7 +1097,9 @@
       "disabled": "Disabled",
       "keys": "Keys",
       "cloud": "Cloud"
-    }
+    },
+    "subtitle_one": "{{count}} 个提供者",
+    "subtitle_other": "{{count}} 个提供者"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1295,8 +1305,6 @@
     "permissions": "权限",
     "assignedUsers": "分配的用户",
     "noRoles": "没有定义的角色",
-    "subtitle": "{{count}} role",
-    "subtitle_plural": "{{count}} roles",
     "createCustomRole": "Create Custom Role",
     "roleType": "Type",
     "permissionCount": "{{count}} perms",
@@ -1342,7 +1350,9 @@
       "system": "系统",
       "custom": "Custom",
       "users": "用户"
-    }
+    },
+    "subtitle_one": "{{count}} 个角色",
+    "subtitle_other": "{{count}} 个角色"
   },
   "scep": {
     "title": "SCEP协议",
@@ -1421,8 +1431,6 @@
     "chainValid": "哈希链有效",
     "chainInvalid": "哈希链完整性受损",
     "noAnomalies": "未检测到异常",
-    "anomaliesDetected": "检测到{{count}}个异常",
-    "anomaliesDetected_plural": "检测到{{count}}个异常",
     "subtitle": "Monitor security status and manage secrets",
     "anomalyDetection": "异常检测",
     "auditLogIntegrity": "审计日志完整性",
@@ -1466,7 +1474,9 @@
     },
     "success": {
       "auditVerified": "Audit integrity verified ({{count}} entries)"
-    }
+    },
+    "anomaliesDetected_one": "检测到 {{count}} 个异常",
+    "anomaliesDetected_other": "检测到 {{count}} 个异常"
   },
   "session": {
     "expiring": "Session Expiring",
@@ -1863,20 +1873,22 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "pathLength": "Path Length",
-    "caCertificate": "CA Certificate"
+    "caCertificate": "CA Certificate",
+    "subtitle_one": "{{count}} 个模板",
+    "subtitle_other": "{{count}} 个模板"
   },
   "time": {
     "justNow": "刚刚",
-    "minutesAgo": "{{count}}分钟前",
-    "minutesAgo_plural": "{{count}}分钟前",
-    "hoursAgo": "{{count}}小时前",
-    "hoursAgo_plural": "{{count}}小时前",
-    "daysAgo": "{{count}}天前",
-    "daysAgo_plural": "{{count}}天前",
     "today": "今天",
     "yesterday": "昨天",
     "thisWeek": "本周",
-    "thisMonth": "本月"
+    "thisMonth": "本月",
+    "minutesAgo_one": "{{count}} 分钟前",
+    "minutesAgo_other": "{{count}} 分钟前",
+    "hoursAgo_one": "{{count}} 小时前",
+    "hoursAgo_other": "{{count}} 小时前",
+    "daysAgo_one": "{{count}} 天前",
+    "daysAgo_other": "{{count}} 天前"
   },
   "tools": {
     "title": "证书工具",
@@ -2019,8 +2031,6 @@
     "system": "系统",
     "custom": "自定义",
     "noCertificates": "没有受信任的证书",
-    "subtitle": "{{count}}个证书",
-    "subtitle_plural": "{{count}}个证书",
     "addTrustedCertificate": "Add Trusted Certificate",
     "syncing": "Syncing...",
     "sync": "Sync",
@@ -2079,7 +2089,9 @@
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
     "emailTrust": "Email",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle_one": "{{count}} 个证书",
+    "subtitle_other": "{{count}} 个证书"
   },
   "users": {
     "title": "用户",
@@ -2111,7 +2123,9 @@
     "confirmResetPassword": "Reset password for \"{{name}}\"?",
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
-    "newPassword": "New password: {{password}}"
+    "newPassword": "New password: {{password}}",
+    "subtitle_one": "{{count}} 个用户",
+    "subtitle_other": "{{count}} 个用户"
   },
   "validation": {
     "required": "此字段必填",

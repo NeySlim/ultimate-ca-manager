@@ -419,7 +419,7 @@ export default function TemplatesPage() {
     <>
       <ResponsiveLayout
         title={t('templates.title')}
-        subtitle={`${templates.length} ${t('templates.template').toLowerCase()}${templates.length !== 1 ? 's' : ''}`}
+        subtitle={t('templates.subtitle', { count: templates.length })}
         icon={FileText}
         stats={stats}
         helpPageKey="templates"

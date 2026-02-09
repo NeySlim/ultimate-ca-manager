@@ -1711,7 +1711,7 @@ export default function ACMEPage() {
     <>
       <ResponsiveLayout
         title={t('acme.title')}
-        subtitle={`${accounts.length} ${t('acme.account')}${accounts.length !== 1 ? 's' : ''}`}
+        subtitle={t('acme.subtitle', { count: accounts.length })}
         icon={Lightning}
         stats={[
           { icon: Key, label: t('acme.accounts'), value: accounts.length },

@@ -455,7 +455,7 @@ export default function UsersGroupsPage() {
         const count = row.members?.length || val || 0
         return (
           <Badge variant={count > 0 ? 'primary' : 'secondary'} size="sm" dot>
-            {count} {count === 1 ? t('groups.members').replace('Members', 'member').toLowerCase() : t('groups.members').toLowerCase()}
+            {t('groups.memberCount', { count })}
           </Badge>
         )
       }
@@ -616,7 +616,7 @@ export default function UsersGroupsPage() {
         icon={Users}
         iconClass="bg-accent-primary/20"
         title={selectedGroup.name}
-        subtitle={`${selectedGroup.members?.length || 0} ${(selectedGroup.members?.length || 0) === 1 ? t('groups.members').toLowerCase().replace('members', 'member') : t('groups.members').toLowerCase()}`}
+        subtitle={t('groups.memberCount', { count: selectedGroup.members?.length || 0 })}
       />
 
       {/* Actions */}
@@ -739,7 +739,7 @@ export default function UsersGroupsPage() {
     <>
       <ResponsiveLayout
         title={activeTab === 'users' ? t('users.title') : t('groups.title')}
-        subtitle={`${currentData.length} ${activeTab}`}
+        subtitle={activeTab === 'users' ? t('users.subtitle', { count: currentData.length }) : t('groups.subtitle', { count: currentData.length })}
         icon={activeTab === 'users' ? User : Users}
         stats={stats}
         tabs={tabs}

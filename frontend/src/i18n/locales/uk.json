@@ -341,7 +341,9 @@
     "proxyUsage": "Usage with certbot:",
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
-    "source": "Source"
+    "source": "Source",
+    "subtitle_one": "{{count}} обліковий запис",
+    "subtitle_other": "{{count}} облікових записів"
   },
   "audit": {
     "title": "Журнали аудиту",
@@ -483,7 +485,9 @@
     "deleteFailed": "Failed to delete CA",
     "exportFailed": "Failed to export CA",
     "createFailed": "Failed to create CA",
-    "passwordTooShort": "Password must be at least 4 characters"
+    "passwordTooShort": "Password must be at least 4 characters",
+    "subtitle_one": "{{count}} ЦС",
+    "subtitle_other": "{{count}} ЦС"
   },
   "certificates": {
     "title": "Сертифікати",
@@ -537,7 +541,9 @@
     "commonNamePlaceholder": "example.com",
     "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
     "validityPlaceholder": "365",
-    "privateKeyPEM": "Private Key (PEM)"
+    "privateKeyPEM": "Private Key (PEM)",
+    "subtitle_one": "{{count}} сертифікат",
+    "subtitle_other": "{{count}} сертифікатів"
   },
   "common": {
     "save": "Зберегти",
@@ -680,11 +686,11 @@
     "swap": "Swap certificates",
     "field": "Field",
     "identical": "Identical",
-    "differences": "{{count}} difference",
-    "differences_plural": "{{count}} differences",
     "identicalDescription": "These certificates have identical properties",
     "differencesDescription": "Differences are highlighted in orange",
-    "selectTwoToCompare": "Select two certificates to compare"
+    "selectTwoToCompare": "Select two certificates to compare",
+    "differences_one": "{{count}} відмінність",
+    "differences_other": "{{count}} відмінностей"
   },
   "crlOcsp": {
     "title": "CRL та OCSP",
@@ -851,8 +857,6 @@
     "recentCAs": "Останні ЦС",
     "statusDistribution": "Розподіл статусів",
     "recentActivity": "Остання активність",
-    "expiringCertificates": "{{count}} сертифікат закінчується",
-    "expiringCertificates_plural": "{{count}} сертифікатів закінчуються",
     "clickToRenew": "Натисніть для перегляду та оновлення",
     "customizeDashboard": "Налаштувати панель",
     "allSystemsOperational": "Всі системи працюють",
@@ -887,7 +891,9 @@
     "widgetCertificateAuthorities": "Центри сертифікації",
     "widgetAcmeAccounts": "Облікові записи ACME",
     "showOrHideWidgets": "Показати або приховати віджети",
-    "loadFailed": "Failed to load dashboard"
+    "loadFailed": "Failed to load dashboard",
+    "expiringCertificates_one": "{{count}} сертифікат скоро закінчиться",
+    "expiringCertificates_other": "{{count}} сертифікатів скоро закінчаться"
   },
   "details": {
     "subject": "Subject",
@@ -976,7 +982,11 @@
     "noGroups": "Групи не знайдено",
     "namePlaceholder": "розробники",
     "descriptionPlaceholder": "Команда розробників",
-    "confirmDelete": "Delete group \"{{name}}\"?"
+    "confirmDelete": "Delete group \"{{name}}\"?",
+    "subtitle_one": "{{count}} група",
+    "subtitle_other": "{{count}} груп",
+    "memberCount_one": "{{count}} учасник",
+    "memberCount_other": "{{count}} учасників"
   },
   "help": {
     "aboutCertificates": "Про сертифікати",
@@ -1012,8 +1022,6 @@
     "disconnected": "Відключено",
     "testConnection": "Перевірити з'єднання",
     "noHSM": "HSM не налаштовано",
-    "subtitle": "{{count}} provider",
-    "subtitle_plural": "{{count}} providers",
     "newProvider": "New Provider",
     "editProvider": "Edit HSM Provider",
     "deleteProvider": "Delete Provider",
@@ -1089,7 +1097,9 @@
       "disabled": "Disabled",
       "keys": "Keys",
       "cloud": "Cloud"
-    }
+    },
+    "subtitle_one": "{{count}} постачальник",
+    "subtitle_other": "{{count}} постачальників"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1295,8 +1305,6 @@
     "permissions": "Дозволи",
     "assignedUsers": "Призначені користувачі",
     "noRoles": "Немає визначених ролей",
-    "subtitle": "{{count}} role",
-    "subtitle_plural": "{{count}} roles",
     "createCustomRole": "Create Custom Role",
     "roleType": "Type",
     "permissionCount": "{{count}} perms",
@@ -1342,7 +1350,9 @@
       "system": "Система",
       "custom": "Custom",
       "users": "Користувачі"
-    }
+    },
+    "subtitle_one": "{{count}} роль",
+    "subtitle_other": "{{count}} ролей"
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -1421,8 +1431,6 @@
     "chainValid": "Хеш-ланцюжок дійсний",
     "chainInvalid": "Цілісність ланцюжка порушена",
     "noAnomalies": "Аномалій не виявлено",
-    "anomaliesDetected": "Виявлено {{count}} аномалію",
-    "anomaliesDetected_plural": "Виявлено {{count}} аномалій",
     "subtitle": "Monitor security status and manage secrets",
     "anomalyDetection": "Виявлення аномалій",
     "auditLogIntegrity": "Цілісність журналу аудиту",
@@ -1466,7 +1474,9 @@
     },
     "success": {
       "auditVerified": "Audit integrity verified ({{count}} entries)"
-    }
+    },
+    "anomaliesDetected_one": "{{count}} аномалія виявлена",
+    "anomaliesDetected_other": "{{count}} аномалій виявлено"
   },
   "session": {
     "expiring": "Session Expiring",
@@ -1863,20 +1873,22 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "pathLength": "Path Length",
-    "caCertificate": "CA Certificate"
+    "caCertificate": "CA Certificate",
+    "subtitle_one": "{{count}} шаблон",
+    "subtitle_other": "{{count}} шаблонів"
   },
   "time": {
     "justNow": "Щойно",
-    "minutesAgo": "{{count}} хвилину тому",
-    "minutesAgo_plural": "{{count}} хвилин тому",
-    "hoursAgo": "{{count}} годину тому",
-    "hoursAgo_plural": "{{count}} годин тому",
-    "daysAgo": "{{count}} день тому",
-    "daysAgo_plural": "{{count}} днів тому",
     "today": "Сьогодні",
     "yesterday": "Вчора",
     "thisWeek": "Цього тижня",
-    "thisMonth": "Цього місяця"
+    "thisMonth": "Цього місяця",
+    "minutesAgo_one": "{{count}} хвилину тому",
+    "minutesAgo_other": "{{count}} хвилин тому",
+    "hoursAgo_one": "{{count}} годину тому",
+    "hoursAgo_other": "{{count}} годин тому",
+    "daysAgo_one": "{{count}} день тому",
+    "daysAgo_other": "{{count}} днів тому"
   },
   "tools": {
     "title": "Інструменти сертифікатів",
@@ -2019,8 +2031,6 @@
     "system": "Система",
     "custom": "Користувацький",
     "noCertificates": "Немає довірених сертифікатів",
-    "subtitle": "{{count}} сертифікат",
-    "subtitle_plural": "{{count}} сертифікатів",
     "addTrustedCertificate": "Add Trusted Certificate",
     "syncing": "Syncing...",
     "sync": "Sync",
@@ -2079,7 +2089,9 @@
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
     "emailTrust": "Email",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle_one": "{{count}} сертифікат",
+    "subtitle_other": "{{count}} сертифікатів"
   },
   "users": {
     "title": "Користувачі",
@@ -2111,7 +2123,9 @@
     "confirmResetPassword": "Reset password for \"{{name}}\"?",
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
-    "newPassword": "New password: {{password}}"
+    "newPassword": "New password: {{password}}",
+    "subtitle_one": "{{count}} користувач",
+    "subtitle_other": "{{count}} користувачів"
   },
   "validation": {
     "required": "Це поле обов'язкове",
