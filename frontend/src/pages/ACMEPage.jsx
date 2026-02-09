@@ -1382,21 +1382,41 @@ export default function ACMEPage() {
       )
     },
     {
-      key: 'revoked',
+      key: 'status',
       header: t('acme.status'),
       priority: 2,
       hideOnMobile: true,
-      render: (value) => (
-        <Badge 
-          variant={value ? 'danger' : 'success'} 
-          size="sm"
-          icon={value ? XCircle : CheckCircle}
-          dot
-          pulse={!value}
-        >
-          {value ? t('acme.revoked') : t('acme.valid')}
-        </Badge>
-      )
+      render: (value, row) => {
+        // Show revoked status first if applicable
+        if (row?.revoked) {
+          return (
+            <Badge variant="danger" size="sm" icon={XCircle} dot>
+              {t('acme.revoked')}
+            </Badge>
+          );
+        }
+        // Show order status
+        const statusConfig = {
+          valid: { variant: 'success', icon: CheckCircle, pulse: true },
+          issued: { variant: 'success', icon: CheckCircle, pulse: false },
+          pending: { variant: 'warning', icon: Clock, pulse: true },
+          processing: { variant: 'info', icon: Clock, pulse: true },
+          ready: { variant: 'info', icon: CheckCircle, pulse: false },
+          invalid: { variant: 'danger', icon: XCircle, pulse: false },
+        };
+        const config = statusConfig[value] || statusConfig.valid;
+        return (
+          <Badge 
+            variant={config.variant} 
+            size="sm"
+            icon={config.icon}
+            dot
+            pulse={config.pulse}
+          >
+            {value ? value.charAt(0).toUpperCase() + value.slice(1) : t('acme.valid')}
+          </Badge>
+        );
+      }
     },
     {
       key: 'issuer',
@@ -1735,6 +1755,7 @@ export default function ACMEPage() {
     <ResponsiveDataTable
       data={filteredHistory}
       columns={historyColumns}
+      columnStorageKey="acme-history-columns"
       searchable
       searchPlaceholder={t('acme.searchCertificates')}
       searchKeys={['common_name', 'serial', 'issuer']}
