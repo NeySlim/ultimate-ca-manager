@@ -432,7 +432,20 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       {/* File list with per-file passwords */}
       {files.length > 0 && (
         <div className="space-y-2">
-          <div className="text-sm font-medium">{t('import.files')} ({files.length})</div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">{t('import.files')} ({files.length})</div>
+            {hasEncryptedFiles && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={useGlobalPassword}
+                  onChange={(e) => setUseGlobalPassword(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary"
+                />
+                {t('import.useGlobalPassword')}
+              </label>
+            )}
+          </div>
           {files.map((file, i) => {
             const isEncryptable = file.name.match(/\.(p12|pfx|key)$/i)
             return (
@@ -479,35 +492,20 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         className="w-full h-32 p-3 font-mono text-xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
       />
       
-      {/* Password for encrypted content */}
-      {hasEncrypted && (
-        <div className="space-y-2">
-          {hasEncryptedFiles && (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={useGlobalPassword}
-                onChange={(e) => setUseGlobalPassword(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary"
-              />
-              {t('import.useGlobalPassword')}
-            </label>
-          )}
-          {(useGlobalPassword || hasEncryptedPem) && (
-            <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
-              <LockSimple size={18} className="shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t('common.enterPassword')}
-                  className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-                />
-              </div>
-            </div>
-          )}
+      {/* Global password for encrypted content */}
+      {hasEncrypted && (useGlobalPassword || hasEncryptedPem) && (
+        <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
+          <LockSimple size={18} className="shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t('common.enterPassword')}
+              className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+            />
+          </div>
         </div>
       )}
       
