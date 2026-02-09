@@ -13,7 +13,7 @@ from models.certificate_template import CertificateTemplate
 from models.truststore import TrustedCertificate
 from models.group import Group, GroupMember
 from models.email_notification import SMTPConfig, NotificationConfig, NotificationLog
-from models.acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce, DnsProvider, AcmeClientOrder
+from models.acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce, DnsProvider, AcmeClientOrder, AcmeDomain
 from models.api_key import APIKey
 from models.auth_certificate import AuthCertificate
 from models.crl import CRLMetadata
@@ -930,11 +930,11 @@ from .crl import CRLMetadata
 from .ocsp import OCSPResponse
 
 # Import ACME models
-from .acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce, DnsProvider, AcmeClientOrder
+from .acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce, DnsProvider, AcmeClientOrder, AcmeDomain
 
 __all__ = [
     "db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", 
     "AuditLog", "CRLMetadata", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce",
-    "DnsProvider", "AcmeClientOrder"
+    "DnsProvider", "AcmeClientOrder", "AcmeDomain"
 ]
