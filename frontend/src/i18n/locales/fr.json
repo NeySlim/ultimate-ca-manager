@@ -1431,7 +1431,8 @@
       "notSet": "Non défini (clés non chiffrées)",
       "rotationInProgress": "Rotation en cours",
       "rotationSuccess": "Nouveau secret généré - suivre les instructions pour appliquer",
-      "rotationInstructions": "Instructions de rotation"
+      "rotationInstructions": "Instructions de rotation",
+      "previousKeyExpires": "L'ancienne clé expire le : {{date}}"
     },
     "audit": {
       "integrityVerified": "Intégrité vérifiée",
