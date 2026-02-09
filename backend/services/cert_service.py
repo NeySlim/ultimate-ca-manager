@@ -449,6 +449,21 @@ class CertificateService:
             default_backend()
         )
         
+        # Extract key algorithm info
+        from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448
+        pub_key = cert.public_key()
+        if isinstance(pub_key, rsa.RSAPublicKey):
+            key_algo = f"RSA {pub_key.key_size}"
+        elif isinstance(pub_key, ec.EllipticCurvePublicKey):
+            key_algo = f"EC {pub_key.curve.name}"
+        elif isinstance(pub_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
+            key_algo = "EdDSA"
+        else:
+            key_algo = "Unknown"
+        
+        # Extract signature algorithm
+        sig_algo = cert.signature_algorithm_oid._name if hasattr(cert.signature_algorithm_oid, '_name') else str(cert.signature_algorithm_oid.dotted_string)
+        
         # Extract SANs from certificate
         import json
         san_dns_list = []
@@ -470,6 +485,10 @@ class CertificateService:
         except x509.ExtensionNotFound:
             pass  # No SAN extension
         
+        # Extract CN for subject_cn
+        cn_attrs = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+        subject_cn = cn_attrs[0].value if cn_attrs else None
+        
         # Create certificate record - include chain in crt if provided
         full_cert = cert_pem
         if chain_pem:
@@ -481,10 +500,12 @@ class CertificateService:
             crt=base64.b64encode(full_cert.encode() if isinstance(full_cert, str) else full_cert).decode('utf-8'),
             prv=base64.b64encode(key_pem.encode()).decode('utf-8') if key_pem else None,
             subject=cert.subject.rfc4514_string(),
+            subject_cn=subject_cn,
             issuer=cert.issuer.rfc4514_string(),
             serial_number=str(cert.serial_number),
             valid_from=cert.not_valid_before,
             valid_to=cert.not_valid_after,
+            key_algo=key_algo,
             # Store extracted SANs
             san_dns=json.dumps(san_dns_list) if san_dns_list else None,
             san_ip=json.dumps(san_ip_list) if san_ip_list else None,
