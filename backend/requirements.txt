@@ -27,7 +27,7 @@ pyasn1==0.6.2
 pyasn1-modules==0.4.1
 
 # ACME Support
-josepy==1.14.0
+josepy>=2.2.0
 dnspython==2.8.0
 
 # HTTP & Utils
