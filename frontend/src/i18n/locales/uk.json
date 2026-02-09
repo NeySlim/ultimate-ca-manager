@@ -1179,7 +1179,12 @@
       "hostPlaceholder": "192.168.1.1",
       "portPlaceholder": "443",
       "apiKeyPlaceholder": "Ключ API",
-      "apiSecretPlaceholder": "Секрет API"
+      "apiSecretPlaceholder": "Секрет API",
+      "selectAll": "Вибрати все",
+      "certificates": "Сертифікати",
+      "importSelected": "Імпортувати {{count}} вибраних",
+      "importSuccess": "Успішно імпортовано {{count}} елементів ({{skipped}} пропущено)",
+      "noItemsSelected": "Будь ласка, виберіть хоча б один елемент для імпорту"
     },
     "export": {
       "allCertsTitle": "Export All Certificates",

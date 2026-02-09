@@ -1179,7 +1179,12 @@
       "hostPlaceholder": "192.168.1.1",
       "portPlaceholder": "443",
       "apiKeyPlaceholder": "API-Schlüssel",
-      "apiSecretPlaceholder": "API-Geheimnis"
+      "apiSecretPlaceholder": "API-Geheimnis",
+      "selectAll": "Alle auswählen",
+      "certificates": "Zertifikate",
+      "importSelected": "{{count}} ausgewählte importieren",
+      "importSuccess": "{{count}} Elemente erfolgreich importiert ({{skipped}} übersprungen)",
+      "noItemsSelected": "Bitte wählen Sie mindestens ein Element zum Importieren aus"
     },
     "export": {
       "allCertsTitle": "Export All Certificates",
