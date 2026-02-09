@@ -506,6 +506,7 @@ class AcmeProxyService:
             # Certificate obtained successfully
             cert_pem = resp.content.decode('utf-8') if isinstance(resp.content, bytes) else resp.content
             
+            stored_cert = None
             # Store the certificate in the database
             try:
                 # The response usually contains full chain, extract first cert
@@ -539,25 +540,31 @@ class AcmeProxyService:
                 import traceback
                 traceback.print_exc()
             
-            # Cleanup DNS records
+            # Cleanup DNS records and link certificate to order
             order = AcmeClientOrder.query.filter(
                 AcmeClientOrder.is_proxy_order == True,
                 AcmeClientOrder.status == 'pending'
             ).order_by(AcmeClientOrder.created_at.desc()).first()
             
-            if order and order.dns_records_created:
+            if order:
                 try:
-                    records = json.loads(order.dns_records_created)
-                    for record in records:
-                        provider_model = DnsProvider.query.get(record['provider_id'])
-                        if provider_model:
-                            credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
-                            provider = create_provider(provider_model.provider_type, credentials)
-                            try:
-                                provider.delete_txt_record(record['domain'], record['record_name'])
-                            except Exception as e:
-                                # Log but don't fail - record might already be deleted
-                                pass
+                    # Link certificate to order
+                    if stored_cert:
+                        order.certificate_id = stored_cert.id
+                    
+                    # Cleanup DNS records
+                    if order.dns_records_created:
+                        records = json.loads(order.dns_records_created)
+                        for record in records:
+                            provider_model = DnsProvider.query.get(record['provider_id'])
+                            if provider_model:
+                                credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                                provider = create_provider(provider_model.provider_type, credentials)
+                                try:
+                                    provider.delete_txt_record(record['domain'], record['record_name'])
+                                except Exception as e:
+                                    # Log but don't fail - record might already be deleted
+                                    pass
                     
                     # Update order status
                     order.status = 'valid'
