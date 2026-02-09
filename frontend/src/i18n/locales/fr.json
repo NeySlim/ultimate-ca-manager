@@ -1459,7 +1459,15 @@
   "settings": {
     "title": "Paramètres",
     "general": "Général",
-    "appearance": "Apparence",
+    "appearance": {
+      "title": "Apparence",
+      "theme": "Thème",
+      "colorTheme": "Thème de couleur",
+      "appearance": "Mode d'apparence",
+      "followSystem": "Suivre le système",
+      "dark": "Sombre",
+      "light": "Clair"
+    },
     "appearanceSubtitle": "Personnalisez l'apparence de UCM",
     "colorTheme": "Thème de couleur",
     "colorThemeDesc": "Choisissez un schéma de couleurs selon vos préférences",

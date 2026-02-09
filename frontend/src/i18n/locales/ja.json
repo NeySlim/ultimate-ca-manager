@@ -1645,7 +1645,15 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": "外観"
+    "appearance": {
+      "title": "外観",
+      "theme": "テーマ",
+      "colorTheme": "カラーテーマ",
+      "appearance": "外観モード",
+      "followSystem": "システムに従う",
+      "dark": "ダーク",
+      "light": "ライト"
+    }
   },
   "sso": {
     "title": "シングルサインオン",

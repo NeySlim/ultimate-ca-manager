@@ -1236,7 +1236,15 @@
     "allUsers": "All Users"
   },
   "settings": {
-    "appearance": "Appearance",
+    "appearance": {
+      "title": "Appearance",
+      "theme": "Theme",
+      "colorTheme": "Color Theme",
+      "appearance": "Appearance Mode",
+      "followSystem": "Follow System",
+      "dark": "Dark",
+      "light": "Light"
+    },
     "appearanceSubtitle": "Customize UCM appearance",
     "colorTheme": "Color Theme",
     "colorThemeDesc": "Choose a color scheme according to your preferences",

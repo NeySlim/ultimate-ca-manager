@@ -1645,7 +1645,15 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": "Aparência"
+    "appearance": {
+      "title": "Aparência",
+      "theme": "Tema",
+      "colorTheme": "Tema de cores",
+      "appearance": "Modo de aparência",
+      "followSystem": "Seguir sistema",
+      "dark": "Escuro",
+      "light": "Claro"
+    }
   },
   "sso": {
     "title": "Login Único",
