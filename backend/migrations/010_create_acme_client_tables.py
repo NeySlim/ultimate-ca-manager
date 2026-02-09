@@ -12,32 +12,35 @@ CREATE TABLE IF NOT EXISTS dns_providers (
     name VARCHAR(100) NOT NULL,
     provider_type VARCHAR(50) NOT NULL DEFAULT 'manual',
     credentials TEXT,
+    zones TEXT,
     is_default BOOLEAN DEFAULT 0,
+    enabled BOOLEAN DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME,
-    created_by VARCHAR(80)
+    updated_at DATETIME
 );
 
 -- ACME Client Orders for Let's Encrypt certificate requests
 CREATE TABLE IF NOT EXISTS acme_client_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     domains TEXT NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    environment VARCHAR(20) NOT NULL DEFAULT 'staging',
     challenge_type VARCHAR(20) NOT NULL DEFAULT 'dns-01',
-    dns_provider_id INTEGER REFERENCES dns_providers(id),
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    order_url TEXT,
-    finalize_url TEXT,
-    certificate_url TEXT,
+    environment VARCHAR(20) NOT NULL DEFAULT 'staging',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    order_url VARCHAR(500),
+    account_url VARCHAR(500),
+    finalize_url VARCHAR(500),
+    certificate_url VARCHAR(500),
     challenges_data TEXT,
-    error_message TEXT,
+    dns_provider_id INTEGER REFERENCES dns_providers(id),
     certificate_id INTEGER REFERENCES certificates(id),
-    auto_renew BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME,
+    renewal_enabled BOOLEAN DEFAULT 1,
+    last_renewal_at DATETIME,
+    renewal_failures INTEGER DEFAULT 0,
+    error_message TEXT,
+    last_error_at DATETIME,
     expires_at DATETIME,
-    created_by VARCHAR(80)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME
 );
 
 -- Index for faster lookups

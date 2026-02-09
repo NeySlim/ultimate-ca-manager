@@ -212,7 +212,7 @@ def request_certificate():
                 'challenges': challenge_info,
             },
             message=message,
-            status_code=201
+            status=201
         )
         
     except Exception as e:

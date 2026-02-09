@@ -628,7 +628,7 @@ class AcmeClientService:
             Certificate ID or None
         """
         try:
-            from services.certificate_service import CertificateService
+            from services.cert_service import CertificateService
             
             # Parse certificate to extract details
             cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
@@ -637,12 +637,11 @@ class AcmeClientService:
             cert_record = Certificate(
                 descr=f"Let's Encrypt: {domains[0]}",
                 subject_cn=domains[0].lstrip('*.'),
-                cert=cert_pem,
+                crt=cert_pem,
                 prv=key_pem,
                 serial_number=format(cert.serial_number, 'x'),
                 valid_from=cert.not_valid_before_utc,
                 valid_to=cert.not_valid_after_utc,
-                source=source,
                 refid=secrets.token_hex(8),
             )
             

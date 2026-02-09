@@ -1,7 +1,7 @@
 """
-Hetzner DNS Provider
-Uses Hetzner DNS API for record management
-https://dns.hetzner.com/api-docs
+Hetzner DNS Provider - Cloud API
+Uses Hetzner Cloud API (api.hetzner.cloud) for DNS record management
+https://docs.hetzner.cloud
 """
 import requests
 from typing import Tuple, Dict, Any, Optional
@@ -14,20 +14,20 @@ logger = logging.getLogger(__name__)
 
 class HetznerDnsProvider(BaseDnsProvider):
     """
-    Hetzner DNS Provider.
+    Hetzner DNS Provider using Cloud API.
     
     Required credentials:
-    - api_token: Hetzner DNS API Token
+    - api_token: Hetzner Cloud API Token
     
-    Get token at: https://dns.hetzner.com/settings/api-token
+    Get token at: console.hetzner.cloud > Project > Security > API Tokens
     """
     
     PROVIDER_TYPE = "hetzner"
     PROVIDER_NAME = "Hetzner"
-    PROVIDER_DESCRIPTION = "Hetzner DNS API (Germany)"
+    PROVIDER_DESCRIPTION = "Hetzner Cloud DNS API (Germany)"
     REQUIRED_CREDENTIALS = ["api_token"]
     
-    BASE_URL = "https://dns.hetzner.com/api/v1"
+    BASE_URL = "https://api.hetzner.cloud/v1"
     
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
@@ -35,7 +35,7 @@ class HetznerDnsProvider(BaseDnsProvider):
     
     def _get_headers(self) -> Dict[str, str]:
         return {
-            'Auth-API-Token': self.credentials['api_token'],
+            'Authorization': f'Bearer {self.credentials["api_token"]}',
             'Content-Type': 'application/json',
         }
     
@@ -44,9 +44,8 @@ class HetznerDnsProvider(BaseDnsProvider):
         method: str, 
         path: str, 
         data: Optional[Dict] = None,
-        params: Optional[Dict] = None
     ) -> Tuple[bool, Any]:
-        """Make Hetzner DNS API request"""
+        """Make Hetzner Cloud API request"""
         url = f"{self.BASE_URL}{path}"
         
         try:
@@ -55,7 +54,6 @@ class HetznerDnsProvider(BaseDnsProvider):
                 url=url,
                 headers=self._get_headers(),
                 json=data,
-                params=params,
                 timeout=30
             )
             
@@ -72,7 +70,7 @@ class HetznerDnsProvider(BaseDnsProvider):
             return True, None
             
         except requests.RequestException as e:
-            logger.error(f"Hetzner DNS API request failed: {e}")
+            logger.error(f"Hetzner Cloud API request failed: {e}")
             return False, str(e)
     
     def _get_zone(self, domain: str) -> Optional[Dict]:
@@ -88,7 +86,7 @@ class HetznerDnsProvider(BaseDnsProvider):
         
         zones = result.get('zones', [])
         
-        # Find best matching zone
+        # Find best matching zone (longest suffix match)
         domain_parts = domain.split('.')
         for i in range(len(domain_parts) - 1):
             zone_name = '.'.join(domain_parts[i:])
@@ -106,70 +104,80 @@ class HetznerDnsProvider(BaseDnsProvider):
         record_value: str, 
         ttl: int = 300
     ) -> Tuple[bool, str]:
-        """Create TXT record via Hetzner API"""
+        """Create TXT record via Hetzner Cloud API"""
         zone = self._get_zone(domain)
         if not zone:
             return False, f"Could not find zone for domain {domain}"
         
-        # Hetzner wants relative name (without zone)
+        zone_id = zone['id']
+        
+        # Get relative name (without zone suffix)
         relative_name = self.get_relative_record_name(record_name, zone['name'])
         
-        data = {
-            'zone_id': zone['id'],
-            'type': 'TXT',
-            'name': relative_name,
-            'value': record_value,
-            'ttl': ttl,
-        }
+        # Cloud API requires value to be quoted for TXT records
+        quoted_value = f'"{record_value}"'
         
-        success, result = self._request('POST', '/records', data)
+        # First check if rrset already exists
+        success, result = self._request('GET', f'/zones/{zone_id}/rrsets/{relative_name}/TXT')
+        
+        if success and result.get('rrset'):
+            # RRset exists, add record to it via PATCH
+            existing_records = result['rrset'].get('records', [])
+            existing_records.append({'value': quoted_value})
+            
+            data = {
+                'records': existing_records,
+                'ttl': ttl,
+            }
+            success, result = self._request('PATCH', f'/zones/{zone_id}/rrsets/{relative_name}/TXT', data)
+        else:
+            # Create new rrset
+            data = {
+                'name': relative_name,
+                'type': 'TXT',
+                'ttl': ttl,
+                'records': [{'value': quoted_value}],
+            }
+            success, result = self._request('POST', f'/zones/{zone_id}/rrsets', data)
+        
         if not success:
             return False, f"Failed to create record: {result}"
         
-        record_id = result.get('record', {}).get('id', 'unknown')
-        logger.info(f"Hetzner: Created TXT record {record_name} (ID: {record_id})")
-        return True, f"Record created successfully (ID: {record_id})"
+        logger.info(f"Hetzner: Created TXT record {record_name}")
+        return True, f"Record created successfully"
     
     def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
-        """Delete TXT record via Hetzner API"""
+        """Delete TXT record via Hetzner Cloud API"""
         zone = self._get_zone(domain)
         if not zone:
             return False, f"Could not find zone for domain {domain}"
         
+        zone_id = zone['id']
         relative_name = self.get_relative_record_name(record_name, zone['name'])
         
-        # Get all records for zone
-        success, result = self._request('GET', '/records', params={'zone_id': zone['id']})
+        # Delete the entire TXT rrset for this name
+        success, result = self._request('DELETE', f'/zones/{zone_id}/rrsets/{relative_name}/TXT')
+        
         if not success:
-            return False, f"Failed to list records: {result}"
+            if 'not found' in str(result).lower():
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to delete record: {result}"
         
-        records = result.get('records', [])
-        
-        # Find and delete matching TXT records
-        deleted = 0
-        for record in records:
-            if record['type'] == 'TXT' and record['name'] == relative_name:
-                success, _ = self._request('DELETE', f'/records/{record["id"]}')
-                if success:
-                    deleted += 1
-        
-        if deleted == 0:
-            return True, "Record not found (already deleted?)"
-        
-        logger.info(f"Hetzner: Deleted {deleted} TXT record(s) for {record_name}")
-        return True, f"Deleted {deleted} record(s)"
+        logger.info(f"Hetzner: Deleted TXT record {record_name}")
+        return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:
-        """Test Hetzner DNS API connection"""
+        """Test Hetzner Cloud API connection"""
         success, result = self._request('GET', '/zones')
         if success:
             zones = result.get('zones', [])
-            return True, f"Connected successfully. Found {len(zones)} zone(s)."
+            zone_names = [z['name'] for z in zones]
+            return True, f"Connected successfully. Found {len(zones)} zone(s): {', '.join(zone_names)}"
         return False, f"Connection failed: {result}"
     
     @classmethod
     def get_credential_schema(cls):
         return [
             {'name': 'api_token', 'label': 'API Token', 'type': 'password', 'required': True,
-             'help': 'Get at dns.hetzner.com/settings/api-token'},
+             'help': 'console.hetzner.cloud > Project > Security > API Tokens'},
         ]
