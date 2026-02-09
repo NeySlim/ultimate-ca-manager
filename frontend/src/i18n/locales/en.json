@@ -123,7 +123,13 @@
     "enterPassword": "Enter password",
     "unknown": "Unknown",
     "unnamed": "Unnamed",
-    "na": "N/A"
+    "na": "N/A",
+    "set": "Set",
+    "configured": "Configured",
+    "enterNewToChange": "Enter a new value to change",
+    "auto": "Auto",
+    "manual": "Manual",
+    "update": "Update"
   },
   "nav": {
     "dashboard": "Dashboard",

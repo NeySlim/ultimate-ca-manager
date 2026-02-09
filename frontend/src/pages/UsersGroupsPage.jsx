@@ -950,7 +950,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         value={formData.password}
         onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
         required={!user}
-        placeholder={t('users.passwordPlaceholder')}
+        hasExistingValue={!!user}
         showStrength={!user}
       />
       <Select

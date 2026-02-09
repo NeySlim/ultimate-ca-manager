@@ -658,7 +658,13 @@
     "unknown": "Inconnu",
     "unnamed": "Sans nom",
     "na": "N/A",
-    "daysAgo": "{{count}}d ago"
+    "daysAgo": "Il y a {{count}}j",
+    "set": "Défini",
+    "configured": "Configuré",
+    "enterNewToChange": "Entrez une nouvelle valeur pour modifier",
+    "auto": "Auto",
+    "manual": "Manuel",
+    "update": "Mettre à jour"
   },
   "compare": {
     "title": "Compare Certificates",
