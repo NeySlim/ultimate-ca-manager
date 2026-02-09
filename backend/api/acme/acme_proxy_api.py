@@ -37,7 +37,7 @@ def verify_proxy_jws(request):
     try:
         jws_data = request.get_json()
         if not jws_data:
-            return False, None, "No JSON"
+            return False, None, None, "No JSON"
             
         # We need to construct expected URL
         # e.g. https://ucm.local/acme/proxy/new-order
@@ -49,7 +49,7 @@ def verify_proxy_jws(request):
         return verify_jws(jws_data, expected_url)
         
     except Exception as e:
-        return False, None, str(e)
+        return False, None, None, str(e)
 
 # --- Endpoints ---
 
@@ -142,8 +142,28 @@ def challenge(chall_id):
          return make_response(jsonify({"type": "malformed", "detail": err}), 400)
 
     try:
-        data = svc.respond_challenge(chall_id)
-        return proxy_response(data)
+        data, link_header = svc.respond_challenge(chall_id)
+        resp = proxy_response(data)
+        if link_header:
+            resp.headers['Link'] = link_header
+        return resp
+    except Exception as e:
+        return make_response(jsonify({"type": "serverInternal", "detail": str(e)}), 500)
+
+@acme_proxy_bp.route('/order/<order_id>', methods=['POST'])
+def get_order(order_id):
+    """POST-as-GET for order status polling"""
+    svc = get_proxy_service()
+    is_valid, _, _, err = verify_proxy_jws(request)
+    if not is_valid:
+         return make_response(jsonify({"type": "malformed", "detail": err}), 400)
+
+    try:
+        data = svc.get_order(order_id)
+        order_url = f"{request.scheme}://{request.host}/acme/proxy/order/{order_id}"
+        resp = proxy_response(data)
+        resp.headers['Location'] = order_url
+        return resp
     except Exception as e:
         return make_response(jsonify({"type": "serverInternal", "detail": str(e)}), 500)
 
@@ -187,10 +207,14 @@ def cert(cert_id):
     if not is_valid:
          return make_response(jsonify({"type": "malformed", "detail": err}), 400)
 
-    content, content_type = svc.get_certificate(cert_id)
+    content, content_type, link_header = svc.get_certificate(cert_id)
     
     resp = make_response(content, 200)
     resp.headers['Content-Type'] = content_type
+    
+    # Add Link header with issuer cert (required by certbot)
+    if link_header:
+        resp.headers['Link'] = link_header
     
     # Add nonce
     svc_local = AcmeService()
