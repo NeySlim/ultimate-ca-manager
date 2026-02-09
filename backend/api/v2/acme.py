@@ -305,6 +305,11 @@ def get_acme_history():
     per_page = min(request.args.get('per_page', 50, type=int), 100)
     source_filter = request.args.get('source', 'all')
     
+    # Whitelist source filter values
+    valid_sources = ['all', 'acme', 'letsencrypt']
+    if source_filter not in valid_sources:
+        source_filter = 'all'
+    
     # Get certificates with source='acme' or 'letsencrypt'
     if source_filter == 'all':
         query = Certificate.query.filter(
