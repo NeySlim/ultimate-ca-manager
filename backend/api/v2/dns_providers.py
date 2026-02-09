@@ -118,12 +118,17 @@ def update_provider(provider_id):
     
     if 'credentials' in data:
         credentials = data['credentials']
-        # Merge with existing credentials (for partial updates)
-        if provider.credentials:
-            existing = json.loads(provider.credentials)
-            existing.update(credentials)
-            credentials = existing
-        provider.credentials = json.dumps(credentials) if credentials else None
+        # Skip if credentials is empty or not a dict
+        if credentials and isinstance(credentials, dict):
+            # Merge with existing credentials (for partial updates)
+            if provider.credentials:
+                existing = json.loads(provider.credentials)
+                # Only update with non-empty values
+                for key, value in credentials.items():
+                    if value:  # Don't overwrite with empty values
+                        existing[key] = value
+                credentials = existing
+            provider.credentials = json.dumps(credentials) if credentials else None
     
     if 'zones' in data:
         provider.zones = json.dumps(data['zones']) if data['zones'] else None
