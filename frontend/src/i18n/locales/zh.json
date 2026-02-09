@@ -1179,7 +1179,12 @@
       "hostPlaceholder": "192.168.1.1",
       "portPlaceholder": "443",
       "apiKeyPlaceholder": "API密钥",
-      "apiSecretPlaceholder": "API密钥"
+      "apiSecretPlaceholder": "API密钥",
+      "selectAll": "全选",
+      "certificates": "证书",
+      "importSelected": "导入 {{count}} 个已选",
+      "importSuccess": "成功导入 {{count}} 个项目（跳过 {{skipped}} 个）",
+      "noItemsSelected": "请至少选择一个要导入的项目"
     },
     "export": {
       "allCertsTitle": "Export All Certificates",

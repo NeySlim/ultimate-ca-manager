@@ -1179,7 +1179,12 @@
       "hostPlaceholder": "192.168.1.1",
       "portPlaceholder": "443",
       "apiKeyPlaceholder": "APIキー",
-      "apiSecretPlaceholder": "APIシークレット"
+      "apiSecretPlaceholder": "APIシークレット",
+      "selectAll": "すべて選択",
+      "certificates": "証明書",
+      "importSelected": "{{count}} 件をインポート",
+      "importSuccess": "{{count}} 件を正常にインポートしました（{{skipped}} 件スキップ）",
+      "noItemsSelected": "少なくとも1つのアイテムを選択してください"
     },
     "export": {
       "allCertsTitle": "Export All Certificates",

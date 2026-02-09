@@ -84,6 +84,7 @@ export default function ImportExportPage() {
   const handleTestConf = async () => {
     setProcessing(true)
     setTestResult(null)
+    setTestItems([])
     try {
       const result = await opnsenseService.test({
         host: opnsenseHost,
@@ -91,27 +92,46 @@ export default function ImportExportPage() {
         api_key: opnsenseApiKey,
         api_secret: opnsenseApiSecret
       })
-      setTestResult('success')
-      setTestItems(result.data?.items || [])
+      setTestResult({ success: true, stats: result.stats })
+      setTestItems((result.items || []).map(item => ({ ...item, selected: true })))
       saveOpnsenseConfig()
     } catch (error) {
-      setTestResult('error')
+      setTestResult({ success: false, error: error.message })
       showError(error.message || t('importExport.opnsense.connectionFailed'))
     } finally {
       setProcessing(false)
     }
   }
 
+  const toggleItemSelection = (id) => {
+    setTestItems(prev => prev.map(item => 
+      item.id === id ? { ...item, selected: !item.selected } : item
+    ))
+  }
+
+  const toggleAllItems = (selected) => {
+    setTestItems(prev => prev.map(item => ({ ...item, selected })))
+  }
+
   const handleImportFromOpnsense = async () => {
+    const selectedItems = testItems.filter(i => i.selected).map(i => i.id)
+    if (selectedItems.length === 0) {
+      showError(t('importExport.opnsense.noItemsSelected'))
+      return
+    }
     setProcessing(true)
     try {
       const result = await opnsenseService.import({
         host: opnsenseHost,
         port: opnsensePort,
         api_key: opnsenseApiKey,
-        api_secret: opnsenseApiSecret
+        api_secret: opnsenseApiSecret,
+        items: selectedItems
       })
-      showSuccess(result.message || SUCCESS.IMPORT.OPNSENSE)
+      const imported = (result.imported?.cas || 0) + (result.imported?.certificates || 0)
+      showSuccess(t('importExport.opnsense.importSuccess', { count: imported, skipped: result.skipped || 0 }))
+      setTestResult(null)
+      setTestItems([])
       loadCAs()
     } catch (error) {
       showError(error.message || t('importExport.importFailed'))
@@ -216,21 +236,71 @@ export default function ImportExportPage() {
             </DetailSection>
             
             {testResult && (
-              <DetailSection title={t('importExport.opnsense.connectionResult')} icon={testResult === 'success' ? CheckCircle : Key} iconClass={testResult === 'success' ? 'icon-bg-emerald' : 'icon-bg-orange'}>
-                {testResult === 'success' ? (
-                  <div className="space-y-3">
+              <DetailSection 
+                title={t('importExport.opnsense.connectionResult')} 
+                icon={testResult.success ? CheckCircle : Key} 
+                iconClass={testResult.success ? 'icon-bg-emerald' : 'icon-bg-orange'}
+              >
+                {testResult.success ? (
+                  <div className="space-y-4">
                     <div className="flex items-center gap-2 text-status-success">
                       <CheckCircle size={18} weight="fill" />
                       <span className="text-sm font-medium">{t('importExport.opnsense.connectedSuccessfully')}</span>
                     </div>
+                    
+                    {/* Stats summary */}
+                    {testResult.stats && (
+                      <div className="flex gap-4">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
+                          <ShieldCheck size={16} className="text-accent-primary" />
+                          <span className="text-sm font-medium">{testResult.stats.cas} CA{testResult.stats.cas > 1 ? 's' : ''}</span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
+                          <Certificate size={16} className="text-accent-primary" />
+                          <span className="text-sm font-medium">{testResult.stats.certificates} {t('importExport.opnsense.certificates')}</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Items list with checkboxes */}
                     {testItems.length > 0 && (
-                      <div className="text-sm text-text-secondary">
-                        {t('importExport.opnsense.foundCertificates', { count: testItems.length })}
+                      <div className="border border-border rounded-lg overflow-hidden">
+                        <div className="flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border">
+                          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={testItems.every(i => i.selected)}
+                              onChange={(e) => toggleAllItems(e.target.checked)}
+                              className="w-4 h-4 rounded border-border text-accent-primary"
+                            />
+                            {t('importExport.opnsense.selectAll')} ({testItems.filter(i => i.selected).length}/{testItems.length})
+                          </label>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto divide-y divide-border">
+                          {testItems.map(item => (
+                            <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={item.selected}
+                                onChange={() => toggleItemSelection(item.id)}
+                                className="w-4 h-4 rounded border-border text-accent-primary shrink-0"
+                              />
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${
+                                item.type === 'CA' 
+                                  ? 'bg-accent-primary/15 text-accent-primary' 
+                                  : 'bg-status-info/15 text-status-info'
+                              }`}>
+                                {item.type}
+                              </span>
+                              <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-status-danger">{t('importExport.opnsense.connectionFailed')}</div>
+                  <div className="text-sm text-status-danger">{testResult.error || t('importExport.opnsense.connectionFailed')}</div>
                 )}
               </DetailSection>
             )}
@@ -244,10 +314,10 @@ export default function ImportExportPage() {
               >
                 {processing ? t('importExport.opnsense.testing') : t('importExport.opnsense.testConnection')}
               </Button>
-              {testResult === 'success' && testItems.length > 0 && (
+              {testResult?.success && testItems.some(i => i.selected) && (
                 <Button onClick={handleImportFromOpnsense} disabled={processing} size="lg">
                   <UploadSimple size={18} />
-                  {t('importExport.opnsense.importCertificates', { count: testItems.length })}
+                  {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
                 </Button>
               )}
             </div>
