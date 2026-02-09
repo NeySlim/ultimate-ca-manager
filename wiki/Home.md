@@ -137,22 +137,17 @@ Welcome to the **Ultimate CA Manager (UCM)** documentation! This wiki provides c
 
 ## 🗺️ Roadmap
 
-### v1.8.4 - Backup/Restore UI (Next - 1-2 days)
-- Restore UI with upload/list/one-click restore
-- Health check API endpoint
-- Database optimization
+### v2.1.0 - Current Development
+- ✅ HSM Support (PKCS#11, Azure Key Vault, Google Cloud KMS)
+- ✅ Let's Encrypt Proxy with DNS-01
+- ✅ RBAC with custom roles
+- ✅ Security Dashboard
+- 🔄 Multi-tenancy (in progress)
 
-### v1.9.0 - SSO & Templates (1-2 weeks)
-- Single Sign-On (SAML, OAuth2, LDAP)
-- Certificate templates
-- Bulk operations
-- Enhanced monitoring
-
-### v1.10.0 - Enterprise (1 month)
-- Multi-tenancy
-- Hardware Security Module (HSM)
-- Audit logging
+### v2.2.0 - Planned
 - GraphQL API
+- Enhanced monitoring
+- Bulk operations
 
 [View Full Roadmap](https://github.com/NeySlim/ultimate-ca-manager/blob/main/ROADMAP.md)
 

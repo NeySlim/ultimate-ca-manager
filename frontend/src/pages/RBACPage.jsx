@@ -1,5 +1,5 @@
 /**
- * RBAC Management Page (Advanced Feature)
+ * RBAC Management Page
  * Role-Based Access Control with custom roles and permissions
  * 
  * Migrated to ResponsiveLayout for consistent UX
