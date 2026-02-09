@@ -151,5 +151,40 @@ export const acmeService = {
 
   async testDnsProvider(id) {
     return apiClient.post(`/dns-providers/${id}/test`)
+  },
+
+  // =========================================================================
+  // ACME Domains (Domain to Provider mapping)
+  // =========================================================================
+
+  async getDomains() {
+    return apiClient.get('/acme/domains')
+  },
+
+  async getDomain(id) {
+    return apiClient.get(`/acme/domains/${id}`)
+  },
+
+  async createDomain(data) {
+    return apiClient.post('/acme/domains', data)
+  },
+
+  async updateDomain(id, data) {
+    return apiClient.put(`/acme/domains/${id}`, data)
+  },
+
+  async deleteDomain(id) {
+    return apiClient.delete(`/acme/domains/${id}`)
+  },
+
+  async resolveDomain(domain) {
+    return apiClient.get(`/acme/domains/resolve?domain=${encodeURIComponent(domain)}`)
+  },
+
+  async testDomainAccess(domain, dnsProviderId = null) {
+    return apiClient.post('/acme/domains/test', { 
+      domain, 
+      dns_provider_id: dnsProviderId 
+    })
   }
 }

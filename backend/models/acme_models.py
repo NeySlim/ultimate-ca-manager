@@ -407,3 +407,38 @@ class AcmeClientOrder(db.Model):
     
     def __repr__(self):
         return f'<AcmeClientOrder {self.primary_domain} status={self.status}>'
+
+
+class AcmeDomain(db.Model):
+    """ACME Domain - Maps domains to DNS providers for ACME Proxy"""
+    __tablename__ = 'acme_domains'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    domain = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    dns_provider_id = db.Column(db.Integer, db.ForeignKey('dns_providers.id'), nullable=False)
+    is_wildcard_allowed = db.Column(db.Boolean, default=True)
+    auto_approve = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.String(80))
+    
+    # Relationships
+    dns_provider = db.relationship('DnsProvider', backref=db.backref('domains', lazy='dynamic'))
+    
+    def to_dict(self):
+        """Convert to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'domain': self.domain,
+            'dns_provider_id': self.dns_provider_id,
+            'dns_provider_name': self.dns_provider.name if self.dns_provider else None,
+            'dns_provider_type': self.dns_provider.provider_type if self.dns_provider else None,
+            'is_wildcard_allowed': self.is_wildcard_allowed,
+            'auto_approve': self.auto_approve,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_by': self.created_by,
+        }
+    
+    def __repr__(self):
+        return f'<AcmeDomain {self.domain} -> {self.dns_provider.name if self.dns_provider else "?"}>'
