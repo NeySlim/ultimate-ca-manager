@@ -1071,9 +1071,10 @@ def register_blueprints(app):
     
     # ACME Protocol (RFC 8555) - /acme/*
     try:
-        from api.acme import acme_bp
+        from api.acme import acme_bp, acme_proxy_bp
         app.register_blueprint(acme_bp)
-        app.logger.info("✓ ACME protocol enabled (/acme)")
+        app.register_blueprint(acme_proxy_bp)
+        app.logger.info("✓ ACME protocol enabled (/acme, /acme/proxy)")
     except ImportError as e:
         app.logger.warning(f"⚠️ ACME protocol not available: {e}")
     
