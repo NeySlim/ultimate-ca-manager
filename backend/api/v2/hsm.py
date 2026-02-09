@@ -550,3 +550,143 @@ def get_provider_types():
     ]
     
     return success_response(data=types)
+
+
+@bp.route('/api/v2/hsm/dependencies', methods=['GET'])
+@require_auth(['read:hsm'])
+def get_dependencies_status():
+    """
+    Get HSM dependencies installation status
+    
+    Returns status for each provider type:
+    - installed: True if Python packages are installed
+    - packages: List of required pip packages
+    - install_command: Command to install the packages
+    """
+    
+    dependencies = []
+    
+    # Check PKCS#11
+    try:
+        import pkcs11
+        pkcs11_installed = True
+    except ImportError:
+        pkcs11_installed = False
+    
+    dependencies.append({
+        'provider': 'pkcs11',
+        'label': 'PKCS#11 (SoftHSM, Thales, nCipher, AWS CloudHSM)',
+        'installed': pkcs11_installed,
+        'packages': ['python-pkcs11>=0.7.0'],
+        'install_command': 'pip install python-pkcs11',
+        'system_packages': {
+            'debian': 'apt install softhsm2',
+            'rhel': 'dnf install softhsm'
+        }
+    })
+    
+    # Check Azure
+    try:
+        from azure.keyvault.keys import KeyClient
+        from azure.identity import DefaultAzureCredential
+        azure_installed = True
+    except ImportError:
+        azure_installed = False
+    
+    dependencies.append({
+        'provider': 'azure-keyvault',
+        'label': 'Azure Key Vault',
+        'installed': azure_installed,
+        'packages': ['azure-keyvault-keys>=4.9.0', 'azure-identity>=1.15.0'],
+        'install_command': 'pip install azure-keyvault-keys azure-identity'
+    })
+    
+    # Check GCP
+    try:
+        from google.cloud import kms_v1
+        gcp_installed = True
+    except ImportError:
+        gcp_installed = False
+    
+    dependencies.append({
+        'provider': 'google-kms',
+        'label': 'Google Cloud KMS',
+        'installed': gcp_installed,
+        'packages': ['google-cloud-kms>=2.21.0'],
+        'install_command': 'pip install google-cloud-kms'
+    })
+    
+    return success_response(data={
+        'dependencies': dependencies,
+        'install_script': '/opt/ucm/backend/scripts/install_hsm_deps.py'
+    })
+
+
+@bp.route('/api/v2/hsm/dependencies/install', methods=['POST'])
+@require_auth(['admin'])
+def install_dependencies():
+    """
+    Install HSM dependencies (requires admin)
+    
+    Body:
+        provider: Provider type to install (pkcs11, azure, gcp, all)
+    
+    Note: This runs pip install which may take a moment.
+    In production, prefer installing via system packages.
+    """
+    import subprocess
+    import sys
+    
+    data = request.get_json() or {}
+    provider = data.get('provider', '').lower()
+    
+    if not provider:
+        return error_response('Provider type required (pkcs11, azure, gcp, all)', 400)
+    
+    packages_map = {
+        'pkcs11': ['python-pkcs11'],
+        'azure': ['azure-keyvault-keys', 'azure-identity'],
+        'gcp': ['google-cloud-kms'],
+    }
+    
+    if provider == 'all':
+        packages = []
+        for pkgs in packages_map.values():
+            packages.extend(pkgs)
+    elif provider in packages_map:
+        packages = packages_map[provider]
+    else:
+        return error_response(f'Unknown provider: {provider}. Use: pkcs11, azure, gcp, all', 400)
+    
+    try:
+        # Run pip install
+        result = subprocess.run(
+            [sys.executable, '-m', 'pip', 'install', '--quiet'] + packages,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        if result.returncode == 0:
+            # Log the action
+            AuditService.log(
+                action='hsm.dependencies.install',
+                user_id=g.current_user.id if hasattr(g, 'current_user') else None,
+                details={'provider': provider, 'packages': packages}
+            )
+            
+            return success_response(
+                message=f'Successfully installed {provider} dependencies',
+                data={'packages': packages}
+            )
+        else:
+            return error_response(
+                f'Installation failed: {result.stderr}',
+                500
+            )
+            
+    except subprocess.TimeoutExpired:
+        return error_response('Installation timed out', 504)
+    except Exception as e:
+        logger.exception(f"Failed to install HSM dependencies: {e}")
+        return error_response(f'Installation error: {str(e)}', 500)
