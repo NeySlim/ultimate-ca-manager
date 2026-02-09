@@ -1645,7 +1645,15 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": "Зовнішній вигляд"
+    "appearance": {
+      "title": "Зовнішній вигляд",
+      "theme": "Тема",
+      "colorTheme": "Кольорова тема",
+      "appearance": "Режим вигляду",
+      "followSystem": "Слідувати системі",
+      "dark": "Темний",
+      "light": "Світлий"
+    }
   },
   "sso": {
     "title": "Єдиний вхід",

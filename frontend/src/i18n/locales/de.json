@@ -1645,7 +1645,15 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": "Erscheinungsbild"
+    "appearance": {
+      "title": "Erscheinung",
+      "theme": "Thema",
+      "colorTheme": "Farbthema",
+      "appearance": "Erscheinungsmodus",
+      "followSystem": "System folgen",
+      "dark": "Dunkel",
+      "light": "Hell"
+    }
   },
   "sso": {
     "title": "Single Sign-On",

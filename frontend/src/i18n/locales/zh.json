@@ -1645,7 +1645,15 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": "外观"
+    "appearance": {
+      "title": "外观",
+      "theme": "主题",
+      "colorTheme": "颜色主题",
+      "appearance": "外观模式",
+      "followSystem": "跟随系统",
+      "dark": "深色",
+      "light": "浅色"
+    }
   },
   "sso": {
     "title": "单点登录",
