@@ -8,11 +8,12 @@ import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
-  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket
+  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
+  Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
-  Button, Input, Select, Badge,
+  Button, Input, Select, Badge, Textarea, Card, EmptyState, ConfirmModal,
   LoadingSpinner, FileUpload, Modal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   UpdateChecker
@@ -25,7 +26,7 @@ import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
-import SSOSettingsSection from './settings/SSOSettingsSection'
+import { apiClient } from '../services/apiClient'
 
 // Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
@@ -33,13 +34,20 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'appearance', labelKey: 'settings.tabs.appearance', icon: Palette, color: 'icon-bg-violet' },
   { id: 'email', labelKey: 'settings.tabs.email', icon: EnvelopeSimple, color: 'icon-bg-teal' },
   { id: 'security', labelKey: 'settings.tabs.security', icon: ShieldCheck, color: 'icon-bg-amber' },
-  { id: 'sso', labelKey: 'settings.tabs.sso', icon: Key, color: 'icon-bg-purple', component: SSOSettingsSection },
+  { id: 'sso', labelKey: 'settings.tabs.sso', icon: Key, color: 'icon-bg-purple' },
   { id: 'backup', labelKey: 'settings.tabs.backup', icon: Database, color: 'icon-bg-emerald' },
   { id: 'audit', labelKey: 'settings.tabs.audit', icon: ListBullets, color: 'icon-bg-orange' },
   { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-blue' },
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
 ]
+
+// SSO Provider type icons
+const SSO_PROVIDER_ICONS = {
+  ldap: Database,
+  oauth2: Globe,
+  saml: Shield,
+}
 
 // Appearance Settings Component
 function AppearanceSettings() {
@@ -55,7 +63,7 @@ function AppearanceSettings() {
   
   return (
     <DetailContent>
-      <DetailHeader compact
+      <DetailHeader
         icon={Palette}
         title={t('settings.appearance')}
         subtitle={t('settings.appearanceSubtitle')}
@@ -218,6 +226,268 @@ function AppearanceSettings() {
   )
 }
 
+// SSO Provider Form Component
+function SsoProviderForm({ provider, onSave, onCancel }) {
+  const { t } = useTranslation()
+  const [formData, setFormData] = useState({
+    name: provider?.name || '',
+    display_name: provider?.display_name || '',
+    provider_type: provider?.provider_type || 'ldap',
+    enabled: provider?.enabled ?? false,
+    default_role: provider?.default_role || 'viewer',
+    auto_create_users: provider?.auto_create_users ?? true,
+    auto_update_users: provider?.auto_update_users ?? true,
+    // LDAP
+    ldap_server: provider?.ldap_server || '',
+    ldap_port: provider?.ldap_port || 389,
+    ldap_use_ssl: provider?.ldap_use_ssl ?? false,
+    ldap_bind_dn: provider?.ldap_bind_dn || '',
+    ldap_bind_password: '',
+    ldap_base_dn: provider?.ldap_base_dn || '',
+    ldap_user_filter: provider?.ldap_user_filter || '(uid={username})',
+    // OAuth2
+    oauth2_client_id: provider?.oauth2_client_id || '',
+    oauth2_client_secret: '',
+    oauth2_auth_url: provider?.oauth2_auth_url || '',
+    oauth2_token_url: provider?.oauth2_token_url || '',
+    oauth2_userinfo_url: provider?.oauth2_userinfo_url || '',
+    oauth2_scopes: provider?.oauth2_scopes?.join(' ') || 'openid profile email',
+    // SAML
+    saml_entity_id: provider?.saml_entity_id || '',
+    saml_sso_url: provider?.saml_sso_url || '',
+    saml_slo_url: provider?.saml_slo_url || '',
+    saml_certificate: provider?.saml_certificate || '',
+  })
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const data = { ...formData }
+    if (data.provider_type === 'oauth2') {
+      data.oauth2_scopes = data.oauth2_scopes.split(/\s+/).filter(Boolean)
+    }
+    onSave(data)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-6">
+      {/* General Settings */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">{t('sso.tabs.general')}</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label={t('sso.providerName')}
+            value={formData.name}
+            onChange={e => handleChange('name', e.target.value)}
+            required
+            placeholder={t('sso.providerNamePlaceholder')}
+          />
+          <Input
+            label={t('sso.displayName')}
+            value={formData.display_name}
+            onChange={e => handleChange('display_name', e.target.value)}
+            placeholder={t('sso.displayNamePlaceholder')}
+          />
+        </div>
+        {!provider && (
+          <Select
+            label={t('sso.providerType')}
+            value={formData.provider_type}
+            onChange={value => handleChange('provider_type', value)}
+            options={[
+              { value: 'ldap', label: t('sso.ldap') },
+              { value: 'oauth2', label: t('sso.oauth2') },
+              { value: 'saml', label: t('sso.saml') },
+            ]}
+          />
+        )}
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.enabled}
+            onChange={e => handleChange('enabled', e.target.checked)}
+            className="rounded border-border bg-bg-tertiary"
+          />
+          <span className="text-sm text-text-primary">{t('sso.enableProvider')}</span>
+        </label>
+      </div>
+
+      {/* Connection Settings */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">{t('sso.tabs.connection')}</h4>
+        
+        {formData.provider_type === 'ldap' && (
+          <>
+            <div className="grid grid-cols-3 gap-4">
+              <Input
+                label={t('sso.ldapServer')}
+                value={formData.ldap_server}
+                onChange={e => handleChange('ldap_server', e.target.value)}
+                placeholder="ldap.example.com"
+                className="col-span-2"
+              />
+              <Input
+                label={t('sso.ldapPort')}
+                type="number"
+                value={formData.ldap_port}
+                onChange={e => handleChange('ldap_port', parseInt(e.target.value))}
+              />
+            </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.ldap_use_ssl}
+                onChange={e => handleChange('ldap_use_ssl', e.target.checked)}
+                className="rounded border-border bg-bg-tertiary"
+              />
+              <span className="text-sm text-text-primary">{t('sso.ldapUseSsl')}</span>
+            </label>
+            <Input
+              label={t('sso.bindDn')}
+              value={formData.ldap_bind_dn}
+              onChange={e => handleChange('ldap_bind_dn', e.target.value)}
+              placeholder={t('sso.bindDnPlaceholder')}
+            />
+            <Input
+              label={t('sso.bindPassword')}
+              type="password"
+              value={formData.ldap_bind_password}
+              onChange={e => handleChange('ldap_bind_password', e.target.value)}
+              placeholder={provider ? t('sso.keepExisting') : ''}
+            />
+            <Input
+              label={t('sso.baseDn')}
+              value={formData.ldap_base_dn}
+              onChange={e => handleChange('ldap_base_dn', e.target.value)}
+              placeholder={t('sso.baseDnPlaceholder')}
+            />
+            <Input
+              label={t('sso.userFilter')}
+              value={formData.ldap_user_filter}
+              onChange={e => handleChange('ldap_user_filter', e.target.value)}
+              placeholder={t('sso.userFilterPlaceholder')}
+            />
+          </>
+        )}
+
+        {formData.provider_type === 'oauth2' && (
+          <>
+            <Input
+              label={t('sso.clientId')}
+              value={formData.oauth2_client_id}
+              onChange={e => handleChange('oauth2_client_id', e.target.value)}
+            />
+            <Input
+              label={t('sso.clientSecret')}
+              type="password"
+              value={formData.oauth2_client_secret}
+              onChange={e => handleChange('oauth2_client_secret', e.target.value)}
+              placeholder={provider ? t('sso.keepExisting') : ''}
+            />
+            <Input
+              label={t('sso.authUrl')}
+              value={formData.oauth2_auth_url}
+              onChange={e => handleChange('oauth2_auth_url', e.target.value)}
+              placeholder={t('sso.authUrlPlaceholder')}
+            />
+            <Input
+              label={t('sso.tokenUrl')}
+              value={formData.oauth2_token_url}
+              onChange={e => handleChange('oauth2_token_url', e.target.value)}
+              placeholder={t('sso.tokenUrlPlaceholder')}
+            />
+            <Input
+              label={t('sso.scopes')}
+              value={formData.oauth2_scopes}
+              onChange={e => handleChange('oauth2_scopes', e.target.value)}
+              placeholder={t('sso.scopesPlaceholder')}
+            />
+          </>
+        )}
+
+        {formData.provider_type === 'saml' && (
+          <>
+            <Input
+              label={t('sso.entityId')}
+              value={formData.saml_entity_id}
+              onChange={e => handleChange('saml_entity_id', e.target.value)}
+              placeholder="https://idp.example.com/saml/metadata"
+            />
+            <Input
+              label={t('sso.ssoURL')}
+              value={formData.saml_sso_url}
+              onChange={e => handleChange('saml_sso_url', e.target.value)}
+              placeholder="https://idp.example.com/saml/sso"
+            />
+            <Input
+              label={t('sso.sloURL')}
+              value={formData.saml_slo_url}
+              onChange={e => handleChange('saml_slo_url', e.target.value)}
+              placeholder="https://idp.example.com/saml/slo"
+            />
+            <Textarea
+              label={t('sso.certificate')}
+              value={formData.saml_certificate}
+              onChange={e => handleChange('saml_certificate', e.target.value)}
+              rows={6}
+              placeholder="-----BEGIN CERTIFICATE-----..."
+              className="font-mono text-xs"
+            />
+          </>
+        )}
+      </div>
+
+      {/* Provisioning Settings */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">{t('sso.tabs.provisioning')}</h4>
+        <Select
+          label={t('sso.defaultRole')}
+          value={formData.default_role}
+          onChange={value => handleChange('default_role', value)}
+          options={[
+            { value: 'admin', label: t('sso.roles.admin') },
+            { value: 'operator', label: t('sso.roles.operator') },
+            { value: 'viewer', label: t('sso.roles.viewer') },
+          ]}
+        />
+        <div className="space-y-2">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.auto_create_users}
+              onChange={e => handleChange('auto_create_users', e.target.checked)}
+              className="rounded border-border bg-bg-tertiary"
+            />
+            <span className="text-sm text-text-primary">{t('sso.autoCreateUsers')}</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.auto_update_users}
+              onChange={e => handleChange('auto_update_users', e.target.checked)}
+              className="rounded border-border bg-bg-tertiary"
+            />
+            <span className="text-sm text-text-primary">{t('sso.autoUpdateUsers')}</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit">
+          {provider ? t('common.save') : t('common.create')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
@@ -261,6 +531,14 @@ export default function SettingsPage() {
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
 
+  // SSO states
+  const [ssoProviders, setSsoProviders] = useState([])
+  const [ssoLoading, setSsoLoading] = useState(false)
+  const [showSsoModal, setShowSsoModal] = useState(false)
+  const [editingSsoProvider, setEditingSsoProvider] = useState(null)
+  const [ssoTesting, setSsoTesting] = useState(false)
+  const [ssoConfirmDelete, setSsoConfirmDelete] = useState(null)
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -271,13 +549,30 @@ export default function SettingsPage() {
     loadCAs()
     loadCertificates()
     loadDbStats()
+    loadSsoProviders()
   }, [])
 
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const response = await settingsService.getAll()
-      setSettings(response.data || response || {})
+      const [generalRes, emailRes] = await Promise.all([
+        settingsService.getAll(),
+        settingsService.getEmailSettings().catch(() => ({ data: {} }))
+      ])
+      const generalSettings = generalRes.data || generalRes || {}
+      const emailSettings = emailRes.data || {}
+      
+      // Merge email settings with mapped field names
+      setSettings({
+        ...generalSettings,
+        smtp_host: emailSettings.smtp_host,
+        smtp_port: emailSettings.smtp_port,
+        smtp_username: emailSettings.smtp_username,
+        smtp_password: emailSettings.smtp_password,
+        smtp_use_tls: emailSettings.smtp_tls,
+        smtp_from_email: emailSettings.from_email,
+        smtp_from_name: emailSettings.from_name,
+      })
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.SETTINGS)
     } finally {
@@ -327,6 +622,84 @@ export default function SettingsPage() {
     }
   }
 
+  // SSO Functions
+  const loadSsoProviders = async () => {
+    setSsoLoading(true)
+    try {
+      const response = await apiClient.get('/sso/providers')
+      setSsoProviders(response.data || [])
+    } catch (error) {
+      console.error('Failed to load SSO providers:', error)
+    } finally {
+      setSsoLoading(false)
+    }
+  }
+
+  const handleSsoCreate = () => {
+    setEditingSsoProvider(null)
+    setShowSsoModal(true)
+  }
+
+  const handleSsoEdit = (provider) => {
+    setEditingSsoProvider(provider)
+    setShowSsoModal(true)
+  }
+
+  const handleSsoSave = async (formData) => {
+    try {
+      if (editingSsoProvider) {
+        await apiClient.put(`/sso/providers/${editingSsoProvider.id}`, formData)
+        showSuccess(t('sso.updateSuccess'))
+      } else {
+        await apiClient.post('/sso/providers', formData)
+        showSuccess(t('sso.createSuccess'))
+      }
+      setShowSsoModal(false)
+      loadSsoProviders()
+    } catch (error) {
+      showError(error.message || t('sso.saveFailed'))
+    }
+  }
+
+  const handleSsoDelete = async () => {
+    if (!ssoConfirmDelete) return
+    try {
+      await apiClient.delete(`/sso/providers/${ssoConfirmDelete.id}`)
+      showSuccess(t('sso.deleteSuccess'))
+      loadSsoProviders()
+    } catch (error) {
+      showError(t('sso.deleteFailed'))
+    } finally {
+      setSsoConfirmDelete(null)
+    }
+  }
+
+  const handleSsoToggle = async (provider) => {
+    try {
+      await apiClient.post(`/sso/providers/${provider.id}/toggle`)
+      showSuccess(t('sso.toggleSuccess', { action: provider.enabled ? t('common.disabled').toLowerCase() : t('common.enabled').toLowerCase() }))
+      loadSsoProviders()
+    } catch (error) {
+      showError(t('sso.toggleFailed'))
+    }
+  }
+
+  const handleSsoTest = async (provider) => {
+    setSsoTesting(true)
+    try {
+      const response = await apiClient.post(`/sso/providers/${provider.id}/test`)
+      if (response.data?.status === 'success') {
+        showSuccess(response.data.message || t('sso.testSuccess'))
+      } else {
+        showError(response.message || t('sso.testFailed'))
+      }
+    } catch (error) {
+      showError(error.message || t('sso.testFailed'))
+    } finally {
+      setSsoTesting(false)
+    }
+  }
+
   const loadCertificates = async () => {
     try {
       const data = await certificatesService.getAll({ status: 'valid' })
@@ -344,8 +717,23 @@ export default function SettingsPage() {
   const handleSave = async (section) => {
     setSaving(true)
     try {
-      await settingsService.updateBulk(settings)
+      if (section === 'email') {
+        // Email settings go to a different endpoint with mapped field names
+        await settingsService.updateEmailSettings({
+          smtp_host: settings.smtp_host,
+          smtp_port: settings.smtp_port,
+          smtp_username: settings.smtp_username,
+          smtp_password: settings.smtp_password,
+          smtp_tls: settings.smtp_use_tls,
+          from_email: settings.smtp_from_email,
+          from_name: settings.smtp_from_name,
+          enabled: true
+        })
+      } else {
+        await settingsService.updateBulk(settings)
+      }
       showSuccess(SUCCESS.UPDATE.SETTINGS)
+      await loadSettings()
     } catch (error) {
       showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
     } finally {
@@ -354,8 +742,13 @@ export default function SettingsPage() {
   }
 
   const handleTestEmail = async () => {
+    const testEmail = settings.smtp_from_email || settings.admin_email
+    if (!testEmail) {
+      showError(t('settings.emailAddressRequired'))
+      return
+    }
     try {
-      await settingsService.testEmail(settings.admin_email)
+      await settingsService.testEmail(testEmail)
       showSuccess(SUCCESS.EMAIL.TEST_SENT)
     } catch (error) {
       showError(error.message || ERRORS.EMAIL.TEST_FAILED)
@@ -562,13 +955,10 @@ export default function SettingsPage() {
       case 'general':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={Gear}
               title={t('settings.generalTitle')}
               subtitle={t('settings.generalSubtitle')}
-              actions={canWrite('settings') ? [
-                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('general'), disabled: saving }
-              ] : []}
             />
             <DetailSection title={t('settings.systemConfiguration')} icon={Gear} iconClass="icon-bg-blue">
               <div className="space-y-4">
@@ -608,6 +998,14 @@ export default function SettingsPage() {
                   value={settings.timezone || 'UTC'}
                   onChange={(val) => updateSetting('timezone', val)}
                 />
+                {canWrite('settings') && (
+                  <div className="pt-2">
+                    <Button onClick={() => handleSave('general')} disabled={saving}>
+                      <FloppyDisk size={16} />
+                      {t('settings.saveChanges')}
+                    </Button>
+                  </div>
+                )}
               </div>
             </DetailSection>
           </DetailContent>
@@ -619,14 +1017,10 @@ export default function SettingsPage() {
       case 'email':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={EnvelopeSimple}
               title={t('settings.emailTitle')}
               subtitle={t('settings.emailSubtitle')}
-              actions={canWrite('settings') ? [
-                { label: t('settings.testEmail'), icon: Envelope, onClick: handleTestEmail, variant: 'secondary' },
-                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('email'), disabled: saving }
-              ] : []}
             />
             <DetailSection title={t('settings.smtpServer')} icon={Envelope} iconClass="icon-bg-violet">
               <DetailGrid>
@@ -682,6 +1076,18 @@ export default function SettingsPage() {
                   />
                   <span className="text-sm text-text-primary">{t('settings.useTls')}</span>
                 </label>
+                {canWrite('settings') && (
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="secondary" onClick={handleTestEmail}>
+                      <Envelope size={16} />
+                      {t('settings.testEmail')}
+                    </Button>
+                    <Button onClick={() => handleSave('email')} disabled={saving}>
+                      <FloppyDisk size={16} />
+                      {t('settings.saveChanges')}
+                    </Button>
+                  </div>
+                )}
               </div>
             </DetailSection>
           </DetailContent>
@@ -690,13 +1096,10 @@ export default function SettingsPage() {
       case 'security':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={ShieldCheck}
               title={t('settings.securityTitle')}
               subtitle={t('settings.securitySubtitle')}
-              actions={hasPermission('admin:system') ? [
-                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('security'), disabled: saving }
-              ] : []}
             />
             <DetailSection title={t('settings.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -776,20 +1179,101 @@ export default function SettingsPage() {
                   />
                 </div>
               </DetailGrid>
+              {hasPermission('admin:system') && (
+                <div className="pt-4">
+                  <Button onClick={() => handleSave('security')} disabled={saving}>
+                    <FloppyDisk size={16} />
+                    {t('settings.saveChanges')}
+                  </Button>
+                </div>
+              )}
             </DetailSection>
+          </DetailContent>
+        )
+
+      case 'sso':
+        return (
+          <DetailContent>
+            <DetailHeader
+              icon={Key}
+              title={t('sso.title')}
+              subtitle={t('sso.subtitle')}
+            />
+
+            <HelpCard variant="info" title={t('sso.helpTitle')} className="mb-4">
+              {t('sso.helpDescription')}
+            </HelpCard>
+
+            {ssoLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+              </div>
+            ) : ssoProviders.length === 0 ? (
+              <EmptyState
+                icon={Key}
+                title={t('sso.noProviders')}
+                description={t('sso.noProvidersDescription')}
+                action={{ label: t('sso.addProvider'), onClick: handleSsoCreate }}
+              />
+            ) : (
+              <DetailSection title={t('sso.configuredProviders')} icon={Key} iconClass="icon-bg-purple">
+                <div className="space-y-3">
+                  {ssoProviders.map(provider => {
+                    const ProviderIcon = SSO_PROVIDER_ICONS[provider.provider_type] || Key
+                    return (
+                      <div key={provider.id} className="flex items-center justify-between p-4 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-accent-primary/10 flex items-center justify-center">
+                            <ProviderIcon size={20} className="text-accent-primary" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-text-primary">{provider.display_name || provider.name}</span>
+                              <Badge variant={provider.enabled ? 'success' : 'secondary'} size="sm">
+                                {provider.enabled ? t('common.enabled') : t('common.disabled')}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-text-secondary">{provider.provider_type?.toUpperCase()}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting}>
+                            {ssoTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)}>
+                            <Lightning size={14} />
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)}>
+                            <PencilSimple size={14} />
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)}>
+                            <Trash size={14} />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {hasPermission('admin:system') && (
+                    <div className="pt-2">
+                      <Button onClick={handleSsoCreate}>
+                        <Plus size={16} />
+                        {t('sso.addProvider')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </DetailSection>
+            )}
           </DetailContent>
         )
 
       case 'backup':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={Database}
               title={t('settings.backupTitle')}
               subtitle={t('settings.backupSubtitle')}
-              actions={hasPermission('admin:system') ? [
-                { label: t('settings.createBackup'), icon: Database, onClick: () => setShowBackupModal(true) }
-              ] : []}
             />
             <DetailSection title={t('settings.automaticBackups')} icon={Database} iconClass="icon-bg-emerald">
               <div className="space-y-4">
@@ -839,10 +1323,16 @@ export default function SettingsPage() {
                 )}
 
                 {hasPermission('admin:system') && (
-                  <Button size="sm" onClick={() => handleSave('backup')} disabled={saving}>
-                    <FloppyDisk size={16} />
-                    {t('settings.saveSettings')}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button onClick={() => handleSave('backup')} disabled={saving}>
+                      <FloppyDisk size={16} />
+                      {t('settings.saveSettings')}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setShowBackupModal(true)}>
+                      <Database size={16} />
+                      {t('settings.createBackup')}
+                    </Button>
+                  </div>
                 )}
               </div>
             </DetailSection>
@@ -894,13 +1384,10 @@ export default function SettingsPage() {
       case 'audit':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={ListBullets}
               title={t('settings.auditTitle')}
               subtitle={t('settings.auditSubtitle')}
-              actions={hasPermission('admin:system') ? [
-                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('audit'), disabled: saving }
-              ] : []}
             />
             <DetailSection title={t('settings.auditLogging')} icon={ListBullets} iconClass="icon-bg-orange">
               <div className="space-y-4">
@@ -947,6 +1434,14 @@ export default function SettingsPage() {
                     <span className="text-sm text-text-primary">{event.label}</span>
                   </label>
                 ))}
+                {hasPermission('admin:system') && (
+                  <div className="pt-4">
+                    <Button onClick={() => handleSave('audit')} disabled={saving}>
+                      <FloppyDisk size={16} />
+                      {t('settings.saveChanges')}
+                    </Button>
+                  </div>
+                )}
               </div>
             </DetailSection>
           </DetailContent>
@@ -955,7 +1450,7 @@ export default function SettingsPage() {
       case 'database':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={HardDrives}
               title={t('settings.databaseTitle')}
               subtitle={t('settings.databaseSubtitle')}
@@ -1018,7 +1513,7 @@ export default function SettingsPage() {
       case 'https':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={Lock}
               title={t('settings.httpsTitle')}
               subtitle={t('settings.httpsSubtitle')}
@@ -1120,7 +1615,7 @@ export default function SettingsPage() {
       case 'updates':
         return (
           <DetailContent>
-            <DetailHeader compact
+            <DetailHeader
               icon={Rocket}
               title={t('settings.updatesTitle')}
               subtitle={t('settings.updatesSubtitle')}
@@ -1130,12 +1625,6 @@ export default function SettingsPage() {
         )
 
       default:
-        // Check if it's a category with a custom component (e.g., SSO)
-        const customCategory = SETTINGS_CATEGORIES.find(c => c.id === selectedCategory && c.component)
-        if (customCategory?.component) {
-          const CustomComponent = customCategory.component
-          return <CustomComponent />
-        }
         return null
     }
   }
@@ -1282,6 +1771,31 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
+
+      {/* SSO Provider Modal */}
+      <Modal
+        open={showSsoModal}
+        onClose={() => { setShowSsoModal(false); setEditingSsoProvider(null) }}
+        title={editingSsoProvider ? t('sso.editProvider') : t('sso.addProvider')}
+        size="lg"
+      >
+        <SsoProviderForm
+          provider={editingSsoProvider}
+          onSave={handleSsoSave}
+          onCancel={() => { setShowSsoModal(false); setEditingSsoProvider(null) }}
+        />
+      </Modal>
+
+      {/* SSO Delete Confirmation */}
+      <ConfirmModal
+        open={!!ssoConfirmDelete}
+        onClose={() => setSsoConfirmDelete(null)}
+        onConfirm={handleSsoDelete}
+        title={t('common.confirmDelete')}
+        message={t('sso.deleteConfirm', { name: ssoConfirmDelete?.name })}
+        confirmText={t('common.delete')}
+        variant="danger"
+      />
       
       {/* Smart Import Modal for HTTPS certificate */}
       <SmartImportModal

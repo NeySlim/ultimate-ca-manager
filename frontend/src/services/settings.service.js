@@ -29,7 +29,7 @@ export const settingsService = {
     return apiClient.patch('/settings/email', data)
   },
 
-  async testEmail(to) {
-    return apiClient.post('/settings/email/test', { to })
+  async testEmail(email) {
+    return apiClient.post('/settings/email/test', { email })
   }
 }
