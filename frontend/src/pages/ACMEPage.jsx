@@ -70,6 +70,7 @@ export default function ACMEPage() {
   // History filters
   const [historyFilterStatus, setHistoryFilterStatus] = useState('')
   const [historyFilterCA, setHistoryFilterCA] = useState('')
+  const [historyFilterSource, setHistoryFilterSource] = useState('')
 
   useEffect(() => {
     loadData()
@@ -1463,9 +1464,62 @@ export default function ACMEPage() {
       }
     },
     {
+      key: 'source',
+      header: t('acme.source'),
+      priority: 3,
+      hideOnMobile: true,
+      render: (value) => (
+        <Badge 
+          variant={value === 'letsencrypt' ? 'green' : 'cyan'} 
+          size="sm"
+          dot
+        >
+          {value === 'letsencrypt' ? "LET'S ENCRYPT" : 'LOCAL ACME'}
+        </Badge>
+      )
+    },
+    {
+      key: 'challenge_type',
+      header: t('acme.method'),
+      priority: 4,
+      hideOnMobile: true,
+      render: (value) => (
+        <Badge variant="default" size="sm">
+          {value?.toUpperCase() || 'N/A'}
+        </Badge>
+      )
+    },
+    {
+      key: 'dns_provider',
+      header: t('acme.provider'),
+      priority: 5,
+      hideOnMobile: true,
+      render: (value) => (
+        <span className="text-sm text-text-secondary">{value || '-'}</span>
+      )
+    },
+    {
+      key: 'environment',
+      header: t('acme.environment'),
+      priority: 5,
+      hideOnMobile: true,
+      render: (value) => {
+        if (!value) return <span className="text-text-tertiary">-</span>
+        const isProduction = value === 'production'
+        return (
+          <Badge 
+            variant={isProduction ? 'success' : 'warning'} 
+            size="sm"
+          >
+            {isProduction ? t('acme.production') : t('acme.staging')}
+          </Badge>
+        )
+      }
+    },
+    {
       key: 'created_at',
       header: t('acme.issued'),
-      priority: 5,
+      priority: 6,
       sortable: true,
       hideOnMobile: true,
       render: (value) => (
@@ -1665,8 +1719,11 @@ export default function ACMEPage() {
     if (historyFilterCA) {
       filtered = filtered.filter(cert => cert.issuer === historyFilterCA)
     }
+    if (historyFilterSource) {
+      filtered = filtered.filter(cert => cert.source === historyFilterSource)
+    }
     return filtered
-  }, [history, historyFilterStatus, historyFilterCA])
+  }, [history, historyFilterStatus, historyFilterCA, historyFilterSource])
 
   // Get unique CAs from history for filter
   const historyCAs = useMemo(() => {
@@ -1689,6 +1746,16 @@ export default function ACMEPage() {
       exportEnabled
       exportFilename="acme-certificates"
       toolbarFilters={[
+        {
+          key: 'source',
+          value: historyFilterSource,
+          onChange: setHistoryFilterSource,
+          placeholder: t('acme.allSources'),
+          options: [
+            { value: 'acme', label: 'Local ACME' },
+            { value: 'letsencrypt', label: "Let's Encrypt" }
+          ]
+        },
         {
           key: 'status',
           value: historyFilterStatus,

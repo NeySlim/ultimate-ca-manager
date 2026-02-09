@@ -7,6 +7,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, SystemConfig, CA, Certificate
+from models.acme_models import DnsProvider
 
 bp = Blueprint('acme_v2', __name__)
 
@@ -291,19 +292,28 @@ def unregister_proxy_account():
 @bp.route('/api/v2/acme/history', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_history():
-    """Get history of certificates issued via ACME
+    """Get history of certificates issued via ACME (local and Let's Encrypt)
     
     Query params:
         page: Page number (default: 1)
         per_page: Items per page (default: 50, max: 100)
+        source: Filter by source ('acme', 'letsencrypt', or 'all' - default: 'all')
     """
+    from models.acme_models import AcmeClientOrder
+    
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 100)
+    source_filter = request.args.get('source', 'all')
     
-    # Get certificates with source='acme'
-    query = Certificate.query.filter_by(source='acme').order_by(
-        Certificate.created_at.desc()
-    )
+    # Get certificates with source='acme' or 'letsencrypt'
+    if source_filter == 'all':
+        query = Certificate.query.filter(
+            Certificate.source.in_(['acme', 'letsencrypt'])
+        )
+    else:
+        query = Certificate.query.filter_by(source=source_filter)
+    
+    query = query.order_by(Certificate.created_at.desc())
     total = query.count()
     certs = query.offset((page - 1) * per_page).limit(per_page).all()
     
@@ -317,7 +327,7 @@ def get_acme_history():
         cas = CA.query.filter(CA.refid.in_(ca_refs)).all()
         cas_map = {ca.refid: ca.common_name for ca in cas}
     
-    # Fetch all orders at once
+    # Fetch local ACME orders
     orders_map = {}
     if cert_ids:
         orders = AcmeOrder.query.filter(AcmeOrder.certificate_id.in_(cert_ids)).all()
@@ -326,22 +336,54 @@ def get_acme_history():
             orders_map[order.certificate_id] = {
                 'order_id': order.order_id,
                 'account': account.account_id if account else 'Unknown',
-                'status': order.status
+                'status': order.status,
+                'challenge_type': 'http-01',  # Local ACME typically uses http-01
+                'environment': 'local'
+            }
+    
+    # Fetch LE client orders
+    client_orders_map = {}
+    if cert_ids:
+        client_orders = AcmeClientOrder.query.filter(AcmeClientOrder.certificate_id.in_(cert_ids)).all()
+        for order in client_orders:
+            dns_provider = None
+            if order.dns_provider_id:
+                provider = DnsProvider.query.get(order.dns_provider_id)
+                dns_provider = provider.name if provider else None
+            
+            client_orders_map[order.certificate_id] = {
+                'order_id': order.id,
+                'status': order.status,
+                'challenge_type': order.challenge_type,
+                'environment': order.environment,
+                'dns_provider': dns_provider
             }
     
     data = []
     for cert in certs:
+        # For LE certs, use the issuer field directly; for local ACME, use CA name
+        if cert.source == 'letsencrypt':
+            issuer_name = cert.issuer_name if hasattr(cert, 'issuer_name') else cert.issuer
+            order_data = client_orders_map.get(cert.id, {})
+        else:
+            issuer_name = cas_map.get(cert.caref) if cert.caref else None
+            order_data = orders_map.get(cert.id, {})
+        
         data.append({
             'id': cert.id,
             'refid': cert.refid,
             'common_name': cert.subject_cn or cert.descr,
             'serial': cert.serial_number,
-            'issuer': cas_map.get(cert.caref) if cert.caref else None,
+            'issuer': issuer_name,
+            'source': cert.source,
+            'challenge_type': order_data.get('challenge_type'),
+            'environment': order_data.get('environment'),
+            'dns_provider': order_data.get('dns_provider'),
             'valid_from': cert.valid_from.isoformat() if cert.valid_from else None,
             'valid_to': cert.valid_to.isoformat() if cert.valid_to else None,
             'revoked': cert.revoked,
             'created_at': cert.created_at.isoformat() if cert.created_at else None,
-            'order': orders_map.get(cert.id)
+            'order': order_data
         })
     
     return success_response(
