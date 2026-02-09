@@ -22,6 +22,14 @@ from .infomaniak import InfomaniakDnsProvider
 from .route53 import Route53DnsProvider
 from .scaleway import ScalewayDnsProvider
 from .ionos import IonosDnsProvider
+from .desec import DesecDnsProvider
+from .linode import LinodeDnsProvider
+from .bookmyname import BookMyNameDnsProvider
+from .vultr import VultrDnsProvider
+from .godaddy import GoDaddyDnsProvider
+from .namecheap import NamecheapDnsProvider
+from .netcup import NetcupDnsProvider
+from .inwx import InwxDnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +47,18 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'infomaniak': InfomaniakDnsProvider,
     'scaleway': ScalewayDnsProvider,
     'ionos': IonosDnsProvider,
+    'netcup': NetcupDnsProvider,
+    'inwx': InwxDnsProvider,
+    'bookmyname': BookMyNameDnsProvider,
     # International providers
     'cloudflare': CloudflareDnsProvider,
     'digitalocean': DigitalOceanDnsProvider,
     'route53': Route53DnsProvider,
+    'linode': LinodeDnsProvider,
+    'vultr': VultrDnsProvider,
+    'godaddy': GoDaddyDnsProvider,
+    'namecheap': NamecheapDnsProvider,
+    'desec': DesecDnsProvider,
 }
 
 
