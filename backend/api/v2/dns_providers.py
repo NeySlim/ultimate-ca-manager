@@ -22,7 +22,7 @@ bp = Blueprint('dns_providers', __name__)
 def list_providers():
     """List all configured DNS providers"""
     providers = DnsProvider.query.order_by(DnsProvider.name).all()
-    return success_response(data=[p.to_dict() for p in providers])
+    return success_response(data=[p.to_dict(include_credentials=True) for p in providers])
 
 
 @bp.route('/api/v2/dns-providers/types', methods=['GET'])

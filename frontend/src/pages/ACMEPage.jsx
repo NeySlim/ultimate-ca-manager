@@ -2041,9 +2041,12 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     provider_type: provider?.provider_type || 'manual',
-    credentials: provider?.credentials ? JSON.parse(provider.credentials) : {},
+    credentials: {},  // Always start empty - backend will merge
     is_default: provider?.is_default || false
   })
+  
+  // Track which credentials already exist (from credential_keys)
+  const existingCredentialKeys = provider?.credential_keys || []
   
   const selectedType = providerTypes.find(pt => pt.type === formData.provider_type)
   
@@ -2056,7 +2059,8 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
     }
     
     // Validate required credentials using schema
-    if (selectedType?.credentials_schema) {
+    // Only check if it's a NEW provider or if the field is not already set
+    if (selectedType?.credentials_schema && !provider) {
       const missing = selectedType.credentials_schema
         .filter(field => field.required && !formData.credentials[field.name])
         .map(field => field.label)
@@ -2104,32 +2108,36 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
       {selectedType?.credentials_schema?.length > 0 && (
         <div className="space-y-3 p-3 bg-bg-tertiary/50 rounded-lg">
           <p className="text-sm font-medium text-text-secondary">{t('acme.credentials')}</p>
-          {selectedType.credentials_schema.map(field => (
-            <div key={field.name}>
-              {field.type === 'select' ? (
-                <Select
-                  label={field.label}
-                  value={formData.credentials[field.name] || field.default || ''}
-                  onChange={(val) => updateCredential(field.name, val)}
-                  options={field.options || []}
-                  required={field.required}
-                />
-              ) : (
-                <Input
-                  label={field.label}
-                  type={field.type === 'password' ? 'password' : 'text'}
-                  autoComplete={field.type === 'password' ? 'new-password' : 'off'}
-                  value={formData.credentials[field.name] || ''}
-                  onChange={(e) => updateCredential(field.name, e.target.value)}
-                  required={field.required}
-                  placeholder={field.placeholder}
-                />
-              )}
-              {field.help && (
-                <p className="text-xs text-text-tertiary mt-1 ml-1">{field.help}</p>
-              )}
-            </div>
-          ))}
+          {selectedType.credentials_schema.map(field => {
+            const hasExistingValue = existingCredentialKeys.includes(field.name)
+            const isPasswordType = field.type === 'password'
+            
+            return (
+              <div key={field.name}>
+                {field.type === 'select' ? (
+                  <Select
+                    label={field.label}
+                    value={formData.credentials[field.name] || field.default || ''}
+                    onChange={(val) => updateCredential(field.name, val)}
+                    options={field.options || []}
+                    required={field.required && !hasExistingValue}
+                  />
+                ) : (
+                  <Input
+                    label={field.label}
+                    type={isPasswordType ? 'password' : 'text'}
+                    autoComplete={isPasswordType ? 'new-password' : 'off'}
+                    value={formData.credentials[field.name] || ''}
+                    onChange={(e) => updateCredential(field.name, e.target.value)}
+                    required={field.required}
+                    placeholder={field.placeholder}
+                    hasExistingValue={hasExistingValue}
+                    helperText={field.help}
+                  />
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
       

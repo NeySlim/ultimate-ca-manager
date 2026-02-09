@@ -356,7 +356,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               type="password"
               value={formData.ldap_bind_password}
               onChange={e => handleChange('ldap_bind_password', e.target.value)}
-              placeholder={provider ? t('sso.keepExisting') : ''}
+              hasExistingValue={!!provider?.ldap_bind_password}
             />
             <Input
               label={t('sso.baseDn')}
@@ -385,7 +385,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               type="password"
               value={formData.oauth2_client_secret}
               onChange={e => handleChange('oauth2_client_secret', e.target.value)}
-              placeholder={provider ? t('sso.keepExisting') : ''}
+              hasExistingValue={!!provider?.oauth2_client_secret}
             />
             <Input
               label={t('sso.authUrl')}
@@ -1052,9 +1052,9 @@ export default function SettingsPage() {
                 <Input
                   label={t('settings.smtpPassword')}
                   type="password"
-                  value={settings.smtp_password || ''}
+                  value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
                   onChange={(e) => updateSetting('smtp_password', e.target.value)}
-                  placeholder={t('settings.passwordPlaceholder')}
+                  hasExistingValue={settings.smtp_password === '********'}
                 />
               </div>
             </DetailSection>
