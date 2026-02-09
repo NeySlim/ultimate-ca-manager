@@ -245,7 +245,7 @@ export function AppShell() {
             <div className="h-px bg-border my-1.5" />
             
             {/* Mode */}
-            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance')}</div>
+            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance.title')}</div>
             {[
               { id: 'system', labelKey: 'settings.followSystem' },
               { id: 'dark', labelKey: 'settings.dark' },

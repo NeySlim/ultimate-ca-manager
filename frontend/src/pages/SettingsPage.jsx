@@ -65,7 +65,7 @@ function AppearanceSettings() {
     <DetailContent>
       <DetailHeader
         icon={Palette}
-        title={t('settings.appearance')}
+        title={t('settings.appearance.title')}
         subtitle={t('settings.appearanceSubtitle')}
       />
       

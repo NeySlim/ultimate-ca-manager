@@ -782,7 +782,7 @@ export default function LoginPage() {
               <button
                 onClick={() => { setThemeMenuOpen(!themeMenuOpen); setLangMenuOpen(false) }}
                 className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
-                title={t('settings.appearance')}
+                title={t('settings.appearance.title')}
               >
                 <Palette size={18} />
               </button>
@@ -816,7 +816,7 @@ export default function LoginPage() {
                     <div className="h-px bg-border my-1.5" />
                     
                     {/* Mode */}
-                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance')}</div>
+                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance.title')}</div>
                     {[
                       { id: 'system', labelKey: 'settings.followSystem' },
                       { id: 'dark', labelKey: 'settings.dark' },
