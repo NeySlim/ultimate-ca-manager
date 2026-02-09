@@ -209,6 +209,25 @@ export default function ACMEPage() {
     }
   }
   
+  const handleDeleteClientOrder = async (order) => {
+    const confirmed = await showConfirm(
+      t('acme.deleteOrderConfirm'),
+      t('acme.deleteOrderConfirmDesc', { domain: order.primary_domain || order.domains?.[0] })
+    )
+    if (!confirmed) return
+    
+    try {
+      await acmeService.deleteOrder(order.id)
+      showSuccess(t('acme.orderDeleted'))
+      if (selectedClientOrder?.id === order.id) {
+        setSelectedClientOrder(null)
+      }
+      loadData()
+    } catch (error) {
+      showError(error.message || t('common.deleteFailed'))
+    }
+  }
+  
   // =========================================================================
   // DNS Provider Handlers
   // =========================================================================
@@ -686,101 +705,117 @@ export default function ACMEPage() {
         </Button>
       </div>
       
-      {/* Orders List */}
-      <CompactSection title={t('acme.certificates')} icon={Certificate}>
-        {clientOrders.length === 0 ? (
-          <div className="text-center py-8 text-text-secondary">
-            <Certificate size={40} className="mx-auto mb-2 opacity-40" />
-            <p>{t('acme.noClientOrders')}</p>
-            <p className="text-sm text-text-tertiary mt-1">{t('acme.noClientOrdersDesc')}</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {clientOrders.map(order => (
-              <div 
-                key={order.id} 
-                className={cn(
-                  "p-3 rounded-lg border border-border cursor-pointer transition-all",
-                  "hover:bg-bg-tertiary/50",
-                  selectedClientOrder?.id === order.id && "ring-2 ring-accent-primary bg-bg-tertiary/50"
-                )}
-                onClick={() => setSelectedClientOrder(order)}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className={cn(
-                      "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-                      order.status === 'valid' && "icon-bg-green",
-                      order.status === 'pending' && "icon-bg-yellow",
-                      order.status === 'processing' && "icon-bg-blue",
-                      order.status === 'invalid' && "icon-bg-red"
-                    )}>
-                      {order.status === 'valid' ? <CheckCircle size={14} weight="fill" /> : 
-                       order.status === 'invalid' ? <XCircle size={14} weight="fill" /> :
-                       <Clock size={14} />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">
-                        {Array.isArray(order.domains) ? order.domains.join(', ') : order.domains}
-                      </p>
-                      <p className="text-xs text-text-tertiary">
-                        {order.environment} • {order.challenge_type} • {formatDate(order.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge 
-                    variant={order.status === 'valid' ? 'success' : 
-                             order.status === 'invalid' ? 'danger' : 
-                             order.status === 'pending' ? 'warning' : 'default'}
-                    size="sm"
-                  >
-                    {order.status}
-                  </Badge>
+      {/* Orders List - ResponsiveDataTable */}
+      <ResponsiveDataTable
+        data={clientOrders}
+        columns={[
+          {
+            key: 'primary_domain',
+            label: t('acme.domain'),
+            sortable: true,
+            priority: 1,
+            render: (val, row) => (
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                  (row.status === 'valid' || row.status === 'issued') ? "icon-bg-emerald" : 
+                  row.status === 'pending' ? "icon-bg-amber" :
+                  row.status === 'processing' ? "icon-bg-blue" :
+                  row.status === 'invalid' ? "icon-bg-orange" : "icon-bg-gray"
+                )}>
+                  {row.status === 'valid' || row.status === 'issued' ? <CheckCircle size={14} weight="fill" /> : 
+                   row.status === 'invalid' ? <XCircle size={14} weight="fill" /> :
+                   <Clock size={14} />}
                 </div>
-                
-                {/* Show challenge info for pending orders */}
-                {order.status === 'pending' && order.challenges_data && (
-                  <div className="mt-3 p-2 bg-bg-tertiary/50 rounded border border-border text-xs">
-                    <p className="font-medium text-text-secondary mb-1">{t('acme.pendingChallenge')}</p>
-                    {(() => {
-                      try {
-                        const challenges = JSON.parse(order.challenges_data || '{}')
-                        return Object.entries(challenges).map(([domain, data]) => (
-                          <div key={domain} className="mb-2 last:mb-0">
-                            <p className="text-text-primary">{domain}</p>
-                            {order.challenge_type === 'dns-01' && (
-                              <div className="mt-1 space-y-1">
-                                <p className="text-text-tertiary">{t('acme.dnsRecordName')}: <code className="bg-bg-primary px-1 rounded">{data.record_name}</code></p>
-                                <p className="text-text-tertiary">{t('acme.dnsRecordValue')}: <code className="bg-bg-primary px-1 rounded break-all">{data.record_value}</code></p>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      } catch { return null }
-                    })()}
-                    <div className="flex gap-2 mt-2">
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); handleVerifyChallenge(order) }}>
-                        <Play size={12} />
-                        {t('acme.verifyChallenge')}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Finalize button for ready orders */}
-                {order.status === 'processing' && (
-                  <div className="flex gap-2 mt-2">
-                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleFinalizeOrder(order) }}>
-                      <CheckCircle size={12} />
-                      {t('acme.finalize')}
-                    </Button>
-                  </div>
-                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">
+                    {val || (Array.isArray(row.domains) ? row.domains.join(', ') : row.domains)}
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </CompactSection>
+            )
+          },
+          {
+            key: 'environment',
+            label: t('acme.environment'),
+            sortable: true,
+            priority: 3,
+            render: (val) => (
+              <Badge variant={val === 'production' ? 'success' : 'secondary'} size="sm">
+                {val === 'production' ? 'Prod' : 'Test'}
+              </Badge>
+            )
+          },
+          {
+            key: 'challenge_type',
+            label: t('acme.method'),
+            sortable: true,
+            priority: 4,
+            render: (val) => (
+              <span className="text-xs text-text-secondary uppercase">{val || '-'}</span>
+            )
+          },
+          {
+            key: 'dns_provider_name',
+            label: t('acme.dnsProvider'),
+            sortable: true,
+            priority: 5,
+            render: (val) => val || '-'
+          },
+          {
+            key: 'status',
+            label: t('common.status'),
+            sortable: true,
+            priority: 2,
+            render: (val) => (
+              <Badge 
+                variant={val === 'valid' || val === 'issued' ? 'success' : 
+                         val === 'invalid' ? 'danger' : 
+                         val === 'pending' ? 'warning' : 
+                         val === 'processing' ? 'info' : 'default'}
+                size="sm"
+              >
+                {val || '-'}
+              </Badge>
+            )
+          },
+          {
+            key: 'created_at',
+            label: t('common.created'),
+            sortable: true,
+            priority: 6,
+            render: (val) => (
+              <span className="text-xs text-text-secondary">{formatDate(val)}</span>
+            )
+          }
+        ]}
+        actions={(row) => [
+          ...(row.status === 'pending' ? [{
+            label: t('acme.verifyChallenge'),
+            icon: Play,
+            onClick: () => handleVerifyChallenge(row)
+          }] : []),
+          ...(row.status === 'processing' ? [{
+            label: t('acme.finalize'),
+            icon: CheckCircle,
+            onClick: () => handleFinalizeOrder(row)
+          }] : []),
+          {
+            label: t('common.delete'),
+            icon: Trash,
+            variant: 'danger',
+            onClick: () => handleDeleteClientOrder(row)
+          }
+        ]}
+        onRowClick={(row) => setSelectedClientOrder(row)}
+        selectedRow={selectedClientOrder}
+        searchKeys={['domains', 'status', 'environment', 'dns_provider_name']}
+        emptyIcon={Certificate}
+        emptyTitle={t('acme.noClientOrders')}
+        emptyDescription={t('acme.noClientOrdersDesc')}
+        exportFilename="acme-orders"
+        compact
+      />
       
       {/* Client Settings */}
       <CompactSection title={t('acme.clientSettings')} icon={Gear}>
@@ -852,7 +887,7 @@ export default function ACMEPage() {
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                    provider.is_default ? "icon-bg-green" : "icon-bg-blue"
+                    provider.is_default ? "icon-bg-emerald" : "icon-bg-blue"
                   )}>
                     <PlugsConnected size={16} />
                   </div>
@@ -1076,7 +1111,7 @@ export default function ACMEPage() {
         <div className="flex items-center gap-2">
           <div className={cn(
             "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-            row?.revoked ? "icon-bg-red" : "icon-bg-blue"
+            row?.revoked ? "icon-bg-orange" : "icon-bg-blue"
           )}>
             <Certificate size={14} weight="duotone" />
           </div>
@@ -1093,7 +1128,7 @@ export default function ACMEPage() {
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className={cn(
               "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-              row?.revoked ? "icon-bg-red" : "icon-bg-blue"
+              row?.revoked ? "icon-bg-orange" : "icon-bg-blue"
             )}>
               <Certificate size={14} weight="duotone" />
             </div>
