@@ -30,6 +30,8 @@ from .godaddy import GoDaddyDnsProvider
 from .namecheap import NamecheapDnsProvider
 from .netcup import NetcupDnsProvider
 from .inwx import InwxDnsProvider
+from .freedns import FreeDnsDnsProvider
+from .duckdns import DuckDnsDnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,9 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'godaddy': GoDaddyDnsProvider,
     'namecheap': NamecheapDnsProvider,
     'desec': DesecDnsProvider,
+    # Free DNS services
+    'duckdns': DuckDnsDnsProvider,
+    'freedns': FreeDnsDnsProvider,
 }
 
 
