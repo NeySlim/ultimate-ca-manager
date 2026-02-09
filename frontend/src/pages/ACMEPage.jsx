@@ -721,7 +721,7 @@ export default function ACMEPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-text-primary truncate">
-                        {JSON.parse(order.domains || '[]').join(', ')}
+                        {Array.isArray(order.domains) ? order.domains.join(', ') : order.domains}
                       </p>
                       <p className="text-xs text-text-tertiary">
                         {order.environment} • {order.challenge_type} • {formatDate(order.created_at)}
@@ -1707,6 +1707,7 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
                 <Input
                   label={field.label}
                   type={field.type === 'password' ? 'password' : 'text'}
+                  autoComplete={field.type === 'password' ? 'new-password' : 'off'}
                   value={formData.credentials[field.name] || ''}
                   onChange={(e) => updateCredential(field.name, e.target.value)}
                   required={field.required}
