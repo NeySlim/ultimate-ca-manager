@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 import josepy as jose
 
-from models import db, SystemConfig
+from models import db, SystemConfig, DnsProvider
 
 class AcmeProxyService:
     # Default upstream (Let's Encrypt Staging for safety by default, user can change)
@@ -199,9 +199,30 @@ class AcmeProxyService:
         svc = AcmeService(self.base_url)
         return svc.generate_nonce()
 
-    def new_order(self, identifiers, not_before=None, not_after=None):
-        """Proxy new-order"""
+    def new_order(self, identifiers, not_before=None, not_after=None, client_thumbprint=None):
+        """Proxy new-order with domain validation"""
+        from api.v2.acme_domains import find_provider_for_domain
+        from models import AcmeClientOrder
+        
         self._ensure_directory()
+        
+        # Extract domains from identifiers
+        domains = []
+        for ident in identifiers:
+            if ident.get('type') == 'dns':
+                domains.append(ident.get('value'))
+        
+        # Verify each domain has a DNS provider configured
+        domain_providers = {}
+        for domain in domains:
+            # Remove wildcard prefix for lookup
+            lookup_domain = domain.lstrip('*.')
+            provider = find_provider_for_domain(lookup_domain)
+            if not provider:
+                raise Exception(f"No DNS provider configured for domain: {domain}. Configure it in ACME > Domains.")
+            domain_providers[domain] = provider
+        
+        # Forward to upstream Let's Encrypt
         payload = {
             "identifiers": identifiers,
             "notBefore": not_before.isoformat() + 'Z' if not_before else None,
@@ -218,9 +239,25 @@ class AcmeProxyService:
         upstream_order = resp.json()
         upstream_location = resp.headers['Location']
         
+        # Store order in database for tracking
+        order = AcmeClientOrder(
+            domains=json.dumps(domains),
+            email='proxy@ucm.local',
+            environment='staging' if 'staging' in self.upstream_directory_url else 'production',
+            challenge_type='dns-01',
+            status='pending',
+            order_url=upstream_location,
+            upstream_order_url=upstream_location,
+            is_proxy_order=True,
+            client_jwk_thumbprint=client_thumbprint,
+            # Use first domain's provider
+            dns_provider_id=list(domain_providers.values())[0].id if domain_providers else None
+        )
+        db.session.add(order)
+        db.session.commit()
+        
         # Rewrite URLs in response to point to Proxy
         # We encode upstream URLs into base64 IDs
-        
         order_id = base64.urlsafe_b64encode(upstream_location.encode()).rstrip(b'=').decode()
         
         proxy_authzs = []
@@ -248,6 +285,9 @@ class AcmeProxyService:
              
         authz = resp.json()
         
+        # Extract identifier (domain)
+        identifier = authz.get('identifier', {})
+        
         # Rewrite challenges
         proxy_challenges = []
         for chall in authz['challenges']:
@@ -259,23 +299,111 @@ class AcmeProxyService:
             proxy_challenges.append(chall)
             
         authz['challenges'] = proxy_challenges
-        return authz
+        return authz, identifier
 
-    def respond_challenge(self, chall_id_b64):
-        """Proxy challenge response"""
-        chall_id_b64 += '=' * (4 - len(chall_id_b64) % 4)
-        chall_url = base64.urlsafe_b64decode(chall_id_b64).decode()
+    def respond_challenge(self, chall_id_b64, authz_id_b64=None):
+        """Proxy challenge response with automatic DNS setup"""
+        import hashlib
+        from api.v2.acme_domains import find_provider_for_domain
+        from services.acme.dns_providers import create_provider
+        from models import DnsProvider, AcmeClientOrder
         
-        # Trigger upstream validation
-        # Payload is usually empty {}
+        chall_id_b64_padded = chall_id_b64 + '=' * (4 - len(chall_id_b64) % 4)
+        chall_url = base64.urlsafe_b64decode(chall_id_b64_padded).decode()
+        
+        # First, fetch the challenge to get token and type
+        # We need to find the authz to get the domain
+        # The challenge URL contains hints about the authz
+        
+        # Extract token from upstream challenge
+        # Fetch current challenge state
+        resp = self._post_jws(chall_url, "", kid=self.account_url)
+        if resp.status_code != 200:
+            raise Exception(f"Failed to fetch challenge: {resp.text}")
+        
+        challenge_data = resp.json()
+        token = challenge_data.get('token')
+        challenge_type = challenge_data.get('type')
+        
+        # Only handle dns-01 challenges
+        if challenge_type == 'dns-01' and token:
+            # Calculate key authorization
+            # key_authz = token + "." + base64url(sha256(JWK_thumbprint))
+            # The thumbprint is of OUR upstream account key
+            jwk_thumbprint = self._get_account_thumbprint()
+            key_authz = f"{token}.{jwk_thumbprint}"
+            
+            # TXT record value = base64url(sha256(key_authz))
+            digest = hashlib.sha256(key_authz.encode()).digest()
+            txt_value = base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+            
+            # Find the domain from the authz URL pattern
+            # The authz URL is typically: .../acme/authz-v3/{authz_id}
+            # We stored order info, find matching order by challenge URL prefix
+            # For now, extract domain from challenge URL pattern or use order lookup
+            
+            # Get domain from DB order (we stored it in new_order)
+            # Find order by upstream URL pattern
+            order = AcmeClientOrder.query.filter(
+                AcmeClientOrder.is_proxy_order == True,
+                AcmeClientOrder.status == 'pending'
+            ).order_by(AcmeClientOrder.created_at.desc()).first()
+            
+            if order and order.domains_list:
+                domain = order.domains_list[0].lstrip('*.')
+                
+                # Find DNS provider for this domain
+                provider_model = find_provider_for_domain(domain)
+                if provider_model:
+                    try:
+                        # Create DNS provider instance
+                        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                        provider = create_provider(provider_model.provider_type, credentials)
+                        
+                        # Create TXT record
+                        record_name = f"_acme-challenge.{domain}"
+                        provider.create_txt_record(domain, record_name, txt_value)
+                        
+                        # Store record info for cleanup
+                        records = json.loads(order.dns_records_created) if order.dns_records_created else []
+                        records.append({
+                            'domain': domain,
+                            'record_name': record_name,
+                            'value': txt_value,
+                            'provider_id': provider_model.id
+                        })
+                        order.dns_records_created = json.dumps(records)
+                        db.session.commit()
+                        
+                        # Wait for DNS propagation (configurable, default 10s)
+                        time.sleep(10)
+                        
+                    except Exception as e:
+                        raise Exception(f"Failed to create DNS record: {e}")
+        
+        # Now trigger upstream validation
         resp = self._post_jws(chall_url, {}, kid=self.account_url)
         
         if resp.status_code != 200:
-             raise Exception(f"Upstream challenge error: {resp.text}")
+            raise Exception(f"Upstream challenge error: {resp.text}")
              
         chall = resp.json()
         chall['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
         return chall
+    
+    def _get_account_thumbprint(self):
+        """Get JWK thumbprint of our upstream account key"""
+        import hashlib
+        # The thumbprint is SHA-256 of the canonical JWK
+        jwk = self.account_key.to_json()
+        # Canonical form for RSA: {"e":"...","kty":"RSA","n":"..."}
+        canonical = json.dumps({
+            "e": jwk["e"],
+            "kty": jwk["kty"],
+            "n": jwk["n"]
+        }, separators=(',', ':'), sort_keys=True)
+        digest = hashlib.sha256(canonical.encode()).digest()
+        return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
 
     def finalize_order(self, order_id_b64, csr_pem):
         """Proxy finalize"""
@@ -328,10 +456,44 @@ class AcmeProxyService:
         return order
 
     def get_certificate(self, cert_id_b64):
-        """Proxy certificate download"""
-        cert_id_b64 += '=' * (4 - len(cert_id_b64) % 4)
-        cert_url = base64.urlsafe_b64decode(cert_id_b64).decode()
+        """Proxy certificate download with DNS cleanup"""
+        from models import AcmeClientOrder
+        from services.acme.dns_providers import create_provider
+        
+        cert_id_b64_padded = cert_id_b64 + '=' * (4 - len(cert_id_b64) % 4)
+        cert_url = base64.urlsafe_b64decode(cert_id_b64_padded).decode()
         
         resp = self._post_jws(cert_url, "", kid=self.account_url)
+        
+        if resp.status_code == 200:
+            # Certificate obtained successfully - cleanup DNS records
+            # Find the order and cleanup
+            order = AcmeClientOrder.query.filter(
+                AcmeClientOrder.is_proxy_order == True,
+                AcmeClientOrder.status == 'pending'
+            ).order_by(AcmeClientOrder.created_at.desc()).first()
+            
+            if order and order.dns_records_created:
+                try:
+                    records = json.loads(order.dns_records_created)
+                    for record in records:
+                        provider_model = DnsProvider.query.get(record['provider_id'])
+                        if provider_model:
+                            credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                            provider = create_provider(provider_model.provider_type, credentials)
+                            try:
+                                provider.delete_txt_record(record['domain'], record['record_name'], record['value'])
+                            except Exception as e:
+                                # Log but don't fail - record might already be deleted
+                                pass
+                    
+                    # Update order status
+                    order.status = 'valid'
+                    order.dns_records_created = None  # Clear after cleanup
+                    db.session.commit()
+                except Exception as e:
+                    # Log cleanup error but still return cert
+                    pass
+        
         # Cert response is PEM stream usually
-        return resp.content, resp.headers['Content-Type']
+        return resp.content, resp.headers.get('Content-Type', 'application/pem-certificate-chain')

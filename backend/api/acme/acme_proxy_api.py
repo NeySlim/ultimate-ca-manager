@@ -126,10 +126,12 @@ def authz(authz_id):
     if not is_valid:
          return make_response(jsonify({"type": "malformed", "detail": err}), 400)
 
-    data = svc.get_authz(authz_id)
-    if not data:
+    result = svc.get_authz(authz_id)
+    if not result:
         return make_response(jsonify({"type": "malformed", "detail": "Authz not found"}), 404)
-        
+    
+    # get_authz returns (authz_data, identifier)
+    data, _ = result
     return proxy_response(data)
 
 @acme_proxy_bp.route('/challenge/<chall_id>', methods=['POST'])

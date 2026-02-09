@@ -336,6 +336,12 @@ class AcmeClientOrder(db.Model):
     error_message = db.Column(db.Text)
     last_error_at = db.Column(db.DateTime)
     
+    # Proxy order fields
+    is_proxy_order = db.Column(db.Boolean, default=False)
+    dns_records_created = db.Column(db.Text)  # JSON array of record IDs
+    client_jwk_thumbprint = db.Column(db.String(64))
+    upstream_order_url = db.Column(db.Text)
+    
     # Timestamps
     expires_at = db.Column(db.DateTime)  # Order expiration
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
