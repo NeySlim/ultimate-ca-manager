@@ -117,6 +117,10 @@ export const acmeService = {
     return apiClient.delete(`/acme/client/orders/${orderId}`)
   },
 
+  async renewOrder(orderId) {
+    return apiClient.post(`/acme/client/orders/${orderId}/renew`)
+  },
+
   // =========================================================================
   // DNS Providers
   // =========================================================================

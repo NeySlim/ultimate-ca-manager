@@ -12,7 +12,8 @@ import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
-  ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning
+  ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
+  DownloadSimple, Eye, ArrowSquareOut, FilePem, LockKey
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -21,7 +22,7 @@ import {
   LoadingSpinner, StatusIndicator,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
-import { acmeService, casService } from '../services'
+import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
@@ -225,6 +226,57 @@ export default function ACMEPage() {
       loadData()
     } catch (error) {
       showError(error.message || t('common.deleteFailed'))
+    }
+  }
+  
+  // Download certificate from order
+  const handleDownloadCertificate = async (order, format = 'pem', includeKey = false) => {
+    if (!order.certificate_id) {
+      showError(t('acme.noCertificateYet'))
+      return
+    }
+    try {
+      const response = await certificatesService.export(order.certificate_id, format, { 
+        include_key: includeKey,
+        include_chain: true 
+      })
+      
+      // Create download
+      const blob = new Blob([response], { type: 'application/x-pem-file' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const domain = order.primary_domain || 'certificate'
+      const suffix = includeKey ? '-with-key' : ''
+      a.download = `${domain}${suffix}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      showSuccess(t('acme.certificateDownloaded'))
+    } catch (error) {
+      showError(error.message || t('acme.downloadFailed'))
+    }
+  }
+  
+  // Navigate to certificate in Certificates page
+  const handleViewCertificate = (order) => {
+    if (!order.certificate_id) {
+      showError(t('acme.noCertificateYet'))
+      return
+    }
+    window.location.href = `/certificates?id=${order.certificate_id}`
+  }
+  
+  // Manual renewal
+  const handleRenewCertificate = async (order) => {
+    try {
+      await acmeService.renewOrder(order.id)
+      showSuccess(t('acme.renewalStarted'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.renewalFailed'))
     }
   }
   
@@ -1289,6 +1341,135 @@ export default function ACMEPage() {
     </div>
   )
   
+  // Let's Encrypt Order Detail Content
+  const orderDetailContent = selectedClientOrder && (
+    <div className="p-3 space-y-3">
+      <CompactHeader
+        icon={Certificate}
+        iconClass={cn(
+          selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued' ? "bg-status-success/20" :
+          selectedClientOrder.status === 'invalid' ? "bg-status-error/20" :
+          selectedClientOrder.status === 'pending' ? "bg-status-warning/20" : "bg-bg-tertiary"
+        )}
+        title={selectedClientOrder.primary_domain || selectedClientOrder.domains?.[0]}
+        subtitle={`${selectedClientOrder.environment} • ${selectedClientOrder.challenge_type}`}
+        badge={
+          <Badge 
+            variant={selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued' ? 'success' : 
+                     selectedClientOrder.status === 'invalid' ? 'danger' : 
+                     selectedClientOrder.status === 'pending' ? 'warning' : 'default'}
+            size="sm"
+          >
+            {selectedClientOrder.status}
+          </Badge>
+        }
+      />
+
+      <CompactStats stats={[
+        { icon: Globe, value: `${(selectedClientOrder.domains || []).length} ${t('acme.domains').toLowerCase()}` },
+        { icon: PlugsConnected, value: selectedClientOrder.dns_provider_name || t('acme.manualDns') },
+      ]} />
+      
+      {/* Domains */}
+      <CompactSection title={t('acme.domains')}>
+        <div className="space-y-1">
+          {(selectedClientOrder.domains || []).map((domain, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <Globe size={12} className="text-text-tertiary" />
+              <span className="text-text-primary">{domain}</span>
+            </div>
+          ))}
+        </div>
+      </CompactSection>
+      
+      {/* Order Info */}
+      <CompactSection title={t('acme.orderInfo')}>
+        <CompactGrid>
+          <CompactField label={t('acme.environment')} value={selectedClientOrder.environment === 'production' ? t('acme.production') : t('acme.staging')} />
+          <CompactField label={t('acme.method')} value={selectedClientOrder.challenge_type?.toUpperCase()} />
+          <CompactField label={t('acme.dnsProvider')} value={selectedClientOrder.dns_provider_name || t('acme.manualDns')} />
+          <CompactField label={t('common.status')} value={selectedClientOrder.status} />
+          <CompactField label={t('common.created')} value={formatDate(selectedClientOrder.created_at)} />
+          {selectedClientOrder.expires_at && (
+            <CompactField label={t('acme.expires')} value={formatDate(selectedClientOrder.expires_at)} />
+          )}
+        </CompactGrid>
+      </CompactSection>
+      
+      {/* Challenge Info for pending orders */}
+      {selectedClientOrder.status === 'pending' && selectedClientOrder.challenges && (
+        <CompactSection title={t('acme.pendingChallenge')}>
+          <div className="space-y-3">
+            {Object.entries(selectedClientOrder.challenges).map(([domain, data]) => (
+              <div key={domain} className="p-2 bg-bg-tertiary/50 rounded-lg border border-border/50">
+                <p className="text-sm font-medium text-text-primary mb-2">{domain}</p>
+                {selectedClientOrder.challenge_type === 'dns-01' && (
+                  <div className="space-y-2 text-xs">
+                    <CompactField label={t('acme.dnsRecordName')} value={data.dns_txt_name || data.record_name} mono copyable />
+                    <CompactField label={t('acme.dnsRecordValue')} value={data.dns_txt_value || data.record_value} mono copyable />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CompactSection>
+      )}
+      
+      {/* Error Message */}
+      {selectedClientOrder.error_message && (
+        <CompactSection title={t('common.error')}>
+          <div className="p-2 bg-status-error/10 border border-status-error/20 rounded-lg">
+            <p className="text-sm text-status-error">{selectedClientOrder.error_message}</p>
+          </div>
+        </CompactSection>
+      )}
+      
+      {/* Certificate Actions - for issued/valid orders */}
+      {(selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued') && selectedClientOrder.certificate_id && (
+        <CompactSection title={t('acme.certificateActions')}>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', false)}>
+              <DownloadSimple size={12} />
+              {t('acme.downloadCert')}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', true)}>
+              <LockKey size={12} />
+              {t('acme.downloadWithKey')}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleViewCertificate(selectedClientOrder)}>
+              <Eye size={12} />
+              {t('acme.viewCertificate')}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleRenewCertificate(selectedClientOrder)}>
+              <ArrowsClockwise size={12} />
+              {t('acme.renewNow')}
+            </Button>
+          </div>
+        </CompactSection>
+      )}
+      
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2 pt-2">
+        {selectedClientOrder.status === 'pending' && (
+          <Button size="sm" onClick={() => handleVerifyChallenge(selectedClientOrder)}>
+            <Play size={12} />
+            {t('acme.verifyChallenge')}
+          </Button>
+        )}
+        {selectedClientOrder.status === 'processing' && (
+          <Button size="sm" onClick={() => handleFinalizeOrder(selectedClientOrder)}>
+            <CheckCircle size={12} />
+            {t('acme.finalize')}
+          </Button>
+        )}
+        <Button size="sm" variant="danger" onClick={() => handleDeleteClientOrder(selectedClientOrder)}>
+          <Trash size={12} />
+          {t('common.delete')}
+        </Button>
+      </div>
+    </div>
+  )
+  
   // Filter history data
   const filteredHistory = useMemo(() => {
     let filtered = history
@@ -1373,29 +1554,37 @@ export default function ACMEPage() {
         activeTab={activeTab}
         onTabChange={(tab) => {
           setActiveTab(tab)
-          if (tab === 'config') {
-            setSelectedAccount(null)
-            setSelectedCert(null)
-          } else if (tab === 'accounts') {
-            setSelectedCert(null)
-          } else if (tab === 'history') {
-            setSelectedAccount(null)
-          }
+          // Clear selections when changing tabs
+          setSelectedClientOrder(null)
+          setSelectedAccount(null)
+          setSelectedCert(null)
         }}
         actions={headerActions}
         helpPageKey="acme"
         
-        // Split view for accounts and history tabs
-        splitView={activeTab === 'accounts' || activeTab === 'history'}
-        slideOverOpen={activeTab === 'accounts' ? !!selectedAccount : !!selectedCert}
-        slideOverTitle={
-          activeTab === 'accounts' 
-            ? (selectedAccount?.email || t('acme.details'))
-            : (selectedCert?.common_name || t('acme.certificateDetails'))
+        // Split view for letsencrypt, accounts and history tabs
+        splitView={activeTab === 'letsencrypt' || activeTab === 'accounts' || activeTab === 'history'}
+        slideOverOpen={
+          activeTab === 'letsencrypt' ? !!selectedClientOrder :
+          activeTab === 'accounts' ? !!selectedAccount : 
+          !!selectedCert
         }
-        slideOverContent={activeTab === 'accounts' ? accountDetailContent : certDetailContent}
+        slideOverTitle={
+          activeTab === 'letsencrypt'
+            ? (selectedClientOrder?.primary_domain || t('acme.orderDetails'))
+            : activeTab === 'accounts' 
+              ? (selectedAccount?.email || t('acme.details'))
+              : (selectedCert?.common_name || t('acme.certificateDetails'))
+        }
+        slideOverContent={
+          activeTab === 'letsencrypt' ? orderDetailContent :
+          activeTab === 'accounts' ? accountDetailContent : 
+          certDetailContent
+        }
         onSlideOverClose={() => {
-          if (activeTab === 'accounts') {
+          if (activeTab === 'letsencrypt') {
+            setSelectedClientOrder(null)
+          } else if (activeTab === 'accounts') {
             setSelectedAccount(null)
           } else {
             setSelectedCert(null)

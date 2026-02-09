@@ -351,6 +351,34 @@ def cancel_order(order_id):
     return success_response(message='Order deleted')
 
 
+@bp.route('/api/v2/acme/client/orders/<int:order_id>/renew', methods=['POST'])
+@require_auth(['write:acme'])
+def renew_order(order_id):
+    """Manually trigger renewal for an order"""
+    order = AcmeClientOrder.query.get(order_id)
+    if not order:
+        return error_response('Order not found', 404)
+    
+    if order.status not in ('valid', 'issued'):
+        return error_response('Only valid/issued orders can be renewed', 400)
+    
+    try:
+        from services.acme_renewal_service import renew_certificate
+        
+        success, message = renew_certificate(order)
+        
+        if success:
+            return success_response(
+                data={'order': order.to_dict()},
+                message=message
+            )
+        else:
+            return error_response(message, 400)
+            
+    except Exception as e:
+        return error_response(f'Renewal failed: {str(e)}', 500)
+
+
 # =============================================================================
 # Account Management
 # =============================================================================
