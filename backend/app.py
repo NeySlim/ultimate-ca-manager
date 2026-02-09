@@ -354,6 +354,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register ACME auto-renewal task (runs every 6 hours)
+        try:
+            from services.acme_renewal_service import scheduled_acme_renewal
+            scheduler.register_task(
+                name="acme_auto_renewal",
+                func=scheduled_acme_renewal,
+                interval=21600,  # 6 hours
+                description="Auto-renew Let's Encrypt certificates"
+            )
+            app.logger.info("Registered ACME auto-renewal task (every 6 hours)")
+        except ImportError:
+            pass
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
         app.logger.info("Scheduler service started with all tasks")
