@@ -1130,7 +1130,12 @@
     "allSkipped": "All objects were skipped or already exist",
     "imported": "Imported",
     "privateKeysMatched": "private key(s) matched",
-    "importMore": "Import More"
+    "importMore": "Import More",
+    "dropFilesHere": "ファイルをここにドロップまたは",
+    "browse": "参照",
+    "allFormats": "全形式対応: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "filePassword": "このファイルの復号パスワード",
+    "useGlobalPassword": "すべてのファイルに同じパスワードを使用"
   },
   "importExport": {
     "title": "インポート/エクスポート",

@@ -645,7 +645,7 @@
     "proxyUsageNote": "UCM automatically creates and cleans up DNS TXT records - no certbot DNS plugin needed!",
     "proxyRegistered": "Proxy Registered",
     "emailAddress": "Email Address",
-    "emailRequired": "Required for Let's Encrypt account registration",
+    "emailRequired": "Email address is required",
     "registerAccount": "Register Account",
     "saveConfiguration": "Save Configuration",
     "saving": "Saving...",
@@ -670,7 +670,7 @@
     "createAccountTitle": "Create ACME Account",
     "agreeToTerms": "I agree to the ACME Terms of Service",
     "agreeToTermsRequired": "You must agree to the Terms of Service",
-    "contactEmailHelper": "Contact email for certificate expiry notifications",
+    "contactEmailHelper": "Email for certificate expiry notifications",
     "cancel": "Cancel",
     "noDataAvailable": "No data available",
     "dropFilesOrBrowse": "Drop files here or click to browse",
@@ -710,7 +710,6 @@
     "accountDeactivationFailed": "Failed to deactivate account",
     "accountDeletedSuccess": "Account deleted successfully",
     "unknownCA": "Unknown CA",
-    
     "letsEncrypt": "Let's Encrypt",
     "dnsProviders": "DNS Providers",
     "server": "Local ACME",
@@ -749,7 +748,6 @@
     "productionDesc": "Trusted certificates (rate limited)",
     "environmentHelper": "Use staging for testing to avoid rate limits",
     "contactEmail": "Contact Email",
-    "contactEmailHelper": "Email for certificate expiry notifications",
     "autoRenewal": "Auto-Renewal",
     "autoRenewalDesc": "Automatically renew certificates 30 days before expiration",
     "domains": "Domains",
@@ -757,7 +755,6 @@
     "atLeastOneDomainRequired": "At least one domain is required",
     "invalidDomainFormat": "Invalid domain format: {{domains}}",
     "wildcardRequiresDns01": "Wildcard certificates require DNS-01 challenge",
-    "emailRequired": "Email address is required",
     "challengeType": "Challenge Type",
     "dns01Desc": "DNS TXT record validation",
     "http01Desc": "HTTP file validation (port 80)",
@@ -775,7 +772,6 @@
     "challengeVerificationFailed": "Failed to verify challenge",
     "orderFinalized": "Certificate issued successfully",
     "orderFinalizationFailed": "Failed to finalize order",
-    
     "dnsProvidersAbout": "DNS Providers",
     "dnsProvidersAboutDesc": "Configure DNS providers for automatic DNS-01 challenge validation. UCM will create and delete TXT records automatically.",
     "addDnsProvider": "Add Provider",
@@ -801,7 +797,6 @@
     "setAsDefault": "Set as default provider",
     "update": "Update",
     "create": "Create",
-
     "domainsHelp": "Domain Management",
     "domainsHelpDesc": "Register domains and assign them to DNS providers. Only registered domains can request certificates via ACME Proxy.",
     "addDomain": "Add Domain",
@@ -812,7 +807,6 @@
     "noDomainsDesc": "Register your domains to enable ACME Proxy. Certbot and other ACME clients will be able to request certificates for these domains.",
     "domainName": "Domain Name",
     "domainNameHelper": "Enter the root domain (e.g., example.com). Subdomains will inherit this configuration.",
-    "domain": "Domain",
     "wildcard": "Wildcard",
     "autoApprove": "Auto-Approve",
     "allowWildcard": "Allow Wildcard Certificates",
@@ -2105,6 +2099,11 @@
     "allSkipped": "All objects were skipped or already exist",
     "imported": "Imported",
     "privateKeysMatched": "private key(s) matched",
-    "importMore": "Import More"
+    "importMore": "Import More",
+    "dropFilesHere": "Drop files here or",
+    "browse": "browse",
+    "allFormats": "All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "filePassword": "Decryption password for this file",
+    "useGlobalPassword": "Use same password for all files"
   }
 }

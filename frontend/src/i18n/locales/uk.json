@@ -1130,7 +1130,12 @@
     "allSkipped": "All objects were skipped or already exist",
     "imported": "Imported",
     "privateKeysMatched": "private key(s) matched",
-    "importMore": "Import More"
+    "importMore": "Import More",
+    "dropFilesHere": "Перетягніть файли сюди або",
+    "browse": "огляд",
+    "allFormats": "Усі формати: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "filePassword": "Пароль розшифрування для цього файлу",
+    "useGlobalPassword": "Використовувати однаковий пароль для всіх файлів"
   },
   "importExport": {
     "title": "Імпорт / Експорт",

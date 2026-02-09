@@ -1130,7 +1130,12 @@
     "allSkipped": "All objects were skipped or already exist",
     "imported": "Imported",
     "privateKeysMatched": "private key(s) matched",
-    "importMore": "Import More"
+    "importMore": "Import More",
+    "dropFilesHere": "将文件拖放到此处或",
+    "browse": "浏览",
+    "allFormats": "所有格式: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "filePassword": "此文件的解密密码",
+    "useGlobalPassword": "对所有文件使用相同密码"
   },
   "importExport": {
     "title": "导入/导出",

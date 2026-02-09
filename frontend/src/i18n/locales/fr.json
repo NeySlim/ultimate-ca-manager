@@ -317,7 +317,6 @@
     "setAsDefault": "Définir comme fournisseur par défaut",
     "update": "Mettre à jour",
     "create": "Créer",
-
     "domainsHelp": "Gestion des domaines",
     "domainsHelpDesc": "Enregistrez des domaines et associez-les à des fournisseurs DNS. Seuls les domaines enregistrés peuvent demander des certificats via le proxy ACME.",
     "addDomain": "Ajouter un domaine",
@@ -328,7 +327,6 @@
     "noDomainsDesc": "Enregistrez vos domaines pour activer le proxy ACME. Certbot et autres clients ACME pourront demander des certificats pour ces domaines.",
     "domainName": "Nom de domaine",
     "domainNameHelper": "Entrez le domaine racine (ex: example.com). Les sous-domaines hériteront de cette configuration.",
-    "domain": "Domaine",
     "wildcard": "Wildcard",
     "autoApprove": "Auto-approbation",
     "allowWildcard": "Autoriser les certificats wildcard",
@@ -1132,7 +1130,12 @@
     "allSkipped": "Tous les objets ont été ignorés ou existent déjà",
     "imported": "Importé",
     "privateKeysMatched": "clé(s) privée(s) associée(s)",
-    "importMore": "Importer d'autres"
+    "importMore": "Importer d'autres",
+    "dropFilesHere": "Déposez les fichiers ici ou",
+    "browse": "parcourir",
+    "allFormats": "Tous les formats : PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "filePassword": "Mot de passe de déchiffrement pour ce fichier",
+    "useGlobalPassword": "Utiliser le même mot de passe pour tous les fichiers"
   },
   "importExport": {
     "title": "Import / Export",

@@ -1130,7 +1130,12 @@
     "allSkipped": "All objects were skipped or already exist",
     "imported": "Imported",
     "privateKeysMatched": "private key(s) matched",
-    "importMore": "Import More"
+    "importMore": "Import More",
+    "dropFilesHere": "Arraste arquivos aqui ou",
+    "browse": "procurar",
+    "allFormats": "Todos os formatos: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
+    "filePassword": "Senha de descriptografia para este arquivo",
+    "useGlobalPassword": "Usar a mesma senha para todos os arquivos"
   },
   "importExport": {
     "title": "Importar / Exportar",

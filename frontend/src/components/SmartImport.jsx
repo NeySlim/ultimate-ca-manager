@@ -187,9 +187,10 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   const fileInputRef = useRef(null)
   
   const [step, setStep] = useState('input')
-  const [files, setFiles] = useState([]) // { name, type, data (base64 or text), size }
+  const [files, setFiles] = useState([]) // { name, type, data (base64 or text), size, password }
   const [pemContent, setPemContent] = useState('')
   const [password, setPassword] = useState('')
+  const [useGlobalPassword, setUseGlobalPassword] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
@@ -202,7 +203,13 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   })
   
   // Check if we have encrypted content
-  const hasEncrypted = pemContent.includes('ENCRYPTED') || files.some(f => f.name.match(/\.(p12|pfx)$/i))
+  const hasEncryptedPem = pemContent.includes('ENCRYPTED')
+  const encryptedFileIndices = files.reduce((acc, f, i) => {
+    if (f.name.match(/\.(p12|pfx)$/i) || f.name.match(/\.key$/i)) acc.push(i)
+    return acc
+  }, [])
+  const hasEncryptedFiles = encryptedFileIndices.length > 0
+  const hasEncrypted = hasEncryptedPem || hasEncryptedFiles
   
   // Reset state
   const reset = useCallback(() => {
@@ -210,6 +217,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     setFiles([])
     setPemContent('')
     setPassword('')
+    setUseGlobalPassword(false)
     setAnalysisResult(null)
     setImportResult(null)
     setSelectedObjects(new Set())
@@ -286,6 +294,29 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     return parts.join('\n\n')
   }
   
+  // Get effective password for API call
+  const getEffectivePassword = () => {
+    if (useGlobalPassword) return password || undefined
+    // If per-file, send the first non-empty file password (backend handles single password)
+    const filePassword = files.find(f => f.password)?.password
+    return filePassword || password || undefined
+  }
+  
+  // Build per-file passwords map
+  const getFilePasswords = () => {
+    if (useGlobalPassword) return undefined
+    const passwords = {}
+    files.forEach((f, i) => {
+      if (f.password) passwords[i] = f.password
+    })
+    return Object.keys(passwords).length > 0 ? passwords : undefined
+  }
+  
+  // Update file password
+  const setFilePassword = (index, pwd) => {
+    setFiles(prev => prev.map((f, i) => i === index ? { ...f, password: pwd } : f))
+  }
+  
   // Analyze content
   const handleAnalyze = async () => {
     const content = buildContent()
@@ -298,7 +329,8 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     try {
       const response = await api.post('/import/analyze', { 
         content, 
-        password: password || undefined 
+        password: getEffectivePassword(),
+        file_passwords: getFilePasswords()
       })
       // response = {success, data} - data contains {objects, chains, ...}
       const result = response.data || response
@@ -322,7 +354,8 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     try {
       const response = await api.post('/import/execute', {
         content: buildContent(),
-        password: password || undefined,
+        password: getEffectivePassword(),
+        file_passwords: getFilePasswords(),
         options: { ...importOptions, selected_indices: Array.from(selectedObjects) }
       })
       const result = response.data || response
@@ -380,11 +413,11 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       >
         <UploadSimple size={40} className="mx-auto mb-3 text-text-secondary" />
         <p className="text-sm mb-1">
-          Drop files here or{' '}
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="text-accent-primary hover:underline">browse</button>
+          {t('import.dropFilesHere')}{' '}
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="text-accent-primary hover:underline">{t('import.browse')}</button>
         </p>
         <p className="text-xs text-text-secondary">
-          All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B
+          {t('import.allFormats')}
         </p>
         <input 
           ref={fileInputRef} 
@@ -396,23 +429,40 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         />
       </div>
       
-      {/* File list */}
+      {/* File list with per-file passwords */}
       {files.length > 0 && (
         <div className="space-y-2">
           <div className="text-sm font-medium">{t('import.files')} ({files.length})</div>
-          {files.map((file, i) => (
-            <div key={i} className="flex items-center gap-2 p-2 bg-bg-secondary rounded-lg">
-              <File size={16} className="text-text-secondary" />
-              <span className="text-sm flex-1 truncate">{file.name}</span>
-              <Badge variant={file.type === 'binary' ? 'amber' : 'blue'} size="xs">
-                {file.ext.toUpperCase().slice(1)}
-              </Badge>
-              <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>
-              <button onClick={() => removeFile(i)} className="text-status-danger hover:text-status-danger">
-                <Trash size={14} />
-              </button>
-            </div>
-          ))}
+          {files.map((file, i) => {
+            const isEncryptable = file.name.match(/\.(p12|pfx|key)$/i)
+            return (
+              <div key={i} className="p-2 bg-bg-secondary rounded-lg space-y-2">
+                <div className="flex items-center gap-2">
+                  <File size={16} className="text-text-secondary shrink-0" />
+                  <span className="text-sm flex-1 truncate">{file.name}</span>
+                  <Badge variant={file.type === 'binary' ? 'amber' : 'blue'} size="xs">
+                    {file.ext.toUpperCase().slice(1)}
+                  </Badge>
+                  <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>
+                  <button onClick={() => removeFile(i)} className="text-status-danger hover:text-status-danger">
+                    <Trash size={14} />
+                  </button>
+                </div>
+                {isEncryptable && !useGlobalPassword && (
+                  <div className="flex items-center gap-2 ml-6">
+                    <LockSimple size={14} className="text-text-secondary shrink-0" />
+                    <input
+                      type="password"
+                      value={file.password || ''}
+                      onChange={(e) => setFilePassword(i, e.target.value)}
+                      placeholder={t('import.filePassword')}
+                      className="flex-1 px-2 py-1 text-xs border border-border rounded bg-bg-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
       
@@ -431,18 +481,33 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       
       {/* Password for encrypted content */}
       {hasEncrypted && (
-        <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
-          <LockSimple size={18} />
-          <div className="flex-1">
-            <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={t('common.enterPassword')}
-              className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-            />
-          </div>
+        <div className="space-y-2">
+          {hasEncryptedFiles && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={useGlobalPassword}
+                onChange={(e) => setUseGlobalPassword(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary"
+              />
+              {t('import.useGlobalPassword')}
+            </label>
+          )}
+          {(useGlobalPassword || hasEncryptedPem) && (
+            <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
+              <LockSimple size={18} className="shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t('common.enterPassword')}
+                  className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
       
