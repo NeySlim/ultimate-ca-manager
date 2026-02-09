@@ -147,6 +147,7 @@ def reset_db():
         
         return success_response(message="Database reset successfully. Default admin user created.")
     except Exception as e:
+        db.session.rollback()
         return error_response(f"Reset failed: {str(e)}")
 
 @bp.route('/api/v2/system/https/cert-info', methods=['GET'])

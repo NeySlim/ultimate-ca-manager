@@ -412,6 +412,7 @@ def webauthn_verify():
             message='Login successful via WebAuthn'
         )
     except Exception as e:
+        db.session.rollback()
         logger.error(f"WebAuthn verification error: {e}")
         return error_response(f'WebAuthn verification failed: {str(e)}', 401)
 

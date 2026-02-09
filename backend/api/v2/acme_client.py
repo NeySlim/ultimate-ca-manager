@@ -289,6 +289,7 @@ def verify_challenges(order_id):
         )
         
     except Exception as e:
+        db.session.rollback()
         return error_response(f'Verification failed: {str(e)}', 500)
 
 
@@ -477,4 +478,5 @@ def register_account():
             return error_response(message, 400)
             
     except Exception as e:
+        db.session.rollback()
         return error_response(f'Registration failed: {str(e)}', 500)

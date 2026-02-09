@@ -232,7 +232,7 @@ def list_cas_tree():
                             from models import db
                             db.session.commit()
                     except Exception:
-                        pass
+                        db.session.rollback()
                         
                     break
         
@@ -457,8 +457,10 @@ def import_ca():
         )
         
     except ValueError as e:
+        db.session.rollback()
         return error_response(str(e), 400)
     except Exception as e:
+        db.session.rollback()
         import traceback
         print(f"CA Import Error: {str(e)}")
         print(traceback.format_exc())

@@ -939,6 +939,7 @@ def upload_private_key(cert_id):
         )
         
     except Exception as e:
+        db.session.rollback()
         return error_response(f'Failed to upload private key: {str(e)}', 500)
 
 
@@ -1334,8 +1335,10 @@ def import_certificate():
         )
         
     except ValueError as e:
+        db.session.rollback()
         return error_response(str(e), 400)
     except Exception as e:
+        db.session.rollback()
         import traceback
         print(f"Certificate Import Error: {str(e)}")
         print(traceback.format_exc())

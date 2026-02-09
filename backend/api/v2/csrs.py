@@ -255,6 +255,7 @@ def upload_csr():
             message='CSR uploaded successfully'
         )
     except Exception as e:
+        db.session.rollback()
         return error_response(f"Failed to upload CSR: {str(e)}", 500)
 
 
@@ -360,6 +361,7 @@ def import_csr():
         )
         
     except Exception as e:
+        db.session.rollback()
         import traceback
         print(f"CSR Import Error: {str(e)}")
         print(traceback.format_exc())
@@ -497,6 +499,7 @@ def upload_csr_private_key(csr_id):
         )
         
     except Exception as e:
+        db.session.rollback()
         return error_response(f'Failed to upload private key: {str(e)}', 500)
 
 

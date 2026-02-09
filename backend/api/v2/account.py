@@ -382,6 +382,7 @@ def regenerate_api_key(key_id):
         )
     
     except Exception as e:
+        db.session.rollback()
         current_app.logger.error(f"Error regenerating API key: {e}")
         return error_response('Failed to regenerate API key', 500)
 

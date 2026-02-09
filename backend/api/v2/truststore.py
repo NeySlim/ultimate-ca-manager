@@ -156,6 +156,7 @@ def import_trusted_certificate():
         )
         
     except ValueError as e:
+        db.session.rollback()
         return error_response(str(e), 400)
     except Exception as e:
         db.session.rollback()
