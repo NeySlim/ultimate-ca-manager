@@ -78,3 +78,9 @@ flask-socketio==5.3.7
 python-socketio==5.16.1
 gevent==24.11.1
 gevent-websocket==0.10.1
+
+# HSM Support (optional - install only if using HSM features)
+python-pkcs11>=0.7.0
+azure-keyvault-keys>=4.9.0
+azure-identity>=1.15.0
+google-cloud-kms>=2.21.0

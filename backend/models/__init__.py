@@ -167,13 +167,22 @@ class CA(db.Model):
     ocsp_enabled = db.Column(db.Boolean, default=False)
     ocsp_url = db.Column(db.String(512))  # Ex: http://ucm.local:8443/ocsp
     
+    # HSM Support - private key stored in Hardware Security Module
+    hsm_key_id = db.Column(db.Integer, db.ForeignKey('hsm_keys.id'), nullable=True)
+    hsm_key = db.relationship('HsmKey', backref='cas')
+    
     # Relationships
     certificates = db.relationship("Certificate", back_populates="ca", lazy="dynamic")
     
     @property
     def has_private_key(self) -> bool:
-        """Check if CA has a private key"""
-        return bool(self.prv and len(self.prv) > 0)
+        """Check if CA has a private key (local or HSM)"""
+        return bool(self.prv and len(self.prv) > 0) or bool(self.hsm_key_id)
+    
+    @property
+    def uses_hsm(self) -> bool:
+        """Check if CA uses HSM for private key"""
+        return bool(self.hsm_key_id)
     
     @property
     def common_name(self) -> str:
