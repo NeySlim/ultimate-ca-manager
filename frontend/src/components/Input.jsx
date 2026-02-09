@@ -41,6 +41,7 @@ export const Input = forwardRef(function Input({
   showStrength,
   hasExistingValue,  // Shows "Set" badge and "enter new to change" hint
   placeholder,
+  required,
   ...props 
 }, ref) {
   const { t } = useTranslation()
@@ -79,7 +80,7 @@ export const Input = forwardRef(function Input({
               </span>
             )}
           </span>
-          {props.required && !hasExistingValue && <span className="status-danger-text ml-1">*</span>}
+          {required && !hasExistingValue && <span className="status-danger-text ml-1">*</span>}
         </label>
       )}
       
@@ -113,7 +114,7 @@ export const Input = forwardRef(function Input({
           }}
           onChange={handleChange}
           placeholder={effectivePlaceholder}
-          required={props.required && !hasExistingValue}
+          required={required && !hasExistingValue}
           {...props}
         />
         
