@@ -550,6 +550,17 @@ def init_database(app):
             'notification_log': [
                 ('retry_count', 'INTEGER', '0'),
             ],
+            'dns_providers': [
+                ('zones', 'TEXT', None),
+                ('enabled', 'BOOLEAN', '1'),
+            ],
+            'acme_client_orders': [
+                ('account_url', 'VARCHAR(500)', None),
+                ('renewal_enabled', 'BOOLEAN', '1'),
+                ('last_renewal_at', 'DATETIME', None),
+                ('renewal_failures', 'INTEGER', '0'),
+                ('last_error_at', 'DATETIME', None),
+            ],
         }
         
         for table, columns in expected_columns.items():
