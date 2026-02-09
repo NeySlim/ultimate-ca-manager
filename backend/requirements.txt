@@ -49,7 +49,6 @@ email-validator==2.3.0
 # API Documentation
 flasgger>=0.9.7
 
-# ============ PRO FEATURES ============
 # LDAP/Active Directory Integration
 ldap3>=2.9.1
 
@@ -57,11 +56,13 @@ ldap3>=2.9.1
 python3-saml>=1.16.0
 python-jose>=3.3.0
 
-# HSM/PKCS#11 Support
-PyKCS11>=1.5.12
+# HSM Support (PKCS#11, Azure Key Vault, Google Cloud KMS)
+python-pkcs11>=0.7.0
+azure-keyvault-keys>=4.9.0
+azure-identity>=1.15.0
+google-cloud-kms>=2.21.0
 
-# ============ HIGH AVAILABILITY ============
-# PostgreSQL support (optional, install with: pip install psycopg2-binary)
+# PostgreSQL support (optional, for HA deployments)
 # psycopg2-binary>=2.9.9
 
 # Redis session store (optional, install with: pip install redis)
@@ -78,9 +79,3 @@ flask-socketio==5.3.7
 python-socketio==5.16.1
 gevent==24.11.1
 gevent-websocket==0.10.1
-
-# HSM Support (optional - install only if using HSM features)
-python-pkcs11>=0.7.0
-azure-keyvault-keys>=4.9.0
-azure-identity>=1.15.0
-google-cloud-kms>=2.21.0
