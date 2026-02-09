@@ -309,7 +309,39 @@
     "update": "Aktualisieren",
     "verifyChallenge": "Challenge verifizieren",
     "viewCertificate": "Zertifikat anzeigen",
-    "wildcardRequiresDns01": "Wildcard-Zertifikate erfordern DNS-01-Challenge"
+    "wildcardRequiresDns01": "Wildcard-Zertifikate erfordern DNS-01-Challenge",
+    "confirmDeleteDomain": "Remove domain \"{{domain}}\"? ACME Proxy will no longer accept certificate requests for this domain.",
+    "domainDeletedSuccess": "Domain removed successfully",
+    "provider": "DNS Provider",
+    "domainNameHelper": "Enter the root domain (e.g., example.com). Subdomains will inherit this configuration.",
+    "allowWildcard": "Allow Wildcard Certificates",
+    "autoApproveRequests": "Auto-approve Certificate Requests",
+    "noDomainsYet": "No Domains Registered",
+    "domainsHelp": "Domain Management",
+    "editDomain": "Edit Domain",
+    "wildcard": "Wildcard",
+    "addDomain": "Add Domain",
+    "domainCreateFailed": "Failed to register domain",
+    "domainUpdateFailed": "Failed to update domain",
+    "domainUpdatedSuccess": "Domain updated successfully",
+    "domainTestSuccess": "DNS access test successful",
+    "proxyUsageNote": "UCM automatically creates and cleans up DNS TXT records - no certbot DNS plugin needed!",
+    "allSources": "All Sources",
+    "deleteDomain": "Delete Domain",
+    "domainTestFailed": "DNS access test failed",
+    "localAcmeServer": "Local ACME Server",
+    "viewHistoryForCertificates": "Issued certificates are displayed in the History tab.",
+    "domainName": "Domain Name",
+    "autoApprove": "Auto-Approve",
+    "domainCreatedSuccess": "Domain registered successfully",
+    "testDnsAccess": "Test DNS Access",
+    "domainsHelpDesc": "Register domains and assign them to DNS providers. Only registered domains can request certificates via ACME Proxy.",
+    "noDomainsDesc": "Register your domains to enable ACME Proxy. Certbot and other ACME clients will be able to request certificates for these domains.",
+    "noDomains": "No domains registered",
+    "proxyUsage": "Usage with certbot:",
+    "allowWildcardDesc": "Allow requesting *.domain.com certificates",
+    "autoApproveDesc": "Automatically approve requests without manual review",
+    "source": "Source"
   },
   "audit": {
     "title": "Audit-Protokolle",
@@ -634,7 +666,10 @@
     "set": "Gesetzt",
     "configured": "Konfiguriert",
     "enterNewToChange": "Neuen Wert eingeben zum Ändern",
-    "na": "N/A"
+    "na": "N/A",
+    "update": "Update",
+    "manual": "Manual",
+    "auto": "Auto"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1394,7 +1429,8 @@
       "notSet": "Not set (keys unencrypted)",
       "rotationInProgress": "Rotation in progress",
       "rotationSuccess": "New secret generated - follow instructions to apply",
-      "rotationInstructions": "Rotation Instructions"
+      "rotationInstructions": "Rotation Instructions",
+      "previousKeyExpires": "Previous key expires: {{date}}"
     },
     "audit": {
       "integrityVerified": "Integrity Verified",
