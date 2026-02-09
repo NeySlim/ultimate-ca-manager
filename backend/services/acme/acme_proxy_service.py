@@ -242,7 +242,6 @@ class AcmeProxyService:
         # Store order in database for tracking
         order = AcmeClientOrder(
             domains=json.dumps(domains),
-            email='proxy@ucm.local',
             environment='staging' if 'staging' in self.upstream_directory_url else 'production',
             challenge_type='dns-01',
             status='pending',
@@ -250,8 +249,8 @@ class AcmeProxyService:
             upstream_order_url=upstream_location,
             is_proxy_order=True,
             client_jwk_thumbprint=client_thumbprint,
-            # Use first domain's provider
-            dns_provider_id=list(domain_providers.values())[0].id if domain_providers else None
+            # Use first domain's provider (provider dict contains 'provider' key with model)
+            dns_provider_id=list(domain_providers.values())[0]['provider'].id if domain_providers else None
         )
         db.session.add(order)
         db.session.commit()
@@ -353,8 +352,9 @@ class AcmeProxyService:
                 domain = order.domains_list[0].lstrip('*.')
                 
                 # Find DNS provider for this domain
-                provider_model = find_provider_for_domain(domain)
-                if provider_model:
+                provider_info = find_provider_for_domain(domain)
+                if provider_info:
+                    provider_model = provider_info['provider']
                     try:
                         # Create DNS provider instance
                         credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
@@ -375,8 +375,8 @@ class AcmeProxyService:
                         order.dns_records_created = json.dumps(records)
                         db.session.commit()
                         
-                        # Wait for DNS propagation (configurable, default 10s)
-                        time.sleep(10)
+                        # Wait for DNS propagation (30s for most providers)
+                        time.sleep(30)
                         
                     except Exception as e:
                         raise Exception(f"Failed to create DNS record: {e}")
@@ -389,7 +389,20 @@ class AcmeProxyService:
              
         chall = resp.json()
         chall['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
-        return chall
+        
+        # Get Link header from upstream and rewrite authz URL
+        link_header = resp.headers.get('Link')
+        if link_header:
+            # Parse and rewrite the authz URL in Link header
+            # Format: <https://...authz...>;rel="up"
+            import re
+            match = re.search(r'<([^>]+)>', link_header)
+            if match:
+                authz_url = match.group(1)
+                authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
+                link_header = f'<{self.base_url}/acme/proxy/authz/{authz_id}>;rel="up"'
+        
+        return chall, link_header
     
     def _get_account_thumbprint(self):
         """Get JWK thumbprint of our upstream account key"""
@@ -404,6 +417,26 @@ class AcmeProxyService:
         }, separators=(',', ':'), sort_keys=True)
         digest = hashlib.sha256(canonical.encode()).digest()
         return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+
+    def get_order(self, order_id_b64):
+        """Get order status (POST-as-GET)"""
+        order_id_b64_padded = order_id_b64 + '=' * (4 - len(order_id_b64) % 4)
+        order_url = base64.urlsafe_b64decode(order_id_b64_padded).decode()
+        
+        resp = self._post_jws(order_url, "", kid=self.account_url)
+        if resp.status_code != 200:
+            raise Exception(f"Upstream error: {resp.text}")
+            
+        order = resp.json()
+        
+        # Rewrite URLs
+        order['finalize'] = f"{self.base_url}/acme/proxy/order/{order_id_b64}/finalize"
+        if 'certificate' in order:
+            cert_url = order['certificate']
+            cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
+            order['certificate'] = f"{self.base_url}/acme/proxy/cert/{cert_id}"
+            
+        return order
 
     def finalize_order(self, order_id_b64, csr_pem):
         """Proxy finalize"""
@@ -465,6 +498,9 @@ class AcmeProxyService:
         
         resp = self._post_jws(cert_url, "", kid=self.account_url)
         
+        # Extract Link header from upstream (contains issuer cert URL)
+        link_header = resp.headers.get('Link')
+        
         if resp.status_code == 200:
             # Certificate obtained successfully - cleanup DNS records
             # Find the order and cleanup
@@ -482,7 +518,7 @@ class AcmeProxyService:
                             credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
                             provider = create_provider(provider_model.provider_type, credentials)
                             try:
-                                provider.delete_txt_record(record['domain'], record['record_name'], record['value'])
+                                provider.delete_txt_record(record['domain'], record['record_name'])
                             except Exception as e:
                                 # Log but don't fail - record might already be deleted
                                 pass
@@ -496,4 +532,4 @@ class AcmeProxyService:
                     pass
         
         # Cert response is PEM stream usually
-        return resp.content, resp.headers.get('Content-Type', 'application/pem-certificate-chain')
+        return resp.content, resp.headers.get('Content-Type', 'application/pem-certificate-chain'), link_header
