@@ -239,6 +239,9 @@ class AcmeProxyService:
         upstream_order = resp.json()
         upstream_location = resp.headers['Location']
         
+        # Get upstream authz URLs for later matching
+        upstream_authz_urls = upstream_order.get('authorizations', [])
+        
         # Store order in database for tracking
         order = AcmeClientOrder(
             domains=json.dumps(domains),
@@ -247,6 +250,7 @@ class AcmeProxyService:
             status='pending',
             order_url=upstream_location,
             upstream_order_url=upstream_location,
+            upstream_authz_urls=json.dumps(upstream_authz_urls),
             is_proxy_order=True,
             client_jwk_thumbprint=client_thumbprint,
             # Use first domain's provider (provider dict contains 'provider' key with model)
@@ -310,12 +314,13 @@ class AcmeProxyService:
         chall_id_b64_padded = chall_id_b64 + '=' * (4 - len(chall_id_b64) % 4)
         chall_url = base64.urlsafe_b64decode(chall_id_b64_padded).decode()
         
-        # First, fetch the challenge to get token and type
-        # We need to find the authz to get the domain
-        # The challenge URL contains hints about the authz
+        # Decode authz URL if provided
+        authz_url = None
+        if authz_id_b64:
+            authz_id_padded = authz_id_b64 + '=' * (4 - len(authz_id_b64) % 4)
+            authz_url = base64.urlsafe_b64decode(authz_id_padded).decode()
         
-        # Extract token from upstream challenge
-        # Fetch current challenge state
+        # First, fetch the challenge to get token and type
         resp = self._post_jws(chall_url, "", kid=self.account_url)
         if resp.status_code != 200:
             raise Exception(f"Failed to fetch challenge: {resp.text}")
@@ -327,8 +332,6 @@ class AcmeProxyService:
         # Only handle dns-01 challenges
         if challenge_type == 'dns-01' and token:
             # Calculate key authorization
-            # key_authz = token + "." + base64url(sha256(JWK_thumbprint))
-            # The thumbprint is of OUR upstream account key
             jwk_thumbprint = self._get_account_thumbprint()
             key_authz = f"{token}.{jwk_thumbprint}"
             
@@ -336,17 +339,31 @@ class AcmeProxyService:
             digest = hashlib.sha256(key_authz.encode()).digest()
             txt_value = base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
             
-            # Find the domain from the authz URL pattern
-            # The authz URL is typically: .../acme/authz-v3/{authz_id}
-            # We stored order info, find matching order by challenge URL prefix
-            # For now, extract domain from challenge URL pattern or use order lookup
+            # Find order by authz URL match (more precise than just "most recent pending")
+            order = None
+            if authz_url:
+                # Find order that contains this authz URL
+                pending_orders = AcmeClientOrder.query.filter(
+                    AcmeClientOrder.is_proxy_order == True,
+                    AcmeClientOrder.status == 'pending'
+                ).all()
+                
+                for o in pending_orders:
+                    if o.upstream_authz_urls:
+                        try:
+                            authz_urls = json.loads(o.upstream_authz_urls)
+                            if authz_url in authz_urls:
+                                order = o
+                                break
+                        except (json.JSONDecodeError, TypeError):
+                            pass
             
-            # Get domain from DB order (we stored it in new_order)
-            # Find order by upstream URL pattern
-            order = AcmeClientOrder.query.filter(
-                AcmeClientOrder.is_proxy_order == True,
-                AcmeClientOrder.status == 'pending'
-            ).order_by(AcmeClientOrder.created_at.desc()).first()
+            # Fallback to most recent if no match (backwards compatibility)
+            if not order:
+                order = AcmeClientOrder.query.filter(
+                    AcmeClientOrder.is_proxy_order == True,
+                    AcmeClientOrder.status == 'pending'
+                ).order_by(AcmeClientOrder.created_at.desc()).first()
             
             if order and order.domains_list:
                 domain = order.domains_list[0].lstrip('*.')
@@ -364,7 +381,10 @@ class AcmeProxyService:
                         record_name = f"_acme-challenge.{domain}"
                         provider.create_txt_record(domain, record_name, txt_value)
                         
-                        # Store record info for cleanup
+                        # Wait for DNS propagation (30s for most providers)
+                        time.sleep(30)
+                        
+                        # Store record info for cleanup AFTER successful creation
                         records = json.loads(order.dns_records_created) if order.dns_records_created else []
                         records.append({
                             'domain': domain,
@@ -375,10 +395,8 @@ class AcmeProxyService:
                         order.dns_records_created = json.dumps(records)
                         db.session.commit()
                         
-                        # Wait for DNS propagation (30s for most providers)
-                        time.sleep(30)
-                        
                     except Exception as e:
+                        db.session.rollback()
                         raise Exception(f"Failed to create DNS record: {e}")
         
         # Now trigger upstream validation
