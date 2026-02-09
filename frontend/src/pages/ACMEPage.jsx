@@ -827,117 +827,13 @@ export default function ACMEPage() {
         </Button>
       </div>
       
-      {/* Orders List - ResponsiveDataTable */}
-      <ResponsiveDataTable
-        data={clientOrders}
-        columns={[
-          {
-            key: 'primary_domain',
-            label: t('acme.domain'),
-            sortable: true,
-            priority: 1,
-            render: (val, row) => (
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-                  (row.status === 'valid' || row.status === 'issued') ? "icon-bg-emerald" : 
-                  row.status === 'pending' ? "icon-bg-amber" :
-                  row.status === 'processing' ? "icon-bg-blue" :
-                  row.status === 'invalid' ? "icon-bg-orange" : "icon-bg-gray"
-                )}>
-                  {row.status === 'valid' || row.status === 'issued' ? <CheckCircle size={14} weight="fill" /> : 
-                   row.status === 'invalid' ? <XCircle size={14} weight="fill" /> :
-                   <Clock size={14} />}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-text-primary truncate">
-                    {val || (Array.isArray(row.domains) ? row.domains.join(', ') : row.domains)}
-                  </p>
-                </div>
-              </div>
-            )
-          },
-          {
-            key: 'environment',
-            label: t('acme.environment'),
-            sortable: true,
-            priority: 3,
-            render: (val) => (
-              <Badge variant={val === 'production' ? 'success' : 'secondary'} size="sm">
-                {val === 'production' ? 'Prod' : 'Test'}
-              </Badge>
-            )
-          },
-          {
-            key: 'challenge_type',
-            label: t('acme.method'),
-            sortable: true,
-            priority: 4,
-            render: (val) => (
-              <span className="text-xs text-text-secondary uppercase">{val || '-'}</span>
-            )
-          },
-          {
-            key: 'dns_provider_name',
-            label: t('acme.dnsProvider'),
-            sortable: true,
-            priority: 5,
-            render: (val) => val || '-'
-          },
-          {
-            key: 'status',
-            label: t('common.status'),
-            sortable: true,
-            priority: 2,
-            render: (val) => (
-              <Badge 
-                variant={val === 'valid' || val === 'issued' ? 'success' : 
-                         val === 'invalid' ? 'danger' : 
-                         val === 'pending' ? 'warning' : 
-                         val === 'processing' ? 'info' : 'default'}
-                size="sm"
-              >
-                {val || '-'}
-              </Badge>
-            )
-          },
-          {
-            key: 'created_at',
-            label: t('common.created'),
-            sortable: true,
-            priority: 6,
-            render: (val) => (
-              <span className="text-xs text-text-secondary">{formatDate(val)}</span>
-            )
-          }
-        ]}
-        actions={(row) => [
-          ...(row.status === 'pending' ? [{
-            label: t('acme.verifyChallenge'),
-            icon: Play,
-            onClick: () => handleVerifyChallenge(row)
-          }] : []),
-          ...(row.status === 'processing' ? [{
-            label: t('acme.finalize'),
-            icon: CheckCircle,
-            onClick: () => handleFinalizeOrder(row)
-          }] : []),
-          {
-            label: t('common.delete'),
-            icon: Trash,
-            variant: 'danger',
-            onClick: () => handleDeleteClientOrder(row)
-          }
-        ]}
-        onRowClick={(row) => setSelectedClientOrder(row)}
-        selectedRow={selectedClientOrder}
-        searchKeys={['domains', 'status', 'environment', 'dns_provider_name']}
-        emptyIcon={Certificate}
-        emptyTitle={t('acme.noClientOrders')}
-        emptyDescription={t('acme.noClientOrdersDesc')}
-        exportFilename="acme-orders"
-        compact
-      />
+      {/* Info about History tab */}
+      <HelpCard variant="info" compact>
+        <span className="flex items-center gap-2">
+          <ClockCounterClockwise size={16} />
+          {t('acme.viewHistoryForCertificates')}
+        </span>
+      </HelpCard>
       
       {/* Client Settings */}
       <CompactSection title={t('acme.clientSettings')} icon={Gear}>
