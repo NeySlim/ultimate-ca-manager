@@ -1230,11 +1230,23 @@ export default function ACMEPage() {
               <CompactGrid columns={1}>
                 <CompactField 
                   label={t('acme.proxyEndpoint')} 
-                  value={`${window.location.origin}/api/v2/acme/proxy`}
+                  value={`${window.location.origin}/acme/proxy/directory`}
                   mono
                   copyable
                 />
               </CompactGrid>
+              
+              {/* Instructions */}
+              <div className="p-3 bg-bg-tertiary/50 rounded-lg space-y-2">
+                <p className="text-xs font-medium text-text-secondary">{t('acme.proxyUsage')}</p>
+                <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono">
+{`certbot certonly \\
+  --server ${window.location.origin}/acme/proxy/directory \\
+  --preferred-challenges dns \\
+  -d example.com`}
+                </pre>
+                <p className="text-xs text-text-tertiary">{t('acme.proxyUsageNote')}</p>
+              </div>
               
               {acmeSettings.proxy_registered ? (
                 <div className="p-3 rounded-lg status-success-bg status-success-border border">
