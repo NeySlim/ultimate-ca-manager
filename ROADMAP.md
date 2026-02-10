@@ -65,9 +65,12 @@
 - ✅ **Security Dashboard** - Secrets management, anomaly detection
 
 ### Planned for v2.1.0
-- [ ] **Policies Page** - Certificate policy management
-- [ ] **Approval Workflows** - Multi-approver requests
-- [ ] **Reports Page** - Scheduled reports
+- [ ] **Bulk Operations** - Revoke, renew, export multiple certificates at once
+- [ ] **API Key Scoping** - Enforce per-key permissions (read-only, CA-specific)
+- [ ] **Expiry Alerts UI** - Configure email alerts in Settings (backend ready)
+- [ ] **Webhook Management UI** - Configure webhook endpoints in Settings (backend ready)
+- [ ] **Auto-Renewal UI** - Enable/configure auto-renewal per CA (backend ready)
+- [ ] **Dashboard Widgets** - Expiring certs timeline, renewal status, webhook health
 
 ---
 
@@ -86,10 +89,8 @@
 
 ### Integrations
 - [ ] Kubernetes cert-manager issuer
-- [ ] HashiCorp Vault connector
 - [ ] EST Protocol (RFC 7030)
 - [ ] Certificate Transparency logs
-- [ ] CMPv2 (RFC 4210)
 
 ---
 
