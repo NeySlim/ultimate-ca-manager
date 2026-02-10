@@ -142,21 +142,18 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
     
-    # Version - single source of truth from frontend/package.json
+    # Version - single source of truth from VERSION file
     @staticmethod
     def _get_version():
-        """Read version from package.json - single source of truth"""
+        """Read version from VERSION file"""
         try:
-            import json
-            pkg_path = BASE_DIR / "frontend" / "package.json"
-            if pkg_path.exists():
-                with open(pkg_path) as f:
-                    return json.load(f).get("version", "2.0.0")
-            # Docker: package.json might be elsewhere
-            docker_pkg = Path("/app/frontend/package.json")
-            if docker_pkg.exists():
-                with open(docker_pkg) as f:
-                    return json.load(f).get("version", "2.0.0")
+            version_path = BASE_DIR / "VERSION"
+            if version_path.exists():
+                return version_path.read_text().strip()
+            # Docker: VERSION might be at root
+            docker_version = Path("/opt/ucm/VERSION")
+            if docker_version.exists():
+                return docker_version.read_text().strip()
         except Exception:
             pass
         return os.getenv("APP_VERSION", "2.0.0")
