@@ -161,7 +161,7 @@ export default function HSMPage() {
   const columns = [
     {
       key: 'name',
-      header: t('hsm.providerName'),
+      header: t('common.providerName'),
       priority: 1,
       sortable: true,
       render: (val, row) => {
@@ -190,7 +190,7 @@ export default function HSMPage() {
               <span className="font-medium truncate">{val}</span>
             </div>
             <Badge variant={row.enabled ? 'success' : 'secondary'} size="sm" dot pulse={row.enabled}>
-              {row.enabled ? t('hsm.enabled') : t('hsm.disabled')}
+              {row.enabled ? t('common.enabled') : t('common.disabled')}
             </Badge>
           </div>
         )
@@ -230,7 +230,7 @@ export default function HSMPage() {
       hideOnMobile: true,
       render: (val) => (
         <Badge variant={val ? 'success' : 'secondary'} size="sm" dot pulse={val}>
-          {val ? t('hsm.enabled') : t('hsm.disabled')}
+          {val ? t('common.enabled') : t('common.disabled')}
         </Badge>
       )
     },
@@ -248,7 +248,7 @@ export default function HSMPage() {
   ]
 
   const rowActions = (row) => [
-    { label: t('hsm.test'), icon: TestTube, onClick: () => handleTest(row) },
+    { label: t('common.test'), icon: TestTube, onClick: () => handleTest(row) },
     { label: t('common.edit'), icon: PencilSimple, onClick: () => handleEdit(row) },
     { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
   ]
@@ -260,8 +260,8 @@ export default function HSMPage() {
     const cloudCount = providers.filter(p => p.provider_type !== 'pkcs11').length
     return [
       { label: t('hsm.stats.providers'), value: providers.length, icon: Lock, variant: 'primary' },
-      { label: t('hsm.stats.enabled'), value: enabledCount, icon: CheckCircle, variant: 'success' },
-      { label: t('hsm.stats.disabled'), value: disabledCount, icon: XCircle, variant: 'neutral' },
+      { label: t('common.enabled'), value: enabledCount, icon: CheckCircle, variant: 'success' },
+      { label: t('common.disabled'), value: disabledCount, icon: XCircle, variant: 'neutral' },
       { label: t('hsm.stats.keys'), value: totalKeys, icon: Key, variant: 'purple' },
       { label: t('hsm.stats.cloud'), value: cloudCount, icon: Cloud, variant: 'cyan' },
     ]
@@ -270,10 +270,10 @@ export default function HSMPage() {
   // Help content
   const helpContent = (
     <div className="space-y-4">
-      <HelpCard title={t('help.securityNote')} variant="warning">
+      <HelpCard title={t('common.securityNote')} variant="warning">
         {t('hsm.helpSecurity')}
       </HelpCard>
-      <HelpCard title={t('help.bestPractices')} variant="info">
+      <HelpCard title={t('common.bestPractices')} variant="info">
         {t('hsm.helpBestPractice')}
       </HelpCard>
     </div>
@@ -300,13 +300,13 @@ export default function HSMPage() {
 
         <CompactStats stats={[
           { icon: Key, value: t('hsm.keysInHsm', { count: provider.key_count || 0 }).replace('{{count}} keys in this HSM', `${provider.key_count || 0} keys`) },
-          { icon: CheckCircle, value: provider.last_connected_at ? t('hsm.connected') : t('hsm.never') },
+          { icon: CheckCircle, value: provider.last_connected_at ? t('common.connected') : t('common.never') },
         ]} />
 
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleTest(provider)} disabled={testing}>
             {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-            {testing ? t('hsm.testing') : t('hsm.test')}
+            {testing ? t('common.testing') : t('common.test')}
           </Button>
           <Button size="sm" variant="secondary" onClick={() => handleEdit(provider)}>
             <PencilSimple size={14} />
@@ -326,7 +326,7 @@ export default function HSMPage() {
           </div>
         )}
 
-        <CompactSection title={t('hsm.configuration')}>
+        <CompactSection title={t('common.config')}>
           {provider.provider_type === 'pkcs11' && (
             <>
               <CompactGrid>
@@ -375,7 +375,7 @@ export default function HSMPage() {
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-text-tertiary">{t('hsm.keysInHsm', { count: keys.length })}</span>
             <Button size="sm" variant="secondary" onClick={() => setShowKeyModal(true)}>
-              <Plus size={12} /> {t('hsm.generateKey')}
+              <Plus size={12} /> {t('common.generate')}
             </Button>
           </div>
           {keys.length === 0 ? (
@@ -411,12 +411,12 @@ export default function HSMPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('hsm.title')}
+        title={t('common.hsm')}
         subtitle={t('hsm.subtitle', { count: providers.length })}
         icon={Key}
         stats={stats}
         helpContent={helpContent}
-        helpTitle={t('hsm.title')}
+        helpTitle={t('common.hsm')}
         helpPageKey="hsm"
         splitView={true}
         splitEmptyContent={
@@ -442,24 +442,24 @@ export default function HSMPage() {
             selectedId={selectedProvider?.id}
             rowActions={rowActions}
             searchable
-            searchPlaceholder={t('hsm.searchProviders')}
+            searchPlaceholder={t('common.searchProviders')}
             searchKeys={['name', 'provider_type']}
             toolbarFilters={[
               {
                 key: 'enabled',
                 value: filterStatus,
                 onChange: setFilterStatus,
-                placeholder: t('hsm.allStatus'),
+                placeholder: t('common.allStatus'),
                 options: [
-                  { value: 'true', label: t('hsm.enabled') },
-                  { value: 'false', label: t('hsm.disabled') }
+                  { value: 'true', label: t('common.enabled') },
+                  { value: 'false', label: t('common.disabled') }
                 ]
               },
               {
                 key: 'provider_type',
                 value: filterType,
                 onChange: setFilterType,
-                placeholder: t('hsm.allTypes'),
+                placeholder: t('common.allTypes'),
                 options: PROVIDER_TYPES.map(t => ({ value: t.value, label: t.label.split(' ')[0] }))
               }
             ]}
@@ -544,9 +544,9 @@ function ProviderModal({ provider, onSave, onClose }) {
       submitLabel={provider ? t('common.save') : t('common.create')}
     >
       <div className="grid grid-cols-2 gap-4">
-        <Input label={t('hsm.providerName')} value={formData.name} onChange={e => handleChange('name', e.target.value)} required />
+        <Input label={t('common.providerName')} value={formData.name} onChange={e => handleChange('name', e.target.value)} required />
         {!provider && (
-          <Select label={t('hsm.providerType')} value={formData.provider_type} onChange={value => handleChange('provider_type', value)} options={PROVIDER_TYPES} />
+          <Select label={t('common.providerType')} value={formData.provider_type} onChange={value => handleChange('provider_type', value)} options={PROVIDER_TYPES} />
         )}
       </div>
 
@@ -583,9 +583,9 @@ function ProviderModal({ provider, onSave, onClose }) {
           <Input label={t('hsm.azureConfig.vaultUrl')} value={formData.azure_vault_url} onChange={e => handleChange('azure_vault_url', e.target.value)} placeholder={t('hsm.azureConfig.vaultUrlPlaceholder')} />
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.azureConfig.tenantId')} value={formData.azure_tenant_id} onChange={e => handleChange('azure_tenant_id', e.target.value)} />
-            <Input label={t('hsm.azureConfig.clientId')} value={formData.azure_client_id} onChange={e => handleChange('azure_client_id', e.target.value)} />
+            <Input label={t('common.clientId')} value={formData.azure_client_id} onChange={e => handleChange('azure_client_id', e.target.value)} />
           </div>
-          <Input label={t('hsm.azureConfig.clientSecret')} type="password" value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} />
+          <Input label={t('common.clientSecret')} type="password" value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} />
         </div>
       )}
 
@@ -601,7 +601,7 @@ function ProviderModal({ provider, onSave, onClose }) {
 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={formData.enabled} onChange={e => handleChange('enabled', e.target.checked)} />
-        {t('hsm.enableProvider')}
+        {t('common.enableProvider')}
       </label>
     </FormModal>
   )
@@ -624,13 +624,13 @@ function KeyModal({ provider, onSave, onClose }) {
       title={t('hsm.generateHsmKey')}
       size="md"
       onSubmit={() => onSave(formData)}
-      submitLabel={t('hsm.generateKey')}
+      submitLabel={t('common.generate')}
     >
       <Input label={t('hsm.keyLabel')} value={formData.key_label} onChange={e => setFormData({...formData, key_label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} />
       <div className="grid grid-cols-2 gap-4">
-        <Select label={t('hsm.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
+        <Select label={t('common.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
         <Select
-          label={t('hsm.keySize')}
+          label={t('common.keySize')}
           value={formData.key_size}
           onChange={value => setFormData({...formData, key_size: parseInt(value)})}
           options={
@@ -642,7 +642,7 @@ function KeyModal({ provider, onSave, onClose }) {
           }
         />
       </div>
-      <Select label={t('hsm.keyPurpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'general', label: t('hsm.purposes.general') }, { value: 'ca_signing', label: t('hsm.purposes.caSigning') }, { value: 'code_signing', label: t('hsm.purposes.codeSigning') }, { value: 'encryption', label: t('hsm.purposes.encryption') }]} />
+      <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'general', label: t('hsm.purposes.general') }, { value: 'ca_signing', label: t('hsm.purposes.caSigning') }, { value: 'code_signing', label: t('common.codeSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }]} />
     </FormModal>
   )
 }

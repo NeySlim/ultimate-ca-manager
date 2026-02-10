@@ -34,8 +34,8 @@ export default function CSRsPage() {
   
   // Tab definitions (inside component for translations)
   const TABS = [
-    { id: 'pending', label: t('csrs.pending'), icon: Warning },
-    { id: 'history', label: t('csrs.history'), icon: ClockCounterClockwise }
+    { id: 'pending', label: t('common.pending'), icon: Warning },
+    { id: 'history', label: t('common.history'), icon: ClockCounterClockwise }
   ]
   
   // Tab state
@@ -221,16 +221,16 @@ export default function CSRsPage() {
 
   // Stats
   const stats = useMemo(() => [
-    { icon: Warning, label: t('csrs.pending'), value: pendingCSRs.length, variant: 'warning' },
+    { icon: Warning, label: t('common.pending'), value: pendingCSRs.length, variant: 'warning' },
     { icon: CheckCircle, label: t('csrs.signed'), value: historyCSRs.length, variant: 'success' },
-    { icon: FileText, label: t('csrs.total'), value: pendingCSRs.length + historyCSRs.length, variant: 'primary' }
+    { icon: FileText, label: t('common.total'), value: pendingCSRs.length + historyCSRs.length, variant: 'primary' }
   ], [pendingCSRs, historyCSRs, t])
 
   // Pending table columns
   const pendingColumns = useMemo(() => [
     {
       key: 'cn',
-      header: t('csrs.commonName'),
+      header: t('common.commonName'),
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
@@ -250,20 +250,20 @@ export default function CSRsPage() {
             <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
-          <Badge variant="warning" size="sm" dot>{t('csrs.pending')}</Badge>
+          <Badge variant="warning" size="sm" dot>{t('common.pending')}</Badge>
         </div>
       )
     },
     {
       key: 'organization',
-      header: t('csrs.organization'),
+      header: t('common.organization'),
       priority: 3,
       hideOnMobile: true,
       render: (val) => <span className="text-sm text-text-secondary">{val || '—'}</span>
     },
     {
       key: 'created_at',
-      header: t('csrs.created'),
+      header: t('common.created'),
       priority: 2,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
@@ -273,7 +273,7 @@ export default function CSRsPage() {
     },
     {
       key: 'key_type',
-      header: t('csrs.key'),
+      header: t('common.key'),
       priority: 4,
       hideOnMobile: true,
       render: (val, row) => (
@@ -288,7 +288,7 @@ export default function CSRsPage() {
   const historyColumns = useMemo(() => [
     {
       key: 'cn',
-      header: t('csrs.commonName'),
+      header: t('common.commonName'),
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
@@ -320,7 +320,7 @@ export default function CSRsPage() {
     },
     {
       key: 'signed_by',
-      header: t('csrs.signedBy'),
+      header: t('common.signedBy'),
       priority: 2,
       hideOnMobile: true,
       render: (val, row) => (
@@ -338,7 +338,7 @@ export default function CSRsPage() {
     },
     {
       key: 'signed_at',
-      header: t('csrs.signedDate'),
+      header: t('csrs.signed'),
       priority: 3,
       render: (val, row) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
@@ -348,7 +348,7 @@ export default function CSRsPage() {
     },
     {
       key: 'valid_to',
-      header: t('csrs.expires'),
+      header: t('common.expires'),
       priority: 4,
       hideOnMobile: true,
       render: (val, row) => {
@@ -356,7 +356,7 @@ export default function CSRsPage() {
         const variant = days < 0 ? 'danger' : days < 30 ? 'warning' : 'success'
         return (
           <Badge variant={variant} size="sm">
-            {days < 0 ? t('csrs.expired') : t('csrs.daysRemaining', { days })}
+            {days < 0 ? t('common.expired') : t('csrs.daysRemaining', { days })}
           </Badge>
         )
       }
@@ -370,14 +370,14 @@ export default function CSRsPage() {
       { label: t('csrs.sign'), icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
     ] : []),
     ...(canDelete('csrs') ? [
-      { label: t('csrs.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
+      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
     ] : [])
   ], [canWrite, canDelete, t])
 
   // Row actions for history
   const historyRowActions = useCallback((row) => [
-    { label: t('csrs.downloadCertificate'), icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'cert'}.pem`) },
-    { label: t('csrs.viewInCertificates'), icon: Certificate, onClick: () => window.location.href = `/certificates?id=${row.id}` }
+    { label: t('common.downloadCertificate'), icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'cert'}.pem`) },
+    { label: t('common.viewInCertificates'), icon: Certificate, onClick: () => window.location.href = `/certificates?id=${row.id}` }
   ], [t])
 
   // Help content
@@ -393,7 +393,7 @@ export default function CSRsPage() {
           <div className="quick-info-grid">
             <div className="help-stat-card">
               <div className="help-stat-value help-stat-value-warning">{pendingCSRs.length}</div>
-              <div className="help-stat-label">{t('csrs.pending')}</div>
+              <div className="help-stat-label">{t('common.pending')}</div>
             </div>
             <div className="help-stat-card">
               <div className="help-stat-value help-stat-value-success">{historyCSRs.length}</div>
@@ -401,19 +401,19 @@ export default function CSRsPage() {
             </div>
             <div className="help-stat-card">
               <div className="help-stat-value help-stat-value-primary">{pendingCSRs.length + historyCSRs.length}</div>
-              <div className="help-stat-label">{t('csrs.total')}</div>
+              <div className="help-stat-label">{t('common.total')}</div>
             </div>
           </div>
         </div>
       </div>
 
-      <HelpCard title={t('csrs.aboutCSRs')} variant="info">
+      <HelpCard title={t('common.aboutCSRs')} variant="info">
         {t('csrs.aboutCSRsDescription')}
       </HelpCard>
-      <HelpCard title={t('csrs.statusTitle')} variant="info">
+      <HelpCard title={t('common.status')} variant="info">
         <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>{t('csrs.pending')}</Badge>
+            <Badge variant="warning" size="sm" dot>{t('common.pending')}</Badge>
             <span className="text-xs">{t('csrs.pendingDescription')}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -437,7 +437,7 @@ export default function CSRsPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('csrs.title')}
+        title={t('common.csrs')}
         subtitle={t('csrs.pendingSubtitle', { pending: pendingCSRs.length, signed: historyCSRs.length })}
         icon={FileText}
         stats={stats}
@@ -456,7 +456,7 @@ export default function CSRsPage() {
         }
         slideOverOpen={!!selectedCSR}
         onSlideOverClose={() => setSelectedCSR(null)}
-        slideOverTitle={activeTab === 'pending' ? t('csrs.csrDetails') : t('csrs.certificateDetails')}
+        slideOverTitle={activeTab === 'pending' ? t('common.csrDetails') : t('common.certificateDetails')}
         slideOverContent={selectedCSR && (
           activeTab === 'pending' ? (
             <CSRDetailsPanel 
@@ -500,7 +500,7 @@ export default function CSRsPage() {
             ) : (
               <Button size="sm" onClick={() => setShowImportModal(true)}>
                 <UploadSimple size={14} weight="bold" />
-                {t('csrs.import')}
+                {t('common.import')}
               </Button>
             )
           )}
@@ -543,7 +543,7 @@ export default function CSRsPage() {
                   : "text-text-secondary hover:text-text-primary"
               )}
             >
-              <UploadSimple size={16} /> {t('csrs.uploadFile')}
+              <UploadSimple size={16} /> {t('common.uploadFile')}
             </button>
             <button
               onClick={() => setUploadMode('paste')}
@@ -585,7 +585,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
               />
               <div className="flex justify-end gap-2 pt-2 border-t border-border">
                 <Button variant="secondary" onClick={() => { closeModal('upload'); setPastedPEM('') }}>
-                  {t('csrs.cancel')}
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handlePasteUpload} disabled={!pastedPEM.trim()}>
                   <UploadSimple size={16} /> {t('common.upload')}
@@ -600,7 +600,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
       <Modal
         open={modals.sign}
         onOpenChange={() => closeModal('sign')}
-        title={t('csrs.signCSR')}
+        title={t('common.signCSR')}
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
@@ -608,7 +608,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           </p>
           
           <Select
-            label={t('csrs.certificateAuthority')}
+            label={t('common.certificateAuthority')}
             options={cas.map(ca => ({ value: ca.id, label: ca.descr || ca.name || ca.common_name }))}
             value={signCA}
             onChange={setSignCA}
@@ -625,9 +625,9 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           />
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => closeModal('sign')}>{t('csrs.cancel')}</Button>
+            <Button variant="secondary" onClick={() => closeModal('sign')}>{t('common.cancel')}</Button>
             <Button onClick={handleSign} disabled={!signCA}>
-              <SignIn size={16} /> {t('csrs.signCSR')}
+              <SignIn size={16} /> {t('common.signCSR')}
             </Button>
           </div>
         </div>
@@ -644,7 +644,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             {t('csrs.uploadPrivateKey')} <strong>{selectedCSR?.common_name || selectedCSR?.cn}</strong>
           </p>
           <Textarea
-            label={t('csrs.privateKeyPEM')}
+            label={t('common.privateKeyPEM')}
             value={keyPem}
             onChange={(e) => setKeyPem(e.target.value)}
             placeholder="-----BEGIN PRIVATE KEY-----
@@ -662,7 +662,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <Button variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
-              {t('csrs.cancel')}
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
               <UploadSimple size={16} /> {t('csrs.uploadKey')}
@@ -699,8 +699,8 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         subtitle={csr.organization}
         badge={
           <div className="flex gap-1">
-            <Badge variant="warning" size="sm" icon={Clock}>{t('csrs.pending')}</Badge>
-            {csr.has_private_key && <Badge variant="success" size="sm" icon={Key}>{t('csrs.hasKey')}</Badge>}
+            <Badge variant="warning" size="sm" icon={Clock}>{t('common.pending')}</Badge>
+            {csr.has_private_key && <Badge variant="success" size="sm" icon={Key}>{t('common.hasKey')}</Badge>}
           </div>
         }
       />
@@ -714,7 +714,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       {/* Actions */}
       <div className="flex gap-2 flex-wrap">
         <Button size="sm" variant="secondary" onClick={onDownload}>
-          <Download size={14} /> {t('csrs.download')}
+          <Download size={14} /> {t('common.download')}
         </Button>
         {canWrite('csrs') && !csr.has_private_key && (
           <Button size="sm" variant="secondary" onClick={onUploadKey}>
@@ -734,30 +734,30 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       </div>
 
       {/* Subject Information */}
-      <CompactSection title={t('csrs.subject')}>
+      <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField label={t('csrs.commonName')} value={csr.common_name || csr.cn} className="col-span-2" />
-          <CompactField label={t('csrs.organization')} value={csr.organization} />
-          <CompactField label={t('csrs.orgUnit')} value={csr.organizational_unit} />
-          <CompactField label={t('csrs.country')} value={csr.country} />
-          <CompactField label={t('csrs.state')} value={csr.state} />
-          <CompactField label={t('csrs.locality')} value={csr.locality} />
-          <CompactField label={t('csrs.email')} value={csr.email} />
+          <CompactField label={t('common.commonName')} value={csr.common_name || csr.cn} className="col-span-2" />
+          <CompactField label={t('common.organization')} value={csr.organization} />
+          <CompactField label={t('common.orgUnit')} value={csr.organizational_unit} />
+          <CompactField label={t('common.country')} value={csr.country} />
+          <CompactField label={t('common.state')} value={csr.state} />
+          <CompactField label={t('common.locality')} value={csr.locality} />
+          <CompactField label={t('common.email')} value={csr.email} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Information */}
-      <CompactSection title={t('csrs.keyInformation')}>
+      <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField label={t('csrs.algorithm')} value={csr.key_algorithm || 'RSA'} />
-          <CompactField label={t('csrs.keySize')} value={csr.key_size} />
-          <CompactField label={t('csrs.signature')} value={csr.signature_algorithm} />
+          <CompactField label={t('common.algorithm')} value={csr.key_algorithm || 'RSA'} />
+          <CompactField label={t('common.keySize')} value={csr.key_size} />
+          <CompactField label={t('common.signature')} value={csr.signature_algorithm} />
         </CompactGrid>
       </CompactSection>
 
       {/* SANs */}
       {(csr.sans?.length > 0 || csr.san_dns?.length > 0) && (
-        <CompactSection title={t('csrs.subjectAltNames')}>
+        <CompactSection title={t('common.subjectAltNames')}>
           <div className="text-xs text-text-secondary space-y-1">
             {(csr.sans || csr.san_dns || []).map((san, i) => (
               <div key={i} className="font-mono bg-bg-tertiary px-2 py-1 rounded">
@@ -769,9 +769,9 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       )}
 
       {/* Timeline */}
-      <CompactSection title={t('csrs.timeline')}>
+      <CompactSection title={t('common.timeline')}>
         <CompactGrid>
-          <CompactField label={t('csrs.created')} value={csr.created_at ? formatDate(csr.created_at) : '—'} />
+          <CompactField label={t('common.created')} value={csr.created_at ? formatDate(csr.created_at) : '—'} />
           <CompactField label={t('csrs.requester')} value={csr.requester || csr.created_by} />
         </CompactGrid>
       </CompactSection>
@@ -815,28 +815,28 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       {/* Actions */}
       <div className="flex gap-2">
         <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
-          <Download size={14} /> {t('csrs.download')}
+          <Download size={14} /> {t('common.download')}
         </Button>
         <Button 
           size="sm" 
           variant="secondary"
           onClick={() => window.location.href = `/certificates?id=${cert.id}`}
         >
-          <Certificate size={14} /> {t('csrs.viewCertificate')}
+          <Certificate size={14} /> {t('common.viewCertificate')}
         </Button>
       </div>
 
       {/* Signing Information */}
-      <CompactSection title={t('csrs.signingDetails')}>
+      <CompactSection title={t('common.signingDetails')}>
         <CompactGrid>
-          <CompactField label={t('csrs.signedBy')} value={cert.signed_by || cert.issuer_name} className="col-span-2" />
-          <CompactField label={t('csrs.signedDate')} value={cert.signed_at ? formatDate(cert.signed_at) : formatDate(cert.valid_from)} />
-          <CompactField label={t('csrs.expires')} value={cert.valid_to ? formatDate(cert.valid_to) : '—'} />
+          <CompactField label={t('common.signedBy')} value={cert.signed_by || cert.issuer_name} className="col-span-2" />
+          <CompactField label={t('csrs.signed')} value={cert.signed_at ? formatDate(cert.signed_at) : formatDate(cert.valid_from)} />
+          <CompactField label={t('common.expires')} value={cert.valid_to ? formatDate(cert.valid_to) : '—'} />
           <CompactField 
-            label={t('csrs.status')} 
+            label={t('common.status')} 
             value={
               <Badge variant={expiryVariant} size="sm">
-                {daysRemaining < 0 ? t('csrs.expired') : t('csrs.daysLeft', { days: daysRemaining })}
+                {daysRemaining < 0 ? t('common.expired') : t('csrs.daysLeft', { days: daysRemaining })}
               </Badge>
             } 
           />
@@ -844,27 +844,27 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       </CompactSection>
 
       {/* Subject Information */}
-      <CompactSection title={t('csrs.subject')}>
+      <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField label={t('csrs.commonName')} value={cert.common_name || cert.cn} className="col-span-2" />
-          <CompactField label={t('csrs.organization')} value={cert.organization} />
-          <CompactField label={t('csrs.orgUnit')} value={cert.organizational_unit} />
-          <CompactField label={t('csrs.country')} value={cert.country} />
-          <CompactField label={t('csrs.state')} value={cert.state} />
+          <CompactField label={t('common.commonName')} value={cert.common_name || cert.cn} className="col-span-2" />
+          <CompactField label={t('common.organization')} value={cert.organization} />
+          <CompactField label={t('common.orgUnit')} value={cert.organizational_unit} />
+          <CompactField label={t('common.country')} value={cert.country} />
+          <CompactField label={t('common.state')} value={cert.state} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Information */}
-      <CompactSection title={t('csrs.keyInformation')}>
+      <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField label={t('csrs.algorithm')} value={cert.key_algorithm || 'RSA'} />
-          <CompactField label={t('csrs.keySize')} value={cert.key_size} />
-          <CompactField label={t('csrs.serial')} value={cert.serial_number} copyable mono className="col-span-2" />
+          <CompactField label={t('common.algorithm')} value={cert.key_algorithm || 'RSA'} />
+          <CompactField label={t('common.keySize')} value={cert.key_size} />
+          <CompactField label={t('common.serial')} value={cert.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 
       {/* Timeline */}
-      <CompactSection title={t('csrs.timeline')}>
+      <CompactSection title={t('common.timeline')}>
         <CompactGrid>
           <CompactField label={t('csrs.csrCreated')} value={cert.created_at ? formatDate(cert.created_at) : '—'} />
           <CompactField label={t('csrs.certificateIssued')} value={cert.valid_from ? formatDate(cert.valid_from) : '—'} />

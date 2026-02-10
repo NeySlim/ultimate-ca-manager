@@ -542,7 +542,7 @@ export function CommandPalette({ open, onOpenChange }) {
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">esc</kbd>
-              {t('commandPalette.close')}
+              {t('common.close')}
             </span>
           </div>
         </Dialog.Content>

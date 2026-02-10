@@ -432,7 +432,7 @@ export default function LoginPage() {
               /* No saved username: show input field */
               <form onSubmit={handleContinue} className="space-y-4">
                 <Input
-                  label={t('auth.username')}
+                  label={t('common.username')}
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -567,7 +567,7 @@ export default function LoginPage() {
                 
                 <Input
                   ref={passwordRef}
-                  label={t('auth.password')}
+                  label={t('common.password')}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -650,12 +650,12 @@ export default function LoginPage() {
             {userMethods.webauthn && userMethods.webauthn_credentials > 0 && (
               <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
                 <Fingerprint size={12} weight="fill" />
-                <span>{t('auth.key')}</span>
+                <span>{t('common.key')}</span>
               </div>
             )}
             <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
               <Key size={12} weight="fill" />
-              <span>{t('auth.password')}</span>
+              <span>{t('common.password')}</span>
             </div>
           </div>
         )}
@@ -682,7 +682,7 @@ export default function LoginPage() {
             {/* LDAP Login form */}
             <form onSubmit={handleLDAPLogin} className="space-y-3 sm:space-y-4">
               <Input
-                label={t('auth.username')}
+                label={t('common.username')}
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -694,7 +694,7 @@ export default function LoginPage() {
               />
               
               <Input
-                label={t('auth.password')}
+                label={t('common.password')}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -782,7 +782,7 @@ export default function LoginPage() {
               <button
                 onClick={() => { setThemeMenuOpen(!themeMenuOpen); setLangMenuOpen(false) }}
                 className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
-                title={t('settings.appearance.title')}
+                title={t('settings.tabs.appearance')}
               >
                 <Palette size={18} />
               </button>
@@ -816,7 +816,7 @@ export default function LoginPage() {
                     <div className="h-px bg-border my-1.5" />
                     
                     {/* Mode */}
-                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance.title')}</div>
+                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.tabs.appearance')}</div>
                     {[
                       { id: 'system', labelKey: 'settings.followSystem' },
                       { id: 'dark', labelKey: 'settings.dark' },

@@ -268,8 +268,8 @@ export default function UsersGroupsPage() {
       ]
     } else {
       return [
-        { icon: Users, label: t('groups.title'), value: groups.length, variant: 'primary' },
-        { icon: User, label: t('users.title'), value: users.length, variant: 'secondary' }
+        { icon: Users, label: t('common.groups'), value: groups.length, variant: 'primary' },
+        { icon: User, label: t('common.users'), value: users.length, variant: 'secondary' }
       ]
     }
   }, [activeTab, users, groups, t])
@@ -279,7 +279,7 @@ export default function UsersGroupsPage() {
   const userColumns = useMemo(() => [
     {
       key: 'username',
-      header: t('users.user'),
+      header: t('common.user'),
       priority: 1,
       sortable: true,
       render: (val, row) => {
@@ -338,7 +338,7 @@ export default function UsersGroupsPage() {
     },
     {
       key: 'role',
-      header: t('users.role'),
+      header: t('common.role'),
       priority: 2,
       sortable: true,
       render: (val, row) => {
@@ -351,13 +351,13 @@ export default function UsersGroupsPage() {
         const config = roleConfig[val] || roleConfig.viewer
         const roleLabels = {
           admin: t('users.admin'),
-          operator: t('users.operator'),
-          viewer: t('users.viewer')
+          operator: t('common.operator'),
+          viewer: t('common.viewer')
         }
         return (
           <Badge variant={config.variant} size="sm" dot={config.dot}>
             {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
-            {roleLabels[val] || t('users.viewer')}
+            {roleLabels[val] || t('common.viewer')}
           </Badge>
         )
       },
@@ -371,15 +371,15 @@ export default function UsersGroupsPage() {
         const config = roleConfig[val] || roleConfig.viewer
         const roleLabels = {
           admin: t('users.admin'),
-          operator: t('users.operator'),
-          viewer: t('users.viewer')
+          operator: t('common.operator'),
+          viewer: t('common.viewer')
         }
         return (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-text-secondary truncate">{row.email || '—'}</span>
             <Badge variant={config.variant} size="xs" dot={config.dot}>
               {val === 'admin' && <Crown weight="fill" className="h-2.5 w-2.5 mr-0.5" />}
-              {roleLabels[val] || t('users.viewer')}
+              {roleLabels[val] || t('common.viewer')}
             </Badge>
           </div>
         )
@@ -405,7 +405,7 @@ export default function UsersGroupsPage() {
     },
     {
       key: 'last_login',
-      header: t('users.lastLogin'),
+      header: t('common.lastLogin'),
       hideOnMobile: true,
       sortable: true,
       render: (val) => (
@@ -466,7 +466,7 @@ export default function UsersGroupsPage() {
   
   const userRowActions = useCallback((row) => [
     { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingUser(row); setShowUserModal(true) } },
-    { label: row.active ? t('users.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
+    { label: row.active ? t('common.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
     { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
     ...(canDelete('users') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
@@ -488,7 +488,7 @@ export default function UsersGroupsPage() {
       <div className="visual-section">
         <div className="visual-section-header">
           <Users size={16} className="status-primary-text" />
-          {activeTab === 'users' ? t('users.title') + ' ' + t('common.details') : t('groups.title') + ' ' + t('common.details')}
+          {activeTab === 'users' ? t('common.users') + ' ' + t('common.details') : t('common.groups') + ' ' + t('common.details')}
         </div>
         <div className="visual-section-body">
           {activeTab === 'users' ? (
@@ -514,32 +514,32 @@ export default function UsersGroupsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="help-stat-card">
                 <div className="help-stat-value help-stat-value-primary">{groups.length}</div>
-                <div className="help-stat-label">{t('groups.title')}</div>
+                <div className="help-stat-label">{t('common.groups')}</div>
               </div>
               <div className="help-stat-card">
                 <div className="help-stat-value">{users.length}</div>
-                <div className="help-stat-label">{t('users.title')}</div>
+                <div className="help-stat-label">{t('common.users')}</div>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <HelpCard title={t('users.title')} variant="info">
-        {t('users.title')}
+      <HelpCard title={t('common.users')} variant="info">
+        {t('common.users')}
       </HelpCard>
-      <HelpCard title={t('users.role')} variant="tip">
+      <HelpCard title={t('common.role')} variant="tip">
         <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
             <Badge variant="primary" size="sm" dot>{t('users.admin')}</Badge>
             <span className="text-xs">{t('common.all')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>{t('users.operator')}</Badge>
-            <span className="text-xs">{t('certificates.title')}</span>
+            <Badge variant="warning" size="sm" dot>{t('common.operator')}</Badge>
+            <span className="text-xs">{t('common.certificates')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm" dot>{t('users.viewer')}</Badge>
+            <Badge variant="secondary" size="sm" dot>{t('common.viewer')}</Badge>
             <span className="text-xs">{t('common.details')}</span>
           </div>
         </div>
@@ -572,7 +572,7 @@ export default function UsersGroupsPage() {
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleToggleUser(selectedUser)}>
               {selectedUser.active ? <XCircle size={14} /> : <CheckCircle size={14} />}
-              {selectedUser.active ? t('users.deactivate') : t('users.activate')}
+              {selectedUser.active ? t('common.deactivate') : t('users.activate')}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
               <Key size={14} /> {t('users.resetPassword')}
@@ -586,24 +586,24 @@ export default function UsersGroupsPage() {
         )}
       </div>
 
-      <CompactSection title={t('users.user') + ' ' + t('common.info')} icon={UserCircle} iconClass="icon-bg-blue">
+      <CompactSection title={t('common.user') + ' ' + t('common.info')} icon={UserCircle} iconClass="icon-bg-blue">
         <CompactGrid columns={1}>
           <CompactField label={t('common.name')} value={selectedUser.full_name || '—'} />
-          <CompactField label={t('users.email')} value={selectedUser.email} />
-          <CompactField label={t('users.role')} value={selectedUser.role} />
+          <CompactField label={t('common.email')} value={selectedUser.email} />
+          <CompactField label={t('common.role')} value={selectedUser.role} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title={t('users.lastLogin')} icon={Clock} iconClass="icon-bg-green">
+      <CompactSection title={t('common.lastLogin')} icon={Clock} iconClass="icon-bg-green">
         <CompactGrid columns={1}>
           <CompactField label={t('common.created')} value={formatDate(selectedUser.created_at)} />
-          <CompactField label={t('users.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
+          <CompactField label={t('common.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title={t('nav.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
+      <CompactSection title={t('common.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
         <CompactGrid columns={1}>
-          <CompactField label={t('users.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
+          <CompactField label={t('common.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
           <CompactField label="TOTP" value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
         </CompactGrid>
       </CompactSection>
@@ -731,14 +731,14 @@ export default function UsersGroupsPage() {
 
   // Tabs
   const tabs = [
-    { id: 'users', label: t('users.title'), icon: User, count: users.length },
-    { id: 'groups', label: t('groups.title'), icon: Users, count: groups.length }
+    { id: 'users', label: t('common.users'), icon: User, count: users.length },
+    { id: 'groups', label: t('common.groups'), icon: Users, count: groups.length }
   ]
 
   return (
     <>
       <ResponsiveLayout
-        title={activeTab === 'users' ? t('users.title') : t('groups.title')}
+        title={activeTab === 'users' ? t('common.users') : t('common.groups')}
         subtitle={activeTab === 'users' ? t('users.subtitle', { count: currentData.length }) : t('groups.subtitle', { count: currentData.length })}
         icon={activeTab === 'users' ? User : Users}
         stats={stats}
@@ -746,7 +746,7 @@ export default function UsersGroupsPage() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         helpContent={helpContent}
-        helpTitle={t('users.title')}
+        helpTitle={t('common.users')}
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -783,8 +783,8 @@ export default function UsersGroupsPage() {
               placeholder: LABELS.FILTERS.ALL_ROLES,
               options: [
                 { value: 'admin', label: t('users.admin') },
-                { value: 'operator', label: t('users.operator') },
-                { value: 'viewer', label: t('users.viewer') }
+                { value: 'operator', label: t('common.operator') },
+                { value: 'viewer', label: t('common.viewer') }
               ]
             },
             {
@@ -923,7 +923,7 @@ function UserForm({ user, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
-        label={t('users.username')}
+        label={t('common.username')}
         value={formData.username}
         onChange={(e) => setFormData(p => ({ ...p, username: e.target.value }))}
         required
@@ -931,7 +931,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         placeholder={t('users.usernamePlaceholder')}
       />
       <Input
-        label={t('users.email')}
+        label={t('common.email')}
         type="email"
         value={formData.email}
         onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
@@ -945,7 +945,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         placeholder={t('users.namePlaceholder')}
       />
       <Input
-        label={user ? t('account.newPassword') : t('auth.password')}
+        label={user ? t('common.newPassword') : t('common.password')}
         type="password"
         value={formData.password}
         onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
@@ -954,13 +954,13 @@ function UserForm({ user, onSubmit, onCancel }) {
         showStrength={!user}
       />
       <Select
-        label={t('users.role')}
+        label={t('common.role')}
         value={formData.role}
         onChange={(val) => setFormData(p => ({ ...p, role: val }))}
         options={[
           { value: 'admin', label: t('users.admin') },
-          { value: 'operator', label: t('users.operator') },
-          { value: 'viewer', label: t('users.viewer') }
+          { value: 'operator', label: t('common.operator') },
+          { value: 'viewer', label: t('common.viewer') }
         ]}
       />
       <div className="flex justify-end gap-2 pt-4 border-t border-border">

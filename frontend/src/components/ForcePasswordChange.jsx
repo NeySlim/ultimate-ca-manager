@@ -37,7 +37,7 @@ export function ForcePasswordChange({ onComplete }) {
     }
     
     if (formData.new_password !== formData.confirm_password) {
-      newErrors.confirm_password = t('password.noMatch')
+      newErrors.confirm_password = t('common.passwordMismatch')
     }
     
     setErrors(newErrors)
@@ -86,7 +86,7 @@ export function ForcePasswordChange({ onComplete }) {
         </div>
 
         <Input
-          label={t('password.currentPassword')}
+          label={t('common.currentPassword')}
           type="password"
           value={formData.current_password}
           onChange={(e) => setFormData(prev => ({ ...prev, current_password: e.target.value }))}
@@ -96,7 +96,7 @@ export function ForcePasswordChange({ onComplete }) {
         />
         
         <Input
-          label={t('password.newPassword')}
+          label={t('common.newPassword')}
           type="password"
           value={formData.new_password}
           onChange={(e) => setFormData(prev => ({ ...prev, new_password: e.target.value }))}
@@ -106,7 +106,7 @@ export function ForcePasswordChange({ onComplete }) {
         />
         
         <Input
-          label={t('password.confirmPassword')}
+          label={t('common.confirmNewPassword')}
           type="password"
           value={formData.confirm_password}
           onChange={(e) => setFormData(prev => ({ ...prev, confirm_password: e.target.value }))}
@@ -117,7 +117,7 @@ export function ForcePasswordChange({ onComplete }) {
         <div className="flex justify-end pt-2">
           <Button type="submit" disabled={loading}>
             <Lock size={16} />
-            {loading ? t('common.loading') : t('password.changePassword')}
+            {loading ? t('common.loading') : t('common.changePassword')}
           </Button>
         </div>
       </form>

@@ -150,8 +150,8 @@ export default function TrustStorePage() {
 
   // Stats - from backend API
   const stats = useMemo(() => [
-    { icon: ShieldCheck, label: t('trustStore.rootCA'), value: certStats.root_ca, variant: 'success' },
-    { icon: Certificate, label: t('trustStore.intermediate'), value: certStats.intermediate_ca, variant: 'primary' },
+    { icon: ShieldCheck, label: t('common.rootCA'), value: certStats.root_ca, variant: 'success' },
+    { icon: Certificate, label: t('common.intermediate'), value: certStats.intermediate_ca, variant: 'primary' },
     { icon: Warning, label: t('common.expired'), value: certStats.expired, variant: 'danger' },
     { icon: CheckCircle, label: t('common.total'), value: certStats.total, variant: 'default' }
   ], [certStats, t])
@@ -165,7 +165,7 @@ export default function TrustStorePage() {
       </Button>
       <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
         <UploadSimple size={14} />
-        <span className="hidden sm:inline">{t('trustStore.import')}</span>
+        <span className="hidden sm:inline">{t('common.import')}</span>
       </Button>
       <Button size="sm" onClick={() => openModal('add')}>
         <Plus size={14} />
@@ -178,7 +178,7 @@ export default function TrustStorePage() {
   const columns = useMemo(() => [
     {
       key: 'name',
-      header: t('trustStore.certificate'),
+      header: t('common.certificate'),
       priority: 1,
       sortable: true,
       render: (val, row) => (
@@ -206,7 +206,7 @@ export default function TrustStorePage() {
               <span className="font-medium truncate">{val}</span>
             </div>
             <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot>
-              {row.purpose?.replace('_', ' ') || t('trustStore.custom')}
+              {row.purpose?.replace('_', ' ') || t('common.custom')}
             </Badge>
           </div>
         )
@@ -214,7 +214,7 @@ export default function TrustStorePage() {
     },
     {
       key: 'purpose',
-      header: t('trustStore.purpose'),
+      header: t('common.purpose'),
       priority: 2,
       hideOnMobile: true,
       render: (val) => {
@@ -231,7 +231,7 @@ export default function TrustStorePage() {
     },
     {
       key: 'not_after',
-      header: t('trustStore.expires'),
+      header: t('common.expires'),
       priority: 2,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
@@ -249,7 +249,7 @@ export default function TrustStorePage() {
         if (!val) return null
         return (
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">{t('trustStore.expires')}:</span>
+            <span className="text-text-tertiary">{t('common.expires')}:</span>
             <span className="text-text-secondary">{formatDate(val)}</span>
           </div>
         )
@@ -291,10 +291,10 @@ export default function TrustStorePage() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-text-primary truncate">
-                {selectedCert.name || selectedCert.subject_cn || t('trustStore.certificate')}
+                {selectedCert.name || selectedCert.subject_cn || t('common.certificate')}
               </h3>
               <Badge variant={isExpired ? 'danger' : isExpiring ? 'warning' : 'success'} size="sm">
-                {isExpired ? t('trustStore.expired') : isExpiring ? t('trustStore.expiring') : t('trustStore.valid')}
+                {isExpired ? t('common.expired') : isExpiring ? t('common.detailsExpiring') : t('common.valid')}
               </Badge>
               <Badge variant={selectedCert.purpose === 'root_ca' ? 'info' : 'default'} size="sm">
                 {selectedCert.purpose?.replace('_', ' ') || 'trusted'}
@@ -324,10 +324,10 @@ export default function TrustStorePage() {
                 isExpiring && "text-status-warning",
                 !isExpired && !isExpiring && "text-status-success"
               )}>
-                {isExpired ? t('trustStore.expired') : t('trustStore.daysRemaining', { count: daysRemaining })}
+                {isExpired ? t('common.expired') : t('trustStore.daysRemaining', { count: daysRemaining })}
               </div>
               <div className="text-xs text-text-tertiary">
-                {t('trustStore.expires')} {formatDate(selectedCert.not_after)}
+                {t('common.expires')} {formatDate(selectedCert.not_after)}
               </div>
             </div>
           </div>
@@ -338,17 +338,17 @@ export default function TrustStorePage() {
           <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
             <Key size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary">{selectedCert.key_type || 'RSA'}</div>
-            <div className="text-2xs text-text-tertiary">{t('trustStore.keyType')}</div>
+            <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
           </div>
           <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
             <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || 'SHA256'}</div>
-            <div className="text-2xs text-text-tertiary">{t('trustStore.signature')}</div>
+            <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
           </div>
           <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
             <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary">{selectedCert.is_ca ? t('trustStore.ca') : t('trustStore.endEntity')}</div>
-            <div className="text-2xs text-text-tertiary">{t('trustStore.type')}</div>
+            <div className="text-xs font-medium text-text-primary">{selectedCert.is_ca ? t('common.ca') : t('common.endEntity')}</div>
+            <div className="text-2xs text-text-tertiary">{t('common.type')}</div>
           </div>
         </div>
 
@@ -365,44 +365,44 @@ export default function TrustStorePage() {
         </div>
 
         {/* Subject Section */}
-        <CompactSection title={t('trustStore.subject')} icon={Globe}>
+        <CompactSection title={t('common.subject')} icon={Globe}>
           <CompactGrid>
-            <CompactField icon={Globe} label={t('trustStore.commonName')} value={selectedCert.subject_cn || selectedCert.name} />
-            <CompactField icon={Buildings} label={t('trustStore.organization')} value={selectedCert.organization} />
+            <CompactField icon={Globe} label={t('common.commonName')} value={selectedCert.subject_cn || selectedCert.name} />
+            <CompactField icon={Buildings} label={t('common.organization')} value={selectedCert.organization} />
           </CompactGrid>
         </CompactSection>
 
         {/* Issuer Section */}
-        <CompactSection title={t('trustStore.issuer')} icon={ShieldCheck}>
-          <CompactField label={t('trustStore.issuer')} value={selectedCert.issuer || selectedCert.issuer_cn} mono />
+        <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
+          <CompactField label={t('common.issuer')} value={selectedCert.issuer || selectedCert.issuer_cn} mono />
         </CompactSection>
 
         {/* Validity Section */}
-        <CompactSection title={t('trustStore.validity')} icon={Calendar}>
+        <CompactSection title={t('common.validity')} icon={Calendar}>
           <CompactGrid>
-            <CompactField icon={Calendar} label={t('trustStore.validFrom')} value={selectedCert.not_before ? formatDate(selectedCert.not_before) : '—'} />
-            <CompactField icon={Calendar} label={t('trustStore.validUntil')} value={selectedCert.not_after ? formatDate(selectedCert.not_after) : '—'} />
+            <CompactField icon={Calendar} label={t('common.validFrom')} value={selectedCert.not_before ? formatDate(selectedCert.not_before) : '—'} />
+            <CompactField icon={Calendar} label={t('common.validUntil')} value={selectedCert.not_after ? formatDate(selectedCert.not_after) : '—'} />
           </CompactGrid>
         </CompactSection>
 
         {/* Technical Details */}
-        <CompactSection title={t('trustStore.technicalDetails')} icon={Info}>
+        <CompactSection title={t('common.technicalDetails')} icon={Info}>
           <CompactGrid>
-            <CompactField icon={Hash} label={t('trustStore.serial')} value={selectedCert.serial_number} mono copyable />
-            <CompactField icon={Key} label={t('trustStore.keyType')} value={selectedCert.key_type} />
+            <CompactField icon={Hash} label={t('common.serial')} value={selectedCert.serial_number} mono copyable />
+            <CompactField icon={Key} label={t('common.keyType')} value={selectedCert.key_type} />
           </CompactGrid>
         </CompactSection>
 
         {/* Fingerprints */}
         {selectedCert.fingerprint_sha256 && (
-          <CompactSection title={t('trustStore.fingerprints')} icon={Fingerprint} collapsible defaultOpen={false}>
-            <CompactField icon={Fingerprint} label={t('trustStore.sha256')} value={selectedCert.fingerprint_sha256} mono copyable />
+          <CompactSection title={t('common.fingerprints')} icon={Fingerprint} collapsible defaultOpen={false}>
+            <CompactField icon={Fingerprint} label={t('common.sha256')} value={selectedCert.fingerprint_sha256} mono copyable />
           </CompactSection>
         )}
 
         {/* Notes */}
         {selectedCert.notes && (
-          <CompactSection title={t('trustStore.notes')} icon={Warning}>
+          <CompactSection title={t('common.notes')} icon={Warning}>
             <p className="text-sm text-text-secondary">{selectedCert.notes}</p>
           </CompactSection>
         )}
@@ -413,15 +413,15 @@ export default function TrustStorePage() {
   // Help content
   const helpContent = (
     <div className="space-y-3">
-      <HelpCard variant="info" title={t('trustStore.aboutTrustStore')}>
+      <HelpCard variant="info" title={t('common.aboutTrustStore')}>
         {t('trustStore.aboutTrustStoreDesc')}
       </HelpCard>
       
-      <HelpCard variant="tip" title={t('trustStore.bestPractices')}>
+      <HelpCard variant="tip" title={t('common.bestPractices')}>
         {t('trustStore.bestPracticesDesc')}
       </HelpCard>
 
-      <HelpCard variant="warning" title={t('trustStore.securityNote')}>
+      <HelpCard variant="warning" title={t('common.securityNote')}>
         {t('trustStore.securityNoteDesc')}
       </HelpCard>
     </div>
@@ -430,7 +430,7 @@ export default function TrustStorePage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('trustStore.title')}
+        title={t('common.trustStore')}
         subtitle={t('trustStore.subtitle', { count: certificates.length })}
         icon={ShieldCheck}
         stats={stats}
@@ -445,7 +445,7 @@ export default function TrustStorePage() {
           </div>
         }
         slideOverOpen={!!selectedCert}
-        slideOverTitle={selectedCert?.name || t('trustStore.certificate')}
+        slideOverTitle={selectedCert?.name || t('common.certificate')}
         slideOverContent={detailContent}
         onSlideOverClose={() => setSelectedCert(null)}
       >
@@ -457,19 +457,19 @@ export default function TrustStorePage() {
           selectedId={selectedCert?.id}
           rowActions={rowActions}
           searchable
-          searchPlaceholder={t('trustStore.searchCertificates')}
+          searchPlaceholder={t('common.searchCertificates')}
           searchKeys={['name', 'subject_cn', 'issuer_cn', 'purpose']}
           toolbarFilters={[
             {
               key: 'purpose',
               placeholder: t('trustStore.allPurposes'),
               options: [
-                { value: 'root_ca', label: t('trustStore.rootCA') },
-                { value: 'intermediate_ca', label: t('trustStore.intermediate') },
+                { value: 'root_ca', label: t('common.rootCA') },
+                { value: 'intermediate_ca', label: t('common.intermediate') },
                 { value: 'client_auth', label: t('trustStore.clientAuth') },
-                { value: 'code_signing', label: t('trustStore.codeSigning') },
-                { value: 'system', label: t('trustStore.system') },
-                { value: 'custom', label: t('trustStore.custom') }
+                { value: 'code_signing', label: t('common.codeSigning') },
+                { value: 'system', label: t('common.system') },
+                { value: 'custom', label: t('common.custom') }
               ]
             }
           ]}
@@ -496,28 +496,28 @@ export default function TrustStorePage() {
       >
         <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleAdd() }}>
           <Input
-            label={t('trustStore.name')}
+            label={t('common.name')}
             placeholder={t('trustStore.namePlaceholder')}
             value={addForm.name}
             onChange={(e) => setAddForm(prev => ({ ...prev, name: e.target.value }))}
             required
           />
           <Input
-            label={t('trustStore.description')}
+            label={t('common.description')}
             placeholder={t('trustStore.descriptionPlaceholder')}
             value={addForm.description}
             onChange={(e) => setAddForm(prev => ({ ...prev, description: e.target.value }))}
           />
           <FormSelect
-            label={t('trustStore.purpose')}
+            label={t('common.purpose')}
             value={addForm.purpose}
             onChange={(val) => setAddForm(prev => ({ ...prev, purpose: val }))}
             options={[
-              { value: 'root_ca', label: t('trustStore.rootCA') },
-              { value: 'intermediate_ca', label: t('trustStore.intermediateCA') },
+              { value: 'root_ca', label: t('common.rootCA') },
+              { value: 'intermediate_ca', label: t('common.intermediateCA') },
               { value: 'client_auth', label: t('trustStore.clientAuth') },
-              { value: 'code_signing', label: t('trustStore.codeSigning') },
-              { value: 'custom', label: t('trustStore.custom') },
+              { value: 'code_signing', label: t('common.codeSigning') },
+              { value: 'custom', label: t('common.custom') },
             ]}
             size="lg"
           />
@@ -531,7 +531,7 @@ export default function TrustStorePage() {
             required
           />
           <Input
-            label={t('trustStore.notes')}
+            label={t('common.notes')}
             placeholder={t('trustStore.notesPlaceholder')}
             value={addForm.notes}
             onChange={(e) => setAddForm(prev => ({ ...prev, notes: e.target.value }))}

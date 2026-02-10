@@ -65,7 +65,7 @@ function AppearanceSettings() {
     <DetailContent>
       <DetailHeader
         icon={Palette}
-        title={t('settings.appearance.title')}
+        title={t('settings.tabs.appearance')}
         subtitle={t('settings.appearanceSubtitle')}
       />
       
@@ -276,10 +276,10 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     <form onSubmit={handleSubmit} className="p-4 space-y-6">
       {/* General Settings */}
       <div className="space-y-4">
-        <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">{t('sso.tabs.general')}</h4>
+        <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">{t('common.general')}</h4>
         <div className="grid grid-cols-2 gap-4">
           <Input
-            label={t('sso.providerName')}
+            label={t('common.providerName')}
             value={formData.name}
             onChange={e => handleChange('name', e.target.value)}
             required
@@ -294,7 +294,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
         </div>
         {!provider && (
           <Select
-            label={t('sso.providerType')}
+            label={t('common.providerType')}
             value={formData.provider_type}
             onChange={value => handleChange('provider_type', value)}
             options={[
@@ -311,7 +311,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             onChange={e => handleChange('enabled', e.target.checked)}
             className="rounded border-border bg-bg-tertiary"
           />
-          <span className="text-sm text-text-primary">{t('sso.enableProvider')}</span>
+          <span className="text-sm text-text-primary">{t('common.enableProvider')}</span>
         </label>
       </div>
 
@@ -330,7 +330,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
                 className="col-span-2"
               />
               <Input
-                label={t('sso.ldapPort')}
+                label={t('common.portLabel')}
                 type="number"
                 value={formData.ldap_port}
                 onChange={e => handleChange('ldap_port', parseInt(e.target.value))}
@@ -376,12 +376,12 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
         {formData.provider_type === 'oauth2' && (
           <>
             <Input
-              label={t('sso.clientId')}
+              label={t('common.clientId')}
               value={formData.oauth2_client_id}
               onChange={e => handleChange('oauth2_client_id', e.target.value)}
             />
             <Input
-              label={t('sso.clientSecret')}
+              label={t('common.clientSecret')}
               type="password"
               value={formData.oauth2_client_secret}
               onChange={e => handleChange('oauth2_client_secret', e.target.value)}
@@ -448,9 +448,9 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           value={formData.default_role}
           onChange={value => handleChange('default_role', value)}
           options={[
-            { value: 'admin', label: t('sso.roles.admin') },
-            { value: 'operator', label: t('sso.roles.operator') },
-            { value: 'viewer', label: t('sso.roles.viewer') },
+            { value: 'admin', label: t('common.admin') },
+            { value: 'operator', label: t('common.operator') },
+            { value: 'viewer', label: t('common.viewer') },
           ]}
         />
         <div className="space-y-2">
@@ -691,10 +691,10 @@ export default function SettingsPage() {
       if (response.data?.status === 'success') {
         showSuccess(response.data.message || t('sso.testSuccess'))
       } else {
-        showError(response.message || t('sso.testFailed'))
+        showError(response.message || t('common.dnsProviderTestFailed'))
       }
     } catch (error) {
-      showError(error.message || t('sso.testFailed'))
+      showError(error.message || t('common.dnsProviderTestFailed'))
     } finally {
       setSsoTesting(false)
     }
@@ -744,7 +744,7 @@ export default function SettingsPage() {
   const handleTestEmail = async () => {
     const testEmail = settings.smtp_from_email || settings.admin_email
     if (!testEmail) {
-      showError(t('settings.emailAddressRequired'))
+      showError(t('common.emailRequired'))
       return
     }
     try {
@@ -928,7 +928,7 @@ export default function SettingsPage() {
 
   const handleRegenerateHttpsCert = async () => {
     const confirmed = await showConfirm(t('settings.regenerateCertConfirm'), {
-      title: t('settings.regenerateCertificate'),
+      title: t('settings.regenerateCert'),
       confirmText: t('settings.regenerateAndRestart')
     })
     if (!confirmed) return
@@ -957,10 +957,10 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader
               icon={Gear}
-              title={t('settings.generalTitle')}
+              title={t('settings.helpGeneral')}
               subtitle={t('settings.generalSubtitle')}
             />
-            <DetailSection title={t('settings.systemConfiguration')} icon={Gear} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.subtitle')} icon={Gear} iconClass="icon-bg-blue">
               <div className="space-y-4">
                 <Input
                   label={t('settings.systemName')}
@@ -1002,7 +1002,7 @@ export default function SettingsPage() {
                   <div className="pt-2">
                     <Button onClick={() => handleSave('general')} disabled={saving}>
                       <FloppyDisk size={16} />
-                      {t('settings.saveChanges')}
+                      {t('common.saveChanges')}
                     </Button>
                   </div>
                 )}
@@ -1022,7 +1022,7 @@ export default function SettingsPage() {
               title={t('settings.emailTitle')}
               subtitle={t('settings.emailSubtitle')}
             />
-            <DetailSection title={t('settings.smtpServer')} icon={Envelope} iconClass="icon-bg-violet">
+            <DetailSection title={t('settings.smtpHost')} icon={Envelope} iconClass="icon-bg-violet">
               <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
@@ -1084,7 +1084,7 @@ export default function SettingsPage() {
                     </Button>
                     <Button onClick={() => handleSave('email')} disabled={saving}>
                       <FloppyDisk size={16} />
-                      {t('settings.saveChanges')}
+                      {t('common.saveChanges')}
                     </Button>
                   </div>
                 )}
@@ -1098,10 +1098,10 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader
               icon={ShieldCheck}
-              title={t('settings.securityTitle')}
+              title={t('common.securitySettings')}
               subtitle={t('settings.securitySubtitle')}
             />
-            <DetailSection title={t('settings.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
+            <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1183,7 +1183,7 @@ export default function SettingsPage() {
                 <div className="pt-4">
                   <Button onClick={() => handleSave('security')} disabled={saving}>
                     <FloppyDisk size={16} />
-                    {t('settings.saveChanges')}
+                    {t('common.saveChanges')}
                   </Button>
                 </div>
               )}
@@ -1196,7 +1196,7 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader
               icon={Key}
-              title={t('sso.title')}
+              title={t('common.sso')}
               subtitle={t('sso.subtitle')}
             />
 
@@ -1213,7 +1213,7 @@ export default function SettingsPage() {
                 icon={Key}
                 title={t('sso.noProviders')}
                 description={t('sso.noProvidersDescription')}
-                action={{ label: t('sso.addProvider'), onClick: handleSsoCreate }}
+                action={{ label: t('common.addDnsProvider'), onClick: handleSsoCreate }}
               />
             ) : (
               <DetailSection title={t('sso.configuredProviders')} icon={Key} iconClass="icon-bg-purple">
@@ -1257,7 +1257,7 @@ export default function SettingsPage() {
                     <div className="pt-2">
                       <Button onClick={handleSsoCreate}>
                         <Plus size={16} />
-                        {t('sso.addProvider')}
+                        {t('common.addDnsProvider')}
                       </Button>
                     </div>
                   )}
@@ -1272,7 +1272,7 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader
               icon={Database}
-              title={t('settings.backupTitle')}
+              title={t('settings.helpBackup')}
               subtitle={t('settings.backupSubtitle')}
             />
             <DetailSection title={t('settings.automaticBackups')} icon={Database} iconClass="icon-bg-emerald">
@@ -1422,7 +1422,7 @@ export default function SettingsPage() {
                   { key: 'certIssueRevoke', label: t('settings.eventCertIssueRevoke') },
                   { key: 'caCreateDelete', label: t('settings.eventCaCreateDelete') },
                   { key: 'settingsChanges', label: t('settings.eventSettingsChanges') },
-                  { key: 'userManagement', label: t('settings.eventUserManagement') },
+                  { key: 'userManagement', label: t('common.eventUserManagement') },
                 ].map(event => (
                   <label key={event.key} className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1438,7 +1438,7 @@ export default function SettingsPage() {
                   <div className="pt-4">
                     <Button onClick={() => handleSave('audit')} disabled={saving}>
                       <FloppyDisk size={16} />
-                      {t('settings.saveChanges')}
+                      {t('common.saveChanges')}
                     </Button>
                   </div>
                 )}
@@ -1452,7 +1452,7 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader
               icon={HardDrives}
-              title={t('settings.databaseTitle')}
+              title={t('settings.helpDatabase')}
               subtitle={t('settings.databaseSubtitle')}
             />
             <DetailSection title={t('settings.databaseStatistics')} icon={HardDrives} iconClass="icon-bg-blue">
@@ -1462,7 +1462,7 @@ export default function SettingsPage() {
                   value={dbStats?.certificates || '-'}
                 />
                 <DetailField
-                  label={t('settings.certificateAuthorities')}
+                  label={t('common.cas')}
                   value={dbStats?.cas || '-'}
                 />
                 <DetailField
@@ -1526,19 +1526,19 @@ export default function SettingsPage() {
             <DetailSection title={t('settings.currentCertificate')} icon={Certificate} iconClass="icon-bg-blue">
               <DetailGrid>
                 <DetailField
-                  label={t('settings.commonName')}
+                  label={t('common.commonName')}
                   value={httpsInfo?.common_name || window.location.hostname}
                 />
                 <DetailField
-                  label={t('settings.issuer')}
+                  label={t('common.issuer')}
                   value={httpsInfo?.issuer || '-'}
                 />
                 <DetailField
-                  label={t('settings.validFrom')}
+                  label={t('common.validFrom')}
                   value={formatDate(httpsInfo?.valid_from)}
                 />
                 <DetailField
-                  label={t('settings.validUntil')}
+                  label={t('common.validUntil')}
                   value={formatDate(httpsInfo?.valid_to)}
                 />
                 <DetailField
@@ -1551,7 +1551,7 @@ export default function SettingsPage() {
               </DetailGrid>
             </DetailSection>
 
-            <DetailSection title={t('settings.useUcmCertificate')} icon={Certificate} iconClass="icon-bg-violet">
+            <DetailSection title={t('settings.useUCMCert')} icon={Certificate} iconClass="icon-bg-violet">
               <div className="space-y-4">
                 <p className="text-xs text-text-secondary">
                   {t('settings.useUcmCertificateDesc')}
@@ -1563,7 +1563,7 @@ export default function SettingsPage() {
                   placeholder={t('settings.chooseCertificate')}
                   options={certificates.map(cert => ({
                     value: cert.id,
-                    label: `${cert.common_name || t('certificates.certificate')} (${t('settings.expires')} ${formatDate(cert.valid_to)})`
+                    label: `${cert.common_name || t('common.certificate')} (${t('common.expires')} ${formatDate(cert.valid_to)})`
                   }))}
                 />
                 {certificates.length === 0 && (
@@ -1583,7 +1583,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title={t('settings.regenerateCertificate')} icon={ArrowsClockwise} iconClass="icon-bg-emerald">
+            <DetailSection title={t('settings.regenerateCert')} icon={ArrowsClockwise} iconClass="icon-bg-emerald">
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
                   {t('settings.regenerateCertificateDesc')}
@@ -1595,7 +1595,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title={t('settings.applyCustomCertificate')} icon={Lock} iconClass="icon-bg-amber">
+            <DetailSection title={t('settings.applyCustomCert')} icon={Lock} iconClass="icon-bg-amber">
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
                   {t('settings.applyCustomCertificateDesc')}
@@ -1642,7 +1642,7 @@ export default function SettingsPage() {
         expiration alerts and system events. Test your configuration before saving.
       </HelpCard>
 
-      <HelpCard variant="warning" title={t('settings.helpSecurity')}>
+      <HelpCard variant="warning" title={t('common.securitySettings')}>
         Security settings like 2FA enforcement and password policies affect all users.
         Changes take effect immediately - users may need to update their credentials.
       </HelpCard>
@@ -1657,7 +1657,7 @@ export default function SettingsPage() {
         The danger zone allows complete database reset - use with extreme caution.
       </HelpCard>
 
-      <HelpCard variant="info" title={t('settings.helpHttps')}>
+      <HelpCard variant="info" title={t('settings.https')}>
         Manage the SSL/TLS certificate used by UCM. You can use a certificate
         from your PKI or generate a self-signed certificate for testing.
       </HelpCard>
@@ -1684,7 +1684,7 @@ export default function SettingsPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('settings.title')}
+        title={t('common.settings')}
         subtitle={t('settings.subtitle')}
         icon={Gear}
         tabs={tabs}
@@ -1701,7 +1701,7 @@ export default function SettingsPage() {
       <Modal
         open={showBackupModal}
         onClose={() => { setShowBackupModal(false); setBackupPassword('') }}
-        title={t('settings.createEncryptedBackup')}
+        title={t('settings.encryptedBackup')}
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
@@ -1776,7 +1776,7 @@ export default function SettingsPage() {
       <Modal
         open={showSsoModal}
         onClose={() => { setShowSsoModal(false); setEditingSsoProvider(null) }}
-        title={editingSsoProvider ? t('sso.editProvider') : t('sso.addProvider')}
+        title={editingSsoProvider ? t('sso.editProvider') : t('common.addDnsProvider')}
         size="lg"
       >
         <SsoProviderForm

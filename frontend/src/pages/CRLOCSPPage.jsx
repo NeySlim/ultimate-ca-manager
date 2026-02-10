@@ -169,10 +169,10 @@ export default function CRLOCSPPage() {
 
   // Header stats
   const headerStats = useMemo(() => [
-    { icon: ShieldCheck, label: t('cas.title'), value: cas.length },
+    { icon: ShieldCheck, label: t('common.cas'), value: cas.length },
     { icon: FileX, label: t('crlOcsp.crl'), value: crls.length, variant: 'info' },
-    { icon: XCircle, label: t('crlOcsp.revoked'), value: totalRevoked, variant: 'danger' },
-    { icon: Pulse, label: t('crlOcsp.ocsp'), value: ocspStatus.running ? t('common.online') : t('common.offline'), variant: ocspStatus.running ? 'success' : 'warning' }
+    { icon: XCircle, label: t('common.revoked'), value: totalRevoked, variant: 'danger' },
+    { icon: Pulse, label: t('common.ocspResponder'), value: ocspStatus.running ? t('common.online') : t('common.offline'), variant: ocspStatus.running ? 'success' : 'warning' }
   ], [cas.length, crls.length, totalRevoked, ocspStatus.running, t])
 
   // Table columns
@@ -205,25 +205,25 @@ export default function CRLOCSPPage() {
             <span className="font-medium truncate">{v || row.name}</span>
           </div>
           <Badge variant={row.has_crl ? 'success' : 'orange'} size="sm" dot pulse={!row.has_crl}>
-            {row.has_crl ? t('crlOcsp.active') : t('crlOcsp.noCRL')}
+            {row.has_crl ? t('common.active') : t('crlOcsp.noCRL')}
           </Badge>
         </div>
       )
     },
     {
       key: 'has_crl',
-      header: t('crlOcsp.status'),
+      header: t('common.status'),
       priority: 2,
       hideOnMobile: true,
       render: (v) => (
         <Badge variant={v ? 'success' : 'orange'} size="sm" dot pulse={!v}>
-          {v ? t('crlOcsp.active') : t('crlOcsp.noCRL')}
+          {v ? t('common.active') : t('crlOcsp.noCRL')}
         </Badge>
       )
     },
     {
       key: 'cdp_enabled',
-      header: t('crlOcsp.auto'),
+      header: t('common.auto'),
       priority: 3,
       hideOnMobile: true,
       render: (v, row) => (
@@ -240,7 +240,7 @@ export default function CRLOCSPPage() {
     },
     {
       key: 'revoked_count',
-      header: t('crlOcsp.revoked'),
+      header: t('common.revoked'),
       priority: 2,
       render: (v) => (
         <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
@@ -249,7 +249,7 @@ export default function CRLOCSPPage() {
       ),
       mobileRender: (v) => (
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">{t('crlOcsp.revoked')}:</span>
+          <span className="text-text-tertiary">{t('common.revoked')}:</span>
           <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
             {v || 0}
           </Badge>
@@ -258,7 +258,7 @@ export default function CRLOCSPPage() {
     },
     {
       key: 'crl_updated',
-      header: t('crlOcsp.updated'),
+      header: t('common.updated'),
       priority: 3,
       hideOnMobile: true,
       render: (v) => (
@@ -294,13 +294,13 @@ export default function CRLOCSPPage() {
       <Card className={`p-4 space-y-3 ${ocspStatus.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Pulse size={16} className="text-accent-primary" />
-          {t('crlOcsp.ocspResponder')}
+          {t('common.ocspResponder')}
         </h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">{t('crlOcsp.status')}</span>
+            <span className="text-sm text-text-secondary">{t('common.status')}</span>
             <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'}>
-              {ocspStatus.enabled ? (ocspStatus.running ? t('crlOcsp.running') : t('crlOcsp.stopped')) : t('common.disabled')}
+              {ocspStatus.enabled ? (ocspStatus.running ? t('common.running') : t('crlOcsp.stopped')) : t('common.disabled')}
             </StatusIndicator>
           </div>
           <div className="flex items-center justify-between">
@@ -316,7 +316,7 @@ export default function CRLOCSPPage() {
 
       {/* Help Cards */}
       <div className="space-y-3">
-        <HelpCard variant="info" title={t('crlOcsp.aboutCRLs')}>
+        <HelpCard variant="info" title={t('common.aboutCRLs')}>
           {t('crlOcsp.crlDescription')}
         </HelpCard>
         
@@ -346,7 +346,7 @@ export default function CRLOCSPPage() {
           </div>
         </div>
         <Badge variant={selectedCRL ? 'success' : 'warning'} size="sm" dot>
-          {selectedCRL ? t('crlOcsp.active') : t('crlOcsp.noCRL')}
+          {selectedCRL ? t('common.active') : t('crlOcsp.noCRL')}
         </Badge>
       </div>
 
@@ -360,12 +360,12 @@ export default function CRLOCSPPage() {
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <XCircle size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.revoked_count || 0}</div>
-          <div className="text-2xs text-text-tertiary">{t('crlOcsp.revoked')}</div>
+          <div className="text-2xs text-text-tertiary">{t('common.revoked')}</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Calendar size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'}</div>
-          <div className="text-2xs text-text-tertiary">{t('crlOcsp.updated')}</div>
+          <div className="text-2xs text-text-tertiary">{t('common.updated')}</div>
         </div>
       </div>
 
@@ -395,10 +395,10 @@ export default function CRLOCSPPage() {
       <CompactSection title={t('crlOcsp.crlConfig')} icon={LinkIcon}>
         <CompactGrid cols={2}>
           <CompactField label={t('crlOcsp.caName')} value={selectedCA.descr || selectedCA.name} />
-          <CompactField label={t('crlOcsp.status')} value={selectedCRL ? t('crlOcsp.active') : t('crlOcsp.noCRL')} />
+          <CompactField label={t('common.status')} value={selectedCRL ? t('common.active') : t('crlOcsp.noCRL')} />
           <CompactField label={t('crlOcsp.crlNumber')} value={selectedCRL?.crl_number || '-'} />
           <CompactField label={t('crlOcsp.revokedCount')} value={selectedCRL?.revoked_count || 0} />
-          <CompactField label={t('crlOcsp.lastUpdate')} value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
+          <CompactField label={t('common.lastUpdate')} value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
           <CompactField label={t('crlOcsp.nextUpdate')} value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
         </CompactGrid>
       </CompactSection>
@@ -407,8 +407,8 @@ export default function CRLOCSPPage() {
       <CompactSection title={t('crlOcsp.ocspConfig')} icon={Pulse}>
         <CompactGrid cols={2}>
           <CompactField 
-            label={t('crlOcsp.status')} 
-            value={ocspStatus.enabled ? (ocspStatus.running ? t('crlOcsp.running') : t('crlOcsp.stopped')) : t('common.disabled')} 
+            label={t('common.status')} 
+            value={ocspStatus.enabled ? (ocspStatus.running ? t('common.running') : t('crlOcsp.stopped')) : t('common.disabled')} 
           />
           <CompactField label={t('crlOcsp.totalRequests')} value={ocspStats.total_requests} />
           <CompactField label={t('crlOcsp.cacheHits')} value={ocspStats.cache_hits} />
@@ -417,7 +417,7 @@ export default function CRLOCSPPage() {
       </CompactSection>
 
       {/* Distribution Points */}
-      <CompactSection title={t('crlOcsp.distributionPoints')} icon={LinkIcon}>
+      <CompactSection title={t('crlOcsp.cdpNote')} icon={LinkIcon}>
         <div className="space-y-3">
           <div>
             <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.cdp')}</p>
@@ -471,7 +471,7 @@ export default function CRLOCSPPage() {
 
   return (
     <ResponsiveLayout
-      title={t('crlOcsp.title')}
+      title={t('common.crlOcsp')}
       icon={FileX}
       subtitle={t('crlOcsp.subtitle', { count: crls.length })}
       stats={headerStats}
@@ -496,7 +496,7 @@ export default function CRLOCSPPage() {
         columns={columns}
         keyField="id"
         searchable
-        searchPlaceholder={t('crlOcsp.searchCAs')}
+        searchPlaceholder={t('common.searchPlaceholder')}
         searchKeys={['name', 'common_name', 'cn']}
         toolbarActions={
           <>
@@ -520,7 +520,7 @@ export default function CRLOCSPPage() {
         }}
         emptyState={{
           icon: FileX,
-          title: t('crlOcsp.noCAs'),
+          title: t('common.noCA'),
           description: t('crlOcsp.createCAFirst')
         }}
       />

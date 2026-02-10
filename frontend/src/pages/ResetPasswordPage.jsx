@@ -116,7 +116,7 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  label={t('auth.newPassword')}
+                  label={t('common.newPassword')}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -128,7 +128,7 @@ export default function ResetPasswordPage() {
                 />
 
                 <Input
-                  label={t('auth.confirmPassword')}
+                  label={t('common.confirmPassword')}
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

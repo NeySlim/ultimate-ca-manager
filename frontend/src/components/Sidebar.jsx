@@ -80,7 +80,7 @@ export function Sidebar({ activePage }) {
   return (
     <div className="w-14 h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px">
       {/* Logo */}
-      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title={t('dashboard.title')}>
+      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title={t('common.dashboard')}>
         <Logo variant="compact" size="sm" withText={false} />
       </Link>
 
@@ -134,7 +134,7 @@ export function Sidebar({ activePage }) {
           <button className={cn(buttonSize, "rounded-sm flex items-center justify-center text-text-secondary hover:bg-bg-tertiary hover:text-text-primary transition-all group")}>
             <Palette size={iconSize} />
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-              {t('settings.appearance.theme')}
+              {t('settings.theme')}
             </div>
           </button>
         </DropdownMenu.Trigger>
@@ -146,7 +146,7 @@ export function Sidebar({ activePage }) {
             side="right"
           >
             <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
-              {t('settings.appearance.colorTheme')}
+              {t('settings.colorTheme')}
             </DropdownMenu.Label>
             {themes.map(theme => (
               <DropdownMenu.Item
@@ -168,7 +168,7 @@ export function Sidebar({ activePage }) {
             <DropdownMenu.Separator className="h-px bg-border my-1" />
             
             <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
-              {t('settings.appearance.appearance')}
+              {t('settings.appearanceMode')}
             </DropdownMenu.Label>
             {[
               { id: 'system', labelKey: 'settings.appearance.followSystem' },
@@ -215,7 +215,7 @@ export function Sidebar({ activePage }) {
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
             >
               <UserCircle size={16} />
-              <span>{t('nav.account')}</span>
+              <span>{t('common.account')}</span>
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
@@ -223,7 +223,7 @@ export function Sidebar({ activePage }) {
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
             >
               <Gear size={16} />
-              <span>{t('nav.settings')}</span>
+              <span>{t('common.settings')}</span>
             </DropdownMenu.Item>
 
             <DropdownMenu.Separator className="h-px bg-border my-1" />

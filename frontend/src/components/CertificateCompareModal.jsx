@@ -51,7 +51,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
     { value: '', label: t('compare.selectCertificate') },
     ...certificates.map(c => ({
       value: String(c.id),
-      label: c.common_name || c.subject || `${t('certificates.certificate')} #${c.id}`
+      label: c.common_name || c.subject || `${t('common.certificate')} #${c.id}`
     }))
   ], [certificates, t])
   
@@ -162,15 +162,15 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
             
             {/* Comparison fields */}
             <div className="px-3 py-1 max-h-[400px] overflow-y-auto">
-              <CompareField label={t('details.commonName')} value1={cert1.common_name} value2={cert2.common_name} />
+              <CompareField label={t('common.commonName')} value1={cert1.common_name} value2={cert2.common_name} />
               <CompareField label={t('common.status')} value1={cert1.status} value2={cert2.status} />
-              <CompareField label={t('details.issuer')} value1={cert1.issuer} value2={cert2.issuer} />
-              <CompareField label={t('details.keyType')} value1={cert1.key_type} value2={cert2.key_type} />
-              <CompareField label={t('details.keySize')} value1={cert1.key_size} value2={cert2.key_size} />
-              <CompareField label={t('details.validFrom')} value1={formatDate(cert1.valid_from)} value2={formatDate(cert2.valid_from)} />
-              <CompareField label={t('details.validUntil')} value1={formatDate(cert1.valid_to)} value2={formatDate(cert2.valid_to)} />
-              <CompareField label={t('details.serialNumber')} value1={cert1.serial_number} value2={cert2.serial_number} mono />
-              <CompareField label={t('details.sigAlgo')} value1={cert1.signature_algorithm} value2={cert2.signature_algorithm} />
+              <CompareField label={t('common.issuer')} value1={cert1.issuer} value2={cert2.issuer} />
+              <CompareField label={t('common.keyType')} value1={cert1.key_type} value2={cert2.key_type} />
+              <CompareField label={t('common.keySize')} value1={cert1.key_size} value2={cert2.key_size} />
+              <CompareField label={t('common.validFrom')} value1={formatDate(cert1.valid_from)} value2={formatDate(cert2.valid_from)} />
+              <CompareField label={t('common.validUntil')} value1={formatDate(cert1.valid_to)} value2={formatDate(cert2.valid_to)} />
+              <CompareField label={t('common.serialNumber')} value1={cert1.serial_number} value2={cert2.serial_number} mono />
+              <CompareField label={t('common.signatureAlgorithm')} value1={cert1.signature_algorithm} value2={cert2.signature_algorithm} />
               {(cert1.san || cert2.san) && (
                 <CompareField label={t('details.sans')} value1={cert1.san} value2={cert2.san} />
               )}

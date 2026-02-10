@@ -159,10 +159,10 @@ export function AppShell() {
           
           {/* Page title - custom labels for some pages */}
           <span className="text-xs font-medium text-text-primary truncate max-w-[140px]">
-            {activePage === '' ? t('nav.dashboard') : 
-             activePage === 'import' ? t('nav.importExport') :
+            {activePage === '' ? t('common.dashboard') : 
+             activePage === 'import' ? t('common.importExport') :
              activePage === 'scep-config' ? t('nav.scep') :
-             activePage === 'crl-ocsp' ? t('nav.crlOcsp') :
+             activePage === 'crl-ocsp' ? t('common.crlOcsp') :
              activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
           </span>
           
@@ -245,7 +245,7 @@ export function AppShell() {
             <div className="h-px bg-border my-1.5" />
             
             {/* Mode */}
-            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance.title')}</div>
+            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">{t('settings.tabs.appearance')}</div>
             {[
               { id: 'system', labelKey: 'settings.followSystem' },
               { id: 'dark', labelKey: 'settings.dark' },

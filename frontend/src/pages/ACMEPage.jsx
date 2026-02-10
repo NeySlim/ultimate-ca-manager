@@ -313,10 +313,10 @@ export default function ACMEPage() {
       if (result.success) {
         showSuccess(t('acme.dnsProviderTestSuccess'))
       } else {
-        showWarning(result.message || t('acme.dnsProviderTestFailed'))
+        showWarning(result.message || t('common.dnsProviderTestFailed'))
       }
     } catch (error) {
-      showError(error.message || t('acme.dnsProviderTestFailed'))
+      showError(error.message || t('common.dnsProviderTestFailed'))
     }
   }
   
@@ -347,8 +347,8 @@ export default function ACMEPage() {
 
   const handleDeactivate = async (id) => {
     const confirmed = await showConfirm(t('acme.confirmDeactivate'), {
-      title: t('acme.deactivateAccount'),
-      confirmText: t('acme.deactivate'),
+      title: t('common.deactivateAccount'),
+      confirmText: t('common.deactivate'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -364,7 +364,7 @@ export default function ACMEPage() {
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(t('acme.confirmDelete'), {
-      title: t('acme.deleteAccount'),
+      title: t('common.deleteAccount'),
       confirmText: t('common.delete'),
       variant: 'danger'
     })
@@ -458,7 +458,7 @@ export default function ACMEPage() {
   const accountColumns = useMemo(() => [
     {
       key: 'email',
-      header: t('acme.email'),
+      header: t('common.email'),
       priority: 1,
       render: (_, row) => (
         <div className="flex items-center gap-2">
@@ -488,7 +488,7 @@ export default function ACMEPage() {
     },
     {
       key: 'status',
-      header: t('acme.status'),
+      header: t('common.status'),
       priority: 2,
       hideOnMobile: true,
       render: (val) => (
@@ -500,13 +500,13 @@ export default function ACMEPage() {
     },
     {
       key: 'created_at',
-      header: t('acme.created'),
+      header: t('common.created'),
       priority: 3,
       hideOnMobile: true,
       render: (val) => formatDate(val),
       mobileRender: (val) => (
         <div className="text-xs text-text-tertiary">
-          {t('acme.created')}: <span className="text-text-secondary">{formatDate(val)}</span>
+          {t('common.created')}: <span className="text-text-secondary">{formatDate(val)}</span>
         </div>
       )
     }
@@ -519,14 +519,14 @@ export default function ACMEPage() {
     { id: 'domains', label: t('acme.domains'), icon: GlobeHemisphereWest, count: acmeDomains.length },
     { id: 'config', label: t('acme.server'), icon: Gear },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
-    { id: 'history', label: t('acme.history'), icon: ClockCounterClockwise, count: history.length }
+    { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: history.length }
   ]
 
   // Detail tabs (when account selected)
   const detailTabs = [
-    { id: 'account', label: t('acme.details'), icon: Key },
+    { id: 'account', label: t('common.details'), icon: Key },
     { id: 'orders', label: t('acme.orders'), icon: Globe, count: orders.length },
-    { id: 'challenges', label: t('acme.challenges'), icon: ShieldCheck, count: challenges.length }
+    { id: 'challenges', label: t('common.challenges'), icon: ShieldCheck, count: challenges.length }
   ]
 
   // Header actions
@@ -534,7 +534,7 @@ export default function ACMEPage() {
     <>
       <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
-        {t('acme.refresh')}
+        {t('common.refresh')}
       </Button>
       {activeTab === 'accounts' && (
         <Button size="sm" onClick={() => setShowCreateModal(true)}>
@@ -566,7 +566,7 @@ export default function ACMEPage() {
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold status-success-text">{stats.active}</p>
-            <p className="text-xs text-text-secondary">{t('acme.active')}</p>
+            <p className="text-xs text-text-secondary">{t('common.active')}</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold text-accent-primary">{stats.orders}</p>
@@ -574,7 +574,7 @@ export default function ACMEPage() {
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold status-warning-text">{stats.pending}</p>
-            <p className="text-xs text-text-secondary">{t('acme.pending')}</p>
+            <p className="text-xs text-text-secondary">{t('common.pending')}</p>
           </div>
         </div>
       </Card>
@@ -588,20 +588,20 @@ export default function ACMEPage() {
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-secondary">{t('acme.acmeServer')}</span>
             <StatusIndicator status={acmeSettings.enabled ? 'success' : 'warning'}>
-              {acmeSettings.enabled ? t('acme.enabled') : t('acme.disabled')}
+              {acmeSettings.enabled ? t('common.enabled') : t('common.disabled')}
             </StatusIndicator>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-secondary">{t('acme.leProxy')}</span>
             <StatusIndicator status={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'success' : 'warning') : 'inactive'}>
-              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? t('acme.active') : t('acme.setupRequired')) : t('acme.disabled')}
+              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? t('common.active') : t('acme.setupRequired')) : t('common.disabled')}
             </StatusIndicator>
           </div>
         </div>
       </Card>
 
       <div className="space-y-3">
-        <HelpCard variant="info" title={t('acme.aboutAcme')}>
+        <HelpCard variant="info" title={t('common.aboutAcme')}>
           {t('acme.aboutAcmeInfo')}
         </HelpCard>
         
@@ -635,7 +635,7 @@ export default function ACMEPage() {
       <CompactStats stats={[
         { icon: Key, value: selectedAccount.key_type || 'RSA-2048' },
         { icon: Globe, value: `${orders.length} ${t('acme.orders').toLowerCase()}` },
-        { icon: ShieldCheck, value: `${challenges.length} ${t('acme.challenges').toLowerCase()}` },
+        { icon: ShieldCheck, value: `${challenges.length} ${t('common.challenges').toLowerCase()}` },
       ]} />
 
       {/* Actions */}
@@ -648,7 +648,7 @@ export default function ACMEPage() {
           disabled={selectedAccount.status !== 'valid'}
         >
           <XCircle size={14} />
-          {t('acme.deactivate')}
+          {t('common.deactivate')}
         </Button>
         <Button 
           size="sm" 
@@ -685,16 +685,16 @@ export default function ACMEPage() {
       {/* Tab Content */}
       {activeDetailTab === 'account' && (
         <div className="space-y-3">
-          <CompactSection title={t('acme.accountInformation')}>
+          <CompactSection title={t('common.accountInformation')}>
             <CompactGrid>
-              <CompactField label={t('acme.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
-              <CompactField label={t('acme.status')}>
+              <CompactField label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
+              <CompactField label={t('common.status')}>
                 <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
                   {selectedAccount.status}
                 </StatusIndicator>
               </CompactField>
-              <CompactField label={t('acme.keyType')} value={selectedAccount.key_type || 'RSA-2048'} />
-              <CompactField label={t('acme.created')} value={formatDate(selectedAccount.created_at)} />
+              <CompactField label={t('common.keyType')} value={selectedAccount.key_type || 'RSA-2048'} />
+              <CompactField label={t('common.created')} value={formatDate(selectedAccount.created_at)} />
             </CompactGrid>
           </CompactSection>
 
@@ -755,11 +755,11 @@ export default function ACMEPage() {
                       <span className="text-text-secondary font-medium">{order.method || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-text-tertiary">{t('acme.expires')}</span>
+                      <span className="text-text-tertiary">{t('common.expires')}</span>
                       <span className="text-text-secondary">{order.expires || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('acme.created')}</span>
+                      <span className="text-text-tertiary">{t('common.created')}</span>
                       <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
                     </div>
                     {order.order_id && (
@@ -779,7 +779,7 @@ export default function ACMEPage() {
       )}
 
       {activeDetailTab === 'challenges' && (
-        <CompactSection title={`${challenges.length} ${t('acme.challenges')}`}>
+        <CompactSection title={`${challenges.length} ${t('common.challenges')}`}>
           {challenges.length === 0 ? (
             <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noActiveChallenges')}</p>
           ) : (
@@ -823,7 +823,7 @@ export default function ACMEPage() {
         </Button>
         <Button variant="secondary" onClick={loadData}>
           <ArrowsClockwise size={14} />
-          {t('acme.refresh')}
+          {t('common.refresh')}
         </Button>
       </div>
       
@@ -836,7 +836,7 @@ export default function ACMEPage() {
       </HelpCard>
       
       {/* Client Settings */}
-      <CompactSection title={t('acme.clientSettings')} icon={Gear}>
+      <CompactSection title={t('common.settings')} icon={Gear}>
         <div className="space-y-3">
           <Select
             label={t('acme.defaultEnvironment')}
@@ -880,14 +880,14 @@ export default function ACMEPage() {
   
   const dnsProvidersContent = (
     <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.dnsProvidersAbout')} compact>
+      <HelpCard variant="info" title={t('acme.dnsProviders')} compact>
         {t('acme.dnsProvidersAboutDesc')}
       </HelpCard>
       
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
           <Plus size={14} />
-          {t('acme.addDnsProvider')}
+          {t('common.addDnsProvider')}
         </Button>
       </div>
       
@@ -915,7 +915,7 @@ export default function ACMEPage() {
                   </div>
                 </div>
                 {provider.is_default && (
-                  <Badge variant="success" size="sm">{t('acme.default')}</Badge>
+                  <Badge variant="success" size="sm">{t('common.default')}</Badge>
                 )}
               </div>
               
@@ -926,7 +926,7 @@ export default function ACMEPage() {
                   onClick={() => handleTestDnsProvider(provider)}
                 >
                   <Play size={12} />
-                  {t('acme.test')}
+                  {t('common.test')}
                 </Button>
                 <Button 
                   size="sm" 
@@ -934,7 +934,7 @@ export default function ACMEPage() {
                   onClick={() => { setSelectedDnsProvider(provider); setShowDnsProviderModal(true) }}
                 >
                   <Gear size={12} />
-                  {t('acme.edit')}
+                  {t('common.edit')}
                 </Button>
                 <Button 
                   size="sm" 
@@ -986,7 +986,7 @@ export default function ACMEPage() {
             },
             {
               key: 'dns_provider_name',
-              label: t('acme.dnsProvider'),
+              label: t('acme.provider'),
               sortable: true,
               render: (val, row) => (
                 <div className="flex items-center gap-2">
@@ -1057,7 +1057,7 @@ export default function ACMEPage() {
   // Configuration content
   const configContent = (
     <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.aboutAcme')} compact>
+      <HelpCard variant="info" title={t('common.aboutAcme')} compact>
         {t('acme.aboutAcmeDesc')}
       </HelpCard>
 
@@ -1082,7 +1082,7 @@ export default function ACMEPage() {
             value={acmeSettings.issuing_ca_id?.toString() || ''}
             onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
             disabled={!acmeSettings.enabled}
-            placeholder={t('acme.selectCA')}
+            placeholder={t('common.acmeSelectCA')}
             options={cas.map(ca => ({ 
               value: ca.id.toString(), 
               label: ca.name || ca.common_name 
@@ -1095,7 +1095,7 @@ export default function ACMEPage() {
       <CompactSection title={t('acme.endpoints')} icon={Lightning}>
         <CompactGrid columns={1}>
           <CompactField 
-            label={t('acme.directoryUrl')} 
+            label={t('acme.directory')} 
             value={`${window.location.origin}/acme/directory`}
             mono
             copyable
@@ -1168,12 +1168,12 @@ export default function ACMEPage() {
               ) : (
                 <div className="space-y-3 p-3 bg-bg-tertiary/30 rounded-lg">
                   <Input
-                    label={t('acme.emailAddress')}
+                    label={t('common.emailAddress')}
                     type="email"
                     value={proxyEmail}
                     onChange={(e) => setProxyEmail(e.target.value)}
                     placeholder={t('acme.emailPlaceholder')}
-                    helperText={t('acme.emailRequired')}
+                    helperText={t('common.emailRequired')}
                   />
                   <Button 
                     variant="secondary" 
@@ -1195,7 +1195,7 @@ export default function ACMEPage() {
       <div className="flex gap-2 pt-3 border-t border-border">
         <Button onClick={handleSaveConfig} disabled={saving}>
           <FloppyDisk size={14} />
-          {saving ? t('acme.saving') : t('acme.saveConfiguration')}
+          {saving ? t('common.saving') : t('common.saveConfiguration')}
         </Button>
       </div>
     </div>
@@ -1237,7 +1237,7 @@ export default function ACMEPage() {
   const historyColumns = useMemo(() => [
     {
       key: 'common_name',
-      header: t('acme.commonName'),
+      header: t('common.commonName'),
       priority: 1,
       sortable: true,
       render: (value, row) => (
@@ -1272,14 +1272,14 @@ export default function ACMEPage() {
             size="sm"
             icon={row?.revoked ? XCircle : CheckCircle}
           >
-            {row?.revoked ? t('acme.revoked') : t('acme.valid')}
+            {row?.revoked ? t('common.revoked') : t('common.valid')}
           </Badge>
         </div>
       )
     },
     {
       key: 'status',
-      header: t('acme.status'),
+      header: t('common.status'),
       priority: 2,
       hideOnMobile: true,
       render: (value, row) => {
@@ -1287,7 +1287,7 @@ export default function ACMEPage() {
         if (row?.revoked) {
           return (
             <Badge variant="danger" size="sm" icon={XCircle} dot>
-              {t('acme.revoked')}
+              {t('common.revoked')}
             </Badge>
           );
         }
@@ -1309,14 +1309,14 @@ export default function ACMEPage() {
             dot
             pulse={config.pulse}
           >
-            {value ? value.charAt(0).toUpperCase() + value.slice(1) : t('acme.valid')}
+            {value ? value.charAt(0).toUpperCase() + value.slice(1) : t('common.valid')}
           </Badge>
         );
       }
     },
     {
       key: 'issuer',
-      header: t('acme.issuer'),
+      header: t('common.issuer'),
       priority: 3,
       sortable: true,
       hideOnMobile: true,
@@ -1332,7 +1332,7 @@ export default function ACMEPage() {
     },
     {
       key: 'valid_to',
-      header: t('acme.expires'),
+      header: t('common.expires'),
       priority: 4,
       sortable: true,
       render: (value) => {
@@ -1357,7 +1357,7 @@ export default function ACMEPage() {
                 isExpiring ? "text-status-warning" : 
                 "text-text-tertiary"
               )}>
-                {isExpired ? t('acme.expired') : t('acme.daysLeft', { count: daysLeft })}
+                {isExpired ? t('common.expired') : t('acme.daysLeft', { count: daysLeft })}
               </span>
             </div>
           </div>
@@ -1373,7 +1373,7 @@ export default function ACMEPage() {
           <div className="flex items-center gap-2 text-xs">
             <Clock size={12} className="text-text-tertiary" />
             <span className={isExpired ? "text-status-error" : "text-text-secondary"}>
-              {isExpired ? t('acme.expired') : `${daysLeft}d`}
+              {isExpired ? t('common.expired') : `${daysLeft}d`}
             </span>
           </div>
         )
@@ -1381,7 +1381,7 @@ export default function ACMEPage() {
     },
     {
       key: 'source',
-      header: t('acme.source'),
+      header: t('common.source'),
       priority: 3,
       hideOnMobile: true,
       render: (value) => (
@@ -1434,7 +1434,7 @@ export default function ACMEPage() {
     },
     {
       key: 'created_at',
-      header: t('acme.issued'),
+      header: t('common.issued'),
       priority: 6,
       sortable: true,
       hideOnMobile: true,
@@ -1453,11 +1453,11 @@ export default function ACMEPage() {
         icon={ClockCounterClockwise}
         iconClass={selectedCert.revoked ? "bg-status-error/20" : "bg-status-success/20"}
         title={selectedCert.common_name}
-        subtitle={`${t('acme.issuer')}: ${selectedCert.issuer || t('acme.unknownCA')}`}
+        subtitle={`${t('common.issuer')}: ${selectedCert.issuer || t('acme.unknownCA')}`}
         badge={
           <Badge variant={selectedCert.revoked ? 'danger' : 'success'} size="sm">
             {!selectedCert.revoked && <CheckCircle size={10} weight="fill" />}
-            {selectedCert.revoked ? t('acme.revoked') : t('acme.valid')}
+            {selectedCert.revoked ? t('common.revoked') : t('common.valid')}
           </Badge>
         }
       />
@@ -1467,19 +1467,19 @@ export default function ACMEPage() {
         { icon: Globe, value: selectedCert.order?.status || t('common.na') },
       ]} />
       
-      <CompactSection title={t('acme.certificateDetails')}>
+      <CompactSection title={t('common.certificateDetails')}>
         <CompactGrid>
-          <CompactField label={t('acme.commonName')} value={selectedCert.common_name} copyable />
-          <CompactField label={t('acme.serialNumber')} value={selectedCert.serial} mono copyable />
-          <CompactField label={t('acme.issuer')} value={selectedCert.issuer || t('common.unknown')} />
+          <CompactField label={t('common.commonName')} value={selectedCert.common_name} copyable />
+          <CompactField label={t('common.serialNumber')} value={selectedCert.serial} mono copyable />
+          <CompactField label={t('common.issuer')} value={selectedCert.issuer || t('common.unknown')} />
         </CompactGrid>
       </CompactSection>
       
-      <CompactSection title={t('acme.validity')}>
+      <CompactSection title={t('common.validity')}>
         <CompactGrid>
-          <CompactField label={t('acme.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : t('common.na')} />
-          <CompactField label={t('acme.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : t('common.na')} />
-          <CompactField label={t('acme.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : t('common.na')} />
+          <CompactField label={t('common.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : t('common.na')} />
+          <CompactField label={t('common.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : t('common.na')} />
+          <CompactField label={t('common.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : t('common.na')} />
         </CompactGrid>
       </CompactSection>
       
@@ -1541,11 +1541,11 @@ export default function ACMEPage() {
         <CompactGrid>
           <CompactField label={t('acme.environment')} value={selectedClientOrder.environment === 'production' ? t('acme.production') : t('acme.staging')} />
           <CompactField label={t('acme.method')} value={selectedClientOrder.challenge_type?.toUpperCase()} />
-          <CompactField label={t('acme.dnsProvider')} value={selectedClientOrder.dns_provider_name || t('acme.manualDns')} />
+          <CompactField label={t('acme.provider')} value={selectedClientOrder.dns_provider_name || t('acme.manualDns')} />
           <CompactField label={t('common.status')} value={selectedClientOrder.status} />
           <CompactField label={t('common.created')} value={formatDate(selectedClientOrder.created_at)} />
           {selectedClientOrder.expires_at && (
-            <CompactField label={t('acme.expires')} value={formatDate(selectedClientOrder.expires_at)} />
+            <CompactField label={t('common.expires')} value={formatDate(selectedClientOrder.expires_at)} />
           )}
         </CompactGrid>
       </CompactSection>
@@ -1592,7 +1592,7 @@ export default function ACMEPage() {
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleViewCertificate(selectedClientOrder)}>
               <Eye size={12} />
-              {t('acme.viewCertificate')}
+              {t('common.viewCertificate')}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleRenewCertificate(selectedClientOrder)}>
               <ArrowsClockwise size={12} />
@@ -1653,7 +1653,7 @@ export default function ACMEPage() {
       columns={historyColumns}
       columnStorageKey="acme-history-columns"
       searchable
-      searchPlaceholder={t('acme.searchCertificates')}
+      searchPlaceholder={t('common.searchCertificates')}
       searchKeys={['common_name', 'serial', 'issuer']}
       getRowId={(row) => row.id}
       onRowClick={setSelectedCert}
@@ -1677,10 +1677,10 @@ export default function ACMEPage() {
           key: 'status',
           value: historyFilterStatus,
           onChange: setHistoryFilterStatus,
-          placeholder: t('acme.allStatus'),
+          placeholder: t('common.allStatus'),
           options: [
-            { value: 'valid', label: t('acme.valid') },
-            { value: 'revoked', label: t('acme.revoked') }
+            { value: 'valid', label: t('common.valid') },
+            { value: 'revoked', label: t('common.revoked') }
           ]
         },
         {
@@ -1715,8 +1715,8 @@ export default function ACMEPage() {
         icon={Lightning}
         stats={[
           { icon: Key, label: t('acme.accounts'), value: accounts.length },
-          { icon: CheckCircle, label: t('acme.active'), value: stats.active, variant: 'success' },
-          { icon: ClockCounterClockwise, label: t('acme.certificates'), value: history.length, variant: 'primary' },
+          { icon: CheckCircle, label: t('common.active'), value: stats.active, variant: 'success' },
+          { icon: ClockCounterClockwise, label: t('common.certificates'), value: history.length, variant: 'primary' },
         ]}
         tabs={tabs}
         activeTab={activeTab}
@@ -1741,8 +1741,8 @@ export default function ACMEPage() {
           activeTab === 'letsencrypt'
             ? (selectedClientOrder?.primary_domain || t('acme.orderDetails'))
             : activeTab === 'accounts' 
-              ? (selectedAccount?.email || t('acme.details'))
-              : (selectedCert?.common_name || t('acme.certificateDetails'))
+              ? (selectedAccount?.email || t('common.details'))
+              : (selectedCert?.common_name || t('common.certificateDetails'))
         }
         slideOverContent={
           activeTab === 'letsencrypt' ? orderDetailContent :
@@ -1799,7 +1799,7 @@ export default function ACMEPage() {
       <Modal
         open={showDnsProviderModal}
         onClose={() => { setShowDnsProviderModal(false); setSelectedDnsProvider(null) }}
-        title={selectedDnsProvider ? t('acme.editDnsProvider') : t('acme.addDnsProvider')}
+        title={selectedDnsProvider ? t('acme.editDnsProvider') : t('common.addDnsProvider')}
       >
         <DnsProviderForm
           provider={selectedDnsProvider}
@@ -1848,7 +1848,7 @@ function CreateAccountForm({ onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
-        label={t('acme.emailAddress')}
+        label={t('common.emailAddress')}
         type="email"
         value={formData.email}
         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
@@ -1857,7 +1857,7 @@ function CreateAccountForm({ onSubmit, onCancel }) {
       />
       
       <Select
-        label={t('acme.keyType')}
+        label={t('common.keyType')}
         value={formData.key_type}
         onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
         options={[
@@ -1882,7 +1882,7 @@ function CreateAccountForm({ onSubmit, onCancel }) {
       
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('acme.cancel')}
+          {t('common.cancel')}
         </Button>
         <Button type="submit">
           <Plus size={14} />
@@ -1934,7 +1934,7 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
     }
     
     if (!formData.email) {
-      showWarning(t('acme.emailRequired'))
+      showWarning(t('common.emailRequired'))
       return
     }
     
@@ -1992,7 +1992,7 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
       
       {formData.challenge_type === 'dns-01' && (
         <Select
-          label={t('acme.dnsProvider')}
+          label={t('acme.provider')}
           value={formData.dns_provider_id?.toString() || ''}
           onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: val ? parseInt(val) : null }))}
           placeholder={t('acme.selectDnsProvider')}
@@ -2000,7 +2000,7 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
             { value: '', label: t('acme.manualDns') },
             ...dnsProviders.map(p => ({ 
               value: p.id.toString(), 
-              label: p.name + (p.is_default ? ' (' + t('acme.default') + ')' : '')
+              label: p.name + (p.is_default ? ' (' + t('common.default') + ')' : '')
             }))
           ]}
           helperText={t('acme.dnsProviderHelper')}
@@ -2019,7 +2019,7 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
       
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('acme.cancel')}
+          {t('common.cancel')}
         </Button>
         <Button type="submit">
           <CloudArrowUp size={14} />
@@ -2082,7 +2082,7 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
-        label={t('acme.providerName')}
+        label={t('common.providerName')}
         value={formData.name}
         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
         required
@@ -2090,7 +2090,7 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
       />
       
       <Select
-        label={t('acme.providerType')}
+        label={t('common.providerType')}
         value={formData.provider_type}
         onChange={(val) => setFormData(prev => ({ ...prev, provider_type: val, credentials: {} }))}
         options={providerTypes.map(pt => ({
@@ -2155,11 +2155,11 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
       
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('acme.cancel')}
+          {t('common.cancel')}
         </Button>
         <Button type="submit">
           <FloppyDisk size={14} />
-          {provider ? t('acme.update') : t('acme.create')}
+          {provider ? t('common.update') : t('common.create')}
         </Button>
       </div>
     </form>
@@ -2194,7 +2194,7 @@ function DomainForm({ domain, dnsProviders, onSubmit, onCancel }) {
       />
       
       <Select
-        label={t('acme.dnsProvider')}
+        label={t('acme.provider')}
         value={formData.dns_provider_id}
         onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: parseInt(val) }))}
         options={dnsProviders.map(p => ({

@@ -131,7 +131,7 @@ export default function SCEPPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
-    showInfo(t('scep.copiedToClipboard'))
+    showInfo(t('common.copiedToClipboard'))
   }
 
   const getStatusBadge = (status) => {
@@ -161,8 +161,8 @@ export default function SCEPPage() {
   // Tabs config
   const tabs = useMemo(() => [
     { id: 'requests', label: t('scep.requests'), icon: ListBullets, badge: stats.pending > 0 ? stats.pending : null },
-    { id: 'config', label: t('scep.config'), icon: Gear },
-    { id: 'challenge', label: t('scep.challenges'), icon: Key },
+    { id: 'config', label: t('common.config'), icon: Gear },
+    { id: 'challenge', label: t('common.challenges'), icon: Key },
     { id: 'info', label: t('scep.info'), icon: Info }
   ], [stats.pending, t])
 
@@ -186,7 +186,7 @@ export default function SCEPPage() {
     { key: 'id', header: t('scep.id'), width: '60px', hideOnMobile: true },
     { 
       key: 'subject', 
-      header: t('scep.subject'), 
+      header: t('common.subject'), 
       priority: 1,
       // Desktop: Icon + CN as main text + O/OU as secondary
       render: (v, row) => {
@@ -237,19 +237,19 @@ export default function SCEPPage() {
     },
     { 
       key: 'status', 
-      header: t('scep.status'), 
+      header: t('common.status'), 
       priority: 2,
       hideOnMobile: true, // Status shown in subject mobileRender
       render: (v) => getStatusBadge(v)
     },
     {
       key: 'ca',
-      header: t('scep.ca'),
+      header: t('common.ca'),
       priority: 3,
       hideOnMobile: true,
       render: () => (
         <span className="text-text-secondary truncate">
-          {scepCaName || <span className="text-text-tertiary italic">{t('scep.notConfigured')}</span>}
+          {scepCaName || <span className="text-text-tertiary italic">{t('common.notConfigured')}</span>}
         </span>
       )
     },
@@ -273,7 +273,7 @@ export default function SCEPPage() {
         return (
           <div className="flex items-center gap-2 flex-wrap text-xs">
             {scepCaName && (
-              <span><span className="text-text-tertiary">{t('scep.ca')}:</span> <span className="text-text-secondary">{scepCaName}</span></span>
+              <span><span className="text-text-tertiary">{t('common.ca')}:</span> <span className="text-text-secondary">{scepCaName}</span></span>
             )}
             {parts.O && (
               <span><span className="text-text-tertiary">Org:</span> <span className="text-text-secondary">{parts.O}</span></span>
@@ -357,17 +357,17 @@ export default function SCEPPage() {
         </div>
       )}
 
-      <CompactSection title={t('scep.requestDetails')}>
+      <CompactSection title={t('common.requestDetails')}>
         <CompactGrid>
           <CompactField label={t('scep.transactionId')} value={selectedRequest.transaction_id} mono copyable />
-          <CompactField label={t('scep.subject')} value={selectedRequest.subject} />
-          <CompactField label={t('scep.status')} value={selectedRequest.status} />
-          <CompactField label={t('scep.created')} value={formatDate(selectedRequest.created_at)} />
+          <CompactField label={t('common.subject')} value={selectedRequest.subject} />
+          <CompactField label={t('common.status')} value={selectedRequest.status} />
+          <CompactField label={t('common.created')} value={formatDate(selectedRequest.created_at)} />
         </CompactGrid>
       </CompactSection>
 
       {selectedRequest.csr_pem && (
-        <CompactSection title={t('scep.csrContent')} collapsible defaultOpen={false}>
+        <CompactSection title={t('common.csrContent')} collapsible defaultOpen={false}>
           <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
             {selectedRequest.csr_pem}
           </pre>
@@ -418,7 +418,7 @@ export default function SCEPPage() {
         }
         slideOverOpen={!!selectedRequest && !showRejectModal}
         onSlideOverClose={() => setSelectedRequest(null)}
-        slideOverTitle={t('scep.requestDetails')}
+        slideOverTitle={t('common.requestDetails')}
         slideOverContent={requestDetailContent}
         slideOverWidth="md"
       >
@@ -505,8 +505,8 @@ export default function SCEPPage() {
               />
 
               <Select
-                label={t('scep.issuingCa')}
-                placeholder={t('scep.selectCa')}
+                label={t('common.issuingCA')}
+                placeholder={t('common.acmeSelectCA')}
                 options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject }))}
                 value={config.ca_id?.toString() || ''}
                 onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
@@ -525,7 +525,7 @@ export default function SCEPPage() {
             <Card className="p-4 space-y-4">
               <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
                 <ShieldCheck size={16} />
-                {t('scep.securitySettings')}
+                {t('common.securitySettings')}
               </h3>
               
               <div className="p-3 bg-bg-tertiary rounded-lg">
@@ -567,7 +567,7 @@ export default function SCEPPage() {
               <div className="flex justify-end">
                 <Button onClick={handleSaveConfig} disabled={saving}>
                   {saving ? <LoadingSpinner size="sm" /> : <Gear size={14} />}
-                  {saving ? t('scep.saving') : t('scep.saveConfiguration')}
+                  {saving ? t('common.saving') : t('common.saveConfiguration')}
                 </Button>
               </div>
             )}

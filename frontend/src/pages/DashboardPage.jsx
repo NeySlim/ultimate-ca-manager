@@ -292,7 +292,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard 
             icon={Certificate}
-            label={t('nav.certificates')}
+            label={t('common.certificates')}
             value={totalCerts}
             color="blue"
             live={isConnected}
@@ -300,7 +300,7 @@ export default function DashboardPage() {
           />
           <StatCard 
             icon={ShieldCheck}
-            label={t('nav.cas')}
+            label={t('common.cas')}
             value={totalCAs}
             color="purple"
             live={isConnected}
@@ -308,7 +308,7 @@ export default function DashboardPage() {
           />
           <StatCard 
             icon={ListChecks}
-            label={t('nav.csrs')}
+            label={t('common.csrs')}
             value={pendingCSRs}
             color={pendingCSRs > 0 ? 'yellow' : 'slate'}
             badge={pendingCSRs > 0 ? t('common.pending') : null}
@@ -465,7 +465,7 @@ export default function DashboardPage() {
                           {ca.dn_commonname || ca.descr || ca.name}
                         </span>
                         <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
-                          {ca.is_root ? t('dashboard.root') : t('dashboard.sub')}
+                          {ca.is_root ? t('common.root') : t('dashboard.sub')}
                         </Badge>
                       </div>
                     </div>
@@ -493,18 +493,18 @@ export default function DashboardPage() {
                   <SystemStat 
                     icon={WifiHigh} 
                     label={t('dashboard.websocket')} 
-                    value={isConnected ? t('dashboard.connected') : t('dashboard.disconnected')} 
+                    value={isConnected ? t('common.connected') : t('common.disconnected')} 
                     status={isConnected ? 'online' : 'offline'} 
                   />
                   <SystemStat 
                     icon={Database} 
-                    label={t('dashboard.database')} 
+                    label={t('common.database')} 
                     value={t('dashboard.healthy')} 
                     status="online" 
                   />
                   <SystemStat 
                     icon={Clock} 
-                    label={t('dashboard.lastUpdate')} 
+                    label={t('common.lastUpdate')} 
                     value={formatRelativeTime(lastUpdate, t)} 
                     status="online" 
                   />

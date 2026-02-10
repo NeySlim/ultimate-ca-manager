@@ -118,7 +118,7 @@ export default function CAsPage() {
       addToHistory({
         id: fullCA.id,
         name: fullCA.common_name || fullCA.descr || `CA ${fullCA.id}`,
-        subtitle: fullCA.is_root ? t('cas.rootCA') : (fullCA.parent_name || t('cas.intermediate'))
+        subtitle: fullCA.is_root ? t('common.rootCA') : (fullCA.parent_name || t('common.intermediate'))
       })
     } catch {
       setSelectedCA(ca)
@@ -291,8 +291,8 @@ export default function CAsPage() {
     const expiredCount = cas.filter(c => c.status === 'Expired').length
     
     return [
-      { icon: Crown, label: t('cas.rootCA'), value: rootCount, variant: 'warning' },
-      { icon: ShieldCheck, label: t('cas.intermediateCA'), value: intermediateCount, variant: 'primary' },
+      { icon: Crown, label: t('common.rootCA'), value: rootCount, variant: 'warning' },
+      { icon: ShieldCheck, label: t('common.intermediateCA'), value: intermediateCount, variant: 'primary' },
       { icon: Certificate, label: t('common.active'), value: activeCount, variant: 'success' },
       { icon: Clock, label: t('common.expired'), value: expiredCount, variant: 'danger' }
     ]
@@ -308,8 +308,8 @@ export default function CAsPage() {
       onChange: setFilterType,
       placeholder: LABELS.FILTERS.ALL_TYPES,
       options: [
-        { value: 'root', label: t('cas.rootCA') },
-        { value: 'intermediate', label: t('cas.intermediateCA') }
+        { value: 'root', label: t('common.rootCA') },
+        { value: 'intermediate', label: t('common.intermediateCA') }
       ]
     }
   ], [filterType, t])
@@ -332,7 +332,7 @@ export default function CAsPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('cas.title')}
+        title={t('common.cas')}
         subtitle={t('cas.subtitle', { count: cas.length })}
         icon={ShieldCheck}
         stats={stats}
@@ -372,7 +372,7 @@ export default function CAsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('cas.searchPlaceholder')}
+                  placeholder={t('common.searchPlaceholder')}
                   className={cn(
                     'w-full rounded-lg border border-border bg-bg-primary',
                     'text-text-primary placeholder:text-text-tertiary',
@@ -413,8 +413,8 @@ export default function CAsPage() {
                     onChange={setFilterType}
                     placeholder={LABELS.FILTERS.ALL_TYPES}
                     options={[
-                      { value: 'root', label: t('cas.rootCA') },
-                      { value: 'intermediate', label: t('cas.intermediateCA') },
+                      { value: 'root', label: t('common.rootCA') },
+                      { value: 'intermediate', label: t('common.intermediateCA') },
                     ]}
                     size="sm"
                   />
@@ -463,11 +463,11 @@ export default function CAsPage() {
                 <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
                   <ShieldCheck size={32} className="text-text-secondary" />
                 </div>
-                <h3 className="text-lg font-medium text-text-primary mb-1">{t('cas.noCA')}</h3>
+                <h3 className="text-lg font-medium text-text-primary mb-1">{t('common.noCA')}</h3>
                 <p className="text-sm text-text-secondary text-center mb-4">{t('cas.createFirst')}</p>
                 {canWrite('cas') && (
                   <Button onClick={() => openModal('create')}>
-                    <Plus size={16} /> {t('cas.createCA')}
+                    <Plus size={16} /> {t('common.createCA')}
                   </Button>
                 )}
               </div>
@@ -521,19 +521,19 @@ export default function CAsPage() {
       <Modal
         open={modals.create}
         onOpenChange={() => closeModal('create')}
-        title={t('cas.createCA')}
+        title={t('common.createCA')}
         size="lg"
       >
         <form onSubmit={handleCreateCA} className="space-y-6 p-4">
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">{t('cas.subjectInfo')}</h3>
-            <Input name="commonName" label={t('certificates.commonName') + ' (CN)'} placeholder={t('cas.cnPlaceholder')} required />
+            <Input name="commonName" label={t('common.commonName') + ' (CN)'} placeholder={t('cas.cnPlaceholder')} required />
             <div className="grid grid-cols-2 gap-4">
-              <Input name="organization" label={t('cas.organization') + ' (O)'} placeholder={t('cas.orgPlaceholder')} />
-              <Input name="country" label={t('cas.country') + ' (C)'} placeholder={t('cas.countryPlaceholder')} maxLength={2} />
+              <Input name="organization" label={t('common.organization') + ' (O)'} placeholder={t('cas.orgPlaceholder')} />
+              <Input name="country" label={t('common.country') + ' (C)'} placeholder={t('common.countryPlaceholder')} maxLength={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input name="state" label={t('cas.stateProvince') + ' (ST)'} placeholder={t('cas.statePlaceholder')} />
+              <Input name="state" label={t('common.stateProvince') + ' (ST)'} placeholder={t('common.statePlaceholder')} />
               <Input name="locality" label={t('cas.locality') + ' (L)'} placeholder={t('cas.localityPlaceholder')} />
             </div>
           </div>
@@ -543,7 +543,7 @@ export default function CAsPage() {
             <div className="grid grid-cols-2 gap-4">
               <Select
                 name="keyAlgo"
-                label={t('certificates.keyAlgorithm')}
+                label={t('common.keyAlgorithm')}
                 options={[
                   { value: 'RSA', label: 'RSA' },
                   { value: 'ECDSA', label: 'ECDSA' }
@@ -552,7 +552,7 @@ export default function CAsPage() {
               />
               <Select
                 name="keySize"
-                label={t('certificates.keySize')}
+                label={t('common.keySize')}
                 options={[
                   { value: '2048', label: '2048 bits' },
                   { value: '3072', label: '3072 bits' },
@@ -564,10 +564,10 @@ export default function CAsPage() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">{t('certificates.validityPeriod')}</h3>
+            <h3 className="text-sm font-semibold text-text-primary">{t('common.validityPeriod')}</h3>
             <Select
               name="validityYears"
-              label={t('certificates.validityPeriod')}
+              label={t('common.validityPeriod')}
               options={[
                 { value: '5', label: t('cas.yearsValidity', { count: 5 }) },
                 { value: '10', label: t('cas.yearsValidity', { count: 10 }) },
@@ -607,7 +607,7 @@ export default function CAsPage() {
             <Button type="button" variant="secondary" onClick={() => closeModal('create')}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit">{t('cas.createCA')}</Button>
+            <Button type="submit">{t('common.createCA')}</Button>
           </div>
         </form>
       </Modal>
@@ -729,7 +729,7 @@ function TypeBadge({ type, isMobile, t }) {
       'shrink-0 px-1.5 py-0.5 rounded-md text-2xs font-semibold',
       type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
     )}>
-      {type === 'root' ? t('cas.rootCA') : (isMobile ? 'Int.' : t('cas.intermediateCA'))}
+      {type === 'root' ? t('common.rootCA') : (isMobile ? 'Int.' : t('common.intermediateCA'))}
     </span>
   )
 }
@@ -1116,10 +1116,10 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-text-primary truncate">
-              {ca.name || ca.common_name || t('cas.ca')}
+              {ca.name || ca.common_name || t('common.certificateAuthority')}
             </h3>
             <Badge variant={ca.type === 'root' || ca.is_root ? 'warning' : 'primary'} size="sm">
-              {ca.type === 'root' || ca.is_root ? t('cas.rootCA') : t('cas.intermediateCA')}
+              {ca.type === 'root' || ca.is_root ? t('common.rootCA') : t('common.intermediateCA')}
             </Badge>
           </div>
           {ca.subject && (
@@ -1160,37 +1160,37 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
       </div>
 
       {/* Subject Info */}
-      <CompactSection title={t('cas.subject')}>
+      <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField label={t('certificates.commonName')} value={ca.common_name} copyable className="col-span-2" />
-          <CompactField label={t('cas.organization')} value={ca.organization} />
-          <CompactField label={t('cas.country')} value={ca.country} />
-          <CompactField label={t('cas.stateProvince')} value={ca.state} />
+          <CompactField label={t('common.commonName')} value={ca.common_name} copyable className="col-span-2" />
+          <CompactField label={t('common.organization')} value={ca.organization} />
+          <CompactField label={t('common.country')} value={ca.country} />
+          <CompactField label={t('common.stateProvince')} value={ca.state} />
           <CompactField label={t('cas.locality')} value={ca.locality} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Info */}
-      <CompactSection title={t('cas.keyInformation')}>
+      <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField label={t('cas.algorithm')} value={ca.key_algorithm || 'RSA'} />
-          <CompactField label={t('certificates.keySize')} value={ca.key_size} />
-          <CompactField label={t('cas.signature')} value={ca.signature_algorithm} />
+          <CompactField label={t('common.algorithm')} value={ca.key_algorithm || 'RSA'} />
+          <CompactField label={t('common.keySize')} value={ca.key_size} />
+          <CompactField label={t('common.signature')} value={ca.signature_algorithm} />
         </CompactGrid>
       </CompactSection>
 
       {/* Validity */}
-      <CompactSection title={t('cas.validity')}>
+      <CompactSection title={t('common.validity')}>
         <CompactGrid>
-          <CompactField label={t('certificates.validFrom')} value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
-          <CompactField label={t('certificates.validTo')} value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
-          <CompactField label={t('certificates.serialNumber')} value={ca.serial_number} copyable mono className="col-span-2" />
+          <CompactField label={t('common.validFrom')} value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
+          <CompactField label={t('common.validTo')} value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
+          <CompactField label={t('common.serialNumber')} value={ca.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 
       {/* Fingerprints */}
       {(ca.thumbprint_sha1 || ca.thumbprint_sha256) && (
-        <CompactSection title={t('certificates.fingerprints')}>
+        <CompactSection title={t('common.fingerprints')}>
           <CompactGrid>
             {ca.thumbprint_sha1 && (
               <CompactField label="SHA-1" value={ca.thumbprint_sha1} copyable mono className="col-span-2" />

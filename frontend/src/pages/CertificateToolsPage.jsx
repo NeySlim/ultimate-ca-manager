@@ -74,7 +74,7 @@ export default function CertificateToolsPage() {
 
   // Help content with translations
   const helpContent = {
-    title: t('tools.helpTitle'),
+    title: t('common.tools'),
     description: t('tools.helpDescription'),
     sections: [
       {
@@ -86,7 +86,7 @@ export default function CertificateToolsPage() {
         content: t('tools.helpCsrDecoder')
       },
       {
-        title: t('tools.certDecoder'),
+        title: t('tools.decoder'),
         content: t('tools.helpCertDecoder')
       },
       {
@@ -318,7 +318,7 @@ export default function CertificateToolsPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
-    showSuccess(t('tools.copiedToClipboard'))
+    showSuccess(t('common.copiedToClipboard'))
   }
 
   // Reusable Textarea with file upload
@@ -416,15 +416,15 @@ export default function CertificateToolsPage() {
         <div className="flex-1">
           <Input
             label={t('tools.hostname')}
-            placeholder={t('tools.hostnamePlaceholder')}
+            placeholder={t('common.commonNamePlaceholder')}
             value={sslHostname}
             onChange={(e) => setSslHostname(e.target.value)}
           />
         </div>
         <div className="w-24">
           <Input
-            label={t('tools.port')}
-            placeholder={t('tools.portPlaceholder')}
+            label={t('common.portLabel')}
+            placeholder={t('common.portPlaceholder')}
             value={sslPort}
             onChange={(e) => setSslPort(e.target.value)}
           />
@@ -526,7 +526,7 @@ export default function CertificateToolsPage() {
         
         {/* File upload */}
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t('tools.uploadFileLabel')}</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">{t('common.uploadFile')}</label>
           <input
             type="file"
             accept=".pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr"
@@ -554,7 +554,7 @@ export default function CertificateToolsPage() {
         {/* Or paste */}
         <div className="flex items-center gap-2">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-text-secondary">{t('tools.orPastePem')}</span>
+          <span className="text-xs text-text-secondary">{t('common.orPastePem')}</span>
           <div className="flex-1 h-px bg-border" />
         </div>
         
@@ -705,12 +705,12 @@ export default function CertificateToolsPage() {
 
         {/* Certificate info */}
         <CompactGrid cols={2}>
-          <CompactField label={t('tools.commonName')} value={data.subject?.commonName} copyable />
-          <CompactField label={t('tools.issuer')} value={data.issuer?.commonName || data.issuer?.organizationName} />
-          <CompactField label={t('tools.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
-          <CompactField label={t('tools.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
+          <CompactField label={t('common.commonName')} value={data.subject?.commonName} copyable />
+          <CompactField label={t('common.issuer')} value={data.issuer?.commonName || data.issuer?.organizationName} />
+          <CompactField label={t('common.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
+          <CompactField label={t('common.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
           <CompactField label={t('tools.daysLeft')} value={data.days_until_expiry} />
-          <CompactField label={t('tools.status')} value={
+          <CompactField label={t('common.status')} value={
             <Badge variant={data.status === 'valid' ? 'success' : 'danger'}>
               {data.status}
             </Badge>
@@ -721,14 +721,14 @@ export default function CertificateToolsPage() {
         <CompactGrid cols={2}>
           <CompactField label={t('tools.tlsVersion')} value={data.tls_version} />
           <CompactField label={t('tools.cipher')} value={data.cipher?.name} />
-          <CompactField label={t('tools.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
-          <CompactField label={t('tools.signature')} value={data.signature_algorithm} />
+          <CompactField label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
+          <CompactField label={t('common.signature')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* SANs */}
         {data.extensions?.subject_alt_names?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.subjectAltNames')}</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('common.subjectAltNames')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.subject_alt_names.map((san, i) => (
                 <Badge key={i} variant="secondary">{san.replace('DNS:', '')}</Badge>
@@ -739,7 +739,7 @@ export default function CertificateToolsPage() {
 
         {/* Fingerprints */}
         <CompactGrid cols={1}>
-          <CompactField label={t('tools.sha256Fingerprint')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
+          <CompactField label={t('common.sha256')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
         </CompactGrid>
       </div>
     </CompactSection>
@@ -749,14 +749,14 @@ export default function CertificateToolsPage() {
   const renderCSRResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title={t('tools.csrDetails')} defaultOpen>
+    <CompactSection title={t('common.csrDetails')} defaultOpen>
       <div className="space-y-4">
         <CompactGrid cols={2}>
-          <CompactField label={t('tools.commonName')} value={data.subject?.commonName} copyable />
-          <CompactField label={t('tools.organization')} value={data.subject?.organizationName} />
-          <CompactField label={t('tools.country')} value={data.subject?.countryName} />
-          <CompactField label={t('tools.state')} value={data.subject?.stateOrProvinceName} />
-          <CompactField label={t('tools.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField label={t('common.commonName')} value={data.subject?.commonName} copyable />
+          <CompactField label={t('common.organization')} value={data.subject?.organizationName} />
+          <CompactField label={t('common.country')} value={data.subject?.countryName} />
+          <CompactField label={t('common.state')} value={data.subject?.stateOrProvinceName} />
+          <CompactField label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
           <CompactField label={t('tools.signatureValid')} value={
             <Badge variant={data.is_signature_valid ? 'success' : 'danger'}>
               {data.is_signature_valid ? t('common.yes') : t('common.no')}
@@ -782,7 +782,7 @@ export default function CertificateToolsPage() {
   const renderCertResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title={t('tools.certDetails')} defaultOpen>
+    <CompactSection title={t('common.certificateDetails')} defaultOpen>
       <div className="space-y-4">
         {/* Status */}
         <div className={cn(
@@ -796,10 +796,10 @@ export default function CertificateToolsPage() {
           )}
           <div>
             <div className="font-medium text-text-primary">
-              {data.status === 'valid' ? t('tools.validCertificate') : data.status === 'expired' ? t('tools.expired') : t('tools.notYetValid')}
+              {data.status === 'valid' ? t('tools.validCertificate') : data.status === 'expired' ? t('common.expired') : t('tools.notYetValid')}
             </div>
             <div className="text-sm text-text-secondary">
-              {data.is_ca ? t('tools.certificateAuthority') : t('tools.endEntityCertificate')}
+              {data.is_ca ? t('common.certificateAuthority') : t('tools.endEntityCertificate')}
             </div>
           </div>
         </div>
@@ -808,29 +808,29 @@ export default function CertificateToolsPage() {
         <CompactGrid cols={2}>
           <CompactField label={t('tools.subjectCn')} value={data.subject?.commonName} copyable />
           <CompactField label={t('tools.issuerCn')} value={data.issuer?.commonName} />
-          <CompactField label={t('tools.organization')} value={data.subject?.organizationName} />
+          <CompactField label={t('common.organization')} value={data.subject?.organizationName} />
           <CompactField label={t('tools.issuerOrg')} value={data.issuer?.organizationName} />
         </CompactGrid>
 
         {/* Validity */}
         <CompactGrid cols={3}>
-          <CompactField label={t('tools.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
-          <CompactField label={t('tools.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
+          <CompactField label={t('common.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
+          <CompactField label={t('common.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
           <CompactField label={t('tools.daysLeft')} value={data.days_until_expiry} />
         </CompactGrid>
 
         {/* Technical */}
         <CompactGrid cols={2}>
-          <CompactField label={t('tools.serialNumber')} value={data.serial_number} copyable mono />
+          <CompactField label={t('common.serialNumber')} value={data.serial_number} copyable mono />
           <CompactField label={t('tools.version')} value={data.version} />
-          <CompactField label={t('tools.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
-          <CompactField label={t('tools.signatureAlgorithm')} value={data.signature_algorithm} />
+          <CompactField label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField label={t('common.signatureAlgorithm')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* Extensions */}
         {data.extensions?.key_usage?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.keyUsage')}</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('common.keyUsage')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.key_usage.map((ku, i) => (
                 <Badge key={i} variant="secondary">{ku}</Badge>
@@ -841,7 +841,7 @@ export default function CertificateToolsPage() {
 
         {data.extensions?.extended_key_usage?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.extendedKeyUsage')}</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('common.extKeyUsage')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.extended_key_usage.map((eku, i) => (
                 <Badge key={i} variant="secondary">{eku}</Badge>
@@ -852,7 +852,7 @@ export default function CertificateToolsPage() {
 
         {data.extensions?.subject_alt_names?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.subjectAltNames')}</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('common.subjectAltNames')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.subject_alt_names.map((san, i) => (
                 <Badge key={i} variant="secondary">{san.replace('DNS:', '')}</Badge>
@@ -1026,7 +1026,7 @@ export default function CertificateToolsPage() {
 
   return (
     <ResponsiveLayout
-      title={t('tools.title')}
+      title={t('common.tools')}
       subtitle={t('tools.subtitle')}
       icon={Wrench}
       helpContent={helpContent}

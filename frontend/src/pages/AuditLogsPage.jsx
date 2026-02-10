@@ -315,7 +315,7 @@ export default function AuditLogsPage() {
     },
     {
       key: 'username',
-      header: t('audit.user'),
+      header: t('common.user'),
       priority: 3,
       width: '120px',
       hideOnMobile: true,
@@ -390,16 +390,16 @@ export default function AuditLogsPage() {
       type: 'select',
       value: filterAction,
       onChange: (v) => { setFilterAction(v); setPage(1); },
-      placeholder: t('audit.allActions'),
+      placeholder: t('common.allActions'),
       options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
     },
     {
       key: 'status',
-      label: t('audit.status'),
+      label: t('common.status'),
       type: 'select',
       value: filterSuccess,
       onChange: (v) => { setFilterSuccess(v); setPage(1); },
-      placeholder: t('audit.allStatus'),
+      placeholder: t('common.allStatus'),
       options: [
         { value: 'true', label: t('common.success') },
         { value: 'false', label: t('common.failed') }
@@ -407,11 +407,11 @@ export default function AuditLogsPage() {
     },
     {
       key: 'username',
-      label: t('audit.user'),
+      label: t('common.user'),
       type: 'select',
       value: filterUsername,
       onChange: (v) => { setFilterUsername(v); setPage(1); },
-      placeholder: t('audit.allUsers'),
+      placeholder: t('common.allUsers'),
       options: uniqueUsernames.map(u => ({ value: u, label: u }))
     }
   ], [filterAction, filterSuccess, filterUsername, actions.actions, uniqueUsernames, t]);
@@ -460,7 +460,7 @@ export default function AuditLogsPage() {
 
       {/* Help Cards */}
       <div className="space-y-3">
-        <HelpCard variant="info" title={t('audit.aboutAuditLogs')}>
+        <HelpCard variant="info" title={t('common.aboutAuditLogs')}>
           All user actions are logged for security and compliance purposes.
           Logs include timestamps, users, actions, resources, and IP addresses.
         </HelpCard>
@@ -605,14 +605,14 @@ export default function AuditLogsPage() {
         { icon: ClockCounterClockwise, value: formatTime(selectedLog.timestamp) }
       ]} />
 
-      <CompactSection title={t('audit.details')}>
+      <CompactSection title={t('common.details')}>
         <CompactGrid>
           <CompactField 
             label={t('audit.timestamp')} 
             value={new Date(selectedLog.timestamp).toLocaleString()} 
           />
           <CompactField 
-            label={t('audit.user')} 
+            label={t('common.user')} 
             value={selectedLog.username || t('common.system')} 
           />
           <CompactField 
@@ -637,7 +637,7 @@ export default function AuditLogsPage() {
       </CompactSection>
 
       {selectedLog.details && (
-        <CompactSection title={t('audit.details')} collapsible>
+        <CompactSection title={t('common.details')} collapsible>
           <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
             {selectedLog.details}
           </pre>
@@ -700,7 +700,7 @@ export default function AuditLogsPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('audit.title')}
+        title={t('common.audit')}
         icon={ClockCounterClockwise}
         subtitle={t('common.countEntries', { count: total })}
         stats={headerStats}

@@ -25,10 +25,10 @@ export default function ImportExportPage() {
   
   // Tabs with translations
   const TABS = [
-    { id: 'import', label: t('importExport.tabs.import'), icon: UploadSimple },
+    { id: 'import', label: t('common.import'), icon: UploadSimple },
     { id: 'opnsense', label: t('importExport.tabs.opnsense'), icon: CloudArrowUp },
     { id: 'export-certs', label: t('importExport.tabs.exportCerts'), icon: DownloadSimple },
-    { id: 'export-cas', label: t('importExport.tabs.exportCAs'), icon: DownloadSimple },
+    { id: 'export-cas', label: t('importExport.exportCAs'), icon: DownloadSimple },
   ]
   const [activeTab, setActiveTab] = useState('import')
   const [processing, setProcessing] = useState(false)
@@ -134,7 +134,7 @@ export default function ImportExportPage() {
       setTestItems([])
       loadCAs()
     } catch (error) {
-      showError(error.message || t('importExport.importFailed'))
+      showError(error.message || t('common.importFailed'))
     } finally {
       setProcessing(false)
     }
@@ -214,23 +214,23 @@ export default function ImportExportPage() {
                   placeholder={t('importExport.opnsense.hostPlaceholder')}
                 />
                 <Input 
-                  label={t('importExport.opnsense.portLabel')}
+                  label={t('common.portLabel')}
                   value={opnsensePort}
                   onChange={(e) => setOpnsensePort(e.target.value)}
-                  placeholder={t('importExport.opnsense.portPlaceholder')}
+                  placeholder={t('common.portPlaceholder')}
                 />
                 <Input 
                   label={t('importExport.opnsense.apiKeyLabel')}
                   value={opnsenseApiKey}
                   onChange={(e) => setOpnsenseApiKey(e.target.value)}
-                  placeholder={t('importExport.opnsense.apiKeyPlaceholder')}
+                  placeholder={t('importExport.opnsense.apiKeyLabel')}
                 />
                 <Input 
                   label={t('importExport.opnsense.apiSecretLabel')}
                   type="password"
                   value={opnsenseApiSecret}
                   onChange={(e) => setOpnsenseApiSecret(e.target.value)}
-                  placeholder={t('importExport.opnsense.apiSecretPlaceholder')}
+                  placeholder={t('importExport.opnsense.apiSecretLabel')}
                 />
               </div>
             </DetailSection>
@@ -257,7 +257,7 @@ export default function ImportExportPage() {
                         </div>
                         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
                           <Certificate size={16} className="text-accent-primary" />
-                          <span className="text-sm font-medium">{testResult.stats.certificates} {t('importExport.opnsense.certificates')}</span>
+                          <span className="text-sm font-medium">{testResult.stats.certificates} {t('common.certificates')}</span>
                         </div>
                       </div>
                     )}
@@ -312,7 +312,7 @@ export default function ImportExportPage() {
                 disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}
                 size="lg"
               >
-                {processing ? t('importExport.opnsense.testing') : t('importExport.opnsense.testConnection')}
+                {processing ? t('common.testing') : t('common.testConnection')}
               </Button>
               {testResult?.success && testItems.some(i => i.selected) && (
                 <Button onClick={handleImportFromOpnsense} disabled={processing} size="lg">
@@ -361,7 +361,7 @@ export default function ImportExportPage() {
 
   return (
     <ResponsiveLayout
-      title={t('importExport.title')}
+      title={t('common.importExport')}
       subtitle={t('importExport.subtitle')}
       icon={ArrowsLeftRight}
       tabs={TABS}

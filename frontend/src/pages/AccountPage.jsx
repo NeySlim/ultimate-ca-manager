@@ -28,7 +28,7 @@ export default function AccountPage() {
   // Tab configuration - inside component to use translations
   const TABS = [
     { id: 'profile', label: t('account.profile'), icon: User },
-    { id: 'security', label: t('account.security'), icon: ShieldCheck },
+    { id: 'security', label: t('common.security'), icon: ShieldCheck },
     { id: 'api-keys', label: t('account.apiKeys'), icon: Key },
   ]
   
@@ -150,7 +150,7 @@ export default function AccountPage() {
         const code = await showPrompt(t('account.enterCodeToDisable'), {
           title: t('account.disableTwoFactor'),
           placeholder: '123456',
-          confirmText: t('account.disable2FA')
+          confirmText: t('common.disable2FA')
         })
         if (!code) return
         await accountService.disable2FA(code)
@@ -307,7 +307,7 @@ export default function AccountPage() {
   // mTLS handlers
   const handleDeleteMTLS = async (certId) => {
     const confirmed = await showConfirm(t('account.deleteCertConfirm'), {
-      title: t('account.deleteCertificate'),
+      title: t('common.deleteCertificate'),
       confirmText: t('common.delete'),
       variant: 'danger'
     })
@@ -331,14 +331,14 @@ export default function AccountPage() {
         title={t('account.profileInfo')}
         subtitle={t('account.personalDetails')}
         actions={editMode ? [
-          { label: t('account.cancel'), variant: 'secondary', onClick: () => setEditMode(false) },
-          { label: saving ? t('account.saving') : t('account.save'), icon: FloppyDisk, onClick: handleSaveProfile, disabled: saving }
+          { label: t('common.cancel'), variant: 'secondary', onClick: () => setEditMode(false) },
+          { label: saving ? t('common.saving') : t('common.save'), icon: FloppyDisk, onClick: handleSaveProfile, disabled: saving }
         ] : [
-          { label: t('account.edit'), icon: PencilSimple, variant: 'secondary', onClick: () => setEditMode(true) }
+          { label: t('common.edit'), icon: PencilSimple, variant: 'secondary', onClick: () => setEditMode(true) }
         ]}
       />
       
-      <DetailSection title={t('account.accountInfo')}>
+      <DetailSection title={t('common.accountInformation')}>
         {editMode ? (
           <div className="space-y-4">
             <Input
@@ -348,7 +348,7 @@ export default function AccountPage() {
               placeholder={t('account.enterYourName')}
             />
             <Input
-              label={t('account.email')}
+              label={t('common.email')}
               type="email"
               value={formData.email}
               onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
@@ -356,14 +356,14 @@ export default function AccountPage() {
           </div>
         ) : (
           <DetailGrid>
-            <DetailField label={t('account.username')} value={accountData.username || '—'} />
+            <DetailField label={t('common.username')} value={accountData.username || '—'} />
             <DetailField label={t('account.fullName')} value={accountData.full_name || accountData.username || '—'} />
-            <DetailField label={t('account.email')} value={accountData.email || '—'} />
+            <DetailField label={t('common.email')} value={accountData.email || '—'} />
             <DetailField 
-              label={t('account.role')} 
+              label={t('common.role')} 
               value={
                 <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-                  {accountData.role || t('account.user')}
+                  {accountData.role || t('common.user')}
                 </Badge>
               } 
             />
@@ -378,7 +378,7 @@ export default function AccountPage() {
             value={accountData.created_at ? formatDate(accountData.created_at) : '—'} 
           />
           <DetailField 
-            label={t('account.lastLogin')} 
+            label={t('common.lastLogin')} 
             value={accountData.last_login ? formatDate(accountData.last_login, true) : '—'} 
           />
           <DetailField 
@@ -386,10 +386,10 @@ export default function AccountPage() {
             value={accountData.login_count || 0} 
           />
           <DetailField 
-            label={t('account.status')} 
+            label={t('common.status')} 
             value={
               <Badge variant={accountData.active ? 'success' : 'danger'}>
-                {accountData.active ? t('account.active') : t('account.inactive')}
+                {accountData.active ? t('common.active') : t('common.inactive')}
               </Badge>
             } 
           />
@@ -402,29 +402,29 @@ export default function AccountPage() {
     <DetailContent>
       <DetailHeader
         icon={ShieldCheck}
-        title={t('account.securitySettings')}
+        title={t('common.securitySettings')}
         subtitle={t('account.manageAccountSecurity')}
       />
       
       {/* Password */}
-      <DetailSection title={t('account.password')}>
+      <DetailSection title={t('common.password')}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-text-primary">{t('account.changeYourPassword')}</p>
             <p className="text-xs text-text-tertiary mt-0.5">
               {t('account.lastChanged')}: {accountData.password_changed_at 
                 ? formatDate(accountData.password_changed_at)
-                : t('account.never')}
+                : t('common.never')}
             </p>
           </div>
           <Button size="sm" onClick={() => setShowPasswordModal(true)}>
-            {t('account.changePassword')}
+            {t('common.changePassword')}
           </Button>
         </div>
       </DetailSection>
 
       {/* 2FA */}
-      <DetailSection title={t('account.twoFactorAuth')}>
+      <DetailSection title={t('common.twoFactorAuth')}>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-text-primary">{t('account.authenticatorApp')}</p>
@@ -439,7 +439,7 @@ export default function AccountPage() {
             variant={accountData.two_factor_enabled ? 'danger' : 'primary'} 
             onClick={handleToggle2FA}
           >
-            {accountData.two_factor_enabled ? t('account.disable2FA') : t('account.enable2FA')}
+            {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
           </Button>
         </div>
       </DetailSection>
@@ -473,7 +473,7 @@ export default function AccountPage() {
                     <p className="text-sm font-medium text-text-primary">{cred.name || t('account.securityKey')}</p>
                     <p className="text-xs text-text-tertiary">
                       {t('account.added')} {formatDate(cred.created_at)}
-                      {cred.last_used_at && ` • ${t('account.used')} ${formatDate(cred.last_used_at)}`}
+                      {cred.last_used_at && ` • ${t('common.used')} ${formatDate(cred.last_used_at)}`}
                     </p>
                   </div>
                 </div>
@@ -517,7 +517,7 @@ export default function AccountPage() {
                   <div>
                     <p className="text-sm font-medium text-text-primary">{cert.cn || cert.subject}</p>
                     <p className="text-xs text-text-tertiary">
-                      {t('account.expiresOn')} {formatDate(cert.not_after)}
+                      {t('common.expires')} {formatDate(cert.not_after)}
                     </p>
                   </div>
                 </div>
@@ -537,7 +537,7 @@ export default function AccountPage() {
       <DetailHeader
         icon={Key}
         title={t('account.apiKeys')}
-        subtitle={t('account.aboutAPIKeys')}
+        subtitle={t('common.aboutAPIKeys')}
         actions={[
           { label: t('account.createKey'), icon: Plus, onClick: () => setShowApiKeyModal(true) }
         ]}
@@ -545,7 +545,7 @@ export default function AccountPage() {
       
       <HelpCard 
         variant="tip" 
-        title={t('account.aboutAPIKeys')} 
+        title={t('common.aboutAPIKeys')} 
         items={t('account.apiKeyTips', { returnObjects: true })} 
       />
 
@@ -572,8 +572,8 @@ export default function AccountPage() {
                     </div>
                     <p className="text-xs text-text-tertiary font-mono">{key.key_prefix}...</p>
                     <p className="text-xs text-text-tertiary">
-                      {t('account.created')} {formatDate(key.created_at)}
-                      {key.expires_at && ` • ${t('account.expires')} ${formatDate(key.expires_at)}`}
+                      {t('common.created')} {formatDate(key.created_at)}
+                      {key.expires_at && ` • ${t('common.expires')} ${formatDate(key.expires_at)}`}
                     </p>
                   </div>
                 </div>
@@ -613,7 +613,7 @@ export default function AccountPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('account.title')}
+        title={t('common.account')}
         subtitle={accountData.email || user?.username}
         icon={User}
         tabs={TABS}
@@ -632,25 +632,25 @@ export default function AccountPage() {
       <FormModal
         open={showPasswordModal}
         onOpenChange={setShowPasswordModal}
-        title={t('account.changePassword')}
+        title={t('common.changePassword')}
         onSubmit={handleChangePassword}
-        submitLabel={t('account.changePassword')}
+        submitLabel={t('common.changePassword')}
       >
         <Input
-          label={t('account.currentPassword')}
+          label={t('common.currentPassword')}
           type="password"
           name="current_password"
           required
         />
         <Input
-          label={t('account.newPassword')}
+          label={t('common.newPassword')}
           type="password"
           name="new_password"
           showStrength
           required
         />
         <Input
-          label={t('account.confirmNewPassword')}
+          label={t('common.confirmNewPassword')}
           type="password"
           name="confirm_password"
           required
@@ -675,7 +675,7 @@ export default function AccountPage() {
           label={t('account.expiresInDays')}
           type="number"
           name="expires_in_days"
-          placeholder={t('account.daysPlaceholder')}
+          placeholder={t('common.validityPlaceholder')}
           helperText={t('account.noExpiration')}
         />
       </FormModal>

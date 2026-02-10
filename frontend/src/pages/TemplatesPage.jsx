@@ -198,8 +198,8 @@ export default function TemplatesPage() {
     const certTemplates = templates.filter(t => getTemplateType(t) === 'certificate').length
     const caTemplates = templates.filter(t => getTemplateType(t) === 'ca').length
     return [
-      { icon: Certificate, label: t('templates.certificate'), value: certTemplates, variant: 'primary' },
-      { icon: ShieldCheck, label: t('templates.ca'), value: caTemplates, variant: 'violet' },
+      { icon: Certificate, label: t('common.certificate'), value: certTemplates, variant: 'primary' },
+      { icon: ShieldCheck, label: t('common.ca'), value: caTemplates, variant: 'violet' },
       { icon: FileText, label: t('common.total'), value: templates.length, variant: 'default' }
     ]
   }, [templates, getTemplateType, t])
@@ -238,7 +238,7 @@ export default function TemplatesPage() {
               <span className="font-medium truncate">{val || t('common.unnamed')}</span>
             </div>
             <Badge variant={type === 'ca' ? 'amber' : 'primary'} size="sm" dot>
-              {type === 'ca' ? t('templates.ca') : t('templates.cert')}
+              {type === 'ca' ? t('common.ca') : t('templates.cert')}
             </Badge>
           </div>
         )
@@ -252,13 +252,13 @@ export default function TemplatesPage() {
       hideOnMobile: true,
       render: (val) => (
         <Badge variant={val === 'ca' ? 'amber' : 'primary'} size="sm" dot>
-          {val === 'ca' ? t('templates.ca') : t('templates.certificate')}
+          {val === 'ca' ? t('common.ca') : t('common.certificate')}
         </Badge>
       )
     },
     {
       key: 'validity_days',
-      header: t('templates.validity'),
+      header: t('common.validity'),
       priority: 3,
       hideOnMobile: true,
       sortable: true,
@@ -269,14 +269,14 @@ export default function TemplatesPage() {
       ),
       mobileRender: (val) => (
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">{t('templates.validity')}:</span>
+          <span className="text-text-tertiary">{t('common.validity')}:</span>
           <span className="text-text-secondary">{val || 365}d</span>
         </div>
       )
     },
     {
       key: 'usage_count',
-      header: t('templates.used'),
+      header: t('common.used'),
       hideOnMobile: true,
       sortable: true,
       render: (val) => (
@@ -312,22 +312,22 @@ export default function TemplatesPage() {
   
   const helpContent = (
     <div className="space-y-3">
-      <HelpCard title={t('templates.aboutTemplates')} variant="info">
+      <HelpCard title={t('common.aboutTemplates')} variant="info">
         {t('templates.aboutTemplatesDescription')}
       </HelpCard>
       <HelpCard title={t('templates.templateTypes')} variant="tip">
         <div className="space-y-1 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">{t('templates.certificate')}</Badge>
+            <Badge variant="primary" size="sm">{t('common.certificate')}</Badge>
             <span className="text-xs">{t('templates.endEntityCerts')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">{t('templates.ca')}</Badge>
+            <Badge variant="warning" size="sm">{t('common.ca')}</Badge>
             <span className="text-xs">{t('templates.intermediateCAs')}</span>
           </div>
         </div>
       </HelpCard>
-      <HelpCard title={t('templates.keyUsage')} variant="warning">
+      <HelpCard title={t('common.keyUsage')} variant="warning">
         {t('templates.keyUsageWarning')}
       </HelpCard>
     </div>
@@ -344,7 +344,7 @@ export default function TemplatesPage() {
         subtitle={t('templates.certificatesIssued', { count: selectedTemplate.usage_count || 0 })}
         badge={
           <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'primary'} size="sm">
-            {selectedTemplate.type === 'ca' ? t('templates.ca') : t('templates.certificate')}
+            {selectedTemplate.type === 'ca' ? t('common.ca') : t('common.certificate')}
           </Badge>
         }
       />
@@ -377,14 +377,14 @@ export default function TemplatesPage() {
       <CompactSection title={t('templates.basicInfo')}>
         <CompactGrid columns={1}>
           <CompactField label={t('common.name')} value={selectedTemplate.name} />
-          <CompactField label={t('common.type')} value={selectedTemplate.type === 'ca' ? t('templates.certificateAuthority') : t('templates.certificate')} />
+          <CompactField label={t('common.type')} value={selectedTemplate.type === 'ca' ? t('common.certificateAuthority') : t('common.certificate')} />
           <CompactField label={t('common.description')} value={selectedTemplate.description || '—'} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title={t('templates.validityPeriod')} icon={Clock}>
+      <CompactSection title={t('common.validityPeriod')} icon={Clock}>
         <CompactGrid columns={2}>
-          <CompactField label={t('templates.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || 365 })} />
+          <CompactField label={t('common.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || 365 })} />
           <CompactField label={t('templates.maximum')} value={t('templates.validityDays', { count: selectedTemplate.max_validity_days || 3650 })} />
         </CompactGrid>
       </CompactSection>
@@ -399,13 +399,13 @@ export default function TemplatesPage() {
       </CompactSection>
 
       {(selectedTemplate.key_usage?.length > 0 || selectedTemplate.extended_key_usage?.length > 0) && (
-        <CompactSection title={t('templates.keyUsage')} collapsible defaultOpen={false}>
+        <CompactSection title={t('common.keyUsage')} collapsible defaultOpen={false}>
           <CompactGrid columns={1}>
             {selectedTemplate.key_usage?.length > 0 && (
-              <CompactField label={t('templates.keyUsage')} value={selectedTemplate.key_usage.join(', ')} />
+              <CompactField label={t('common.keyUsage')} value={selectedTemplate.key_usage.join(', ')} />
             )}
             {selectedTemplate.extended_key_usage?.length > 0 && (
-              <CompactField label={t('templates.extKeyUsage')} value={selectedTemplate.extended_key_usage.join(', ')} />
+              <CompactField label={t('common.extKeyUsage')} value={selectedTemplate.extended_key_usage.join(', ')} />
             )}
           </CompactGrid>
         </CompactSection>
@@ -418,7 +418,7 @@ export default function TemplatesPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('templates.title')}
+        title={t('common.templates')}
         subtitle={t('templates.subtitle', { count: templates.length })}
         icon={FileText}
         stats={stats}
@@ -453,10 +453,10 @@ export default function TemplatesPage() {
               key: 'type',
               value: filterType,
               onChange: setFilterType,
-              placeholder: t('templates.allTypes'),
+              placeholder: t('common.allTypes'),
               options: [
-                { value: 'certificate', label: t('templates.certificate') },
-                { value: 'ca', label: t('templates.ca') }
+                { value: 'certificate', label: t('common.certificate') },
+                { value: 'ca', label: t('common.ca') }
               ]
             }
           ]}
@@ -648,8 +648,8 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           value={formData.type}
           onChange={(val) => setFormData(p => ({ ...p, type: val }))}
           options={[
-            { value: 'certificate', label: t('templates.certificate') },
-            { value: 'ca', label: t('templates.certificateAuthority') }
+            { value: 'certificate', label: t('common.certificate') },
+            { value: 'ca', label: t('common.certificateAuthority') }
           ]}
         />
       </div>
@@ -686,13 +686,13 @@ function TemplateForm({ template, onSubmit, onCancel }) {
             label={t('templates.country')}
             value={formData.subject.C}
             onChange={(e) => updateSubject('C', e.target.value)}
-            placeholder={t('templates.countryPlaceholder')}
+            placeholder={t('common.countryPlaceholder')}
           />
           <Input
             label={t('templates.state')}
             value={formData.subject.ST}
             onChange={(e) => updateSubject('ST', e.target.value)}
-            placeholder={t('templates.statePlaceholder')}
+            placeholder={t('common.statePlaceholder')}
           />
           <Input
             label={t('templates.organization')}
@@ -714,7 +714,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={loading || !formData.name.trim()}>
-          {loading ? <LoadingSpinner size="sm" /> : (template ? t('templates.update') : t('common.create'))}
+          {loading ? <LoadingSpinner size="sm" /> : (template ? t('common.update') : t('common.create'))}
         </Button>
       </div>
     </form>

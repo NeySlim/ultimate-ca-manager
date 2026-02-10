@@ -100,8 +100,8 @@ export default function SecurityDashboardPage() {
   // Stats for header
   const stats = [
     {
-      label: t('securityDashboard.stats.secretsStatus'),
-      value: secretsStatus?.jwt_secret?.configured ? t('securityDashboard.stats.configured') : t('securityDashboard.stats.notSet'),
+      label: t('securityDashboard.secretsStatus'),
+      value: secretsStatus?.jwt_secret?.configured ? t('common.configured') : t('securityDashboard.stats.notSet'),
       icon: Key,
       color: secretsStatus?.jwt_secret?.configured ? 'text-status-success' : 'text-status-danger'
     },
@@ -149,7 +149,7 @@ export default function SecurityDashboardPage() {
                     <span className="font-medium text-text-primary">{t('securityDashboard.secrets.jwtSecret')}</span>
                   </div>
                   <div className="text-sm text-text-secondary">
-                    {secretsStatus.jwt_secret?.configured ? t('securityDashboard.secrets.configured') : t('securityDashboard.secrets.notConfigured')}
+                    {secretsStatus.jwt_secret?.configured ? t('common.configured') : t('common.notConfigured')}
                   </div>
                   {secretsStatus.jwt_secret?.has_previous && secretsStatus.jwt_secret?.previous_expires_at && (
                     <div className="mt-1 text-xs text-status-info flex items-center gap-1">
@@ -171,7 +171,7 @@ export default function SecurityDashboardPage() {
                     <span className="font-medium text-text-primary">{t('securityDashboard.secrets.sessionSecret')}</span>
                   </div>
                   <div className="text-sm text-text-secondary">
-                    {secretsStatus.session_secret?.configured ? t('securityDashboard.secrets.configured') : t('securityDashboard.secrets.notConfigured')}
+                    {secretsStatus.session_secret?.configured ? t('common.configured') : t('common.notConfigured')}
                   </div>
                 </div>
 
@@ -185,7 +185,7 @@ export default function SecurityDashboardPage() {
                     <span className="font-medium text-text-primary">{t('securityDashboard.secrets.encryptionKey')}</span>
                   </div>
                   <div className="text-sm text-text-secondary">
-                    {secretsStatus.encryption_key?.configured ? t('securityDashboard.secrets.configured') : t('securityDashboard.secrets.notSet')}
+                    {secretsStatus.encryption_key?.configured ? t('common.configured') : t('securityDashboard.secrets.notSet')}
                   </div>
                 </div>
               </CompactGrid>

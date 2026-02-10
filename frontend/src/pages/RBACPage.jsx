@@ -205,20 +205,20 @@ export default function RBACPage() {
             <span className="font-medium truncate">{val}</span>
           </div>
           <Badge variant={row.is_system ? 'warning' : 'success'} size="sm" dot>
-            {row.is_system ? t('rbac.systemRole') : t('rbac.customRole')}
+            {row.is_system ? t('common.system') : t('common.custom')}
           </Badge>
         </div>
       )
     },
     {
       key: 'is_system',
-      header: t('rbac.roleType'),
+      header: t('common.type'),
       priority: 2,
       sortable: true,
       hideOnMobile: true,
       render: (val) => (
         <Badge variant={val ? 'warning' : 'success'} size="sm" dot>
-          {val ? t('rbac.systemRole') : t('rbac.customRole')}
+          {val ? t('common.system') : t('common.custom')}
         </Badge>
       )
     },
@@ -237,7 +237,7 @@ export default function RBACPage() {
     },
     {
       key: 'permissions',
-      header: t('rbac.permissions'),
+      header: t('common.permissions'),
       priority: 2,
       hideOnMobile: true,
       render: (val, row) => {
@@ -256,7 +256,7 @@ export default function RBACPage() {
         const permCount = row.all_permissions?.length || val?.length || 0
         return (
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">{t('rbac.permissions')}:</span>
+            <span className="text-text-tertiary">{t('common.permissions')}:</span>
             <span className="text-text-secondary">{permCount}</span>
           </div>
         )
@@ -264,7 +264,7 @@ export default function RBACPage() {
     },
     {
       key: 'user_count',
-      header: t('rbac.users'),
+      header: t('common.users'),
       priority: 3,
       hideOnMobile: true,
       render: (val) => (
@@ -284,10 +284,10 @@ export default function RBACPage() {
     const customRoles = roles.filter(r => !r.is_system).length
     const totalUsers = roles.reduce((acc, r) => acc + (r.user_count || 0), 0)
     return [
-      { label: t('rbac.stats.total'), value: roles.length, icon: Shield, variant: 'primary' },
-      { label: t('rbac.stats.system'), value: systemRoles, icon: Lock, variant: 'warning' },
-      { label: t('rbac.stats.custom'), value: customRoles, icon: Shield, variant: 'success' },
-      { label: t('rbac.stats.users'), value: totalUsers, icon: UsersThree, variant: 'cyan' },
+      { label: t('common.total'), value: roles.length, icon: Shield, variant: 'primary' },
+      { label: t('common.system'), value: systemRoles, icon: Lock, variant: 'warning' },
+      { label: t('common.custom'), value: customRoles, icon: Shield, variant: 'success' },
+      { label: t('common.users'), value: totalUsers, icon: UsersThree, variant: 'cyan' },
     ]
   }, [roles, t])
 
@@ -297,7 +297,7 @@ export default function RBACPage() {
       <HelpCard title="RBAC" variant="info">
         {t('rbac.helpInfo')}
       </HelpCard>
-      <HelpCard title={t('rbac.systemRole')} variant="warning">
+      <HelpCard title={t('common.system')} variant="warning">
         {t('rbac.helpSystemRoles')}
       </HelpCard>
     </div>
@@ -313,7 +313,7 @@ export default function RBACPage() {
         subtitle={role.description || 'No description'}
         badge={
           <Badge variant={role.is_system ? 'secondary' : 'primary'} size="sm">
-            {role.is_system ? t('rbac.systemRole') : t('rbac.customRole')}
+            {role.is_system ? t('common.system') : t('common.custom')}
           </Badge>
         }
       />
@@ -326,7 +326,7 @@ export default function RBACPage() {
       {!role.is_system && (
         <div className="flex gap-2">
           <Button size="sm" className="flex-1" onClick={handleUpdate}>
-            <CheckCircle size={14} /> {t('rbac.saveChanges')}
+            <CheckCircle size={14} /> {t('common.saveChanges')}
           </Button>
           <Button size="sm" variant="danger" onClick={() => handleDelete(role)}>
             <Trash size={14} />
@@ -346,7 +346,7 @@ export default function RBACPage() {
       <CompactSection title={t('rbac.roleInformation')}>
         <CompactGrid>
           <CompactField label={t('common.name')} value={role.name} />
-          <CompactField label={t('rbac.roleType')} value={role.is_system ? t('rbac.systemRole') : t('rbac.customRole')} />
+          <CompactField label={t('common.type')} value={role.is_system ? t('common.system') : t('common.custom')} />
           {role.inherits_from && (
             <CompactField label={t('rbac.inheritsFrom')} value={role.parent_name || `Role #${role.inherits_from}`} />
           )}
@@ -354,7 +354,7 @@ export default function RBACPage() {
         {role.description && <p className="text-xs text-text-secondary mt-2">{role.description}</p>}
       </CompactSection>
 
-      <CompactSection title={t('rbac.permissions')}>
+      <CompactSection title={t('common.permissions')}>
         <div className="space-y-4">
           {Object.entries(PERMISSION_CATEGORIES).map(([key, category]) => {
             const categoryPerms = category.permissions
@@ -463,10 +463,10 @@ export default function RBACPage() {
                 key: 'is_system',
                 value: filterType,
                 onChange: setFilterType,
-                placeholder: t('rbac.allTypes'),
+                placeholder: t('common.allTypes'),
                 options: [
-                  { value: 'true', label: t('rbac.systemRole') },
-                  { value: 'false', label: t('rbac.customRole') }
+                  { value: 'true', label: t('common.system') },
+                  { value: 'false', label: t('common.custom') }
                 ]
               }
             ]}

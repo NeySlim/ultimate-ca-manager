@@ -165,10 +165,10 @@ export function TemplatePreviewModal({ open, onClose, template }) {
                   <Badge variant="info" size="sm">{t('templates.cnRequired')}</Badge>
                 )}
                 {template.max_path_length !== undefined && template.max_path_length >= 0 && (
-                  <Badge variant="default" size="sm">{t('templates.pathLength')}: {template.max_path_length}</Badge>
+                  <Badge variant="default" size="sm">{t('common.pathLength')}: {template.max_path_length}</Badge>
                 )}
                 {template.basic_constraints === 'ca' && (
-                  <Badge variant="purple" size="sm">{t('templates.caCertificate')}</Badge>
+                  <Badge variant="purple" size="sm">{t('common.caCertificate')}</Badge>
                 )}
               </div>
             </div>

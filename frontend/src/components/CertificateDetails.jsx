@@ -122,7 +122,7 @@ export function CertificateDetails({
   // Status badge config
   const statusConfig = {
     valid: { variant: 'success', label: t('common.valid') },
-    expiring: { variant: 'warning', label: t('details.expiringSoon') },
+    expiring: { variant: 'warning', label: t('common.detailsExpiring') },
     expired: { variant: 'danger', label: t('common.expired') },
     revoked: { variant: 'danger', label: t('common.revoked') }
   }
@@ -131,9 +131,9 @@ export function CertificateDetails({
   const sourceConfig = {
     acme: { variant: 'info', label: 'ACME' },
     scep: { variant: 'warning', label: 'SCEP' },
-    import: { variant: 'default', label: t('details.imported') },
+    import: { variant: 'default', label: t('common.imported') },
     csr: { variant: 'default', label: t('details.fromCSR') },
-    manual: { variant: 'default', label: t('details.manual') }
+    manual: { variant: 'default', label: t('common.manual') }
   }
   
   const statusBadge = statusConfig[status] || statusConfig.valid
@@ -175,7 +175,7 @@ export function CertificateDetails({
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
-          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? t('details.hasKey') : t('details.noKey')}</div>
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? t('common.hasKey') : t('details.noKey')}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">
             {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
           </div>
@@ -183,7 +183,7 @@ export function CertificateDetails({
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
           <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
-          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{t('details.signature')}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{t('common.signature')}</div>
         </div>
       </div>
       
@@ -234,39 +234,39 @@ export function CertificateDetails({
       )}
       
       {/* Subject Information */}
-      <CompactSection title={t('details.subject')} icon={Globe} iconClass="icon-bg-blue">
+      <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
-          <CompactField icon={Globe} label={t('details.commonName')} value={cert.cn || cert.common_name} />
-          <CompactField icon={Buildings} label={t('details.organization')} value={cert.organization} />
-          <CompactField autoIcon label={t('details.orgUnit')} value={cert.organizational_unit} />
-          <CompactField icon={MapPin} label={t('details.locality')} value={cert.locality} />
-          <CompactField autoIcon label={t('details.state')} value={cert.state} />
-          <CompactField autoIcon label={t('details.country')} value={cert.country} />
-          <CompactField icon={Envelope} label={t('details.email')} value={cert.email} colSpan={2} />
+          <CompactField icon={Globe} label={t('common.commonName')} value={cert.cn || cert.common_name} />
+          <CompactField icon={Buildings} label={t('common.organization')} value={cert.organization} />
+          <CompactField autoIcon label={t('common.orgUnit')} value={cert.organizational_unit} />
+          <CompactField icon={MapPin} label={t('common.locality')} value={cert.locality} />
+          <CompactField autoIcon label={t('common.state')} value={cert.state} />
+          <CompactField autoIcon label={t('common.country')} value={cert.country} />
+          <CompactField icon={Envelope} label={t('common.email')} value={cert.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* Validity Period */}
-      <CompactSection title={t('details.validity')} icon={Calendar} iconClass="icon-bg-green">
+      <CompactSection title={t('common.validity')} icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
-          <CompactField icon={Calendar} label={t('details.validFrom')} value={formatDate(cert.valid_from)} />
-          <CompactField icon={Calendar} label={t('details.validUntil')} value={formatDate(cert.valid_to)} />
+          <CompactField icon={Calendar} label={t('common.validFrom')} value={formatDate(cert.valid_from)} />
+          <CompactField icon={Calendar} label={t('common.validUntil')} value={formatDate(cert.valid_to)} />
         </CompactGrid>
       </CompactSection>
       
       {/* Technical Details */}
-      <CompactSection title={t('details.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
+      <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
-          <CompactField icon={Hash} label={t('details.serial')} value={cert.serial_number} mono copyable />
-          <CompactField autoIcon label={t('details.keyType')} value={cert.key_type} />
-          <CompactField autoIcon label={t('details.sigAlgo')} value={cert.signature_algorithm} />
+          <CompactField icon={Hash} label={t('common.serial')} value={cert.serial_number} mono copyable />
+          <CompactField autoIcon label={t('common.keyType')} value={cert.key_type} />
+          <CompactField autoIcon label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
           <CompactField autoIcon label={t('details.certType')} value={cert.cert_type} />
         </CompactGrid>
       </CompactSection>
       
       {/* SANs */}
       {cert.san_combined && (
-        <CompactSection title={t('details.subjectAltNames')} icon={Globe} iconClass="icon-bg-cyan">
+        <CompactSection title={t('common.subjectAltNames')} icon={Globe} iconClass="icon-bg-cyan">
           <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded border border-border/50">
             {cert.san_combined}
           </div>
@@ -274,16 +274,16 @@ export function CertificateDetails({
       )}
       
       {/* Issuer */}
-      <CompactSection title={t('details.issuer')} icon={ShieldCheck} iconClass="icon-bg-orange">
+      <CompactSection title={t('common.issuer')} icon={ShieldCheck} iconClass="icon-bg-orange">
         <CompactGrid cols={1}>
-          <CompactField autoIcon label={t('details.issuer')} value={cert.issuer} mono />
-          <CompactField autoIcon label={t('details.ca')} value={cert.issuer_name} />
+          <CompactField autoIcon label={t('common.issuer')} value={cert.issuer} mono />
+          <CompactField autoIcon label={t('common.ca')} value={cert.issuer_name} />
           <CompactField autoIcon label={t('details.caReference')} value={cert.caref} mono copyable />
         </CompactGrid>
       </CompactSection>
       
       {/* Thumbprints */}
-      <CompactSection title={t('details.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
+      <CompactSection title={t('common.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
           <CompactField autoIcon label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
           <CompactField autoIcon label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
@@ -353,9 +353,9 @@ export function CertificateDetails({
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField label={t('details.created')} value={formatDate(cert.created_at)} />
+          <CompactField label={t('common.created')} value={formatDate(cert.created_at)} />
           <CompactField label={t('details.createdBy')} value={cert.created_by} />
-          <CompactField label={t('details.source')} value={cert.source} />
+          <CompactField label={t('common.source')} value={cert.source} />
           <CompactField label={t('details.importedFrom')} value={cert.imported_from} />
           <CompactField label={t('details.referenceId')} value={cert.refid} mono copyable colSpan={2} />
         </CompactGrid>

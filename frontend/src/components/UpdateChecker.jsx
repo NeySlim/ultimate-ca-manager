@@ -112,7 +112,7 @@ export function UpdateChecker() {
                   <span className="text-accent-success font-medium">v{updateInfo.latest_version}</span>
                 </>
               ) : (
-                <>{t('settings.running')} v{updateInfo?.current_version}</>
+                <>{t('common.running')} v{updateInfo?.current_version}</>
               )}
             </div>
             

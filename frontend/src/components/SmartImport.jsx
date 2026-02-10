@@ -63,8 +63,8 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
           <div className="flex items-center gap-2 text-xs text-text-secondary">
             <Badge variant={config.color} size="xs">{t(config.labelKey)}</Badge>
             {obj.is_self_signed && <Badge variant="gray" size="xs">{t('import.selfSigned')}</Badge>}
-            {obj.chain_position === 'root' && <Badge variant="amber" size="xs">{t('import.root')}</Badge>}
-            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="xs">{t('import.intermediate')}</Badge>}
+            {obj.chain_position === 'root' && <Badge variant="amber" size="xs">{t('common.root')}</Badge>}
+            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="xs">{t('common.intermediate')}</Badge>}
           </div>
         </div>
         
@@ -75,13 +75,13 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
         <div className="px-3 pb-3 border-t border-border pt-3 space-y-2 text-sm">
           {obj.subject && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('details.subject')}:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('common.subject')}:</span>
               <span className="font-mono text-xs break-all">{obj.subject}</span>
             </div>
           )}
           {obj.issuer && obj.issuer !== obj.subject && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('details.issuer')}:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('common.issuer')}:</span>
               <span className="font-mono text-xs break-all">{obj.issuer}</span>
             </div>
           )}
@@ -93,13 +93,13 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
           )}
           {obj.not_before && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('details.valid')}:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('common.valid')}:</span>
               <span className="text-xs">{new Date(obj.not_before).toLocaleDateString()} → {new Date(obj.not_after).toLocaleDateString()}</span>
             </div>
           )}
           {obj.key_algorithm && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">{t('details.algorithm')}:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('common.algorithm')}:</span>
               <span className="text-xs">{obj.key_algorithm} ({obj.key_size} bits)</span>
             </div>
           )}
@@ -125,13 +125,13 @@ function ChainCard({ chain, index }) {
       <div className="flex items-center gap-1 text-xs flex-wrap">
         {chain.root && (
           <>
-            <span className="px-2 py-1 rounded badge-bg-amber">{chain.root.subject?.split(',')[0] || t('import.root')}</span>
+            <span className="px-2 py-1 rounded badge-bg-amber">{chain.root.subject?.split(',')[0] || t('common.root')}</span>
             <span className="text-text-secondary">→</span>
           </>
         )}
         {chain.intermediates?.map((int, i) => (
           <span key={i}>
-            <span className="px-2 py-1 rounded badge-bg-blue">{int.subject?.split(',')[0] || `${t('import.intermediate')} ${i + 1}`}</span>
+            <span className="px-2 py-1 rounded badge-bg-blue">{int.subject?.split(',')[0] || `${t('common.intermediate')} ${i + 1}`}</span>
             <span className="text-text-secondary mx-1">→</span>
           </span>
         ))}
@@ -369,7 +369,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         showSuccess(t('import.successImported', { count: totalImported }))
       }
     } catch (err) {
-      showError(err.response?.data?.error || t('import.importFailed'))
+      showError(err.response?.data?.error || t('common.importFailed'))
       setStep('preview')
     } finally {
       setIsImporting(false)
@@ -482,7 +482,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       {/* Or paste PEM */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">{t('import.orPastePem')}</span></div>
+        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">{t('common.orPastePem')}</span></div>
       </div>
       
       <textarea
@@ -650,7 +650,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         {/* Show what was imported */}
         {totalImported > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-success">{t('import.imported')}:</h4>
+            <h4 className="text-sm font-medium text-status-success">{t('common.imported')}:</h4>
             {importResult?.csrs_imported > 0 && (
               <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
             )}

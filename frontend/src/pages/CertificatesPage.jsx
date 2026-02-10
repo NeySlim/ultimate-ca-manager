@@ -204,7 +204,7 @@ export default function CertificatesPage() {
   // Delete certificate
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.CERTIFICATE, {
-      title: t('certificates.deleteCertificate'),
+      title: t('common.deleteCertificate'),
       confirmText: t('common.delete'),
       variant: 'danger'
     })
@@ -343,7 +343,7 @@ export default function CertificatesPage() {
   const columns = useMemo(() => [
     {
       key: 'cn',
-      header: t('certificates.commonName'),
+      header: t('common.commonName'),
       priority: 1,
       sortable: true,
       render: (val, row) => (
@@ -372,7 +372,7 @@ export default function CertificatesPage() {
             )}>
               <Certificate size={14} weight="duotone" />
             </div>
-            <span className="font-medium truncate">{val || row.cn || row.common_name || t('certificates.certificate')}</span>
+            <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
           <div className="shrink-0">
@@ -407,7 +407,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'issuer',
-      header: t('certificates.issuer'),
+      header: t('common.issuer'),
       priority: 3,
       sortable: true,
       render: (val, row) => (
@@ -449,7 +449,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'key_type',
-      header: t('certificates.keyType'),
+      header: t('common.keyType'),
       hideOnMobile: true,
       sortable: true,
       render: (val, row) => (
@@ -553,7 +553,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'ca',
-      label: t('certificates.issuer'),
+      label: t('common.issuer'),
       type: 'select',
       value: filterCA,
       onChange: setFilterCA,
@@ -574,7 +574,7 @@ export default function CertificatesPage() {
       <div className="visual-section">
         <div className="visual-section-header">
           <Certificate size={16} className="status-primary-text" />
-          {t('certificates.title')}
+          {t('common.certificates')}
         </div>
         <div className="visual-section-body">
           <div className="quick-info-grid">
@@ -595,7 +595,7 @@ export default function CertificatesPage() {
       </div>
 
       <HelpCard title={t('help.aboutCertificates')} variant="info">
-        {t('certificates.title')}
+        {t('common.certificates')}
       </HelpCard>
       <HelpCard title={t('help.statusLegend')} variant="info">
         <div className="space-y-1.5 mt-2">
@@ -636,7 +636,7 @@ export default function CertificatesPage() {
   return (
     <>
       <ResponsiveLayout
-        title={t('certificates.title')}
+        title={t('common.certificates')}
         subtitle={t('certificates.subtitle', { count: total })}
         icon={Certificate}
         stats={stats}
@@ -653,7 +653,7 @@ export default function CertificatesPage() {
           </div>
         }
         slideOverOpen={!!selectedCert}
-        slideOverTitle={selectedCert?.cn || selectedCert?.common_name || t('certificates.certificate')}
+        slideOverTitle={selectedCert?.cn || selectedCert?.common_name || t('common.certificate')}
         slideOverContent={slideOverContent}
         slideOverWidth="wide"
         slideOverActions={selectedCert && (
@@ -683,7 +683,7 @@ export default function CertificatesPage() {
           selectedId={selectedCert?.id}
           rowActions={rowActions}
           searchable
-          searchPlaceholder={t('common.search') + ' ' + t('certificates.title').toLowerCase() + '...'}
+          searchPlaceholder={t('common.search') + ' ' + t('common.certificates').toLowerCase() + '...'}
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
           columnStorageKey="ucm-certs-columns"
           filterPresetsKey="ucm-certs-presets"
@@ -803,7 +803,7 @@ export default function CertificatesPage() {
             {t('common.upload')} <strong>{selectedCert?.cn || selectedCert?.common_name}</strong>
           </p>
           <Textarea
-            label={t('certificates.privateKeyPEM')}
+            label={t('common.privateKeyPEM')}
             value={keyPem}
             onChange={(e) => setKeyPem(e.target.value)}
             placeholder="-----BEGIN PRIVATE KEY-----
@@ -813,7 +813,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             className="font-mono text-xs"
           />
           <Input
-            label={t('auth.password')}
+            label={t('common.password')}
             type="password"
             value={keyPassphrase}
             onChange={(e) => setKeyPassphrase(e.target.value)}
@@ -841,7 +841,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             {t('certificates.pkcs12Password')}
           </p>
           <Input
-            label={t('auth.password')}
+            label={t('common.password')}
             type="password"
             value={p12Password}
             onChange={(e) => setP12Password(e.target.value)}
@@ -850,12 +850,12 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             showStrength
           />
           <Input
-            label={t('account.confirmPassword')}
+            label={t('common.confirmPassword')}
             type="password"
-            placeholder={t('account.confirmPassword')}
+            placeholder={t('common.confirmPassword')}
             onBlur={(e) => {
               if (e.target.value && e.target.value !== p12Password) {
-                showError(t('validation.passwordMismatch'))
+                showError(t('common.passwordMismatch'))
               }
             }}
           />
@@ -910,7 +910,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Select
-        label={t('cas.ca')}
+        label={t('common.certificateAuthority')}
         value={formData.ca_id}
         onChange={(e) => setFormData(prev => ({ ...prev, ca_id: e.target.value }))}
         required
@@ -922,15 +922,15 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       </Select>
       
       <Input 
-        label={t('certificates.commonName')} 
-        placeholder={t('certificates.commonNamePlaceholder')}
+        label={t('common.commonName')} 
+        placeholder={t('common.commonNamePlaceholder')}
         value={formData.common_name}
         onChange={(e) => setFormData(prev => ({ ...prev, common_name: e.target.value }))}
         required
       />
       
       <Textarea 
-        label={t('certificates.san')} 
+        label={t('common.subjectAltNames')} 
         placeholder={t('certificates.sanPlaceholder')} 
         rows={3}
         value={formData.san}
@@ -939,7 +939,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       
       <div className="grid grid-cols-2 gap-4">
         <Select
-          label={t('certificates.keyType')}
+          label={t('common.keyType')}
           value={formData.key_type}
           onChange={(e) => setFormData(prev => ({ ...prev, key_type: e.target.value }))}
         >
@@ -948,7 +948,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
         </Select>
         
         <Select
-          label={t('certificates.keySize')}
+          label={t('common.keySize')}
           value={formData.key_size}
           onChange={(e) => setFormData(prev => ({ ...prev, key_size: e.target.value }))}
         >
@@ -967,9 +967,9 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       </div>
       
       <Input 
-        label={t('certificates.validityPeriod') + ' (' + t('certificates.days') + ')'} 
+        label={t('common.validityPeriod') + ' (' + t('common.days') + ')'} 
         type="number"
-        placeholder={t('certificates.validityPlaceholder')}
+        placeholder={t('common.validityPlaceholder')}
         value={formData.validity_days}
         onChange={(e) => setFormData(prev => ({ ...prev, validity_days: e.target.value }))}
       />

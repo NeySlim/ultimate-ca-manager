@@ -100,17 +100,17 @@ export function CSRDetails({
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">{t('details.keyType')}</div>
+          <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Hash size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">{t('details.keySize')}</div>
+          <div className="text-2xs text-text-tertiary">{t('common.keySize')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_size || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <FileText size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">{t('details.signature')}</div>
+          <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.signature_algorithm || 'N/A'}</div>
         </div>
       </div>
@@ -120,7 +120,7 @@ export function CSRDetails({
         <div className="flex gap-2 flex-wrap">
           {onSign && canWrite && (
             <Button size="sm" variant="primary" onClick={onSign}>
-              <Check size={14} /> {t('csrs.signCSR')}
+              <Check size={14} /> {t('common.signCSR')}
             </Button>
           )}
           {onReject && canWrite && (
@@ -142,21 +142,21 @@ export function CSRDetails({
       )}
       
       {/* Subject Information */}
-      <CompactSection title={t('details.subject')}>
+      <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField icon={Globe} label={t('details.commonName')} value={csr.common_name || csr.cn} />
-          <CompactField icon={Buildings} label={t('details.organization')} value={csr.organization || csr.o} />
-          <CompactField label={t('details.orgUnit')} value={csr.organizational_unit || csr.ou} />
-          <CompactField icon={MapPin} label={t('details.locality')} value={csr.locality || csr.l} />
-          <CompactField label={t('details.state')} value={csr.state || csr.st} />
-          <CompactField label={t('details.country')} value={csr.country || csr.c} />
-          <CompactField icon={Envelope} label={t('details.email')} value={csr.email} colSpan={2} />
+          <CompactField icon={Globe} label={t('common.commonName')} value={csr.common_name || csr.cn} />
+          <CompactField icon={Buildings} label={t('common.organization')} value={csr.organization || csr.o} />
+          <CompactField label={t('common.orgUnit')} value={csr.organizational_unit || csr.ou} />
+          <CompactField icon={MapPin} label={t('common.locality')} value={csr.locality || csr.l} />
+          <CompactField label={t('common.state')} value={csr.state || csr.st} />
+          <CompactField label={t('common.country')} value={csr.country || csr.c} />
+          <CompactField icon={Envelope} label={t('common.email')} value={csr.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* Subject Alternative Names */}
       {(csr.san || csr.sans || csr.san_dns || csr.san_ip) && (
-        <CompactSection title={t('details.subjectAltNames')}>
+        <CompactSection title={t('common.subjectAltNames')}>
           <CompactGrid cols={1}>
             {csr.san_dns && csr.san_dns.length > 0 && (
               <CompactField 
@@ -183,11 +183,11 @@ export function CSRDetails({
       )}
       
       {/* Technical Details */}
-      <CompactSection title={t('details.technicalDetails')}>
+      <CompactSection title={t('common.technicalDetails')}>
         <CompactGrid>
-          <CompactField icon={Key} label={t('details.keyAlgorithm')} value={csr.key_algorithm || csr.key_type} />
-          <CompactField label={t('details.keySize')} value={csr.key_size} />
-          <CompactField label={t('details.sigAlgo')} value={csr.signature_algorithm} />
+          <CompactField icon={Key} label={t('common.keyAlgorithm')} value={csr.key_algorithm || csr.key_type} />
+          <CompactField label={t('common.keySize')} value={csr.key_size} />
+          <CompactField label={t('common.signatureAlgorithm')} value={csr.signature_algorithm} />
           <CompactField label={t('details.subjectDN')} value={csr.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -239,10 +239,10 @@ export function CSRDetails({
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField icon={Calendar} label={t('details.createdAt')} value={formatDate(csr.created_at)} />
+          <CompactField icon={Calendar} label={t('common.createdAt')} value={formatDate(csr.created_at)} />
           <CompactField label={t('details.createdBy')} value={csr.created_by} />
           <CompactField label={t('details.signedAt')} value={csr.signed_at ? formatDate(csr.signed_at) : null} />
-          <CompactField label={t('details.signedBy')} value={csr.signed_by} />
+          <CompactField label={t('common.signedBy')} value={csr.signed_by} />
         </CompactGrid>
       </CompactSection>
     </div>
