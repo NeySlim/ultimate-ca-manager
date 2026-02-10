@@ -58,7 +58,7 @@ COPY --chown=ucm:ucm wsgi.py /app/wsgi.py
 COPY --chown=ucm:ucm .env.docker.example /app/.env.example
 
 # Create data directory at unified path (same as DEB/RPM installs)
-RUN mkdir -p /opt/ucm/data/{cas,certs,backups,logs,temp} && \
+RUN mkdir -p /opt/ucm/data/{ca,certs,private,crl,scep,backups,sessions,logs,temp} && \
     chown -R ucm:ucm /opt/ucm
 
 # Set environment variables

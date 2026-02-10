@@ -139,7 +139,6 @@ services:
       - ucm-network
     
     labels:
-      - "com.ultimate-ca-manager.version=1.8.3"
       - "com.ultimate-ca-manager.description=Certificate Authority Management"
       - "traefik.enable=false"  # Disable if using Traefik
 

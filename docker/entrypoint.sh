@@ -1,5 +1,5 @@
 #!/bin/bash
-# UCM Docker Entrypoint Script v1.8.0-beta
+# UCM Docker Entrypoint Script
 # Comprehensive environment configuration and initialization
 
 set -e
@@ -15,10 +15,13 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Read version from VERSION file (single source of truth)
+UCM_VERSION=$(cat /app/VERSION 2>/dev/null || echo "unknown")
+
 # Banner
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  Ultimate CA Manager - Docker         ║${NC}"
-echo -e "${GREEN}║  Version 2.0.3                         ║${NC}"
+echo -e "${GREEN}║  Version ${UCM_VERSION}$(printf '%*s' $((25 - ${#UCM_VERSION})) '')║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -114,7 +117,7 @@ validate_email() {
 : ${UCM_INITIAL_ADMIN_PASSWORD:="changeme123"}
 
 # Application
-: ${UCM_APP_VERSION:="1.8.0-beta"}
+: ${UCM_APP_VERSION:="${UCM_VERSION}"}
 
 # =============================================================================
 # VALIDATION
@@ -169,16 +172,21 @@ if [ -d "$OLD_DATA_PATH" ] && [ "$(ls -A $OLD_DATA_PATH 2>/dev/null)" ]; then
     # Copy everything that doesn't already exist in new path
     for item in "$OLD_DATA_PATH"/*; do
         basename_item=$(basename "$item")
-        if [ ! -e "$DATA_PATH/$basename_item" ]; then
-            echo -e "${YELLOW}   Migrating $basename_item...${NC}"
-            cp -a "$item" "$DATA_PATH/" 2>/dev/null || true
-        elif [ -d "$item" ] && [ -d "$DATA_PATH/$basename_item" ]; then
+        # Rename 'cas' → 'ca' (old Docker naming mismatch)
+        target_name="$basename_item"
+        if [ "$basename_item" = "cas" ]; then
+            target_name="ca"
+        fi
+        if [ ! -e "$DATA_PATH/$target_name" ]; then
+            echo -e "${YELLOW}   Migrating $basename_item → $target_name...${NC}"
+            cp -a "$item" "$DATA_PATH/$target_name" 2>/dev/null || true
+        elif [ -d "$item" ] && [ -d "$DATA_PATH/$target_name" ]; then
             # Merge directories: copy files that don't exist in destination
             for subitem in "$item"/*; do
                 sub_basename=$(basename "$subitem")
-                if [ ! -e "$DATA_PATH/$basename_item/$sub_basename" ]; then
-                    echo -e "${YELLOW}   Migrating $basename_item/$sub_basename...${NC}"
-                    cp -a "$subitem" "$DATA_PATH/$basename_item/" 2>/dev/null || true
+                if [ ! -e "$DATA_PATH/$target_name/$sub_basename" ]; then
+                    echo -e "${YELLOW}   Migrating $target_name/$sub_basename...${NC}"
+                    cp -a "$subitem" "$DATA_PATH/$target_name/" 2>/dev/null || true
                 fi
             done
         fi
@@ -186,10 +194,10 @@ if [ -d "$OLD_DATA_PATH" ] && [ "$(ls -A $OLD_DATA_PATH 2>/dev/null)" ]; then
     echo -e "${GREEN}✅ Data migration complete${NC}"
 fi
 
-# Create necessary directories
-mkdir -p "$DATA_PATH"/{cas,certs,backups,logs,temp} 2>/dev/null || true
+# Create necessary directories (must match backend/config/settings.py)
+mkdir -p "$DATA_PATH"/{ca,certs,private,crl,scep,backups,sessions,logs,temp} 2>/dev/null || true
 chmod 755 "$DATA_PATH" 2>/dev/null || true
-chmod 700 "$DATA_PATH"/{cas,certs,backups} 2>/dev/null || true
+chmod 700 "$DATA_PATH"/{ca,certs,private,backups} 2>/dev/null || true
 
 # Fix permissions to ensure UCM user can write
 echo -e "${BLUE}🔧 Checking file permissions...${NC}"
@@ -461,7 +469,7 @@ export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"
 export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"
 export ACME_ENABLED="${UCM_ACME_ENABLED}"
 
-echo -e "${GREEN}🚀 Starting UCM v2.0.3...${NC}"
+echo -e "${GREEN}🚀 Starting UCM v${UCM_VERSION}...${NC}"
 echo -e "${CYAN}   Access: https://${UCM_FQDN}:${UCM_HTTPS_PORT}${NC}"
 echo ""
 echo -e "${BLUE}📋 Executing command: $*${NC}"
