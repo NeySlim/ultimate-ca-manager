@@ -77,15 +77,16 @@
 
 ## 🌟 v2.1.0 - Next Release
 
-### Internationalization (i18n)
-- [ ] **French** (Français)
-- [ ] **German** (Deutsch)
-- [ ] **Spanish** (Español)
-- [ ] **Italian** (Italiano)
-- [ ] **Portuguese** (Português)
-- [ ] **Ukrainian** (Українська)
-- [ ] **Chinese** (中文)
-- [ ] **Japanese** (日本語)
+### Internationalization (i18n) ✅
+- ✅ **English** (default)
+- ✅ **French** (Français)
+- ✅ **German** (Deutsch)
+- ✅ **Spanish** (Español)
+- ✅ **Italian** (Italiano)
+- ✅ **Portuguese** (Português)
+- ✅ **Ukrainian** (Українська)
+- ✅ **Chinese** (中文)
+- ✅ **Japanese** (日本語)
 
 ### Integrations
 - [ ] Kubernetes cert-manager issuer
