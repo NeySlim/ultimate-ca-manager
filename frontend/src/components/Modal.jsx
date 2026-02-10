@@ -47,7 +47,7 @@ export function Modal({
           aria-describedby={undefined}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0 modal-header-gradient">
             <Dialog.Title className="text-sm font-semibold text-text-primary">
               {title}
             </Dialog.Title>
