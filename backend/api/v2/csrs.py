@@ -3,6 +3,7 @@ CSR Management Routes v2.0
 /api/csrs/* - Certificate Signing Request CRUD
 """
 
+import re
 from flask import Blueprint, request, jsonify
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
@@ -14,6 +15,25 @@ import base64
 import uuid
 
 bp = Blueprint('csrs_v2', __name__)
+
+# DN validation (shared pattern)
+DN_FIELD_PATTERNS = {
+    'CN': re.compile(r'^[\w\s\-\.\,\'\@\(\)]+$', re.UNICODE),
+    'O': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
+    'OU': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
+    'C': re.compile(r'^[A-Z]{2}$'),
+}
+
+def _validate_dn_field(field_name, value):
+    if not value:
+        return True, None
+    value = str(value).strip()
+    if len(value) > 64:
+        return False, f"{field_name} must be 64 characters or less"
+    if field_name in DN_FIELD_PATTERNS:
+        if not DN_FIELD_PATTERNS[field_name].match(value):
+            return False, f"Invalid characters in {field_name}"
+    return True, None
 
 @bp.route('/api/v2/csrs', methods=['GET'])
 @require_auth(['read:csrs'])
@@ -132,13 +152,20 @@ def create_csr():
     
     try:
         # Map frontend data to service arguments
+        country = (data.get('country') or '').upper() or None
         dn = {'CN': data['cn']}
         if data.get('department'):
             dn['OU'] = data['department']
         if data.get('organization'):
             dn['O'] = data['organization']
-        if data.get('country'):
-            dn['C'] = data['country']
+        if country:
+            dn['C'] = country
+        
+        # Validate DN fields
+        for field, value in dn.items():
+            is_valid, error = _validate_dn_field(field, value)
+            if not is_valid:
+                return error_response(error, 400)
             
         # Parse key type (Frontend sends "RSA 2048")
         key_algo_full = data.get('key_type', 'RSA 2048')

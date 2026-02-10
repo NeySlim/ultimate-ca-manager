@@ -211,7 +211,7 @@ def create_certificate():
         ('CN', data.get('cn')),
         ('O', data.get('organization')),
         ('OU', data.get('organizational_unit')),
-        ('C', data.get('country')),
+        ('C', (data.get('country') or '').upper() or None),
         ('ST', data.get('state')),
         ('L', data.get('locality')),
     ]
@@ -237,7 +237,7 @@ def create_certificate():
         
         # Generate key pair
         key_type = data.get('key_type', 'RSA')
-        key_size = data.get('key_size', 2048)
+        key_size = int(data.get('key_size') or 2048)
         
         if key_type.upper() == 'EC':
             curve_name = data.get('curve', 'secp256r1')
@@ -251,7 +251,7 @@ def create_certificate():
         else:
             new_key = rsa.generate_private_key(
                 public_exponent=65537,
-                key_size=int(key_size),
+                key_size=key_size,
                 backend=default_backend()
             )
         
@@ -262,7 +262,7 @@ def create_certificate():
         if data.get('organizational_unit'):
             subject_attrs.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, data['organizational_unit']))
         if data.get('country'):
-            subject_attrs.append(x509.NameAttribute(NameOID.COUNTRY_NAME, data['country']))
+            subject_attrs.append(x509.NameAttribute(NameOID.COUNTRY_NAME, data['country'].upper()))
         if data.get('state'):
             subject_attrs.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, data['state']))
         if data.get('locality'):
