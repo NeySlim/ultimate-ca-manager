@@ -281,9 +281,9 @@ def create_ca():
         # Determine key type
         key_type = '2048' # Default
         if data.get('keyAlgo') == 'RSA':
-            key_type = str(data.get('keySize', 2048))
+            key_type = str(data.get('keySize') or 2048)
         elif data.get('keyAlgo') == 'ECDSA':
-            key_type = data.get('keySize', 'P-256') # Using keySize field for curve in frontend
+            key_type = data.get('keySize') or 'P-256'
         
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
             
@@ -291,7 +291,7 @@ def create_ca():
             descr=data.get('commonName'), # Use CN as description
             dn=dn,
             key_type=key_type,
-            validity_days=int(data.get('validityYears', 10)) * 365,
+            validity_days=int(data.get('validityYears') or 10) * 365,
             username=username
         )
         
