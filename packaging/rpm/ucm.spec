@@ -35,7 +35,7 @@ install -d %{buildroot}%{ucm_home}
 install -d %{buildroot}%{ucm_home}/backend
 install -d %{buildroot}%{ucm_home}/frontend
 install -d %{buildroot}%{ucm_home}/scripts
-install -d %{buildroot}%{ucm_data}/{ca,certs,private,sessions,backups}
+install -d %{buildroot}%{ucm_data}/{ca,certs,private,crl,scep,backups,sessions}
 install -d %{buildroot}%{_sysconfdir}/%{name}
 install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
@@ -77,7 +77,7 @@ UCM_HOME=%{ucm_home}
 UCM_DATA=%{ucm_data}
 UCM_CONFIG=/etc/%{name}
 
-mkdir -p $UCM_DATA/{ca,certs,private,sessions,backups}
+mkdir -p $UCM_DATA/{ca,certs,private,crl,scep,backups,sessions}
 mkdir -p /var/log/%{name}
 
 # Check for v1.8.x data to migrate

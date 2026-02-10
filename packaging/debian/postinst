@@ -25,7 +25,7 @@ case "$1" in
         fi
         
         # Create directories
-        mkdir -p "$UCM_DATA"/{ca,certs,backups,sessions,private}
+        mkdir -p "$UCM_DATA"/{ca,certs,private,crl,scep,backups,sessions}
         mkdir -p "$UCM_CONFIG"
         mkdir -p /var/log/ucm
         
