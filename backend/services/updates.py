@@ -158,26 +158,31 @@ def check_for_updates(include_prereleases=False):
         download_url = None
         package_name = None
         
-        # Detect package type
-        is_deb = os.path.exists('/usr/bin/dpkg')
-        is_rpm = os.path.exists('/usr/bin/rpm')
+        # Detect package type (deb takes priority over rpm if both exist)
         is_docker = os.getenv('UCM_DOCKER') == '1'
+        is_deb = os.path.exists('/usr/bin/dpkg')
+        is_rpm = os.path.exists('/usr/bin/rpm') and not is_deb
+        
+        # Collect all matching assets, then pick the best one
+        deb_asset = None
+        rpm_asset = None
         
         for asset in latest_release.get('assets', []):
             name = asset['name']
             if is_docker:
-                # Docker uses container registry
                 download_url = f"ghcr.io/neyslim/ultimate-ca-manager:{latest_version}"
                 package_name = name
                 break
-            elif is_deb and name.endswith('.deb'):
-                download_url = asset['browser_download_url']
-                package_name = name
-                break
-            elif is_rpm and name.endswith('.rpm'):
-                download_url = asset['browser_download_url']
-                package_name = name
-                break
+            elif name.endswith('.deb') and not deb_asset:
+                deb_asset = asset
+            elif name.endswith('.rpm') and not rpm_asset:
+                rpm_asset = asset
+        
+        if not is_docker:
+            chosen = deb_asset if is_deb and deb_asset else (rpm_asset if is_rpm and rpm_asset else None)
+            if chosen:
+                download_url = chosen['browser_download_url']
+                package_name = chosen['name']
         
         update_available = compare_versions(latest_version, current) > 0
         
