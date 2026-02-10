@@ -12,14 +12,14 @@ services:
     
     volumes:
       # Persistent data volume (REQUIRED)
-      - ucm-data:/app/backend/data
+      - ucm-data:/opt/ucm/data
       
       # Optional: Custom configuration
       # - ./.env:/app/.env.custom:ro
       
       # Optional: Custom HTTPS certificates
-      # - ./certs/https_cert.pem:/app/backend/data/https_cert.pem:ro
-      # - ./certs/https_key.pem:/app/backend/data/https_key.pem:ro
+      # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro
+      # - ./certs/https_key.pem:/opt/ucm/data/https_key.pem:ro
     
     environment:
       # ========================================
@@ -53,7 +53,7 @@ services:
       # DATABASE
       # ========================================
       
-      - UCM_DATABASE_PATH=${UCM_DATABASE_PATH:-/app/backend/data/ucm.db}
+      - UCM_DATABASE_PATH=${UCM_DATABASE_PATH:-/opt/ucm/data/ucm.db}
       - UCM_BACKUP_ENABLED=${UCM_BACKUP_ENABLED:-true}
       - UCM_BACKUP_RETENTION_DAYS=${UCM_BACKUP_RETENTION_DAYS:-30}
       

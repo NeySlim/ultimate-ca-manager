@@ -34,7 +34,7 @@ See: [Docker Installation Guide](docker.md)
 docker run -d \
   --name ucm \
   -p 8443:8443 \
-  -v ucm-data:/app/backend/data \
+  -v ucm-data:/opt/ucm/data \
   ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta
 ```
 
@@ -134,7 +134,7 @@ After installation, access UCM at **https://localhost:8443**
 ## 📁 Data Locations
 
 ### Docker
-- **Data:** `/app/backend/data` (inside container)
+- **Data:** `/opt/ucm/data` (inside container)
 - **Volume:** `ucm-data` (Docker volume)
 - **Config:** Auto-generated from environment variables
 

@@ -27,7 +27,7 @@ docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.0
 docker run -d \
   --name ucm \
   -p 8443:8443 \
-  -v ucm-data:/app/backend/data \
+  -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
   ghcr.io/neyslim/ultimate-ca-manager:2.0.0
 ```
@@ -54,7 +54,7 @@ services:
     ports:
       - "8443:8443"
     volumes:
-      - ucm-data:/app/backend/data
+      - ucm-data:/opt/ucm/data
     environment:
       - UCM_FQDN=ucm.example.com
       - UCM_ACME_ENABLED=true
@@ -84,11 +84,11 @@ services:
     
     volumes:
       # Persistent data
-      - ucm-data:/app/backend/data
+      - ucm-data:/opt/ucm/data
       
       # Optional: Custom HTTPS certificates
-      # - ./certs/https_cert.pem:/app/backend/data/https_cert.pem:ro
-      # - ./certs/https_key.pem:/app/backend/data/https_key.pem:ro
+      # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro
+      # - ./certs/https_key.pem:/opt/ucm/data/https_key.pem:ro
     
     environment:
       # Network
@@ -167,14 +167,14 @@ See full list in [docker-compose.yml](../../docker-compose.yml)
 
 ```bash
 docker volume create ucm-data
-docker run -v ucm-data:/app/backend/data ...
+docker run -v ucm-data:/opt/ucm/data ...
 ```
 
 ### Using Bind Mounts
 
 ```bash
 mkdir -p /opt/ucm/data
-docker run -v /opt/ucm/data:/app/backend/data ...
+docker run -v /opt/ucm/data:/opt/ucm/data ...
 ```
 
 ### Data Structure
@@ -206,8 +206,8 @@ docker run -e UCM_HTTPS_CERT="$(cat cert.pem)" \
 ### Option 2: Volume Mount
 
 ```bash
-docker run -v /path/to/cert.pem:/app/backend/data/https_cert.pem:ro \
-           -v /path/to/key.pem:/app/backend/data/https_key.pem:ro \
+docker run -v /path/to/cert.pem:/opt/ucm/data/https_cert.pem:ro \
+           -v /path/to/key.pem:/opt/ucm/data/https_key.pem:ro \
            ...
 ```
 
@@ -229,7 +229,7 @@ docker rm ucm
 docker run -d \
   --name ucm \
   -p 8443:8443 \
-  -v ucm-data:/app/backend/data \
+  -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
   ghcr.io/neyslim/ultimate-ca-manager:2.0.0
 ```
@@ -274,7 +274,7 @@ sudo netstat -tlnp | grep 8443
 
 ```bash
 # Regenerate certificate
-docker exec ucm rm -f /app/backend/data/https_cert.pem /app/backend/data/https_key.pem
+docker exec ucm rm -f /opt/ucm/data/https_cert.pem /opt/ucm/data/https_key.pem
 docker restart ucm
 ```
 

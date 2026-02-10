@@ -18,7 +18,7 @@ NC='\033[0m'
 # Banner
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  Ultimate CA Manager - Docker         ║${NC}"
-echo -e "${GREEN}║  Version 2.0.0                         ║${NC}"
+echo -e "${GREEN}║  Version 2.0.3                         ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -76,7 +76,7 @@ validate_email() {
 : ${UCM_JWT_EXPIRATION:=86400}
 
 # Database
-: ${UCM_DATABASE_PATH:="/app/backend/data/ucm.db"}
+: ${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}
 : ${UCM_BACKUP_ENABLED:=true}
 : ${UCM_BACKUP_RETENTION_DAYS:=30}
 
@@ -159,20 +159,31 @@ echo -e "${GREEN}✅ Configuration validated${NC}"
 
 echo -e "${BLUE}📁 Setting up directories...${NC}"
 
+# Unified data path: /opt/ucm/data (same as DEB/RPM)
+DATA_PATH="/opt/ucm/data"
+
+# Migration: if old path has data but new path doesn't, migrate
+OLD_DATA_PATH="/app/backend/data"
+if [ -f "$OLD_DATA_PATH/ucm.db" ] && [ ! -f "$DATA_PATH/ucm.db" ]; then
+    echo -e "${YELLOW}   Migrating data from $OLD_DATA_PATH to $DATA_PATH...${NC}"
+    cp -a "$OLD_DATA_PATH"/* "$DATA_PATH"/ 2>/dev/null || true
+    echo -e "${GREEN}✅ Data migrated${NC}"
+fi
+
 # Create necessary directories
-mkdir -p /app/backend/data/{cas,certs,backups,logs,temp}
-chmod 755 /app/backend/data 2>/dev/null || true
-chmod 700 /app/backend/data/{cas,certs,backups} 2>/dev/null || true
+mkdir -p "$DATA_PATH"/{cas,certs,backups,logs,temp} 2>/dev/null || true
+chmod 755 "$DATA_PATH" 2>/dev/null || true
+chmod 700 "$DATA_PATH"/{cas,certs,backups} 2>/dev/null || true
 
 # Fix permissions to ensure UCM user can write
 echo -e "${BLUE}🔧 Checking file permissions...${NC}"
 # Only try chown if running as root (UID 0)
-if [ "$(id -u)" = "0" ] && [ -d /app/backend/data ]; then
-    chown -R 1000:1000 /app/backend/data 2>/dev/null || true
+if [ "$(id -u)" = "0" ] && [ -d "$DATA_PATH" ]; then
+    chown -R 1000:1000 "$DATA_PATH" 2>/dev/null || true
 fi
 
 # Check data directory permissions
-if [ ! -w /app/backend/data ]; then
+if [ ! -w "$DATA_PATH" ]; then
     echo -e "${RED}❌ Data directory is not writable!${NC}"
     echo "   Please check volume permissions"
     exit 1
@@ -255,8 +266,8 @@ echo -e "${GREEN}✅ Configuration file created${NC}"
 
 echo -e "${BLUE}🔐 Setting up HTTPS certificate...${NC}"
 
-CERT_PATH="/app/backend/data/https_cert.pem"
-KEY_PATH="/app/backend/data/https_key.pem"
+CERT_PATH="/opt/ucm/data/https_cert.pem"
+KEY_PATH="/opt/ucm/data/https_key.pem"
 
 # Check if custom certificates provided via ENV
 if [ -n "$UCM_HTTPS_CERT" ] && [ -n "$UCM_HTTPS_KEY" ]; then
@@ -346,7 +357,7 @@ else
     
     # Database backup if enabled
     if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-        BACKUP_DIR="/app/backend/data/backups"
+        BACKUP_DIR="/opt/ucm/data/backups"
         BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
         
         # Create backup
@@ -374,7 +385,7 @@ echo "   • HTTP Port:   ${UCM_HTTP_PORT}"
 echo ""
 echo -e "${GREEN}💾 Storage:${NC}"
 echo "   • Database:    ${UCM_DATABASE_PATH}"
-echo "   • Data Dir:    /app/backend/data"
+echo "   • Data Dir:    /opt/ucm/data"
 echo "   • Backup:      ${UCM_BACKUP_ENABLED}"
 echo ""
 echo -e "${GREEN}📧 Email:${NC}"
@@ -434,7 +445,7 @@ export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"
 export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"
 export ACME_ENABLED="${UCM_ACME_ENABLED}"
 
-echo -e "${GREEN}🚀 Starting UCM v1.8.0-beta...${NC}"
+echo -e "${GREEN}🚀 Starting UCM v2.0.3...${NC}"
 echo -e "${CYAN}   Access: https://${UCM_FQDN}:${UCM_HTTPS_PORT}${NC}"
 echo ""
 echo -e "${BLUE}📋 Executing command: $*${NC}"
