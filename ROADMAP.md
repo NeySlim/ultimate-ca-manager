@@ -69,10 +69,6 @@
 - [ ] **Approval Workflows** - Multi-approver requests
 - [ ] **Reports Page** - Scheduled reports
 
-### High Availability (Planned)
-- [ ] **PostgreSQL** - External database
-- [ ] **Redis Sessions** - Distributed sessions
-
 ---
 
 ## 🌟 v2.1.0 - Next Release
