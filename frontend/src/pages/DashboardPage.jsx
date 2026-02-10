@@ -27,7 +27,8 @@ import { formatRelativeTime } from '../lib/ui'
 // Default widgets configuration
 const DEFAULT_WIDGETS = [
   { id: 'stats', nameKey: 'dashboard.widgetStatistics', visible: true },
-  { id: 'charts', nameKey: 'dashboard.widgetChartsAnalytics', visible: true },
+  { id: 'chartTrend', nameKey: 'dashboard.widgetCertificateActivity', visible: true },
+  { id: 'chartPie', nameKey: 'dashboard.widgetStatusDistribution', visible: true },
   { id: 'nextExpiry', nameKey: 'dashboard.widgetNextExpirations', visible: true },
   { id: 'system', nameKey: 'dashboard.widgetSystemStatus', visible: true },
   { id: 'activity', nameKey: 'dashboard.widgetRecentActivity', visible: true },
@@ -39,34 +40,37 @@ const DEFAULT_WIDGETS = [
 // Default grid layouts per breakpoint (12-column grid)
 const DEFAULT_LAYOUTS = {
   lg: [
-    { i: 'stats',     x: 0,  y: 0, w: 12, h: 2, static: true },
-    { i: 'charts',    x: 0,  y: 2, w: 8,  h: 5, minW: 4, minH: 4 },
-    { i: 'nextExpiry',x: 8,  y: 2, w: 4,  h: 5, minW: 3, minH: 3 },
-    { i: 'certs',     x: 0,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'cas',       x: 4,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'activity',  x: 8,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'system',    x: 0,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
-    { i: 'acme',      x: 6,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
+    { i: 'stats',      x: 0,  y: 0, w: 12, h: 2, static: true },
+    { i: 'chartTrend', x: 0,  y: 2, w: 5,  h: 5, minW: 3, minH: 4 },
+    { i: 'chartPie',   x: 5,  y: 2, w: 4,  h: 5, minW: 3, minH: 4 },
+    { i: 'nextExpiry', x: 9,  y: 2, w: 3,  h: 5, minW: 3, minH: 3 },
+    { i: 'certs',      x: 0,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
+    { i: 'cas',        x: 4,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
+    { i: 'activity',   x: 8,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
+    { i: 'system',     x: 0,  y: 11, w: 6,  h: 5, minW: 3, minH: 4 },
+    { i: 'acme',       x: 6,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
   ],
   md: [
-    { i: 'stats',     x: 0, y: 0, w: 6, h: 2, static: true },
-    { i: 'charts',    x: 0, y: 2, w: 6, h: 5, minW: 3, minH: 4 },
-    { i: 'nextExpiry',x: 0, y: 7, w: 6, h: 4, minW: 3, minH: 3 },
-    { i: 'certs',     x: 0, y: 11, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: 'cas',       x: 3, y: 11, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: 'activity',  x: 0, y: 15, w: 6, h: 4, minW: 3, minH: 3 },
-    { i: 'system',    x: 0, y: 19, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: 'acme',      x: 3, y: 19, w: 3, h: 4, minW: 3, minH: 3 },
+    { i: 'stats',      x: 0, y: 0, w: 6, h: 2, static: true },
+    { i: 'chartTrend', x: 0, y: 2, w: 6, h: 5, minW: 3, minH: 4 },
+    { i: 'chartPie',   x: 0, y: 7, w: 6, h: 5, minW: 3, minH: 4 },
+    { i: 'nextExpiry', x: 0, y: 12, w: 6, h: 4, minW: 3, minH: 3 },
+    { i: 'certs',      x: 0, y: 16, w: 3, h: 4, minW: 3, minH: 3 },
+    { i: 'cas',        x: 3, y: 16, w: 3, h: 4, minW: 3, minH: 3 },
+    { i: 'activity',   x: 0, y: 20, w: 6, h: 4, minW: 3, minH: 3 },
+    { i: 'system',     x: 0, y: 24, w: 3, h: 5, minW: 3, minH: 4 },
+    { i: 'acme',       x: 3, y: 24, w: 3, h: 4, minW: 3, minH: 3 },
   ],
   sm: [
-    { i: 'stats',     x: 0, y: 0, w: 1, h: 2, static: true },
-    { i: 'charts',    x: 0, y: 2, w: 1, h: 5 },
-    { i: 'nextExpiry',x: 0, y: 7, w: 1, h: 4 },
-    { i: 'certs',     x: 0, y: 11, w: 1, h: 4 },
-    { i: 'cas',       x: 0, y: 15, w: 1, h: 4 },
-    { i: 'activity',  x: 0, y: 19, w: 1, h: 4 },
-    { i: 'system',    x: 0, y: 23, w: 1, h: 4 },
-    { i: 'acme',      x: 0, y: 27, w: 1, h: 4 },
+    { i: 'stats',      x: 0, y: 0, w: 1, h: 2, static: true },
+    { i: 'chartTrend', x: 0, y: 2, w: 1, h: 5 },
+    { i: 'chartPie',   x: 0, y: 7, w: 1, h: 5 },
+    { i: 'nextExpiry', x: 0, y: 12, w: 1, h: 4 },
+    { i: 'certs',      x: 0, y: 16, w: 1, h: 4 },
+    { i: 'cas',        x: 0, y: 20, w: 1, h: 4 },
+    { i: 'activity',   x: 0, y: 24, w: 1, h: 4 },
+    { i: 'system',     x: 0, y: 28, w: 1, h: 5 },
+    { i: 'acme',       x: 0, y: 33, w: 1, h: 4 },
   ]
 }
 
@@ -90,16 +94,24 @@ const saveWidgetPrefs = (widgets) => {
 }
 
 // Load grid layout from localStorage
+const LAYOUT_STORAGE_KEY = 'ucm-dashboard-layouts-v2'
 const loadGridLayouts = () => {
   try {
-    const saved = localStorage.getItem('ucm-dashboard-layouts')
-    if (saved) return JSON.parse(saved)
+    const saved = localStorage.getItem(LAYOUT_STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Validate that all default widget IDs exist in saved layouts
+      const defaultIds = new Set(DEFAULT_LAYOUTS.lg.map(l => l.i))
+      const savedIds = new Set((parsed.lg || []).map(l => l.i))
+      const allPresent = [...defaultIds].every(id => savedIds.has(id))
+      if (allPresent) return parsed
+    }
   } catch {}
   return DEFAULT_LAYOUTS
 }
 
 const saveGridLayouts = (layouts) => {
-  localStorage.setItem('ucm-dashboard-layouts', JSON.stringify(layouts))
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts))
 }
 
 // Action icons mapping
@@ -139,6 +151,7 @@ export default function DashboardPage() {
   const [showWidgetSettings, setShowWidgetSettings] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [gridLayouts, setGridLayouts] = useState(loadGridLayouts)
+  const [gridKey, setGridKey] = useState(0) // Force re-mount on reset
   const refreshTimeoutRef = useRef(null)
 
   // Grid layout width measurement
@@ -255,6 +268,7 @@ export default function DashboardPage() {
   const resetLayout = useCallback(() => {
     setGridLayouts(DEFAULT_LAYOUTS)
     saveGridLayouts(DEFAULT_LAYOUTS)
+    setGridKey(k => k + 1)
   }, [])
 
   // Filter layouts to only include visible widgets
@@ -293,7 +307,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 h-full overflow-auto bg-bg-primary">
-      <div className="px-3 pt-2 pb-0 space-y-2 max-w-[1800px] mx-auto">
+      <div className="px-3 pt-2 pb-2 space-y-2 mx-auto min-h-full" style={{ maxWidth: 'min(1800px, 100%)' }}>
         
         {/* Hero Header */}
         <div className="relative overflow-hidden rounded-xl hero-gradient border border-accent-primary/20 px-4 py-2">
@@ -377,9 +391,10 @@ export default function DashboardPage() {
         </div>
 
         {/* Grid Layout */}
-        <div ref={gridContainerRef} className="overflow-hidden">
+        <div ref={gridContainerRef}>
         {gridMounted && (
         <Responsive
+          key={gridKey}
           className={`dashboard-grid ${editMode ? 'edit-mode' : ''}`}
           layouts={visibleLayouts}
           breakpoints={{ lg: 1024, md: 640, sm: 0 }}
@@ -388,9 +403,8 @@ export default function DashboardPage() {
           rowHeight={40}
           margin={[10, 10]}
           containerPadding={[0, 0]}
-          draggableHandle=".widget-drag-handle"
-          isDraggable={editMode}
-          isResizable={editMode}
+          dragConfig={{ enabled: editMode, handle: '.widget-drag-handle' }}
+          resizeConfig={{ enabled: editMode }}
           compactor={verticalCompactor}
           onLayoutChange={handleLayoutChange}
         >
@@ -433,30 +447,40 @@ export default function DashboardPage() {
           </div>
           )}
 
-          {/* Charts Widget */}
-          {isVisible('charts') && (
-          <div key="charts">
+          {/* Certificate Activity Chart */}
+          {isVisible('chartTrend') && (
+          <div key="chartTrend">
             <WidgetWrapper editMode={editMode}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
-                <Card variant="elevated" className="p-0 flex flex-col">
-                  <Card.Header 
-                    icon={Lightning}
-                    iconColor="blue"
-                    title={t('dashboard.certificateActivity')}
-                    subtitle={t('dashboard.last7Days')}
-                  />
-                  <Card.Body className="flex-1 !pt-2 !pb-2">
+              <Card variant="elevated" className="h-full flex flex-col p-0">
+                <Card.Header 
+                  icon={Lightning}
+                  iconColor="blue"
+                  title={t('dashboard.certificateActivity')}
+                  subtitle={t('dashboard.last7Days')}
+                />
+                <Card.Body className="flex-1 !pt-1 !pb-1 flex items-center">
+                  <div className="w-full">
                     <CertificateTrendChart data={certificateTrend} height={140} />
-                  </Card.Body>
-                </Card>
-                <Card variant="elevated" className="p-0 flex flex-col">
-                  <Card.Header 
-                    icon={Certificate}
-                    iconColor="violet"
-                    title={t('dashboard.statusDistribution')}
-                    subtitle={t('dashboard.currentCertificates')}
-                  />
-                  <Card.Body className="flex-1 !pt-2 !pb-2">
+                  </div>
+                </Card.Body>
+              </Card>
+            </WidgetWrapper>
+          </div>
+          )}
+
+          {/* Status Distribution Chart */}
+          {isVisible('chartPie') && (
+          <div key="chartPie">
+            <WidgetWrapper editMode={editMode}>
+              <Card variant="elevated" className="h-full flex flex-col p-0">
+                <Card.Header 
+                  icon={Certificate}
+                  iconColor="violet"
+                  title={t('dashboard.statusDistribution')}
+                  subtitle={t('dashboard.currentCertificates')}
+                />
+                <Card.Body className="flex-1 !pt-1 !pb-1 flex items-center justify-center">
+                  <div className="w-full">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
@@ -466,9 +490,9 @@ export default function DashboardPage() {
                       }}
                       height={140} 
                     />
-                  </Card.Body>
-                </Card>
-              </div>
+                  </div>
+                </Card.Body>
+              </Card>
             </WidgetWrapper>
           </div>
           )}
@@ -725,8 +749,8 @@ export default function DashboardPage() {
                     </Button>
                   }
                 />
-                <Card.Body className="!pt-2">
-                  <div className="grid grid-cols-2 gap-2 mb-3">
+                <Card.Body className="flex-1 overflow-hidden !pt-1 !pb-1">
+                  <div className="grid grid-cols-2 gap-1.5 mb-2">
                     <SystemStat 
                       icon={WifiHigh} 
                       label={t('dashboard.websocket')} 
@@ -752,10 +776,10 @@ export default function DashboardPage() {
                       status="online" 
                     />
                   </div>
-                  <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                  <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide mb-1">
                     {t('dashboard.services')}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-4 gap-1.5">
                     <ServiceBadge name="ACME" status={systemStatus?.acme} />
                     <ServiceBadge name="SCEP" status={systemStatus?.scep} />
                     <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />

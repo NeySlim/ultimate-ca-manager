@@ -402,7 +402,6 @@
     "sub": "Sub",
     "orders": "orders",
     "widgetStatistics": "Statistics",
-    "widgetChartsAnalytics": "Charts & Analytics",
     "widgetSystemStatus": "System Status",
     "widgetExpiringCertificates": "Expiring Certificates",
     "showOrHideWidgets": "Show or hide widgets",
@@ -422,7 +421,9 @@
     "resetLayout": "Reset Layout",
     "dragToReorder": "Drag widgets to reorder",
     "expiresIn": "Expires in",
-    "expired": "Expired"
+    "expired": "Expired",
+    "widgetCertificateActivity": "Certificate Activity",
+    "widgetStatusDistribution": "Status Distribution"
   },
   "certificates": {
     "createCertificate": "Create Certificate",

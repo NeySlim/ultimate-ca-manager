@@ -823,7 +823,6 @@
     "sub": "Sub",
     "orders": "ordini",
     "widgetStatistics": "Statistiche",
-    "widgetChartsAnalytics": "Grafici e analisi",
     "widgetSystemStatus": "Stato del sistema",
     "widgetExpiringCertificates": "Certificati in scadenza",
     "showOrHideWidgets": "Mostra o nascondi widget",
@@ -843,7 +842,9 @@
     "resetLayout": "Ripristina layout",
     "dragToReorder": "Trascina i widget per riordinare",
     "expiresIn": "Scade tra",
-    "expired": "Scaduto"
+    "expired": "Scaduto",
+    "widgetCertificateActivity": "Attività certificati",
+    "widgetStatusDistribution": "Distribuzione stati"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

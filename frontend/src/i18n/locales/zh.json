@@ -823,7 +823,6 @@
     "sub": "Sub",
     "orders": "订单",
     "widgetStatistics": "统计",
-    "widgetChartsAnalytics": "图表与分析",
     "widgetSystemStatus": "系统状态",
     "widgetExpiringCertificates": "即将过期的证书",
     "showOrHideWidgets": "显示或隐藏小部件",
@@ -843,7 +842,9 @@
     "resetLayout": "重置布局",
     "dragToReorder": "拖动小部件以重新排列",
     "expiresIn": "到期时间",
-    "expired": "已过期"
+    "expired": "已过期",
+    "widgetCertificateActivity": "证书活动",
+    "widgetStatusDistribution": "状态分布"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

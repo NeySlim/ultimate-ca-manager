@@ -1077,6 +1077,14 @@ input:focus, select:focus, textarea:focus {
   transition: all 200ms ease;
 }
 
+/* Compact headers/body for dashboard widgets */
+.dashboard-grid .section-header-gradient {
+  padding: 8px 12px 6px;
+}
+.dashboard-grid .px-4.py-3 {
+  padding: 4px 12px 6px;
+}
+
 .dashboard-grid .react-grid-item.react-grid-placeholder {
   background: var(--accent-primary);
   opacity: 0.1;

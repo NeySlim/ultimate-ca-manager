@@ -823,7 +823,6 @@
     "sub": "Sub",
     "orders": "замовлень",
     "widgetStatistics": "Статистика",
-    "widgetChartsAnalytics": "Графіки та аналітика",
     "widgetSystemStatus": "Стан системи",
     "widgetExpiringCertificates": "Сертифікати з терміном дії",
     "showOrHideWidgets": "Показати або приховати віджети",
@@ -843,7 +842,9 @@
     "resetLayout": "Скинути макет",
     "dragToReorder": "Перетягніть віджети для зміни порядку",
     "expiresIn": "Закінчується через",
-    "expired": "Прострочений"
+    "expired": "Прострочений",
+    "widgetCertificateActivity": "Активність сертифікатів",
+    "widgetStatusDistribution": "Розподіл статусів"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

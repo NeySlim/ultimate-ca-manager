@@ -823,7 +823,6 @@
     "sub": "Intermédiaire",
     "orders": "commandes",
     "widgetStatistics": "Statistiques",
-    "widgetChartsAnalytics": "Graphiques et analyses",
     "widgetSystemStatus": "État du système",
     "widgetExpiringCertificates": "Certificats expirant bientôt",
     "showOrHideWidgets": "Afficher ou masquer les widgets",
@@ -843,7 +842,9 @@
     "resetLayout": "Réinitialiser",
     "dragToReorder": "Glissez les widgets pour réorganiser",
     "expiresIn": "Expire dans",
-    "expired": "Expiré"
+    "expired": "Expiré",
+    "widgetCertificateActivity": "Activité des certificats",
+    "widgetStatusDistribution": "Distribution des statuts"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

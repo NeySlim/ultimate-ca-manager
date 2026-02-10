@@ -823,7 +823,6 @@
     "sub": "Sub",
     "orders": "オーダー",
     "widgetStatistics": "統計",
-    "widgetChartsAnalytics": "チャートと分析",
     "widgetSystemStatus": "システム状態",
     "widgetExpiringCertificates": "有効期限が近い証明書",
     "showOrHideWidgets": "ウィジェットの表示/非表示",
@@ -843,7 +842,9 @@
     "resetLayout": "レイアウトをリセット",
     "dragToReorder": "ウィジェットをドラッグして並べ替え",
     "expiresIn": "有効期限まで",
-    "expired": "期限切れ"
+    "expired": "期限切れ",
+    "widgetCertificateActivity": "証明書アクティビティ",
+    "widgetStatusDistribution": "ステータス分布"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

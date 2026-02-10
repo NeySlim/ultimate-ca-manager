@@ -29,6 +29,9 @@ override_dh_auto_install:
 	# Only copy built frontend (dist/), not node_modules or source
 	cp -r frontend/dist debian/ucm/opt/ucm/frontend/
 	
+	# Copy VERSION file (single source of truth)
+	install -m 644 VERSION debian/ucm/opt/ucm/VERSION
+	
 	# Remove .env files (configuration is created by postinst)
 	rm -f debian/ucm/opt/ucm/.env* debian/ucm/opt/ucm/backend/.env* 2>/dev/null || true
 	

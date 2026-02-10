@@ -57,6 +57,8 @@ export function AppShell() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isLargeScreen, setIsLargeScreen] = useState(false)
+  const [isDesktopFrame, setIsDesktopFrame] = useState(false)
   const { showWarning } = useNotification()
   
   // Extract current page from pathname (empty string for dashboard)
@@ -85,10 +87,14 @@ export function AppShell() {
 
   // Check for mobile viewport
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    const checkViewport = () => {
+      setIsMobile(window.innerWidth < 768)
+      setIsLargeScreen(window.innerWidth >= 1280)
+      setIsDesktopFrame(window.innerWidth >= 900)
+    }
+    checkViewport()
+    window.addEventListener('resize', checkViewport)
+    return () => window.removeEventListener('resize', checkViewport)
   }, [])
   
   // Check for expiring certificates on mount (once per session)
@@ -138,12 +144,16 @@ export function AppShell() {
   const allNavItems = [...mobileNavItems, ...advancedNavItems]
 
   return (
-    <div className="flex h-full w-full overflow-hidden justify-center items-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Window container with frame effect */}
+    <div className={cn(
+      "flex h-full w-full overflow-hidden justify-center items-center",
+      isDesktopFrame ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-bg-primary"
+    )}>
+      {/* App container - frame effect on desktop (>= 900px) */}
       <div className={cn(
-        "flex flex-col h-full w-full max-w-[1920px] overflow-hidden bg-bg-primary relative",
-        // Frame effect on large screens only
-        "2xl:h-[calc(100%-24px)] 2xl:my-3 2xl:mx-4 2xl:rounded-xl 2xl:shadow-2xl 2xl:border 2xl:border-white/10"
+        "flex flex-col w-full overflow-hidden bg-bg-primary relative",
+        isDesktopFrame
+          ? "max-w-[1880px] h-[calc(100%-24px)] rounded-xl shadow-2xl border border-white/10"
+          : "h-full"
       )}>
         
       {/* Mobile Header - OUTSIDE the row flex, in a column layout */}
