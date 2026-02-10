@@ -56,7 +56,7 @@ RUN chown ucm:ucm /app
 COPY --chown=ucm:ucm backend/ /app/backend/
 COPY --chown=ucm:ucm frontend/ /app/frontend/
 COPY --chown=ucm:ucm wsgi.py /app/wsgi.py
-COPY --chown=ucm:ucm .env.example /app/.env.example
+COPY --chown=ucm:ucm .env.docker.example /app/.env.example
 
 # Create data directory at unified path (same as DEB/RPM installs)
 RUN mkdir -p /opt/ucm/data/{cas,certs,backups,logs,temp} && \
