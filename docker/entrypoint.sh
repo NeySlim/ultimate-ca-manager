@@ -162,12 +162,28 @@ echo -e "${BLUE}📁 Setting up directories...${NC}"
 # Unified data path: /opt/ucm/data (same as DEB/RPM)
 DATA_PATH="/opt/ucm/data"
 
-# Migration: if old path has data but new path doesn't, migrate
+# Migration: if old path has data, migrate everything to new path
 OLD_DATA_PATH="/app/backend/data"
-if [ -f "$OLD_DATA_PATH/ucm.db" ] && [ ! -f "$DATA_PATH/ucm.db" ]; then
-    echo -e "${YELLOW}   Migrating data from $OLD_DATA_PATH to $DATA_PATH...${NC}"
-    cp -a "$OLD_DATA_PATH"/* "$DATA_PATH"/ 2>/dev/null || true
-    echo -e "${GREEN}✅ Data migrated${NC}"
+if [ -d "$OLD_DATA_PATH" ] && [ "$(ls -A $OLD_DATA_PATH 2>/dev/null)" ]; then
+    echo -e "${YELLOW}   Checking for data migration from $OLD_DATA_PATH...${NC}"
+    # Copy everything that doesn't already exist in new path
+    for item in "$OLD_DATA_PATH"/*; do
+        basename_item=$(basename "$item")
+        if [ ! -e "$DATA_PATH/$basename_item" ]; then
+            echo -e "${YELLOW}   Migrating $basename_item...${NC}"
+            cp -a "$item" "$DATA_PATH/" 2>/dev/null || true
+        elif [ -d "$item" ] && [ -d "$DATA_PATH/$basename_item" ]; then
+            # Merge directories: copy files that don't exist in destination
+            for subitem in "$item"/*; do
+                sub_basename=$(basename "$subitem")
+                if [ ! -e "$DATA_PATH/$basename_item/$sub_basename" ]; then
+                    echo -e "${YELLOW}   Migrating $basename_item/$sub_basename...${NC}"
+                    cp -a "$subitem" "$DATA_PATH/$basename_item/" 2>/dev/null || true
+                fi
+            done
+        fi
+    done
+    echo -e "${GREEN}✅ Data migration complete${NC}"
 fi
 
 # Create necessary directories
