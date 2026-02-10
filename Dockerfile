@@ -1,5 +1,4 @@
 # Multi-stage Dockerfile for Ultimate CA Manager
-# Version: 2.0.0-beta1
 # Optimized for production with security and minimal size
 
 # Stage 1: Builder - Install dependencies and build environment
@@ -29,7 +28,6 @@ FROM python:3.13-slim-bookworm
 
 LABEL maintainer="NeySlim <https://github.com/NeySlim>" \
       description="Ultimate CA Manager - Certificate Authority Management System" \
-      version="2.0.0-beta1" \
       org.opencontainers.image.source="https://github.com/NeySlim/ultimate-ca-manager"
 
 # Install only runtime dependencies
@@ -53,6 +51,7 @@ RUN chown ucm:ucm /app
 
 # Copy application files
 # Copy application files with proper ownership
+COPY --chown=ucm:ucm VERSION /app/VERSION
 COPY --chown=ucm:ucm backend/ /app/backend/
 COPY --chown=ucm:ucm frontend/ /app/frontend/
 COPY --chown=ucm:ucm wsgi.py /app/wsgi.py

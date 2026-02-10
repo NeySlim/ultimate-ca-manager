@@ -137,6 +137,7 @@ jobs:
           
           # Copy only what's needed (NO node_modules, only dist/)
           cp -r backend packaging /tmp/rpm-build/ucm-${TAR_VERSION}/
+          cp VERSION /tmp/rpm-build/ucm-${TAR_VERSION}/
           mkdir -p /tmp/rpm-build/ucm-${TAR_VERSION}/frontend
           cp -r frontend/dist /tmp/rpm-build/ucm-${TAR_VERSION}/frontend/
           
