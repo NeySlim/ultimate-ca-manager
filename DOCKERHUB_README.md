@@ -25,7 +25,7 @@ Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Cer
 
 ```bash
 # Pull from GHCR (GitHub Container Registry)
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+docker pull neyslim/ultimate-ca-manager:latest
 
 # Run with SQLite
 docker run -d \
@@ -33,7 +33,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:latest
+  neyslim/ultimate-ca-manager:latest
 
 # Access: https://localhost:8443
 # Default login: admin / changeme123 ⚠️ CHANGE IMMEDIATELY!
@@ -148,16 +148,16 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 
 ```bash
 # Latest stable
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+docker pull neyslim/ultimate-ca-manager:latest
 
 # Specific version
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.0.1
+docker pull neyslim/ultimate-ca-manager:latest
 
 # Major version
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1
+docker pull neyslim/ultimate-ca-manager:latest
 
 # Architecture-specific
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
+docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:
@@ -289,7 +289,7 @@ BSD 3-Clause License - see [LICENSE](LICENSE) for details.
 - **Issues**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
 - **Documentation**: [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-- **Docker Hub**: [ghcr.io/neyslim/ultimate-ca-manager](https://hub.docker.com/r/ghcr.io/neyslim/ultimate-ca-manager)
+- **Docker Hub**: [neyslim/ultimate-ca-manager](https://hub.docker.com/r/neyslim/ultimate-ca-manager)
 
 ---
 

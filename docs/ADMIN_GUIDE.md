@@ -305,7 +305,7 @@ All actions are logged:
 
 ```bash
 # Docker
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+docker pull neyslim/ultimate-ca-manager:latest
 docker-compose up -d
 
 # Package

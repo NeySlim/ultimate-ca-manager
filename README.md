@@ -173,7 +173,7 @@ docker run -d --restart=unless-stopped \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
-  ghcr.io/neyslim/ultimate-ca-manager:latest
+  neyslim/ultimate-ca-manager:latest
 ```
 
 **Access:** https://localhost:8443  

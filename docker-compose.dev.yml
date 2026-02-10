@@ -1,5 +1,5 @@
 # ============================================================================
-# UCM v1.8.3 - Docker Compose Development Configuration
+# UCM v2.0.3 - Docker Compose Development Configuration
 # ============================================================================
 # Development setup with hot-reload, debugging, and verbose logging
 # 
@@ -7,7 +7,6 @@
 #   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 # ============================================================================
 
-version: '3.8'
 
 services:
   ucm:
@@ -20,7 +19,7 @@ services:
     volumes:
       - ./backend:/app/backend:rw
       - ./frontend:/app/frontend:rw
-      - ucm-data:/app/backend/data
+      - ucm-data:/opt/ucm/data
       
       # Don't mount these (keep container versions)
       # - ./backend/__pycache__

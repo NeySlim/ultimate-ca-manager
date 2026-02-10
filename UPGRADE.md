@@ -18,7 +18,7 @@ This guide covers upgrading UCM to newer versions across different installation 
 
 ```bash
 # 1. Backup current data
-docker-compose exec ucm cp /app/backend/data/ucm.db /app/backend/data/backups/manual-backup-$(date +%Y%m%d).db
+docker-compose exec ucm cp /opt/ucm/data/ucm.db /opt/ucm/data/backups/manual-backup-$(date +%Y%m%d).db
 
 # 2. Pull new image
 docker-compose pull
@@ -46,21 +46,21 @@ docker-compose logs -f ucm
 docker stop ucm
 
 # 2. Backup data
-docker cp ucm:/app/backend/data/ucm.db ./backup-$(date +%Y%m%d).db
+docker cp ucm:/opt/ucm/data/ucm.db ./backup-$(date +%Y%m%d).db
 
 # 3. Remove old container
 docker rm ucm
 
 # 4. Pull new image
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+docker pull neyslim/ultimate-ca-manager:latest
 
 # 5. Start new container
 docker run -d \
   --name ucm \
   -p 8443:8443 \
-  -v ucm-data:/app/backend/data \
+  -v ucm-data:/opt/ucm/data \
   -e UCM_FQDN=ucm.example.com \
-  ghcr.io/neyslim/ultimate-ca-manager:latest
+  neyslim/ultimate-ca-manager:latest
 ```
 
 ---
@@ -275,7 +275,7 @@ sudo systemctl restart ucm
 
 ```bash
 # Try different registry
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+docker pull neyslim/ultimate-ca-manager:latest
 # or
 docker pull neyslim/ultimate-ca-manager:latest
 
@@ -337,7 +337,7 @@ systemctl is-active --quiet ucm || \
 
 ```bash
 # Specify exact version
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+docker pull neyslim/ultimate-ca-manager:latest
 docker-compose down
 # Edit docker-compose.yml to use version 1.8.3
 docker-compose up -d

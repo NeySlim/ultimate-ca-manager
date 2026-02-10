@@ -32,6 +32,11 @@ Thumbs.db
 
 # Obsolete
 .release-version
+MANIFEST
+verify_imports.py
+verify_proxy.py
+GITHUB_DESCRIPTION.md
+wiki/
 
 # Application
 .env
