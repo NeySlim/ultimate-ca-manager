@@ -26,6 +26,12 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+.bash_logout
+.bashrc
+.profile
+
+# Obsolete
+.release-version
 
 # Application
 .env
