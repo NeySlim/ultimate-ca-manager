@@ -122,6 +122,12 @@ export function UpdateChecker() {
               </div>
             )}
             
+            {updateInfo?.update_available && !updateInfo?.can_auto_update && (
+              <div className="text-xs text-text-tertiary mt-1">
+                💡 docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+              </div>
+            )}
+            
             {error && (
               <div className="flex items-center gap-1 text-accent-danger text-sm mt-2">
                 <Warning size={14} />
@@ -139,7 +145,7 @@ export function UpdateChecker() {
         </div>
         
         <div className="flex items-center gap-2">
-          {updateInfo?.update_available && (
+          {updateInfo?.update_available && updateInfo?.can_auto_update && (
             <Button
               variant="primary"
               size="sm"
