@@ -1,5 +1,5 @@
 # ============================================================================
-# UCM v1.8.3 - Docker Compose Production Configuration
+# UCM v2.0.3 - Docker Compose Production Configuration
 # ============================================================================
 # Production-ready setup with security hardening and performance optimization
 # 
@@ -7,11 +7,10 @@
 #   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # ============================================================================
 
-version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/username/ucm:1.8.3  # Use pre-built image
+    image: neyslim/ultimate-ca-manager:latest  # Use pre-built image
     
     # Production environment overrides
     environment:

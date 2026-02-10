@@ -1,7 +1,6 @@
 # UCM with Redis - High Availability Setup
 # Use: docker compose -f docker-compose.yml -f docker-compose.redis.yml up -d
 
-version: '3.8'
 
 services:
   ucm:
