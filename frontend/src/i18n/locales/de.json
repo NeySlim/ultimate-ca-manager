@@ -680,7 +680,14 @@
     "update": "Update",
     "manual": "Manual",
     "auto": "Auto",
-    "gotIt": "Verstanden"
+    "gotIt": "Verstanden",
+    "certificate": "Zertifikat",
+    "certificates": "Zertifikate",
+    "compare": "Vergleichen",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "importCertificate": "Zertifikat importieren",
+    "importSuccess": "Import erfolgreich",
+    "issued": "Ausgestellt"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1726,7 +1733,8 @@
       "followSystem": "System folgen",
       "dark": "Dunkel",
       "light": "Hell"
-    }
+    },
+    "emailAddressRequired": "E-Mail-Adresse ist erforderlich"
   },
   "sso": {
     "title": "Single Sign-On",
@@ -1807,7 +1815,8 @@
       "admin": "Admin",
       "operator": "Operator",
       "viewer": "Betrachter"
-    }
+    },
+    "configuredProviders": "Konfigurierte Anbieter"
   },
   "templates": {
     "title": "Vorlagen",
@@ -2098,7 +2107,8 @@
     "emailTrust": "Email",
     "emailTrustDesc": "Trusted for S/MIME",
     "subtitle_one": "{{count}} Zertifikat",
-    "subtitle_other": "{{count}} Zertifikate"
+    "subtitle_other": "{{count}} Zertifikate",
+    "sha256": "SHA-256-Fingerabdruck"
   },
   "users": {
     "title": "Benutzer",

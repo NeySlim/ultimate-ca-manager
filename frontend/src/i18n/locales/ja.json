@@ -680,7 +680,14 @@
     "update": "Update",
     "manual": "Manual",
     "auto": "Auto",
-    "gotIt": "了解"
+    "gotIt": "了解",
+    "certificate": "証明書",
+    "certificates": "証明書",
+    "compare": "比較",
+    "deleteFailed": "削除に失敗しました",
+    "importCertificate": "証明書をインポート",
+    "importSuccess": "インポート成功",
+    "issued": "発行済み"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1726,7 +1733,8 @@
       "followSystem": "システムに従う",
       "dark": "ダーク",
       "light": "ライト"
-    }
+    },
+    "emailAddressRequired": "メールアドレスは必須です"
   },
   "sso": {
     "title": "シングルサインオン",
@@ -1807,7 +1815,8 @@
       "admin": "管理者",
       "operator": "オペレーター",
       "viewer": "閲覧者"
-    }
+    },
+    "configuredProviders": "設定済みプロバイダー"
   },
   "templates": {
     "title": "テンプレート",
@@ -2098,7 +2107,8 @@
     "emailTrust": "Email",
     "emailTrustDesc": "Trusted for S/MIME",
     "subtitle_one": "{{count}} 件の証明書",
-    "subtitle_other": "{{count}} 件の証明書"
+    "subtitle_other": "{{count}} 件の証明書",
+    "sha256": "SHA-256 フィンガープリント"
   },
   "users": {
     "title": "ユーザー",

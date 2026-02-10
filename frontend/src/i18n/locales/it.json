@@ -487,7 +487,11 @@
     "createFailed": "Failed to create CA",
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} CA",
-    "subtitle_other": "{{count}} CA"
+    "subtitle_other": "{{count}} CA",
+    "columnsView": "Vista colonne",
+    "noIntermediate": "Nessuna CA intermedia",
+    "orgView": "Vista organigramma",
+    "orphanCAs": "CA orfane"
   },
   "certificates": {
     "title": "Certificati",
@@ -675,7 +679,15 @@
     "na": "N/A",
     "update": "Update",
     "manual": "Manual",
-    "auto": "Auto"
+    "auto": "Auto",
+    "gotIt": "Capito",
+    "certificate": "Certificato",
+    "certificates": "Certificati",
+    "compare": "Confronta",
+    "deleteFailed": "Eliminazione fallita",
+    "importCertificate": "Importa certificato",
+    "importSuccess": "Importazione riuscita",
+    "issued": "Emesso"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1007,7 +1019,9 @@
     "aboutAPIKeys": "Informazioni sulle chiavi API",
     "aboutWebAuthn": "Informazioni sulle chiavi di sicurezza",
     "bestPractices": "Best practice",
-    "securityNote": "Nota sulla sicurezza"
+    "securityNote": "Nota sulla sicurezza",
+    "proTips": "Suggerimenti",
+    "seeAlso": "Vedi anche"
   },
   "hsm": {
     "title": "Gestione HSM",
@@ -1719,7 +1733,8 @@
       "followSystem": "Segui sistema",
       "dark": "Scuro",
       "light": "Chiaro"
-    }
+    },
+    "emailAddressRequired": "L'indirizzo email è obbligatorio"
   },
   "sso": {
     "title": "Single Sign-On",
@@ -1800,7 +1815,8 @@
       "admin": "Admin",
       "operator": "Operatore",
       "viewer": "Visualizzatore"
-    }
+    },
+    "configuredProviders": "Provider configurati"
   },
   "templates": {
     "title": "Modelli",
@@ -2091,7 +2107,8 @@
     "emailTrust": "Email",
     "emailTrustDesc": "Trusted for S/MIME",
     "subtitle_one": "{{count}} certificato",
-    "subtitle_other": "{{count}} certificati"
+    "subtitle_other": "{{count}} certificati",
+    "sha256": "Impronta SHA-256"
   },
   "users": {
     "title": "Utenti",

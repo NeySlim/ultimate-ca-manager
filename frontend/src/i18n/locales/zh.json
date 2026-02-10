@@ -680,7 +680,14 @@
     "update": "Update",
     "manual": "Manual",
     "auto": "Auto",
-    "gotIt": "知道了"
+    "gotIt": "知道了",
+    "certificate": "证书",
+    "certificates": "证书",
+    "compare": "比较",
+    "deleteFailed": "删除失败",
+    "importCertificate": "导入证书",
+    "importSuccess": "导入成功",
+    "issued": "已签发"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1726,7 +1733,8 @@
       "followSystem": "跟随系统",
       "dark": "深色",
       "light": "浅色"
-    }
+    },
+    "emailAddressRequired": "电子邮件地址为必填项"
   },
   "sso": {
     "title": "单点登录",
@@ -1807,7 +1815,8 @@
       "admin": "管理员",
       "operator": "操作员",
       "viewer": "查看者"
-    }
+    },
+    "configuredProviders": "已配置的提供商"
   },
   "templates": {
     "title": "模板",
@@ -2098,7 +2107,8 @@
     "emailTrust": "Email",
     "emailTrustDesc": "Trusted for S/MIME",
     "subtitle_one": "{{count}} 个证书",
-    "subtitle_other": "{{count}} 个证书"
+    "subtitle_other": "{{count}} 个证书",
+    "sha256": "SHA-256 指纹"
   },
   "users": {
     "title": "用户",

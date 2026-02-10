@@ -680,7 +680,14 @@
     "update": "Update",
     "manual": "Manual",
     "auto": "Auto",
-    "gotIt": "Entendido"
+    "gotIt": "Entendido",
+    "certificate": "Certificado",
+    "certificates": "Certificados",
+    "compare": "Comparar",
+    "deleteFailed": "Error al eliminar",
+    "importCertificate": "Importar certificado",
+    "importSuccess": "Importación exitosa",
+    "issued": "Emitido"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1726,7 +1733,8 @@
       "followSystem": "Seguir sistema",
       "dark": "Oscuro",
       "light": "Claro"
-    }
+    },
+    "emailAddressRequired": "La dirección de correo es obligatoria"
   },
   "sso": {
     "title": "Inicio de sesión único",
@@ -1807,7 +1815,8 @@
       "admin": "Admin",
       "operator": "Operador",
       "viewer": "Visualizador"
-    }
+    },
+    "configuredProviders": "Proveedores configurados"
   },
   "templates": {
     "title": "Plantillas",
@@ -2098,7 +2107,8 @@
     "emailTrust": "Email",
     "emailTrustDesc": "Trusted for S/MIME",
     "subtitle_one": "{{count}} certificado",
-    "subtitle_other": "{{count}} certificados"
+    "subtitle_other": "{{count}} certificados",
+    "sha256": "Huella SHA-256"
   },
   "users": {
     "title": "Usuarios",

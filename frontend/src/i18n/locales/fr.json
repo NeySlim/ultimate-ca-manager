@@ -680,7 +680,14 @@
     "auto": "Auto",
     "manual": "Manuel",
     "update": "Mettre à jour",
-    "gotIt": "Compris"
+    "gotIt": "Compris",
+    "certificate": "Certificat",
+    "certificates": "Certificats",
+    "compare": "Comparer",
+    "deleteFailed": "Échec de la suppression",
+    "importCertificate": "Importer un certificat",
+    "importSuccess": "Importation réussie",
+    "issued": "Émis"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1726,7 +1733,8 @@
     "applyAndRestart": "Appliquer et redémarrer",
     "regenerateCertConfirm": "Régénérer le certificat HTTPS ? Cela redémarrera le serveur.",
     "regenerateAndRestart": "Régénérer et redémarrer",
-    "applyImportedCertConfirm": "Apply this imported certificate as HTTPS certificate? This will restart the server."
+    "applyImportedCertConfirm": "Apply this imported certificate as HTTPS certificate? This will restart the server.",
+    "emailAddressRequired": "L'adresse e-mail est requise"
   },
   "sso": {
     "title": "Authentification unique",
@@ -1807,7 +1815,8 @@
       "admin": "Admin",
       "operator": "Opérateur",
       "viewer": "Lecteur"
-    }
+    },
+    "configuredProviders": "Fournisseurs configurés"
   },
   "templates": {
     "title": "Modèles",
@@ -2098,7 +2107,8 @@
     "tlsTrust": "TLS Trust",
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "subtitle_one": "{{count}} certificat",
-    "subtitle_other": "{{count}} certificats"
+    "subtitle_other": "{{count}} certificats",
+    "sha256": "Empreinte SHA-256"
   },
   "users": {
     "title": "Utilisateurs",

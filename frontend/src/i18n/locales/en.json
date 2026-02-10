@@ -130,7 +130,14 @@
     "auto": "Auto",
     "manual": "Manual",
     "update": "Update",
-    "gotIt": "Got it"
+    "gotIt": "Got it",
+    "certificate": "Certificate",
+    "certificates": "Certificates",
+    "compare": "Compare",
+    "deleteFailed": "Delete failed",
+    "importCertificate": "Import Certificate",
+    "importSuccess": "Import successful",
+    "issued": "Issued"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -1042,7 +1049,8 @@
     "validUntil": "Valid Until",
     "validity": "Validity",
     "subtitle_one": "{{count}} certificate",
-    "subtitle_other": "{{count}} certificates"
+    "subtitle_other": "{{count}} certificates",
+    "sha256": "SHA-256 Fingerprint"
   },
   "importExport": {
     "title": "Import / Export",
@@ -1497,7 +1505,8 @@
     "vacuum": "Vacuum Database",
     "validFrom": "Valid From",
     "validUntil": "Valid Until",
-    "weekly": "Weekly"
+    "weekly": "Weekly",
+    "emailAddressRequired": "Email address is required"
   },
   "account": {
     "title": "My Account",
@@ -1845,7 +1854,8 @@
       "admin": "Admin",
       "operator": "Operator",
       "viewer": "Viewer"
-    }
+    },
+    "configuredProviders": "Configured Providers"
   },
   "securityDashboard": {
     "title": "Security Dashboard",
