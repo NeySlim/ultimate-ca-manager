@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers all installation methods for Ultimate CA Manager v2.0.0.
+This guide covers all installation methods for Ultimate CA Manager.
 
 ## 📋 System Requirements
 
@@ -35,7 +35,7 @@ docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
-  ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta
+  neyslim/ultimate-ca-manager:latest
 ```
 
 **Access:** https://localhost:8443  
@@ -51,10 +51,10 @@ See: [Debian/Ubuntu Installation Guide](debian-ubuntu.md)
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta/ucm_2.0.0-beta_amd64.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
 
 # Install
-sudo dpkg -i ucm_2.0.0-beta_amd64.deb
+sudo dpkg -i ucm_2.0.3_all.deb
 sudo apt-get install -f  # Fix any dependencies
 
 # Enable and start
@@ -75,10 +75,10 @@ See: [RHEL/Rocky/Alma Installation Guide](rhel-rocky-alma.md)
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta/ucm-2.0.0-0.1.beta.x86_64.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm.noarch.rpm
 
 # Install
-sudo dnf install ucm-2.0.0-0.1.beta.x86_64.rpm
+sudo dnf install ucm-*.noarch.rpm
 
 # Enable and start
 sudo systemctl enable ucm

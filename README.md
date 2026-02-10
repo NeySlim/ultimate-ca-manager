@@ -139,7 +139,7 @@ wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pac
 
 ```bash
 # Download from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_2.0.1_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
 
 # Install
 sudo apt install -y python3-venv python3-pip  # Required dependencies
@@ -151,7 +151,7 @@ sudo systemctl enable --now ucm
 
 ```bash
 # Download from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-2.0.1-1.fc43.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm.noarch.rpm
 
 # Install
 sudo dnf install ./ucm-*.rpm
@@ -166,14 +166,14 @@ docker run -d --restart=unless-stopped \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
-  neyslim/ultimate-ca-manager:2.0.0
+  neyslim/ultimate-ca-manager:latest
 
 # Or from GitHub Container Registry
 docker run -d --restart=unless-stopped \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
-  ghcr.io/neyslim/ultimate-ca-manager:2.0.0
+  neyslim/ultimate-ca-manager:latest
 ```
 
 **Access:** https://localhost:8443  
@@ -182,10 +182,9 @@ docker run -d --restart=unless-stopped \
 ### Docker Compose
 
 ```yaml
-version: '3.8'
 services:
   ucm:
-    image: neyslim/ultimate-ca-manager:2.0.0  # or ghcr.io/neyslim/ultimate-ca-manager:2.0.0
+    image: neyslim/ultimate-ca-manager:latest
     container_name: ucm
     ports:
       - "8443:8443"
@@ -372,7 +371,7 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details.
 ## 🙏 Acknowledgments
 
 - Flask & SQLAlchemy teams
-- HTMX & Alpine.js projects
+- React & Radix UI
 - OpenSSL & cryptography library
 - All contributors and users
 
@@ -390,15 +389,9 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📚 Documentation
+## 📚 Additional Documentation
 
-Comprehensive technical documentation is available in the [`/docs`](/docs) directory:
-
-- **[UCM API Specification](/docs/UCM-API-SPECIFICATION.md)** - Complete API v2 contract, endpoint analysis, implementation plan
-- **[API Wiring Audit](/docs/API-WIRING-AUDIT.md)** - Frontend/backend integration audit and bug reports
-- **[Documentation Overview](/docs/README.md)** - Architecture, conventions, and contribution guidelines
-
-**Current Status:** 🚧 **Beta** - v2.x with new React frontend
+Comprehensive technical documentation is available in the [`/docs`](/docs) directory and the **[Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**.
 
 ## ⚡ What's New in v2.x
 

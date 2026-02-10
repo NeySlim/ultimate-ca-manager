@@ -1,6 +1,6 @@
 # UCM API v2.0 - Complete Reference
 
-> **Version**: 2.0.0  
+> **Version**: 2.x  
 > **Base URL**: `https://your-server:8443/api/v2`  
 > **Last Updated**: January 2026  
 > **Total Endpoints**: 155
@@ -1024,7 +1024,7 @@ GET /api/v2/dashboard/system-status
       "percent": 4.2
     },
     "uptime": "15 days, 3:42:15",
-    "version": "2.0.0"
+    "version": "2.x"
   }
 }
 ```
@@ -1508,6 +1508,6 @@ const data = await certs.json();
 
 ---
 
-**Documentation generated**: January 28, 2026  
-**API Version**: 2.0.0  
+**Documentation generated**: January 2026  
+**API Version**: 2.x  
 **Total Endpoints**: 155

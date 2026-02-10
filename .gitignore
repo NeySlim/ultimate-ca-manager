@@ -26,6 +26,17 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+.bash_logout
+.bashrc
+.profile
+
+# Obsolete
+.release-version
+MANIFEST
+verify_imports.py
+verify_proxy.py
+GITHUB_DESCRIPTION.md
+wiki/
 
 # Application
 .env

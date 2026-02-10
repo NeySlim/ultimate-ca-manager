@@ -1,7 +1,7 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.0  
-**Status:** Beta Testing
+**Current Version:** See [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest)  
+**Status:** Stable
 
 ---
 
@@ -56,15 +56,15 @@
 
 ---
 
-## ✅ Pro Features (v2.0.0)
+## ✅ Advanced Features (v2.0.0)
 
-### Enterprise Security ✅
+### Security & Administration ✅
 - ✅ **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault
 - ✅ **RBAC** - Custom roles and permissions
 - ✅ **SSO** - SAML, OAuth2, LDAP integration
 - ✅ **Security Dashboard** - Secrets management, anomaly detection
 
-### Coming in Pro v2.1.0
+### Planned for v2.1.0
 - [ ] **Policies Page** - Certificate policy management
 - [ ] **Approval Workflows** - Multi-approver requests
 - [ ] **Reports Page** - Scheduled reports

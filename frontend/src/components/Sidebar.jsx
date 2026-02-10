@@ -66,7 +66,7 @@ export function Sidebar({ activePage }) {
     { id: 'tools', icon: Wrench, labelKey: 'nav.tools', path: '/tools' },
     { id: 'audit', icon: ClockCounterClockwise, labelKey: 'nav.audit', path: '/audit' },
     { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
-    // Advanced features (formerly Pro)
+    // Advanced features
     { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
     { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
     { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security' },

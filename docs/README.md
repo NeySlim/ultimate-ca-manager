@@ -1,126 +1,42 @@
 # UCM Documentation
 
-Ce dossier contient la documentation technique du projet Ultimate CA Manager.
+Technical documentation for Ultimate CA Manager.
 
-## Documents Disponibles
+## Guides
 
-### Guides
-- **[USER_GUIDE.md](./USER_GUIDE.md)** - Guide de démarrage utilisateur
-- **[ADMIN_GUIDE.md](./ADMIN_GUIDE.md)** - Configuration serveur et administration
-- **[PRO-FEATURES.md](./PRO-FEATURES.md)** - Fonctionnalités Pro (SSO, LDAP, HSM, RBAC)
+- **[USER_GUIDE.md](./USER_GUIDE.md)** — Getting started
+- **[ADMIN_GUIDE.md](./ADMIN_GUIDE.md)** — Server configuration & administration
+- **[ADVANCED-FEATURES.md](./ADVANCED-FEATURES.md)** — Advanced features overview
+- **[SECURITY.md](./SECURITY.md)** — Security documentation
 
-### Spécifications API
-- **[API_REFERENCE.md](./API_REFERENCE.md)** - Documentation des 155+ endpoints
-- **[openapi.yaml](./openapi.yaml)** - Spécification OpenAPI 3.0 complète
-- **[UCM-API-SPECIFICATION.md](./UCM-API-SPECIFICATION.md)** - Contrat API v2
+## Installation
 
-### Tests
-- **[TESTING.md](./TESTING.md)** - Guide des tests (unit + E2E)
+- **[installation/README.md](./installation/README.md)** — All installation methods (DEB, RPM, Docker)
+- **[installation/docker.md](./installation/docker.md)** — Docker & docker-compose deployment
 
-### Screenshots
-- **[SCREENSHOTS.md](./SCREENSHOTS.md)** - Captures d'écran de l'interface
+## API
 
-## Statut Actuel
+- **[API_REFERENCE.md](./API_REFERENCE.md)** — Complete API reference (155+ endpoints)
 
-**Date:** 2026-01-29  
-**Version:** 2.0.0  
-**Statut:** ✅ PRODUCTION READY
+## Operations
 
-### Fonctionnalités Complètes
-
-#### PKI Core
-- ✅ Gestion complète des CAs (création, import, export, delete)
-- ✅ Gestion des certificats (génération, signature, révocation, renouvellement)
-- ✅ CSRs (upload, signature, export)
-- ✅ Templates de certificats
-- ✅ CRL & OCSP
-- ✅ SCEP & ACME
-
-#### Import/Export
-- ✅ Import fichier (PEM, DER, PKCS12, PKCS7)
-- ✅ Coller PEM/JSON directement
-- ✅ Auto-détection du format
-- ✅ Auto-routage (CA vs certificat)
-- ✅ Détection des doublons avec mise à jour
-- ✅ Export PEM/DER/PKCS12
-- ✅ Copier PEM en un clic
-
-#### Authentification
-- ✅ Login username/password
-- ✅ 2FA TOTP (Google Authenticator)
-- ✅ WebAuthn/FIDO2 (YubiKey)
-- ✅ mTLS (certificat client)
-- ✅ Cascade automatique des méthodes
-
-#### UI/UX
-- ✅ 6 thèmes avec gradients
-- ✅ Layout split-view cohérent
-- ✅ TreeView pour hiérarchie CAs
-- ✅ Audit logs avec filtres et export
+- **[LOG_ROTATION.md](./LOG_ROTATION.md)** — Log rotation configuration
+- **[REDIS.md](./REDIS.md)** — Optional Redis integration
+- **[TESTING.md](./TESTING.md)** — Testing guide (unit + E2E)
 
 ## Architecture
 
-### Backend
-- **Framework:** Flask + SQLAlchemy
-- **API Version:** v2
-- **Base URL:** `/api/v2`
-- **Auth:** Session-based (cookie)
-- **Database:** SQLite (`/opt/ucm/data/ucm.db`)
+| Component | Stack |
+|-----------|-------|
+| Backend | Flask + SQLAlchemy |
+| API | REST v2 (`/api/v2`) |
+| Auth | Session-based (JWT) |
+| Database | SQLite |
+| Frontend | React 18 + Radix UI + Vite |
 
-### Frontend
-- **Framework:** React 18
-- **Router:** React Router v6
-- **UI:** Radix UI + TailwindCSS
-- **Build:** Vite
-- **Deployment:** `/opt/ucm/frontend/static/`
+## Links
 
-### Conventions API
-
-**Réponse Standard (Lists):**
-```json
-{
-  "data": [...],
-  "meta": {
-    "total": 100,
-    "page": 1,
-    "per_page": 20,
-    "total_pages": 5
-  }
-}
-```
-
-**Réponse Standard (Single/Config):**
-```json
-{
-  "data": {...}
-}
-```
-
-**Mutations:**
-```json
-{
-  "success": true,
-  "data": {...},
-  "message": "Operation successful"
-}
-```
-
-## Build & Deploy
-
-```bash
-# Frontend build
-cd /root/ucm-src/frontend
-npm run build
-
-# Deploy
-cp dist/assets/* /opt/ucm/frontend/static/assets/
-cp dist/index.html /opt/ucm/frontend/templates/index.html
-sudo systemctl restart ucm
-```
-
-## Ressources
-
-- **Production:** https://netsuit.lan.pew.pet:8443
-- **Source:** `/root/ucm-src` (branch: `redesign/v3.0.0-clean`)
-- **Database:** `/opt/ucm/data/ucm.db`
-- **Logs:** `/var/log/ucm/`
+- **[GitHub](https://github.com/NeySlim/ultimate-ca-manager)**
+- **[Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**
+- **[Docker Hub](https://hub.docker.com/r/neyslim/ultimate-ca-manager)**
+- **[Changelog](../CHANGELOG.md)**

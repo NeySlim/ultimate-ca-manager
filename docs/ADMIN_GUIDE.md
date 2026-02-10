@@ -279,7 +279,7 @@ Users can create API keys for automation:
 
 ```bash
 curl -k https://localhost:8443/api/v2/health
-# {"status": "healthy", "version": "2.0.0", ...}
+# {"status": "healthy", "version": "2.0.x", ...}
 ```
 
 ### Metrics
@@ -305,7 +305,7 @@ All actions are logged:
 
 ```bash
 # Docker
-docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+docker pull neyslim/ultimate-ca-manager:latest
 docker-compose up -d
 
 # Package
