@@ -58,17 +58,16 @@ COPY --chown=ucm:ucm frontend/ /app/frontend/
 COPY --chown=ucm:ucm wsgi.py /app/wsgi.py
 COPY --chown=ucm:ucm .env.example /app/.env.example
 
-# Create necessary directories with proper permissions
-# Using bash for brace expansion
-RUN bash -c 'mkdir -p /app/backend/data/{cas,certs,backups,logs,temp}' && \
-    chown -R ucm:ucm /app/backend/data
+# Create data directory at unified path (same as DEB/RPM installs)
+RUN mkdir -p /opt/ucm/data/{cas,certs,backups,logs,temp} && \
+    chown -R ucm:ucm /opt/ucm
 
 # Set environment variables
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UCM_DOCKER=1 \
-    DATA_DIR=/app/backend/data
+    DATA_DIR=/opt/ucm/data
 
 # Expose HTTPS port
 EXPOSE 8443

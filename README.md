@@ -254,7 +254,7 @@ UCM_FQDN=ucm.example.com         # Server FQDN
 UCM_HTTPS_PORT=8443              # HTTPS port
 
 # Database
-UCM_DATABASE_PATH=/app/backend/data/ucm.db
+UCM_DATABASE_PATH=/opt/ucm/data/ucm.db
 
 # Security
 UCM_SECRET_KEY=auto-generated    # Session secret key
@@ -326,7 +326,7 @@ sudo systemctl restart ucm
 ```bash
 docker logs ucm
 # Check certificate generation
-docker exec ucm ls -l /app/backend/data/https*.pem
+docker exec ucm ls -l /opt/ucm/data/https*.pem
 ```
 
 ### Health check failing
