@@ -98,7 +98,7 @@ export function Sidebar({ activePage }) {
               buttonSize,
               "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
               isActive
-                ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/20" 
+                ? "sidebar-active-gradient text-accent-primary border border-accent-primary/20" 
                 : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
             )}
             title={showBadge ? `${label} (${expiringCount} ${t('common.expiring').toLowerCase()})` : label}

@@ -586,13 +586,21 @@ tr.row-selected td:first-child {
   border-right: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
 }
 .table-row-hover:hover {
-  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--accent-primary) 6%, transparent),
+    color-mix(in srgb, var(--bg-tertiary) 40%, transparent) 40%,
+    transparent
+  );
   box-shadow: 
     inset 0 1px 0 color-mix(in srgb, var(--bg-tertiary) 80%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
 }
 .table-row-hover.selected {
-  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--accent-primary) 12%, transparent),
+    color-mix(in srgb, var(--accent-primary) 5%, transparent) 60%,
+    transparent
+  );
 }
 
 /* First cell accent on hover */
@@ -609,14 +617,17 @@ tr.row-selected td:first-child {
 
 /* Mobile card hover */
 .mobile-card-hover {
-  transition: background-color var(--duration-fast) var(--ease-smooth), transform var(--duration-fast) var(--ease-smooth);
+  transition: background var(--duration-fast) var(--ease-smooth), transform var(--duration-fast) var(--ease-smooth);
 }
 .mobile-card-hover:hover {
-  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--accent-primary) 5%, transparent),
+    color-mix(in srgb, var(--bg-tertiary) 30%, transparent)
+  );
 }
 .mobile-card-hover:active {
   transform: scale(0.99);
-  background-color: var(--bg-tertiary);
+  background: var(--bg-tertiary);
 }
 
 /* Generic hover backgrounds with transparency (workaround for CSS variable + opacity) */
@@ -657,16 +668,16 @@ tr.row-selected td:first-child {
   color: color-mix(in srgb, var(--accent-primary) 70%, transparent);
 }
 
-/* CompactSection header gradient - theme aware */
+/* CompactSection header gradient - theme aware with accent tint */
 .section-header-gradient {
   background: linear-gradient(to right, 
-    color-mix(in srgb, var(--bg-tertiary) 40%, transparent), 
+    color-mix(in srgb, var(--accent-primary) 4%, color-mix(in srgb, var(--bg-tertiary) 40%, transparent)), 
     transparent
   );
 }
 .section-header-gradient:hover {
   background: linear-gradient(to right, 
-    color-mix(in srgb, var(--bg-tertiary) 60%, transparent), 
+    color-mix(in srgb, var(--accent-primary) 6%, color-mix(in srgb, var(--bg-tertiary) 60%, transparent)), 
     transparent
   );
 }
@@ -1031,7 +1042,10 @@ input:focus, select:focus, textarea:focus {
 .stat-card-enhanced {
   --card-accent: var(--accent-primary);
   position: relative;
-  background: var(--bg-secondary);
+  background: linear-gradient(135deg,
+    var(--bg-secondary),
+    color-mix(in srgb, var(--card-accent) 3%, var(--bg-secondary))
+  );
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
@@ -1825,18 +1839,62 @@ input:focus, select:focus, textarea:focus {
   border-bottom: 1px solid var(--border);
 }
 
-/* Status badge backgrounds — safe with CSS variables */
+/* Status badge backgrounds — gradient for premium feel */
 .status-badge-success {
-  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-success) 18%, transparent),
+    color-mix(in srgb, var(--accent-success) 8%, transparent)
+  );
   color: var(--accent-success);
 }
 .status-badge-danger {
-  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-danger) 18%, transparent),
+    color-mix(in srgb, var(--accent-danger) 8%, transparent)
+  );
   color: var(--accent-danger);
 }
 .status-badge-warning {
-  background: color-mix(in srgb, var(--accent-warning) 15%, transparent);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-warning) 18%, transparent),
+    color-mix(in srgb, var(--accent-warning) 8%, transparent)
+  );
   color: var(--accent-warning);
+}
+
+/* ============================================
+   MODAL HEADER GRADIENT — top accent line + gradient bg
+   ============================================ */
+.modal-header-gradient {
+  position: relative;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-primary) 8%, var(--bg-primary)),
+    var(--bg-primary) 70%
+  );
+}
+
+.modal-header-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--accent-primary),
+    color-mix(in srgb, var(--accent-primary) 40%, #8B5CF6),
+    transparent
+  );
+}
+
+/* ============================================
+   SIDEBAR ACTIVE — gradient highlight
+   ============================================ */
+.sidebar-active-gradient {
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--accent-primary) 15%, transparent),
+    color-mix(in srgb, var(--accent-primary) 5%, transparent)
+  ) !important;
 }
 
 /* ============================================
