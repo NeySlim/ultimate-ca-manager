@@ -396,7 +396,7 @@ export default function DashboardPage() {
                 iconColor="blue"
                 title={t('dashboard.recentCertificates')}
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
+                  <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/certificates')}>
                     {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 }
@@ -442,7 +442,7 @@ export default function DashboardPage() {
                 iconColor="violet"
                 title={t('dashboard.recentCAs')}
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
+                  <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>
                     {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 }
@@ -483,7 +483,7 @@ export default function DashboardPage() {
                 iconColor="emerald"
                 title={t('dashboard.systemHealth')}
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
+                  <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/settings')}>
                     <Gear size={14} />
                   </Button>
                 }
@@ -536,7 +536,7 @@ export default function DashboardPage() {
                 iconColor="orange"
                 title={t('dashboard.acmeAccounts')}
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
+                  <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>
                     {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 }
@@ -583,7 +583,7 @@ export default function DashboardPage() {
                   {isConnected && (
                     <Badge variant="success" size="sm" dot pulse>{t('common.live')}</Badge>
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>
+                  <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/audit')}>
                     {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 </div>

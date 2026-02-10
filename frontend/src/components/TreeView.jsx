@@ -30,12 +30,12 @@ function TreeNode({ node, level, onSelect, selectedId }) {
     <div>
       <div
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded-sm cursor-pointer transition-colors group",
+          "flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group",
           isSelected 
-            ? "bg-accent-primary/20 text-accent-primary" 
-            : "hover:bg-bg-tertiary text-text-primary"
+            ? "bg-accent-25 text-accent-primary border border-accent-primary/20 shadow-sm" 
+            : "hover:bg-bg-tertiary text-text-primary border border-transparent"
         )}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        style={{ paddingLeft: `${level * 20 + 8}px` }}
         onClick={() => onSelect?.(node)}
       >
         {hasChildren && (
@@ -44,7 +44,7 @@ function TreeNode({ node, level, onSelect, selectedId }) {
               e.stopPropagation()
               setIsExpanded(!isExpanded)
             }}
-            className="flex-shrink-0 text-text-secondary hover:text-text-primary"
+            className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
           >
             {isExpanded ? (
               <CaretDown size={14} weight="bold" />
@@ -54,7 +54,7 @@ function TreeNode({ node, level, onSelect, selectedId }) {
           </button>
         )}
         
-        {!hasChildren && <div className="w-3.5" />}
+        {!hasChildren && <div className="w-5" />}
         
         {node.icon && (
           <span className="flex-shrink-0">
@@ -67,7 +67,7 @@ function TreeNode({ node, level, onSelect, selectedId }) {
         </span>
         
         {node.badge && (
-          <span className="flex-shrink-0 px-1 py-0.5 text-xs bg-bg-tertiary rounded-sm">
+          <span className="flex-shrink-0 px-1.5 py-0.5 text-xs font-medium bg-accent-25 text-accent-primary rounded-md">
             {node.badge}
           </span>
         )}

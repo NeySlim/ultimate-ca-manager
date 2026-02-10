@@ -439,6 +439,10 @@
     "hierarchy": "階層",
     "hierarchyView": "階層ビュー",
     "listView": "リストビュー",
+    "orgView": "組織図ビュー",
+    "columnsView": "カラムビュー",
+    "orphanCAs": "孤立CA",
+    "noIntermediate": "中間CAなし",
     "noCA": "認証局がありません",
     "createFirst": "最初のCAを作成して開始",
     "pathLength": "パス長",
@@ -675,7 +679,8 @@
     "na": "N/A",
     "update": "Update",
     "manual": "Manual",
-    "auto": "Auto"
+    "auto": "Auto",
+    "gotIt": "了解"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1007,7 +1012,9 @@
     "aboutAPIKeys": "APIキーについて",
     "aboutWebAuthn": "セキュリティキーについて",
     "bestPractices": "ベストプラクティス",
-    "securityNote": "セキュリティに関する注意"
+    "securityNote": "セキュリティに関する注意",
+    "proTips": "ヒント",
+    "seeAlso": "関連項目"
   },
   "hsm": {
     "title": "HSM管理",

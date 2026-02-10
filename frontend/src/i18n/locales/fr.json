@@ -438,7 +438,11 @@
     "parentCA": "AC parente",
     "hierarchy": "Hiérarchie",
     "hierarchyView": "Vue hiérarchique",
+    "orgView": "Vue organigramme",
+    "columnsView": "Vue colonnes",
     "listView": "Vue en liste",
+    "orphanCAs": "AC orphelines",
+    "noIntermediate": "Aucune AC intermédiaire",
     "noCA": "Aucune autorité de certification",
     "createFirst": "Créez votre première AC pour commencer",
     "pathLength": "Longueur du chemin",
@@ -675,7 +679,8 @@
     "enterNewToChange": "Entrez une nouvelle valeur pour modifier",
     "auto": "Auto",
     "manual": "Manuel",
-    "update": "Mettre à jour"
+    "update": "Mettre à jour",
+    "gotIt": "Compris"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1007,7 +1012,9 @@
     "aboutAPIKeys": "À propos des clés API",
     "aboutWebAuthn": "À propos des clés de sécurité",
     "bestPractices": "Bonnes pratiques",
-    "securityNote": "Note de sécurité"
+    "securityNote": "Note de sécurité",
+    "proTips": "Astuces",
+    "seeAlso": "Voir aussi"
   },
   "hsm": {
     "title": "Gestion HSM",

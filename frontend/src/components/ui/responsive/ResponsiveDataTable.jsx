@@ -1090,7 +1090,7 @@ function DesktopTable({
         style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}
       >
         {/* Header */}
-        <thead className="sticky top-0 z-10 bg-bg-secondary/95 backdrop-blur-sm border-b border-border shadow-sm">
+        <thead className="sticky top-0 z-10 table-header-gradient backdrop-blur-sm border-b border-border shadow-sm">
           <tr>
             {columns.map((col, colIdx) => {
               const style = getColStyle(col)

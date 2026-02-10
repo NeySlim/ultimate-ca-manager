@@ -7,7 +7,7 @@ import { useSearchParams } from 'react-router-dom'
 import { 
   Key, Download, Trash,
   Certificate, UploadSimple, Clock, Plus, CaretRight, CaretDown,
-  TreeStructure, List, Check, Crown, ShieldCheck
+  TreeStructure, List, Check, Crown, ShieldCheck, Columns, SquaresFour
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, LoadingSpinner,
@@ -58,7 +58,7 @@ export default function CAsPage() {
   
   // View mode: 'tree' or 'list'
   const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('ucm-ca-view-mode') || 'tree'
+    return localStorage.getItem('ucm-ca-view-mode') || 'org'
   })
   
   // Save view mode preference
@@ -383,32 +383,27 @@ export default function CAsPage() {
               </div>
               {!isMobile && (
                 <>
-                  {/* View Mode Toggle */}
+                  {/* View Mode Toggle — 3 views */}
                   <div className="flex items-center rounded-lg border border-border bg-bg-secondary/50 p-0.5">
-                    <button
-                      onClick={() => setViewMode('tree')}
-                      className={cn(
-                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
-                        viewMode === 'tree' 
-                          ? 'bg-accent-primary text-white' 
-                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                      )}
-                      title={t('cas.hierarchyView')}
-                    >
-                      <TreeStructure size={14} weight={viewMode === 'tree' ? 'fill' : 'regular'} />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={cn(
-                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
-                        viewMode === 'list' 
-                          ? 'bg-accent-primary text-white' 
-                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-                      )}
-                      title={t('cas.listView')}
-                    >
-                      <List size={14} weight={viewMode === 'list' ? 'fill' : 'regular'} />
-                    </button>
+                    {[
+                      { mode: 'org', icon: SquaresFour, tip: t('cas.orgView') },
+                      { mode: 'columns', icon: Columns, tip: t('cas.columnsView') },
+                      { mode: 'list', icon: List, tip: t('cas.listView') },
+                    ].map(({ mode, icon: Icon, tip }) => (
+                      <button
+                        key={mode}
+                        onClick={() => setViewMode(mode)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
+                          viewMode === mode
+                            ? 'bg-accent-primary text-white'
+                            : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                        )}
+                        title={tip}
+                      >
+                        <Icon size={14} weight={viewMode === mode ? 'fill' : 'regular'} />
+                      </button>
+                    ))}
                   </div>
                   
                   <div className="w-px h-5 bg-border/50" />
@@ -477,69 +472,45 @@ export default function CAsPage() {
                 )}
               </div>
             ) : (
-              <div className="p-3">
-                {/* Table Header - Desktop */}
-                {!isMobile && (
-                  <div className="flex items-center gap-3 px-3 py-2 mb-2 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border/50">
-                    <div className="flex-1 min-w-0">{t('cas.ca')}</div>
-                    {viewMode === 'list' && <div className="w-24 text-center">{t('cas.parentCA')}</div>}
-                    <div className="w-20 text-center">{t('common.type')}</div>
-                    <div className="w-16 text-center">{t('cas.issuedCertificates')}</div>
-                    <div className="w-20 text-center">{t('common.expires')}</div>
-                    <div className="w-16 text-center">{t('common.status')}</div>
-                  </div>
+              <div className={cn('p-3', viewMode === 'columns' ? '' : 'space-y-3')}>
+                {viewMode === 'org' ? (
+                  <OrgView
+                    tree={filteredTree}
+                    selectedId={selectedCA?.id}
+                    expandedNodes={expandedNodes}
+                    onToggle={toggleNode}
+                    onSelect={loadCADetails}
+                    isMobile={isMobile}
+                    t={t}
+                  />
+                ) : viewMode === 'columns' ? (
+                  <ColumnsView
+                    tree={filteredTree}
+                    orphans={filteredTree.filter(ca => ca.type !== 'root')}
+                    selectedId={selectedCA?.id}
+                    onSelect={loadCADetails}
+                    isMobile={isMobile}
+                    t={t}
+                  />
+                ) : (
+                  <ListView
+                    cas={cas.filter(ca => {
+                      if (searchQuery) {
+                        const q = searchQuery.toLowerCase()
+                        if (!(ca.name || '').toLowerCase().includes(q) &&
+                            !(ca.common_name || '').toLowerCase().includes(q) &&
+                            !(ca.subject || '').toLowerCase().includes(q)) return false
+                      }
+                      if (filterType && ca.type !== filterType) return false
+                      return true
+                    })}
+                    allCAs={cas}
+                    selectedId={selectedCA?.id}
+                    onSelect={loadCADetails}
+                    isMobile={isMobile}
+                    t={t}
+                  />
                 )}
-                
-                {/* Single card with all CAs */}
-                <div className="rounded-xl border border-border/60 bg-bg-secondary/30 overflow-hidden divide-y divide-border/40">
-                  {viewMode === 'tree' ? (
-                    // Hierarchical tree view
-                    filteredTree.map((ca, idx) => (
-                      <TreeNode
-                        key={ca.id}
-                        ca={ca}
-                        level={0}
-                        selectedId={selectedCA?.id}
-                        expandedNodes={expandedNodes}
-                        onToggle={toggleNode}
-                        onSelect={loadCADetails}
-                        isOrphan={isOrphanIntermediate(ca)}
-                        isMobile={isMobile}
-                        isLast={idx === filteredTree.length - 1}
-                        isFirst={idx === 0}
-                        t={t}
-                      />
-                    ))
-                  ) : (
-                    // Flat list view
-                    cas
-                      .filter(ca => {
-                        // Apply search filter
-                        if (searchQuery) {
-                          const query = searchQuery.toLowerCase()
-                          if (!(ca.name || '').toLowerCase().includes(query) &&
-                              !(ca.common_name || '').toLowerCase().includes(query) &&
-                              !(ca.subject || '').toLowerCase().includes(query)) {
-                            return false
-                          }
-                        }
-                        // Apply type filter
-                        if (filterType && ca.type !== filterType) return false
-                        return true
-                      })
-                      .map((ca, idx, arr) => (
-                        <ListRow
-                          key={ca.id}
-                          ca={ca}
-                          allCAs={cas}
-                          selectedId={selectedCA?.id}
-                          onSelect={loadCADetails}
-                          isMobile={isMobile}
-                          t={t}
-                        />
-                      ))
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -685,202 +656,190 @@ export default function CAsPage() {
 }
 
 // =============================================================================
-// TREE NODE COMPONENT - Styled with visual hierarchy
+// SHARED HELPERS
 // =============================================================================
 
-function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile, isLast = false, isFirst = false, t }) {
+function formatExpiry(date, t) {
+  if (!date) return null
+  const d = new Date(date)
+  const now = new Date()
+  const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return { text: t('common.expired'), variant: 'danger' }
+  if (diffDays < 30) return { text: t('cas.daysLeft', { count: diffDays }), variant: 'warning' }
+  if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default' }
+  return { text: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), variant: 'default' }
+}
+
+function getStatusBadgeClass(status) {
+  return status === 'Active' ? 'status-badge-success' : status === 'Expired' ? 'status-badge-danger' : 'status-badge-warning'
+}
+
+function getStatusDotClass(status) {
+  return status === 'Active' ? 'bg-status-success' : status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
+}
+
+/** Reusable CA info row — used by all 3 views */
+function CAInfoLine({ ca, isMobile, t }) {
+  const expiry = formatExpiry(ca.valid_to || ca.not_after, t)
+  return (
+    <div className="flex items-center gap-2 text-2xs text-text-tertiary flex-wrap">
+      {ca.subject && (
+        <span className="truncate max-w-[200px]">{ca.subject.split(',')[0]}</span>
+      )}
+      <span className="flex items-center gap-1">
+        <Certificate size={11} weight="duotone" className="text-accent-primary" />
+        <span className="font-semibold text-text-secondary">
+          {t('cas.certificateCount', { count: ca.certs || 0 })}
+        </span>
+      </span>
+      {expiry && (
+        <>
+          <span className="text-border">·</span>
+          <span className={cn(
+            'font-medium flex items-center gap-1',
+            expiry.variant === 'danger' ? 'text-status-danger' :
+            expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
+          )}>
+            <Clock size={11} weight="duotone" />
+            {expiry.text}
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Status pill badge */
+function StatusBadge({ status }) {
+  return (
+    <span className={cn(
+      'shrink-0 px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',
+      getStatusBadgeClass(status)
+    )}>
+      <span className={cn('w-1.5 h-1.5 rounded-full', getStatusDotClass(status))} />
+      {status || '?'}
+    </span>
+  )
+}
+
+/** Type badge (Root / Intermediate) */
+function TypeBadge({ type, isMobile, t }) {
+  return (
+    <span className={cn(
+      'shrink-0 px-1.5 py-0.5 rounded-md text-2xs font-semibold',
+      type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
+    )}>
+      {type === 'root' ? t('cas.rootCA') : (isMobile ? 'Int.' : t('cas.intermediateCA'))}
+    </span>
+  )
+}
+
+// =============================================================================
+// VIEW A: ORGANIGRAMME — Root = big card, children nested inside
+// =============================================================================
+
+function OrgView({ tree, selectedId, expandedNodes, onToggle, onSelect, isMobile, t }) {
+  // Separate roots from orphans
+  const roots = tree.filter(ca => ca.type === 'root')
+  const orphans = tree.filter(ca => ca.type !== 'root')
+
+  return (
+    <div className="space-y-3">
+      {roots.map(root => (
+        <OrgRootCard
+          key={root.id}
+          ca={root}
+          selectedId={selectedId}
+          expandedNodes={expandedNodes}
+          onToggle={onToggle}
+          onSelect={onSelect}
+          isMobile={isMobile}
+          t={t}
+        />
+      ))}
+      {orphans.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-2xs font-semibold text-text-tertiary uppercase tracking-wider px-1">
+            {t('cas.orphanCAs')}
+          </div>
+          {orphans.map(ca => (
+            <OrgChildCard
+              key={ca.id}
+              ca={ca}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              isMobile={isMobile}
+              t={t}
+              isOrphan
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobile, t }) {
   const hasChildren = ca.children && ca.children.length > 0
   const isExpanded = expandedNodes.has(ca.id)
   const isSelected = selectedId === ca.id
-  const isRoot = level === 0
-  const indent = 24 // indent per level for children
-  
-  // Format expiration
-  const formatExpiry = (date) => {
-    if (!date) return null
-    const d = new Date(date)
-    const now = new Date()
-    const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return { text: t('common.expired'), variant: 'danger', urgent: true }
-    if (diffDays < 30) return { text: t('cas.daysLeft', { count: diffDays }), variant: 'warning', urgent: true }
-    if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default', urgent: false }
-    const formatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-    return { text: formatted, variant: 'default', urgent: false }
-  }
-  
-  const expiry = formatExpiry(ca.valid_to || ca.not_after)
-  const rowPadding = isRoot ? 12 : 12 + (level * indent)
-  
+
   return (
-    <div className="relative">
-      {/* Row */}
+    <div className={cn(
+      'rounded-xl border overflow-hidden transition-all duration-200',
+      isSelected ? 'border-accent-primary ca-org-root-selected' : 'border-border/60'
+    )}>
+      {/* Root header — gradient */}
       <div
         onClick={() => onSelect(ca)}
         className={cn(
-          'relative flex items-center gap-3 cursor-pointer transition-all duration-150',
-          'hover:bg-bg-tertiary/50',
-          isSelected && 'bg-accent-primary/8 hover:bg-accent-primary/12',
-          isMobile ? 'py-3 px-3' : 'py-2 px-3'
+          'ca-org-root-header cursor-pointer transition-colors',
+          isMobile ? 'px-3 py-3' : 'px-4 py-3'
         )}
-        style={{ paddingLeft: rowPadding }}
       >
-        {/* L connector: simple vertical + horizontal lines */}
-        {!isRoot && (
-          <>
-            <div 
-              className="absolute bg-border"
-              style={{
-                left: rowPadding - indent + 46,
-                top: 0,
-                width: 2,
-                height: '50%'
-              }}
-            />
-            <div 
-              className="absolute bg-border"
-              style={{
-                left: rowPadding - indent + 46,
-                top: '50%',
-                width: indent - 20,
-                height: 2,
-                marginTop: -1
-              }}
-            />
-          </>
-        )}
-        
-        {/* Left accent for selected */}
-        {isSelected && (
-          <div className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-accent-primary" />
-        )}
-        
-        {/* Expand button + Icon */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Expand/Collapse */}
-          {hasChildren ? (
+        <div className="flex items-center gap-2.5">
+          {hasChildren && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggle(ca.id) }}
-              className={cn(
-                'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
-                'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary',
-                isExpanded && 'bg-bg-tertiary/50'
-              )}
+              className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-text-tertiary hover:text-accent-primary hover:bg-bg-tertiary/50 transition-all"
             >
-              {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+              <CaretRight
+                size={12} weight="bold"
+                className={cn('transition-transform duration-200', isExpanded && 'rotate-90')}
+              />
             </button>
-          ) : (
-            <div className="w-6" />
           )}
-          
-          {/* Icon with background */}
-          <CATypeIcon isRoot={ca.type === 'root'} size="lg" />
-        </div>
-        
-        {/* Name & Subject */}
-        <div className="flex-1 min-w-0">
-          <div className={cn(
-            'font-medium truncate',
-            isMobile ? 'text-sm' : 'text-xs',
-            isSelected ? 'text-accent-primary' : 'text-text-primary'
-          )}>
-            {ca.name || ca.common_name || t('cas.unnamedCA')}
-          </div>
-          {!isMobile && ca.subject && (
-            <div className="text-2xs text-text-tertiary truncate mt-0.5">
-              {ca.subject.split(',')[0]}
-            </div>
-          )}
-        </div>
-        
-        {/* Desktop: Metadata columns */}
-        {!isMobile && (
-          <>
-            {/* Type badge */}
-            <div className="w-20 flex justify-center">
-              <span className={cn(
-                'px-2 py-0.5 rounded-md text-2xs font-semibold',
-                ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
-              )}>
-                {ca.type === 'root' ? t('cas.rootCA') : t('cas.intermediateCA')}
-              </span>
-            </div>
-            
-            {/* Certs count */}
-            <div className="w-16 flex justify-center">
-              {ca.certs > 0 ? (
-                <span className="flex items-center gap-1 text-2xs text-text-secondary">
-                  <Certificate size={12} weight="duotone" className="text-text-tertiary" />
-                  <span className="font-medium">{ca.certs}</span>
-                </span>
-              ) : (
-                <span className="text-2xs text-text-tertiary">—</span>
-              )}
-            </div>
-            
-            {/* Expiry */}
-            <div className="w-20 flex justify-center">
-              {expiry ? (
-                <span className={cn(
-                  'text-2xs font-medium',
-                  expiry.variant === 'danger' ? 'text-status-danger' : 
-                  expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
-                )}>
-                  {expiry.text}
-                </span>
-              ) : (
-                <span className="text-2xs text-text-tertiary">—</span>
-              )}
-            </div>
-            
-            {/* Status */}
-            <div className="w-16 flex justify-center">
-              <span className={cn(
-                'px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',
-                ca.status === 'Active' 
-                  ? 'bg-status-success/10 text-status-success'
-                  : ca.status === 'Expired'
-                    ? 'bg-status-danger/10 text-status-danger'
-                    : 'bg-status-warning/10 text-status-warning'
-              )}>
-                <span className={cn(
-                  'w-1.5 h-1.5 rounded-full',
-                  ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
-                )} />
-                {ca.status || '?'}
-              </span>
-            </div>
-          </>
-        )}
-        
-        {/* Mobile: Compact badges */}
-        {isMobile && (
-          <div className="flex items-center gap-2">
-            {ca.certs > 0 && (
-              <span className="text-xs text-text-tertiary">{ca.certs}</span>
-            )}
+          <CATypeIcon isRoot size={isMobile ? 'lg' : 'md'} />
+          <div className="flex-1 min-w-0">
             <span className={cn(
-              'w-2.5 h-2.5 rounded-full shrink-0',
-              ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
-            )} />
+              'font-bold truncate block',
+              isMobile ? 'text-base' : 'text-sm',
+              'text-text-primary'
+            )}>
+              {ca.name || ca.common_name || t('cas.unnamedCA')}
+            </span>
           </div>
-        )}
+          <TypeBadge type="root" isMobile={isMobile} t={t} />
+          <StatusBadge status={ca.status} />
+        </div>
+        <div className={cn('mt-1.5', hasChildren ? 'ml-8' : 'ml-0')}>
+          <CAInfoLine ca={ca} isMobile={isMobile} t={t} />
+        </div>
       </div>
-      
-      {/* Children */}
+
+      {/* Children area */}
       {hasChildren && isExpanded && (
-        <div className={cn(isRoot && 'pb-1')}>
-          {ca.children.map((child, idx) => (
-            <TreeNode
+        <div className={cn(
+          'ca-org-children-area',
+          isMobile ? 'px-2 py-2 space-y-1.5' : 'px-3 py-2.5 space-y-1.5'
+        )}>
+          {ca.children.map(child => (
+            <OrgChildCard
               key={child.id}
               ca={child}
-              level={level + 1}
               selectedId={selectedId}
-              expandedNodes={expandedNodes}
-              onToggle={onToggle}
               onSelect={onSelect}
-              isOrphan={false}
               isMobile={isMobile}
-              isLast={idx === ca.children.length - 1}
               t={t}
             />
           ))}
@@ -890,148 +849,256 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
   )
 }
 
-// =============================================================================
-// LIST ROW COMPONENT - Flat list view
-// =============================================================================
-
-function ListRow({ ca, allCAs, selectedId, onSelect, isMobile, t }) {
+function OrgChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
   const isSelected = selectedId === ca.id
-  
-  // Find parent CA name
-  const parentCA = ca.parent_id ? allCAs.find(c => c.id === ca.parent_id) : null
-  
-  // Format expiration
-  const formatExpiry = (date) => {
-    if (!date) return null
-    const d = new Date(date)
-    const now = new Date()
-    const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return { text: t('common.expired'), variant: 'danger' }
-    if (diffDays < 30) return { text: t('cas.daysLeft', { count: diffDays }), variant: 'warning' }
-    if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default' }
-    const formatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-    return { text: formatted, variant: 'default' }
-  }
-  
-  const expiry = formatExpiry(ca.valid_to || ca.not_after)
-  
+
   return (
     <div
       onClick={() => onSelect(ca)}
       className={cn(
-        'relative flex items-center gap-3 cursor-pointer transition-all duration-150',
-        'hover:bg-bg-tertiary/50',
-        isSelected && 'bg-accent-primary/8 hover:bg-accent-primary/12',
-        isMobile ? 'py-3 px-3' : 'py-2 px-3'
+        'rounded-lg border cursor-pointer transition-all duration-150',
+        isMobile ? 'px-3 py-2.5' : 'px-3 py-2',
+        isSelected
+          ? 'ca-org-child-selected border-accent-primary'
+          : 'border-border/50 bg-bg-primary hover:border-border hover:shadow-sm',
+        isOrphan && 'border-dashed'
       )}
     >
-      {/* Left accent for selected */}
-      {isSelected && (
-        <div className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-accent-primary" />
-      )}
-      
-      {/* Icon with background */}
-      <CATypeIcon isRoot={ca.type === 'root'} size="lg" />
-      
-      {/* Name & Subject */}
-      <div className="flex-1 min-w-0">
-        <div className={cn(
-          'font-medium truncate',
-          isMobile ? 'text-sm' : 'text-xs',
-          isSelected ? 'text-accent-primary' : 'text-text-primary'
-        )}>
-          {ca.name || ca.common_name || t('cas.unnamedCA')}
+      <div className="flex items-center gap-2">
+        <CATypeIcon isRoot={false} size={isMobile ? 'md' : 'sm'} />
+        <div className="flex-1 min-w-0">
+          <span className={cn(
+            'font-semibold truncate block',
+            isMobile ? 'text-sm' : 'text-xs',
+            isSelected ? 'text-accent-primary' : 'text-text-primary'
+          )}>
+            {ca.name || ca.common_name || t('cas.unnamedCA')}
+          </span>
         </div>
-        {!isMobile && ca.subject && (
-          <div className="text-2xs text-text-tertiary truncate mt-0.5">
-            {ca.subject.split(',')[0]}
+        <TypeBadge type="intermediate" isMobile={isMobile} t={t} />
+        <StatusBadge status={ca.status} />
+      </div>
+      <div className={cn('mt-1', isMobile ? 'ml-9' : 'ml-7')}>
+        <CAInfoLine ca={ca} isMobile={isMobile} t={t} />
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// VIEW B: COLUMNS — One column per Root CA
+// =============================================================================
+
+function ColumnsView({ tree, selectedId, onSelect, isMobile, t }) {
+  const roots = tree.filter(ca => ca.type === 'root')
+  const orphans = tree.filter(ca => ca.type !== 'root')
+
+  if (isMobile) {
+    // Mobile: stacked sections
+    return (
+      <div className="space-y-4">
+        {roots.map(root => (
+          <div key={root.id} className="space-y-1.5">
+            <ColumnHeader ca={root} selectedId={selectedId} onSelect={onSelect} isMobile t={t} />
+            {root.children?.map(child => (
+              <ColumnChildCard key={child.id} ca={child} selectedId={selectedId} onSelect={onSelect} isMobile t={t} />
+            ))}
+            {(!root.children || root.children.length === 0) && (
+              <div className="text-center py-4 text-xs text-text-tertiary rounded-lg border border-dashed border-border/50">
+                {t('cas.noIntermediate')}
+              </div>
+            )}
+          </div>
+        ))}
+        {orphans.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="ca-col-header-orphan rounded-lg px-3 py-2">
+              <span className="text-xs font-bold text-text-secondary">{t('cas.orphanCAs')}</span>
+            </div>
+            {orphans.map(ca => (
+              <ColumnChildCard key={ca.id} ca={ca} selectedId={selectedId} onSelect={onSelect} isMobile t={t} isOrphan />
+            ))}
           </div>
         )}
       </div>
-      
-      {/* Desktop columns */}
-      {!isMobile && (
-        <>
-          {/* Parent */}
-          <div className="w-24 flex justify-center">
-            {parentCA ? (
-              <span className="text-2xs text-text-secondary truncate max-w-[90px]" title={parentCA.name || parentCA.common_name}>
-                {parentCA.name || parentCA.common_name || '—'}
-              </span>
-            ) : (
-              <span className="text-2xs text-text-tertiary">—</span>
+    )
+  }
+
+  // Desktop: side-by-side columns
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2" style={{ minHeight: 200 }}>
+      {roots.map(root => (
+        <div key={root.id} className="ca-col-wrapper flex-1 min-w-[240px] max-w-[400px] flex flex-col rounded-xl border border-border/60 overflow-hidden">
+          <ColumnHeader ca={root} selectedId={selectedId} onSelect={onSelect} isMobile={false} t={t} />
+          <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
+            {root.children?.map(child => (
+              <ColumnChildCard key={child.id} ca={child} selectedId={selectedId} onSelect={onSelect} isMobile={false} t={t} />
+            ))}
+            {(!root.children || root.children.length === 0) && (
+              <div className="text-center py-6 text-xs text-text-tertiary">
+                {t('cas.noIntermediate')}
+              </div>
             )}
           </div>
-          
-          {/* Type badge */}
-          <div className="w-20 flex justify-center">
-            <span className={cn(
-              'px-2 py-0.5 rounded-md text-2xs font-semibold',
-              ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
-            )}>
-              {ca.type === 'root' ? t('cas.rootCA') : t('cas.intermediateCA')}
-            </span>
+        </div>
+      ))}
+      {orphans.length > 0 && (
+        <div className="ca-col-wrapper flex-1 min-w-[220px] max-w-[300px] flex flex-col rounded-xl border border-dashed border-border/60 overflow-hidden">
+          <div className="ca-col-header-orphan px-3 py-2.5">
+            <span className="text-xs font-bold text-text-secondary">{t('cas.orphanCAs')}</span>
           </div>
-          
-          {/* Certs count */}
-          <div className="w-16 flex justify-center">
-            {ca.certs > 0 ? (
-              <span className="flex items-center gap-1 text-2xs text-text-secondary">
-                <Certificate size={12} weight="duotone" className="text-text-tertiary" />
-                <span className="font-medium">{ca.certs}</span>
-              </span>
-            ) : (
-              <span className="text-2xs text-text-tertiary">—</span>
-            )}
+          <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
+            {orphans.map(ca => (
+              <ColumnChildCard key={ca.id} ca={ca} selectedId={selectedId} onSelect={onSelect} isMobile={false} t={t} isOrphan />
+            ))}
           </div>
-          
-          {/* Expiry */}
-          <div className="w-20 flex justify-center">
-            {expiry ? (
-              <span className={cn(
-                'text-2xs font-medium',
-                expiry.variant === 'danger' ? 'text-status-danger' : 
-                expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
-              )}>
-                {expiry.text}
-              </span>
-            ) : (
-              <span className="text-2xs text-text-tertiary">—</span>
-            )}
-          </div>
-          
-          {/* Status */}
-          <div className="w-16 flex justify-center">
-            <span className={cn(
-              'px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',
-              ca.status === 'Active' 
-                ? 'bg-status-success/10 text-status-success'
-                : ca.status === 'Expired'
-                  ? 'bg-status-danger/10 text-status-danger'
-                  : 'bg-status-warning/10 text-status-warning'
-            )}>
-              <span className={cn(
-                'w-1.5 h-1.5 rounded-full',
-                ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
-              )} />
-              {ca.status || '?'}
-            </span>
-          </div>
-        </>
-      )}
-      
-      {/* Mobile: Compact badges */}
-      {isMobile && (
-        <div className="flex items-center gap-2">
-          {ca.certs > 0 && (
-            <span className="text-xs text-text-tertiary">{ca.certs}</span>
-          )}
-          <span className={cn(
-            'w-2.5 h-2.5 rounded-full shrink-0',
-            ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
-          )} />
         </div>
       )}
+    </div>
+  )
+}
+
+function ColumnHeader({ ca, selectedId, onSelect, isMobile, t }) {
+  const isSelected = selectedId === ca.id
+  return (
+    <div
+      onClick={() => onSelect(ca)}
+      className={cn(
+        'ca-org-root-header cursor-pointer transition-colors',
+        isMobile ? 'px-3 py-2.5 rounded-lg' : 'px-3 py-2.5'
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <CATypeIcon isRoot size="sm" />
+        <span className={cn(
+          'font-bold truncate flex-1',
+          isMobile ? 'text-sm' : 'text-xs',
+          isSelected ? 'text-accent-primary' : 'text-text-primary'
+        )}>
+          {ca.name || ca.common_name}
+        </span>
+        <StatusBadge status={ca.status} />
+      </div>
+      <div className="mt-1 ml-7">
+        <div className="flex items-center gap-2 text-2xs text-text-tertiary">
+          <span className="flex items-center gap-1">
+            <Certificate size={11} weight="duotone" className="text-accent-primary" />
+            <span className="font-semibold text-text-secondary">{ca.certs || 0}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <ShieldCheck size={11} weight="duotone" className="text-text-tertiary" />
+            <span className="text-text-secondary">{ca.children?.length || 0} int.</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
+  const isSelected = selectedId === ca.id
+  const expiry = formatExpiry(ca.valid_to || ca.not_after, t)
+
+  return (
+    <div
+      onClick={() => onSelect(ca)}
+      className={cn(
+        'rounded-lg border cursor-pointer transition-all duration-150',
+        isMobile ? 'px-3 py-2.5' : 'px-2.5 py-2',
+        isSelected
+          ? 'ca-org-child-selected border-accent-primary'
+          : 'border-border/40 bg-bg-primary hover:border-border hover:shadow-sm',
+        isOrphan && 'border-dashed'
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <CATypeIcon isRoot={false} size="sm" />
+        <span className={cn(
+          'font-medium truncate flex-1 text-xs',
+          isSelected ? 'text-accent-primary' : 'text-text-primary'
+        )}>
+          {ca.name || ca.common_name}
+        </span>
+        <StatusBadge status={ca.status} />
+      </div>
+      <div className="mt-1 ml-7 flex items-center gap-2 text-2xs text-text-tertiary">
+        <span className="flex items-center gap-1">
+          <Certificate size={10} weight="duotone" className="text-accent-primary" />
+          <span className="font-semibold text-text-secondary">{ca.certs || 0}</span>
+        </span>
+        {expiry && (
+          <>
+            <span className="text-border">·</span>
+            <span className={cn(
+              'font-medium',
+              expiry.variant === 'danger' ? 'text-status-danger' :
+              expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
+            )}>
+              {expiry.text}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// VIEW C: LIST — Flat card rows
+// =============================================================================
+
+function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-bg-secondary/30 overflow-hidden">
+      <div className={cn(isMobile ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5')}>
+        {cas.map(ca => {
+          const isSelected = selectedId === ca.id
+          const parentCA = ca.parent_id ? allCAs.find(c => c.id === ca.parent_id) : null
+
+          return (
+            <div
+              key={ca.id}
+              onClick={() => onSelect(ca)}
+              className={cn(
+                'relative rounded-lg cursor-pointer transition-all duration-150',
+                'border border-transparent',
+                isMobile ? 'px-3 py-2.5' : 'px-3 py-2',
+                isSelected
+                  ? 'ca-org-child-selected border-accent-primary'
+                  : 'hover:bg-bg-tertiary hover:border-border'
+              )}
+            >
+              {isSelected && (
+                <div className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent-primary" />
+              )}
+              {/* Row 1 */}
+              <div className="flex items-center gap-2">
+                <CATypeIcon isRoot={ca.type === 'root'} size={isMobile ? 'md' : 'sm'} />
+                <span className={cn(
+                  'font-semibold truncate flex-1',
+                  isMobile ? 'text-sm' : 'text-xs',
+                  isSelected ? 'text-accent-primary' : 'text-text-primary'
+                )}>
+                  {ca.name || ca.common_name || t('cas.unnamedCA')}
+                </span>
+                <TypeBadge type={ca.type} isMobile={isMobile} t={t} />
+                <StatusBadge status={ca.status} />
+              </div>
+              {/* Row 2 */}
+              <div className={cn('mt-1 flex items-center gap-2 text-2xs text-text-tertiary', isMobile ? 'ml-9' : 'ml-7')}>
+                {parentCA && (
+                  <span className="flex items-center gap-1 shrink-0">
+                    <TreeStructure size={10} className="text-text-tertiary" />
+                    <span className="text-text-secondary truncate max-w-[100px]">{parentCA.name || parentCA.common_name}</span>
+                    <span className="text-border">·</span>
+                  </span>
+                )}
+                <CAInfoLine ca={ca} isMobile={isMobile} t={t} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

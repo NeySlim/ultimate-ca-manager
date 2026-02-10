@@ -14,9 +14,9 @@ export function EmptyState({
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
       {/* Decorative background circle */}
       <div className="relative mb-4">
-        <div className="absolute inset-0 w-20 h-20 rounded-full bg-bg-tertiary/50 -translate-x-2 -translate-y-2" />
+        <div className="absolute inset-0 w-20 h-20 rounded-full bg-accent-25 -translate-x-2 -translate-y-2" />
         <div className="relative w-16 h-16 rounded-2xl bg-bg-tertiary border border-border/50 flex items-center justify-center">
-          <Icon size={28} className="text-text-secondary" weight="duotone" />
+          <Icon size={28} className="text-accent-primary" weight="duotone" />
         </div>
       </div>
       <h3 className="text-base font-medium text-text-primary mb-1">{title}</h3>

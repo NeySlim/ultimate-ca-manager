@@ -49,7 +49,7 @@ export function Card({
 Card.Header = function CardHeader({ children, className, icon: Icon, iconColor = 'primary', title, subtitle, action }) {
   if (Icon || title) {
     return (
-      <div className={cn('flex items-start justify-between gap-3 p-4 pb-3 border-b border-border/30', className)}>
+      <div className={cn('flex items-start justify-between gap-3 p-4 pb-3 border-b border-border/30 section-header-gradient', className)}>
         <div className="flex items-center gap-3">
           {Icon && (
             <IconBadge icon={Icon} color={iconColor} size="sm" rounded="lg" />

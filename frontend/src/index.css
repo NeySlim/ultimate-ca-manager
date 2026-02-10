@@ -1035,7 +1035,7 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color var(--duration-fast) var(--ease-smooth);
+  transition: all var(--duration-fast) var(--ease-smooth);
 }
 
 .stat-card-enhanced::before {
@@ -1044,12 +1044,13 @@ input:focus, select:focus, textarea:focus {
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background: var(--card-accent);
+  height: 3px;
+  background: linear-gradient(90deg, var(--card-accent), color-mix(in srgb, var(--card-accent) 60%, transparent));
 }
 
 .stat-card-enhanced:hover {
   border-color: color-mix(in srgb, var(--card-accent) 40%, var(--border));
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--card-accent) 12%, transparent);
 }
 
 .stat-card-enhanced.success { --card-accent: var(--accent-success); }
@@ -1531,6 +1532,15 @@ input:focus, select:focus, textarea:focus {
 /* ============================================
    ENHANCED TABLE CONTAINER
    ============================================ */
+
+/* Table thead gradient — opaque for sticky positioning */
+.table-header-gradient {
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--bg-tertiary) 95%, var(--accent-primary)),
+    color-mix(in srgb, var(--bg-secondary) 95%, var(--accent-primary))
+  );
+}
+
 .table-container-enhanced {
   @apply rounded-xl overflow-hidden;
   background: var(--bg-secondary);
@@ -1772,6 +1782,88 @@ input:focus, select:focus, textarea:focus {
 .alert-bg-red {
   background: color-mix(in srgb, var(--status-danger) 15%, transparent);
   color: var(--status-danger);
+}
+
+.icon-bg-red {
+  background: color-mix(in srgb, var(--status-danger) 15%, transparent);
+  color: var(--status-danger);
+}
+
+/* ============================================
+   CA TREE VIEW — Organigramme + Columns styles
+   ============================================ */
+.ca-org-root-header {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary)),
+    color-mix(in srgb, var(--accent-primary) 3%, var(--bg-primary))
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-primary) 15%, var(--border));
+}
+
+.ca-org-root-selected {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 30%, transparent),
+              0 2px 8px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.ca-org-children-area {
+  background: color-mix(in srgb, var(--bg-tertiary) 30%, var(--bg-primary));
+  border-top: 1px solid var(--border);
+}
+
+.ca-org-child-selected {
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}
+
+.ca-col-wrapper {
+  background: color-mix(in srgb, var(--bg-secondary) 50%, var(--bg-primary));
+}
+
+.ca-col-header-orphan {
+  background: color-mix(in srgb, var(--bg-tertiary) 50%, var(--bg-secondary));
+  border-bottom: 1px solid var(--border);
+}
+
+/* Status badge backgrounds — safe with CSS variables */
+.status-badge-success {
+  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  color: var(--accent-success);
+}
+.status-badge-danger {
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: var(--accent-danger);
+}
+.status-badge-warning {
+  background: color-mix(in srgb, var(--accent-warning) 15%, transparent);
+  color: var(--accent-warning);
+}
+
+/* ============================================
+   HELP MODAL — theme-aware accent styling
+   ============================================ */
+.help-modal-header {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-primary) 15%, var(--bg-secondary)),
+    color-mix(in srgb, var(--accent-primary) 5%, var(--bg-primary))
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-primary) 20%, var(--border));
+}
+
+.help-modal-icon-bg {
+  background: var(--gradient-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.help-modal-btn {
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+.help-modal-btn:hover {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  transform: translateY(-1px);
 }
 
 /* ============================================

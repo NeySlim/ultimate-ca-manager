@@ -439,6 +439,10 @@
     "hierarchy": "层级",
     "hierarchyView": "层级视图",
     "listView": "列表视图",
+    "orgView": "组织图视图",
+    "columnsView": "分栏视图",
+    "orphanCAs": "孤立CA",
+    "noIntermediate": "无中间CA",
     "noCA": "没有证书颁发机构",
     "createFirst": "创建您的第一个CA开始使用",
     "pathLength": "路径长度",
@@ -675,7 +679,8 @@
     "na": "N/A",
     "update": "Update",
     "manual": "Manual",
-    "auto": "Auto"
+    "auto": "Auto",
+    "gotIt": "知道了"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1007,7 +1012,9 @@
     "aboutAPIKeys": "关于API密钥",
     "aboutWebAuthn": "关于安全密钥",
     "bestPractices": "最佳实践",
-    "securityNote": "安全说明"
+    "securityNote": "安全说明",
+    "proTips": "实用技巧",
+    "seeAlso": "另请参阅"
   },
   "hsm": {
     "title": "HSM管理",
