@@ -1,6 +1,6 @@
 # Security Documentation
 
-Ultimate CA Manager v2.0.0 implements comprehensive security features to protect your PKI infrastructure.
+Ultimate CA Manager implements comprehensive security features to protect your PKI infrastructure.
 
 ## 🔐 Security Features
 
