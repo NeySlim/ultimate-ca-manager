@@ -129,26 +129,28 @@ def get_recent_cas():
 @bp.route('/api/v2/dashboard/expiring-certs', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_expiring_certificates():
-    """Get certificates expiring soon"""
+    """Get next certificates to expire (soonest first, not yet expired)"""
     from models import Certificate
-    from datetime import datetime, timedelta
+    from datetime import datetime
     
-    days = request.args.get('days', 30, type=int)
+    limit = request.args.get('limit', 10, type=int)
     
-    expiry_threshold = datetime.utcnow() + timedelta(days=days)
-    
-    expiring = Certificate.query.filter(
-        Certificate.valid_to <= expiry_threshold,
+    # Only certs that haven't expired yet, sorted by soonest expiration
+    certs = Certificate.query.filter(
+        Certificate.valid_to != None,
+        Certificate.valid_to > datetime.utcnow(),
         Certificate.revoked == False
-    ).order_by(Certificate.valid_to.asc()).limit(10).all()
+    ).order_by(Certificate.valid_to.asc()).limit(limit).all()
     
     return success_response(data=[{
         'id': cert.id,
         'refid': cert.refid,
         'descr': cert.descr,
+        'common_name': cert.common_name,
         'subject': cert.subject,
+        'valid_from': cert.valid_from.isoformat() if cert.valid_from else None,
         'valid_to': cert.valid_to.isoformat() if cert.valid_to else None
-    } for cert in expiring])
+    } for cert in certs])
 
 
 @bp.route('/api/v2/dashboard/activity', methods=['GET'])

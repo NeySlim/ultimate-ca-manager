@@ -829,7 +829,21 @@
     "showOrHideWidgets": "Показати або приховати віджети",
     "loadFailed": "Failed to load dashboard",
     "expiringCertificates_one": "{{count}} сертифікат скоро закінчиться",
-    "expiringCertificates_other": "{{count}} сертифікатів скоро закінчаться"
+    "expiringCertificates_other": "{{count}} сертифікатів скоро закінчаться",
+    "widgetRecentActivity": "Нещодавня активність",
+    "widgetRecentCertificates": "Нещодавні сертифікати",
+    "widgetCertificateAuthorities": "Центри сертифікації",
+    "widgetAcmeAccounts": "Облікові записи ACME",
+    "widgetNextExpirations": "Наступні закінчення",
+    "nextExpirations": "Наступні закінчення",
+    "noExpirations": "Немає сертифікатів для закінчення",
+    "daysRemaining": "{{count}} днів",
+    "editLayout": "Редагувати макет",
+    "doneEditing": "Готово",
+    "resetLayout": "Скинути макет",
+    "dragToReorder": "Перетягніть віджети для зміни порядку",
+    "expiresIn": "Закінчується через",
+    "expired": "Прострочений"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

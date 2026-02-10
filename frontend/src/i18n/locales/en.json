@@ -408,7 +408,21 @@
     "showOrHideWidgets": "Show or hide widgets",
     "loadFailed": "Failed to load dashboard",
     "expiringCertificates_one": "{{count}} certificate expiring soon",
-    "expiringCertificates_other": "{{count}} certificates expiring soon"
+    "expiringCertificates_other": "{{count}} certificates expiring soon",
+    "widgetRecentActivity": "Recent Activity",
+    "widgetRecentCertificates": "Recent Certificates",
+    "widgetCertificateAuthorities": "Certificate Authorities",
+    "widgetAcmeAccounts": "ACME Accounts",
+    "widgetNextExpirations": "Next Expirations",
+    "nextExpirations": "Next Expirations",
+    "noExpirations": "No certificates to expire",
+    "daysRemaining": "{{count}} days",
+    "editLayout": "Edit Layout",
+    "doneEditing": "Done",
+    "resetLayout": "Reset Layout",
+    "dragToReorder": "Drag widgets to reorder",
+    "expiresIn": "Expires in",
+    "expired": "Expired"
   },
   "certificates": {
     "createCertificate": "Create Certificate",

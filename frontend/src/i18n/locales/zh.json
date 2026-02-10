@@ -829,7 +829,21 @@
     "showOrHideWidgets": "显示或隐藏小部件",
     "loadFailed": "Failed to load dashboard",
     "expiringCertificates_one": "{{count}} 个证书即将过期",
-    "expiringCertificates_other": "{{count}} 个证书即将过期"
+    "expiringCertificates_other": "{{count}} 个证书即将过期",
+    "widgetRecentActivity": "最近活动",
+    "widgetRecentCertificates": "最近证书",
+    "widgetCertificateAuthorities": "证书颁发机构",
+    "widgetAcmeAccounts": "ACME 账户",
+    "widgetNextExpirations": "即将到期",
+    "nextExpirations": "即将到期",
+    "noExpirations": "没有即将到期的证书",
+    "daysRemaining": "{{count}} 天",
+    "editLayout": "编辑布局",
+    "doneEditing": "完成",
+    "resetLayout": "重置布局",
+    "dragToReorder": "拖动小部件以重新排列",
+    "expiresIn": "到期时间",
+    "expired": "已过期"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

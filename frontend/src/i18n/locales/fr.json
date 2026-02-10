@@ -829,7 +829,21 @@
     "showOrHideWidgets": "Afficher ou masquer les widgets",
     "loadFailed": "Échec du chargement du tableau de bord",
     "expiringCertificates_one": "{{count}} certificat expirant bientôt",
-    "expiringCertificates_other": "{{count}} certificats expirant bientôt"
+    "expiringCertificates_other": "{{count}} certificats expirant bientôt",
+    "widgetRecentActivity": "Activité récente",
+    "widgetRecentCertificates": "Certificats récents",
+    "widgetCertificateAuthorities": "Autorités de certification",
+    "widgetAcmeAccounts": "Comptes ACME",
+    "widgetNextExpirations": "Prochaines expirations",
+    "nextExpirations": "Prochaines expirations",
+    "noExpirations": "Aucun certificat à expirer",
+    "daysRemaining": "{{count}} jours",
+    "editLayout": "Modifier la disposition",
+    "doneEditing": "Terminé",
+    "resetLayout": "Réinitialiser",
+    "dragToReorder": "Glissez les widgets pour réorganiser",
+    "expiresIn": "Expire dans",
+    "expired": "Expiré"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

@@ -18,6 +18,10 @@ export const dashboardService = {
     return apiClient.get(`/certificates?status=expiring&per_page=10`)
   },
 
+  async getNextExpirations(limit = 6) {
+    return apiClient.get(`/dashboard/expiring-certs?limit=${limit}`)
+  },
+
   async getActivityLog(limit = 20, offset = 0) {
     return apiClient.get(`/dashboard/activity?limit=${limit}&offset=${offset}`)
   },

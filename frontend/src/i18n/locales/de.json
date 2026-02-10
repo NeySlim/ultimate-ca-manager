@@ -829,7 +829,21 @@
     "showOrHideWidgets": "Widgets ein- oder ausblenden",
     "loadFailed": "Failed to load dashboard",
     "expiringCertificates_one": "{{count}} Zertifikat läuft bald ab",
-    "expiringCertificates_other": "{{count}} Zertifikate laufen bald ab"
+    "expiringCertificates_other": "{{count}} Zertifikate laufen bald ab",
+    "widgetRecentActivity": "Letzte Aktivität",
+    "widgetRecentCertificates": "Letzte Zertifikate",
+    "widgetCertificateAuthorities": "Zertifizierungsstellen",
+    "widgetAcmeAccounts": "ACME-Konten",
+    "widgetNextExpirations": "Nächste Abläufe",
+    "nextExpirations": "Nächste Abläufe",
+    "noExpirations": "Keine Zertifikate laufen ab",
+    "daysRemaining": "{{count}} Tage",
+    "editLayout": "Layout bearbeiten",
+    "doneEditing": "Fertig",
+    "resetLayout": "Layout zurücksetzen",
+    "dragToReorder": "Widgets ziehen zum Neuanordnen",
+    "expiresIn": "Läuft ab in",
+    "expired": "Abgelaufen"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

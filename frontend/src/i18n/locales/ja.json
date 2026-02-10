@@ -829,7 +829,21 @@
     "showOrHideWidgets": "ウィジェットの表示/非表示",
     "loadFailed": "Failed to load dashboard",
     "expiringCertificates_one": "{{count}} 件の証明書が間もなく期限切れ",
-    "expiringCertificates_other": "{{count}} 件の証明書が間もなく期限切れ"
+    "expiringCertificates_other": "{{count}} 件の証明書が間もなく期限切れ",
+    "widgetRecentActivity": "最近のアクティビティ",
+    "widgetRecentCertificates": "最近の証明書",
+    "widgetCertificateAuthorities": "認証局",
+    "widgetAcmeAccounts": "ACMEアカウント",
+    "widgetNextExpirations": "次の有効期限",
+    "nextExpirations": "次の有効期限",
+    "noExpirations": "期限切れの証明書はありません",
+    "daysRemaining": "{{count}} 日",
+    "editLayout": "レイアウト編集",
+    "doneEditing": "完了",
+    "resetLayout": "レイアウトをリセット",
+    "dragToReorder": "ウィジェットをドラッグして並べ替え",
+    "expiresIn": "有効期限まで",
+    "expired": "期限切れ"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

@@ -1072,6 +1072,41 @@ input:focus, select:focus, textarea:focus {
 .stat-card-enhanced.danger { --card-accent: var(--accent-danger); }
 .stat-card-enhanced.primary { --card-accent: var(--accent-primary); }
 
+/* === DASHBOARD GRID LAYOUT === */
+.dashboard-grid .react-grid-item {
+  transition: all 200ms ease;
+}
+
+.dashboard-grid .react-grid-item.react-grid-placeholder {
+  background: var(--accent-primary);
+  opacity: 0.1;
+  border-radius: 12px;
+  border: 2px dashed var(--accent-primary);
+}
+
+.dashboard-grid.edit-mode .react-grid-item {
+  border: 1px dashed color-mix(in srgb, var(--accent-primary) 30%, transparent);
+  border-radius: 12px;
+}
+
+.dashboard-grid.edit-mode .react-grid-item:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.dashboard-grid .react-grid-item > .react-resizable-handle::after {
+  border-color: var(--accent-primary);
+  opacity: 0.5;
+}
+
+.dashboard-grid .react-grid-item > .react-resizable-handle {
+  opacity: 0;
+}
+
+.dashboard-grid.edit-mode .react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}
+
 /* === ENHANCED ANIMATIONS === */
 @keyframes fade-in-up {
   from {
