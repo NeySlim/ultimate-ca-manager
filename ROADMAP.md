@@ -1,6 +1,6 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.3  
+**Current Version:** See [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest)  
 **Status:** Stable
 
 ---

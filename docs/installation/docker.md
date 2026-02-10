@@ -21,7 +21,7 @@ Complete guide for installing Ultimate CA Manager using Docker.
 
 ```bash
 # Pull latest image
-docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
 
 # Run container
 docker run -d \
@@ -29,7 +29,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+  ghcr.io/neyslim/ultimate-ca-manager:latest
 ```
 
 **Access:** https://localhost:8443  
@@ -48,7 +48,7 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+    image: ghcr.io/neyslim/ultimate-ca-manager:latest
     container_name: ucm
     restart: unless-stopped
     ports:
@@ -75,7 +75,7 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+    image: ghcr.io/neyslim/ultimate-ca-manager:latest
     container_name: ucm
     restart: unless-stopped
     
@@ -219,7 +219,7 @@ docker run -v /path/to/cert.pem:/opt/ucm/data/https_cert.pem:ro \
 
 ```bash
 # Pull new image
-docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
 
 # Stop and remove old container
 docker stop ucm
@@ -231,7 +231,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+  ghcr.io/neyslim/ultimate-ca-manager:latest
 ```
 
 **With Docker Compose:**

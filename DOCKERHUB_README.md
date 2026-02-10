@@ -1,6 +1,6 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-2.0.3-brightgreen.svg)
+![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![GitHub release](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager)
 [![CI/CD](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml)
@@ -25,7 +25,7 @@ Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Cer
 
 ```bash
 # Pull from GHCR (GitHub Container Registry)
-docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
 
 # Run with SQLite
 docker run -d \
@@ -33,7 +33,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+  ghcr.io/neyslim/ultimate-ca-manager:latest
 
 # Access: https://localhost:8443
 # Default login: admin / changeme123 ⚠️ CHANGE IMMEDIATELY!
@@ -148,7 +148,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 
 ```bash
 # Latest stable
-docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.3
+docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
 
 # Specific version
 docker pull ghcr.io/neyslim/ultimate-ca-manager:1.0.1
@@ -157,12 +157,12 @@ docker pull ghcr.io/neyslim/ultimate-ca-manager:1.0.1
 docker pull ghcr.io/neyslim/ultimate-ca-manager:1
 
 # Architecture-specific
-docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.3  # Multi-arch (amd64, arm64)
+docker pull ghcr.io/neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:
-- `latest` - Latest stable release (v2.0.3)
-- `2.0.3`, `2.0`, `2` - Semantic versions
+- `latest` - Latest stable release
+- Semantic version tags (e.g. `2.0.3`, `2.0`, `2`)
 - `v*.*.*` - Specific releases
 
 **Image Details**:
@@ -299,6 +299,6 @@ If you find UCM useful, please consider giving it a star! ⭐
 
 ---
 
-**Version**: 2.0.3  
+**Version**: See GitHub releases  
 **Status**: Production Ready ✅  
 **Last Updated**: 2026-01-06
