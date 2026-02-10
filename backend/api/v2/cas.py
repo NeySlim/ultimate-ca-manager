@@ -270,7 +270,7 @@ def create_ca():
         dn = {
             'CN': data.get('commonName'),
             'O': data.get('organization'),
-            'C': data.get('country')
+            'C': (data.get('country') or '').upper() or None
         }
         
         # SECURITY: Validate DN fields
