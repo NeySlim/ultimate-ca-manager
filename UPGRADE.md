@@ -212,7 +212,7 @@ sudo systemctl start ucm
 3. **mTLS users:**
    - Check configuration at `/config/mtls`
    - Update reverse proxy if needed
-   - See `DOCKER_QUICKSTART.md` for new setup
+   - See [Docker Guide](docs/installation/docker.md) for new setup
 
 ### Upgrading to v1.7.0 from v1.6.x
 

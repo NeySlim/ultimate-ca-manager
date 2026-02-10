@@ -368,5 +368,5 @@ openssl rsa -noout -modulus -in server.key | md5sum
 
 - [User Guide](USER_GUIDE.md)
 - [API Reference](API_REFERENCE.md)
-- [Installation](../INSTALLATION.md)
+- [Installation](installation/README.md)
 - [Changelog](../CHANGELOG.md)

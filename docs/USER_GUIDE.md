@@ -271,6 +271,6 @@ UCM is mobile-responsive:
 ## 📚 More Resources
 
 - [API Reference](API_REFERENCE.md)
-- [Installation Guide](../INSTALLATION.md)
-- [Docker Quickstart](../DOCKER_QUICKSTART.md)
+- [Installation Guide](installation/README.md)
+- [Docker Guide](installation/docker.md)
 - [Changelog](../CHANGELOG.md)
