@@ -10,7 +10,7 @@ UCM supports Redis for distributed caching and rate limiting. Redis is **optiona
 | Multiple UCM instances (load balanced) | ✅ Yes |
 | High availability setup | ✅ Yes |
 | Persistent rate limiting across restarts | ✅ Yes |
-| UCM Pro with many concurrent users | ✅ Recommended |
+| UCM with many concurrent users | ✅ Recommended |
 
 ## Features Enabled by Redis
 

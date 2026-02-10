@@ -56,12 +56,12 @@
 
 ---
 
-## ✅ Advanced Features (v2.0.0)
+## 🧪 Advanced Features (Experimental)
 
-### Security & Administration ✅
-- ✅ **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault
-- ✅ **RBAC** - Custom roles and permissions
-- ✅ **SSO** - SAML, OAuth2, LDAP integration
+### Security & Administration
+- 🧪 **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault, GCP KMS (UI + backend, needs real HSM testing)
+- 🧪 **RBAC** - Custom roles and permissions (UI + API, enforcement in progress)
+- 🧪 **SSO** - LDAP, OAuth2/OIDC, SAML 2.0 (UI + backend, needs production validation)
 - ✅ **Security Dashboard** - Secrets management, anomaly detection
 
 ### Planned for v2.1.0
@@ -100,6 +100,7 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| v2.0.3 | 2026-02-09 | Docker migration fix, null handling, auto-update |
 | v2.0.0 | 2026-02-06 | React 18 UI, 12 themes, templates, groups |
 | v1.8.3 | 2026-01-10 | Standalone mode, packaging fixes |
 | v1.7.0 | 2026-01-08 | ACME, WebAuthn |
@@ -107,4 +108,4 @@
 
 ---
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-10

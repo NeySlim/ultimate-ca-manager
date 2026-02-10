@@ -1,20 +1,20 @@
 # UCM Advanced Features
 
-All features are included in UCM v2.1+. No separate editions.
+All features are included in UCM. No separate editions.
 
 ## Features Overview
 
 | Feature | Status |
 |---------|--------|
-| Certificate Management | ✅ |
-| Multiple CAs | ✅ |
-| ACME Protocol | ✅ |
-| SCEP Protocol | ✅ |
-| User Groups | ✅ |
-| Custom RBAC Roles | ✅ |
-| SSO (LDAP/OAuth2/SAML) | ✅ |
-| HSM Integration | ✅ |
-| Advanced Audit Logs | ✅ |
+| Certificate Management | ✅ Stable |
+| Multiple CAs | ✅ Stable |
+| ACME Protocol | ✅ Stable |
+| SCEP Protocol | ✅ Stable |
+| User Groups | ✅ Stable |
+| Custom RBAC Roles | 🧪 Experimental |
+| SSO (LDAP/OAuth2/SAML) | 🧪 Experimental |
+| HSM Integration | 🧪 Experimental |
+| Advanced Audit Logs | ✅ Stable |
 
 ---
 

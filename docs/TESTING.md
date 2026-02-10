@@ -81,7 +81,7 @@ npm run test:e2e
 # Run with UI
 npm run test:e2e:headed
 
-# Run Pro-specific tests
+# Run advanced feature tests
 npm run test:e2e:pro
 ```
 
@@ -95,7 +95,7 @@ frontend/e2e/
 ├── certificates.spec.ts
 ├── cas.spec.ts
 ├── core.spec.ts       # Users, Settings, Navigation
-└── pro/               # Pro-only features
+└── pro/               # Advanced features
     ├── groups.spec.ts
     ├── rbac.spec.ts
     ├── sso.spec.ts
@@ -137,9 +137,9 @@ test.describe('Dashboard', () => {
 })
 ```
 
-## Pro Test Infrastructure
+## Advanced Features Test Infrastructure
 
-For testing Pro features (SSO, LDAP, HSM), a Docker Compose stack is available:
+For testing advanced features (SSO, LDAP, HSM), a Docker Compose stack is available:
 
 ```bash
 # Start test infrastructure
