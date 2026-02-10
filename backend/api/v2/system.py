@@ -1083,10 +1083,12 @@ def get_security_anomalies():
 def check_updates():
     """Check for available updates"""
     try:
+        import os
         from services.updates import check_for_updates
         
         include_prereleases = request.args.get('include_prereleases', 'false').lower() == 'true'
         result = check_for_updates(include_prereleases=include_prereleases)
+        result['can_auto_update'] = os.getenv('UCM_DOCKER') != '1'
         
         return success_response(data=result)
     except Exception as e:
@@ -1097,6 +1099,10 @@ def check_updates():
 @require_auth(['admin:system'])
 def install_update():
     """Download and install an update"""
+    import os
+    if os.getenv('UCM_DOCKER') == '1':
+        return error_response("Auto-update is not available in Docker. Pull the new image instead: docker pull ghcr.io/neyslim/ultimate-ca-manager:latest", 400)
+    
     try:
         from services.updates import check_for_updates, download_update, install_update as do_install
         

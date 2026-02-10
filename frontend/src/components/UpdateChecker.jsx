@@ -114,13 +114,17 @@ export function UpdateChecker() {
               ) : (
                 <>{t('settings.running')} v{updateInfo?.current_version}</>
               )}
-              <span className="mx-2">•</span>
-              <span className="capitalize">{updateInfo?.edition}</span> {t('settings.edition')}
             </div>
             
             {updateInfo?.published_at && updateInfo?.update_available && (
               <div className="text-xs text-text-tertiary mt-1">
                 Released {formatRelativeTime(updateInfo.published_at)}
+              </div>
+            )}
+            
+            {updateInfo?.update_available && !updateInfo?.can_auto_update && (
+              <div className="text-xs text-text-tertiary mt-1">
+                💡 docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
               </div>
             )}
             
@@ -131,14 +135,7 @@ export function UpdateChecker() {
               </div>
             )}
             
-            {updateInfo?.needs_token && (
-              <div className="flex items-center gap-1 text-accent-warning text-sm mt-2">
-                <Info size={14} />
-                {updateInfo.message || 'Pro updates require GitHub token configuration.'}
-              </div>
-            )}
-            
-            {updateInfo?.message && !updateInfo?.needs_token && !updateInfo?.update_available && (
+            {updateInfo?.message && !updateInfo?.update_available && (
               <div className="flex items-center gap-1 text-text-tertiary text-xs mt-2">
                 <Info size={14} />
                 {updateInfo.message}
@@ -148,7 +145,7 @@ export function UpdateChecker() {
         </div>
         
         <div className="flex items-center gap-2">
-          {updateInfo?.update_available && (
+          {updateInfo?.update_available && updateInfo?.can_auto_update && (
             <Button
               variant="primary"
               size="sm"
