@@ -1120,15 +1120,13 @@ def install_update():
         do_install(package_path)
         
         # Log the update
-        from services.audit import log_audit_event
-        log_audit_event(
-            action='system.update',
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action='settings_update',
             resource_type='system',
             resource_id='ucm',
-            details={
-                'from_version': update_info['current_version'],
-                'to_version': update_info['latest_version']
-            }
+            resource_name='UCM Update',
+            details=f"Updated from {update_info['current_version']} to {update_info['latest_version']}"
         )
         
         return success_response(

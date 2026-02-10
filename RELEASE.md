@@ -1,6 +1,6 @@
 # UCM Release & Deployment Guide
 
-## Version 2.0.0
+## Version 2.0.3
 
 ### Supported Platforms
 
@@ -27,10 +27,10 @@ After installation:
 
 ```bash
 # Download
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_2.0.0_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_2.0.3_all.deb
 
 # Install
-sudo dpkg -i ucm_2.0.0_all.deb
+sudo dpkg -i ucm_2.0.3_all.deb
 
 # If dependency issues (shouldn't happen with venv approach):
 sudo apt-get install -f
@@ -40,12 +40,12 @@ sudo apt-get install -f
 
 ```bash
 # Download
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-2.0.0-1.fc43.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-2.0.3-1.fc43.noarch.rpm
 
 # Install
-sudo dnf install ./ucm-2.0.0-1.fc43.noarch.rpm
+sudo dnf install ./ucm-2.0.3-1.fc43.noarch.rpm
 # or
-sudo rpm -ivh ucm-2.0.0-1.fc43.noarch.rpm
+sudo rpm -ivh ucm-2.0.3-1.fc43.noarch.rpm
 ```
 
 ### Docker
@@ -57,7 +57,7 @@ docker run -d \
   -v ucm-data:/opt/ucm/data \
   -e SECRET_KEY=$(openssl rand -hex 32) \
   -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
-  ghcr.io/neyslim/ucm:2.0.0
+  ghcr.io/neyslim/ucm:2.0.3
 ```
 
 ---
@@ -88,7 +88,7 @@ sudo cp /var/lib/ucm/ucm.db /var/lib/ucm/ucm.db.backup
 sudo cp /etc/ucm/ucm.env /etc/ucm/ucm.env.backup
 
 # Install new version
-sudo dpkg -i ucm_2.0.0_all.deb
+sudo dpkg -i ucm_2.0.3_all.deb
 
 # Check migration log
 sudo cat /var/log/ucm/migration.log

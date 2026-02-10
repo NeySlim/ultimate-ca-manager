@@ -12,9 +12,9 @@ Ultimate CA Manager (UCM) - Complete Certificate Authority management system wit
 - 🔗 SCEP Server (RFC 8894) - Auto-enrollment
 - 🟢 OCSP Responder (RFC 6960) - Real-time status
 - 📄 CRL Distribution (RFC 5280) - Revocation lists
-- 🎨 8 Professional Themes (Light & Dark)
+- 🎨 12 Theme Variants (Light & Dark)
 - 🐳 Docker ready with multi-arch support
-- 📱 Responsive modern UI with HTMX
+- 📱 Modern React 18 UI with responsive design
 - 🔒 Role-based access control
 - 📡 Complete REST API
 
@@ -61,7 +61,7 @@ Recommended size: 1280×640px (will be cropped from 1530×921)
 ## README Badges to Add
 
 ```markdown
-![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.3-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)

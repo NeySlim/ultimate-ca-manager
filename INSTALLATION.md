@@ -1,6 +1,6 @@
 # Installation Guide
 
-**UCM v1.8.3** - Ultimate CA Manager
+**UCM v2.0.3** - Ultimate CA Manager
 
 Choose the installation method that best suits your needs.
 
@@ -45,9 +45,9 @@ wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pac
 docker run -d \
   --name ucm \
   -p 8443:8443 \
-  -v ucm-data:/app/backend/data \
+  -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+  ghcr.io/neyslim/ultimate-ca-manager:2.0.3
 ```
 
 **Access:** https://localhost:8443  
@@ -62,13 +62,13 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.3
     container_name: ucm
     restart: unless-stopped
     ports:
       - "8443:8443"
     volumes:
-      - ucm-data:/app/backend/data
+      - ucm-data:/opt/ucm/data
     environment:
       - UCM_FQDN=ucm.example.com
       - UCM_ACME_ENABLED=true

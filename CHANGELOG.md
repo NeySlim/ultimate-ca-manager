@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.3] - 2026-02-10
+
+### 🐛 Bug Fixes
+
+- **CA Creation Fix** - Fixed crash when creating CA with null `validityYears` or `keySize` values (Docker/fresh installs)
+- **DN Field Validation** - Country code now auto-uppercased across all endpoints (CAs, Certificates, CSRs)
+- **CSR Validation** - Added missing Distinguished Name validation to CSR creation endpoint
+
+### 🐳 Docker Improvements
+
+- **Unified Data Path** - All Docker data now stored in `/opt/ucm/data` (same as DEB/RPM installs)
+- **Migration Support** - Automatic migration from old path (`/app/backend/data`) on container upgrade
+- **Volume Mount Simplified** - Single volume mount: `-v ucm-data:/opt/ucm/data`
+
+### 📝 Documentation
+
+- Updated Docker installation guides with correct volume paths
+- Updated docker-compose examples
+
+---
+
 ## [2.0.0] - 2026-02-07
 
 ### 🔐 Security Enhancements (from beta2)

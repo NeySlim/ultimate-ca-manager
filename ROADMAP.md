@@ -1,7 +1,7 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.0  
-**Status:** Beta Testing
+**Current Version:** v2.0.3  
+**Status:** Stable
 
 ---
 
