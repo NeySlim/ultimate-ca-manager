@@ -245,7 +245,8 @@
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} обліковий запис",
-    "subtitle_other": "{{count}} облікових записів"
+    "subtitle_other": "{{count}} облікових записів",
+    "subtitle": "{{count}} облікових записів ACME"
   },
   "audit": {
     "event": "Подія",
@@ -354,7 +355,8 @@
     "columnsView": "Вигляд колонок",
     "noIntermediate": "Немає проміжних ЦС",
     "orgView": "Вигляд органіграми",
-    "orphanCAs": "Сирітські ЦС"
+    "orphanCAs": "Сирітські ЦС",
+    "subtitle": "{{count}} центрів сертифікації"
   },
   "certificates": {
     "createCertificate": "Створити сертифікат",
@@ -381,7 +383,8 @@
     "exportDER": "Експортувати DER",
     "pkcs12Password": "Пароль PKCS#12",
     "includeChain": "Включити ланцюжок сертифікатів",
-    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1"
+    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
+    "subtitle": "{{count}} сертифікатів"
   },
   "common": {
     "save": "Зберегти",
@@ -895,7 +898,8 @@
     "subtitle_one": "{{count}} група",
     "subtitle_other": "{{count}} груп",
     "memberCount_one": "{{count}} учасник",
-    "memberCount_other": "{{count}} учасників"
+    "memberCount_other": "{{count}} учасників",
+    "subtitle": "{{count}} груп"
   },
   "help": {
     "aboutCertificates": "Про сертифікати",
@@ -975,7 +979,8 @@
       "cloud": "Cloud"
     },
     "subtitle_one": "{{count}} постачальник",
-    "subtitle_other": "{{count}} постачальників"
+    "subtitle_other": "{{count}} постачальників",
+    "subtitle": "{{count}} постачальників HSM"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1095,7 +1100,27 @@
     "scep": "SCEP",
     "rbac": "Контроль доступу",
     "hsm": "HSM",
-    "logout": "Вийти"
+    "logout": "Вийти",
+    "operations": "Операції"
+  },
+  "operations": {
+    "title": "Операції",
+    "subtitle": "Імпорт, експорт та масові дії",
+    "bulkActions": "Масові дії",
+    "noData": "Елементів не знайдено",
+    "noDataDesc": "Спробуйте змінити фільтри",
+    "loadFailed": "Не вдалося завантажити",
+    "bulkSuccess": "{{action}}: {{count}} успішно",
+    "bulkPartialFail": "{{count}} елементів не вдалося",
+    "bulkFailed": "Масова операція не вдалася",
+    "confirmBulk": "Підтвердити масову операцію",
+    "confirmRevoke": "Відкликати {{count}} сертифікат(ів)? Цю дію не можна скасувати.",
+    "confirmRenew": "Оновити {{count}} сертифікат(ів)? Будуть згенеровані нові ключі.",
+    "confirmDelete": "Видалити {{count}} елемент(ів)? Цю дію не можна скасувати.",
+    "confirmExport": "Експортувати {{count}} елемент(ів)?",
+    "confirmSign": "Підписати {{count}} CSR?",
+    "signCSRs": "Підписати {{count}} CSR",
+    "selectCAForSign": "Оберіть CA для підпису CSR:"
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",
@@ -1164,7 +1189,8 @@
     },
     "stats": {},
     "subtitle_one": "{{count}} роль",
-    "subtitle_other": "{{count}} ролей"
+    "subtitle_other": "{{count}} ролей",
+    "subtitle": "{{count}} користувацьких ролей"
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -1581,7 +1607,8 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} шаблон",
-    "subtitle_other": "{{count}} шаблонів"
+    "subtitle_other": "{{count}} шаблонів",
+    "subtitle": "{{count}} шаблонів сертифікатів"
   },
   "time": {
     "today": "Сьогодні",
@@ -1726,7 +1753,8 @@
     "syncedCerts": "Synced {{coat}} certificatees",
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle": "Керувати довіреними сертифікатами"
   },
   "users": {
     "createUser": "Створити користувача",
@@ -1745,7 +1773,8 @@
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
     "newPassword": "New password: {{password}}",
-    "subtitle_one": "{{count}} користувач"
+    "subtitle_one": "{{count}} користувач",
+    "subtitle": "{{count}} користувачів"
   },
   "validation": {
     "required": "Це поле обов'язкове",

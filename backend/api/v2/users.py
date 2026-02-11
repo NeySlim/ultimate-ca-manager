@@ -371,6 +371,52 @@ def delete_user(user_id):
         return error_response('Failed to delete user', 500)
 
 
+# ============================================================
+# Bulk Operations
+# ============================================================
+
+@bp.route('/api/v2/users/bulk/delete', methods=['POST'])
+@require_auth(['delete:users'])
+def bulk_delete_users():
+    """Bulk deactivate users (soft delete)"""
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+
+    data = request.get_json()
+    if not data or not data.get('ids'):
+        return error_response('ids array required', 400)
+
+    ids = data['ids']
+    results = {'success': [], 'failed': []}
+
+    for user_id in ids:
+        try:
+            if g.current_user.id == user_id:
+                results['failed'].append({'id': user_id, 'error': 'Cannot delete your own account'})
+                continue
+            user = db.session.get(User, user_id)
+            if not user:
+                results['failed'].append({'id': user_id, 'error': 'Not found'})
+                continue
+            user.active = False
+            db.session.commit()
+            results['success'].append(user_id)
+        except Exception as e:
+            db.session.rollback()
+            results['failed'].append({'id': user_id, 'error': str(e)})
+
+    AuditService.log_action(
+        action='users_bulk_deactivated',
+        resource_type='user',
+        resource_id=','.join(str(i) for i in results['success']),
+        resource_name=f'{len(results["success"])} users',
+        details=f'Bulk deactivated {len(results["success"])} users',
+        success=True
+    )
+
+    return success_response(data=results, message=f'{len(results["success"])} users deactivated')
+
+
 @bp.route('/api/v2/users/<int:user_id>/reset-password', methods=['POST'])
 @require_auth(['write:users'])
 def reset_user_password(user_id):

@@ -76,5 +76,19 @@ export const certificatesService = {
       key: keyPem,
       passphrase 
     })
+  },
+
+  // Bulk operations
+  async bulkRevoke(ids, reason = 'unspecified') {
+    return apiClient.post('/certificates/bulk/revoke', { ids, reason })
+  },
+  async bulkRenew(ids) {
+    return apiClient.post('/certificates/bulk/renew', { ids })
+  },
+  async bulkDelete(ids) {
+    return apiClient.post('/certificates/bulk/delete', { ids })
+  },
+  async bulkExport(ids, format = 'pem') {
+    return apiClient.post('/certificates/bulk/export', { ids, format })
   }
 }

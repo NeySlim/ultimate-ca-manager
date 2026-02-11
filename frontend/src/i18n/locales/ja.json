@@ -245,7 +245,8 @@
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} 件のアカウント",
-    "subtitle_other": "{{count}} 件のアカウント"
+    "subtitle_other": "{{count}} 件のアカウント",
+    "subtitle": "{{count}} 件の ACME アカウント"
   },
   "audit": {
     "event": "イベント",
@@ -354,7 +355,8 @@
     "createFailed": "Failed to create CA",
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} 件の CA",
-    "subtitle_other": "{{count}} 件の CA"
+    "subtitle_other": "{{count}} 件の CA",
+    "subtitle": "{{count}} 件の認証局"
   },
   "certificates": {
     "createCertificate": "証明書を作成",
@@ -381,7 +383,8 @@
     "exportDER": "DERでエクスポート",
     "pkcs12Password": "PKCS#12パスワード",
     "includeChain": "証明書チェーンを含める",
-    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1"
+    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
+    "subtitle": "{{count}} 件の証明書"
   },
   "common": {
     "save": "保存",
@@ -895,7 +898,8 @@
     "subtitle_one": "{{count}} 件のグループ",
     "subtitle_other": "{{count}} 件のグループ",
     "memberCount_one": "{{count}} 人のメンバー",
-    "memberCount_other": "{{count}} 人のメンバー"
+    "memberCount_other": "{{count}} 人のメンバー",
+    "subtitle": "{{count}} 件のグループ"
   },
   "help": {
     "aboutCertificates": "証明書について",
@@ -975,7 +979,8 @@
       "cloud": "Cloud"
     },
     "subtitle_one": "{{count}} 件のプロバイダー",
-    "subtitle_other": "{{count}} 件のプロバイダー"
+    "subtitle_other": "{{count}} 件のプロバイダー",
+    "subtitle": "{{count}} 件の HSM プロバイダー"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1095,7 +1100,27 @@
     "scep": "SCEP",
     "rbac": "アクセス制御",
     "hsm": "HSM",
-    "logout": "ログアウト"
+    "logout": "ログアウト",
+    "operations": "オペレーション"
+  },
+  "operations": {
+    "title": "オペレーション",
+    "subtitle": "インポート、エクスポート、一括操作",
+    "bulkActions": "一括操作",
+    "noData": "アイテムが見つかりません",
+    "noDataDesc": "フィルターを調整してみてください",
+    "loadFailed": "読み込みに失敗しました",
+    "bulkSuccess": "{{action}}: {{count}} 件成功",
+    "bulkPartialFail": "{{count}} 件失敗",
+    "bulkFailed": "一括操作に失敗しました",
+    "confirmBulk": "一括操作の確認",
+    "confirmRevoke": "{{count}} 件の証明書を失効しますか？この操作は元に戻せません。",
+    "confirmRenew": "{{count}} 件の証明書を更新しますか？新しい鍵が生成されます。",
+    "confirmDelete": "{{count}} 件のアイテムを削除しますか？この操作は元に戻せません。",
+    "confirmExport": "{{count}} 件のアイテムをエクスポートしますか？",
+    "confirmSign": "{{count}} 件のCSRに署名しますか？",
+    "signCSRs": "{{count}} 件のCSRに署名",
+    "selectCAForSign": "CSRに署名するCAを選択してください："
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",
@@ -1164,7 +1189,8 @@
     },
     "stats": {},
     "subtitle_one": "{{count}} 件のロール",
-    "subtitle_other": "{{count}} 件のロール"
+    "subtitle_other": "{{count}} 件のロール",
+    "subtitle": "{{count}} 件のカスタムロール"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -1581,7 +1607,8 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} 件のテンプレート",
-    "subtitle_other": "{{count}} 件のテンプレート"
+    "subtitle_other": "{{count}} 件のテンプレート",
+    "subtitle": "{{count}} 件の証明書テンプレート"
   },
   "time": {
     "today": "今日",
@@ -1726,7 +1753,8 @@
     "syncedCerts": "Synced {{coat}} certificatees",
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle": "信頼された証明書を管理"
   },
   "users": {
     "createUser": "ユーザーを作成",
@@ -1745,7 +1773,8 @@
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
     "newPassword": "New password: {{password}}",
-    "subtitle_one": "{{count}} 人のユーザー"
+    "subtitle_one": "{{count}} 人のユーザー",
+    "subtitle": "{{count}} 件のユーザー"
   },
   "validation": {
     "required": "この項目は必須です",

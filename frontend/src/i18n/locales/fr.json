@@ -245,7 +245,8 @@
     "domainTestSuccess": "Test d'accès DNS réussi",
     "domainTestFailed": "Échec du test d'accès DNS",
     "subtitle_one": "{{count}} compte",
-    "subtitle_other": "{{count}} comptes"
+    "subtitle_other": "{{count}} comptes",
+    "subtitle": "{{count}} comptes ACME"
   },
   "audit": {
     "event": "Événement",
@@ -354,7 +355,8 @@
     "createFailed": "Échec de la création de l'AC",
     "unnamedCA": "AC sans nom",
     "subtitle_one": "{{count}} AC",
-    "subtitle_other": "{{count}} AC"
+    "subtitle_other": "{{count}} AC",
+    "subtitle": "{{count}} autorités de certification"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -381,7 +383,8 @@
     "exportDER": "Exporter en DER",
     "pkcs12Password": "Mot de passe PKCS#12",
     "includeChain": "Inclure la chaîne de certificats",
-    "sanPlaceholder": "DNS:exemple.com\nDNS:www.exemple.com\nIP:192.168.1.1"
+    "sanPlaceholder": "DNS:exemple.com\nDNS:www.exemple.com\nIP:192.168.1.1",
+    "subtitle": "{{count}} certificats"
   },
   "common": {
     "save": "Enregistrer",
@@ -895,7 +898,8 @@
     "subtitle_one": "{{count}} groupe",
     "subtitle_other": "{{count}} groupes",
     "memberCount_one": "{{count}} membre",
-    "memberCount_other": "{{count}} membres"
+    "memberCount_other": "{{count}} membres",
+    "subtitle": "{{count}} groupes"
   },
   "help": {
     "aboutCertificates": "À propos des certificats",
@@ -975,7 +979,8 @@
       "cloud": "Cloud"
     },
     "subtitle_one": "{{count}} fournisseur",
-    "subtitle_other": "{{count}} fournisseurs"
+    "subtitle_other": "{{count}} fournisseurs",
+    "subtitle": "{{count}} fournisseurs HSM"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1095,7 +1100,27 @@
     "scep": "SCEP",
     "rbac": "Contrôle d'accès",
     "hsm": "HSM",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "operations": "Opérations"
+  },
+  "operations": {
+    "title": "Opérations",
+    "subtitle": "Importer, exporter et actions en masse",
+    "bulkActions": "Actions en masse",
+    "noData": "Aucun élément trouvé",
+    "noDataDesc": "Essayez d'ajuster vos filtres",
+    "loadFailed": "Échec du chargement",
+    "bulkSuccess": "{{action}} : {{count}} réussi(s)",
+    "bulkPartialFail": "{{count}} éléments échoués",
+    "bulkFailed": "L'opération en masse a échoué",
+    "confirmBulk": "Confirmer l'opération en masse",
+    "confirmRevoke": "Révoquer {{count}} certificat(s) ? Cette action est irréversible.",
+    "confirmRenew": "Renouveler {{count}} certificat(s) ? De nouvelles clés seront générées.",
+    "confirmDelete": "Supprimer {{count}} élément(s) ? Cette action est irréversible.",
+    "confirmExport": "Exporter {{count}} élément(s) ?",
+    "confirmSign": "Signer {{count}} CSR ?",
+    "signCSRs": "Signer {{count}} CSR",
+    "selectCAForSign": "Sélectionnez une CA pour signer les CSR :"
   },
   "notifications": {
     "certificateIssued": "Certificat émis : {{name}}",
@@ -1164,7 +1189,8 @@
     },
     "stats": {},
     "subtitle_one": "{{count}} rôle",
-    "subtitle_other": "{{count}} rôles"
+    "subtitle_other": "{{count}} rôles",
+    "subtitle": "{{count}} rôles personnalisés"
   },
   "scep": {
     "title": "Protocole SCEP",
@@ -1581,7 +1607,8 @@
     "fixedCN": "CN fixe",
     "cnRequired": "CN requis",
     "subtitle_one": "{{count}} modèle",
-    "subtitle_other": "{{count}} modèles"
+    "subtitle_other": "{{count}} modèles",
+    "subtitle": "{{count}} modèles de certificats"
   },
   "time": {
     "today": "Aujourd'hui",
@@ -1726,7 +1753,8 @@
     "codeSigningDesc": "Trusted for code signing",
     "emailTrustDesc": "Trusted for S/MIME",
     "tlsTrust": "TLS Trust",
-    "tlsTrustDesc": "Trusted for TLS/SSL connections"
+    "tlsTrustDesc": "Trusted for TLS/SSL connections",
+    "subtitle": "Gérer les certificats de confiance"
   },
   "users": {
     "createUser": "Créer un utilisateur",
@@ -1745,7 +1773,8 @@
     "newPassword": "Nouveau mot de passe : {{password}}",
     "checkEmail": "Vérifiez votre email",
     "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
-    "subtitle_one": "{{count}} utilisateur"
+    "subtitle_one": "{{count}} utilisateur",
+    "subtitle": "{{count}} utilisateurs"
   },
   "validation": {
     "required": "Ce champ est requis",

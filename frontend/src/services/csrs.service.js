@@ -63,5 +63,13 @@ export const csrsService = {
     return apiClient.get(`/csrs/${id}/download`, {
       responseType: 'blob'
     })
+  },
+
+  // Bulk operations
+  async bulkSign(ids, ca_id, validity_days = 365) {
+    return apiClient.post('/csrs/bulk/sign', { ids, ca_id, validity_days })
+  },
+  async bulkDelete(ids) {
+    return apiClient.post('/csrs/bulk/delete', { ids })
   }
 }

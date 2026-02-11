@@ -42,5 +42,10 @@ export const templatesService = {
 
   async import(formData) {
     return apiClient.upload('/templates/import', formData)
+  },
+
+  // Bulk operations
+  async bulkDelete(ids) {
+    return apiClient.post('/templates/bulk/delete', { ids })
   }
 }

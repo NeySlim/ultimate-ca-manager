@@ -292,6 +292,51 @@ def delete_template(template_id):
         return error_response(f'Failed to delete template: {str(e)}', 500)
 
 
+# ============================================================
+# Bulk Operations
+# ============================================================
+
+@bp.route('/api/v2/templates/bulk/delete', methods=['POST'])
+@require_auth(['read:templates'])
+def bulk_delete_templates():
+    """Bulk delete templates"""
+
+    data = request.get_json()
+    if not data or not data.get('ids'):
+        return error_response('ids array required', 400)
+
+    ids = data['ids']
+    results = {'success': [], 'failed': []}
+
+    for template_id in ids:
+        try:
+            template = CertificateTemplate.query.get(template_id)
+            if not template:
+                results['failed'].append({'id': template_id, 'error': 'Not found'})
+                continue
+            if template.is_system:
+                results['failed'].append({'id': template_id, 'error': 'Cannot delete system template'})
+                continue
+            template_name = template.name
+            db.session.delete(template)
+            db.session.commit()
+            results['success'].append(template_id)
+        except Exception as e:
+            db.session.rollback()
+            results['failed'].append({'id': template_id, 'error': str(e)})
+
+    AuditService.log_action(
+        action='templates_bulk_deleted',
+        resource_type='template',
+        resource_id=','.join(str(i) for i in results['success']),
+        resource_name=f'{len(results["success"])} templates',
+        details=f'Bulk deleted {len(results["success"])} templates',
+        success=True
+    )
+
+    return success_response(data=results, message=f'{len(results["success"])} templates deleted')
+
+
 @bp.route('/api/v2/templates/<int:template_id>/export', methods=['GET'])
 @require_auth(['read:templates'])
 def export_template(template_id):

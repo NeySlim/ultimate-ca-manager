@@ -594,3 +594,94 @@ def sign_csr(csr_id):
         print(f"CSR Sign Error: {str(e)}")
         print(traceback.format_exc())
         return error_response(f"Failed to sign CSR: {str(e)}", 500)
+
+
+# ============================================================
+# Bulk Operations
+# ============================================================
+
+@bp.route('/api/v2/csrs/bulk/sign', methods=['POST'])
+@require_auth(['write:csrs', 'write:certificates'])
+def bulk_sign_csrs():
+    """Bulk sign CSRs with a CA"""
+    from models import CA
+
+    data = request.get_json()
+    if not data or not data.get('ids'):
+        return error_response('ids array required', 400)
+
+    ca_id = data.get('ca_id')
+    validity_days = data.get('validity_days', 365)
+
+    if not ca_id:
+        return error_response('ca_id required', 400)
+
+    ca = CA.query.get(ca_id)
+    if not ca or not ca.crt or not ca.prv:
+        return error_response('CA not found or not valid for signing', 404)
+
+    ids = data['ids']
+    results = {'success': [], 'failed': []}
+
+    for csr_id in ids:
+        try:
+            cert = Certificate.query.get(csr_id)
+            if not cert:
+                results['failed'].append({'id': csr_id, 'error': 'Not found'})
+                continue
+            if not cert.csr:
+                results['failed'].append({'id': csr_id, 'error': 'No CSR data'})
+                continue
+            if cert.crt:
+                results['failed'].append({'id': csr_id, 'error': 'Already signed'})
+                continue
+
+            signed_cert = CertificateService.sign_csr(
+                cert_id=csr_id, caref=ca.refid, validity_days=validity_days)
+            results['success'].append(csr_id)
+        except Exception as e:
+            results['failed'].append({'id': csr_id, 'error': str(e)})
+
+    AuditService.log_action(
+        action='csrs_bulk_signed',
+        resource_type='csr',
+        resource_id=','.join(str(i) for i in results['success']),
+        resource_name=f'{len(results["success"])} CSRs',
+        details=f'Bulk signed {len(results["success"])} CSRs with CA {ca.descr}',
+        success=True
+    )
+
+    return success_response(data=results, message=f'{len(results["success"])} CSRs signed')
+
+
+@bp.route('/api/v2/csrs/bulk/delete', methods=['POST'])
+@require_auth(['delete:csrs'])
+def bulk_delete_csrs():
+    """Bulk delete CSRs"""
+
+    data = request.get_json()
+    if not data or not data.get('ids'):
+        return error_response('ids array required', 400)
+
+    ids = data['ids']
+    results = {'success': [], 'failed': []}
+
+    for csr_id in ids:
+        try:
+            if CertificateService.delete_certificate(csr_id):
+                results['success'].append(csr_id)
+            else:
+                results['failed'].append({'id': csr_id, 'error': 'Not found'})
+        except Exception as e:
+            results['failed'].append({'id': csr_id, 'error': str(e)})
+
+    AuditService.log_action(
+        action='csrs_bulk_deleted',
+        resource_type='csr',
+        resource_id=','.join(str(i) for i in results['success']),
+        resource_name=f'{len(results["success"])} CSRs',
+        details=f'Bulk deleted {len(results["success"])} CSRs',
+        success=True
+    )
+
+    return success_response(data=results, message=f'{len(results["success"])} CSRs deleted')
