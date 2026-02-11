@@ -31,7 +31,7 @@ class SMTPConfig(db.Model):
         if not self._smtp_password:
             return None
         try:
-            from features.encryption import decrypt_if_needed
+            from utils.encryption import decrypt_if_needed
             return decrypt_if_needed(self._smtp_password)
         except ImportError:
             # Pro module not available, return as-is
@@ -46,7 +46,7 @@ class SMTPConfig(db.Model):
             self._smtp_password = None
             return
         try:
-            from features.encryption import encrypt_if_needed
+            from utils.encryption import encrypt_if_needed
             self._smtp_password = encrypt_if_needed(value)
         except ImportError:
             # Pro module not available, store as-is

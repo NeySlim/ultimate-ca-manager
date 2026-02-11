@@ -6,7 +6,7 @@ from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db
-from models.features.policy import CertificatePolicy, ApprovalRequest
+from models.policy import CertificatePolicy, ApprovalRequest
 from datetime import datetime, timedelta
 import json
 

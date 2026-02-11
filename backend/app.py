@@ -247,32 +247,31 @@ def create_app(config_name=None):
                     db.create_all()
                     app.logger.info("✓ Database tables created/verified")
                 
-                # ===== PRO TABLES =====
-                # Import Pro models to register them with SQLAlchemy (if Pro is available)
+                # ===== EXTENDED TABLES =====
+                # Import models to register them with SQLAlchemy
                 try:
-                    # Groups are now in community (models.group), Pro only has RBAC/SSO/HSM/Policies
-                    from models.features.rbac import CustomRole, RolePermission
-                    from models.features.sso import SSOProvider, SSOSession
-                    from models.features.policy import CertificatePolicy, ApprovalRequest
-                    from models.features.hsm import HSMProvider, HSMKey
+                    from models.rbac import CustomRole, RolePermission
+                    from models.sso import SSOProvider, SSOSession
+                    from models.policy import CertificatePolicy, ApprovalRequest
+                    from models.hsm import HsmProvider, HsmKey
                     
-                    # Check if Pro tables exist, create if missing
+                    # Check if tables exist, create if missing
                     inspector = inspect(db.engine)
                     tables = inspector.get_table_names()
-                    pro_tables = ['pro_custom_roles', 'pro_role_permissions', 
+                    extended_tables = ['pro_custom_roles', 'pro_role_permissions', 
                                   'pro_sso_providers', 'pro_sso_sessions',
                                   'certificate_policies', 'approval_requests',
-                                  'pro_hsm_providers', 'pro_hsm_keys']
-                    missing_pro = [t for t in pro_tables if t not in tables]
+                                  'hsm_providers', 'hsm_keys']
+                    missing = [t for t in extended_tables if t not in tables]
                     
-                    if missing_pro:
-                        app.logger.info(f"Creating Pro tables: {', '.join(missing_pro)}")
+                    if missing:
+                        app.logger.info(f"Creating tables: {', '.join(missing)}")
                         db.create_all()
-                        app.logger.info("✓ Pro database tables created")
+                        app.logger.info("✓ Extended database tables created")
                     else:
-                        app.logger.info("✓ Pro database tables already exist")
+                        app.logger.info("✓ Extended database tables already exist")
                 except ImportError:
-                    pass  # Pro not available, skip
+                    pass
                 # =======================
                 
                 # Always verify critical tables exist (whether just created or pre-existing)
@@ -927,10 +926,10 @@ def init_database(app):
     except Exception as e:
         app.logger.error(f"Failed to generate HTTPS certificate: {e}")
     
-    # ===== INITIALIZE PRO DEFAULT DATA =====
+    # ===== INITIALIZE DEFAULT DATA =====
     try:
-        from models.features.group import Group
-        from models.features.rbac import CustomRole, RolePermission
+        from models.group import Group
+        from models.rbac import CustomRole, RolePermission
         
         # Create default groups if none exist
         if Group.query.count() == 0:
@@ -1065,18 +1064,6 @@ def register_blueprints(app):
     # This must be before ui_bp which has catch-all routing
     from api.v2 import register_api_v2
     register_api_v2(app)
-    
-    # ===== FEATURE MODULES =====
-    # Auto-load feature modules (SSO, HSM, RBAC, etc.)
-    try:
-        from features import register_feature_blueprints
-        register_feature_blueprints(app)
-        app.logger.info("✨ UCM feature modules loaded successfully")
-    except ImportError as e:
-        app.logger.debug(f"Feature modules not available: {e}")
-    except Exception as e:
-        app.logger.warning(f"⚠️ Feature modules failed to load: {e}")
-    # ============================
     
     # Public endpoints (no auth, no /api prefix - standard paths)
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points

@@ -7,7 +7,7 @@ from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db
-from models.features.rbac import CustomRole, RolePermission
+from models.rbac import CustomRole, RolePermission
 
 bp = Blueprint('rbac_pro', __name__)
 

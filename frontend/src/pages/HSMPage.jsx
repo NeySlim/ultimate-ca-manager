@@ -147,7 +147,7 @@ export default function HSMPage() {
   }
 
   const handleDeleteKey = async (key) => {
-    if (!confirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.key_label))) return
+    if (!confirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.label))) return
     try {
       await apiClient.delete(`/hsm/keys/${key.id}`)
       showSuccess(SUCCESS.DELETE.KEY)
@@ -387,7 +387,7 @@ export default function HSMPage() {
                   <div className="flex items-center gap-2 min-w-0">
                     <Key size={14} className="text-text-tertiary flex-shrink-0" />
                     <div className="min-w-0">
-                      <p className="font-medium text-text-primary truncate">{key.key_label}</p>
+                      <p className="font-medium text-text-primary truncate">{key.label}</p>
                       <p className="text-text-tertiary">{key.key_type} {key.key_size}</p>
                     </div>
                   </div>
@@ -534,13 +534,38 @@ function ProviderModal({ provider, onSave, onClose }) {
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
 
+  const buildPayload = () => {
+    const config = {}
+    if (formData.provider_type === 'pkcs11') {
+      config.module_path = formData.pkcs11_library_path
+      config.token_label = formData.pkcs11_token_label
+      config.user_pin = formData.pkcs11_pin
+      if (formData.pkcs11_slot_id !== '') config.slot_index = formData.pkcs11_slot_id
+    } else if (formData.provider_type === 'aws-cloudhsm') {
+      config.module_path = formData.pkcs11_library_path || '/opt/cloudhsm/lib/libcloudhsm_pkcs11.so'
+      config.hsm_user = formData.aws_crypto_user
+      config.hsm_password = formData.aws_crypto_password
+      config.cluster_id = formData.aws_cluster_id
+    } else if (formData.provider_type === 'azure-keyvault') {
+      config.vault_url = formData.azure_vault_url
+      config.tenant_id = formData.azure_tenant_id
+      config.client_id = formData.azure_client_id
+      config.client_secret = formData.azure_client_secret
+    } else if (formData.provider_type === 'google-kms') {
+      config.project_id = formData.gcp_project_id
+      config.location = formData.gcp_location
+      config.key_ring = formData.gcp_keyring
+    }
+    return { name: formData.name, type: formData.provider_type, config }
+  }
+
   return (
     <FormModal
       open={true}
       onClose={onClose}
       title={provider ? t('hsm.editProvider') : t('hsm.newProvider')}
       size="lg"
-      onSubmit={() => onSave(formData)}
+      onSubmit={() => onSave(buildPayload())}
       submitLabel={provider ? t('common.save') : t('common.create')}
     >
       <div className="grid grid-cols-2 gap-4">
@@ -610,12 +635,32 @@ function ProviderModal({ provider, onSave, onClose }) {
 function KeyModal({ provider, onSave, onClose }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
-    key_label: '',
+    label: '',
     key_type: 'rsa',
-    key_size: 2048,
-    purpose: 'general',
-    is_exportable: false,
+    key_size: '2048',
+    purpose: 'signing',
+    extractable: false,
   })
+
+  const algorithmOptions = {
+    rsa: [{ value: '2048', label: 'RSA-2048' }, { value: '3072', label: 'RSA-3072' }, { value: '4096', label: 'RSA-4096' }],
+    ec: [{ value: '256', label: 'EC-P256' }, { value: '384', label: 'EC-P384' }, { value: '521', label: 'EC-P521' }],
+    aes: [{ value: '128', label: 'AES-128' }, { value: '256', label: 'AES-256' }],
+  }
+
+  const buildAlgorithm = () => {
+    const prefix = formData.key_type === 'rsa' ? 'RSA' : formData.key_type === 'ec' ? 'EC-P' : 'AES'
+    return `${prefix}${formData.key_type === 'ec' ? '' : '-'}${formData.key_size}`
+  }
+
+  const handleSubmit = () => {
+    onSave({
+      label: formData.label,
+      algorithm: buildAlgorithm(),
+      purpose: formData.purpose,
+      extractable: formData.extractable,
+    })
+  }
 
   return (
     <FormModal
@@ -623,26 +668,20 @@ function KeyModal({ provider, onSave, onClose }) {
       onClose={onClose}
       title={t('hsm.generateHsmKey')}
       size="md"
-      onSubmit={() => onSave(formData)}
+      onSubmit={handleSubmit}
       submitLabel={t('common.generate')}
     >
-      <Input label={t('hsm.keyLabel')} value={formData.key_label} onChange={e => setFormData({...formData, key_label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} />
+      <Input label={t('hsm.keyLabel')} value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} />
       <div className="grid grid-cols-2 gap-4">
-        <Select label={t('common.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
+        <Select label={t('common.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value, key_size: value === 'rsa' ? '2048' : value === 'ec' ? '256' : '128'})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
-          onChange={value => setFormData({...formData, key_size: parseInt(value)})}
-          options={
-            formData.key_type === 'rsa' 
-              ? [{ value: 2048, label: '2048' }, { value: 3072, label: '3072' }, { value: 4096, label: '4096' }]
-              : formData.key_type === 'ec'
-              ? [{ value: 256, label: 'P-256' }, { value: 384, label: 'P-384' }, { value: 521, label: 'P-521' }]
-              : [{ value: 128, label: '128' }, { value: 256, label: '256' }]
-          }
+          onChange={value => setFormData({...formData, key_size: value})}
+          options={algorithmOptions[formData.key_type] || algorithmOptions.rsa}
         />
       </div>
-      <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'general', label: t('hsm.purposes.general') }, { value: 'ca_signing', label: t('hsm.purposes.caSigning') }, { value: 'code_signing', label: t('common.codeSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }]} />
+      <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'signing', label: t('hsm.purposes.caSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }, { value: 'wrapping', label: t('hsm.purposes.general') }, { value: 'all', label: t('common.all') }]} />
     </FormModal>
   )
 }

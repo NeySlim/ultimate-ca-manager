@@ -22,7 +22,7 @@ from api.v2.users import bp as users_bp
 from api.v2.templates import bp as templates_bp
 from api.v2.truststore import bp as truststore_bp
 from api.v2.import_opnsense import bp as import_opnsense_bp
-from api.v2.roles import bp as roles_bp
+from api.v2.rbac import bp as rbac_bp
 from api.v2.webauthn import bp as webauthn_bp
 from api.v2.mtls import bp as mtls_bp
 from api.v2.audit import bp as audit_bp
@@ -35,9 +35,12 @@ from api.v2.dns_providers import bp as dns_providers_bp
 from api.v2.acme_client import bp as acme_client_bp
 from api.v2.acme_domains import bp as acme_domains_bp
 from api.v2.hsm import bp as hsm_bp
+from api.v2.sso import bp as sso_bp
+from api.v2.policies import bp as policies_bp
+from api.v2.reports import bp as reports_bp
+from api.v2.webhooks import bp as webhooks_bp
 
-# List of all core blueprints to register
-# Feature modules are loaded separately via features/__init__.py in app.py
+# All API v2 blueprints
 API_V2_BLUEPRINTS = [
     auth_bp,
     auth_methods_bp,
@@ -55,7 +58,7 @@ API_V2_BLUEPRINTS = [
     templates_bp,
     truststore_bp,
     import_opnsense_bp,
-    roles_bp,
+    rbac_bp,
     webauthn_bp,
     mtls_bp,
     audit_bp,
@@ -68,20 +71,16 @@ API_V2_BLUEPRINTS = [
     acme_client_bp,
     acme_domains_bp,
     hsm_bp,
+    sso_bp,
+    policies_bp,
+    reports_bp,
+    webhooks_bp,
 ]
 
 
 def register_api_v2(app):
-    """
-    Register all API v2 blueprints
-    
-    Usage in app.py:
-        from api.v2 import register_api_v2
-        register_api_v2(app)
-    
-    Note: Feature modules are loaded separately via features/__init__.py
-    """
+    """Register all API v2 blueprints"""
     for blueprint in API_V2_BLUEPRINTS:
         app.register_blueprint(blueprint)
     
-    print(f"✅ Registered {len(API_V2_BLUEPRINTS)} API v2 core blueprints")
+    print(f"✅ Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")

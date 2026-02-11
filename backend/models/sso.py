@@ -74,7 +74,7 @@ class SSOProvider(db.Model):
         if not self._oauth2_client_secret:
             return None
         try:
-            from features.encryption import decrypt_if_needed
+            from utils.encryption import decrypt_if_needed
             return decrypt_if_needed(self._oauth2_client_secret)
         except:
             return self._oauth2_client_secret
@@ -84,7 +84,7 @@ class SSOProvider(db.Model):
         """Encrypt OAuth2 client secret before storing"""
         if value:
             try:
-                from features.encryption import encrypt_if_needed
+                from utils.encryption import encrypt_if_needed
                 self._oauth2_client_secret = encrypt_if_needed(value)
             except:
                 self._oauth2_client_secret = value
@@ -97,7 +97,7 @@ class SSOProvider(db.Model):
         if not self._ldap_bind_password:
             return None
         try:
-            from features.encryption import decrypt_if_needed
+            from utils.encryption import decrypt_if_needed
             return decrypt_if_needed(self._ldap_bind_password)
         except:
             return self._ldap_bind_password
@@ -107,7 +107,7 @@ class SSOProvider(db.Model):
         """Encrypt LDAP bind password before storing"""
         if value:
             try:
-                from features.encryption import encrypt_if_needed
+                from utils.encryption import encrypt_if_needed
                 self._ldap_bind_password = encrypt_if_needed(value)
             except:
                 self._ldap_bind_password = value
