@@ -106,11 +106,11 @@ export default function HSMPage() {
     setTesting(true)
     try {
       const response = await apiClient.post(`/hsm/providers/${provider.id}/test`)
-      if (response.data?.status === 'success') {
+      if (response.data?.success) {
         showSuccess(response.data.message || SUCCESS.HSM.CONNECTION_OK)
         loadData()
       } else {
-        showError(response.message || ERRORS.HSM.TEST_FAILED)
+        showError(response.data?.message || ERRORS.HSM.TEST_FAILED)
       }
     } catch (error) {
       showError(error.message || ERRORS.HSM.TEST_FAILED)
