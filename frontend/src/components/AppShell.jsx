@@ -152,7 +152,7 @@ export function AppShell() {
       <div className={cn(
         "flex flex-col w-full overflow-hidden bg-bg-primary relative",
         isDesktopFrame
-          ? "max-w-[min(calc(100%-48px),2200px)] h-[calc(100%-24px)] rounded-xl shadow-2xl border border-white/10"
+          ? "max-w-[min(calc(100%-48px),1900px)] h-[calc(100%-24px)] rounded-xl shadow-2xl border border-white/10"
           : "h-full"
       )}>
         

@@ -351,7 +351,7 @@ export default function DashboardPage() {
 
   return (
     <div className={`flex-1 h-full flex flex-col bg-bg-primary ${isDesktopGrid ? 'overflow-hidden' : 'overflow-auto'}`}>
-      <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : ''}`} style={{ maxWidth: 'min(1800px, 100%)' }}>
+      <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : ''}`}>
         
         {/* Hero Header — compact bar */}
         <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-3 py-1.5 mb-1.5">
@@ -452,7 +452,7 @@ export default function DashboardPage() {
           {/* Stats Widget */}
           {isVisible('stats') && (
           <div key="stats">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 h-full">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-3 h-full">
               <StatCard 
                 icon={Certificate}
                 label={t('common.certificates')}
@@ -1012,34 +1012,34 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   return (
     <button 
       onClick={onClick}
-      className={`stat-card-enhanced ${variant} relative p-3 text-left group transition-all duration-200`}
+      className={`stat-card-enhanced ${variant} relative p-2 sm:p-3 text-left group transition-all duration-200`}
       style={{ '--card-accent': `var(${accentVar})` }}
     >
       {live && (
-        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
-          <span className="text-[10px] status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
+        <div className="absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 flex items-center gap-1.5 z-10">
+          <span className="text-[10px] status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">Live</span>
           <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse-soft" />
         </div>
       )}
       
-      <div className="relative flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconStyles[color] || iconStyles.slate}`}>
-          <Icon size={20} weight="duotone" />
+      <div className="relative flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconStyles[color] || iconStyles.slate}`}>
+          <Icon size={18} weight="duotone" />
         </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
+        <div className="min-w-0 text-center sm:text-left w-full">
+          <div className="flex items-center justify-center sm:justify-start gap-2">
+            <p className="text-lg sm:text-xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
             {badge && (
-              <Badge variant="warning" size="sm" dot pulse>{badge}</Badge>
+              <Badge variant="warning" size="sm" dot pulse className="hidden sm:inline-flex">{badge}</Badge>
             )}
           </div>
-          <p className="text-[11px] text-text-secondary font-medium">{label}</p>
+          <p className="text-[9px] sm:text-[11px] text-text-secondary font-medium leading-tight line-clamp-2 sm:truncate sm:line-clamp-none">{label}</p>
         </div>
       </div>
       
       <CaretRight 
         size={14} 
-        className="absolute right-2.5 bottom-2.5 text-text-tertiary opacity-0 group-hover:opacity-60 transition-all duration-200 group-hover:translate-x-0.5" 
+        className="absolute right-2.5 bottom-2.5 text-text-tertiary opacity-0 group-hover:opacity-60 transition-all duration-200 group-hover:translate-x-0.5 hidden sm:block" 
       />
     </button>
   )
