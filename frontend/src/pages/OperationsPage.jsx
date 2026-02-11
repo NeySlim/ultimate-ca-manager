@@ -8,11 +8,12 @@ import { useTranslation } from 'react-i18next'
 import { 
   UploadSimple, DownloadSimple, CloudArrowUp, Lightning,
   CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Key, Trash, 
-  ArrowsClockwise, Prohibit, PencilSimple, FileText, Warning, User, Crown, Info
+  ArrowsClockwise, Prohibit, PencilSimple, FileText, Warning, User, Crown, Info,
+  Table, ShoppingCart, Package
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, ResponsiveDataTable, Button, Input, 
-  DetailSection, ConfirmModal, Badge, KeyIndicator
+  DetailSection, ConfirmModal, Badge, KeyIndicator, TransferPanel
 } from '../components'
 import { SmartImportWidget } from '../components/SmartImport'
 import { 
@@ -284,6 +285,7 @@ export default function OperationsPage() {
   const [bulkSignDays, setBulkSignDays] = useState('365')
   const [statusFilter, setStatusFilter] = useState('')
   const [caFilter, setCaFilter] = useState('')
+  const [bulkViewMode, setBulkViewMode] = useState('table') // 'table' | 'basket'
 
   // Load on mount
   useEffect(() => {
@@ -699,16 +701,79 @@ export default function OperationsPage() {
     </div>
   )
 
+  // Render item for basket/transfer view — compact row per resource type
+  const renderBasketItem = useCallback((item) => {
+    const type = bulkResourceType
+    if (type === 'certificates') {
+      const name = item.cn || item.common_name || extractCN(item.subject) || item.descr || '?'
+      const status = item.revoked ? 'revoked' : item.status || 'unknown'
+      const statusColors = { valid: 'text-accent-success', expiring: 'text-accent-warning', expired: 'text-accent-danger', revoked: 'text-accent-danger' }
+      return (
+        <div className="flex items-center gap-2">
+          <div className={cn("w-6 h-6 rounded-md flex items-center justify-center shrink-0", item.has_private_key ? "icon-bg-emerald" : "icon-bg-blue")}>
+            <Certificate size={12} weight="duotone" />
+          </div>
+          <span className="text-sm font-medium truncate flex-1">{name}</span>
+          <span className={cn("text-[10px] font-medium uppercase", statusColors[status] || 'text-text-tertiary')}>{status}</span>
+        </div>
+      )
+    }
+    if (type === 'cas') {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 icon-bg-green">
+            <ShieldCheck size={12} weight="duotone" />
+          </div>
+          <span className="text-sm font-medium truncate">{item.descr || extractCN(item.subject) || '—'}</span>
+        </div>
+      )
+    }
+    if (type === 'csrs') {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 icon-bg-amber">
+            <FileText size={12} weight="duotone" />
+          </div>
+          <span className="text-sm font-medium truncate">{item.descr || extractCN(item.subject) || '—'}</span>
+        </div>
+      )
+    }
+    if (type === 'templates') {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 icon-bg-violet">
+            <PencilSimple size={12} weight="duotone" />
+          </div>
+          <span className="text-sm font-medium truncate flex-1">{item.name || '—'}</span>
+          <span className="text-[10px] text-text-tertiary">{item.key_type}</span>
+        </div>
+      )
+    }
+    if (type === 'users') {
+      const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', viewer: 'icon-bg-teal' }
+      return (
+        <div className="flex items-center gap-2">
+          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>
+            {item.username?.charAt(0)?.toUpperCase() || '?'}
+          </div>
+          <span className="text-sm font-medium truncate flex-1">{item.username || '—'}</span>
+          <span className="text-[10px] text-text-tertiary">{item.role}</span>
+        </div>
+      )
+    }
+    return <span className="text-sm truncate">{item.name || item.descr || item.username || '—'}</span>
+  }, [bulkResourceType])
+
   const renderBulkTab = () => (
     <div className="flex flex-col h-full min-h-0">
-      {/* Resource type selector */}
+      {/* Resource type selector + view toggle */}
       <div className="flex items-center gap-2 flex-wrap shrink-0 px-4 md:px-6 pt-3 pb-2">
         {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
           const Icon = config.icon
           return (
             <button
               key={key}
-              onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter('') }}
+              onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 bulkResourceType === key 
                   ? 'bg-accent-primary text-white shadow-sm' 
@@ -721,29 +786,71 @@ export default function OperationsPage() {
             </button>
           )
         })}
+
+        {/* View mode toggle */}
+        <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border">
+          <button
+            onClick={() => setBulkViewMode('table')}
+            className={cn(
+              "p-1.5 rounded-md transition-all",
+              bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+            )}
+            title={t('operations.tableView', 'Table View')}
+          >
+            <Table size={16} />
+          </button>
+          <button
+            onClick={() => setBulkViewMode('basket')}
+            className={cn(
+              "p-1.5 rounded-md transition-all",
+              bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+            )}
+            title={t('operations.basketView', 'Basket View')}
+          >
+            <ShoppingCart size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Data table with multi-select — fills remaining space */}
+      {/* Content area — table or basket */}
       <div className="flex-1 min-h-0">
-        <ResponsiveDataTable
-          data={filteredBulkData}
-          columns={resourceConfig.columns}
-          multiSelect={true}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-          bulkActions={renderBulkActionButtons()}
-          searchable
-          searchPlaceholder={t('common.search')}
-          searchKeys={['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
-          sortable
-          toolbarFilters={bulkToolbarFilters}
-          loading={bulkLoading}
-          pagination={true}
-          defaultPerPage={25}
-          emptyIcon={resourceConfig.icon}
-          emptyTitle={t('operations.noData', 'No items found')}
-          emptyDescription={t('operations.noDataDesc', 'Try adjusting your filters')}
-        />
+        {bulkViewMode === 'table' ? (
+          <ResponsiveDataTable
+            data={filteredBulkData}
+            columns={resourceConfig.columns}
+            multiSelect={true}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            bulkActions={renderBulkActionButtons()}
+            searchable
+            searchPlaceholder={t('common.search')}
+            searchKeys={['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
+            sortable
+            toolbarFilters={bulkToolbarFilters}
+            loading={bulkLoading}
+            pagination={true}
+            defaultPerPage={25}
+            emptyIcon={resourceConfig.icon}
+            emptyTitle={t('operations.noData', 'No items found')}
+            emptyDescription={t('operations.noDataDesc', 'Try adjusting your filters')}
+          />
+        ) : (
+          <div className="h-full px-4 md:px-6 pb-2">
+            <TransferPanel
+              items={filteredBulkData}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              renderItem={renderBasketItem}
+              searchKeys={['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
+              leftTitle={t(`common.${bulkResourceType}`, bulkResourceType)}
+              rightTitle={t('operations.basket', 'Basket')}
+              leftIcon={resourceConfig.icon}
+              rightIcon={ShoppingCart}
+              emptyRightMessage={t('operations.dragHere', 'Drag items here or click + to add')}
+              bulkActions={renderBulkActionButtons()}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

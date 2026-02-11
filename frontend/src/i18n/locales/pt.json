@@ -1120,7 +1120,16 @@
     "confirmExport": "Exportar {{count}} item(ns)?",
     "confirmSign": "Assinar {{count}} CSR?",
     "signCSRs": "Assinar {{count}} CSR",
-    "selectCAForSign": "Selecione uma CA para assinar os CSRs:"
+    "selectCAForSign": "Selecione uma CA para assinar os CSRs:",
+    "tableView": "Vista Tabela",
+    "basketView": "Vista Cesto",
+    "available": "Disponíveis",
+    "basket": "Cesto",
+    "dragHere": "Arraste itens para aqui ou clique +",
+    "allSelected": "Todos os itens no cesto",
+    "addAll": "Adicionar todos",
+    "removeAll": "Remover todos",
+    "itemsSelected": "item(ns) selecionado(s)"
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

@@ -339,7 +339,16 @@
     "confirmExport": "Export {{count}} item(s)?",
     "confirmSign": "Sign {{count}} CSR(s)?",
     "signCSRs": "Sign {{count}} CSR(s)",
-    "selectCAForSign": "Select a CA to sign the CSRs:"
+    "selectCAForSign": "Select a CA to sign the CSRs:",
+    "tableView": "Table View",
+    "basketView": "Basket View",
+    "available": "Available",
+    "basket": "Basket",
+    "dragHere": "Drag items here or click + to add",
+    "allSelected": "All items in basket",
+    "addAll": "Add all",
+    "removeAll": "Remove all",
+    "itemsSelected": "item(s) selected"
   },
   "auth": {
     "login": "Sign In",

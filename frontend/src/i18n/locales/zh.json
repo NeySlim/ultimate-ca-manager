@@ -1120,7 +1120,16 @@
     "confirmExport": "导出 {{count}} 个项目？",
     "confirmSign": "签署 {{count}} 个 CSR？",
     "signCSRs": "签署 {{count}} 个 CSR",
-    "selectCAForSign": "选择用于签署 CSR 的 CA："
+    "selectCAForSign": "选择用于签署 CSR 的 CA：",
+    "tableView": "表格视图",
+    "basketView": "购物篮视图",
+    "available": "可用",
+    "basket": "购物篮",
+    "dragHere": "拖拽项目到这里或点击 + 添加",
+    "allSelected": "所有项目已在购物篮中",
+    "addAll": "全部添加",
+    "removeAll": "全部移除",
+    "itemsSelected": "个项目已选"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",

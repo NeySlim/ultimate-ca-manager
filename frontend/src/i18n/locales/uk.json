@@ -1120,7 +1120,16 @@
     "confirmExport": "Експортувати {{count}} елемент(ів)?",
     "confirmSign": "Підписати {{count}} CSR?",
     "signCSRs": "Підписати {{count}} CSR",
-    "selectCAForSign": "Оберіть CA для підпису CSR:"
+    "selectCAForSign": "Оберіть CA для підпису CSR:",
+    "tableView": "Вигляд таблиці",
+    "basketView": "Вигляд кошика",
+    "available": "Доступні",
+    "basket": "Кошик",
+    "dragHere": "Перетягніть елементи сюди або натисніть +",
+    "allSelected": "Всі елементи в кошику",
+    "addAll": "Додати всі",
+    "removeAll": "Видалити всі",
+    "itemsSelected": "елемент(ів) вибрано"
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",

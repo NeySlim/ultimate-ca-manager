@@ -1120,7 +1120,16 @@
     "confirmExport": "¿Exportar {{count}} elemento(s)?",
     "confirmSign": "¿Firmar {{count}} CSR?",
     "signCSRs": "Firmar {{count}} CSR",
-    "selectCAForSign": "Seleccione una CA para firmar los CSRs:"
+    "selectCAForSign": "Seleccione una CA para firmar los CSRs:",
+    "tableView": "Vista Tabla",
+    "basketView": "Vista Cesta",
+    "available": "Disponibles",
+    "basket": "Cesta",
+    "dragHere": "Arrastre elementos aquí o haga clic en +",
+    "allSelected": "Todos los elementos en la cesta",
+    "addAll": "Añadir todos",
+    "removeAll": "Quitar todos",
+    "itemsSelected": "elemento(s) seleccionado(s)"
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

@@ -1120,7 +1120,16 @@
     "confirmExport": "{{count}} 件のアイテムをエクスポートしますか？",
     "confirmSign": "{{count}} 件のCSRに署名しますか？",
     "signCSRs": "{{count}} 件のCSRに署名",
-    "selectCAForSign": "CSRに署名するCAを選択してください："
+    "selectCAForSign": "CSRに署名するCAを選択してください：",
+    "tableView": "テーブルビュー",
+    "basketView": "バスケットビュー",
+    "available": "利用可能",
+    "basket": "バスケット",
+    "dragHere": "アイテムをここにドラッグするか + をクリック",
+    "allSelected": "すべてのアイテムがバスケットに入っています",
+    "addAll": "すべて追加",
+    "removeAll": "すべて削除",
+    "itemsSelected": "件選択済み"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",
