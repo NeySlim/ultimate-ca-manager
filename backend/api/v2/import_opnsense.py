@@ -6,11 +6,7 @@ from flask import Blueprint, request, jsonify, g
 from functools import wraps
 import requests
 import logging
-from urllib3 import disable_warnings
-from urllib3.exceptions import InsecureRequestWarning
-
-# Disable SSL warnings for self-signed certs
-disable_warnings(InsecureRequestWarning)
+from utils.safe_requests import create_session
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -84,8 +80,7 @@ def test_connection():
     
     try:
         # Test API connection
-        session = requests.Session()
-        session.verify = verify_ssl
+        session = create_session(verify_ssl=verify_ssl)
         
         # Try to fetch trust items from OPNsense API
         # This endpoint retrieves all CAs and certificates from the trust store
@@ -237,8 +232,7 @@ def import_items():
     import json
     
     # Fetch data from OPNsense
-    session = requests.Session()
-    session.verify = verify_ssl
+    session = create_session(verify_ssl=verify_ssl)
     base_url = f"https://{host}:{port}"
     
     stats = {
