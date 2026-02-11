@@ -224,21 +224,25 @@ def test_domain_access():
     
     # Test by creating/deleting a TXT record
     try:
-        from services.acme.dns_providers import get_dns_provider_instance
+        from services.acme.dns_providers import create_provider
+        import json as _json
         
-        dns_client = get_dns_provider_instance(provider)
-        test_record = f"_acme-test.{domain.lstrip('*.')}"
+        creds_raw = provider.credentials or '{}'
+        credentials = _json.loads(creds_raw) if isinstance(creds_raw, str) else creds_raw
+        dns_client = create_provider(provider.provider_type, credentials)
+        base_domain = domain.lstrip('*.')
+        test_record = f"_acme-test"
         test_value = "ucm-dns-test-record"
         
         # Create test record
-        dns_client.create_txt_record(test_record, test_value)
+        dns_client.create_txt_record(base_domain, test_record, test_value)
         
         # Wait a moment
         import time
         time.sleep(2)
         
         # Delete test record
-        dns_client.delete_txt_record(test_record, test_value)
+        dns_client.delete_txt_record(base_domain, test_record)
         
         return success_response(
             data={

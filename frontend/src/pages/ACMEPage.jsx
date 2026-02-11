@@ -13,7 +13,7 @@ import {
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, ArrowSquareOut, FilePem, LockKey, GlobeHemisphereWest
+  DownloadSimple, Eye, LockKey, GlobeHemisphereWest
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -1390,7 +1390,7 @@ export default function ACMEPage() {
           size="sm"
           dot
         >
-          {value === 'letsencrypt' ? "LET'S ENCRYPT" : 'LOCAL ACME'}
+          {value === 'letsencrypt' ? t('acme.letsEncryptLabel') : t('acme.localAcmeLabel')}
         </Badge>
       )
     },
@@ -1669,8 +1669,8 @@ export default function ACMEPage() {
           onChange: setHistoryFilterSource,
           placeholder: t('acme.allSources'),
           options: [
-            { value: 'acme', label: 'Local ACME' },
-            { value: 'letsencrypt', label: "Let's Encrypt" }
+            { value: 'acme', label: t('acme.localAcme') },
+            { value: 'letsencrypt', label: t('acme.letsEncrypt') }
           ]
         },
         {
