@@ -101,7 +101,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
             <label className="text-xs text-text-secondary mb-1 block">{t('compare.certificateA')}</label>
             <Select
               value={cert1Id}
-              onChange={e => setCert1Id(e.target.value)}
+              onChange={val => setCert1Id(val)}
               options={options}
               className="w-full"
             />
@@ -118,7 +118,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
             <label className="text-xs text-text-secondary mb-1 block">{t('compare.certificateB')}</label>
             <Select
               value={cert2Id}
-              onChange={e => setCert2Id(e.target.value)}
+              onChange={val => setCert2Id(val)}
               options={options.filter(o => o.value !== cert1Id)}
               className="w-full"
             />

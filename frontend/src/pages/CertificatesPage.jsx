@@ -893,7 +893,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
 function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
   const [formData, setFormData] = useState({
     ca_id: '',
-    common_name: '',
+    cn: '',
     san: '',
     key_type: 'rsa',
     key_size: '2048',
@@ -902,7 +902,10 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSubmit(formData)
+    onSubmit({
+      ...formData,
+      validity_days: parseInt(formData.validity_days, 10) || 365
+    })
   }
 
   return (
@@ -910,20 +913,16 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       <Select
         label={t('cas.ca')}
         value={formData.ca_id}
-        onChange={(e) => setFormData(prev => ({ ...prev, ca_id: e.target.value }))}
-        required
-      >
-        <option value="">{t('certificates.selectCA')}</option>
-        {cas.map(ca => (
-          <option key={ca.id} value={ca.id}>{ca.descr || ca.common_name}</option>
-        ))}
-      </Select>
+        onChange={(val) => setFormData(prev => ({ ...prev, ca_id: val }))}
+        placeholder={t('certificates.selectCA')}
+        options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
+      />
       
       <Input 
         label={t('certificates.commonName')} 
         placeholder={t('certificates.commonNamePlaceholder')}
-        value={formData.common_name}
-        onChange={(e) => setFormData(prev => ({ ...prev, common_name: e.target.value }))}
+        value={formData.cn}
+        onChange={(e) => setFormData(prev => ({ ...prev, cn: e.target.value }))}
         required
       />
       
@@ -939,29 +938,22 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
         <Select
           label={t('certificates.keyType')}
           value={formData.key_type}
-          onChange={(e) => setFormData(prev => ({ ...prev, key_type: e.target.value }))}
-        >
-          <option value="rsa">RSA</option>
-          <option value="ecdsa">ECDSA</option>
-        </Select>
+          onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
+          options={[
+            { value: 'rsa', label: 'RSA' },
+            { value: 'ecdsa', label: 'ECDSA' },
+          ]}
+        />
         
         <Select
           label={t('certificates.keySize')}
           value={formData.key_size}
-          onChange={(e) => setFormData(prev => ({ ...prev, key_size: e.target.value }))}
-        >
-          {formData.key_type === 'rsa' ? (
-            <>
-              <option value="2048">2048 bits</option>
-              <option value="4096">4096 bits</option>
-            </>
-          ) : (
-            <>
-              <option value="256">P-256</option>
-              <option value="384">P-384</option>
-            </>
-          )}
-        </Select>
+          onChange={(val) => setFormData(prev => ({ ...prev, key_size: val }))}
+          options={formData.key_type === 'rsa'
+            ? [{ value: '2048', label: '2048 bits' }, { value: '4096', label: '4096 bits' }]
+            : [{ value: '256', label: 'P-256' }, { value: '384', label: 'P-384' }]
+          }
+        />
       </div>
       
       <Input 
