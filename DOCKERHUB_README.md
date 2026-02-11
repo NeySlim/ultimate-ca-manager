@@ -162,7 +162,7 @@ docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 
 **Tags**:
 - `latest` - Latest stable release
-- Semantic version tags (e.g. `2.0.3`, `2.0`, `2`)
+- Semantic version tags (e.g. `2.0.4`, `2.0`, `2`)
 - `v*.*.*` - Specific releases
 
 **Image Details**:

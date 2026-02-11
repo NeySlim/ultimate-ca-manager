@@ -54,7 +54,7 @@ See: [Debian/Ubuntu Installation Guide](debian-ubuntu.md)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
 
 # Install
-sudo dpkg -i ucm_2.0.3_all.deb
+sudo dpkg -i ucm_2.0.4_all.deb
 sudo apt-get install -f  # Fix any dependencies
 
 # Enable and start
