@@ -9,19 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.4] - 2026-02-11
 
-### 🐛 Bug Fixes
+### Bug Fixes
 
 - **Update Check Fix** - Fixed "maximum recursion depth exceeded" error on Docker (gevent + Python 3.13 SSL compatibility)
 - **Edition Detection** - Removed stale Pro edition detection that caused update checks to query archived private repo
 
-### 🔧 Improvements
+### Improvements
 
 - **VERSION Centralization** - Single `VERSION` file at project root, read by all platforms (DEB, RPM, Docker)
 - **Docker Directory Fix** - Fixed `cas/` → `ca/` mismatch; automatic migration on container upgrade
 - **Safe HTTP Sessions** - Added `safe_requests.py` utility for consistent SSL handling
 - **Early Monkey-Patch** - `gevent.monkey.patch_all()` called before imports in gunicorn configs
 
-### 📦 Packaging
+### Packaging
 
 - DEB/RPM packages now include `VERSION` file at `/opt/ucm/VERSION`
 - Docker image copies `VERSION` to `/app/VERSION`
@@ -31,19 +31,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.3] - 2026-02-10
 
-### 🐛 Bug Fixes
+### Bug Fixes
 
 - **CA Creation Fix** - Fixed crash when creating CA with null `validityYears` or `keySize` values (Docker/fresh installs)
 - **DN Field Validation** - Country code now auto-uppercased across all endpoints (CAs, Certificates, CSRs)
 - **CSR Validation** - Added missing Distinguished Name validation to CSR creation endpoint
 
-### 🐳 Docker Improvements
+### Docker Improvements
 
 - **Unified Data Path** - All Docker data now stored in `/opt/ucm/data` (same as DEB/RPM installs)
 - **Migration Support** - Automatic migration from old path (`/app/backend/data`) on container upgrade
 - **Volume Mount Simplified** - Single volume mount: `-v ucm-data:/opt/ucm/data`
 
-### 📝 Documentation
+### Documentation
 
 - Updated Docker installation guides with correct volume paths
 - Updated docker-compose examples
@@ -52,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2026-02-07
 
-### 🔐 Security Enhancements (from beta2)
+### Security Enhancements (from beta2)
 
 - **Password Show/Hide Toggle** - All password fields now have visibility toggle
 - **Password Strength Indicator** - Visual strength meter with 5 levels (Weak → Strong)
@@ -60,13 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Force Password Change** - Admin can require password change on next login
 - **Session Timeout Warning** - 5-minute warning before session expires with extend option
 
-### 🎨 Dashboard Improvements
+### Dashboard Improvements
 
 - **Dynamic Version Display** - Shows current version with Pro/Community badge
 - **Update Available Indicator** - Visual notification when updates are available
 - **Fixed Layout** - Proper padding and spacing in all dashboard widgets
 
-### 🐛 Bug Fixes
+### Bug Fixes
 
 - Fixed dashboard scroll issues
 - Fixed padding in System Health widget
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0-beta1] - 2026-02-06
 
-### 🎨 Complete UI Redesign
+### Complete UI Redesign
 
 Major release with a completely new React 18 frontend replacing the legacy HTMX UI.
 
@@ -125,7 +125,7 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 ## [1.8.3] - 2026-01-10
 
-### 🐛 Bug Fixes
+### Bug Fixes
 
 #### Fixed
 - **Nginx Dependency** - Nginx is now truly optional
@@ -140,7 +140,7 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 ## [1.8.2] - 2026-01-10
 
-### 🔧 Improvements
+### Improvements
 
 - Export authentication for all formats (PEM, DER, PKCS#12)
 - Visual theme previews with live preview grid
@@ -151,7 +151,7 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 ## [1.8.0-beta] - 2026-01-09
 
-### 🚀 Major Features
+### Major Features
 
 - **mTLS Authentication** - Client certificate login
 - **REST API v1** - Full API for automation
@@ -162,7 +162,7 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 ## [1.7.0] - 2026-01-08
 
-### ✨ Features
+### Features
 
 - **ACME Server** - Let's Encrypt compatible
 - **WebAuthn/FIDO2** - Hardware security key support
@@ -173,7 +173,7 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 ## [1.6.0] - 2026-01-05
 
-### 🎨 UI Overhaul
+### UI Overhaul
 
 - Complete Tailwind CSS removal
 - Custom themed scrollbars
@@ -184,7 +184,7 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 ## [1.0.0] - 2025-12-15
 
-### 🎉 Initial Release
+### Initial Release
 
 - Certificate Authority management
 - Certificate lifecycle (create, sign, revoke)

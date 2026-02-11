@@ -11,7 +11,7 @@
 
 ---
 
-## ✨ Features
+## Features
 
 - **Full CA & Certificate Lifecycle** — Create, sign, revoke, renew, export certificates and CAs with hierarchy support
 - **Industry Protocols** — SCEP (RFC 8894), ACME (Let's Encrypt compatible), OCSP (RFC 6960), CRL/CDP
@@ -24,7 +24,7 @@
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <table>
 <tr>
@@ -41,7 +41,7 @@ See more: **[Full Gallery](docs/SCREENSHOTS.md)**
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Docker (Recommended)
 
@@ -87,7 +87,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pa
 
 ---
 
-## 📡 API
+## API
 
 RESTful JSON API under `/api/v2/`. See [OpenAPI spec](docs/openapi.yaml) and [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki/API-Documentation).
 
@@ -103,27 +103,27 @@ RESTful JSON API under `/api/v2/`. See [OpenAPI spec](docs/openapi.yaml) and [Wi
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 **Frontend:** React 18, Vite, Radix UI · **Backend:** Python 3.11+, Flask, SQLAlchemy · **Database:** SQLite · **Server:** Gunicorn + gevent WebSocket · **Auth:** JWT, WebAuthn/FIDO2, TOTP
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 Full docs on the **[Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**: [Installation](https://github.com/NeySlim/ultimate-ca-manager/wiki/Installation-Guide) · [Quick Start](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start) · [SCEP](https://github.com/NeySlim/ultimate-ca-manager/wiki/SCEP-Server) · [ACME](https://github.com/NeySlim/ultimate-ca-manager/wiki/ACME-Support) · [Troubleshooting](https://github.com/NeySlim/ultimate-ca-manager/wiki/Troubleshooting)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 See [CONTRIBUTING.md](docs/development/contributing.md). Fork → branch → commit → PR.
 
-## 📜 License
+## License
 
 BSD 3-Clause — See [LICENSE](LICENSE).
 
-## 📞 Support
+## Support
 
 [Issues](https://github.com/NeySlim/ultimate-ca-manager/issues) · [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki) · [Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
 

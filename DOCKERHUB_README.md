@@ -5,21 +5,21 @@
 ![GitHub release](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager)
 [![CI/CD](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml)
 
-🔐 **Enterprise-grade Certificate Authority Management System**
+ **Enterprise-grade Certificate Authority Management System**
 
 Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP, ACME, CRL) with multi-factor authentication and a modern, intuitive interface.
 
-**Multi-arch support:** `amd64`, `arm64`  
+**Multi-arch support:** `amd64`, `arm64`
 **Registry:** GitHub Container Registry (GHCR)
 
-## 📸 Dashboard Preview
+## Dashboard Preview
 
 ![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/dash.png)
 *Professional Dashboard - Amber Dark Theme*
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Docker (Recommended)
 
@@ -63,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 
 ---
 
-## ✨ Features
+## Features
 
 ### Certificate Authority Management
 - Create and manage multiple CAs (Root and Intermediate)
@@ -87,11 +87,11 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 - Compatible with iOS, Android, Windows, Cisco, Palo Alto
 
 ### Modern Web Interface
-- 🎨 **8 Professional Themes** - Sentinel, Amber, Blossom, Nebula (Light & Dark)
-- 📱 **Responsive Design** - Desktop, tablet, mobile optimized
-- 🌓 **Full Dark Mode** - Complete dark theme support
-- ⚡ **Modern SPA** - HTMX-powered fast navigation
-- 🖱️ **Custom Scrollbars** - Theme-aware styled scrollbars
+- **8 Professional Themes** - Sentinel, Amber, Blossom, Nebula (Light & Dark)
+- **Responsive Design** - Desktop, tablet, mobile optimized
+- **Full Dark Mode** - Complete dark theme support
+- **Modern SPA** - HTMX-powered fast navigation
+- **Custom Scrollbars** - Theme-aware styled scrollbars
 
 ### Security
 - HTTPS-only access (TLS 1.2+)
@@ -109,7 +109,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 
 ---
 
-## 📸 More Screenshots
+## More Screenshots
 
 ### Certificate Management
 ![Certificate List](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/05-certificates-list_amber-dark.png)
@@ -142,7 +142,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 
 ---
 
-## 🐳 Docker Hub
+## Docker Hub
 
 **Images available:**
 
@@ -157,7 +157,7 @@ docker pull neyslim/ultimate-ca-manager:latest
 docker pull neyslim/ultimate-ca-manager:latest
 
 # Architecture-specific
-docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
+docker pull neyslim/ultimate-ca-manager:latest # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:
@@ -174,7 +174,7 @@ docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 - **[README.md](README.md)** - Project overview and features
 - **[DOCKER.md](DOCKER.md)** - Complete Docker deployment guide
@@ -186,7 +186,7 @@ docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 All Docker settings configurable via `.env` file:
 
@@ -208,7 +208,7 @@ See [.env.docker.example](.env.docker.example) for complete configuration.
 
 ---
 
-## 🔄 Migration
+## Migration
 
 Move UCM between hosts in 5 minutes:
 
@@ -228,7 +228,7 @@ See [docs/MIGRATION_EXAMPLE.md](docs/MIGRATION_EXAMPLE.md) for detailed guide.
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 - **Backend**: Python 3.11, Flask, SQLAlchemy
 - **Database**: SQLite (default), PostgreSQL (supported)
@@ -239,7 +239,7 @@ See [docs/MIGRATION_EXAMPLE.md](docs/MIGRATION_EXAMPLE.md) for detailed guide.
 
 ---
 
-## 🔒 Security
+## Security
 
 - Non-root container execution
 - Minimal Linux capabilities
@@ -252,7 +252,7 @@ See [docs/MIGRATION_EXAMPLE.md](docs/MIGRATION_EXAMPLE.md) for detailed guide.
 
 ---
 
-## 📊 Requirements
+## Requirements
 
 **Docker**:
 - Docker 20.10+
@@ -266,7 +266,7 @@ See [docs/MIGRATION_EXAMPLE.md](docs/MIGRATION_EXAMPLE.md) for detailed guide.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
@@ -278,13 +278,13 @@ Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ---
 
-## 📄 License
+## License
 
 BSD 3-Clause License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 📞 Support
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
@@ -293,12 +293,12 @@ BSD 3-Clause License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## ⭐ Star History
+## Star History
 
-If you find UCM useful, please consider giving it a star! ⭐
+If you find UCM useful, please consider giving it a star!
 
 ---
 
-**Version**: See GitHub releases  
-**Status**: Production Ready ✅  
+**Version**: See GitHub releases
+**Status**: Production Ready ✅
 **Last Updated**: 2026-01-06

@@ -163,7 +163,7 @@ cd backend
 pip install -r requirements.txt --upgrade
 
 # 6. Run migrations (if any)
-python migrate.py  # if migration script exists
+python migrate.py # if migration script exists
 
 # 7. Restart service
 sudo systemctl start ucm
@@ -242,8 +242,8 @@ sudo chown -R ucm:ucm /var/lib/ucm
 sudo chown -R ucm:ucm /var/log/ucm
 
 # 2. Missing dependencies
-sudo apt-get install -f    # Debian/Ubuntu
-sudo dnf install -y ucm    # RHEL/CentOS
+sudo apt-get install -f # Debian/Ubuntu
+sudo dnf install -y ucm # RHEL/CentOS
 
 # 3. Database corruption
 sudo systemctl stop ucm
@@ -366,5 +366,5 @@ sudo dpkg -i --force-downgrade ucm_1.8.3_all.deb
 
 ---
 
-**Last Updated:** 2026-01-09  
+**Last Updated:** 2026-01-09
 **Applies to:** UCM v1.8.3 and later
