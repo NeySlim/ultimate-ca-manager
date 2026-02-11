@@ -1,0 +1,32 @@
+# Docker Compose with HSM support
+# SoftHSM tokens persist in a named volume
+#
+# Usage:
+#   docker compose -f docker-compose.hsm.yml up -d
+#   docker exec ucm-hsm softhsm2-util --show-slots
+
+services:
+  ucm:
+    image: neyslim/ultimate-ca-manager:latest
+    container_name: ucm-hsm
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    environment:
+      # HSM auto-init: creates a default SoftHSM token on first start
+      HSM_AUTO_INIT: "true"
+      # Provide a fixed PIN (optional — auto-generated if omitted)
+      # HSM_PIN: "change-me"
+    volumes:
+      - ucm-data:/opt/ucm/data
+      - ucm-hsm-tokens:/var/lib/softhsm/tokens
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://127.0.0.1:8443/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  ucm-data:
+  ucm-hsm-tokens:

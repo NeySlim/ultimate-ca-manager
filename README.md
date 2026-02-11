@@ -36,6 +36,7 @@
 - **CRL/CDP** - Certificate Revocation List distribution points
 
 ### 🔒 Advanced Security
+- **HSM Integration** - SoftHSM included, hardware HSM via PKCS#11, Azure Key Vault, Google Cloud KMS
 - **WebAuthn/FIDO2** - Hardware security key support (YubiKey, Passkeys)
 - **mTLS Authentication** - Mutual TLS certificate-based authentication
 - **TOTP Two-Factor** - Time-based one-time passwords

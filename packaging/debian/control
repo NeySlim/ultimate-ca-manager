@@ -20,7 +20,8 @@ Depends: ${misc:Depends},
          python3-pip,
          openssl (>= 1.1.1),
          adduser,
-         systemd
+         systemd,
+         softhsm2
 Recommends: python3-dev,
             build-essential
 Description: Ultimate CA Manager - Certificate Authority Management System

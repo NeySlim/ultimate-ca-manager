@@ -45,11 +45,13 @@ export default function HSMPage() {
   const [testing, setTesting] = useState(false)
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [hsmStatus, setHsmStatus] = useState(null)
   const { showSuccess, showError } = useNotification()
   const { isMobile } = useMobile()
 
   useEffect(() => {
     loadData()
+    loadHsmStatus()
   }, [])
 
   useEffect(() => {
@@ -66,6 +68,15 @@ export default function HSMPage() {
       showError(ERRORS.LOAD_FAILED.HSM_PROVIDERS)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadHsmStatus = async () => {
+    try {
+      const response = await apiClient.get('/system/hsm-status')
+      setHsmStatus(response.data)
+    } catch {
+      // Non-critical — ignore
     }
   }
 
@@ -410,6 +421,25 @@ export default function HSMPage() {
 
   return (
     <>
+      {hsmStatus && !hsmStatus.ready && (
+        <div className="mx-4 mt-4 mb-0 p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-3">
+          <Warning size={20} className="text-yellow-500 shrink-0 mt-0.5" weight="bold" />
+          <div className="text-sm">
+            <p className="font-medium text-yellow-600 dark:text-yellow-400 mb-1">
+              {t('hsm.statusUnavailable')}
+            </p>
+            <ul className="text-text-secondary space-y-0.5 text-xs">
+              {!hsmStatus.pkcs11_installed && <li>• {t('hsm.pkcs11Missing')}</li>}
+              {!hsmStatus.softhsm_found && <li>• {t('hsm.softhsmMissing')}</li>}
+            </ul>
+            {hsmStatus.install_command && (
+              <code className="block mt-2 px-2 py-1 rounded bg-bg-tertiary text-xs font-mono">
+                {hsmStatus.install_command}
+              </code>
+            )}
+          </div>
+        </div>
+      )}
       <ResponsiveLayout
         title={t('common.hsm')}
         subtitle={t('hsm.subtitle', { count: providers.length })}

@@ -95,6 +95,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./sc
 
 ### Security
 - HTTPS-only access (TLS 1.2+)
+- HSM support (SoftHSM included, hardware HSM via PKCS#11)
 - Role-based access control (Admin, Operator, Viewer)
 - JWT authentication for API
 - Audit logging

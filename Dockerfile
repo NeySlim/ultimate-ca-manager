@@ -35,10 +35,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     openssl \
+    softhsm2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN useradd -r -u 1000 -s /bin/false -d /app ucm
+RUN useradd -r -u 1000 -s /bin/false -d /app ucm && \
+    usermod -aG softhsm ucm
+
+# Prepare SoftHSM token directory
+RUN mkdir -p /var/lib/softhsm/tokens && \
+    chown root:softhsm /var/lib/softhsm/tokens && \
+    chmod 1770 /var/lib/softhsm/tokens
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv

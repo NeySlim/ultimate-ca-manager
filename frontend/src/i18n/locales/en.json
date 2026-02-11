@@ -1448,6 +1448,9 @@
     "subtitle": "{{count}} custom roles"
   },
   "hsm": {
+    "statusUnavailable": "HSM features are not available",
+    "pkcs11Missing": "python-pkcs11 library not installed",
+    "softhsmMissing": "SoftHSM not detected on this system",
     "addHSM": "Add HSM",
     "newProvider": "New Provider",
     "configureHSM": "Configure HSM",

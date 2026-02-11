@@ -393,6 +393,13 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
+    # HSM availability check at startup
+    try:
+        from utils.hsm_check import log_hsm_warning
+        log_hsm_warning()
+    except Exception as e:
+        app.logger.debug(f"HSM check skipped: {e}")
+    
     # Security headers and cleanup
     @app.after_request
     def add_security_headers(response):

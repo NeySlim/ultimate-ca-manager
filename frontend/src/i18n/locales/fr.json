@@ -916,6 +916,9 @@
     "seeAlso": "Voir aussi"
   },
   "hsm": {
+    "statusUnavailable": "Les fonctionnalités HSM ne sont pas disponibles",
+    "pkcs11Missing": "Bibliothèque python-pkcs11 non installée",
+    "softhsmMissing": "SoftHSM non détecté sur ce système",
     "addHSM": "Ajouter HSM",
     "configureHSM": "Configurer HSM",
     "hsmType": "Type HSM",

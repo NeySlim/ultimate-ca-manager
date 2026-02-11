@@ -16,6 +16,7 @@ Requires:       systemd
 Requires:       openssl >= 1.1.1
 Requires:       gcc-c++
 Requires:       swig
+Requires:       softhsm
 
 # Use /opt/ucm like DEB package for consistency
 %define ucm_home /opt/ucm
@@ -79,6 +80,14 @@ UCM_CONFIG=/etc/%{name}
 
 mkdir -p $UCM_DATA/{ca,certs,private,crl,scep,backups,sessions}
 mkdir -p /var/log/%{name}
+
+# SoftHSM setup: add ucm user to softhsm group and prepare token directory
+getent group softhsm >/dev/null 2>&1 && usermod -aG softhsm %{name} 2>/dev/null || true
+mkdir -p /var/lib/softhsm/tokens
+if getent group softhsm >/dev/null 2>&1; then
+    chown root:softhsm /var/lib/softhsm/tokens
+    chmod 1770 /var/lib/softhsm/tokens
+fi
 
 # Check for v1.8.x data to migrate
 V1_DB=""

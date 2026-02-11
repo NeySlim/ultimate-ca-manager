@@ -1240,3 +1240,15 @@ def get_version():
         'version': get_current_version(),
         'edition': get_edition()
     })
+
+
+@bp.route('/api/v2/system/hsm-status', methods=['GET'])
+@require_auth(['read:settings'])
+def get_hsm_status():
+    """Get HSM availability status"""
+    try:
+        from utils.hsm_check import get_hsm_status as _get_status
+        status = _get_status()
+        return success_response(data=status)
+    except Exception as e:
+        return error_response(f"HSM status check failed: {str(e)}", 500)

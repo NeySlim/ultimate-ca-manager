@@ -29,6 +29,16 @@ case "$1" in
         mkdir -p "$UCM_CONFIG"
         mkdir -p /var/log/ucm
         
+        # SoftHSM setup: add ucm user to softhsm group and prepare token directory
+        if getent group softhsm >/dev/null 2>&1; then
+            usermod -aG softhsm "$UCM_USER" 2>/dev/null || true
+        fi
+        mkdir -p /var/lib/softhsm/tokens
+        if getent group softhsm >/dev/null 2>&1; then
+            chown root:softhsm /var/lib/softhsm/tokens
+            chmod 1770 /var/lib/softhsm/tokens
+        fi
+        
         # ============================================================
         # AUTOMATIC MIGRATION FROM v1.8.x
         # ============================================================
