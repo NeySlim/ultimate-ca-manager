@@ -985,14 +985,14 @@ describe('rolesService', () => {
     rolesService = mod.rolesService
   })
 
-  it('getAll → GET /roles', async () => {
+  it('getAll → GET /rbac/roles', async () => {
     await rolesService.getAll()
-    expect(mockApiClient.get).toHaveBeenCalledWith('/roles')
+    expect(mockApiClient.get).toHaveBeenCalledWith('/rbac/roles')
   })
 
-  it('getRole → GET /roles/:role', async () => {
+  it('getRole → GET /rbac/roles/:role', async () => {
     await rolesService.getRole('admin')
-    expect(mockApiClient.get).toHaveBeenCalledWith('/roles/admin')
+    expect(mockApiClient.get).toHaveBeenCalledWith('/rbac/roles/admin')
   })
 })
 
