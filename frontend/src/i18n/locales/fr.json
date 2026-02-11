@@ -1386,7 +1386,8 @@
       "security": "Sécurité",
       "sso": "SSO",
       "database": "Base de données",
-      "updates": "Mises à jour"
+      "updates": "Mises à jour",
+      "webhooks": "Webhooks"
     },
     "systemNameHelper": "Nom d'affichage du système UCM",
     "baseUrl": "URL de base",
@@ -1798,5 +1799,31 @@
     "minLength": "Minimum {{count}} caractères",
     "maxLength": "Maximum {{count}} caractères",
     "invalidFormat": "Format invalide"
+  },
+  "webhooks": {
+    "title": "Webhooks",
+    "subtitle": "Envoyer des notifications HTTP lors d'événements de certificats",
+    "helpTitle": "Notifications Webhook",
+    "helpDescription": "Configurez des endpoints HTTP pour recevoir des notifications en temps réel lors de l'émission, la révocation, le renouvellement ou l'expiration de certificats.",
+    "addWebhook": "Ajouter un Webhook",
+    "editWebhook": "Modifier le Webhook",
+    "noWebhooks": "Aucun webhook configuré",
+    "noWebhooksDescription": "Ajoutez des endpoints webhook pour recevoir des notifications sur les événements de certificats",
+    "configuredWebhooks": "Webhooks configurés",
+    "namePlaceholder": "ex. Notification Slack",
+    "events": "Événements",
+    "caFilter": "Filtre CA (optionnel)",
+    "caFilterPlaceholder": "Filtrer par ref ID de CA (vide = tous)",
+    "enableOnCreate": "Activer le webhook immédiatement",
+    "createSuccess": "Webhook créé",
+    "updateSuccess": "Webhook mis à jour",
+    "deleteSuccess": "Webhook supprimé",
+    "saveFailed": "Échec de la sauvegarde du webhook",
+    "deleteFailed": "Échec de la suppression du webhook",
+    "deleteConfirm": "Supprimer le webhook \"{{name}}\" ? Cette action est irréversible.",
+    "toggleSuccess": "Webhook {{action}}",
+    "toggleFailed": "Échec du basculement du webhook",
+    "testSuccess": "Événement de test envoyé avec succès",
+    "testFailed": "Échec de l'envoi de l'événement de test"
   }
 }

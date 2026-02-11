@@ -9,7 +9,8 @@ import {
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
-  Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass
+  Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
+  Bell, Copy
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -40,6 +41,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-blue' },
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
+  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
 ]
 
 // SSO Provider type icons
@@ -488,6 +490,119 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
   )
 }
 
+// Webhook Form Component
+const WEBHOOK_EVENTS = [
+  'certificate.issued',
+  'certificate.revoked',
+  'certificate.renewed',
+  'certificate.expiring',
+  'ca.created',
+  'ca.updated',
+  'csr.submitted',
+  'csr.approved',
+  'csr.rejected',
+]
+
+function WebhookForm({ webhook, onSave, onCancel }) {
+  const { t } = useTranslation()
+  const [formData, setFormData] = useState({
+    name: webhook?.name || '',
+    url: webhook?.url || '',
+    events: webhook?.events || [],
+    ca_filter: webhook?.ca_filter || '',
+    enabled: webhook?.enabled ?? true,
+  })
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const toggleEvent = (event) => {
+    setFormData(prev => ({
+      ...prev,
+      events: prev.events.includes(event)
+        ? prev.events.filter(e => e !== event)
+        : [...prev.events, event]
+    }))
+  }
+
+  const toggleAllEvents = () => {
+    setFormData(prev => ({
+      ...prev,
+      events: prev.events.length === WEBHOOK_EVENTS.length ? [] : [...WEBHOOK_EVENTS]
+    }))
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <Input
+        label={t('common.name')}
+        value={formData.name}
+        onChange={e => handleChange('name', e.target.value)}
+        required
+        placeholder={t('webhooks.namePlaceholder')}
+      />
+      <Input
+        label="URL"
+        value={formData.url}
+        onChange={e => handleChange('url', e.target.value)}
+        required
+        placeholder="https://example.com/webhook"
+      />
+      <Input
+        label={t('webhooks.caFilter')}
+        value={formData.ca_filter}
+        onChange={e => handleChange('ca_filter', e.target.value)}
+        placeholder={t('webhooks.caFilterPlaceholder')}
+      />
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-text-primary">{t('webhooks.events')}</label>
+          <button type="button" onClick={toggleAllEvents} className="text-xs text-accent-primary hover:underline">
+            {formData.events.length === WEBHOOK_EVENTS.length ? t('common.deselectAll') : t('common.selectAll')}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {WEBHOOK_EVENTS.map(event => (
+            <label key={event} className="flex items-center gap-2 p-2 rounded-lg bg-bg-tertiary/50 border border-border/30 cursor-pointer hover:border-accent-primary/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.events.includes(event)}
+                onChange={() => toggleEvent(event)}
+                className="rounded border-border bg-bg-tertiary"
+              />
+              <span className="text-xs text-text-primary">{event}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formData.enabled}
+          onChange={e => handleChange('enabled', e.target.checked)}
+          className="rounded border-border bg-bg-tertiary"
+        />
+        <span className="text-sm text-text-primary">{t('webhooks.enableOnCreate')}</span>
+      </label>
+
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
+        <Button type="submit">
+          {webhook ? t('common.save') : t('common.create')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
@@ -539,6 +654,14 @@ export default function SettingsPage() {
   const [ssoTesting, setSsoTesting] = useState(false)
   const [ssoConfirmDelete, setSsoConfirmDelete] = useState(null)
 
+  // Webhook states
+  const [webhooks, setWebhooks] = useState([])
+  const [webhooksLoading, setWebhooksLoading] = useState(false)
+  const [showWebhookModal, setShowWebhookModal] = useState(false)
+  const [editingWebhook, setEditingWebhook] = useState(null)
+  const [webhookTesting, setWebhookTesting] = useState(null)
+  const [webhookConfirmDelete, setWebhookConfirmDelete] = useState(null)
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -550,6 +673,7 @@ export default function SettingsPage() {
     loadCertificates()
     loadDbStats()
     loadSsoProviders()
+    loadWebhooks()
   }, [])
 
   const loadSettings = async () => {
@@ -697,6 +821,80 @@ export default function SettingsPage() {
       showError(error.message || t('common.dnsProviderTestFailed'))
     } finally {
       setSsoTesting(false)
+    }
+  }
+
+  // Webhook handlers
+  const loadWebhooks = async () => {
+    setWebhooksLoading(true)
+    try {
+      const response = await apiClient.get('/webhooks')
+      setWebhooks(response.data || [])
+    } catch (error) {
+      console.error('Failed to load webhooks:', error)
+    } finally {
+      setWebhooksLoading(false)
+    }
+  }
+
+  const handleWebhookCreate = () => {
+    setEditingWebhook(null)
+    setShowWebhookModal(true)
+  }
+
+  const handleWebhookEdit = (webhook) => {
+    setEditingWebhook(webhook)
+    setShowWebhookModal(true)
+  }
+
+  const handleWebhookSave = async (formData) => {
+    try {
+      if (editingWebhook) {
+        await apiClient.put(`/webhooks/${editingWebhook.id}`, formData)
+        showSuccess(t('webhooks.updateSuccess'))
+      } else {
+        await apiClient.post('/webhooks', formData)
+        showSuccess(t('webhooks.createSuccess'))
+      }
+      setShowWebhookModal(false)
+      loadWebhooks()
+    } catch (error) {
+      showError(error.message || t('webhooks.saveFailed'))
+    }
+  }
+
+  const handleWebhookDelete = async () => {
+    if (!webhookConfirmDelete) return
+    try {
+      await apiClient.delete(`/webhooks/${webhookConfirmDelete.id}`)
+      showSuccess(t('webhooks.deleteSuccess'))
+      loadWebhooks()
+    } catch (error) {
+      showError(t('webhooks.deleteFailed'))
+    } finally {
+      setWebhookConfirmDelete(null)
+    }
+  }
+
+  const handleWebhookToggle = async (webhook) => {
+    try {
+      await apiClient.post(`/webhooks/${webhook.id}/toggle`)
+      showSuccess(t('webhooks.toggleSuccess', { action: webhook.enabled ? t('common.disabled').toLowerCase() : t('common.enabled').toLowerCase() }))
+      loadWebhooks()
+    } catch (error) {
+      showError(t('webhooks.toggleFailed'))
+    }
+  }
+
+  const handleWebhookTest = async (webhook) => {
+    setWebhookTesting(webhook.id)
+    try {
+      await apiClient.post(`/webhooks/${webhook.id}/test`)
+      showSuccess(t('webhooks.testSuccess'))
+    } catch (error) {
+      showError(error.message || t('webhooks.testFailed'))
+    } finally {
+      setWebhookTesting(null)
     }
   }
 
@@ -1624,6 +1822,87 @@ export default function SettingsPage() {
           </DetailContent>
         )
 
+      case 'webhooks':
+        return (
+          <DetailContent>
+            <DetailHeader
+              icon={Bell}
+              title={t('webhooks.title')}
+              subtitle={t('webhooks.subtitle')}
+            />
+
+            <HelpCard variant="info" title={t('webhooks.helpTitle')} className="mb-4">
+              {t('webhooks.helpDescription')}
+            </HelpCard>
+
+            {webhooksLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+              </div>
+            ) : webhooks.length === 0 ? (
+              <EmptyState
+                icon={Bell}
+                title={t('webhooks.noWebhooks')}
+                description={t('webhooks.noWebhooksDescription')}
+                action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate }}
+              />
+            ) : (
+              <DetailSection title={t('webhooks.configuredWebhooks')} icon={Bell} iconClass="icon-bg-rose">
+                <div className="space-y-3">
+                  {webhooks.map(webhook => (
+                    <div key={webhook.id} className="flex items-center justify-between p-4 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-accent-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Bell size={20} className="text-accent-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-text-primary truncate">{webhook.name}</span>
+                            <Badge variant={webhook.enabled ? 'success' : 'secondary'} size="sm">
+                              {webhook.enabled ? t('common.enabled') : t('common.disabled')}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-text-secondary truncate">{webhook.url}</p>
+                          <div className="flex items-center gap-1 mt-1">
+                            {(webhook.events || []).slice(0, 3).map(ev => (
+                              <Badge key={ev} variant="outline" size="sm">{ev}</Badge>
+                            ))}
+                            {(webhook.events || []).length > 3 && (
+                              <Badge variant="outline" size="sm">+{webhook.events.length - 3}</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                        <Button size="sm" variant="secondary" onClick={() => handleWebhookTest(webhook)} disabled={webhookTesting === webhook.id}>
+                          {webhookTesting === webhook.id ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => handleWebhookToggle(webhook)}>
+                          <Lightning size={14} />
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => handleWebhookEdit(webhook)}>
+                          <PencilSimple size={14} />
+                        </Button>
+                        <Button size="sm" variant="danger" onClick={() => setWebhookConfirmDelete(webhook)}>
+                          <Trash size={14} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {hasPermission('admin:system') && (
+                    <div className="pt-2">
+                      <Button onClick={handleWebhookCreate}>
+                        <Plus size={16} />
+                        {t('webhooks.addWebhook')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </DetailSection>
+            )}
+          </DetailContent>
+        )
+
       default:
         return null
     }
@@ -1793,6 +2072,31 @@ export default function SettingsPage() {
         onConfirm={handleSsoDelete}
         title={t('common.confirmDelete')}
         message={t('sso.deleteConfirm', { name: ssoConfirmDelete?.name })}
+        confirmText={t('common.delete')}
+        variant="danger"
+      />
+
+      {/* Webhook Modal */}
+      <Modal
+        open={showWebhookModal}
+        onClose={() => { setShowWebhookModal(false); setEditingWebhook(null) }}
+        title={editingWebhook ? t('webhooks.editWebhook') : t('webhooks.addWebhook')}
+        size="lg"
+      >
+        <WebhookForm
+          webhook={editingWebhook}
+          onSave={handleWebhookSave}
+          onCancel={() => { setShowWebhookModal(false); setEditingWebhook(null) }}
+        />
+      </Modal>
+
+      {/* Webhook Delete Confirmation */}
+      <ConfirmModal
+        open={!!webhookConfirmDelete}
+        onClose={() => setWebhookConfirmDelete(null)}
+        onConfirm={handleWebhookDelete}
+        title={t('common.confirmDelete')}
+        message={t('webhooks.deleteConfirm', { name: webhookConfirmDelete?.name })}
         confirmText={t('common.delete')}
         variant="danger"
       />
