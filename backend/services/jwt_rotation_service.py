@@ -23,6 +23,11 @@ def scheduled_jwt_cleanup():
     
     try:
         rotation_info = json.loads(rotation_file.read_text())
+        
+        # Already cleaned up
+        if rotation_info.get('cleaned_up_at'):
+            return
+        
         rotated_at = rotation_info.get('rotated_at')
         expires_hours = rotation_info.get('previous_expires_hours', 24)
         
@@ -33,20 +38,21 @@ def scheduled_jwt_cleanup():
         expires_dt = rotated_dt + timedelta(hours=expires_hours)
         
         if datetime.now() < expires_dt:
-            # Not yet expired
             return
         
         # Time to clean up - remove JWT_SECRET_KEY_PREVIOUS from .env
         cleanup_previous_jwt_key()
         
-        # Update rotation file
+        # Mark as cleaned up (prevents re-running)
         rotation_info['cleaned_up_at'] = datetime.now().isoformat()
         rotation_file.write_text(json.dumps(rotation_info))
         
-        print(f"[JWT Cleanup] Removed previous JWT key (rotated at {rotated_at})")
+        import logging
+        logging.getLogger(__name__).info(f"Removed previous JWT key (rotated at {rotated_at})")
         
     except Exception as e:
-        print(f"[JWT Cleanup] Error: {e}")
+        import logging
+        logging.getLogger(__name__).warning(f"JWT cleanup error: {e}")
 
 
 def cleanup_previous_jwt_key():
