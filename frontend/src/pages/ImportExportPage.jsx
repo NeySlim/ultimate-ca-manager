@@ -92,7 +92,7 @@ export default function ImportExportPage() {
         api_secret: opnsenseApiSecret
       })
       setTestResult('success')
-      setTestItems(result.data?.items || [])
+      setTestItems(result.items || [])
       saveOpnsenseConfig()
     } catch (error) {
       setTestResult('error')
