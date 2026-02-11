@@ -1,9 +1,10 @@
 # UCM API v2.0 - Complete Reference
 
-> **Version**: 2.x  
+> **Version**: 2.1.x  
 > **Base URL**: `https://your-server:8443/api/v2`  
-> **Last Updated**: January 2026  
-> **Total Endpoints**: 155
+> **Last Updated**: February 2026  
+> **Total Endpoints**: 155  
+> **Note**: All endpoints are served from `api/v2/` (33 registered blueprints). There is no separate `features/` module.
 
 ---
 
@@ -20,7 +21,7 @@
 9. [SCEP](#scep)
 10. [CRL & OCSP](#crl--ocsp)
 11. [Users](#users)
-12. [Roles & Permissions](#roles--permissions)
+12. [Roles & Permissions (RBAC)](#roles--permissions-rbac)
 13. [Dashboard](#dashboard)
 14. [Audit Logs](#audit-logs)
 15. [Settings](#settings)
@@ -941,11 +942,11 @@ DELETE /api/v2/users/{user_id}
 
 ---
 
-## Roles & Permissions
+## Roles & Permissions (RBAC)
 
 ### List Roles
 ```http
-GET /api/v2/roles
+GET /api/v2/rbac/roles
 ```
 
 **Response:**
@@ -964,7 +965,12 @@ GET /api/v2/roles
 
 ### Get Role Details
 ```http
-GET /api/v2/roles/{role}
+GET /api/v2/rbac/roles/{role}
+```
+
+### List All Permissions
+```http
+GET /api/v2/rbac/permissions
 ```
 
 ---
@@ -1508,6 +1514,6 @@ const data = await certs.json();
 
 ---
 
-**Documentation generated**: January 2026  
-**API Version**: 2.x  
+**Documentation generated**: February 2026  
+**API Version**: 2.1.x  
 **Total Endpoints**: 155
