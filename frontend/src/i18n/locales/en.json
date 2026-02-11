@@ -1308,7 +1308,13 @@
       "appearance": "Appearance",
       "audit": "Audit",
       "backup": "Backup",
-      "https": "HTTPS"
+      "https": "HTTPS",
+      "general": "General",
+      "email": "Email",
+      "security": "Security",
+      "sso": "SSO",
+      "database": "Database",
+      "updates": "Updates"
     },
     "testEmail": "Test Email",
     "theme": "Theme",

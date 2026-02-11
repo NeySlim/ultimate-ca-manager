@@ -1374,7 +1374,13 @@
       "appearance": "外観",
       "backup": "バックアップ",
       "audit": "監査",
-      "https": "HTTPS"
+      "https": "HTTPS",
+      "general": "一般",
+      "email": "メール",
+      "security": "セキュリティ",
+      "sso": "SSO",
+      "database": "データベース",
+      "updates": "アップデート"
     },
     "systemNameHelper": "UCMシステムの表示名",
     "baseUrl": "Base URL",

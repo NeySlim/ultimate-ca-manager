@@ -171,9 +171,9 @@ export function Sidebar({ activePage }) {
               {t('settings.appearanceMode')}
             </DropdownMenu.Label>
             {[
-              { id: 'system', labelKey: 'settings.appearance.followSystem' },
-              { id: 'dark', labelKey: 'settings.appearance.dark' },
-              { id: 'light', labelKey: 'settings.appearance.light' }
+              { id: 'system', labelKey: 'settings.followSystem' },
+              { id: 'dark', labelKey: 'settings.dark' },
+              { id: 'light', labelKey: 'settings.light' }
             ].map(opt => (
               <DropdownMenu.Item
                 key={opt.id}
