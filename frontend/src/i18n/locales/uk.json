@@ -1374,7 +1374,13 @@
       "appearance": "Зовнішній вигляд",
       "backup": "Резервне копіювання",
       "audit": "Аудит",
-      "https": "HTTPS"
+      "https": "HTTPS",
+      "general": "Загальні",
+      "email": "Пошта",
+      "security": "Безпека",
+      "sso": "SSO",
+      "database": "База даних",
+      "updates": "Оновлення"
     },
     "systemNameHelper": "Відображуване ім'я системи UCM",
     "baseUrl": "Base URL",

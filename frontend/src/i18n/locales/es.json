@@ -1374,7 +1374,13 @@
       "appearance": "Apariencia",
       "backup": "Copia de seguridad",
       "audit": "Auditoría",
-      "https": "HTTPS"
+      "https": "HTTPS",
+      "general": "General",
+      "email": "Correo",
+      "security": "Seguridad",
+      "sso": "SSO",
+      "database": "Base de datos",
+      "updates": "Actualizaciones"
     },
     "systemNameHelper": "Nombre para mostrar del sistema UCM",
     "baseUrl": "Base URL",
