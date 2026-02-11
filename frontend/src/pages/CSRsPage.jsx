@@ -609,7 +609,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           
           <Select
             label={t('csrs.certificateAuthority')}
-            options={cas.map(ca => ({ value: ca.id, label: ca.descr || ca.name || ca.common_name }))}
+            options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
             value={signCA}
             onChange={setSignCA}
             placeholder={t('csrs.selectCA')}
