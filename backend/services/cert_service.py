@@ -18,6 +18,7 @@ from models import db, CA, Certificate, AuditLog, CertificateTemplate
 from services.trust_store import TrustStoreService
 from services.template_service import TemplateService
 from config.settings import Config
+from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 
 # Import key decryption (optional - fallback if not available)
 try:
@@ -202,11 +203,11 @@ class CertificateService:
         AuditService.log_certificate('cert_created', certificate, f'Created certificate: {descr}')
         
         # Save files
-        cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
+        cert_path = cert_cert_path(certificate)
         with open(cert_path, 'wb') as f:
             f.write(cert_pem)
         
-        key_path = Config.PRIVATE_DIR / f"cert_{certificate.refid}.key"
+        key_path = cert_key_path(certificate)
         with open(key_path, 'wb') as f:
             f.write(key_pem)
         key_path.chmod(0o600)
@@ -273,11 +274,11 @@ class CertificateService:
         AuditService.log_csr('csr_generated', certificate, f'Generated CSR: {descr}')
         
         # Save files
-        csr_path = Config.CERT_DIR / f"{certificate.refid}.csr"
+        csr_path = cert_csr_path(certificate)
         with open(csr_path, 'wb') as f:
             f.write(csr_pem)
         
-        key_path = Config.PRIVATE_DIR / f"cert_{certificate.refid}.key"
+        key_path = cert_key_path(certificate)
         with open(key_path, 'wb') as f:
             f.write(key_pem)
         key_path.chmod(0o600)
@@ -419,7 +420,7 @@ class CertificateService:
         AuditService.log_certificate('csr_signed', certificate, f'Signed CSR: {certificate.descr}')
         
         # Save signed certificate
-        cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
+        cert_path = cert_cert_path(certificate)
         with open(cert_path, 'wb') as f:
             f.write(cert_pem)
         
@@ -527,12 +528,12 @@ class CertificateService:
         AuditService.log_certificate('cert_imported', certificate, f'Imported certificate: {descr}')
         
         # Save files
-        cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
+        cert_path = cert_cert_path(certificate)
         with open(cert_path, 'wb') as f:
             f.write(cert_pem.encode() if isinstance(cert_pem, str) else cert_pem)
         
         if key_pem:
-            key_path = Config.PRIVATE_DIR / f"cert_{certificate.refid}.key"
+            key_path = cert_key_path(certificate)
             with open(key_path, 'wb') as f:
                 f.write(key_pem.encode() if isinstance(key_pem, str) else key_pem)
             key_path.chmod(0o600)
@@ -672,10 +673,11 @@ class CertificateService:
         if not certificate:
             return False
         
-        # Delete files
-        cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
-        csr_path = Config.CERT_DIR / f"{certificate.refid}.csr"
-        key_path = Config.PRIVATE_DIR / f"cert_{certificate.refid}.key"
+        # Delete files (cleanup old UUID names first, then new names)
+        cleanup_old_files(certificate=certificate)
+        cert_path = cert_cert_path(certificate)
+        csr_path = cert_csr_path(certificate)
+        key_path = cert_key_path(certificate)
         
         for path in [cert_path, csr_path, key_path]:
             if path.exists():

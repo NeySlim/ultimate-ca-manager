@@ -22,6 +22,7 @@ from pyasn1.codec.der import decoder as pyasn1_decoder
 from pyasn1_modules import rfc5652
 
 from models import db, CA, Certificate, SCEPRequest
+from config.settings import Config
 
 
 class SCEPService:
@@ -516,13 +517,10 @@ class SCEPService:
         db.session.add(cert_obj)
         
         # Save to file
-        data_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "data"
-        )
-        certs_dir = os.path.join(data_dir, "certs")
-        os.makedirs(certs_dir, exist_ok=True)
+        from utils.file_naming import cert_cert_path
+        Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
         
-        cert_file = os.path.join(certs_dir, f"{cert_refid}.crt")
+        cert_file = cert_cert_path(cert_obj)
         with open(cert_file, "wb") as f:
             f.write(cert_pem)
         

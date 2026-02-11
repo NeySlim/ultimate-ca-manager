@@ -15,6 +15,7 @@ from cryptography.hazmat.backends import default_backend
 from models import db, CA, Certificate, AuditLog
 from services.trust_store import TrustStoreService
 from config.settings import Config
+from utils.file_naming import ca_cert_path, ca_key_path, cleanup_old_files
 
 # Import key encryption (optional - fallback if not available)
 try:
@@ -138,12 +139,12 @@ class CAService:
         AuditService.log_ca('ca_created', ca, f'Created CA: {descr}')
         
         # Save certificate to file
-        cert_path = Config.CA_DIR / f"{ca.refid}.crt"
+        cert_path = ca_cert_path(ca)
         with open(cert_path, 'wb') as f:
             f.write(cert_pem)
         
         # Save private key to file
-        key_path = Config.PRIVATE_DIR / f"ca_{ca.refid}.key"
+        key_path = ca_key_path(ca)
         with open(key_path, 'wb') as f:
             f.write(key_pem)
         key_path.chmod(0o600)
@@ -208,12 +209,12 @@ class CAService:
         AuditService.log_ca('ca_imported', ca, f'Imported CA: {descr}')
         
         # Save files
-        cert_path = Config.CA_DIR / f"{ca.refid}.crt"
+        cert_path = ca_cert_path(ca)
         with open(cert_path, 'wb') as f:
             f.write(cert_pem.encode() if isinstance(cert_pem, str) else cert_pem)
         
         if key_pem:
-            key_path = Config.PRIVATE_DIR / f"ca_{ca.refid}.key"
+            key_path = ca_key_path(ca)
             with open(key_path, 'wb') as f:
                 f.write(key_pem.encode() if isinstance(key_pem, str) else key_pem)
             key_path.chmod(0o600)
@@ -261,9 +262,10 @@ class CAService:
         if child_ca_count > 0:
             raise ValueError(f"CA is parent of {child_ca_count} intermediate CA(s)")
         
-        # Delete files
-        cert_path = Config.CA_DIR / f"{ca.refid}.crt"
-        key_path = Config.PRIVATE_DIR / f"ca_{ca.refid}.key"
+        # Delete files (cleanup old UUID names first, then new names)
+        cleanup_old_files(ca=ca)
+        cert_path = ca_cert_path(ca)
+        key_path = ca_key_path(ca)
         
         if cert_path.exists():
             cert_path.unlink()

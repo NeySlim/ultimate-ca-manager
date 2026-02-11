@@ -312,6 +312,16 @@ def create_app(config_name=None):
     app.logger.info("✓ DATABASE INITIALIZATION COMPLETE - Safe to proceed")
     app.logger.info("=" * 60)
     
+    # Regenerate certificate/key files from database if missing
+    try:
+        with app.app_context():
+            from services.file_regen_service import regenerate_all_files
+            stats = regenerate_all_files()
+            if sum(stats.values()) > 0:
+                app.logger.info(f"✓ File regeneration completed: {stats}")
+    except Exception as e:
+        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+    
     # Initialize general task scheduler (CRL auto-regen, etc) - AFTER database is ready
     try:
         from services.scheduler_service import init_scheduler
