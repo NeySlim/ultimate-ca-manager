@@ -1,20 +1,20 @@
 # UCM Advanced Features
 
-All features are included in UCM. No separate editions.
+All features are included in UCM as core functionality. There is no separate "Pro" or "Community" edition — everything ships in a single unified codebase under `api/v2/`.
 
 ## Features Overview
 
-| Feature | Status |
-|---------|--------|
-| Certificate Management | ✅ Stable |
-| Multiple CAs | ✅ Stable |
-| ACME Protocol | ✅ Stable |
-| SCEP Protocol | ✅ Stable |
-| User Groups | ✅ Stable |
-| Custom RBAC Roles | 🧪 Experimental |
-| SSO (LDAP/OAuth2/SAML) | 🧪 Experimental |
-| HSM Integration | 🧪 Experimental |
-| Advanced Audit Logs | ✅ Stable |
+| Feature | Status | Backend Module |
+|---------|--------|----------------|
+| Certificate Management | ✅ Stable | `api/v2/certificates.py` |
+| Multiple CAs | ✅ Stable | `api/v2/cas.py` |
+| ACME Protocol | ✅ Stable | `api/v2/acme.py` |
+| SCEP Protocol | ✅ Stable | `api/v2/scep.py` |
+| User Groups | ✅ Stable | `api/v2/groups.py` |
+| Custom RBAC Roles | 🧪 Experimental | `api/v2/rbac.py` |
+| SSO (LDAP/OAuth2/SAML) | 🧪 Experimental | `api/v2/sso.py` |
+| HSM Integration | 🧪 Experimental | `api/v2/hsm.py` |
+| Advanced Audit Logs | ✅ Stable | `api/v2/audit.py` |
 
 ---
 
@@ -182,5 +182,5 @@ GET    /api/v2/hsm/stats        - HSM statistics
 ## Support
 
 - Documentation: https://github.com/NeySlim/ultimate-ca-manager/wiki
-- Community: https://github.com/NeySlim/ultimate-ca-manager/discussions
+- Discussions: https://github.com/NeySlim/ultimate-ca-manager/discussions
 - Issues: https://github.com/NeySlim/ultimate-ca-manager/issues

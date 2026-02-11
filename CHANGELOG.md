@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-dev] - 2026-02-11
+
+### 🏗️ Architecture Refactor
+
+- **Consolidated API routes** - Removed `features/` module entirely; all routes now registered under `api/v2/` (33 blueprints total)
+- **Consolidated models** - Removed `models/features/`; models (rbac.py, sso.py, policy.py) moved to `models/`
+- **Moved encryption utils** - `features/encryption.py` → `utils/encryption.py`
+- **Replaced roles endpoint** - `api/v2/roles.py` removed, replaced by `api/v2/rbac.py` with expanded RBAC support
+- **No more Pro/Community distinction** - All features are core; no separate feature modules
+
+### 🐛 Bug Fixes
+
+- **HSM frontend** - Fixed field name alignment with `api/v2/hsm.py` backend
+- **Dashboard expiration colors** - Updated thresholds: ≤7 days red, ≤15 days orange, ≤30 days yellow
+
+---
+
 ## [2.0.3] - 2026-02-10
 
 ### 🐛 Bug Fixes
@@ -40,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🎨 Dashboard Improvements
 
-- **Dynamic Version Display** - Shows current version with Pro/Community badge
+- **Dynamic Version Display** - Shows current version
 - **Update Available Indicator** - Visual notification when updates are available
 - **Fixed Layout** - Proper padding and spacing in all dashboard widgets
 
