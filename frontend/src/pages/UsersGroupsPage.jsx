@@ -18,6 +18,7 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService } from '../services'
+import { apiClient } from '../services/apiClient'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -591,6 +592,9 @@ export default function UsersGroupsPage() {
           <CompactField label={t('common.name')} value={selectedUser.full_name || '—'} />
           <CompactField label={t('common.email')} value={selectedUser.email} />
           <CompactField label={t('common.role')} value={selectedUser.role} />
+          {selectedUser.custom_role_name && (
+            <CompactField label={t('rbac.customRole')} value={selectedUser.custom_role_name} />
+          )}
         </CompactGrid>
       </CompactSection>
 
@@ -884,9 +888,17 @@ function UserForm({ user, onSubmit, onCancel }) {
     email: '',
     password: '',
     full_name: '',
-    role: 'viewer'
+    role: 'viewer',
+    custom_role_id: ''
   })
   const [loading, setLoading] = useState(false)
+  const [customRoles, setCustomRoles] = useState([])
+
+  useEffect(() => {
+    apiClient.get('/rbac/roles').then(res => {
+      setCustomRoles((res.data || []).filter(r => !r.is_system))
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (user) {
@@ -895,7 +907,8 @@ function UserForm({ user, onSubmit, onCancel }) {
         email: user.email || '',
         password: '',
         full_name: user.full_name || '',
-        role: user.role || 'viewer'
+        role: user.role || 'viewer',
+        custom_role_id: user.custom_role_id || ''
       })
     } else {
       setFormData({
@@ -903,7 +916,8 @@ function UserForm({ user, onSubmit, onCancel }) {
         email: '',
         password: '',
         full_name: '',
-        role: 'viewer'
+        role: 'viewer',
+        custom_role_id: ''
       })
     }
   }, [user])
@@ -914,6 +928,7 @@ function UserForm({ user, onSubmit, onCancel }) {
     try {
       const data = { ...formData }
       if (user && !data.password) delete data.password
+      data.custom_role_id = data.custom_role_id ? parseInt(data.custom_role_id) : null
       await onSubmit(data)
     } finally {
       setLoading(false)
@@ -963,6 +978,17 @@ function UserForm({ user, onSubmit, onCancel }) {
           { value: 'viewer', label: t('common.viewer') }
         ]}
       />
+      {customRoles.length > 0 && (
+        <Select
+          label={t('rbac.customRole')}
+          value={formData.custom_role_id}
+          onChange={(val) => setFormData(p => ({ ...p, custom_role_id: val }))}
+          options={[
+            { value: '', label: t('rbac.noCustomRole') },
+            ...customRoles.map(r => ({ value: String(r.id), label: r.name }))
+          ]}
+        />
+      )}
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}

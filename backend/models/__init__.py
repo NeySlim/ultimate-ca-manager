@@ -61,6 +61,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255))  # Full name for WebAuthn/certificates
     role = db.Column(db.String(20), nullable=False, default="viewer")  # admin, operator, viewer
+    custom_role_id = db.Column(db.Integer, db.ForeignKey('pro_custom_roles.id', ondelete='SET NULL'), nullable=True)
     active = db.Column(db.Boolean, default=True)
     mfa_enabled = db.Column(db.Boolean, default=False)  # MFA enabled for this user
     
@@ -81,6 +82,16 @@ class User(db.Model):
     failed_logins = db.Column(db.Integer, default=0)  # Failed login attempts
     locked_until = db.Column(db.DateTime, nullable=True)  # Account lockout timestamp
     
+    # Relationships
+    custom_role = db.relationship('CustomRole', foreign_keys=[custom_role_id], lazy='select')
+    
+    @property
+    def groups(self):
+        """Get groups this user belongs to via GroupMember"""
+        from models.group import GroupMember, Group
+        memberships = GroupMember.query.filter_by(user_id=self.id).all()
+        return [Group.query.get(m.group_id) for m in memberships if Group.query.get(m.group_id)]
+    
     def set_password(self, password: str):
         """Hash and set password"""
         self.password_hash = generate_password_hash(password)
@@ -91,22 +102,29 @@ class User(db.Model):
     
     def to_dict(self):
         """Convert to dictionary"""
-        return {
+        result = {
             "id": self.id,
             "username": self.username,
             "email": self.email,
             "full_name": self.full_name,
             "role": self.role,
+            "custom_role_id": self.custom_role_id,
             "active": self.active,
             "mfa_enabled": self.mfa_enabled,
-            "totp_enabled": self.totp_confirmed,  # Legacy compatibility
-            "two_factor_enabled": self.totp_confirmed,  # For frontend
+            "totp_enabled": self.totp_confirmed,
+            "two_factor_enabled": self.totp_confirmed,
             "force_password_change": self.force_password_change or False,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None,
             "login_count": self.login_count or 0,
             "failed_logins": self.failed_logins or 0,
         }
+        try:
+            if self.custom_role_id and self.custom_role:
+                result["custom_role_name"] = self.custom_role.name
+        except Exception:
+            pass
+        return result
 
 
 class SystemConfig(db.Model):

@@ -1445,7 +1445,10 @@
     "stats": {},
     "subtitle_one": "{{count}} role",
     "subtitle_other": "{{count}} roles",
-    "subtitle": "{{count}} custom roles"
+    "subtitle": "{{count}} custom roles",
+    "customRole": "Custom Role",
+    "noCustomRole": "None (base role only)",
+    "userCount": "{{count}} users"
   },
   "hsm": {
     "statusUnavailable": "HSM features are not available",
