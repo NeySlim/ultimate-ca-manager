@@ -503,6 +503,18 @@ const WEBHOOK_EVENTS = [
   'csr.rejected',
 ]
 
+const WEBHOOK_EVENT_LABELS = {
+  'certificate.issued': 'Issued',
+  'certificate.revoked': 'Revoked',
+  'certificate.renewed': 'Renewed',
+  'certificate.expiring': 'Expiring',
+  'ca.created': 'CA Created',
+  'ca.updated': 'CA Updated',
+  'csr.submitted': 'CSR Submitted',
+  'csr.approved': 'CSR Approved',
+  'csr.rejected': 'CSR Rejected',
+}
+
 function WebhookForm({ webhook, onSave, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
@@ -577,7 +589,7 @@ function WebhookForm({ webhook, onSave, onCancel }) {
                 onChange={() => toggleEvent(event)}
                 className="rounded border-border bg-bg-tertiary"
               />
-              <span className="text-xs text-text-primary">{event}</span>
+              <span className="text-xs text-text-primary">{WEBHOOK_EVENT_LABELS[event] || event}</span>
             </label>
           ))}
         </div>
@@ -1865,7 +1877,7 @@ export default function SettingsPage() {
                           <p className="text-xs text-text-secondary truncate">{webhook.url}</p>
                           <div className="flex items-center gap-1 mt-1">
                             {(webhook.events || []).slice(0, 3).map(ev => (
-                              <Badge key={ev} variant="outline" size="sm">{ev}</Badge>
+                              <Badge key={ev} variant="outline" size="sm">{WEBHOOK_EVENT_LABELS[ev] || ev}</Badge>
                             ))}
                             {(webhook.events || []).length > 3 && (
                               <Badge variant="outline" size="sm">+{webhook.events.length - 3}</Badge>
