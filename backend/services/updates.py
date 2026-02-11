@@ -1,7 +1,7 @@
 """
 Update Service - Check and install updates from GitHub releases
 
-Handles both Pro and Community editions automatically.
+UCM is now fully open-source (Community edition).
 """
 import os
 import re
@@ -17,40 +17,21 @@ import requests
 
 from config.settings import Config
 
-# GitHub repos
-REPO_PRO = "NeySlim/ultimate-ca-manager-pro"
-REPO_COMMUNITY = "NeySlim/ultimate-ca-manager"
+# GitHub repo (community only, pro is archived)
+REPO = "NeySlim/ultimate-ca-manager"
 
 # Cache timeout for version check (5 minutes)
 VERSION_CACHE_TIMEOUT = 300
 
 
 def get_edition():
-    """Detect if this is Pro or Community edition"""
-    # Check Flask config first
-    if current_app and current_app.config.get('PRO_ENABLED'):
-        return 'pro'
-    
-    # Check marker file
-    marker_file = '/opt/ucm/.edition'
-    if os.path.exists(marker_file):
-        with open(marker_file, 'r') as f:
-            edition = f.read().strip().lower()
-            if edition in ('pro', 'community'):
-                return edition
-    
-    # Check if pro/ directory exists
-    pro_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'pro')
-    if os.path.isdir(pro_dir):
-        return 'pro'
-    
+    """UCM is community edition (pro archived)"""
     return 'community'
 
 
 def get_github_repo():
-    """Get the correct GitHub repo based on edition"""
-    edition = get_edition()
-    return REPO_PRO if edition == 'pro' else REPO_COMMUNITY
+    """Get GitHub repo for updates"""
+    return REPO
 
 
 def get_current_version():
@@ -129,25 +110,11 @@ def check_for_updates(include_prereleases=False):
         url = f"https://api.github.com/repos/{repo}/releases"
         headers = {'Accept': 'application/vnd.github.v3+json'}
         
-        # For private repos (Pro), use GitHub token if available
-        github_token = os.getenv('GITHUB_TOKEN') or os.getenv('GH_TOKEN')
-        if github_token:
-            headers['Authorization'] = f'token {github_token}'
-        
         try:
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             releases = response.json()
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404 and edition == 'pro':
-                # Private Pro repo - need token or fallback
-                return {
-                    'update_available': False,
-                    'current_version': current,
-                    'edition': edition,
-                    'message': 'Pro updates require GitHub token. Set GITHUB_TOKEN environment variable.',
-                    'needs_token': True
-                }
+        except requests.exceptions.HTTPError:
             raise
         
         if not releases:
