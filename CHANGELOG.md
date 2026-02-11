@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.4] - 2026-02-11
+
+### 🐛 Bug Fixes
+
+- **Update Check Fix** - Fixed "maximum recursion depth exceeded" error on Docker (gevent + Python 3.13 SSL compatibility)
+- **Edition Detection** - Removed stale Pro edition detection that caused update checks to query archived private repo
+
+### 🔧 Improvements
+
+- **VERSION Centralization** - Single `VERSION` file at project root, read by all platforms (DEB, RPM, Docker)
+- **Docker Directory Fix** - Fixed `cas/` → `ca/` mismatch; automatic migration on container upgrade
+- **Safe HTTP Sessions** - Added `safe_requests.py` utility for consistent SSL handling
+- **Early Monkey-Patch** - `gevent.monkey.patch_all()` called before imports in gunicorn configs
+
+### 📦 Packaging
+
+- DEB/RPM packages now include `VERSION` file at `/opt/ucm/VERSION`
+- Docker image copies `VERSION` to `/app/VERSION`
+- Added missing `crl/` and `scep/` data directories to DEB/RPM postinst
+
+---
+
 ## [2.0.3] - 2026-02-10
 
 ### 🐛 Bug Fixes
