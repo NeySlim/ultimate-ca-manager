@@ -17,10 +17,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Replaced roles endpoint** - `api/v2/roles.py` removed, replaced by `api/v2/rbac.py` with expanded RBAC support
 - **No more Pro/Community distinction** - All features are core; no separate feature modules
 
+### New Features
+
+- **Backup v2.0** - Complete backup overhaul: exports/restores all database tables (was only 5, now covers groups, RBAC roles, templates, trust store, SSO, HSM, API keys, SMTP, notifications, policies, auth certificates, DNS providers, ACME domains, HTTPS server files)
+- **File regeneration** - Startup service that regenerates missing certificate/key files from database, ensuring filesystem consistency after restore or data loss
+- **Human-readable file names** - Certificate and CA files now named `{cn-slug}-{refid}.ext` instead of UUID-only (e.g., `www.example.com-550e8400.crt`)
+- **SoftHSM integration** - Automatic SoftHSM2 setup across DEB, RPM, and Docker deployments with PKCS#11 key generation
+- **Webhooks** - Management tab in Settings for webhook CRUD, test, and event filtering
+
+### Improvements
+
+- **Pre-release filter** - Update checker only considers alpha, beta, and rc tags as pre-releases
+- **RBAC-Users integration** - Users can be assigned custom roles with granular permissions
+
 ### Bug Fixes
 
 - **HSM frontend** - Fixed field name alignment with `api/v2/hsm.py` backend
 - **Dashboard expiration colors** - Updated thresholds: ≤7 days red, ≤15 days orange, ≤30 days yellow
+- **ACME DNS test** - Fixed import error for `get_dns_provider_instance`
+- **i18n cleanup** - Removed unused ACME translation keys, fixed hardcoded strings
+
+### Security
+
+- **cryptography** - Upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
+
+### Documentation
+
+- Removed decorative emojis from all documentation and wiki (kept functional markers only)
 
 ---
 

@@ -1501,6 +1501,7 @@
     "updateAvailableTitle": "Mise à jour disponible",
     "upToDateTitle": "À jour",
     "prerelease": "Pré-version",
+    "includePreReleaseVersions": "Inclure les pré-versions",
     "current": "Actuelle",
     "edition": "Édition",
     "passwordMinLength": "Le mot de passe doit contenir au moins 12 caractères",

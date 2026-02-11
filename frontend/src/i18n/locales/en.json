@@ -1156,6 +1156,7 @@
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
     "prerelease": "Pre-release",
+    "includePreReleaseVersions": "Include pre-release versions",
     "current": "Current",
     "edition": "Edition",
     "passwordMinLength": "Password must be at least 12 characters",
