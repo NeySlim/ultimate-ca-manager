@@ -76,10 +76,10 @@ bg-status-success/20
 ### Vertical Rhythm
 ```jsx
 // Sections
-<div className="space-y-4">  // 16px between sections
+<div className="space-y-4"> // 16px between sections
 
 // Compact lists
-<div className="space-y-2">  // 8px between items
+<div className="space-y-2"> // 8px between items
 ```
 
 ## Border Radius
@@ -153,9 +153,9 @@ transition-transform duration-200
 ### Icon Backgrounds
 ```jsx
 // Use CSS classes from ThemeContext
-<div className="icon-bg-blue">  // Blue themed
-<div className="icon-bg-orange">  // Orange themed
-<div className="icon-bg-violet">  // Purple themed
+<div className="icon-bg-blue"> // Blue themed
+<div className="icon-bg-orange"> // Orange themed
+<div className="icon-bg-violet"> // Purple themed
 ```
 
 ## Responsive Breakpoints
@@ -226,12 +226,12 @@ Defined in `ThemeContext.jsx`, applied via CSS custom properties:
 ### ❌ Don't
 ```jsx
 // Hardcoded colors
-<p className="text-gray-500">  // ❌
-<span className="text-red-500">  // ❌
+<p className="text-gray-500"> // ❌
+<span className="text-red-500"> // ❌
 
 // Arbitrary values
-<p className="text-[13px]">  // ❌ Use text-sm or text-xs
+<p className="text-[13px]"> // ❌ Use text-sm or text-xs
 
 // Inline styles for colors
-<div style={{ color: '#ff0000' }}>  // ❌
+<div style={{ color: '#ff0000' }}> // ❌
 ```

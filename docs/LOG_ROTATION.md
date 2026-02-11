@@ -1,10 +1,10 @@
 # UCM Log Rotation
 
-## 📋 Configuration
+## Configuration
 
 **Location:** `/etc/logrotate.d/ucm`
 
-## 📊 Rotation Schedule
+## Rotation Schedule
 
 ### Application Logs (access.log, error.log)
 - **Frequency:** Daily
@@ -18,7 +18,7 @@
 - **Compression:** Yes (gzip)
 - **Total disk usage:** < 1 MB
 
-## 🔄 How It Works
+## How It Works
 
 1. **Daily at ~3 AM**: Logrotate runs (via system cron)
 2. **Rotation**: Moves current log to dated file (e.g., `access.log-20260112`)
@@ -26,20 +26,20 @@
 4. **Service Reload**: UCM service reloaded to open new log files
 5. **Cleanup**: Logs older than retention period are deleted
 
-## 📁 Log Files
+## Log Files
 
 ```
 /var/log/ucm/
-├── access.log              # Current access log
-├── access.log-20260112     # Yesterday (uncompressed)
-├── access.log-20260111.gz  # Day before (compressed)
-├── access.log-20260110.gz  # ...
-├── error.log               # Current error log  
-├── error.log-20260112      # Yesterday
-├── db-optimizer.log        # DB optimization log
+├── access.log # Current access log
+├── access.log-20260112 # Yesterday (uncompressed)
+├── access.log-20260111.gz # Day before (compressed)
+├── access.log-20260110.gz # ...
+├── error.log # Current error log
+├── error.log-20260112 # Yesterday
+├── db-optimizer.log # DB optimization log
 ```
 
-## 🛠️ Manual Operations
+## Manual Operations
 
 ### Force rotation (testing)
 ```bash
@@ -57,7 +57,7 @@ zcat /var/log/ucm/access.log-20260111.gz | less
 zgrep "ERROR" /var/log/ucm/error.log-*.gz
 ```
 
-## 📈 Disk Space Estimation
+## Disk Space Estimation
 
 **Without rotation:**
 - 30 days × 3 MB/day = ~90 MB
@@ -67,22 +67,22 @@ zgrep "ERROR" /var/log/ucm/error.log-*.gz
 - 13 days compressed: 13 × 0.6 MB = ~8 MB
 - **Total: ~11 MB** (87% savings)
 
-## ⚙️ Configuration Options
+## Configuration Options
 
 Current settings in `/etc/logrotate.d/ucm`:
 
 ```
-daily          # Rotate every day
-rotate 14      # Keep 14 rotations
-compress       # Compress old logs
-delaycompress  # Don't compress most recent rotation
-notifempty     # Don't rotate empty logs
-missingok      # Don't error if log missing
-dateext        # Use date extension (not .1, .2)
-sharedscripts  # Run postrotate once for all logs
+daily # Rotate every day
+rotate 14 # Keep 14 rotations
+compress # Compress old logs
+delaycompress # Don't compress most recent rotation
+notifempty # Don't rotate empty logs
+missingok # Don't error if log missing
+dateext # Use date extension (not .1, .2)
+sharedscripts # Run postrotate once for all logs
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Logs not rotating
 ```bash
@@ -117,11 +117,11 @@ find /var/log/ucm/ -type f -size +10M
 find /var/log/ucm/ -name "*.gz" -mtime +7 -delete
 ```
 
-## 📝 Integration with Installer
+## Integration with Installer
 
 The logrotate configuration is automatically deployed by the UCM installer to `/etc/logrotate.d/ucm` during installation.
 
 ---
 
-**Last Updated:** 2026-01-12  
+**Last Updated:** 2026-01-12
 **UCM Version:** 1.9.0

@@ -2,7 +2,7 @@
 
 Ultimate CA Manager implements comprehensive security features to protect your PKI infrastructure.
 
-## 🔐 Security Features
+## Security Features
 
 ### 1. Private Key Encryption
 
@@ -209,7 +209,7 @@ Requires SMTP configuration in Settings > Email.
 
 ---
 
-## 🛡️ Security Best Practices
+## Security Best Practices
 
 ### 1. Initial Setup
 ```bash
@@ -239,7 +239,7 @@ FLASK_ENV=production
 
 ---
 
-## 📊 Security Monitoring
+## Security Monitoring
 
 ### Audit Dashboard
 Access security metrics at Settings > Audit Logs:
@@ -257,7 +257,7 @@ Access security metrics at Settings > Audit Logs:
 
 ---
 
-## 🚨 Reporting Security Issues
+## Reporting Security Issues
 
 If you discover a security vulnerability, please report it responsibly:
 
@@ -268,7 +268,7 @@ If you discover a security vulnerability, please report it responsibly:
 
 ---
 
-## 📝 Security Changelog
+## Security Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|

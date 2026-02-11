@@ -2,7 +2,7 @@
 
 Complete guide for installing Ultimate CA Manager using Docker.
 
-## 🐳 Prerequisites
+## Prerequisites
 
 - Docker Engine 20.10+ or Docker Desktop
 - 2GB RAM minimum, 4GB recommended
@@ -15,7 +15,7 @@ Complete guide for installing Ultimate CA Manager using Docker.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Pull and Run
 
@@ -32,12 +32,12 @@ docker run -d \
   neyslim/ultimate-ca-manager:latest
 ```
 
-**Access:** https://localhost:8443  
+**Access:** https://localhost:8443
 **Credentials:** admin / changeme123
 
 ---
 
-## 📝 Docker Compose (Recommended)
+## Docker Compose (Recommended)
 
 ### Basic Configuration
 
@@ -78,31 +78,31 @@ services:
     image: neyslim/ultimate-ca-manager:latest
     container_name: ucm
     restart: unless-stopped
-    
+
     ports:
       - "8443:8443"
-    
+
     volumes:
       # Persistent data
       - ucm-data:/opt/ucm/data
-      
+
       # Optional: Custom HTTPS certificates
       # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro
       # - ./certs/https_key.pem:/opt/ucm/data/https_key.pem:ro
-    
+
     environment:
       # Network
       - UCM_FQDN=ucm.example.com
       - UCM_HTTPS_PORT=8443
-      
+
       # Security
       - UCM_SESSION_TIMEOUT=3600
       - UCM_JWT_EXPIRATION=86400
-      
+
       # Features
       - UCM_ACME_ENABLED=true
       - UCM_CACHE_ENABLED=true
-      
+
       # Email notifications (optional)
       - UCM_SMTP_ENABLED=true
       - UCM_SMTP_SERVER=smtp.gmail.com
@@ -110,14 +110,14 @@ services:
       - UCM_SMTP_USERNAME=your@email.com
       - UCM_SMTP_PASSWORD=yourpassword
       - UCM_SMTP_FROM=noreply@ucm.example.com
-    
+
     healthcheck:
       test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    
+
     # Security
     security_opt:
       - no-new-privileges:true
@@ -134,7 +134,7 @@ volumes:
 
 ---
 
-## 🔧 Environment Variables
+## Environment Variables
 
 ### Required
 
@@ -161,7 +161,7 @@ See full list in [docker-compose.yml](../../docker-compose.yml)
 
 ---
 
-## 💾 Data Persistence
+## Data Persistence
 
 ### Using Named Volumes (Recommended)
 
@@ -181,19 +181,19 @@ docker run -v /opt/ucm/data:/opt/ucm/data ...
 
 ```
 ucm-data/
-├── ucm.db              # SQLite database
-├── https_cert.pem      # HTTPS certificate
-├── https_key.pem       # HTTPS private key
-├── cas/                # Certificate Authority files
-├── certs/              # Certificate files
-├── backups/            # Automatic backups
-├── logs/               # Application logs
-└── temp/               # Temporary files
+├── ucm.db # SQLite database
+├── https_cert.pem # HTTPS certificate
+├── https_key.pem # HTTPS private key
+├── cas/ # Certificate Authority files
+├── certs/ # Certificate files
+├── backups/ # Automatic backups
+├── logs/ # Application logs
+└── temp/ # Temporary files
 ```
 
 ---
 
-## 🔐 Custom HTTPS Certificates
+## Custom HTTPS Certificates
 
 ### Option 1: Environment Variables
 
@@ -213,7 +213,7 @@ docker run -v /path/to/cert.pem:/opt/ucm/data/https_cert.pem:ro \
 
 ---
 
-## 🔄 Update & Maintenance
+## Update & Maintenance
 
 ### Update to Latest Version
 
@@ -258,7 +258,7 @@ docker run --rm -v ucm-data:/data -v $(pwd):/backup \
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Container Won't Start
 
@@ -303,7 +303,7 @@ docker exec ucm ps aux | grep gunicorn
 
 ---
 
-## 🎯 Advanced Deployment
+## Advanced Deployment
 
 ### Portainer Stack
 
@@ -315,10 +315,10 @@ See: [docker-compose.portainer.yml](../../docker-compose.portainer.yml)
 server {
     listen 443 ssl http2;
     server_name ucm.example.com;
-    
+
     ssl_certificate /etc/nginx/ssl/ucm.crt;
     ssl_certificate_key /etc/nginx/ssl/ucm.key;
-    
+
     location / {
         proxy_pass https://localhost:8443;
         proxy_set_header Host $host;
@@ -339,7 +339,7 @@ Docker automatically pulls the correct architecture.
 
 ---
 
-## 📚 Next Steps
+## Next Steps
 
 - [Configuration Guide](../administration/configuration.md)
 - [First Steps](../user-guide/first-steps.md)

@@ -1,6 +1,6 @@
-# 🗺️ UCM Roadmap
+# UCM Roadmap
 
-**Current Version:** See [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest)  
+**Current Version:** See [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest)
 **Status:** Stable
 
 ---
@@ -56,12 +56,12 @@
 
 ---
 
-## 🧪 Advanced Features (Experimental)
+## Advanced Features (Experimental)
 
 ### Security & Administration
-- 🧪 **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault, GCP KMS (UI + backend, needs real HSM testing)
-- 🧪 **RBAC** - Custom roles and permissions (UI + API, enforcement in progress)
-- 🧪 **SSO** - LDAP, OAuth2/OIDC, SAML 2.0 (UI + backend, needs production validation)
+- **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault, GCP KMS (UI + backend, needs real HSM testing)
+- **RBAC** - Custom roles and permissions (UI + API, enforcement in progress)
+- **SSO** - LDAP, OAuth2/OIDC, SAML 2.0 (UI + backend, needs production validation)
 - ✅ **Security Dashboard** - Secrets management, anomaly detection
 
 ### Planned for v2.1.0
@@ -74,7 +74,7 @@
 
 ---
 
-## 🌟 v2.1.0 - Next Release
+## v2.1.0 - Next Release
 
 ### Internationalization (i18n) ✅
 - ✅ **English** (default)
@@ -94,7 +94,7 @@
 
 ---
 
-## 📊 Version History
+## Version History
 
 | Version | Date | Highlights |
 |---------|------|------------|

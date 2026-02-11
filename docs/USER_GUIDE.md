@@ -4,7 +4,7 @@ Quick start guide for using Ultimate CA Manager.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### First Login
 
@@ -28,7 +28,7 @@ UCM uses a 3-panel layout:
 
 ---
 
-## 📜 Certificate Management
+## Certificate Management
 
 ### Creating a Certificate
 
@@ -63,7 +63,7 @@ UCM uses a 3-panel layout:
 
 ---
 
-## 🏛️ CA Management
+## CA Management
 
 ### Creating a Root CA
 
@@ -94,7 +94,7 @@ UCM uses a 3-panel layout:
 
 ---
 
-## 📝 CSR Management
+## CSR Management
 
 ### Signing a CSR
 
@@ -111,7 +111,7 @@ UCM uses a 3-panel layout:
 
 ---
 
-## 📋 Templates
+## Templates
 
 Templates define default settings for certificates.
 
@@ -138,7 +138,7 @@ Templates define default settings for certificates.
 
 ---
 
-## 👥 User Management
+## User Management
 
 ### Creating Users
 
@@ -161,7 +161,7 @@ Templates define default settings for certificates.
 
 ---
 
-## 🔐 Security Settings
+## Security Settings
 
 ### Enabling 2FA (TOTP)
 
@@ -180,7 +180,7 @@ Templates define default settings for certificates.
 
 ---
 
-## 📡 Protocol Configuration
+## Protocol Configuration
 
 ### ACME Server
 
@@ -216,7 +216,7 @@ Real-time certificate validation:
 
 ---
 
-## 🎨 Themes
+## Themes
 
 Change the UI theme:
 
@@ -233,7 +233,7 @@ Theme persists across sessions.
 
 ---
 
-## 📱 Mobile Usage
+## Mobile Usage
 
 UCM is mobile-responsive:
 
@@ -244,7 +244,7 @@ UCM is mobile-responsive:
 
 ---
 
-## ❓ Troubleshooting
+## Troubleshooting
 
 ### Can't Login
 
@@ -268,7 +268,7 @@ UCM is mobile-responsive:
 
 ---
 
-## 📚 More Resources
+## More Resources
 
 - [API Reference](API_REFERENCE.md)
 - [Installation Guide](installation/README.md)

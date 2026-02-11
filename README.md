@@ -11,9 +11,9 @@
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🔐 Complete PKI Infrastructure
+### Complete PKI Infrastructure
 - **Full CA Management** - Create, import, manage Certificate Authorities with hierarchy support
 - **Certificate Lifecycle** - Generate, sign, revoke, renew, export certificates
 - **CSR Management** - Create, import, sign Certificate Signing Requests
@@ -22,20 +22,20 @@
 - **OCSP Responder** - Real-time certificate status validation (RFC 6960)
 - **Trust Store** - Manage trusted root CA certificates
 
-### 🧰 Certificate Toolbox
+### Certificate Toolbox
 - **SSL Checker** - Verify SSL certificates on any hostname (TLS version, cipher suite, expiry)
 - **CSR Decoder** - Parse and display CSR contents
 - **Certificate Decoder** - Analyze certificate details (extensions, SANs, key usage)
 - **Key Matcher** - Verify certificate and private key match
 - **SSL Converter** - Convert between PEM, DER, PKCS#12, PKCS#7 formats
 
-### 📡 Industry Standard Protocols
+### Industry Standard Protocols
 - **SCEP Server** - RFC 8894 compliant auto-enrollment for network devices
 - **ACME Support** - Let's Encrypt compatible (certbot, acme.sh) with account management
 - **OCSP** - Online Certificate Status Protocol responder
 - **CRL/CDP** - Certificate Revocation List distribution points
 
-### 🔒 Advanced Security
+### Advanced Security
 - **HSM Integration** - SoftHSM included, hardware HSM via PKCS#11, Azure Key Vault, Google Cloud KMS
 - **WebAuthn/FIDO2** - Hardware security key support (YubiKey, Passkeys)
 - **mTLS Authentication** - Mutual TLS certificate-based authentication
@@ -46,12 +46,12 @@
 - **Rate Limiting** - Brute force protection on login
 - **JWT Sessions** - Secure httpOnly cookie authentication
 
-### 👥 User & Group Management
+### User & Group Management
 - **User Groups** - Organize users with role-based access
 - **API Keys** - Generate keys for automation and integrations
 - **Session History** - Track all login sessions
 
-### 🎨 Modern Interface
+### Modern Interface
 - **12 Theme Variants** - 6 color themes (Gray, Ocean, Purple, Forest, Sunset, Cyber) × Light/Dark modes
 - **Auto Dark Mode** - "Follow System" automatically switches based on OS preference
 - **React 18 + Radix UI** - Modern, accessible component library
@@ -61,7 +61,7 @@
 - **Real-time Updates** - WebSocket-based live refresh
 - **Contextual Help** - Help modals on every page
 
-### 📸 More Screenshots
+### More Screenshots
 
 | Certificates with Detail Panel | Certificate Toolbox |
 |-------------------------------|---------------------|
@@ -71,13 +71,13 @@
 |--------|--------|
 | ![Mobile](docs/screenshots/mobile-dashboard.png) | ![Tablet](docs/screenshots/tablet-certificates.png) |
 
-### 🚀 Deployment Options
+### Deployment Options
 - **Docker** - Multi-arch images (amd64, arm64) via Docker Hub & GHCR
 - **Debian/Ubuntu** - Native .deb packages
 - **RHEL/Rocky/Fedora** - Native .rpm packages
 - **From Source** - Python 3.11+ with virtual environment
 
-### ⚙️ Integration & Management
+### Integration & Management
 - **Smart Import** - Intelligent parser for certificates, keys, CSRs (drag & drop)
 - **OPNsense Import** - Direct import from OPNsense firewalls
 - **Bulk Export** - Export all certificates/CAs in one click
@@ -88,7 +88,7 @@
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 See all features in action: **[View Full Gallery](docs/SCREENSHOTS.md)**
 
@@ -117,7 +117,7 @@ See all features in action: **[View Full Gallery](docs/SCREENSHOTS.md)**
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Universal Installer (All Linux Distributions)
 
@@ -132,8 +132,8 @@ Or with wget:
 wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/packaging/scripts/install-ucm.sh | sudo bash
 ```
 
-✅ **Supports:** Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, openSUSE, Arch, Alpine  
-✅ **Smart:** Uses native packages (DEB/RPM) when available, otherwise installs from source  
+✅ **Supports:** Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, openSUSE, Arch, Alpine
+✅ **Smart:** Uses native packages (DEB/RPM) when available, otherwise installs from source
 ✅ **Zero dependencies:** Only requires bash
 
 ### Debian/Ubuntu Package
@@ -143,7 +143,7 @@ wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pac
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
 
 # Install
-sudo apt install -y python3-venv python3-pip  # Required dependencies
+sudo apt install -y python3-venv python3-pip # Required dependencies
 sudo dpkg -i ucm_*.deb
 sudo systemctl enable --now ucm
 ```
@@ -177,7 +177,7 @@ docker run -d --restart=unless-stopped \
   neyslim/ultimate-ca-manager:latest
 ```
 
-**Access:** https://localhost:8443  
+**Access:** https://localhost:8443
 **Credentials:** admin / (shown during install or in `/etc/ucm/ucm.env`) ⚠️ **CHANGE IMMEDIATELY!**
 
 ### Docker Compose
@@ -199,7 +199,7 @@ services:
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 Full documentation is available on the **[Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**.
 
@@ -215,7 +215,7 @@ Full documentation is available on the **[Wiki](https://github.com/NeySlim/ultim
 
 ---
 
-## 📡 API v2
+## API v2
 
 UCM provides a RESTful JSON API under `/api/v2/`. Full documentation in [OpenAPI spec](docs/openapi.yaml).
 
@@ -233,7 +233,7 @@ UCM provides a RESTful JSON API under `/api/v2/`. Full documentation in [OpenAPI
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Frontend:** React 18, Vite, Radix UI
 - **Backend:** Python 3.11+, Flask, SQLAlchemy
@@ -244,25 +244,25 @@ UCM provides a RESTful JSON API under `/api/v2/`. Full documentation in [OpenAPI
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables (Docker)
 
 ```bash
 # Network
-UCM_FQDN=ucm.example.com         # Server FQDN
-UCM_HTTPS_PORT=8443              # HTTPS port
+UCM_FQDN=ucm.example.com # Server FQDN
+UCM_HTTPS_PORT=8443 # HTTPS port
 
 # Database
 UCM_DATABASE_PATH=/opt/ucm/data/ucm.db
 
 # Security
-UCM_SECRET_KEY=auto-generated    # Session secret key
-UCM_MTLS_ENABLED=false          # Mutual TLS auth
+UCM_SECRET_KEY=auto-generated # Session secret key
+UCM_MTLS_ENABLED=false # Mutual TLS auth
 
 # Features
-UCM_ACME_ENABLED=true           # ACME protocol
-UCM_CACHE_ENABLED=true          # Response caching
+UCM_ACME_ENABLED=true # ACME protocol
+UCM_CACHE_ENABLED=true # Response caching
 
 # Email (Optional)
 UCM_SMTP_ENABLED=false
@@ -279,7 +279,7 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 
 ---
 
-## 📦 Package Locations (v2.x+)
+## Package Locations (v2.x+)
 
 ### DEB/RPM (Harmonized)
 - **Application:** `/opt/ucm/` (backend, frontend, venv)
@@ -296,7 +296,7 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 
 ---
 
-## 🔄 Upgrade
+## Upgrade
 
 ### Upgrading from v1.8.x to v2.x
 
@@ -320,7 +320,7 @@ sudo systemctl restart ucm
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Container won't start
 ```bash
@@ -342,16 +342,16 @@ curl -k https://localhost:8443/api/health
 ### Database locked
 ```bash
 # Stop service
-sudo systemctl stop ucm  # or docker stop ucm
+sudo systemctl stop ucm # or docker stop ucm
 # Remove lock
-sudo rm /opt/ucm/backend/data/ucm.db-journal  # DEB/RPM
+sudo rm /opt/ucm/backend/data/ucm.db-journal # DEB/RPM
 # Restart
 sudo systemctl start ucm
 ```
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](docs/development/contributing.md) for guidelines.
 
@@ -363,13 +363,13 @@ We welcome contributions! Please see [CONTRIBUTING.md](docs/development/contribu
 
 ---
 
-## 📜 License
+## License
 
 BSD 3-Clause License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Flask & SQLAlchemy teams
 - React & Radix UI
@@ -378,7 +378,7 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📞 Support
+## Support
 
 - **Issues:** [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - **Wiki:** [GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
@@ -386,15 +386,15 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Made with ❤️ by the UCM Team**
+**Made by the UCM Team**
 
 ---
 
-## 📚 Additional Documentation
+## Additional Documentation
 
 Comprehensive technical documentation is available in the [`/docs`](/docs) directory and the **[Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**.
 
-## ⚡ What's New in v2.x
+## What's New in v2.x
 
 ### Complete UI Redesign
 - **Modern React 18 UI** - Responsive, accessible, mobile-friendly

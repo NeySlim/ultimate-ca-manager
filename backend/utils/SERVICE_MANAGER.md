@@ -27,12 +27,12 @@ else:
 
 ```python
 from utils import (
-    restart_service,      # Restart UCM service
-    reload_service,       # Reload configuration (currently = restart)
-    is_service_running,   # Check if service is running
-    get_service_status,   # Get detailed status info
-    schedule_restart,     # Schedule restart with delay
-    cancel_scheduled_restart  # Cancel scheduled restart
+    restart_service, # Restart UCM service
+    reload_service, # Reload configuration (currently = restart)
+    is_service_running, # Check if service is running
+    get_service_status, # Get detailed status info
+    schedule_restart, # Schedule restart with delay
+    cancel_scheduled_restart # Cancel scheduled restart
 )
 ```
 
@@ -176,11 +176,11 @@ Use `restart_service()` after:
 def update_config():
     # Update configuration
     config.save()
-    
+
     # Restart to apply changes
     from utils import restart_service
     success, message = restart_service()
-    
+
     return jsonify({
         'success': success,
         'message': message
@@ -195,16 +195,16 @@ def update_config():
 def apply_settings_ui():
     # Apply settings
     save_settings(request.form)
-    
+
     # Restart service
     from utils import restart_service
     success, message = restart_service()
-    
+
     if success:
         flash(message, 'success')
     else:
         flash(message, 'error')
-    
+
     return redirect('/settings')
 ```
 

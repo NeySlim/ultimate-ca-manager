@@ -43,7 +43,7 @@ sudo systemctl enable redis-server
 sudo systemctl start redis-server
 
 # Verify
-redis-cli ping  # Should return PONG
+redis-cli ping # Should return PONG
 ```
 
 ### CentOS / RHEL / Rocky Linux
@@ -57,7 +57,7 @@ sudo systemctl enable redis
 sudo systemctl start redis
 
 # Verify
-redis-cli ping  # Should return PONG
+redis-cli ping # Should return PONG
 ```
 
 ### Alpine Linux

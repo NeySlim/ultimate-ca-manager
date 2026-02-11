@@ -2,7 +2,7 @@
 
 This guide covers all installation methods for Ultimate CA Manager.
 
-## 📋 System Requirements
+## System Requirements
 
 ### Minimum Requirements
 - **CPU:** 2 cores
@@ -22,7 +22,7 @@ This guide covers all installation methods for Ultimate CA Manager.
 
 ---
 
-## 🚀 Installation Methods
+## Installation Methods
 
 ### Method 1: Docker (Recommended)
 
@@ -38,7 +38,7 @@ docker run -d \
   neyslim/ultimate-ca-manager:latest
 ```
 
-**Access:** https://localhost:8443  
+**Access:** https://localhost:8443
 **Default credentials:** admin / changeme123 ⚠️ CHANGE IMMEDIATELY
 
 ---
@@ -55,7 +55,7 @@ wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm
 
 # Install
 sudo dpkg -i ucm_2.0.3_all.deb
-sudo apt-get install -f  # Fix any dependencies
+sudo apt-get install -f # Fix any dependencies
 
 # Enable and start
 sudo systemctl enable ucm
@@ -119,7 +119,7 @@ python wsgi.py
 
 ---
 
-## 🔐 First Login
+## First Login
 
 After installation, access UCM at **https://localhost:8443**
 
@@ -131,7 +131,7 @@ After installation, access UCM at **https://localhost:8443**
 
 ---
 
-## 📁 Data Locations
+## Data Locations
 
 ### Docker
 - **Data:** `/opt/ucm/data` (inside container)
@@ -151,7 +151,7 @@ After installation, access UCM at **https://localhost:8443**
 
 ---
 
-## 🔄 Next Steps
+## Next Steps
 
 After installation:
 
@@ -163,7 +163,7 @@ After installation:
 
 ---
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Docker Deployment Guide](docker.md)
 - [Configuration Guide](../administration/configuration.md)

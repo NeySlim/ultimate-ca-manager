@@ -4,7 +4,7 @@ Administration and configuration guide for Ultimate CA Manager.
 
 ---
 
-## 🔧 Configuration Overview
+## Configuration Overview
 
 UCM stores configuration in:
 - **Database** - `/var/lib/ucm/ucm.db` (SQLite)
@@ -13,7 +13,7 @@ UCM stores configuration in:
 
 ---
 
-## ⚙️ Server Configuration
+## Server Configuration
 
 ### Environment Variables
 
@@ -52,7 +52,7 @@ Logs are rotated automatically via logrotate:
 
 ---
 
-## 🔒 Security Configuration
+## Security Configuration
 
 ### HTTPS Certificate
 
@@ -95,7 +95,7 @@ Enable/disable in **Settings** → **Security**:
 
 ---
 
-## 💾 Backup & Restore
+## Backup & Restore
 
 ### Creating Backups
 
@@ -145,7 +145,7 @@ Create cron job:
 
 ---
 
-## 📊 Database Management
+## Database Management
 
 ### SQLite Database
 
@@ -178,7 +178,7 @@ sqlite3 /var/lib/ucm/ucm.db ".dump" > ucm_dump.sql
 
 ---
 
-## 📡 Protocol Administration
+## Protocol Administration
 
 ### CRL Distribution
 
@@ -238,7 +238,7 @@ curl -X POST https://localhost:8443/api/v2/scep/requests/1/reject \
 
 ---
 
-## 👥 User Administration
+## User Administration
 
 ### Password Reset
 
@@ -273,7 +273,7 @@ Users can create API keys for automation:
 
 ---
 
-## 📈 Monitoring
+## Monitoring
 
 ### Health Check
 
@@ -299,7 +299,7 @@ All actions are logged:
 
 ---
 
-## 🔄 Upgrades
+## Upgrades
 
 ### Standard Upgrade
 
@@ -323,7 +323,7 @@ See [UPGRADE.md](../UPGRADE.md) for version-specific migration steps.
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Service Won't Start
 
@@ -364,7 +364,7 @@ openssl rsa -noout -modulus -in server.key | md5sum
 
 ---
 
-## 📚 References
+## References
 
 - [User Guide](USER_GUIDE.md)
 - [API Reference](API_REFERENCE.md)

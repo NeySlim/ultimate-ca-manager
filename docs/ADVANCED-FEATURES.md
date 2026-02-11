@@ -11,9 +11,9 @@ All features are included in UCM as core functionality. There is no separate "Pr
 | ACME Protocol | ✅ Stable | `api/v2/acme.py` |
 | SCEP Protocol | ✅ Stable | `api/v2/scep.py` |
 | User Groups | ✅ Stable | `api/v2/groups.py` |
-| Custom RBAC Roles | 🧪 Experimental | `api/v2/rbac.py` |
-| SSO (LDAP/OAuth2/SAML) | 🧪 Experimental | `api/v2/sso.py` |
-| HSM Integration | 🧪 Experimental | `api/v2/hsm.py` |
+| Custom RBAC Roles | Experimental | `api/v2/rbac.py` |
+| SSO (LDAP/OAuth2/SAML) | Experimental | `api/v2/sso.py` |
+| HSM Integration | Experimental | `api/v2/hsm.py` |
 | Advanced Audit Logs | ✅ Stable | `api/v2/audit.py` |
 
 ---
@@ -35,12 +35,12 @@ Organize users into groups with shared permissions.
 
 ### API Endpoints
 ```
-GET    /api/v2/groups           - List groups
-POST   /api/v2/groups           - Create group
-GET    /api/v2/groups/:id       - Get group details
-PUT    /api/v2/groups/:id       - Update group
-DELETE /api/v2/groups/:id       - Delete group
-POST   /api/v2/groups/:id/members - Add member
+GET /api/v2/groups - List groups
+POST /api/v2/groups - Create group
+GET /api/v2/groups/:id - Get group details
+PUT /api/v2/groups/:id - Update group
+DELETE /api/v2/groups/:id - Delete group
+POST /api/v2/groups/:id/members - Add member
 DELETE /api/v2/groups/:id/members/:uid - Remove member
 ```
 
@@ -68,12 +68,12 @@ Define granular permissions beyond the built-in roles.
 
 ### API Endpoints
 ```
-GET    /api/v2/rbac/roles       - List custom roles
-POST   /api/v2/rbac/roles       - Create role
-GET    /api/v2/rbac/roles/:id   - Get role details
-PUT    /api/v2/rbac/roles/:id   - Update role
-DELETE /api/v2/rbac/roles/:id   - Delete role
-GET    /api/v2/rbac/permissions - List all permissions
+GET /api/v2/rbac/roles - List custom roles
+POST /api/v2/rbac/roles - Create role
+GET /api/v2/rbac/roles/:id - Get role details
+PUT /api/v2/rbac/roles/:id - Update role
+DELETE /api/v2/rbac/roles/:id - Delete role
+GET /api/v2/rbac/permissions - List all permissions
 ```
 
 ---
@@ -121,13 +121,13 @@ Single Sign-On with enterprise identity providers.
 
 ### API Endpoints
 ```
-GET    /api/v2/sso/providers    - List providers
-POST   /api/v2/sso/providers    - Create provider
-PUT    /api/v2/sso/providers/:id - Update provider
+GET /api/v2/sso/providers - List providers
+POST /api/v2/sso/providers - Create provider
+PUT /api/v2/sso/providers/:id - Update provider
 DELETE /api/v2/sso/providers/:id - Delete provider
-POST   /api/v2/sso/providers/:id/test - Test connection
-POST   /api/v2/sso/providers/:id/toggle - Enable/disable
-GET    /api/v2/sso/available    - Public: available providers for login
+POST /api/v2/sso/providers/:id/test - Test connection
+POST /api/v2/sso/providers/:id/toggle - Enable/disable
+GET /api/v2/sso/available - Public: available providers for login
 ```
 
 ---
@@ -166,15 +166,15 @@ Hardware Security Module support for secure key storage.
 
 ### API Endpoints
 ```
-GET    /api/v2/hsm/providers    - List HSM providers
-POST   /api/v2/hsm/providers    - Create provider
-PUT    /api/v2/hsm/providers/:id - Update provider
+GET /api/v2/hsm/providers - List HSM providers
+POST /api/v2/hsm/providers - Create provider
+PUT /api/v2/hsm/providers/:id - Update provider
 DELETE /api/v2/hsm/providers/:id - Delete provider
-POST   /api/v2/hsm/providers/:id/test - Test connection
-GET    /api/v2/hsm/keys         - List all keys
-POST   /api/v2/hsm/providers/:id/keys - Generate key
-DELETE /api/v2/hsm/keys/:id     - Destroy key
-GET    /api/v2/hsm/stats        - HSM statistics
+POST /api/v2/hsm/providers/:id/test - Test connection
+GET /api/v2/hsm/keys - List all keys
+POST /api/v2/hsm/providers/:id/keys - Generate key
+DELETE /api/v2/hsm/keys/:id - Destroy key
+GET /api/v2/hsm/stats - HSM statistics
 ```
 
 ---
