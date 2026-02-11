@@ -13,7 +13,7 @@ Flask-Caching==2.3.0
 Flask-Session==0.8.0
 
 # Cryptography & OpenSSL
-cryptography==46.0.3
+cryptography==46.0.5
 pyOpenSSL==25.3.0
 asn1crypto==1.5.1
 
