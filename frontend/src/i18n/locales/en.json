@@ -1314,7 +1314,8 @@
       "security": "Security",
       "sso": "SSO",
       "database": "Database",
-      "updates": "Updates"
+      "updates": "Updates",
+      "webhooks": "Webhooks"
     },
     "testEmail": "Test Email",
     "theme": "Theme",
@@ -1798,5 +1799,31 @@
     "allFormats": "All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "Decryption password for this file",
     "useGlobalPassword": "Use same password for all files"
+  },
+  "webhooks": {
+    "title": "Webhooks",
+    "subtitle": "Send HTTP notifications when certificate events occur",
+    "helpTitle": "Webhook Notifications",
+    "helpDescription": "Configure HTTP endpoints to receive real-time notifications when certificates are issued, revoked, renewed, or about to expire.",
+    "addWebhook": "Add Webhook",
+    "editWebhook": "Edit Webhook",
+    "noWebhooks": "No webhooks configured",
+    "noWebhooksDescription": "Add webhook endpoints to receive notifications about certificate events",
+    "configuredWebhooks": "Configured Webhooks",
+    "namePlaceholder": "e.g., Slack Notification",
+    "events": "Events",
+    "caFilter": "CA Filter (optional)",
+    "caFilterPlaceholder": "Filter by CA ref ID (leave empty for all)",
+    "enableOnCreate": "Enable webhook immediately",
+    "createSuccess": "Webhook created",
+    "updateSuccess": "Webhook updated",
+    "deleteSuccess": "Webhook deleted",
+    "saveFailed": "Failed to save webhook",
+    "deleteFailed": "Failed to delete webhook",
+    "deleteConfirm": "Delete webhook \"{{name}}\"? This cannot be undone.",
+    "toggleSuccess": "Webhook {{action}}",
+    "toggleFailed": "Failed to toggle webhook",
+    "testSuccess": "Test event sent successfully",
+    "testFailed": "Failed to send test event"
   }
 }
