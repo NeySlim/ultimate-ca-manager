@@ -2,6 +2,11 @@
 # This file is used when gunicorn is started with -c gunicorn_config.py
 # For systemd service, configuration is in /etc/systemd/system/ucm.service
 
+# Monkey-patch BEFORE any other imports to avoid gevent + Python 3.13
+# SSLContext/SSLSocket recursion bugs (super() closure captures wrong class)
+from gevent import monkey
+monkey.patch_all()
+
 import multiprocessing
 import os
 
