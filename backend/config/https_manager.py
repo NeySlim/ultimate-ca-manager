@@ -56,7 +56,7 @@ class HTTPSManager:
         subject = issuer = x509.Name([
             x509.NameAttribute(NameOID.COUNTRY_NAME, "NL"),
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, organization),
-            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name[:64]),
         ])
         
         # Build certificate

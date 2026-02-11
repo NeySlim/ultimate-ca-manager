@@ -241,7 +241,7 @@ def regenerate_https_cert():
         subject = issuer = x509.Name([
             x509.NameAttribute(NameOID.COUNTRY_NAME, "NL"),
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Ultimate CA Manager"),
-            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name[:64]),
         ])
         
         now = datetime.now(timezone.utc)
