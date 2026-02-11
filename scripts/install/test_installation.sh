@@ -104,7 +104,7 @@ python3 -m venv "$TEST_VENV" > /dev/null 2>&1
 test_step "Virtualenv created" "[ -d $TEST_VENV ]"
 test_step "Can install Flask" "$TEST_VENV/bin/pip install -q Flask==3.1.2"
 test_step "Can install Flask-Caching" "$TEST_VENV/bin/pip install -q Flask-Caching==2.3.0"
-test_step "Can install cryptography" "$TEST_VENV/bin/pip install -q cryptography==46.0.3"
+test_step "Can install cryptography" "$TEST_VENV/bin/pip install -q cryptography==46.0.5"
 test_step "Can install pyasn1" "$TEST_VENV/bin/pip install -q pyasn1==0.6.1"
 
 # Cleanup venv
