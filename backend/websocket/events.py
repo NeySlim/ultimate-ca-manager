@@ -24,9 +24,11 @@ connected_clients: Dict[str, Dict[str, Any]] = {}
 
 def init_websocket(app):
     """Initialize WebSocket with Flask app."""
+    # Use CORS origins from app config (don't allow "*")
+    cors_origins = app.config.get('CORS_ORIGINS', ["https://localhost:8443"])
     socketio.init_app(
         app,
-        cors_allowed_origins="*",
+        cors_allowed_origins=cors_origins,
         async_mode='gevent',
         logger=True,
         engineio_logger=False,

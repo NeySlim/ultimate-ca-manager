@@ -285,8 +285,17 @@ class Config:
     LOG_FILE = DATA_DIR / "ucm.log"
     AUDIT_LOG_FILE = DATA_DIR / "audit.log"
     
-    # CORS
-    CORS_ORIGINS = ["https://localhost:8443", "https://127.0.0.1:8443"]
+    # CORS - auto-include FQDN if set
+    _cors_origins = ["https://localhost:8443", "https://127.0.0.1:8443"]
+    _fqdn = get_system_fqdn()
+    _https_port = int(os.getenv("HTTPS_PORT", "8443"))
+    if _fqdn and _fqdn not in ('localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local'):
+        _cors_origins.append(f"https://{_fqdn}:{_https_port}")
+    # Allow extra origins via env
+    _extra = os.getenv("CORS_EXTRA_ORIGINS", "")
+    if _extra:
+        _cors_origins.extend([o.strip() for o in _extra.split(",") if o.strip()])
+    CORS_ORIGINS = _cors_origins
     
     # FQDN for redirect - auto-detected based on environment
     # Docker: Uses UCM_FQDN env var

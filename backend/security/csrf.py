@@ -28,13 +28,17 @@ CSRF_PROTECTED_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH']
 
 # Endpoints exempt from CSRF (public/external protocols)
 CSRF_EXEMPT_PATHS = [
-    '/api/v2/auth/login',  # Login needs to work without token
-    '/acme/',              # ACME protocol
-    '/scep/',              # SCEP protocol  
-    '/.well-known/acme',   # ACME challenge
-    '/ocsp',               # OCSP protocol
-    '/cdp/',               # CRL distribution
-    '/api/health',         # Health checks
+    '/api/v2/auth/login',       # Login (all methods: password, mtls, webauthn)
+    '/api/v2/auth/forgot',      # Forgot password (no session yet)
+    '/api/v2/auth/reset',       # Reset password (token-based)
+    '/api/v2/sso/',             # SSO callbacks (OAuth2/LDAP, external flow)
+    '/acme/',                   # ACME protocol
+    '/scep/',                   # SCEP protocol  
+    '/.well-known/acme',        # ACME challenge
+    '/ocsp',                    # OCSP protocol
+    '/cdp/',                    # CRL distribution
+    '/api/health',              # Health checks
+    '/api/v2/mtls/',            # mTLS authentication (cert-based)
 ]
 
 
@@ -160,8 +164,13 @@ def csrf_protect(f):
         
         if not token:
             # Also check for token in JSON body (fallback)
-            if request.is_json:
-                token = request.json.get('_csrf_token')
+            try:
+                if request.is_json and request.content_length and request.content_length > 0:
+                    body = request.get_json(silent=True)
+                    if body:
+                        token = body.get('_csrf_token')
+            except Exception:
+                pass
         
         is_valid, error = CSRFProtection.validate_token(token, user_id)
         
@@ -211,8 +220,13 @@ def init_csrf_middleware(app):
         
         if not token:
             # Also check for token in JSON body (fallback for forms)
-            if request.is_json and request.json:
-                token = request.json.get('_csrf_token')
+            try:
+                if request.is_json and request.content_length and request.content_length > 0:
+                    body = request.get_json(silent=True)
+                    if body:
+                        token = body.get('_csrf_token')
+            except Exception:
+                pass
         
         is_valid, error = CSRFProtection.validate_token(token, user_id)
         

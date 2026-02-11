@@ -397,13 +397,33 @@ def create_app(config_name=None):
     except Exception as e:
         app.logger.debug(f"HSM check skipped: {e}")
     
+    # Enable CSRF protection middleware
+    try:
+        from security.csrf import init_csrf_middleware
+        init_csrf_middleware(app)
+    except Exception as e:
+        app.logger.warning(f"CSRF middleware not loaded: {e}")
+    
     # Security headers and cleanup
     @app.after_request
     def add_security_headers(response):
         """Add security headers and fix deprecated headers"""
         # Set Permissions-Policy without deprecated features
-        # Only include valid features that are widely supported
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        
+        # Content-Security-Policy
+        if 'Content-Security-Policy' not in response.headers:
+            response.headers['Content-Security-Policy'] = (
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data: blob:; "
+                "font-src 'self'; "
+                "connect-src 'self' wss: ws:; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
         
         # Add security headers if not present
         if 'Strict-Transport-Security' not in response.headers:

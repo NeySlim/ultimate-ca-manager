@@ -23,6 +23,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Import CSRF protection
+try:
+    from security.csrf import CSRFProtection
+    HAS_CSRF = True
+except ImportError:
+    HAS_CSRF = False
+
 bp = Blueprint('auth_methods', __name__)
 
 
@@ -178,6 +185,11 @@ def login_password():
     
     logger.info(f"✅ Password login successful: {user.username}")
     
+    # Generate CSRF token
+    csrf_token = None
+    if HAS_CSRF:
+        csrf_token = CSRFProtection.generate_token(user.id)
+    
     return success_response(
         data={
             'user': {
@@ -190,7 +202,8 @@ def login_password():
             },
             'role': user.role,
             'permissions': permissions,
-            'auth_method': 'password'
+            'auth_method': 'password',
+            'csrf_token': csrf_token
         },
         message='Login successful'
     )
@@ -248,6 +261,11 @@ def login_mtls():
     
     logger.info(f"✅ mTLS login successful: {user.username} (cert: {auth_cert.cert_serial})")
     
+    # Generate CSRF token
+    csrf_token = None
+    if HAS_CSRF:
+        csrf_token = CSRFProtection.generate_token(user.id)
+    
     return success_response(
         data={
             'user': {
@@ -261,6 +279,7 @@ def login_mtls():
             'role': user.role,
             'permissions': permissions,
             'auth_method': 'mtls',
+            'csrf_token': csrf_token,
             'certificate': {
                 'serial': auth_cert.cert_serial,
                 'name': auth_cert.name
@@ -395,6 +414,11 @@ def webauthn_verify():
         
         logger.info(f"✅ WebAuthn login successful: {user.username}")
         
+        # Generate CSRF token
+        csrf_token = None
+        if HAS_CSRF:
+            csrf_token = CSRFProtection.generate_token(user.id)
+        
         return success_response(
             data={
                 'user': {
@@ -407,7 +431,8 @@ def webauthn_verify():
                 },
                 'role': user.role,
                 'permissions': permissions,
-                'auth_method': 'webauthn'
+                'auth_method': 'webauthn',
+                'csrf_token': csrf_token
             },
             message='Login successful via WebAuthn'
         )

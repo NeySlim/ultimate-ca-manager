@@ -27,6 +27,7 @@ def app():
     os.environ['UCM_ENV'] = 'test'
     os.environ['HTTP_REDIRECT'] = 'false'
     os.environ['INITIAL_ADMIN_PASSWORD'] = 'changeme123'
+    os.environ['CSRF_DISABLED'] = 'true'
     
     # Use temp DB so we don't touch production
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
