@@ -101,9 +101,9 @@ export default function SecurityDashboardPage() {
   const stats = [
     {
       label: t('securityDashboard.secretsStatus'),
-      value: secretsStatus?.jwt_secret?.configured ? t('common.configured') : t('securityDashboard.stats.notSet'),
+      value: secretsStatus?.session_secret?.configured ? t('common.configured') : t('securityDashboard.stats.notSet'),
       icon: Key,
-      color: secretsStatus?.jwt_secret?.configured ? 'text-status-success' : 'text-status-danger'
+      color: secretsStatus?.session_secret?.configured ? 'text-status-success' : 'text-status-danger'
     },
     {
       label: t('securityDashboard.stats.anomalies24h'),
@@ -141,24 +141,16 @@ export default function SecurityDashboardPage() {
               <CompactGrid cols={3}>
                 <div className="p-3 rounded-lg bg-bg-secondary">
                   <div className="flex items-center gap-2 mb-2">
-                    {secretsStatus.jwt_secret?.configured ? (
+                    {secretsStatus.session_secret?.configured ? (
                       <CheckCircle size={20} weight="fill" className="text-status-success" />
                     ) : (
                       <XCircle size={20} weight="fill" className="text-status-danger" />
                     )}
-                    <span className="font-medium text-text-primary">{t('securityDashboard.secrets.jwtSecret')}</span>
+                    <span className="font-medium text-text-primary">{t('securityDashboard.secrets.sessionSecret')}</span>
                   </div>
                   <div className="text-sm text-text-secondary">
-                    {secretsStatus.jwt_secret?.configured ? t('common.configured') : t('common.notConfigured')}
+                    {secretsStatus.session_secret?.configured ? t('common.configured') : t('common.notConfigured')}
                   </div>
-                  {secretsStatus.jwt_secret?.has_previous && secretsStatus.jwt_secret?.previous_expires_at && (
-                    <div className="mt-1 text-xs text-status-info flex items-center gap-1">
-                      <Clock size={12} />
-                      {t('securityDashboard.secrets.previousKeyExpires', { 
-                        date: new Date(secretsStatus.jwt_secret.previous_expires_at).toLocaleString() 
-                      })}
-                    </div>
-                  )}
                 </div>
 
                 <div className="p-3 rounded-lg bg-bg-secondary">

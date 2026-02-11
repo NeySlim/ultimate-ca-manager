@@ -2,8 +2,8 @@
 WebSocket API endpoints for management and monitoring.
 """
 
-from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, jsonify, request, g
+from auth.unified import require_auth
 
 from websocket import (
     get_connected_clients_info,
@@ -16,19 +16,9 @@ websocket_bp = Blueprint('websocket', __name__, url_prefix='/api/v2/websocket')
 
 
 @websocket_bp.route('/status', methods=['GET'])
-@jwt_required()
+@require_auth()
 def get_status():
-    """
-    Get WebSocket server status.
-    ---
-    tags:
-      - WebSocket
-    security:
-      - Bearer: []
-    responses:
-      200:
-        description: WebSocket server status
-    """
+    """Get WebSocket server status."""
     clients_info = get_connected_clients_info()
     
     return jsonify({
@@ -42,19 +32,9 @@ def get_status():
 
 
 @websocket_bp.route('/clients', methods=['GET'])
-@jwt_required()
+@require_auth()
 def get_clients():
-    """
-    Get list of connected WebSocket clients (admin only).
-    ---
-    tags:
-      - WebSocket
-    security:
-      - Bearer: []
-    responses:
-      200:
-        description: List of connected clients
-    """
+    """Get list of connected WebSocket clients (admin only)."""
     clients_info = get_connected_clients_info()
     
     return jsonify({
@@ -64,36 +44,9 @@ def get_clients():
 
 
 @websocket_bp.route('/broadcast', methods=['POST'])
-@jwt_required()
+@require_auth()
 def broadcast_message():
-    """
-    Broadcast a system alert to all connected clients (admin only).
-    ---
-    tags:
-      - WebSocket
-    security:
-      - Bearer: []
-    parameters:
-      - in: body
-        name: body
-        schema:
-          type: object
-          required:
-            - message
-          properties:
-            message:
-              type: string
-            alert_type:
-              type: string
-              default: info
-            severity:
-              type: string
-              enum: [info, warning, error, critical]
-              default: info
-    responses:
-      200:
-        description: Message broadcast successfully
-    """
+    """Broadcast a system alert to all connected clients (admin only)."""
     data = request.get_json()
     message = data.get('message', '')
     alert_type = data.get('alert_type', 'system')
@@ -104,7 +57,7 @@ def broadcast_message():
     
     emit_system_alert(alert_type, message, severity)
     
-    user = get_jwt_identity()
+    user = g.current_user.username if hasattr(g, 'current_user') else 'unknown'
     
     return jsonify({
         'success': True,

@@ -93,28 +93,26 @@ export default function LoginPage() {
       .catch(() => {})  // Don't clear providers on error
   }, [])  // Empty deps - only run once on mount
   
-  // Check for SSO token or errors in URL - separate effect
+  // Check for SSO callback or errors in URL - separate effect
   useEffect(() => {
-    // Handle SSO callback with token
-    const token = searchParams.get('token')
-    if (token) {
-      // SSO login successful - establish session with token
+    // Handle SSO callback (session already established via cookie)
+    const ssoComplete = window.location.pathname.includes('sso-complete')
+    if (ssoComplete) {
       setLoading(true)
       setStatusMessage(t('auth.signingIn'))
       
-      // Store token and verify it
+      // Verify session is established
       fetch('/api/v2/auth/verify', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       })
-        .then(res => res.ok ? res.json() : Promise.reject('Token verification failed'))
+        .then(res => res.ok ? res.json() : Promise.reject('Session not established'))
         .then(async (data) => {
-          // Login with token
-          await login(data.data?.username || 'sso_user', null, { access_token: token, user: data.data })
+          await login(data.data?.username || 'sso_user', null, { user: data.data })
           showSuccess(t('auth.welcomeBackUser', { username: data.data?.username || 'User' }))
           navigate('/dashboard')
         })
         .catch((err) => {
-          console.error('SSO token verification failed:', err)
+          console.error('SSO session verification failed:', err)
           showError(t('auth.ssoError'))
           setLoading(false)
           setStatusMessage('')

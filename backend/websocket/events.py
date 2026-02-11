@@ -10,7 +10,6 @@ from functools import wraps
 
 from flask import request, current_app
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
-from flask_jwt_extended import decode_token, get_jwt_identity
 
 from .event_types import EventType
 
@@ -54,24 +53,7 @@ def authenticate_socket(f):
             logger.debug(f"WebSocket auth: user_id={user_id}, username={username}, session keys={list(session.keys())}")
             
             if not user_id and not username:
-                # Try JWT token as fallback
-                token = request.args.get('token')
-                if not token:
-                    auth_header = request.headers.get('Authorization', '')
-                    if auth_header.startswith('Bearer '):
-                        token = auth_header[7:]
-                
-                if token:
-                    try:
-                        decoded = decode_token(token)
-                        user_id = decoded.get('sub')
-                        username = decoded.get('username', 'unknown')
-                    except Exception:
-                        pass
-            
-            # If still no auth, allow as anonymous (but log it)
-            # The connection is already authenticated via cookie session from Flask
-            if not user_id and not username:
+                # Allow as anonymous (session not shared with websocket)
                 logger.info("WebSocket connection as anonymous (session not shared)")
                 user_id = 'anonymous'
                 username = 'anonymous'

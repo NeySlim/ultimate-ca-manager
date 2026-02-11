@@ -1,6 +1,6 @@
 """
-Unified Authentication Manager v2.0
-Supports: Session Cookies, JWT Tokens, API Keys
+Unified Authentication Manager v3.0
+Supports: Session Cookies, API Keys
 
 SIMPLE, ROBUST, TESTABLE
 """
@@ -11,7 +11,6 @@ import json
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify, g, session, current_app
-import jwt
 
 # Import models (will be created)
 try:
@@ -27,29 +26,17 @@ except ImportError:
 class AuthManager:
     """
     Unified Authentication Manager
-    Handles: Sessions, JWT, API Keys
+    Handles: Sessions, API Keys
     """
     
     def __init__(self):
         """Initialize auth manager"""
-        jwt_secret = current_app.config.get('JWT_SECRET_KEY')
-        if not jwt_secret or jwt_secret in ('dev-secret-change-me', 'INSTALL_TIME_PLACEHOLDER'):
-            # Generate a secure secret if not configured
-            import secrets
-            jwt_secret = secrets.token_urlsafe(32)
-            current_app.logger.warning("=" * 60)
-            current_app.logger.warning("WARNING: JWT_SECRET_KEY is not set in environment!")
-            current_app.logger.warning("Using auto-generated secret - all sessions will be")
-            current_app.logger.warning("invalidated on restart. Set JWT_SECRET_KEY in")
-            current_app.logger.warning("/etc/ucm/ucm.env for persistent sessions.")
-            current_app.logger.warning("=" * 60)
-        self.jwt_secret = jwt_secret
-        self.jwt_expiry = current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
+        pass
     
     def authenticate_request(self, request_obj):
         """
         Auto-detect and authenticate request
-        Priority: API Key → JWT → Session Cookie
+        Priority: API Key → Session Cookie
         
         Returns:
             dict: User info with permissions, or None if not authenticated
@@ -61,15 +48,7 @@ class AuthManager:
             if result:
                 return result
         
-        # 2. Check JWT Token
-        auth_header = request_obj.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-            result = self.verify_jwt(token)
-            if result:
-                return result
-        
-        # 3. Check Session Cookie (Flask session)
+        # 2. Check Session Cookie (Flask session)
         if 'user_id' in session:
             result = self.verify_session()
             if result:
@@ -124,59 +103,6 @@ class AuthManager:
             'api_key_id': api_key.id,
             'api_key_name': api_key.name
         }
-    
-    def verify_jwt(self, token):
-        """
-        Verify JWT token - supports key rotation (current + previous key)
-        
-        Args:
-            token: JWT token string
-        
-        Returns:
-            dict: User info, or None
-        """
-        if not User:
-            return None
-        
-        # Try current key first, then previous key (for rotation)
-        secrets_to_try = [self.jwt_secret]
-        previous_secret = current_app.config.get('JWT_SECRET_KEY_PREVIOUS', '')
-        if previous_secret:
-            secrets_to_try.append(previous_secret)
-        
-        payload = None
-        for secret in secrets_to_try:
-            try:
-                payload = jwt.decode(
-                    token,
-                    secret,
-                    algorithms=['HS256']
-                )
-                break  # Success with this key
-            except jwt.ExpiredSignatureError:
-                return None  # Expired regardless of key
-            except jwt.InvalidTokenError:
-                continue  # Try next key
-        
-        if not payload:
-            return None  # No valid key found
-        
-        try:
-            # Get user
-            user = User.query.get(payload['user_id'])
-            if not user or not user.active:
-                return None
-            
-            return {
-                'user_id': user.id,
-                'user': user,
-                'auth_method': 'jwt',
-                'permissions': ['*'],  # JWT = full access
-                'token_expires': payload['exp']
-            }
-        except Exception as e:
-            current_app.logger.error(f"JWT verification error: {e}")
-            return None
     
     def verify_session(self):
         """
@@ -246,60 +172,26 @@ class AuthManager:
             'expires_at': api_key.expires_at.isoformat()
         }
     
-    def create_jwt(self, user_id, expires_in=None):
-        """
-        Create JWT token for user
-        
-        Args:
-            user_id: User ID
-            expires_in: Seconds until expiration (default: from config)
-        
-        Returns:
-            dict: Token and expiration info
-        """
-        if expires_in is None:
-            expires_in = self.jwt_expiry
-        
-        # Handle both timedelta and int for expires_in
-        if isinstance(expires_in, timedelta):
-            exp = datetime.utcnow() + expires_in
-            expires_seconds = int(expires_in.total_seconds())
-        else:
-            exp = datetime.utcnow() + timedelta(seconds=expires_in)
-            expires_seconds = expires_in
-        
-        payload = {
-            'user_id': user_id,
-            'exp': exp,
-            'iat': datetime.utcnow()
-        }
-        
-        token = jwt.encode(payload, self.jwt_secret, algorithm='HS256')
-        
-        return {
-            'token': token,
-            'expires_in': expires_seconds,
-            'expires_at': exp.isoformat()
-        }
 
 
-def create_tokens_for_user(user):
+def create_session_for_user(user):
     """
-    Helper function to create JWT tokens for a user object.
+    Helper function to establish a session for a user.
     Used by SSO callback to establish session.
     
     Args:
         user: User model instance
     
     Returns:
-        dict: {'access_token': str, 'expires_in': int}
+        dict: {'user': dict}
     """
-    auth = AuthManager()
-    token_data = auth.create_jwt(user.id)
+    session['user_id'] = user.id
+    session['username'] = user.username
+    session['login_time'] = datetime.utcnow().isoformat()
+    session.permanent = True
+    session.modified = True
     
     return {
-        'access_token': token_data['token'],
-        'expires_in': token_data['expires_in'],
         'user': user.to_dict() if hasattr(user, 'to_dict') else {'id': user.id, 'username': user.username}
     }
 
