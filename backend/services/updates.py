@@ -131,8 +131,14 @@ def check_for_updates(include_prereleases=False):
         for release in releases:
             if release.get('draft'):
                 continue
-            if release.get('prerelease') and not include_prereleases:
-                continue
+            if release.get('prerelease'):
+                if not include_prereleases:
+                    continue
+                # Only include alpha, beta, rc — skip dev and other tags
+                tag = release.get('tag_name', '').lstrip('v')
+                suffix = tag.split('-', 1)[1] if '-' in tag else ''
+                if not any(suffix.startswith(p) for p in ('alpha', 'beta', 'rc')):
+                    continue
             latest_release = release
             break
         
