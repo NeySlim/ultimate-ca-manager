@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 # Known SoftHSM library paths across distributions
 SOFTHSM_PATHS = [
     "/usr/lib/softhsm/libsofthsm2.so",                        # Debian/Ubuntu
-    "/usr/lib64/softhsm/libsofthsm2.so",                      # RHEL/CentOS/Fedora
+    "/usr/lib64/softhsm/libsofthsm2.so",                      # RHEL/CentOS
+    "/usr/lib64/libsofthsm2.so",                               # Fedora
+    "/usr/lib64/pkcs11/libsofthsm2.so",                        # Fedora pkcs11
     "/usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so",       # Ubuntu x64
     "/usr/lib/aarch64-linux-gnu/softhsm/libsofthsm2.so",      # Ubuntu ARM64
     "/usr/local/lib/softhsm/libsofthsm2.so",                  # Manual install
