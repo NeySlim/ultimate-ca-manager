@@ -254,6 +254,7 @@ def create_app(config_name=None):
                     from models.sso import SSOProvider, SSOSession
                     from models.policy import CertificatePolicy, ApprovalRequest
                     from models.hsm import HsmProvider, HsmKey
+                    from services.webhook_service import WebhookEndpoint
                     
                     # Check if tables exist, create if missing
                     inspector = inspect(db.engine)
@@ -261,7 +262,8 @@ def create_app(config_name=None):
                     extended_tables = ['pro_custom_roles', 'pro_role_permissions', 
                                   'pro_sso_providers', 'pro_sso_sessions',
                                   'certificate_policies', 'approval_requests',
-                                  'hsm_providers', 'hsm_keys']
+                                  'hsm_providers', 'hsm_keys',
+                                  'webhook_endpoints']
                     missing = [t for t in extended_tables if t not in tables]
                     
                     if missing:

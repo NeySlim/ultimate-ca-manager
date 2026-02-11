@@ -23,7 +23,7 @@ SIGN_MECHANISMS = {}
 
 try:
     import pkcs11
-    from pkcs11 import KeyType, Attribute, Mechanism, ObjectClass
+    from pkcs11 import KeyType, Attribute, Mechanism, MechanismFlag, ObjectClass
     from pkcs11.util.rsa import encode_rsa_public_key
     from pkcs11.util.ec import encode_ec_public_key, encode_named_curve_parameters
     PKCS11_AVAILABLE = True
@@ -110,7 +110,7 @@ class Pkcs11Provider(BaseHsmProvider):
                 self._token = self._lib.get_token(token_label=self.token_label)
             
             # Open session
-            self._session = self._token.open(user_pin=self.user_pin)
+            self._session = self._token.open(rw=True, user_pin=self.user_pin)
             self._connected = True
             
             logger.info(f"Connected to PKCS#11 token: {self.token_label}")
@@ -146,10 +146,10 @@ class Pkcs11Provider(BaseHsmProvider):
                 'success': True,
                 'message': 'Connection successful',
                 'details': {
-                    'token_label': self._token.label,
-                    'manufacturer': self._token.manufacturer_id,
-                    'model': self._token.model,
-                    'serial': self._token.serial,
+                    'token_label': str(self._token.label).strip(),
+                    'manufacturer': str(self._token.manufacturer_id).strip(),
+                    'model': str(self._token.model).strip(),
+                    'serial': self._token.serial.hex() if isinstance(self._token.serial, bytes) else str(self._token.serial),
                 }
             }
             
@@ -266,64 +266,61 @@ class Pkcs11Provider(BaseHsmProvider):
             key_id = secrets.token_bytes(16)
             
             if key_type_enum == KeyType.RSA:
-                # Generate RSA keypair
+                # Build MechanismFlag capabilities
+                caps = MechanismFlag(0)
+                if purpose in ('signing', 'all'):
+                    caps |= MechanismFlag.SIGN | MechanismFlag.VERIFY
+                if purpose in ('encryption', 'all'):
+                    caps |= MechanismFlag.ENCRYPT | MechanismFlag.DECRYPT
+
                 pub, priv = self._session.generate_keypair(
                     KeyType.RSA,
-                    param,  # key size
+                    param,
                     store=True,
                     label=label,
                     id=key_id,
-                    capabilities={
-                        Attribute.SIGN: purpose in ('signing', 'all'),
-                        Attribute.VERIFY: True,
-                        Attribute.ENCRYPT: purpose in ('encryption', 'all'),
-                        Attribute.DECRYPT: purpose in ('encryption', 'all'),
-                        Attribute.EXTRACTABLE: extractable,
-                    }
+                    capabilities=caps,
+                    private_template={Attribute.EXTRACTABLE: extractable}
                 )
                 
-                # Get public key PEM
                 public_key_pem = self._export_rsa_public_key(pub)
                 
             elif key_type_enum == KeyType.EC:
-                # Generate EC keypair
                 ecparams = self._session.create_domain_parameters(
                     KeyType.EC,
                     {Attribute.EC_PARAMS: encode_named_curve_parameters(param)},
                     local=True
                 )
                 
+                caps = MechanismFlag(0)
+                if purpose in ('signing', 'all'):
+                    caps |= MechanismFlag.SIGN | MechanismFlag.VERIFY
+
                 pub, priv = ecparams.generate_keypair(
                     store=True,
                     label=label,
                     id=key_id,
-                    capabilities={
-                        Attribute.SIGN: purpose in ('signing', 'all'),
-                        Attribute.VERIFY: True,
-                        Attribute.EXTRACTABLE: extractable,
-                    }
+                    capabilities=caps,
+                    private_template={Attribute.EXTRACTABLE: extractable}
                 )
                 
-                # Get public key PEM
                 public_key_pem = self._export_ec_public_key(pub)
                 
             elif key_type_enum == KeyType.AES:
-                # Generate AES key
+                caps = MechanismFlag.ENCRYPT | MechanismFlag.DECRYPT
+                if purpose in ('wrapping', 'all'):
+                    caps |= MechanismFlag.WRAP | MechanismFlag.UNWRAP
+
                 key = self._session.generate_key(
                     KeyType.AES,
-                    param,  # key size in bits
+                    param,
                     store=True,
                     label=label,
                     id=key_id,
-                    capabilities={
-                        Attribute.ENCRYPT: True,
-                        Attribute.DECRYPT: True,
-                        Attribute.WRAP: purpose in ('wrapping', 'all'),
-                        Attribute.UNWRAP: purpose in ('wrapping', 'all'),
-                        Attribute.EXTRACTABLE: extractable,
-                    }
+                    capabilities=caps,
+                    template={Attribute.EXTRACTABLE: extractable}
                 )
-                public_key_pem = None  # Symmetric keys have no public key
+                public_key_pem = None
                 
             else:
                 raise HsmOperationError(f"Unsupported key type: {key_type_enum}")
@@ -343,7 +340,7 @@ class Pkcs11Provider(BaseHsmProvider):
             )
             
         except pkcs11.PKCS11Error as e:
-            raise HsmOperationError(f"Failed to generate key: {str(e)}")
+            raise HsmOperationError(f"PKCS#11 error: {type(e).__name__}: {str(e) or 'see logs'}")
     
     def _export_rsa_public_key(self, pub_key) -> str:
         """Export RSA public key as PEM"""
