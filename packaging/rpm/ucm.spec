@@ -81,11 +81,17 @@ UCM_CONFIG=/etc/%{name}
 mkdir -p $UCM_DATA/{ca,certs,private,crl,scep,backups,sessions}
 mkdir -p /var/log/%{name}
 
-# SoftHSM setup: add ucm user to softhsm group and prepare token directory
-getent group softhsm >/dev/null 2>&1 && usermod -aG softhsm %{name} 2>/dev/null || true
-mkdir -p /var/lib/softhsm/tokens
+# SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory
+HSM_GROUP=""
 if getent group softhsm >/dev/null 2>&1; then
-    chown root:softhsm /var/lib/softhsm/tokens
+    HSM_GROUP="softhsm"
+elif getent group ods >/dev/null 2>&1; then
+    HSM_GROUP="ods"
+fi
+if [ -n "$HSM_GROUP" ]; then
+    usermod -aG "$HSM_GROUP" %{name} 2>/dev/null || true
+    mkdir -p /var/lib/softhsm/tokens
+    chown root:"$HSM_GROUP" /var/lib/softhsm/tokens
     chmod 1770 /var/lib/softhsm/tokens
 fi
 
