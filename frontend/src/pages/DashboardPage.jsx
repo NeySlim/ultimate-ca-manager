@@ -17,7 +17,7 @@ import {
 import { Responsive, useContainerWidth, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
-import { Card, Button, Badge, LoadingSpinner, Logo, Modal } from '../components'
+import { Card, Button, Badge, LoadingSpinner, Modal } from '../components'
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
 import { dashboardService, certificatesService, acmeService } from '../services'
 import { useNotification } from '../contexts'
@@ -47,7 +47,7 @@ const DEFAULT_LAYOUTS = {
     { i: 'certs',      x: 0,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
     { i: 'cas',        x: 4,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
     { i: 'activity',   x: 8,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'system',     x: 0,  y: 11, w: 6,  h: 5, minW: 3, minH: 4 },
+    { i: 'system',     x: 0,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
     { i: 'acme',       x: 6,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
   ],
   md: [
@@ -156,6 +156,37 @@ export default function DashboardPage() {
 
   // Grid layout width measurement
   const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth()
+
+  // Dynamic row height based on measured grid container height
+  // Grid uses 15 rows total with 14 gaps of 10px margin
+  const GRID_ROWS = 15
+  const GRID_MARGIN = 10
+  const [dynamicRowHeight, setDynamicRowHeight] = useState(40)
+  const gridObserverRef = useRef(null)
+  
+  const gridHeightCallbackRef = useCallback((el) => {
+    // Also set the containerRef for useContainerWidth
+    gridContainerRef.current = el
+    
+    // Clean up previous observer
+    if (gridObserverRef.current) {
+      gridObserverRef.current.disconnect()
+      gridObserverRef.current = null
+    }
+    
+    if (!el) return
+    
+    const observer = new ResizeObserver((entries) => {
+      const h = entries[0].contentRect.height
+      if (h > 0) {
+        const totalGaps = (GRID_ROWS - 1) * GRID_MARGIN
+        const rh = Math.floor((h - totalGaps) / GRID_ROWS)
+        setDynamicRowHeight(Math.max(20, Math.min(rh, 80)))
+      }
+    })
+    observer.observe(el)
+    gridObserverRef.current = observer
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // WebSocket for live updates
   const { isConnected, subscribe } = useWebSocket({ showToasts: true })
@@ -306,17 +337,13 @@ export default function DashboardPage() {
   const isVisible = (id) => widgets.find(w => w.id === id)?.visible
 
   return (
-    <div className="flex-1 h-full overflow-auto bg-bg-primary">
-      <div className="px-3 pt-2 pb-2 space-y-2 mx-auto min-h-full" style={{ maxWidth: 'min(1800px, 100%)' }}>
+    <div className="flex-1 h-full flex flex-col overflow-hidden bg-bg-primary">
+      <div className="flex flex-col flex-1 min-h-0 px-3 pt-2 pb-1 mx-auto w-full" style={{ maxWidth: 'min(1800px, 100%)' }}>
         
-        {/* Hero Header */}
-        <div className="relative overflow-hidden rounded-xl hero-gradient border border-accent-primary/20 px-4 py-2">
-          <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-accent-primary/5 blur-2xl" />
-          
-          <div className="relative flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-4">
-              <Logo variant="horizontal" size="md" />
-              <div className="hidden sm:block w-px h-10 bg-border/50" />
+        {/* Hero Header — compact bar */}
+        <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-3 py-1.5 mb-1.5">
+          <div className="relative flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
               <div>
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -381,17 +408,17 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          {/* Edit mode indicator */}
-          {editMode && (
-            <div className="mt-3 flex items-center gap-2 text-xs text-accent-primary">
-              <DotsSixVertical size={14} />
-              {t('dashboard.dragToReorder')}
-            </div>
-          )}
-        </div>
+           {/* Edit mode indicator */}
+           {editMode && (
+             <div className="mt-1 flex items-center gap-2 text-xs text-accent-primary">
+               <DotsSixVertical size={14} />
+               {t('dashboard.dragToReorder')}
+             </div>
+           )}
+         </div>
 
-        {/* Grid Layout */}
-        <div ref={gridContainerRef}>
+        {/* Grid Layout — flex-1 fills remaining space */}
+        <div ref={gridHeightCallbackRef} className="flex-1 min-h-0">
         {gridMounted && (
         <Responsive
           key={gridKey}
@@ -400,8 +427,10 @@ export default function DashboardPage() {
           breakpoints={{ lg: 1024, md: 640, sm: 0 }}
           cols={{ lg: 12, md: 6, sm: 1 }}
           width={gridWidth}
-          rowHeight={40}
-          margin={[10, 10]}
+          rowHeight={dynamicRowHeight}
+          maxRows={GRID_ROWS}
+          autoSize={false}
+          margin={[GRID_MARGIN, GRID_MARGIN]}
           containerPadding={[0, 0]}
           dragConfig={{ enabled: editMode, handle: '.widget-drag-handle' }}
           resizeConfig={{ enabled: editMode }}
@@ -458,10 +487,8 @@ export default function DashboardPage() {
                   title={t('dashboard.certificateActivity')}
                   subtitle={t('dashboard.last7Days')}
                 />
-                <Card.Body className="flex-1 !pt-1 !pb-1 flex items-center">
-                  <div className="w-full">
-                    <CertificateTrendChart data={certificateTrend} height={140} />
-                  </div>
+                <Card.Body className="flex-1 min-h-0 !pt-0 !pb-0 !px-2">
+                    <CertificateTrendChart data={certificateTrend} />
                 </Card.Body>
               </Card>
             </WidgetWrapper>
@@ -479,8 +506,7 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 !pt-1 !pb-1 flex items-center justify-center">
-                  <div className="w-full">
+                <Card.Body className="flex-1 min-h-0 !pt-0 !pb-0 !px-2">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
@@ -488,9 +514,7 @@ export default function DashboardPage() {
                         expired: 0,
                         revoked: stats?.revoked || 0,
                       }}
-                      height={140} 
                     />
-                  </div>
                 </Card.Body>
               </Card>
             </WidgetWrapper>
@@ -749,8 +773,8 @@ export default function DashboardPage() {
                     </Button>
                   }
                 />
-                <Card.Body className="flex-1 overflow-hidden !pt-1 !pb-1">
-                  <div className="grid grid-cols-2 gap-1.5 mb-2">
+                <Card.Body className="flex-1 overflow-hidden !pt-0.5 !pb-0.5">
+                  <div className="grid grid-cols-2 gap-1 mb-1.5">
                     <SystemStat 
                       icon={WifiHigh} 
                       label={t('dashboard.websocket')} 
@@ -776,10 +800,10 @@ export default function DashboardPage() {
                       status="online" 
                     />
                   </div>
-                  <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide mb-1">
+                  <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide mb-0.5">
                     {t('dashboard.services')}
                   </div>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-4 gap-1">
                     <ServiceBadge name="ACME" status={systemStatus?.acme} />
                     <ServiceBadge name="SCEP" status={systemStatus?.scep} />
                     <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
