@@ -14,7 +14,7 @@ import {
   SlidersHorizontal, Eye, EyeSlash, X, DotsSixVertical,
   PencilSimpleLine, ArrowCounterClockwise, Timer, Check
 } from '@phosphor-icons/react'
-import { Responsive, useContainerWidth, verticalCompactor } from 'react-grid-layout'
+import { Responsive, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import { Card, Button, Badge, LoadingSpinner, Modal } from '../components'
@@ -51,26 +51,26 @@ const DEFAULT_LAYOUTS = {
     { i: 'acme',       x: 6,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
   ],
   md: [
-    { i: 'stats',      x: 0, y: 0, w: 6, h: 2, static: true },
-    { i: 'chartTrend', x: 0, y: 2, w: 6, h: 5, minW: 3, minH: 4 },
-    { i: 'chartPie',   x: 0, y: 7, w: 6, h: 5, minW: 3, minH: 4 },
-    { i: 'nextExpiry', x: 0, y: 12, w: 6, h: 4, minW: 3, minH: 3 },
-    { i: 'certs',      x: 0, y: 16, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: 'cas',        x: 3, y: 16, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: 'activity',   x: 0, y: 20, w: 6, h: 4, minW: 3, minH: 3 },
-    { i: 'system',     x: 0, y: 24, w: 3, h: 5, minW: 3, minH: 4 },
-    { i: 'acme',       x: 3, y: 24, w: 3, h: 4, minW: 3, minH: 3 },
+    { i: 'stats',      x: 0, y: 0, w: 6, h: 3, static: true },
+    { i: 'chartTrend', x: 0, y: 3, w: 6, h: 5, minW: 3, minH: 4 },
+    { i: 'chartPie',   x: 0, y: 8, w: 3, h: 5, minW: 3, minH: 4 },
+    { i: 'nextExpiry', x: 3, y: 8, w: 3, h: 5, minW: 3, minH: 3 },
+    { i: 'certs',      x: 0, y: 13, w: 3, h: 5, minW: 3, minH: 3 },
+    { i: 'cas',        x: 3, y: 13, w: 3, h: 5, minW: 3, minH: 3 },
+    { i: 'activity',   x: 0, y: 18, w: 6, h: 5, minW: 3, minH: 3 },
+    { i: 'system',     x: 0, y: 23, w: 6, h: 6, minW: 3, minH: 4 },
+    { i: 'acme',       x: 0, y: 29, w: 6, h: 4, minW: 3, minH: 3 },
   ],
   sm: [
-    { i: 'stats',      x: 0, y: 0, w: 1, h: 2, static: true },
-    { i: 'chartTrend', x: 0, y: 2, w: 1, h: 5 },
-    { i: 'chartPie',   x: 0, y: 7, w: 1, h: 5 },
-    { i: 'nextExpiry', x: 0, y: 12, w: 1, h: 4 },
-    { i: 'certs',      x: 0, y: 16, w: 1, h: 4 },
-    { i: 'cas',        x: 0, y: 20, w: 1, h: 4 },
-    { i: 'activity',   x: 0, y: 24, w: 1, h: 4 },
-    { i: 'system',     x: 0, y: 28, w: 1, h: 5 },
-    { i: 'acme',       x: 0, y: 33, w: 1, h: 4 },
+    { i: 'stats',      x: 0, y: 0, w: 1, h: 3, static: true },
+    { i: 'chartTrend', x: 0, y: 3, w: 1, h: 5 },
+    { i: 'chartPie',   x: 0, y: 8, w: 1, h: 5 },
+    { i: 'nextExpiry', x: 0, y: 13, w: 1, h: 5 },
+    { i: 'certs',      x: 0, y: 18, w: 1, h: 5 },
+    { i: 'cas',        x: 0, y: 23, w: 1, h: 4 },
+    { i: 'activity',   x: 0, y: 27, w: 1, h: 5 },
+    { i: 'system',     x: 0, y: 32, w: 1, h: 6 },
+    { i: 'acme',       x: 0, y: 38, w: 1, h: 4 },
   ]
 }
 
@@ -154,20 +154,19 @@ export default function DashboardPage() {
   const [gridKey, setGridKey] = useState(0) // Force re-mount on reset
   const refreshTimeoutRef = useRef(null)
 
-  // Grid layout width measurement
-  const { width: gridWidth, containerRef: gridContainerRef, mounted: gridMounted } = useContainerWidth()
-
-  // Dynamic row height based on measured grid container height
-  // Grid uses 15 rows total with 14 gaps of 10px margin
-  const GRID_ROWS = 15
+  // Grid layout measurement — single ResizeObserver for both width and height
+  const GRID_ROWS_LG = 15
   const GRID_MARGIN = 10
-  const [dynamicRowHeight, setDynamicRowHeight] = useState(40)
+  const FIXED_ROW_HEIGHT = 40
+  const [gridWidth, setGridWidth] = useState(1280)
+  const [dynamicRowHeight, setDynamicRowHeight] = useState(FIXED_ROW_HEIGHT)
+  const [currentBreakpoint, setCurrentBreakpoint] = useState('lg')
+  const [gridMounted, setGridMounted] = useState(false)
   const gridObserverRef = useRef(null)
   
-  const gridHeightCallbackRef = useCallback((el) => {
-    // Also set the containerRef for useContainerWidth
-    gridContainerRef.current = el
-    
+  const isDesktopGrid = currentBreakpoint === 'lg'
+  
+  const gridContainerRef = useCallback((el) => {
     // Clean up previous observer
     if (gridObserverRef.current) {
       gridObserverRef.current.disconnect()
@@ -176,12 +175,26 @@ export default function DashboardPage() {
     
     if (!el) return
     
+    // Measure immediately
+    const w = el.offsetWidth
+    const h = el.offsetHeight
+    if (w > 0) setGridWidth(w)
+    if (w >= 1024 && h > 0) {
+      const totalGaps = (GRID_ROWS_LG - 1) * GRID_MARGIN
+      const rh = Math.floor((h - totalGaps) / GRID_ROWS_LG)
+      setDynamicRowHeight(Math.max(20, Math.min(rh, 80)))
+    }
+    setGridMounted(true)
+    
     const observer = new ResizeObserver((entries) => {
-      const h = entries[0].contentRect.height
-      if (h > 0) {
-        const totalGaps = (GRID_ROWS - 1) * GRID_MARGIN
-        const rh = Math.floor((h - totalGaps) / GRID_ROWS)
+      const { width: ow, height: oh } = entries[0].contentRect
+      if (ow > 0) setGridWidth(ow)
+      if (ow >= 1024 && oh > 0) {
+        const totalGaps = (GRID_ROWS_LG - 1) * GRID_MARGIN
+        const rh = Math.floor((oh - totalGaps) / GRID_ROWS_LG)
         setDynamicRowHeight(Math.max(20, Math.min(rh, 80)))
+      } else {
+        setDynamicRowHeight(FIXED_ROW_HEIGHT)
       }
     })
     observer.observe(el)
@@ -337,8 +350,8 @@ export default function DashboardPage() {
   const isVisible = (id) => widgets.find(w => w.id === id)?.visible
 
   return (
-    <div className="flex-1 h-full flex flex-col overflow-hidden bg-bg-primary">
-      <div className="flex flex-col flex-1 min-h-0 px-3 pt-2 pb-1 mx-auto w-full" style={{ maxWidth: 'min(1800px, 100%)' }}>
+    <div className={`flex-1 h-full flex flex-col bg-bg-primary ${isDesktopGrid ? 'overflow-hidden' : 'overflow-auto'}`}>
+      <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : ''}`} style={{ maxWidth: 'min(1800px, 100%)' }}>
         
         {/* Hero Header — compact bar */}
         <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-3 py-1.5 mb-1.5">
@@ -417,8 +430,8 @@ export default function DashboardPage() {
            )}
          </div>
 
-        {/* Grid Layout — flex-1 fills remaining space */}
-        <div ref={gridHeightCallbackRef} className="flex-1 min-h-0">
+        {/* Grid Layout — flex-1 fills remaining space on desktop, natural flow on mobile */}
+        <div ref={gridContainerRef} className={isDesktopGrid ? 'flex-1 min-h-0' : ''}>
         {gridMounted && (
         <Responsive
           key={gridKey}
@@ -428,10 +441,9 @@ export default function DashboardPage() {
           cols={{ lg: 12, md: 6, sm: 1 }}
           width={gridWidth}
           rowHeight={dynamicRowHeight}
-          maxRows={GRID_ROWS}
-          autoSize={false}
           margin={[GRID_MARGIN, GRID_MARGIN]}
           containerPadding={[0, 0]}
+          onBreakpointChange={(bp) => setCurrentBreakpoint(bp)}
           dragConfig={{ enabled: editMode, handle: '.widget-drag-handle' }}
           resizeConfig={{ enabled: editMode }}
           compactor={verticalCompactor}
