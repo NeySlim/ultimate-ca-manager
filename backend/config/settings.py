@@ -160,9 +160,8 @@ class Config:
     
     APP_VERSION = _get_version.__func__()
     
-    # SECRET_KEY and JWT_SECRET_KEY validation - deferred to runtime
+    # SECRET_KEY validation - deferred to runtime
     _secret_key = os.getenv("SECRET_KEY")
-    _jwt_secret = os.getenv("JWT_SECRET_KEY")
     
     # For packaging: allow missing secrets during install, but validate at runtime
     SECRET_KEY = _secret_key if _secret_key else "INSTALL_TIME_PLACEHOLDER"
@@ -213,16 +212,6 @@ class Config:
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
     
-    # JWT Authentication
-    JWT_SECRET_KEY = _jwt_secret if _jwt_secret else "INSTALL_TIME_PLACEHOLDER"
-    # Previous JWT key for rotation - tokens signed with this are still valid during transition
-    JWT_SECRET_KEY_PREVIOUS = os.getenv("JWT_SECRET_KEY_PREVIOUS", "")
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(
-        seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600"))
-    )
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(
-        seconds=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", "2592000"))
-    )
     
     @classmethod
     def validate_secrets(cls):
@@ -232,21 +221,8 @@ class Config:
                 "SECRET_KEY must be set in environment. "
                 "Check /etc/ucm/ucm.env or load environment variables."
             )
-        if cls.JWT_SECRET_KEY == "INSTALL_TIME_PLACEHOLDER" or not cls.JWT_SECRET_KEY:
-            raise ValueError(
-                "JWT_SECRET_KEY must be set in environment. "
-                "Check /etc/ucm/ucm.env or load environment variables."
-            )
     
-    # JWT Cookies - Enable cookie-based auth for UI
-    JWT_TOKEN_LOCATION = ["headers", "cookies"]  # Accept both headers and cookies
-    JWT_COOKIE_SECURE = True  # Require HTTPS
-    JWT_COOKIE_CSRF_PROTECT = False  # Disable CSRF for simplicity (we're using SameSite)
-    JWT_COOKIE_SAMESITE = "Lax"  # Protect against CSRF
-    JWT_ACCESS_COOKIE_NAME = "access_token_cookie"
-    JWT_REFRESH_COOKIE_NAME = "refresh_token_cookie"
-    JWT_HEADER_NAME = "Authorization"
-    JWT_HEADER_TYPE = "Bearer"
+    # Session settings
     
     # Session Configuration - Flask server-side sessions
     # Supports filesystem (default) or Redis (HA mode)

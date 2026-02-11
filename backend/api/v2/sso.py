@@ -466,7 +466,6 @@ def sso_callback(provider_id):
     Creates or updates user and establishes session.
     """
     import requests
-    from auth.unified import create_tokens_for_user
     
     provider = SSOProvider.query.get_or_404(provider_id)
     
@@ -553,18 +552,15 @@ def sso_callback(provider_id):
                 db.session.add(sso_session)
             db.session.commit()
             
-            # Create JWT tokens
-            jwt_tokens = create_tokens_for_user(user)
-            
-            # Also establish Flask session for cookie-based auth
+            # Establish Flask session
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
             session['auth_method'] = 'sso'
-            session.permanent = True  # Use permanent session
+            session.permanent = True
             
-            # Redirect to app with tokens in URL fragment (secure: not sent to server)
-            return redirect(f'/login/sso-complete?token={jwt_tokens["access_token"]}')
+            # Redirect to app (session cookie is set automatically)
+            return redirect('/login/sso-complete')
             
         except Exception as e:
             current_app.logger.error(f"OAuth2 callback error: {e}")
@@ -589,7 +585,6 @@ def ldap_login():
     Direct LDAP authentication.
     Unlike OAuth2/SAML, LDAP authenticates with username/password directly.
     """
-    from auth.unified import create_tokens_for_user
     
     data = request.get_json()
     username = data.get('username')
@@ -643,10 +638,7 @@ def ldap_login():
     db.session.add(sso_session)
     db.session.commit()
     
-    # Create JWT tokens
-    tokens = create_tokens_for_user(user)
-    
-    # Also establish Flask session for cookie-based auth
+    # Establish Flask session
     session['user_id'] = user.id
     session['username'] = user.username
     session['role'] = user.role
@@ -655,7 +647,6 @@ def ldap_login():
     
     return success_response(
         data={
-            'access_token': tokens['access_token'],
             'user': user.to_dict()
         },
         message='LDAP authentication successful'

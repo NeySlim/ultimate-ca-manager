@@ -938,21 +938,13 @@ def reset_rate_limits():
 @require_auth(['admin:system'])
 def rotate_secrets():
     """
-    Rotate JWT secret key with automatic .env update.
+    Rotate session secret key with automatic .env update.
     
     Process:
     1. Backup current .env file
-    2. Current JWT_SECRET_KEY becomes JWT_SECRET_KEY_PREVIOUS
-    3. New key is generated and set as JWT_SECRET_KEY
-    4. Service restart (SIGHUP for graceful reload)
-    5. Tokens signed with old key remain valid during transition period
-    
-    Body:
-        new_secret: Optional - provide your own secret (32+ chars)
-        auto_apply: bool - automatically update .env and restart (default: true)
-        
-    Returns:
-        Success message or manual instructions if auto_apply=false
+    2. Generate new SECRET_KEY
+    3. Service restart
+    4. All active sessions are invalidated (users must re-login)
     """
     import secrets as py_secrets
     import shutil
@@ -967,9 +959,6 @@ def rotate_secrets():
         new_secret = py_secrets.token_urlsafe(32)
     elif len(new_secret) < 32:
         return error_response("Secret must be at least 32 characters", 400)
-    
-    # Get current secret
-    current_secret = os.getenv('JWT_SECRET_KEY', '')
     
     if auto_apply:
         # Determine .env path based on environment
@@ -989,80 +978,54 @@ def rotate_secrets():
             backup_path = env_path.with_suffix(f'.env.backup-{datetime.now().strftime("%Y%m%d_%H%M%S")}')
             shutil.copy(env_path, backup_path)
             
-            # Read current .env
+            # Read and update .env
             env_content = env_path.read_text()
             lines = env_content.splitlines()
             new_lines = []
-            jwt_key_found = False
-            jwt_prev_found = False
+            key_found = False
             
             for line in lines:
                 stripped = line.strip()
-                
-                # Update JWT_SECRET_KEY
-                if stripped.startswith('JWT_SECRET_KEY=') and not stripped.startswith('JWT_SECRET_KEY_PREVIOUS'):
-                    new_lines.append(f'JWT_SECRET_KEY={new_secret}')
-                    jwt_key_found = True
-                # Update or skip JWT_SECRET_KEY_PREVIOUS (we'll add it after)
-                elif stripped.startswith('JWT_SECRET_KEY_PREVIOUS='):
-                    jwt_prev_found = True
-                    # Update with current secret
-                    if current_secret:
-                        new_lines.append(f'JWT_SECRET_KEY_PREVIOUS={current_secret}')
+                if stripped.startswith('SECRET_KEY='):
+                    new_lines.append(f'SECRET_KEY={new_secret}')
+                    key_found = True
+                elif stripped.startswith('JWT_SECRET_KEY'):
+                    continue  # Remove old JWT keys
                 else:
                     new_lines.append(line)
             
-            # Add JWT_SECRET_KEY if not found
-            if not jwt_key_found:
-                new_lines.append(f'JWT_SECRET_KEY={new_secret}')
+            if not key_found:
+                new_lines.append(f'SECRET_KEY={new_secret}')
             
-            # Add JWT_SECRET_KEY_PREVIOUS if not found and we have a current secret
-            if not jwt_prev_found and current_secret:
-                new_lines.append(f'JWT_SECRET_KEY_PREVIOUS={current_secret}')
-            
-            # Write updated .env
             env_path.write_text('\n'.join(new_lines) + '\n')
-            
-            # Save rotation timestamp to data file
-            import json
-            rotation_file = Path('/opt/ucm/data/jwt_rotation.json')
-            rotation_file.parent.mkdir(parents=True, exist_ok=True)
-            rotation_file.write_text(json.dumps({
-                'rotated_at': datetime.now().isoformat(),
-                'previous_expires_hours': 24
-            }))
             
             # Log the rotation
             from services.audit_service import AuditService
             AuditService.log_action(
                 action='secrets_rotated',
                 resource_type='security',
-                details=f'JWT secret key rotated automatically. Backup: {backup_path.name}',
+                details=f'Session secret key rotated. Backup: {backup_path.name}',
                 success=True
             )
             
-            # Signal service to reload (graceful restart)
+            # Restart service
             import signal
             if is_docker:
-                # In Docker, SIGTERM triggers container restart
                 os.kill(os.getppid(), signal.SIGTERM)
             else:
-                # In systemd, use SIGHUP for graceful reload or restart service
                 try:
                     import subprocess
                     subprocess.run(['systemctl', 'restart', 'ucm'], check=True, timeout=30)
                 except Exception:
-                    # Fallback to SIGHUP
                     os.kill(os.getppid(), signal.SIGHUP)
             
             return success_response(
                 data={
                     'rotated': True,
                     'backup': str(backup_path),
-                    'previous_expires_in': '24 hours',
-                    'note': 'Service is restarting. You will need to log in again. Old tokens remain valid for 24 hours.'
+                    'note': 'Service is restarting. All users will need to log in again.'
                 },
-                message='JWT secret rotated successfully. Service restarting.'
+                message='Session secret rotated successfully. Service restarting.'
             )
             
         except Exception as e:
@@ -1070,25 +1033,21 @@ def rotate_secrets():
             return error_response(f"Failed to rotate secrets: {str(e)}", 500)
     
     else:
-        # Manual mode - return instructions
         from services.audit_service import AuditService
         AuditService.log_action(
             action='secrets_rotation_initiated',
             resource_type='security',
-            details='JWT secret key generated (manual apply required)',
+            details='Session secret key generated (manual apply required)',
             success=True
         )
         
         return success_response(
             data={
                 'new_secret': new_secret,
-                'previous_secret': current_secret[:8] + '...' if current_secret else None,
                 'instructions': [
                     '1. Edit /etc/ucm/ucm.env',
-                    '2. Set JWT_SECRET_KEY_PREVIOUS to your current JWT_SECRET_KEY value',
-                    f'3. Set JWT_SECRET_KEY={new_secret}',
-                    '4. Restart UCM: systemctl restart ucm',
-                    '5. After 1 hour (token expiry), remove JWT_SECRET_KEY_PREVIOUS'
+                    f'2. Set SECRET_KEY={new_secret}',
+                    '3. Restart UCM: systemctl restart ucm'
                 ]
             },
             message='New secret generated. Follow instructions to complete rotation.'
@@ -1100,39 +1059,11 @@ def rotate_secrets():
 def secrets_status():
     """Get status of secret keys (without revealing them)"""
     from config.settings import Config
-    import json
-    from datetime import datetime, timedelta
     
-    jwt_configured = bool(os.getenv('JWT_SECRET_KEY')) and Config.JWT_SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
-    jwt_previous = bool(os.getenv('JWT_SECRET_KEY_PREVIOUS'))
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
     encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY'))
     
-    # Check rotation timestamp from data file
-    rotation_info = {}
-    rotation_file = Path('/opt/ucm/data/jwt_rotation.json')
-    if rotation_file.exists():
-        try:
-            rotation_info = json.loads(rotation_file.read_text())
-        except Exception:
-            pass
-    
-    rotated_at = rotation_info.get('rotated_at')
-    expires_previous = None
-    if rotated_at and jwt_previous:
-        rotated_dt = datetime.fromisoformat(rotated_at)
-        # Previous key expires 24 hours after rotation
-        expires_dt = rotated_dt + timedelta(hours=24)
-        expires_previous = expires_dt.isoformat()
-    
     return success_response(data={
-        'jwt_secret': {
-            'configured': jwt_configured,
-            'has_previous': jwt_previous,
-            'rotated_at': rotated_at,
-            'previous_expires_at': expires_previous,
-            'rotation_in_progress': False
-        },
         'session_secret': {
             'configured': session_configured
         },

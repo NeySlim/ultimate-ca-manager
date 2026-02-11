@@ -1590,7 +1590,7 @@
     "secretsStatus": "Secrets Status",
     "anomalyDetection": "Anomaly Detection",
     "auditLogIntegrity": "Audit Log Integrity",
-    "rotateSecrets": "Rotate JWT Secret",
+    "rotateSecrets": "Rotate Session Secret",
     "verifyAuditIntegrity": "Verify Audit Integrity",
     "verifyChain": "Verify Hash Chain",
     "chainValid": "Hash chain is valid",
@@ -1608,7 +1608,7 @@
       "notChecked": "Not Checked"
     },
     "secrets": {
-      "jwtSecret": "JWT Secret",
+      "jwtSecret": "Session Secret",
       "sessionSecret": "Session Secret",
       "encryptionKey": "Encryption Key",
       "notSet": "Not set (keys encrypted)",

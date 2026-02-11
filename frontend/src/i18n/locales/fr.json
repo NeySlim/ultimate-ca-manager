@@ -1267,7 +1267,7 @@
     "secretsStatus": "État des secrets",
     "anomalies": "Anomalies de connexion",
     "auditVerify": "Vérification d'audit",
-    "rotateSecrets": "Rotation du secret JWT",
+    "rotateSecrets": "Rotation du secret de session",
     "verifyChain": "Vérifier la chaîne de hachage",
     "chainValid": "La chaîne de hachage est valide",
     "chainInvalid": "Intégrité de la chaîne de hachage compromise",
@@ -1288,7 +1288,7 @@
       "notChecked": "Non vérifié"
     },
     "secrets": {
-      "jwtSecret": "Secret JWT",
+      "jwtSecret": "Secret de session",
       "sessionSecret": "Secret de session",
       "encryptionKey": "Clé de chiffrement",
       "notSet": "Non défini (clés non chiffrées)",

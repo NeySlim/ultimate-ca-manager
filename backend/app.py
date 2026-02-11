@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from flask import Flask, redirect, request
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_caching import Cache
 from flask_session import Session
@@ -23,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 from config.settings import get_config, BASE_DIR
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
-from middleware.auth_middleware import init_auth_middleware
 from websocket import socketio, init_websocket
 
 # Initialize cache globally
@@ -93,7 +91,6 @@ def create_app(config_name=None):
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
-    jwt = JWTManager(app)
     
     # Log database type
     app.logger.info(f"✓ Database: {config.DATABASE_TYPE.upper()}")
@@ -179,14 +176,20 @@ def create_app(config_name=None):
         "basePath": "/api/v2",
         "schemes": ["https"],
         "securityDefinitions": {
-            "Bearer": {
+            "ApiKey": {
                 "type": "apiKey",
-                "name": "Authorization",
+                "name": "X-API-Key",
                 "in": "header",
-                "description": "JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'"
+                "description": "API Key authentication. Example: 'ucm_ak_...'"
+            },
+            "Session": {
+                "type": "apiKey",
+                "name": "Cookie",
+                "in": "header",
+                "description": "Session cookie (set after login)"
             }
         },
-        "security": [{"Bearer": []}],
+        "security": [{"ApiKey": []}, {"Session": []}],
         "tags": [
             {"name": "auth", "description": "Authentication endpoints"},
             {"name": "cas", "description": "Certificate Authorities"},
@@ -206,9 +209,6 @@ def create_app(config_name=None):
     }
     
     Swagger(app, config=swagger_config, template=swagger_template)
-    
-    # Initialize auth middleware
-    init_auth_middleware(jwt)
     
     # Initialize mTLS middleware
     from middleware.mtls_middleware import init_mtls_middleware
@@ -375,19 +375,6 @@ def create_app(config_name=None):
                 description="Auto-renew Let's Encrypt certificates"
             )
             app.logger.info("Registered ACME auto-renewal task (every 6 hours)")
-        except ImportError:
-            pass
-        
-        # Register JWT rotation cleanup task (runs hourly)
-        try:
-            from services.jwt_rotation_service import scheduled_jwt_cleanup
-            scheduler.register_task(
-                name="jwt_rotation_cleanup",
-                func=scheduled_jwt_cleanup,
-                interval=3600,  # 1 hour
-                description="Clean up previous JWT key after rotation grace period"
-            )
-            app.logger.info("Registered JWT rotation cleanup task (hourly)")
         except ImportError:
             pass
         

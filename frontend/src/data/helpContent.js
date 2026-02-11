@@ -843,10 +843,9 @@ export const helpContent = {
       {
         title: 'Secrets Management',
         icon: Key,
-        content: 'UCM uses cryptographic secrets for JWT signing and session management:',
+        content: 'UCM uses cryptographic secrets for session management:',
         definitions: [
-          { term: 'JWT Secret', description: 'Signs authentication tokens (32+ bytes recommended)' },
-          { term: 'Session Secret', description: 'Encrypts server-side sessions' },
+          { term: 'Session Secret', description: 'Encrypts server-side sessions (32+ bytes recommended)' },
           { term: 'Encryption Key', description: 'Optional key for encrypting private keys at rest' },
         ]
       },
@@ -855,10 +854,10 @@ export const helpContent = {
         icon: ShieldCheck,
         content: 'Rotate secrets periodically for security:',
         items: [
-          { label: 'Generate', text: 'Click "Rotate JWT Secret" to generate a new secret' },
+          { label: 'Generate', text: 'Click "Rotate Session Secret" to generate a new secret' },
           { label: 'Apply', text: 'Copy the new secret to your environment variables' },
           { label: 'Restart', text: 'Restart UCM backend to apply the new secret' },
-          { label: 'Grace Period', text: 'Old tokens remain valid until they expire' },
+          { label: 'Sessions', text: 'Existing sessions will be invalidated after rotation' },
         ]
       },
       {
@@ -884,7 +883,7 @@ export const helpContent = {
       }
     ],
     tips: [
-      'Rotate JWT secrets every 90 days',
+      'Rotate session secrets every 90 days',
       'Review anomalies daily for suspicious activity',
       'Verify audit integrity after any incident',
       'Use strong secrets (32+ random bytes)'

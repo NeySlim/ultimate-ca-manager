@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **JWT removal** - Removed JWT authentication entirely; UCM now uses session cookies + API keys only. Reduces attack surface and eliminates token-related complexity
 - **cryptography** - Upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
 
 ### Documentation

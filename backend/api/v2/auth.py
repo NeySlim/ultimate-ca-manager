@@ -101,9 +101,7 @@ def _clear_failed_attempts(username):
 def login():
     """
     Login endpoint - Rate limited to 5 per minute
-    Supports 2 modes based on Accept header:
-    - Default: Returns session cookie
-    - Accept: application/jwt → Returns JWT token
+    Returns session cookie.
     
     POST /api/auth/login
     Body: {"username": "admin", "password": "xxx"}
@@ -157,77 +155,46 @@ def login():
     if HAS_ANOMALY:
         anomalies = get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=True)
     
-    # Check if JWT requested
-    accept_header = request.headers.get('Accept', '')
-    wants_jwt = 'application/jwt' in accept_header
+    # SECURITY: Regenerate session ID to prevent session fixation
+    session.clear()
     
-    if wants_jwt:
-        # Return JWT token
-        auth_manager = AuthManager()
-        token_info = auth_manager.create_jwt(user.id)
-        
-        # Generate CSRF token for JWT users too
-        csrf_token = None
-        if HAS_CSRF:
-            csrf_token = CSRFProtection.generate_token(user.id)
-        
-        return success_response(
-            data={
-                'token': token_info['token'],
-                'expires_in': token_info['expires_in'],
-                'expires_at': token_info['expires_at'],
-                'user': {
-                    'id': user.id,
-                    'username': user.username
-                },
-                'csrf_token': csrf_token,
-                'force_password_change': user.force_password_change or False,
-                'security_alerts': [a['message'] for a in anomalies if a.get('severity') in ('medium', 'high')]
-            },
-            message='Login successful'
-        )
+    # Create new session with regenerated ID
+    session['user_id'] = user.id
+    session['username'] = user.username
+    session['login_time'] = datetime.utcnow().isoformat()
+    session.permanent = True
+    session.modified = True
     
-    else:
-        # SECURITY: Regenerate session ID to prevent session fixation
-        session.clear()
-        
-        # Create new session with regenerated ID
-        session['user_id'] = user.id
-        session['username'] = user.username
-        session['login_time'] = datetime.utcnow().isoformat()
-        session.permanent = True
-        session.modified = True
-        
-        # Log successful login
-        current_app.logger.info(f"✅ User {user.username} logged in successfully")
-        
-        # WebSocket event for login
-        try:
-            from websocket.emitters import on_user_login
-            on_user_login(
-                username=user.username,
-                ip_address=request.remote_addr or 'unknown',
-                method='password'
-            )
-        except Exception:
-            pass  # Non-blocking
-        
-        # Generate CSRF token
-        csrf_token = None
-        if HAS_CSRF:
-            csrf_token = CSRFProtection.generate_token(user.id)
-        
-        return success_response(
-            data={
-                'user': {
-                    'id': user.id,
-                    'username': user.username
-                },
-                'csrf_token': csrf_token,
-                'force_password_change': user.force_password_change or False
-            },
-            message='Login successful'
+    # Log successful login
+    current_app.logger.info(f"User {user.username} logged in successfully")
+    
+    # WebSocket event for login
+    try:
+        from websocket.emitters import on_user_login
+        on_user_login(
+            username=user.username,
+            ip_address=request.remote_addr or 'unknown',
+            method='password'
         )
+    except Exception:
+        pass  # Non-blocking
+    
+    # Generate CSRF token
+    csrf_token = None
+    if HAS_CSRF:
+        csrf_token = CSRFProtection.generate_token(user.id)
+    
+    return success_response(
+        data={
+            'user': {
+                'id': user.id,
+                'username': user.username
+            },
+            'csrf_token': csrf_token,
+            'force_password_change': user.force_password_change or False
+        },
+        message='Login successful'
+    )
 
 
 @bp.route('/api/v2/auth/logout', methods=['POST'])
@@ -297,36 +264,6 @@ def verify():
             },
             'csrf_token': csrf_token
         }
-    )
-
-
-@bp.route('/api/v2/auth/refresh', methods=['POST'])
-@require_auth()
-def refresh_token():
-    """
-    Refresh JWT token
-    Only works with JWT auth (not session or API key)
-    """
-    from flask import g
-    
-    if g.auth_method != 'jwt':
-        return error_response(
-            'Refresh only available for JWT tokens',
-            400,
-            {'current_method': g.auth_method}
-        )
-    
-    # Create new token
-    auth_manager = AuthManager()
-    token_info = auth_manager.create_jwt(g.user_id)
-    
-    return success_response(
-        data={
-            'token': token_info['token'],
-            'expires_in': token_info['expires_in'],
-            'expires_at': token_info['expires_at']
-        },
-        message='Token refreshed'
     )
 
 
