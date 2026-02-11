@@ -302,7 +302,6 @@ jobs:
           # Run
           docker run -d -p 8443:8443 \
             -e SECRET_KEY=$(openssl rand -hex 32) \
-            -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
             --name ucm neyslim/ultimate-ca-manager:VERSION
           ```
           
@@ -350,12 +349,22 @@ jobs:
           
           cat notes.md
       
+      - name: Delete existing release assets
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          for asset in $(gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null || true); do
+            echo "Deleting existing asset: $asset"
+            gh release delete-asset "$TAG" "$asset" -y || true
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           body_path: notes.md
           draft: false
-          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') || contains(github.ref, 'dev') }}
           files: |
             artifacts/*
         env:
