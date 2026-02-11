@@ -563,8 +563,8 @@ export default function DashboardPage() {
                         const progress = daysLeft !== null ? Math.min(100, (daysLeft / totalLifespan) * 100) : 0
                         const urgency = daysLeft === null ? 'gray' 
                           : daysLeft <= 7 ? 'danger' 
-                          : daysLeft <= 30 ? 'warning' 
-                          : daysLeft <= 90 ? 'yellow' 
+                          : daysLeft <= 15 ? 'warning' 
+                          : daysLeft <= 30 ? 'yellow' 
                           : 'success'
                         const barColor = {
                           danger: 'var(--accent-danger)',

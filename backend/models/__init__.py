@@ -20,6 +20,9 @@ from models.crl import CRLMetadata
 from models.ocsp import OCSPResponse
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 from models.hsm import HsmProvider, HsmKey
+from models.rbac import CustomRole, RolePermission
+from models.sso import SSOProvider, SSOSession
+from models.policy import CertificatePolicy, ApprovalRequest
 
 
 class UserSession(db.Model):
