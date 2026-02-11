@@ -9,8 +9,7 @@ export const rolesService = {
    * @returns {Promise<Object>} Roles data keyed by role id
    */
   async getAll() {
-    const response = await apiClient.get('/roles')
-    // Transform array to object keyed by role id
+    const response = await apiClient.get('/rbac/roles')
     const roles = response.data || []
     const rolesMap = {}
     for (const role of roles) {
@@ -25,7 +24,7 @@ export const rolesService = {
    * @returns {Promise<Object>} Role data
    */
   async getRole(role) {
-    const response = await apiClient.get(`/roles/${role}`)
+    const response = await apiClient.get(`/rbac/roles/${role}`)
     return response.data
   },
 }

@@ -204,7 +204,7 @@ export function UpdateChecker() {
             onChange={(e) => setIncludePrereleases(e.target.checked)}
             className="rounded border-border"
           />
-          <span className="text-text-secondary">{t('includePreReleaseVersions')}</span>
+          <span className="text-text-secondary">{t('settings.includePreReleaseVersions')}</span>
         </label>
         
         {updateInfo?.html_url && (
