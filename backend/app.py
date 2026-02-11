@@ -882,7 +882,7 @@ def init_database(app):
             
             # Create certificate
             subject = issuer = x509.Name([
-                x509.NameAttribute(NameOID.COMMON_NAME, hostname),
+                x509.NameAttribute(NameOID.COMMON_NAME, hostname[:64]),
                 x509.NameAttribute(NameOID.ORGANIZATION_NAME, "UCM Self-Signed"),
             ])
             
