@@ -319,7 +319,27 @@
     "scep": "SCEP",
     "rbac": "Access Control",
     "hsm": "HSM",
-    "logout": "Logout"
+    "logout": "Logout",
+    "operations": "Operations"
+  },
+  "operations": {
+    "title": "Operations",
+    "subtitle": "Import, export & bulk actions",
+    "bulkActions": "Bulk Actions",
+    "noData": "No items found",
+    "noDataDesc": "Try adjusting your filters",
+    "loadFailed": "Failed to load data",
+    "bulkSuccess": "{{action}}: {{count}} succeeded",
+    "bulkPartialFail": "{{count}} items failed",
+    "bulkFailed": "Bulk operation failed",
+    "confirmBulk": "Confirm Bulk Operation",
+    "confirmRevoke": "Revoke {{count}} certificate(s)? This cannot be undone.",
+    "confirmRenew": "Renew {{count}} certificate(s)? New keys will be generated.",
+    "confirmDelete": "Delete {{count}} item(s)? This cannot be undone.",
+    "confirmExport": "Export {{count}} item(s)?",
+    "confirmSign": "Sign {{count}} CSR(s)?",
+    "signCSRs": "Sign {{count}} CSR(s)",
+    "selectCAForSign": "Select a CA to sign the CSRs:"
   },
   "auth": {
     "login": "Sign In",
@@ -450,7 +470,8 @@
     "exportDER": "Export DER",
     "pkcs12Password": "PKCS#12 Password",
     "includeChain": "Include certificate chain",
-    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1"
+    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
+    "subtitle": "{{count}} certificates"
   },
   "cas": {
     "parentCA": "Parent CA",
@@ -491,7 +512,8 @@
     "createFailed": "Failed to create CA",
     "unnamedCA": "Unnamed CA",
     "subtitle_one": "{{count}} CA",
-    "subtitle_other": "{{count}} CAs"
+    "subtitle_other": "{{count}} CAs",
+    "subtitle": "{{count}} certificate authorities"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -599,7 +621,8 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} template",
-    "subtitle_other": "{{count}} templates"
+    "subtitle_other": "{{count}} templates",
+    "subtitle": "{{count}} certificate templates"
   },
   "users": {
     "createUser": "Create User",
@@ -618,7 +641,8 @@
     "newPassword": "New password: {{password}}",
     "checkEmail": "Check email",
     "resetPasswordFailed": "Failed to reset password",
-    "subtitle_one": "{{count}} user"
+    "subtitle_one": "{{count}} user",
+    "subtitle": "{{count}} users"
   },
   "groups": {
     "group": "Group",
@@ -634,7 +658,8 @@
     "subtitle_one": "{{count}} group",
     "subtitle_other": "{{count}} groups",
     "memberCount_one": "{{count}} member",
-    "memberCount_other": "{{count}} members"
+    "memberCount_other": "{{count}} members",
+    "subtitle": "{{count}} groups"
   },
   "acme": {
     "title": "ACME Protocol",
@@ -805,7 +830,8 @@
     "domainTestSuccess": "DNS access test successful",
     "domainTestFailed": "DNS access test failed",
     "subtitle_one": "{{count}} account",
-    "subtitle_other": "{{count}} accounts"
+    "subtitle_other": "{{count}} accounts",
+    "subtitle": "{{count}} ACME accounts"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -926,7 +952,8 @@
     "sync": "Sync",
     "syncConfirm": "This will import up to 50 certificates from the system. Continue?",
     "syncTitle": "Sync from system",
-    "syncing": "Syncing..."
+    "syncing": "Syncing...",
+    "subtitle": "Manage trusted certificates"
   },
   "importExport": {
     "subtitle": "Transfer certificates and CAs",
@@ -1401,7 +1428,8 @@
     },
     "stats": {},
     "subtitle_one": "{{count}} role",
-    "subtitle_other": "{{count}} roles"
+    "subtitle_other": "{{count}} roles",
+    "subtitle": "{{count}} custom roles"
   },
   "hsm": {
     "addHSM": "Add HSM",
@@ -1467,7 +1495,8 @@
       "cloud": "Cloud"
     },
     "subtitle_one": "{{count}} provider",
-    "subtitle_other": "{{count}} providers"
+    "subtitle_other": "{{count}} providers",
+    "subtitle": "{{count}} HSM providers"
   },
   "sso": {
     "subtitle": "Configure LDAP, OAuth2, or SAML providers for centralized authentication",

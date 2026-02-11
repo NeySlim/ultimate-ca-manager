@@ -63,5 +63,13 @@ export const casService = {
     
     const query = params.toString() ? `?${params.toString()}` : ''
     return apiClient.get(`/cas/${id}/certificates${query}`)
+  },
+
+  // Bulk operations
+  async bulkDelete(ids) {
+    return apiClient.post('/cas/bulk/delete', { ids })
+  },
+  async bulkExport(ids, format = 'pem') {
+    return apiClient.post('/cas/bulk/export', { ids, format })
   }
 }

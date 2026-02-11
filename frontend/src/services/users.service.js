@@ -35,5 +35,10 @@ export const usersService = {
 
   async toggleActive(id) {
     return apiClient.post(`/users/${id}/toggle-active`)
+  },
+
+  // Bulk operations
+  async bulkDelete(ids) {
+    return apiClient.post('/users/bulk/delete', { ids })
   }
 }

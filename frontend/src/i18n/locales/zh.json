@@ -245,7 +245,8 @@
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} 个账户",
-    "subtitle_other": "{{count}} 个账户"
+    "subtitle_other": "{{count}} 个账户",
+    "subtitle": "{{count}} 个 ACME 账户"
   },
   "audit": {
     "event": "事件",
@@ -354,7 +355,8 @@
     "createFailed": "Failed to create CA",
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} 个 CA",
-    "subtitle_other": "{{count}} 个 CA"
+    "subtitle_other": "{{count}} 个 CA",
+    "subtitle": "{{count}} 个证书颁发机构"
   },
   "certificates": {
     "createCertificate": "创建证书",
@@ -381,7 +383,8 @@
     "exportDER": "导出DER",
     "pkcs12Password": "PKCS#12密码",
     "includeChain": "包含证书链",
-    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1"
+    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
+    "subtitle": "{{count}} 个证书"
   },
   "common": {
     "save": "保存",
@@ -895,7 +898,8 @@
     "subtitle_one": "{{count}} 个组",
     "subtitle_other": "{{count}} 个组",
     "memberCount_one": "{{count}} 个成员",
-    "memberCount_other": "{{count}} 个成员"
+    "memberCount_other": "{{count}} 个成员",
+    "subtitle": "{{count}} 个组"
   },
   "help": {
     "aboutCertificates": "关于证书",
@@ -975,7 +979,8 @@
       "cloud": "Cloud"
     },
     "subtitle_one": "{{count}} 个提供者",
-    "subtitle_other": "{{count}} 个提供者"
+    "subtitle_other": "{{count}} 个提供者",
+    "subtitle": "{{count}} 个 HSM 提供商"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1095,7 +1100,27 @@
     "scep": "SCEP",
     "rbac": "访问控制",
     "hsm": "HSM",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "operations": "操作"
+  },
+  "operations": {
+    "title": "操作",
+    "subtitle": "导入、导出和批量操作",
+    "bulkActions": "批量操作",
+    "noData": "未找到任何项目",
+    "noDataDesc": "请尝试调整筛选条件",
+    "loadFailed": "加载失败",
+    "bulkSuccess": "{{action}}：{{count}} 个成功",
+    "bulkPartialFail": "{{count}} 个项目失败",
+    "bulkFailed": "批量操作失败",
+    "confirmBulk": "确认批量操作",
+    "confirmRevoke": "吊销 {{count}} 个证书？此操作不可撤销。",
+    "confirmRenew": "续期 {{count}} 个证书？将生成新密钥。",
+    "confirmDelete": "删除 {{count}} 个项目？此操作不可撤销。",
+    "confirmExport": "导出 {{count}} 个项目？",
+    "confirmSign": "签署 {{count}} 个 CSR？",
+    "signCSRs": "签署 {{count}} 个 CSR",
+    "selectCAForSign": "选择用于签署 CSR 的 CA："
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",
@@ -1164,7 +1189,8 @@
     },
     "stats": {},
     "subtitle_one": "{{count}} 个角色",
-    "subtitle_other": "{{count}} 个角色"
+    "subtitle_other": "{{count}} 个角色",
+    "subtitle": "{{count}} 个自定义角色"
   },
   "scep": {
     "title": "SCEP协议",
@@ -1581,7 +1607,8 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} 个模板",
-    "subtitle_other": "{{count}} 个模板"
+    "subtitle_other": "{{count}} 个模板",
+    "subtitle": "{{count}} 个证书模板"
   },
   "time": {
     "today": "今天",
@@ -1726,7 +1753,8 @@
     "syncedCerts": "Synced {{coat}} certificatees",
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle": "管理受信任的证书"
   },
   "users": {
     "createUser": "创建用户",
@@ -1745,7 +1773,8 @@
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
     "newPassword": "New password: {{password}}",
-    "subtitle_one": "{{count}} 个用户"
+    "subtitle_one": "{{count}} 个用户",
+    "subtitle": "{{count}} 个用户"
   },
   "validation": {
     "required": "此字段必填",

@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
-  SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
+  SignOut, Palette, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
   UsersThree, Shield, Lock, FileX, Vault, Wrench, Detective
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -52,24 +52,24 @@ export function Sidebar({ activePage }) {
   const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-9 h-9'
 
   const pages = [
-    { id: '', icon: House, labelKey: 'nav.dashboard', path: '/' },
-    { id: 'certificates', icon: Certificate, labelKey: 'nav.certificates', path: '/certificates' },
-    { id: 'cas', icon: ShieldCheck, labelKey: 'nav.cas', path: '/cas' },
-    { id: 'csrs', icon: FileText, labelKey: 'nav.csrs', path: '/csrs' },
-    { id: 'templates', icon: List, labelKey: 'nav.templates', path: '/templates' },
-    { id: 'users', icon: User, labelKey: 'nav.users', path: '/users' },
+    { id: '', icon: House, labelKey: 'common.dashboard', path: '/' },
+    { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
+    { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
+    { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
+    { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },
+    { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
     { id: 'acme', icon: Key, labelKey: 'nav.acme', path: '/acme' },
     { id: 'scep', icon: Robot, labelKey: 'nav.scep', path: '/scep-config' },
-    { id: 'crl-ocsp', icon: FileX, labelKey: 'nav.crlOcsp', path: '/crl-ocsp' },
-    { id: 'truststore', icon: Vault, labelKey: 'nav.trustStore', path: '/truststore' },
-    { id: 'import', icon: UploadSimple, labelKey: 'nav.importExport', path: '/import' },
-    { id: 'tools', icon: Wrench, labelKey: 'nav.tools', path: '/tools' },
-    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'nav.audit', path: '/audit' },
-    { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
+    { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
+    { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
+    { id: 'operations', icon: Lightning, labelKey: 'nav.operations', path: '/operations' },
+    { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
+    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
+    { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
     // Advanced features
     { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
     { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
-    { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security' },
+    { id: 'security', icon: Detective, labelKey: 'common.security', path: '/security' },
   ]
 
   const handleLogout = async () => {

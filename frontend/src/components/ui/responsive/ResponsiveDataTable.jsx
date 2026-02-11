@@ -24,6 +24,12 @@ export function ResponsiveDataTable({
   onRowClick,
   selectable = true,
   
+  // Multi-select (all optional — existing pages don't pass these)
+  multiSelect = false,
+  selectedIds,          // Set<number|string>
+  onSelectionChange,    // (Set) => void
+  bulkActions,          // ReactNode — shown when items selected
+  
   // Row actions (dropdown menu)
   rowActions, // (row) => [{ label, icon, onClick, variant }]
   
@@ -127,6 +133,32 @@ export function ResponsiveDataTable({
     })
   }, [])
   
+  // Multi-select handlers
+  const handleToggleRow = useCallback((rowId) => {
+    if (!multiSelect || !onSelectionChange) return
+    const next = new Set(selectedIds || [])
+    if (next.has(rowId)) next.delete(rowId)
+    else next.add(rowId)
+    onSelectionChange(next)
+  }, [multiSelect, selectedIds, onSelectionChange])
+
+  const handleToggleAll = useCallback((visibleData) => {
+    if (!multiSelect || !onSelectionChange) return
+    const visibleIds = visibleData.map(r => r.id).filter(Boolean)
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds?.has(id))
+    if (allSelected) {
+      const next = new Set(selectedIds || [])
+      visibleIds.forEach(id => next.delete(id))
+      onSelectionChange(next)
+    } else {
+      const next = new Set(selectedIds || [])
+      visibleIds.forEach(id => next.add(id))
+      onSelectionChange(next)
+    }
+  }, [multiSelect, selectedIds, onSelectionChange])
+
+  const selectionCount = selectedIds?.size || 0
+
   // Row actions dropdown
   const [openActionMenu, setOpenActionMenu] = useState(null)
   const actionMenuRef = useRef(null)
@@ -569,6 +601,24 @@ export function ResponsiveDataTable({
         />
       )}
       
+      {/* BULK ACTION BAR */}
+      {multiSelect && selectionCount > 0 && bulkActions && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-accent-primary/10 border border-accent-primary/20 rounded-lg mx-1 mb-1">
+          <span className="text-sm font-medium text-accent-primary">
+            {selectionCount} selected
+          </span>
+          <div className="flex items-center gap-2 ml-auto">
+            {bulkActions}
+            <button
+              onClick={() => onSelectionChange(new Set())}
+              className="text-xs text-text-secondary hover:text-text-primary transition-colors px-2 py-1"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TABLE / CARDS */}
       {isMobile ? (
         <MobileCardList
@@ -581,6 +631,10 @@ export function ResponsiveDataTable({
           rowActions={rowActions}
           loading={loading}
           density={density}
+          multiSelect={multiSelect}
+          selectedIds={selectedIds}
+          onToggleRow={handleToggleRow}
+          onToggleAll={() => handleToggleAll(paginatedData)}
         />
       ) : (
         <DesktopTable
@@ -600,6 +654,10 @@ export function ResponsiveDataTable({
           columnWidths={columnWidths}
           setColumnWidth={setColumnWidth}
           resetColumnWidth={resetColumnWidth}
+          multiSelect={multiSelect}
+          selectedIds={selectedIds}
+          onToggleRow={handleToggleRow}
+          onToggleAll={() => handleToggleAll(paginatedData)}
         />
       )}
       
@@ -1010,7 +1068,11 @@ function DesktopTable({
   density = 'compact',
   columnWidths = {},
   setColumnWidth,
-  resetColumnWidth
+  resetColumnWidth,
+  multiSelect,
+  selectedIds,
+  onToggleRow,
+  onToggleAll
 }) {
   // Resizing state
   const [resizingColumn, setResizingColumn] = useState(null)
@@ -1092,6 +1154,16 @@ function DesktopTable({
         {/* Header */}
         <thead className="sticky top-0 z-10 table-header-gradient backdrop-blur-sm border-b border-border shadow-sm">
           <tr>
+            {multiSelect && (
+              <th className="w-10 min-w-[40px] px-2 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={data.length > 0 && data.every(r => selectedIds?.has(r.id))}
+                  onChange={onToggleAll}
+                  className="w-4 h-4 rounded border-border text-accent-primary cursor-pointer"
+                />
+              </th>
+            )}
             {columns.map((col, colIdx) => {
               const style = getColStyle(col)
               const isLast = colIdx === columns.length - 1 && !rowActions
@@ -1145,7 +1217,7 @@ function DesktopTable({
         <tbody className="border-b border-border">
           {loading ? (
             <tr>
-              <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-12 text-center">
+              <td colSpan={columns.length + (rowActions ? 1 : 0) + (multiSelect ? 1 : 0)} className="py-12 text-center">
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-8 h-8 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
                   <span className="text-xs text-text-secondary">Loading...</span>
@@ -1156,13 +1228,25 @@ function DesktopTable({
             data.map((row, idx) => (
               <tr
                 key={row.id || idx}
-                onClick={() => onRowClick?.(row)}
+                onClick={() => multiSelect ? onToggleRow(row.id) : onRowClick?.(row)}
                 className={cn(
                   'group transition-all duration-200 table-row-hover',
-                  onRowClick && 'cursor-pointer',
+                  (onRowClick || multiSelect) && 'cursor-pointer',
                   // Selected state - uses theme-aware CSS class
-                  selectedId === row.id && 'row-selected'
+                  selectedId === row.id && 'row-selected',
+                  multiSelect && selectedIds?.has(row.id) && 'row-selected'
                 )}>
+                {multiSelect && (
+                  <td className="w-10 min-w-[40px] px-2 py-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds?.has(row.id) || false}
+                      onChange={(e) => { e.stopPropagation(); onToggleRow(row.id) }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 rounded border-border text-accent-primary cursor-pointer"
+                    />
+                  </td>
+                )}
                 {columns.map((col, colIdx) => {
                   const style = getColStyle(col)
                   const isLast = colIdx === columns.length - 1 && !rowActions
@@ -1287,7 +1371,11 @@ function MobileCardList({
   selectedId,
   onRowClick,
   rowActions,
-  loading
+  loading,
+  multiSelect,
+  selectedIds,
+  onToggleRow,
+  onToggleAll
 }) {
   if (loading) {
     return (
@@ -1302,20 +1390,44 @@ function MobileCardList({
   
   return (
     <div className="flex-1 overflow-auto">
+      {/* Select all for mobile multi-select */}
+      {multiSelect && (
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+          <input
+            type="checkbox"
+            checked={data.length > 0 && data.every(r => selectedIds?.has(r.id))}
+            onChange={onToggleAll}
+            className="w-4 h-4 rounded border-border text-accent-primary cursor-pointer"
+          />
+          <span className="text-xs text-text-secondary">Select all</span>
+        </div>
+      )}
       {/* Gradient dividers instead of flat lines */}
       <div className="space-y-px">
         {data.map((row, idx) => (
-          <div key={row.id || idx}>
-            {idx > 0 && <div className="divider-gradient mx-3" />}
-            <MobileCardRow
-              row={row}
-              primaryCol={primaryCol}
-              secondaryCol={secondaryCol}
-              tertiaryCol={tertiaryCol}
-              isSelected={selectedId === row.id}
-              onClick={() => onRowClick?.(row)}
-              actions={rowActions?.(row)}
-            />
+          <div key={row.id || idx} className="flex items-center">
+            {multiSelect && (
+              <div className="pl-3 pr-1 py-2">
+                <input
+                  type="checkbox"
+                  checked={selectedIds?.has(row.id) || false}
+                  onChange={() => onToggleRow(row.id)}
+                  className="w-4 h-4 rounded border-border text-accent-primary cursor-pointer"
+                />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              {idx > 0 && <div className="divider-gradient mx-3" />}
+              <MobileCardRow
+                row={row}
+                primaryCol={primaryCol}
+                secondaryCol={secondaryCol}
+                tertiaryCol={tertiaryCol}
+                isSelected={multiSelect ? selectedIds?.has(row.id) : selectedId === row.id}
+                onClick={() => multiSelect ? onToggleRow(row.id) : onRowClick?.(row)}
+                actions={rowActions?.(row)}
+              />
+            </div>
           </div>
         ))}
       </div>

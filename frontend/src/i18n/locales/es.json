@@ -245,7 +245,8 @@
     "allowWildcardDesc": "Allow requesting *.domain.com certificates",
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} cuenta",
-    "subtitle_other": "{{count}} cuentas"
+    "subtitle_other": "{{count}} cuentas",
+    "subtitle": "{{count}} cuentas ACME"
   },
   "audit": {
     "event": "Evento",
@@ -354,7 +355,8 @@
     "createFailed": "Failed to create CA",
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} CA",
-    "subtitle_other": "{{count}} CAs"
+    "subtitle_other": "{{count}} CAs",
+    "subtitle": "{{count}} autoridades de certificación"
   },
   "certificates": {
     "createCertificate": "Crear certificado",
@@ -381,7 +383,8 @@
     "exportDER": "Exportar DER",
     "pkcs12Password": "Contraseña PKCS#12",
     "includeChain": "Incluir cadena de certificados",
-    "sanPlaceholder": "DNS:ejemplo.com\nDNS:www.ejemplo.com\nIP:192.168.1.1"
+    "sanPlaceholder": "DNS:ejemplo.com\nDNS:www.ejemplo.com\nIP:192.168.1.1",
+    "subtitle": "{{count}} certificados"
   },
   "common": {
     "save": "Guardar",
@@ -895,7 +898,8 @@
     "subtitle_one": "{{count}} grupo",
     "subtitle_other": "{{count}} grupos",
     "memberCount_one": "{{count}} miembro",
-    "memberCount_other": "{{count}} miembros"
+    "memberCount_other": "{{count}} miembros",
+    "subtitle": "{{count}} grupos"
   },
   "help": {
     "aboutCertificates": "Acerca de certificados",
@@ -975,7 +979,8 @@
       "cloud": "Cloud"
     },
     "subtitle_one": "{{count}} proveedor",
-    "subtitle_other": "{{count}} proveedores"
+    "subtitle_other": "{{count}} proveedores",
+    "subtitle": "{{count}} proveedores HSM"
   },
   "import": {
     "smartImport": "Smart Import",
@@ -1095,7 +1100,27 @@
     "scep": "SCEP",
     "rbac": "Control de acceso",
     "hsm": "HSM",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "operations": "Operaciones"
+  },
+  "operations": {
+    "title": "Operaciones",
+    "subtitle": "Importar, exportar y acciones masivas",
+    "bulkActions": "Acciones masivas",
+    "noData": "No se encontraron elementos",
+    "noDataDesc": "Intente ajustar sus filtros",
+    "loadFailed": "Error al cargar",
+    "bulkSuccess": "{{action}}: {{count}} exitoso(s)",
+    "bulkPartialFail": "{{count}} elementos fallidos",
+    "bulkFailed": "La operación masiva falló",
+    "confirmBulk": "Confirmar operación masiva",
+    "confirmRevoke": "¿Revocar {{count}} certificado(s)? Esta acción no se puede deshacer.",
+    "confirmRenew": "¿Renovar {{count}} certificado(s)? Se generarán nuevas claves.",
+    "confirmDelete": "¿Eliminar {{count}} elemento(s)? Esta acción no se puede deshacer.",
+    "confirmExport": "¿Exportar {{count}} elemento(s)?",
+    "confirmSign": "¿Firmar {{count}} CSR?",
+    "signCSRs": "Firmar {{count}} CSR",
+    "selectCAForSign": "Seleccione una CA para firmar los CSRs:"
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",
@@ -1164,7 +1189,8 @@
     },
     "stats": {},
     "subtitle_one": "{{count}} rol",
-    "subtitle_other": "{{count}} roles"
+    "subtitle_other": "{{count}} roles",
+    "subtitle": "{{count}} roles personalizados"
   },
   "scep": {
     "title": "Protocolo SCEP",
@@ -1581,7 +1607,8 @@
     "fixedCN": "Fixed CN",
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} plantilla",
-    "subtitle_other": "{{count}} plantillas"
+    "subtitle_other": "{{count}} plantillas",
+    "subtitle": "{{count}} plantillas de certificados"
   },
   "time": {
     "today": "Hoy",
@@ -1726,7 +1753,8 @@
     "syncedCerts": "Synced {{coat}} certificatees",
     "tlsTrustDesc": "Trusted for TLS/SSL connections",
     "caTrustDesc": "Trusted for issuing certificatees",
-    "emailTrustDesc": "Trusted for S/MIME"
+    "emailTrustDesc": "Trusted for S/MIME",
+    "subtitle": "Gestionar certificados de confianza"
   },
   "users": {
     "createUser": "Crear usuario",
@@ -1745,7 +1773,8 @@
     "confirmDelete": "Delete user \"{{name}}\"?",
     "resetPasswordFailed": "Failed to reset password",
     "newPassword": "New password: {{password}}",
-    "subtitle_one": "{{count}} usuario"
+    "subtitle_one": "{{count}} usuario",
+    "subtitle": "{{count}} usuarios"
   },
   "validation": {
     "required": "Este campo es requerido",
