@@ -7,7 +7,6 @@ After=network.target
 Type=simple
 User=ucm
 Group=ucm
-WorkingDirectory=/opt/ucm
 
 # Security settings
 NoNewPrivileges=true
@@ -34,8 +33,10 @@ RestartSec=5s
 StartLimitInterval=60s
 StartLimitBurst=3
 
-# Execution - Uses wrapper script to load environment
-ExecStart=/opt/ucm/start-ucm.sh
+# Environment and execution
+EnvironmentFile=-/etc/ucm/ucm.env
+WorkingDirectory=/opt/ucm/backend
+ExecStart=/opt/ucm/venv/bin/gunicorn -c gunicorn_config.py wsgi:app
 ExecReload=/bin/kill -HUP $MAINPID
 
 # Standard output

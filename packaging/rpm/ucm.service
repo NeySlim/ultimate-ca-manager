@@ -12,8 +12,8 @@ WorkingDirectory=/opt/ucm/backend
 # Environment
 EnvironmentFile=-/etc/ucm/ucm.env
 
-# Start script handles cert generation
-ExecStart=/opt/ucm/start-ucm.sh
+# Start gunicorn directly using config file
+ExecStart=/opt/ucm/venv/bin/gunicorn -c gunicorn_config.py wsgi:app
 
 # Security hardening
 NoNewPrivileges=true

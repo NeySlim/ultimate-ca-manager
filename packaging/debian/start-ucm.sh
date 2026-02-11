@@ -8,23 +8,6 @@ set -a
 [ -f /etc/ucm/ucm.env ] && source /etc/ucm/ucm.env
 set +a
 
-# Set defaults if not defined
-: ${HTTPS_PORT:=8443}
-: ${HTTPS_CERT_PATH:=/opt/ucm/data/https_cert.pem}
-: ${HTTPS_KEY_PATH:=/opt/ucm/data/https_key.pem}
-: ${LOG_LEVEL:=info}
-
-# Start Gunicorn with SSL and WebSocket support (gevent worker)
+# Start Gunicorn using Python config file (all settings in gunicorn_config.py)
 cd /opt/ucm/backend
-exec /opt/ucm/venv/bin/gunicorn \
-    --bind "0.0.0.0:${HTTPS_PORT}" \
-    --workers 4 \
-    --worker-class geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
-    --timeout 120 \
-    --access-logfile /var/log/ucm/access.log \
-    --error-logfile /var/log/ucm/error.log \
-    --log-level "${LOG_LEVEL}" \
-    --certfile "${HTTPS_CERT_PATH}" \
-    --keyfile "${HTTPS_KEY_PATH}" \
-    --chdir /opt/ucm/backend \
-    wsgi:app
+exec /opt/ucm/venv/bin/gunicorn -c gunicorn_config.py wsgi:app

@@ -82,8 +82,7 @@ EXPOSE 8443
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f -k https://127.0.0.1:8443/health || exit 1
 
-# Copy Gunicorn configuration and entrypoint before switching user
-COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
+# Copy entrypoint before switching user
 COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
@@ -94,4 +93,4 @@ USER ucm
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command - Use Gunicorn for production
-CMD ["sh", "-c", "UCM_BASE_PATH=/app gunicorn --config /app/gunicorn.conf.py wsgi:app"]
+CMD ["sh", "-c", "cd /app/backend && UCM_BASE_PATH=/app gunicorn -c gunicorn_config.py wsgi:app"]
