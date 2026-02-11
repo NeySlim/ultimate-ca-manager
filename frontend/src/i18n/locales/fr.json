@@ -1202,7 +1202,10 @@
     "stats": {},
     "subtitle_one": "{{count}} rôle",
     "subtitle_other": "{{count}} rôles",
-    "subtitle": "{{count}} rôles personnalisés"
+    "subtitle": "{{count}} rôles personnalisés",
+    "customRole": "Rôle personnalisé",
+    "noCustomRole": "Aucun (rôle de base uniquement)",
+    "userCount": "{{count}} utilisateurs"
   },
   "scep": {
     "title": "Protocole SCEP",

@@ -31,6 +31,11 @@ class CustomRole(db.Model):
         return list(perms)
     
     def to_dict(self):
+        from models import User
+        try:
+            user_count = User.query.filter_by(custom_role_id=self.id).count()
+        except Exception:
+            user_count = 0
         return {
             'id': self.id,
             'name': self.name,
@@ -40,6 +45,7 @@ class CustomRole(db.Model):
             'inherits_from': self.inherits_from,
             'parent_name': self.parent.name if self.parent else None,
             'is_system': self.is_system,
+            'user_count': user_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

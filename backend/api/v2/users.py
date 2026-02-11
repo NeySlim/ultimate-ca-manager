@@ -203,12 +203,24 @@ def create_user():
     if role not in valid_roles:
         return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
     
+    # Validate custom_role_id if provided
+    custom_role_id = data.get('custom_role_id')
+    if custom_role_id:
+        try:
+            from models.rbac import CustomRole
+            if not CustomRole.query.get(int(custom_role_id)):
+                return error_response('Custom role not found', 404)
+            custom_role_id = int(custom_role_id)
+        except (ValueError, ImportError):
+            custom_role_id = None
+    
     # Create user
     user = User(
         username=data['username'],
         email=data['email'],
         full_name=data.get('full_name', ''),
         role=role,
+        custom_role_id=custom_role_id,
         active=data.get('active', True)
     )
     user.set_password(data['password'])
@@ -292,6 +304,21 @@ def update_user(user_id):
         if data['role'] not in valid_roles:
             return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
         user.role = data['role']
+    
+    # SECURITY: Only admins can assign custom roles
+    if 'custom_role_id' in data:
+        if g.current_user.role != 'admin':
+            return error_response('Only admins can assign custom roles', 403)
+        if data['custom_role_id']:
+            try:
+                from models.rbac import CustomRole
+                if not CustomRole.query.get(int(data['custom_role_id'])):
+                    return error_response('Custom role not found', 404)
+                user.custom_role_id = int(data['custom_role_id'])
+            except (ValueError, ImportError):
+                return error_response('Invalid custom role ID', 400)
+        else:
+            user.custom_role_id = None
     
     # SECURITY: Only admins can change active status
     if 'active' in data:

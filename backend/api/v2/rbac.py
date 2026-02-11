@@ -113,8 +113,14 @@ def delete_custom_role(role_id):
     """Delete a custom role"""
     role = CustomRole.query.get_or_404(role_id)
     
+    if role.is_system:
+        return error_response("System roles cannot be deleted", 403)
+    
     # Check if role is in use
-    # TODO: Check users with this role
+    from models import User
+    user_count = User.query.filter_by(custom_role_id=role_id).count()
+    if user_count > 0:
+        return error_response(f"Role is assigned to {user_count} user(s). Remove assignments first.", 409)
     
     db.session.delete(role)
     db.session.commit()
@@ -138,13 +144,16 @@ def get_effective_permissions(user_id):
         permissions.update(['read:cas', 'read:certs'])
     
     # Custom role permissions
-    if user.custom_role_id:
+    if getattr(user, 'custom_role_id', None):
         custom_role = CustomRole.query.get(user.custom_role_id)
         if custom_role:
             permissions.update(custom_role.get_all_permissions())
     
     # Group permissions
-    for group in user.groups:
-        permissions.update(group.permissions or [])
+    try:
+        for group in user.groups:
+            permissions.update(group.permissions or [])
+    except Exception:
+        pass
     
     return success_response(data=list(permissions))
