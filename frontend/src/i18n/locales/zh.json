@@ -1376,10 +1376,15 @@
     "subtitle": "系统配置",
     "tabs": {
       "appearance": "外观",
-      "backup": "备份",
       "audit": "审计",
+      "backup": "备份",
+      "database": "数据库",
+      "email": "邮件",
+      "general": "常规",
       "https": "HTTPS",
-      "general": "常规"
+      "security": "安全",
+      "sso": "SSO",
+      "updates": "更新"
     },
     "systemNameHelper": "UCM系统的显示名称",
     "baseUrl": "Base URL",

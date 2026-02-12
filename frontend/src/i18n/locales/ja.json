@@ -1376,10 +1376,15 @@
     "subtitle": "システム構成",
     "tabs": {
       "appearance": "外観",
-      "backup": "バックアップ",
       "audit": "監査",
+      "backup": "バックアップ",
+      "database": "データベース",
+      "email": "メール",
+      "general": "一般",
       "https": "HTTPS",
-      "general": "一般"
+      "security": "セキュリティ",
+      "sso": "SSO",
+      "updates": "アップデート"
     },
     "systemNameHelper": "UCMシステムの表示名",
     "baseUrl": "Base URL",

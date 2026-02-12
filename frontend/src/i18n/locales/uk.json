@@ -1376,10 +1376,15 @@
     "subtitle": "Конфігурація системи",
     "tabs": {
       "appearance": "Зовнішній вигляд",
-      "backup": "Резервне копіювання",
       "audit": "Аудит",
+      "backup": "Резервне копіювання",
+      "database": "База даних",
+      "email": "Пошта",
+      "general": "Загальні",
       "https": "HTTPS",
-      "general": "Загальні"
+      "security": "Безпека",
+      "sso": "SSO",
+      "updates": "Оновлення"
     },
     "systemNameHelper": "Відображуване ім'я системи UCM",
     "baseUrl": "Base URL",
