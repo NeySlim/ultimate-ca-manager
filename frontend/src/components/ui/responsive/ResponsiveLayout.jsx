@@ -501,11 +501,8 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
           )}
         >
           {TabIcon && (
-            <span className={cn(
-              'shrink-0 w-7 h-7 rounded-md flex items-center justify-center',
-              isActive ? '' : iconColor
-            )} style={isActive ? { background: 'var(--accent-primary)', color: 'white', opacity: 0.9 } : undefined}>
-              <TabIcon size={15} weight={isActive ? "fill" : "duotone"} />
+            <span className={cn('shrink-0', isActive ? '' : iconColor)}>
+              <TabIcon size={16} weight={isActive ? "fill" : "duotone"} />
             </span>
           )}
           <span className="truncate">{tab.label}</span>
