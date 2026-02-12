@@ -87,5 +87,6 @@ export { RichStatsBar } from './ui/RichStatsBar'
 // Charts are lazy loaded - NOT exported from main bundle
 // Import directly: import { CertificateTrendChart, ... } from './DashboardChart'
 export { UpdateChecker } from './UpdateChecker'
+export { ServiceReconnectOverlay } from './ServiceReconnectOverlay'
 export { SessionWarning } from './SessionWarning'
 export { ForcePasswordChange } from './ForcePasswordChange'
