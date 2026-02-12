@@ -88,9 +88,8 @@ function ServiceStatusWidget() {
   }
 
   const handleRestart = async () => {
-    const confirmed = await showConfirm({
+    const confirmed = await showConfirm(t('settings.restartConfirmMessage'), {
       title: t('settings.restartService'),
-      message: t('settings.restartConfirmMessage'),
       confirmText: t('settings.restartNow'),
       variant: 'danger'
     })
