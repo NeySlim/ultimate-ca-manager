@@ -5,16 +5,17 @@ import { cn } from '../lib/utils'
  * Button Component - Standardized sizes across the app
  * 
  * Size guidelines:
- * - sm: Content headers, inline actions, compact UI (default for most actions)
+ * - xs: Very compact icon buttons
+ * - sm: Default — content actions, headers, inline (default)
  * - default: Forms, modals, primary actions
- * - lg: Hero sections, prominent CTAs
+ * - lg: Hero sections, prominent CTAs, icon-only header buttons
  * 
  * Enhanced with visual effects:
  * - Layered shadows
  * - Gradient shine on hover
  * - Smooth micro-interactions
  */
-export function Button({ children, variant = 'primary', size = 'default', loading = false, loadingText, className, ...props }) {
+export function Button({ children, variant = 'primary', size = 'sm', loading = false, loadingText, className, ...props }) {
   const { t } = useTranslation()
   const variants = {
     primary: 'btn-gradient text-white',

@@ -231,10 +231,10 @@ export default function CRLOCSPPage() {
           checked={v}
           onCheckedChange={() => handleToggleAutoRegen(row)}
           disabled={!row.has_private_key || !canWrite('crl')}
-          className="w-9 h-5 bg-bg-tertiary rounded-full relative data-[state=checked]:bg-accent-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-7 h-3.5 bg-bg-tertiary rounded-full relative data-[state=checked]:bg-accent-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={(e) => e.stopPropagation()}
         >
-          <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-100 translate-x-0.5 data-[state=checked]:translate-x-[18px]" />
+          <Switch.Thumb className="block w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-100 translate-x-0.5 data-[state=checked]:translate-x-[13px]" />
         </Switch.Root>
       )
     },

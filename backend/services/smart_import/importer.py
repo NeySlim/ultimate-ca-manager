@@ -264,7 +264,7 @@ class SmartImporter:
             refid = secrets.token_hex(8)
             ca = CA(
                 refid=refid,
-                descr=f"{desc_prefix}{self._get_cn(ca_obj.subject)}",
+                descr=self._get_cn(ca_obj.subject),
                 caref=caref,
                 crt=base64.b64encode(ca_obj.raw_pem.encode()).decode(),
                 prv=prv,
@@ -334,7 +334,7 @@ class SmartImporter:
             import json
             cert = Certificate(
                 refid=secrets.token_urlsafe(16),
-                descr=f"{desc_prefix}{cn or 'Certificate'}",
+                descr=cn or 'Certificate',
                 caref=caref,
                 crt=base64.b64encode(cert_obj.raw_pem.encode()).decode(),
                 prv=prv,
@@ -391,7 +391,7 @@ class SmartImporter:
             import json
             cert = Certificate(
                 refid=secrets.token_urlsafe(16),
-                descr=f"{desc_prefix}{cn}",
+                descr=cn,
                 csr=base64.b64encode(csr_obj.raw_pem.encode()).decode(),
                 prv=prv,
                 cert_type="server_cert",
