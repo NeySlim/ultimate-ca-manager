@@ -262,6 +262,7 @@ export default function TemplatesPage() {
       priority: 3,
       hideOnMobile: true,
       sortable: true,
+      mono: true,
       render: (val) => (
         <span className="text-sm text-text-secondary">
           {t('templates.validityDays', { count: val || 365 })}

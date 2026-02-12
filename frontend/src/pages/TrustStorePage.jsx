@@ -233,6 +233,7 @@ export default function TrustStorePage() {
       key: 'not_after',
       header: t('common.expires'),
       priority: 2,
+      mono: true,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
         const date = new Date(val)
