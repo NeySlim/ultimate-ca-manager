@@ -206,11 +206,12 @@ def backfill_ski_aki():
         db.session.commit()
         logger.info(f"SKI/AKI chain repair: re-chained {stats['rechained_cas']} CAs, {stats['rechained_certs']} certs, deduplicated {stats['deduplicated']} CAs")
 
-    # Count remaining orphans after repair
+    # Count remaining orphans after repair (exclude self-signed roots)
     stats['orphan_cas'] = CA.query.filter(
         CA.caref.is_(None) | (CA.caref == ''),
         CA.ski.isnot(None),
-        CA.crt.isnot(None)
+        CA.crt.isnot(None),
+        CA.subject != CA.issuer
     ).count()
     stats['orphan_certs'] = Certificate.query.filter(
         Certificate.caref.is_(None) | (Certificate.caref == ''),

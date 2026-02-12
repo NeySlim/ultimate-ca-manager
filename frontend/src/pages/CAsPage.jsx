@@ -7,7 +7,8 @@ import { useSearchParams } from 'react-router-dom'
 import { 
   Key, Download, Trash,
   Certificate, UploadSimple, Clock, Plus, CaretRight, CaretDown,
-  TreeStructure, List, Check, Crown, ShieldCheck, Columns, SquaresFour
+  TreeStructure, List, Check, Crown, ShieldCheck, Columns, SquaresFour,
+  LinkSimple, ArrowClockwise, CircleNotch, Timer
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, LoadingSpinner,
@@ -17,6 +18,7 @@ import {
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
+import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useModals, useRecentHistory } from '../hooks'
@@ -48,6 +50,10 @@ export default function CAsPage() {
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Chain repair state
+  const [chainRepair, setChainRepair] = useState(null)
+  const [chainRepairRunning, setChainRepairRunning] = useState(false)
   
   // Pagination state
   const [page, setPage] = useState(1)
@@ -107,6 +113,11 @@ export default function CAsPage() {
     } finally {
       setLoading(false)
     }
+
+    // Load chain repair status (non-blocking)
+    apiClient.get('/system/chain-repair')
+      .then(res => setChainRepair(res.data || null))
+      .catch(() => {})
   }
 
   const loadCADetails = async (ca) => {
@@ -124,6 +135,16 @@ export default function CAsPage() {
       setSelectedCA(ca)
     }
   }
+
+  const runChainRepair = useCallback(async () => {
+    setChainRepairRunning(true)
+    try {
+      const res = await apiClient.post('/system/chain-repair/run')
+      setChainRepair(res.data || null)
+      loadCAs() // Refresh CAs after repair
+    } catch { /* ignore */ }
+    finally { setChainRepairRunning(false) }
+  }, [])
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.CA, {
@@ -336,6 +357,7 @@ export default function CAsPage() {
         subtitle={t('cas.subtitle', { count: cas.length })}
         icon={ShieldCheck}
         stats={stats}
+        afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} t={t} />}
         helpPageKey="cas"
         // Split view on xl+ screens - panel always visible
         splitView={true}
@@ -1201,6 +1223,82 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
           </CompactGrid>
         </CompactSection>
       )}
+    </div>
+  )
+}
+
+// Compact chain repair bar — sits under stats
+function ChainRepairBar({ data, running, onRun, t }) {
+  const task = data?.task || {}
+  const crStats = data?.stats || {}
+  const [countdown, setCountdown] = useState('')
+
+  useEffect(() => {
+    if (!task.next_run) return
+    const update = () => {
+      const diff = Math.max(0, Math.floor((new Date(task.next_run).getTime() - Date.now()) / 1000))
+      const m = Math.floor(diff / 60)
+      const s = diff % 60
+      setCountdown(`${m}:${String(s).padStart(2, '0')}`)
+    }
+    update()
+    const id = setInterval(update, 1000)
+    return () => clearInterval(id)
+  }, [task.next_run])
+
+  const total = crStats.total_cas || 0
+  const orphans = crStats.orphan_cas || 0
+  const linked = total - orphans
+  const pct = total > 0 ? Math.round((linked / total) * 100) : 100
+
+  if (!data) return null
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/30 bg-bg-secondary/30">
+      <div className="flex items-center gap-1.5 text-text-tertiary shrink-0">
+        <LinkSimple size={13} weight="duotone" />
+        <span className="text-[11px] font-medium">{t('dashboard.chainRepair')}</span>
+      </div>
+
+      <div className="flex items-center gap-2 flex-1 max-w-xs">
+        <div className="flex-1 h-1.5 rounded-full bg-bg-tertiary/80 overflow-hidden">
+          <div 
+            className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-accent-success' : 'bg-accent-warning'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-[10px] font-bold font-mono text-text-secondary w-8 text-right">{pct}%</span>
+      </div>
+
+      <div className="hidden sm:flex items-center gap-3 text-[10px] text-text-tertiary">
+        <span>{crStats.total_cas || 0} CA{(crStats.total_cas || 0) > 1 ? 's' : ''}</span>
+        <span>{crStats.total_certs || 0} certs</span>
+        {orphans > 0 && <span className="text-accent-warning">{orphans} {t('dashboard.chainRepairOrphans')}</span>}
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {running ? (
+          <span className="text-[10px] text-accent-primary flex items-center gap-1">
+            <CircleNotch size={10} className="animate-spin" />
+          </span>
+        ) : countdown ? (
+          <span className="text-[10px] text-text-tertiary font-mono flex items-center gap-1">
+            <Timer size={10} />
+            {countdown}
+          </span>
+        ) : null}
+        <button
+          onClick={onRun}
+          disabled={running}
+          className="p-1 rounded hover:bg-bg-tertiary/80 text-text-tertiary hover:text-accent-primary transition-all disabled:opacity-50"
+          title={t('dashboard.chainRepairRun')}
+        >
+          {running 
+            ? <CircleNotch size={12} className="animate-spin" />
+            : <ArrowClockwise size={12} />
+          }
+        </button>
+      </div>
     </div>
   )
 }
