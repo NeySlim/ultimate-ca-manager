@@ -64,6 +64,22 @@ function formatDate(dateStr, format = 'full') {
   }
 }
 
+const CERT_TYPE_LABELS = {
+  server_cert: 'Server',
+  client_cert: 'Client',
+  code_signing: 'Code Signing',
+  email_cert: 'Email / S/MIME',
+  ca_cert: 'CA',
+  intermediate_ca: 'Intermediate CA',
+  root_ca: 'Root CA',
+  self_signed: 'Self-Signed',
+}
+
+function formatCertType(type) {
+  if (!type) return null
+  return CERT_TYPE_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 // Expiry indicator - uses t from parent
 function ExpiryIndicator({ daysRemaining, validTo, t }) {
   let color = 'text-status-success'
@@ -238,10 +254,10 @@ export function CertificateDetails({
         <CompactGrid>
           <CompactField icon={Globe} label={t('common.commonName')} value={cert.cn || cert.common_name} />
           <CompactField icon={Buildings} label={t('common.organization')} value={cert.organization} />
-          <CompactField autoIcon label={t('common.orgUnit')} value={cert.organizational_unit} />
+          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={cert.organizational_unit} />
           <CompactField icon={MapPin} label={t('common.locality')} value={cert.locality} />
-          <CompactField autoIcon label={t('common.state')} value={cert.state} />
-          <CompactField autoIcon label={t('common.country')} value={cert.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={cert.state} />
+          <CompactField autoIcon="country" label={t('common.country')} value={cert.country} />
           <CompactField icon={Envelope} label={t('common.email')} value={cert.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -258,9 +274,9 @@ export function CertificateDetails({
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label={t('common.serial')} value={cert.serial_number} mono copyable />
-          <CompactField autoIcon label={t('common.keyType')} value={cert.key_type} />
-          <CompactField autoIcon label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
-          <CompactField autoIcon label={t('details.certType')} value={cert.cert_type} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={cert.key_type} />
+          <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
+          <CompactField autoIcon="certType" label={t('details.certType')} value={formatCertType(cert.cert_type)} />
         </CompactGrid>
       </CompactSection>
       
@@ -276,17 +292,17 @@ export function CertificateDetails({
       {/* Issuer */}
       <CompactSection title={t('common.issuer')} icon={ShieldCheck} iconClass="icon-bg-orange">
         <CompactGrid cols={1}>
-          <CompactField autoIcon label={t('common.issuer')} value={cert.issuer} mono />
-          <CompactField autoIcon label={t('common.ca')} value={cert.issuer_name} />
-          <CompactField autoIcon label={t('details.caReference')} value={cert.caref} mono copyable />
+          <CompactField autoIcon="issuer" label={t('common.issuer')} value={cert.issuer} mono />
+          <CompactField autoIcon="ca" label={t('common.ca')} value={cert.issuer_name} />
+          <CompactField autoIcon="caReference" label={t('details.caReference')} value={cert.caref} mono copyable />
         </CompactGrid>
       </CompactSection>
       
       {/* Thumbprints */}
       <CompactSection title={t('common.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
-          <CompactField autoIcon label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
-          <CompactField autoIcon label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
+          <CompactField autoIcon="sha1" label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
+          <CompactField autoIcon="sha256" label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
         </CompactGrid>
       </CompactSection>
       

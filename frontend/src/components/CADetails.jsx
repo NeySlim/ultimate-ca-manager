@@ -168,10 +168,10 @@ export function CADetails({
         <CompactGrid>
           <CompactField icon={Globe} label={t('common.commonName')} value={ca.common_name} />
           <CompactField icon={Buildings} label={t('common.organization')} value={ca.organization} />
-          <CompactField autoIcon label={t('common.orgUnit')} value={ca.organizational_unit} />
+          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={ca.organizational_unit} />
           <CompactField icon={MapPin} label={t('common.locality')} value={ca.locality} />
-          <CompactField autoIcon label={t('common.state')} value={ca.state} />
-          <CompactField autoIcon label={t('common.country')} value={ca.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={ca.state} />
+          <CompactField autoIcon="country" label={t('common.country')} value={ca.country} />
           <CompactField icon={Envelope} label={t('common.email')} value={ca.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -197,8 +197,8 @@ export function CADetails({
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label={t('common.serial')} value={ca.serial} mono copyable />
-          <CompactField autoIcon label={t('common.keyType')} value={ca.key_type} />
-          <CompactField autoIcon label={t('common.signatureAlgorithm')} value={ca.signature_algorithm || ca.hash_algorithm} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={ca.key_type} />
+          <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={ca.signature_algorithm || ca.hash_algorithm} />
           <CompactField label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -272,8 +272,8 @@ export function CADetails({
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField autoIcon label={t('common.created')} value={formatDate(ca.created_at)} />
-          <CompactField autoIcon label={t('details.createdBy')} value={ca.created_by} />
+          <CompactField autoIcon="createdAt" label={t('common.created')} value={formatDate(ca.created_at)} />
+          <CompactField autoIcon="createdBy" label={t('details.createdBy')} value={ca.created_by} />
           <CompactField label={t('details.importedFrom')} value={ca.imported_from} colSpan={2} />
         </CompactGrid>
       </CompactSection>

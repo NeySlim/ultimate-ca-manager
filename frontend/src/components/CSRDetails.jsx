@@ -146,10 +146,10 @@ export function CSRDetails({
         <CompactGrid>
           <CompactField icon={Globe} label={t('common.commonName')} value={csr.common_name || csr.cn} />
           <CompactField icon={Buildings} label={t('common.organization')} value={csr.organization || csr.o} />
-          <CompactField label={t('common.orgUnit')} value={csr.organizational_unit || csr.ou} />
+          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={csr.organizational_unit || csr.ou} />
           <CompactField icon={MapPin} label={t('common.locality')} value={csr.locality || csr.l} />
-          <CompactField label={t('common.state')} value={csr.state || csr.st} />
-          <CompactField label={t('common.country')} value={csr.country || csr.c} />
+          <CompactField autoIcon="state" label={t('common.state')} value={csr.state || csr.st} />
+          <CompactField autoIcon="country" label={t('common.country')} value={csr.country || csr.c} />
           <CompactField icon={Envelope} label={t('common.email')} value={csr.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -186,8 +186,8 @@ export function CSRDetails({
       <CompactSection title={t('common.technicalDetails')}>
         <CompactGrid>
           <CompactField icon={Key} label={t('common.keyAlgorithm')} value={csr.key_algorithm || csr.key_type} />
-          <CompactField label={t('common.keySize')} value={csr.key_size} />
-          <CompactField label={t('common.signatureAlgorithm')} value={csr.signature_algorithm} />
+          <CompactField autoIcon="keySize" label={t('common.keySize')} value={csr.key_size} />
+          <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={csr.signature_algorithm} />
           <CompactField label={t('details.subjectDN')} value={csr.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -240,9 +240,9 @@ export function CSRDetails({
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
           <CompactField icon={Calendar} label={t('common.createdAt')} value={formatDate(csr.created_at)} />
-          <CompactField label={t('details.createdBy')} value={csr.created_by} />
-          <CompactField label={t('details.signedAt')} value={csr.signed_at ? formatDate(csr.signed_at) : null} />
-          <CompactField label={t('common.signedBy')} value={csr.signed_by} />
+          <CompactField autoIcon="createdBy" label={t('details.createdBy')} value={csr.created_by} />
+          <CompactField autoIcon="signedAt" label={t('details.signedAt')} value={csr.signed_at ? formatDate(csr.signed_at) : null} />
+          <CompactField autoIcon="signedBy" label={t('common.signedBy')} value={csr.signed_by} />
         </CompactGrid>
       </CompactSection>
     </div>

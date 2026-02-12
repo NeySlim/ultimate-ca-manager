@@ -206,10 +206,10 @@ export function TrustCertDetails({
         <CompactGrid>
           <CompactField label={t('common.commonName')} value={cert.common_name} icon={Globe} />
           <CompactField label={t('common.organization')} value={cert.organization} icon={Buildings} />
-          <CompactField label={t('common.orgUnit')} value={cert.organizational_unit} />
+          <CompactField label={t('common.orgUnit')} value={cert.organizational_unit} autoIcon="orgUnit" />
           <CompactField label={t('common.locality')} value={cert.locality} icon={MapPin} />
-          <CompactField label={t('common.stateProvince')} value={cert.state} />
-          <CompactField label={t('common.country')} value={cert.country} />
+          <CompactField label={t('common.stateProvince')} value={cert.state} autoIcon="state" />
+          <CompactField label={t('common.country')} value={cert.country} autoIcon="country" />
         </CompactGrid>
       </CompactSection>
       
@@ -233,7 +233,7 @@ export function TrustCertDetails({
         <CompactGrid>
           <CompactField label={t('common.serialNumber')} value={cert.serial || cert.serial_number} icon={Hash} mono />
           <CompactField label={t('common.keyType')} value={cert.key_type} icon={Key} />
-          <CompactField label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
+          <CompactField label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} autoIcon="signatureAlgorithm" />
           {cert.subject && (
             <CompactField label={t('details.subjectDN')} value={cert.subject} className="col-span-2" mono />
           )}

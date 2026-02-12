@@ -17,66 +17,36 @@ import { useMobile } from '../contexts'
 import { Badge } from './Badge'
 import { Button } from './Button'
 
-// Auto-icon mapping for common field labels
+// Auto-icon mapping by i18n key (language-independent)
 const FIELD_ICONS = {
   // Location
-  'country': Flag,
-  'state': MapPin,
-  'province': MapPin,
-  'locality': MapPin,
-  'city': MapPin,
-  'organization': Buildings,
-  'org': Buildings,
-  'org unit': Buildings,
-  'organizational unit': Buildings,
-  'ou': Buildings,
-  
-  // Certificate fields
-  'common name': Globe,
-  'cn': Globe,
-  'serial': Hash,
-  'serial number': Hash,
-  'key type': Key,
-  'key algorithm': Key,
-  'key size': Key,
-  'sig algo': ShieldCheck,
-  'signature algorithm': ShieldCheck,
-  'signature': ShieldCheck,
-  'cert type': Certificate,
-  'certificate type': Certificate,
-  'type': FileText,
-  
+  'country': Flag, 'state': MapPin, 'province': MapPin,
+  'locality': MapPin, 'city': MapPin,
+  'organization': Buildings, 'orgUnit': Buildings,
+  // Certificate
+  'commonName': Globe, 'cn': Globe,
+  'serial': Hash, 'serialNumber': Hash,
+  'keyType': Key, 'keyAlgorithm': Key, 'keySize': Key,
+  'signatureAlgorithm': ShieldCheck,
+  'certType': Certificate, 'certificateType': Certificate, 'type': FileText,
   // Security
-  'fingerprint': Fingerprint,
-  'thumbprint': Fingerprint,
-  'sha-1': Fingerprint,
-  'sha-256': Fingerprint,
-  'sha1': Fingerprint,
-  'sha256': Fingerprint,
-  
+  'fingerprint': Fingerprint, 'thumbprint': Fingerprint,
+  'sha-1': Fingerprint, 'sha-256': Fingerprint, 'sha1': Fingerprint, 'sha256': Fingerprint,
   // Time
-  'valid from': Calendar,
-  'valid until': Calendar,
-  'not before': Calendar,
-  'not after': Calendar,
-  'expires': Clock,
-  'expiry': Clock,
-  'created': Calendar,
-  'updated': Calendar,
-  
+  'validFrom': Calendar, 'validUntil': Calendar,
+  'notBefore': Calendar, 'notAfter': Calendar,
+  'expires': Clock, 'expiry': Clock, 'expiryDate': Clock,
+  'created': Calendar, 'createdAt': Calendar, 'updated': Calendar, 'updatedAt': Calendar,
+  'signedAt': Calendar,
   // Contact
-  'email': Envelope,
-  'user': User,
-  'username': User,
-  'created by': User,
-  
+  'email': Envelope, 'user': User, 'username': User, 'createdBy': User, 'signedBy': User,
   // Technical
-  'issuer': Certificate,
-  'ca': Certificate,
-  'ca reference': Database,
-  'caref': Database,
-  'reference id': Hash,
-  'refid': Hash,
+  'issuer': Certificate, 'ca': Certificate,
+  'caReference': Database, 'caref': Database,
+  'referenceId': Hash, 'refid': Hash,
+  // Status
+  'status': ShieldCheck, 'role': User, 'description': FileText, 'name': Globe,
+  'purpose': FileText, 'notes': FileText, 'version': Hash,
 }
 
 /**
@@ -355,9 +325,8 @@ export function DetailField({
       )}>{label}</dt>
       <dd 
         className={cn(
-          mono 
-            ? cn("font-mono text-text-primary break-all", compact ? "text-2xs" : "text-xs")
-            : cn("text-text-primary font-medium", compact ? "text-xs" : "text-sm"),
+          "font-mono text-text-primary break-all",
+          compact ? "text-2xs" : "text-xs",
           copyable && "cursor-pointer hover:text-accent-primary transition-colors flex items-center gap-2"
         )}
         onClick={copyable ? handleCopy : undefined}
@@ -531,16 +500,15 @@ export function CompactGrid({ children, cols = 2, className }) {
 
 /**
  * CompactField - Inline label:value for compact display
- * @param {icon} icon - Optional icon component (or auto-detected from label)
- * @param {boolean} autoIcon - Auto-detect icon from label (default: false)
+ * @param {icon} icon - Optional icon component
+ * @param {string} autoIcon - i18n key for auto icon lookup (e.g. 'keyType', 'validFrom')
  * @param {boolean} copyable - Show copy button
- * @param {boolean} mono - Use monospace font
  */
 export function CompactField({ 
   label, 
   value, 
   icon: IconProp,
-  autoIcon = false,
+  autoIcon,
   mono, 
   copyable,
   className, 
@@ -552,11 +520,10 @@ export function CompactField({
     return null // Don't render empty fields
   }
   
-  // Auto-detect icon from label if autoIcon is true and no icon provided
+  // Resolve icon: explicit > autoIcon key lookup
   let Icon = IconProp
-  if (!Icon && autoIcon && label) {
-    const normalizedLabel = label.toLowerCase().trim()
-    Icon = FIELD_ICONS[normalizedLabel]
+  if (!Icon && autoIcon) {
+    Icon = FIELD_ICONS[autoIcon]
   }
   
   const handleCopy = () => {
@@ -581,10 +548,7 @@ export function CompactField({
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-2xs text-text-tertiary uppercase tracking-wider">{label}</div>
-          <div className={cn(
-            "text-sm text-text-primary break-all",
-            mono && "font-mono text-xs"
-          )}>
+          <div className="text-xs font-mono text-text-primary break-all">
             {value}
           </div>
         </div>
@@ -617,7 +581,7 @@ export function CompactField({
       onClick={copyable ? handleCopy : undefined}
     >
       <span className="text-text-tertiary">{label}:</span>
-      <span className={cn("ml-1 text-text-primary", mono && "font-mono text-xs")}>
+      <span className="ml-1 font-mono text-xs text-text-primary">
         {value}
       </span>
       {copyable && (
