@@ -86,8 +86,13 @@ case "$1" in
         fi
         # ============================================================
         
-        # Sudoers for service restart
-        echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
+        # Sudoers for service restart and auto-update
+        cat > /etc/sudoers.d/ucm-service << 'SUDOERS'
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm, /usr/bin/systemctl start ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/dpkg -i /tmp/ucm_update_*
+ucm ALL=(ALL) NOPASSWD: /usr/bin/rpm -U --force /tmp/ucm_update_*
+SUDOERS
         chmod 440 /etc/sudoers.d/ucm-service
         
         # Create config if not exists (fresh install)

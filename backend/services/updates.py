@@ -229,13 +229,18 @@ def download_update(download_url, package_name):
     file_path = os.path.join(temp_dir, package_name)
     
     try:
-        response = requests.get(download_url, stream=True, timeout=300)
+        import logging
+        logger = logging.getLogger('ucm.updates')
+        logger.info(f"Auto-update: downloading {download_url} to {file_path}")
+        response = requests.get(download_url, stream=True, timeout=300, allow_redirects=True)
         response.raise_for_status()
         
         with open(file_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         
+        file_size = os.path.getsize(file_path)
+        logger.info(f"Auto-update: downloaded {file_size} bytes to {file_path}")
         return file_path
     
     except Exception as e:
@@ -248,18 +253,23 @@ def install_update(package_path):
     Install downloaded update package
     
     This will restart the service, so the response may not complete.
+    Requires sudoers entries for dpkg/rpm and systemctl.
     """
     if package_path.endswith('.deb'):
-        cmd = ['dpkg', '-i', package_path]
+        cmd = f'sudo dpkg -i {package_path}'
     elif package_path.endswith('.rpm'):
-        cmd = ['rpm', '-U', '--force', package_path]
+        cmd = f'sudo rpm -U --force {package_path}'
     else:
         raise Exception(f"Unknown package format: {package_path}")
     
     try:
+        import logging
+        logger = logging.getLogger('ucm.updates')
+        log_file = '/var/log/ucm/update.log'
+        logger.info(f"Auto-update: installing {package_path} with: {cmd}")
         # Run install in background so response can complete
         subprocess.Popen(
-            ['bash', '-c', f'sleep 2 && {" ".join(cmd)} && systemctl restart ucm'],
+            ['bash', '-c', f'sleep 2 && {cmd} >> {log_file} 2>&1 && sudo systemctl restart ucm >> {log_file} 2>&1'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True
