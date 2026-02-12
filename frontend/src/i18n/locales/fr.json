@@ -251,7 +251,12 @@
     "subtitle_other": "{{count}} comptes",
     "subtitle": "{{count}} comptes ACME",
     "daysLeft": "{{count}} jours restants",
-    "daysLeft_one": "{{count}} jour restant"
+    "daysLeft_one": "{{count}} jour restant",
+    "groups": {
+      "certificates": "Certificats",
+      "providers": "Fournisseurs",
+      "management": "Gestion"
+    }
   },
   "audit": {
     "event": "Événement",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "Certificats exportés",
       "caExported": "Certificats AC exportés",
       "exportFailed": "Échec de l'export"
+    },
+    "groups": {
+      "import": "Importer",
+      "export": "Exporter"
     }
   },
   "members": {
@@ -1286,7 +1295,11 @@
     "mdmIntegration": "Intégration MDM",
     "mdmIntegrationDesc": "Compatible avec Microsoft Intune, Jamf Pro, VMware Workspace ONE.",
     "challengeSecurity": "Sécurité des défis",
-    "challengeSecurityDesc": "Les mots de passe de défi doivent être distribués de manière sécurisée."
+    "challengeSecurityDesc": "Les mots de passe de défi doivent être distribués de manière sécurisée.",
+    "groups": {
+      "management": "Gestion",
+      "settings": "Paramètres"
+    }
   },
   "securityDashboard": {
     "title": "Tableau de bord de sécurité",
@@ -1557,7 +1570,13 @@
     "regenerateAndRestart": "Régénérer et redémarrer",
     "applyImportedCertConfirm": "Appliquer ce certificat importé comme certificat HTTPS ? Ceci redémarrera le serveur.",
     "version": "Version",
-    "environment": "Environnement"
+    "environment": "Environnement",
+    "groups": {
+      "system": "Système",
+      "security": "Sécurité",
+      "notifications": "Notifications",
+      "interface": "Interface"
+    }
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

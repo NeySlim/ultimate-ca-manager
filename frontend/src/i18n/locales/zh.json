@@ -251,7 +251,12 @@
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "本地ACME",
     "daysLeft_one": "{{count}} day left",
-    "localAcme": "本地ACME"
+    "localAcme": "本地ACME",
+    "groups": {
+      "certificates": "证书",
+      "providers": "提供商",
+      "management": "管理"
+    }
   },
   "audit": {
     "event": "事件",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "证书已导出",
       "caExported": "CA 证书已导出",
       "exportFailed": "导出失败"
+    },
+    "groups": {
+      "import": "导入",
+      "export": "导出"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "mdmIntegration": "MDM 集成",
     "mdmIntegrationDesc": "兼容 Microsoft Intune, Jamf Pro, VMware Workspace ONE 和其他 MDM 解决方案。在您的 MDM 配置文件中配置 SCEP URL 和挑战密码。",
     "challengeSecurity": "挑战安全性",
-    "challengeSecurityDesc": "挑战密码应安全分发。建议仅在具有适当网络分段的受信任环境中使用自动批准。"
+    "challengeSecurityDesc": "挑战密码应安全分发。建议仅在具有适当网络分段的受信任环境中使用自动批准。",
+    "groups": {
+      "management": "管理",
+      "settings": "设置"
+    }
   },
   "securityDashboard": {
     "title": "安全仪表板",
@@ -1555,7 +1568,13 @@
     "restartNow": "Restart Now",
     "uptime": "Uptime",
     "includePreReleaseVersions": "Include pre-release versions",
-    "serviceStatus": "Service Status"
+    "serviceStatus": "Service Status",
+    "groups": {
+      "system": "系统",
+      "security": "安全",
+      "notifications": "通知",
+      "interface": "界面"
+    }
   },
   "sso": {
     "saml": "SAML 2.0",

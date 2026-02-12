@@ -19,7 +19,8 @@
  * MOBILE: Touch targets 44px+, swipe gestures, full-screen panels
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, ArrowLeft, Question } from '@phosphor-icons/react'
+import { X, ArrowLeft, Question, CaretRight } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
@@ -48,6 +49,11 @@ export function ResponsiveLayout({
   tabs,
   activeTab,
   onTabChange,
+  
+  // Tab layout: 'horizontal' (default) or 'sidebar'
+  tabLayout = 'horizontal',
+  // Tab groups for sidebar mode: [{ labelKey: 'i18n.key', tabs: ['id1','id2'] }]
+  tabGroups,
   
   // Actions (top-right buttons)
   actions,
@@ -93,9 +99,21 @@ export function ResponsiveLayout({
   className
 }) {
   const { isMobile, isTablet, isDesktop, isTouch, isLargeScreen, screenWidth } = useMobile()
+  const { t } = useTranslation()
   
   // Show inline header when sidebar is visible (matches AppShell's breakpoint)
   const showInlineHeader = screenWidth >= 768
+  
+  // Sidebar tab mode
+  const useSidebar = tabLayout === 'sidebar' && tabs && tabs.length > 0
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(true)
+  
+  // Mobile: when tab changes externally, show content (not menu)
+  useEffect(() => {
+    if (useSidebar && !showInlineHeader && activeTab) {
+      setMobileMenuOpen(false)
+    }
+  }, []) // Only on mount
   
   // Local state for filter/help drawers (mobile only)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
@@ -192,7 +210,7 @@ export function ResponsiveLayout({
           title={title}
           subtitle={subtitle}
           icon={Icon}
-          tabs={tabs}
+          tabs={useSidebar ? undefined : tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
           filters={filters}
@@ -206,8 +224,8 @@ export function ResponsiveLayout({
         />
       )}
       
-      {/* MOBILE ONLY (< 768px): Tabs bar */}
-      {!showInlineHeader && tabs && tabs.length > 0 && (
+      {/* MOBILE ONLY (< 768px): Horizontal tabs bar (non-sidebar mode) */}
+      {!showInlineHeader && !useSidebar && tabs && tabs.length > 0 && (
         <div className="shrink-0 border-b border-border/50 bg-bg-secondary/50 overflow-x-auto scrollbar-hide px-2">
           <div className="flex gap-0.5 min-w-max">
             {tabs.map((tab) => {
@@ -257,7 +275,56 @@ export function ResponsiveLayout({
       
       {/* MAIN AREA - Content + SlideOver/SplitPanel */}
       <div className="flex-1 flex overflow-hidden">
-        {/* CONTENT AREA - fills available space */}
+        
+        {/* SIDEBAR TAB NAVIGATION (desktop, sidebar mode) */}
+        {useSidebar && showInlineHeader && (
+          <SidebarNav
+            tabs={tabs}
+            tabGroups={tabGroups}
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            t={t}
+          />
+        )}
+        
+        {/* MOBILE SIDEBAR: menu or content with back button */}
+        {useSidebar && !showInlineHeader && mobileMenuOpen && (
+          <div className="flex-1 overflow-auto bg-bg-primary">
+            <MobileSidebarMenu
+              tabs={tabs}
+              tabGroups={tabGroups}
+              activeTab={activeTab}
+              onTabChange={(id) => {
+                onTabChange?.(id)
+                setMobileMenuOpen(false)
+              }}
+              t={t}
+            />
+          </div>
+        )}
+        
+        {/* MOBILE SIDEBAR: back button when viewing content */}
+        {useSidebar && !showInlineHeader && !mobileMenuOpen && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="shrink-0 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-accent-primary border-b border-border/50 bg-bg-secondary/30"
+            >
+              <ArrowLeft size={16} />
+              {(() => {
+                const currentTab = tabs.find(tab => tab.id === activeTab)
+                return currentTab?.label || t('common.back')
+              })()}
+            </button>
+            <main className="flex-1 min-w-0 overflow-auto bg-bg-primary">
+              {loading ? <LoadingState /> : children}
+            </main>
+          </div>
+        )}
+        
+        {/* CONTENT AREA + SPLIT/SLIDEOVER (non-sidebar or desktop sidebar) */}
+        {(!useSidebar || showInlineHeader) && (
+        <>
         <main className={cn(
           'min-w-0 overflow-auto bg-bg-primary',
           // In split view mode on large screens, content takes remaining space
@@ -359,6 +426,8 @@ export function ResponsiveLayout({
             {slideOverContent}
           </MobileSlideOver>
         )}
+        </>
+        )}
       </div>
       
       {/* MOBILE FILTER DRAWER */}
@@ -404,6 +473,138 @@ export function ResponsiveLayout({
           </DesktopHelpPanel>
         )
       )}
+    </div>
+  )
+}
+
+// =============================================================================
+// SIDEBAR NAV - Desktop sidebar for tabLayout="sidebar"
+// =============================================================================
+
+function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
+  const renderTabs = (tabIds) => {
+    return tabIds.map(id => {
+      const tab = tabs.find(tb => tb.id === id)
+      if (!tab) return null
+      const TabIcon = tab.icon
+      const isActive = activeTab === id
+      return (
+        <button
+          key={id}
+          onClick={() => onTabChange?.(id)}
+          className={cn(
+            "w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-all text-left",
+            isActive
+              ? "bg-accent-primary/10 text-accent-primary font-medium border-l-2 border-accent-primary -ml-px"
+              : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+          )}
+        >
+          {TabIcon && (
+            <span className={cn('shrink-0', tab.color || '')}>
+              <TabIcon size={16} weight={isActive ? "fill" : "regular"} />
+            </span>
+          )}
+          <span className="truncate">{tab.label}</span>
+          {tab.count !== undefined && (
+            <span className={cn(
+              'ml-auto px-1.5 py-0.5 rounded-full text-2xs font-medium shrink-0',
+              isActive ? 'bg-accent-primary/15 text-accent-primary' : 'bg-bg-tertiary text-text-tertiary'
+            )}>
+              {tab.count}
+            </span>
+          )}
+        </button>
+      )
+    })
+  }
+
+  if (tabGroups) {
+    return (
+      <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/20 p-3 space-y-4">
+        {tabGroups.map((group, i) => (
+          <div key={i}>
+            {group.labelKey && (
+              <div className="px-3 pb-1.5 text-3xs font-semibold text-text-tertiary uppercase tracking-wider">
+                {t(group.labelKey)}
+              </div>
+            )}
+            <div className="space-y-0.5">
+              {renderTabs(group.tabs)}
+            </div>
+          </div>
+        ))}
+      </nav>
+    )
+  }
+
+  return (
+    <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/20 p-3">
+      <div className="space-y-0.5">
+        {renderTabs(tabs.map(t => t.id))}
+      </div>
+    </nav>
+  )
+}
+
+// =============================================================================
+// MOBILE SIDEBAR MENU - Full screen category list
+// =============================================================================
+
+function MobileSidebarMenu({ tabs, tabGroups, activeTab, onTabChange, t }) {
+  const renderItem = (tab) => {
+    const TabIcon = tab.icon
+    const isActive = activeTab === tab.id
+    return (
+      <button
+        key={tab.id}
+        onClick={() => onTabChange?.(tab.id)}
+        className={cn(
+          "w-full flex items-center gap-3 px-4 py-3.5 text-sm transition-all",
+          "border-b border-border/30",
+          isActive
+            ? "bg-accent-primary/5 text-accent-primary font-medium"
+            : "text-text-primary active:bg-bg-tertiary"
+        )}
+      >
+        {TabIcon && (
+          <span className={cn('shrink-0 w-8 h-8 rounded-lg flex items-center justify-center', tab.color || 'bg-bg-tertiary')}>
+            <TabIcon size={18} weight={isActive ? "fill" : "regular"} className={isActive ? 'text-accent-primary' : 'text-white'} />
+          </span>
+        )}
+        <span className="flex-1 text-left truncate">{tab.label}</span>
+        {tab.count !== undefined && (
+          <span className="px-1.5 py-0.5 rounded-full text-2xs font-medium bg-bg-tertiary text-text-tertiary">
+            {tab.count}
+          </span>
+        )}
+        <CaretRight size={16} className="text-text-tertiary shrink-0" />
+      </button>
+    )
+  }
+
+  if (tabGroups) {
+    return (
+      <div className="divide-y divide-border/30">
+        {tabGroups.map((group, i) => (
+          <div key={i}>
+            {group.labelKey && (
+              <div className="px-4 pt-4 pb-1.5 text-3xs font-semibold text-text-tertiary uppercase tracking-wider">
+                {t(group.labelKey)}
+              </div>
+            )}
+            {group.tabs.map(id => {
+              const tab = tabs.find(tb => tb.id === id)
+              return tab ? renderItem(tab) : null
+            })}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {tabs.map(tab => renderItem(tab))}
     </div>
   )
 }

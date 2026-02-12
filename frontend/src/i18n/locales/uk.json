@@ -251,7 +251,12 @@
     "daysLeft_one": "{{count}} день залишився",
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "ЛОКАЛЬНИЙ ACME",
-    "localAcme": "Локальний ACME"
+    "localAcme": "Локальний ACME",
+    "groups": {
+      "certificates": "Сертифікати",
+      "providers": "Провайдери",
+      "management": "Керування"
+    }
   },
   "audit": {
     "event": "Подія",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "Сертифікатs exported",
       "caExported": "Сертифікати CA експортовано",
       "exportFailed": "Експорт невдало"
+    },
+    "groups": {
+      "import": "Імпорт",
+      "export": "Експорт"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "mdmIntegration": "Інтеграція з MDM",
     "mdmIntegrationDesc": "Сумісність з Microsoft Intune, Jamf Pro, VMware Workspace ONE та іншими рішеннями MDM. Налаштуйте URL-адресу SCEP та пароль виклику у вашому профілі MDM.",
     "challengeSecurity": "Challenge Безпека",
-    "challengeSecurityDesc": "Challenge passwords should be securely distributed. Consider using авто-approve only in trusted environments with proper network segmentation."
+    "challengeSecurityDesc": "Challenge passwords should be securely distributed. Consider using авто-approve only in trusted environments with proper network segmentation.",
+    "groups": {
+      "management": "Керування",
+      "settings": "Налаштування"
+    }
   },
   "securityDashboard": {
     "title": "Панель безпеки",
@@ -1555,7 +1568,13 @@
     "restartNow": "Перезапустити зараз",
     "uptime": "Час роботи",
     "includePreReleaseVersions": "Включати попередні версії",
-    "serviceStatus": "Статус служби"
+    "serviceStatus": "Статус служби",
+    "groups": {
+      "system": "Система",
+      "security": "Безпека",
+      "notifications": "Сповіщення",
+      "interface": "Інтерфейс"
+    }
   },
   "sso": {
     "saml": "SAML 2.0",

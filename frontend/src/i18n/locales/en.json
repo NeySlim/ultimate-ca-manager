@@ -864,7 +864,12 @@
     "subtitle_other": "{{count}} accounts",
     "subtitle": "{{count}} ACME accounts",
     "daysLeft": "{{count}} days left",
-    "daysLeft_one": "{{count}} day left"
+    "daysLeft_one": "{{count}} day left",
+    "groups": {
+      "certificates": "Certificates",
+      "providers": "Providers",
+      "management": "Management"
+    }
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -916,7 +921,11 @@
     "mdmIntegration": "MDM Integration",
     "mdmIntegrationDesc": "Compatible with Microsoft Intune, Jamf Pro, VMware Workspace ONE, and other MDM solutions. Configure the SCEP URL and challenge password in your MDM profile.",
     "challengeSecurity": "Challenge Security",
-    "challengeSecurityDesc": "Challenge passwords should be securely distributed. Consider using auto-approve only in trusted environments with proper network segmentation."
+    "challengeSecurityDesc": "Challenge passwords should be securely distributed. Consider using auto-approve only in trusted environments with proper network segmentation.",
+    "groups": {
+      "management": "Management",
+      "settings": "Settings"
+    }
   },
   "crlOcsp": {
     "subtitle": "{{count}} active CRLs",
@@ -1038,7 +1047,11 @@
     "supportedFormats": "Supported formats",
     "exportFormat": "Export Format",
     "includePrivateKey": "Include private key",
-    "exportAll": "Export All"
+    "exportAll": "Export All",
+    "groups": {
+      "import": "Import",
+      "export": "Export"
+    }
   },
   "tools": {
     "subtitle": "SSL checker, decoders, converters and key matcher",
@@ -1366,7 +1379,13 @@
     "vacuum": "Vacuum Database",
     "weekly": "Weekly",
     "version": "Version",
-    "environment": "Environment"
+    "environment": "Environment",
+    "groups": {
+      "system": "System",
+      "security": "Security",
+      "notifications": "Notifications",
+      "interface": "Interface"
+    }
   },
   "account": {
     "profile": "Profile",

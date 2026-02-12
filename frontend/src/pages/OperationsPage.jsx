@@ -872,6 +872,7 @@ export default function OperationsPage() {
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={setActiveTab}
+      tabLayout="sidebar"
       helpPageKey="operations"
     >
       {activeTab === 'bulk' ? (

@@ -749,6 +749,7 @@ export default function UsersGroupsPage() {
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        tabLayout="sidebar"
         helpContent={helpContent}
         helpTitle={t('common.users')}
         splitView={true}

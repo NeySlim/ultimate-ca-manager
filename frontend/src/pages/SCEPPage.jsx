@@ -405,6 +405,11 @@ export default function SCEPPage() {
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        tabLayout="sidebar"
+        tabGroups={[
+          { labelKey: 'scep.groups.management', tabs: ['requests', 'challenge'] },
+          { labelKey: 'scep.groups.settings', tabs: ['config', 'info'] },
+        ]}
         stats={activeTab === 'requests' ? headerStats : undefined}
         helpPageKey="scep"
         splitView={activeTab === 'requests'}

@@ -251,7 +251,12 @@
     "daysLeft_one": "{{count}} Tag übrig",
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "LOKALE ACME",
-    "localAcme": "Lokale ACME"
+    "localAcme": "Lokale ACME",
+    "groups": {
+      "certificates": "Zertifikate",
+      "providers": "Anbieter",
+      "management": "Verwaltung"
+    }
   },
   "audit": {
     "event": "Ereignis",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "Zertifikate exportiert",
       "caExported": "CA-Zertifikate exportiert",
       "exportFailed": "Export fehlgeschlagen"
+    },
+    "groups": {
+      "import": "Importieren",
+      "export": "Exportieren"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "mdmIntegration": "MDM-Integration",
     "mdmIntegrationDesc": "Kompatibel mit Microsoft Intune, Jamf Pro, VMware.",
     "challengeSecurity": "Challenge-Sicherheit",
-    "challengeSecurityDesc": "Challenge-Passwörter sicher verteilen."
+    "challengeSecurityDesc": "Challenge-Passwörter sicher verteilen.",
+    "groups": {
+      "management": "Verwaltung",
+      "settings": "Einstellungen"
+    }
   },
   "securityDashboard": {
     "title": "Sicherheits-Dashboard",
@@ -1555,7 +1568,13 @@
     "restartNow": "Restart Now",
     "uptime": "Uptime",
     "includePreReleaseVersions": "Include pre-release versions",
-    "serviceStatus": "Service Status"
+    "serviceStatus": "Service Status",
+    "groups": {
+      "system": "System",
+      "security": "Sicherheit",
+      "notifications": "Benachrichtigungen",
+      "interface": "Oberfläche"
+    }
   },
   "sso": {
     "saml": "SAML 2.0",

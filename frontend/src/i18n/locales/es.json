@@ -251,7 +251,12 @@
     "daysLeft_one": "{{count}} día restante",
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "ACME LOCAL",
-    "localAcme": "ACME Local"
+    "localAcme": "ACME Local",
+    "groups": {
+      "certificates": "Certificados",
+      "providers": "Proveedores",
+      "management": "Gestión"
+    }
   },
   "audit": {
     "event": "Evento",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "Certificados exportared",
       "caExported": "CA certificados exportared",
       "exportFailed": "Exportar error"
+    },
+    "groups": {
+      "import": "Importar",
+      "export": "Exportar"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "mdmIntegration": "Integración MDM",
     "mdmIntegrationDesc": "Compatible with Microsoft Intune, Jamf Pro, VMware Workspace ONE, and otro MDM solutions. Configure the SCEP URL and chtodosenge contraseña in your MDM perfil.",
     "challengeSecurity": "Chtodosenge Seguridad",
-    "challengeSecurityDesc": "Chtodosenge contraseñas should be securely distributed. Consider using auto-approve only in trusted environments with proper network segmentation."
+    "challengeSecurityDesc": "Chtodosenge contraseñas should be securely distributed. Consider using auto-approve only in trusted environments with proper network segmentation.",
+    "groups": {
+      "management": "Gestión",
+      "settings": "Configuración"
+    }
   },
   "securityDashboard": {
     "title": "Panel de seguridad",
@@ -1555,7 +1568,13 @@
     "restartNow": "Reiniciar ahora",
     "uptime": "Tiempo de actividad",
     "includePreReleaseVersions": "Incluir versiones preliminares",
-    "serviceStatus": "Estado del servicio"
+    "serviceStatus": "Estado del servicio",
+    "groups": {
+      "system": "Sistema",
+      "security": "Seguridad",
+      "notifications": "Notificaciones",
+      "interface": "Interfaz"
+    }
   },
   "sso": {
     "saml": "SAML 2.0",

@@ -251,7 +251,12 @@
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "ローカルACME",
     "daysLeft_one": "{{count}} day left",
-    "localAcme": "ローカルACME"
+    "localAcme": "ローカルACME",
+    "groups": {
+      "certificates": "証明書",
+      "providers": "プロバイダー",
+      "management": "管理"
+    }
   },
   "audit": {
     "event": "イベント",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "証明書がエクスポートされました",
       "caExported": "CA証明書がエクスポートされました",
       "exportFailed": "エクスポートに失敗しました"
+    },
+    "groups": {
+      "import": "インポート",
+      "export": "エクスポート"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "mdmIntegration": "MDM統合",
     "mdmIntegrationDesc": "Microsoft Intune、Jamf Pro、VMware Workspace ONE、その他のMDMソリューションと互換性があります。MDMプロファイルでSCEP URLとチャレンジパスワードを設定してください。",
     "challengeSecurity": "チャレンジセキュリティ",
-    "challengeSecurityDesc": "チャレンジパスワードは安全に配布する必要があります。適切なネットワークセグメンテーションが行われている信頼できる環境でのみ、自動承認の使用を検討してください。"
+    "challengeSecurityDesc": "チャレンジパスワードは安全に配布する必要があります。適切なネットワークセグメンテーションが行われている信頼できる環境でのみ、自動承認の使用を検討してください。",
+    "groups": {
+      "management": "管理",
+      "settings": "設定"
+    }
   },
   "securityDashboard": {
     "title": "セキュリティダッシュボード",
@@ -1555,7 +1568,13 @@
     "restartNow": "Restart Now",
     "uptime": "Uptime",
     "includePreReleaseVersions": "Include pre-release versions",
-    "serviceStatus": "Service Status"
+    "serviceStatus": "Service Status",
+    "groups": {
+      "system": "システム",
+      "security": "セキュリティ",
+      "notifications": "通知",
+      "interface": "インターフェース"
+    }
   },
   "sso": {
     "saml": "SAML 2.0",

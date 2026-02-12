@@ -1722,6 +1722,12 @@ export default function ACMEPage() {
         ]}
         tabs={tabs}
         activeTab={activeTab}
+        tabLayout="sidebar"
+        tabGroups={[
+          { labelKey: 'acme.groups.certificates', tabs: ['letsencrypt', 'domains'] },
+          { labelKey: 'acme.groups.providers', tabs: ['dns', 'accounts'] },
+          { labelKey: 'acme.groups.management', tabs: ['config', 'history'] },
+        ]}
         onTabChange={(tab) => {
           setActiveTab(tab)
           // Clear selections when changing tabs

@@ -251,7 +251,12 @@
     "wildcardRequiresDns01": "Certificados wildcard requerem desafio DNS-01",
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "ACME LOCAL",
-    "localAcme": "ACME Local"
+    "localAcme": "ACME Local",
+    "groups": {
+      "certificates": "Certificados",
+      "providers": "Provedores",
+      "management": "Gestão"
+    }
   },
   "audit": {
     "action": "Ação",
@@ -1119,6 +1124,10 @@
     "tabs": {
       "exportCerts": "Exportar Certs",
       "opnsense": "OpnSense"
+    },
+    "groups": {
+      "import": "Importar",
+      "export": "Exportar"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "supportedOperations": "Operações Suportadas",
     "title": "Protocolo SCEP",
     "transactionId": "ID da Transação",
-    "useThisUrl": "Use este URL em client configuration"
+    "useThisUrl": "Use este URL em client configuration",
+    "groups": {
+      "management": "Gestão",
+      "settings": "Configurações"
+    }
   },
   "securityDashboard": {
     "alerts": "{{count}} alertas",
@@ -1555,7 +1568,13 @@
     "restartNow": "Reiniciar Agora",
     "uptime": "Tempo de Atividade",
     "includePreReleaseVersions": "Incluir versões pré-lançamento",
-    "serviceStatus": "Estado do Serviço"
+    "serviceStatus": "Estado do Serviço",
+    "groups": {
+      "system": "Sistema",
+      "security": "Segurança",
+      "notifications": "Notificações",
+      "interface": "Interface"
+    }
   },
   "sso": {
     "authUrl": "URL de autorização",

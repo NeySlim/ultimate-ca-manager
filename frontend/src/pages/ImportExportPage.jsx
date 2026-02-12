@@ -367,6 +367,11 @@ export default function ImportExportPage() {
       tabs={TABS}
       activeTab={activeTab}
       onTabChange={handleTabChange}
+      tabLayout="sidebar"
+      tabGroups={[
+        { labelKey: 'importExport.groups.import', tabs: ['import', 'opnsense'] },
+        { labelKey: 'importExport.groups.export', tabs: ['export-certs', 'export-cas'] },
+      ]}
       helpPageKey="importExport"
     >
       <div className="max-w-3xl mx-auto p-4 md:p-6">

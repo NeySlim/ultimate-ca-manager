@@ -251,7 +251,12 @@
     "daysLeft_one": "{{count}} giorno rimanente",
     "letsEncryptLabel": "LET'S ENCRYPT",
     "localAcmeLabel": "ACME LOCALE",
-    "localAcme": "ACME Locale"
+    "localAcme": "ACME Locale",
+    "groups": {
+      "certificates": "Certificati",
+      "providers": "Provider",
+      "management": "Gestione"
+    }
   },
   "audit": {
     "event": "Evento",
@@ -1110,6 +1115,10 @@
       "certificatesExported": "Certificati esportati",
       "caExported": "Certificati CA esportati",
       "exportFailed": "Esportazione fallita"
+    },
+    "groups": {
+      "import": "Importa",
+      "export": "Esporta"
     }
   },
   "members": {
@@ -1285,7 +1294,11 @@
     "mdmIntegration": "Integrazione MDM",
     "mdmIntegrationDesc": "Compatibile con Microsoft Intune, Jamf Pro, VMware Workspace ONE e altre soluzioni MDM. Configura l'URL SCEP e la password di challenge nel tuo profilo MDM.",
     "challengeSecurity": "Sicurezza Challenge",
-    "challengeSecurityDesc": "Le password di challenge dovrebbero essere distribuite in modo sicuro. Considera l'uso dell'approvazione automatica solo in ambienti fidati con adeguata segmentazione di rete."
+    "challengeSecurityDesc": "Le password di challenge dovrebbero essere distribuite in modo sicuro. Considera l'uso dell'approvazione automatica solo in ambienti fidati con adeguata segmentazione di rete.",
+    "groups": {
+      "management": "Gestione",
+      "settings": "Impostazioni"
+    }
   },
   "securityDashboard": {
     "title": "Dashboard di sicurezza",
@@ -1555,7 +1568,13 @@
     "restartNow": "Riavvia Ora",
     "uptime": "Tempo di attività",
     "includePreReleaseVersions": "Includi versioni pre-release",
-    "serviceStatus": "Stato Servizio"
+    "serviceStatus": "Stato Servizio",
+    "groups": {
+      "system": "Sistema",
+      "security": "Sicurezza",
+      "notifications": "Notifiche",
+      "interface": "Interfaccia"
+    }
   },
   "sso": {
     "saml": "SAML 2.0",
