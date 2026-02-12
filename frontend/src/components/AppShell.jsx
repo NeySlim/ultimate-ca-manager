@@ -24,24 +24,24 @@ import { certificatesService } from '../services'
 
 // Mobile navigation items (grid menu) - labels are i18n keys
 const mobileNavItems = [
-  { id: '', icon: House, labelKey: 'nav.dashboard', path: '/' },
-  { id: 'certificates', icon: Certificate, labelKey: 'nav.certificates', path: '/certificates' },
-  { id: 'cas', icon: ShieldCheck, labelKey: 'nav.cas', path: '/cas' },
-  { id: 'csrs', icon: FileText, labelKey: 'nav.csrs', path: '/csrs' },
-  { id: 'templates', icon: ListIcon, labelKey: 'nav.templates', path: '/templates' },
-  { id: 'users', icon: User, labelKey: 'nav.users', path: '/users' },
+  { id: '', icon: House, labelKey: 'common.dashboard', path: '/' },
+  { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
+  { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
+  { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
+  { id: 'templates', icon: ListIcon, labelKey: 'common.templates', path: '/templates' },
+  { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
   { id: 'acme', icon: Key, labelKey: 'nav.acme', path: '/acme' },
   { id: 'scep', icon: Robot, labelKey: 'nav.scep', path: '/scep-config' },
-  { id: 'crl-ocsp', icon: FileX, labelKey: 'nav.crlOcsp', path: '/crl-ocsp' },
-  { id: 'truststore', icon: Vault, labelKey: 'nav.trustStore', path: '/truststore' },
-  { id: 'import', icon: UploadSimple, labelKey: 'nav.importExport', path: '/import' },
-  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'nav.audit', path: '/audit' },
-  { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
+  { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
+  { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
+  { id: 'import', icon: UploadSimple, labelKey: 'common.importExport', path: '/import' },
+  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
+  { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
 ]
 
 // Advanced features (formerly Pro) - labels are i18n keys
 const advancedNavItems = [
-  { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security' },
+  { id: 'security', icon: Detective, labelKey: 'common.security', path: '/security' },
   { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
   { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
 ]
