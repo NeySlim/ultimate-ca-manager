@@ -12,8 +12,7 @@ import {
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
   UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning,
   SlidersHorizontal, Eye, EyeSlash, X, DotsSixVertical,
-  PencilSimpleLine, ArrowCounterClockwise, Timer, Check,
-  LinkSimple, ArrowClockwise, CircleNotch
+  PencilSimpleLine, ArrowCounterClockwise, Timer, Check
 } from '@phosphor-icons/react'
 import { Responsive, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -21,7 +20,6 @@ import 'react-resizable/css/styles.css'
 import { Card, Button, Badge, LoadingSpinner, Modal } from '../components'
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
 import { dashboardService, certificatesService, acmeService } from '../services'
-import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
@@ -37,7 +35,6 @@ const DEFAULT_WIDGETS = [
   { id: 'certs', nameKey: 'dashboard.widgetRecentCertificates', visible: true },
   { id: 'cas', nameKey: 'dashboard.widgetCertificateAuthorities', visible: true },
   { id: 'acme', nameKey: 'dashboard.widgetAcmeAccounts', visible: true },
-  { id: 'chainRepair', nameKey: 'dashboard.widgetChainRepair', visible: true },
 ]
 
 // Default grid layouts per breakpoint (12-column grid)
@@ -50,9 +47,8 @@ const DEFAULT_LAYOUTS = {
     { i: 'certs',      x: 0,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
     { i: 'cas',        x: 4,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
     { i: 'activity',   x: 8,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'system',     x: 0,  y: 11, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'acme',       x: 4,  y: 11, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'chainRepair',x: 8,  y: 11, w: 4,  h: 4, minW: 3, minH: 3 },
+    { i: 'system',     x: 0,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
+    { i: 'acme',       x: 6,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
   ],
   md: [
     { i: 'stats',      x: 0, y: 0, w: 6, h: 3, static: true },
@@ -64,7 +60,6 @@ const DEFAULT_LAYOUTS = {
     { i: 'activity',   x: 0, y: 18, w: 6, h: 5, minW: 3, minH: 3 },
     { i: 'system',     x: 0, y: 23, w: 6, h: 6, minW: 3, minH: 4 },
     { i: 'acme',       x: 0, y: 29, w: 6, h: 4, minW: 3, minH: 3 },
-    { i: 'chainRepair',x: 0, y: 33, w: 6, h: 4, minW: 3, minH: 3 },
   ],
   sm: [
     { i: 'stats',      x: 0, y: 0, w: 1, h: 3, static: true },
@@ -76,7 +71,6 @@ const DEFAULT_LAYOUTS = {
     { i: 'activity',   x: 0, y: 27, w: 1, h: 5 },
     { i: 'system',     x: 0, y: 32, w: 1, h: 6 },
     { i: 'acme',       x: 0, y: 38, w: 1, h: 4 },
-    { i: 'chainRepair',x: 0, y: 42, w: 1, h: 4 },
   ]
 }
 
@@ -151,8 +145,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [versionInfo, setVersionInfo] = useState({ version: '2.0.0', edition: 'community', update_available: false })
-  const [chainRepair, setChainRepair] = useState(null)
-  const [chainRepairRunning, setChainRepairRunning] = useState(false)
   
   // Widget + layout customization
   const [widgets, setWidgets] = useState(loadWidgetPrefs)
@@ -246,14 +238,6 @@ export default function DashboardPage() {
       } catch {
         setRecentAcme([])
       }
-
-      // Load chain repair status
-      try {
-        const crData = await apiClient.get('/system/chain-repair')
-        setChainRepair(crData.data || null)
-      } catch {
-        setChainRepair(null)
-      }
     } catch (error) {
       showError(error.message || t('dashboard.loadFailed'))
     } finally {
@@ -329,18 +313,6 @@ export default function DashboardPage() {
     setGridLayouts(DEFAULT_LAYOUTS)
     saveGridLayouts(DEFAULT_LAYOUTS)
     setGridKey(k => k + 1)
-  }, [])
-
-  const runChainRepair = useCallback(async () => {
-    setChainRepairRunning(true)
-    try {
-      const res = await apiClient.post('/system/chain-repair/run')
-      setChainRepair(res.data || null)
-    } catch {
-      // ignore
-    } finally {
-      setChainRepairRunning(false)
-    }
   }, [])
 
   // Filter layouts to only include visible widgets
@@ -899,37 +871,6 @@ export default function DashboardPage() {
             </WidgetWrapper>
           </div>
           )}
-
-          {/* Chain Repair */}
-          {isVisible('chainRepair') && (
-          <div key="chainRepair">
-            <WidgetWrapper editMode={editMode}>
-              <Card variant="elevated" className="h-full flex flex-col p-0">
-                <Card.Header 
-                  icon={LinkSimple}
-                  iconColor="blue"
-                  title={t('dashboard.chainRepair')}
-                  action={
-                    <button
-                      onClick={runChainRepair}
-                      disabled={chainRepairRunning}
-                      className="p-1.5 rounded-lg hover:bg-bg-tertiary/80 text-text-tertiary hover:text-accent-primary transition-all disabled:opacity-50"
-                      title={t('dashboard.chainRepairRun')}
-                    >
-                      {chainRepairRunning 
-                        ? <CircleNotch size={14} className="animate-spin" />
-                        : <ArrowClockwise size={14} />
-                      }
-                    </button>
-                  }
-                />
-                <Card.Body className="flex-1 !pt-0">
-                  <ChainRepairContent data={chainRepair} running={chainRepairRunning} t={t} />
-                </Card.Body>
-              </Card>
-            </WidgetWrapper>
-          </div>
-          )}
         </Responsive>
         )}
         </div>
@@ -1152,92 +1093,6 @@ function EmptyWidget({ icon: Icon, text }) {
         <Icon size={20} className="opacity-50" />
       </div>
       <p className="text-xs font-medium opacity-70">{text}</p>
-    </div>
-  )
-}
-
-function ChainRepairContent({ data, running, t }) {
-  const task = data?.task || {}
-  const stats = data?.stats || {}
-
-  // Countdown to next run
-  const [countdown, setCountdown] = useState('')
-  useEffect(() => {
-    if (!task.next_run) return
-    const update = () => {
-      const diff = Math.max(0, Math.floor((new Date(task.next_run).getTime() - Date.now()) / 1000))
-      const m = Math.floor(diff / 60)
-      const s = diff % 60
-      setCountdown(`${m}:${String(s).padStart(2, '0')}`)
-    }
-    update()
-    const id = setInterval(update, 1000)
-    return () => clearInterval(id)
-  }, [task.next_run])
-
-  const total = (stats.total_cas || 0) + (stats.total_certs || 0)
-  const orphans = (stats.orphan_cas || 0) + (stats.orphan_certs || 0)
-  const linked = total - orphans
-  const pct = total > 0 ? Math.round((linked / total) * 100) : 100
-
-  const rows = [
-    { label: t('dashboard.chainRepairCAs'), value: stats.total_cas || 0, sub: stats.orphan_cas ? `${stats.orphan_cas} ${t('dashboard.chainRepairOrphans')}` : null },
-    { label: t('dashboard.chainRepairCerts'), value: stats.total_certs || 0, sub: stats.orphan_certs ? `${stats.orphan_certs} ${t('dashboard.chainRepairOrphans')}` : null },
-  ]
-
-  return (
-    <div className="space-y-3">
-      {/* Progress bar */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[11px] font-medium text-text-secondary">{t('dashboard.chainRepairLinked')}</span>
-          <span className="text-[11px] font-bold text-text-primary font-mono">{pct}%</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-bg-tertiary/80 overflow-hidden">
-          <div 
-            className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-accent-success' : 'bg-accent-warning'}`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Stats rows */}
-      <div className="space-y-1">
-        {rows.map(row => (
-          <div key={row.label} className="flex items-center justify-between py-1 px-1.5 rounded-md">
-            <span className="text-[11px] text-text-secondary">{row.label}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-text-primary font-mono">{row.value}</span>
-              {row.sub && <span className="text-[10px] text-accent-warning">{row.sub}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Footer: last run + countdown */}
-      <div className="flex items-center justify-between pt-1 border-t border-border/30">
-        <div className="flex items-center gap-1.5 text-[10px] text-text-tertiary">
-          <Clock size={11} />
-          {task.last_run 
-            ? <span>{formatRelativeTime(task.last_run)}</span>
-            : <span>{t('dashboard.chainRepairNever')}</span>
-          }
-          {task.last_duration_ms > 0 && <span className="font-mono">({Math.round(task.last_duration_ms)}ms)</span>}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {running ? (
-            <span className="text-[10px] text-accent-primary font-medium flex items-center gap-1">
-              <CircleNotch size={10} className="animate-spin" />
-              {t('dashboard.chainRepairRunning')}
-            </span>
-          ) : countdown ? (
-            <span className="text-[10px] text-text-tertiary font-mono flex items-center gap-1">
-              <Timer size={10} />
-              {countdown}
-            </span>
-          ) : null}
-        </div>
-      </div>
     </div>
   )
 }

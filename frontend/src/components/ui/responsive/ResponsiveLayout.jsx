@@ -54,6 +54,8 @@ export function ResponsiveLayout({
   
   // Stats bar (optional - array of { icon, label, value, variant, filterValue })
   stats,
+  // Custom content rendered inline after stats (e.g., chain repair widget)
+  afterStats,
   // Stats clicking - when stats are clickable for filtering
   activeStatFilter, // currently active stat filter value
   onStatClick, // (stat) => void - called when stat is clicked
@@ -249,6 +251,9 @@ export function ResponsiveLayout({
           activeStatFilter={activeStatFilter}
         />
       )}
+      
+      {/* AFTER STATS (custom content) */}
+      {afterStats}
       
       {/* MAIN AREA - Content + SlideOver/SplitPanel */}
       <div className="flex-1 flex overflow-hidden">
