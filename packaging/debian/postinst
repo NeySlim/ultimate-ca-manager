@@ -29,6 +29,22 @@ case "$1" in
         mkdir -p "$UCM_CONFIG"
         mkdir -p /var/log/ucm
         
+        # SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory
+        HSM_GROUP=""
+        if getent group softhsm >/dev/null 2>&1; then
+            HSM_GROUP="softhsm"
+        elif getent group ods >/dev/null 2>&1; then
+            HSM_GROUP="ods"
+        fi
+        if [ -n "$HSM_GROUP" ]; then
+            usermod -aG "$HSM_GROUP" "$UCM_USER" 2>/dev/null || true
+        fi
+        mkdir -p /var/lib/softhsm/tokens
+        if [ -n "$HSM_GROUP" ]; then
+            chown root:"$HSM_GROUP" /var/lib/softhsm/tokens
+            chmod 1770 /var/lib/softhsm/tokens
+        fi
+        
         # ============================================================
         # AUTOMATIC MIGRATION FROM v1.8.x
         # ============================================================
@@ -70,7 +86,6 @@ case "$1" in
         fi
         # ============================================================
         
-        # Sudoers for service restart
         # Sudoers for service restart and auto-update
         cat > /etc/sudoers.d/ucm-service << 'SUDOERS'
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm
@@ -193,10 +208,14 @@ ENVEOF
             chmod 644 "$UCM_DATA/https_cert.pem"
         fi
         
-        # Enable and start service
+        # Enable and start/restart service
         systemctl daemon-reload
         systemctl enable ucm
-        systemctl start ucm || true
+        if systemctl is-active --quiet ucm; then
+            systemctl restart ucm || true
+        else
+            systemctl start ucm || true
+        fi
         
         # ============================================================
         # FIREWALL CONFIGURATION
