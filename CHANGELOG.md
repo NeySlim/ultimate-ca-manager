@@ -19,12 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features
 
-- **Backup v2.0** - Complete backup overhaul: exports/restores all database tables (was only 5, now covers groups, RBAC roles, templates, trust store, SSO, HSM, API keys, SMTP, notifications, policies, auth certificates, DNS providers, ACME domains, HTTPS server files)
+- ***Backup v2.0*** - Complete backup overhaul: exports/restores all database tables (was only 5, now covers groups, RBAC roles, templates, trust store, SSO, HSM, API keys, SMTP, notifications, policies, auth certificates, DNS providers, ACME domains, HTTPS server files)
 - **File regeneration** - Startup service that regenerates missing certificate/key files from database, ensuring filesystem consistency after restore or data loss
 - **Human-readable file names** - Certificate and CA files now named `{cn-slug}-{refid}.ext` instead of UUID-only (e.g., `www.example.com-550e8400.crt`)
-- **SoftHSM integration** - Automatic SoftHSM2 setup across DEB, RPM, and Docker deployments with PKCS#11 key generation
+- ***SoftHSM integration*** - Automatic SoftHSM2 setup across DEB, RPM, and Docker deployments with PKCS#11 key generation
 - **Webhooks** - Management tab in Settings for webhook CRUD, test, and event filtering
-- **AKI/SKI Chain Matching** - Certificate chain relationships now use cryptographic Authority Key Identifier / Subject Key Identifier matching instead of fragile DN-based matching. Reliable across imports, machines, and environments
+- ***AKI/SKI Chain Matching*** - Certificate chain relationships now use cryptographic Authority Key Identifier / Subject Key Identifier matching instead of fragile DN-based matching. Reliable across imports, machines, and environments
 - **Chain Repair Scheduler** - Hourly background task that: backfills missing SKI/AKI fields from PEM data, re-chains orphan CAs and certificates via AKI→SKI matching, deduplicates CAs with identical Subject Key Identifiers
 - **Chain Repair Widget** - Visual progress bar on CAs page showing chain integrity status with countdown to next repair and manual "Run Now" button
 - **Smart Import Deduplication** - Certificate import detects and prevents duplicate CAs based on Subject Key Identifier
@@ -47,8 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **JWT removal** - Removed JWT authentication entirely; UCM now uses session cookies + API keys only. Reduces attack surface and eliminates token-related complexity
-- **cryptography** - Upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
+- ***JWT removal*** - Removed JWT authentication entirely; UCM now uses session cookies + API keys only. Reduces attack surface and eliminates token-related complexity
+- ***cryptography*** - Upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
 
 ### Documentation
 
