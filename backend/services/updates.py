@@ -66,7 +66,9 @@ def parse_version(version_str):
     if prerelease:
         num_match = re.search(r'\d+', prerelease)
         num = int(num_match.group()) if num_match else 0
-        if prerelease.startswith('alpha'):
+        if prerelease.startswith('dev'):
+            prerelease_order = 50 + num
+        elif prerelease.startswith('alpha'):
             prerelease_order = 100 + num
         elif prerelease.startswith('beta'):
             prerelease_order = 200 + num
