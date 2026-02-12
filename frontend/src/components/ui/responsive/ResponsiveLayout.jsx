@@ -482,12 +482,13 @@ export function ResponsiveLayout({
 // =============================================================================
 
 function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
-  const renderTabs = (tabIds) => {
+  const renderTabs = (tabIds, groupColor) => {
     return tabIds.map(id => {
       const tab = tabs.find(tb => tb.id === id)
       if (!tab) return null
       const TabIcon = tab.icon
       const isActive = activeTab === id
+      const iconColor = groupColor || tab.color || ''
       return (
         <button
           key={id}
@@ -500,8 +501,11 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
           )}
         >
           {TabIcon && (
-            <span className={cn('shrink-0', tab.color || '')}>
-              <TabIcon size={16} weight={isActive ? "fill" : "regular"} />
+            <span className={cn(
+              'shrink-0 w-7 h-7 rounded-md flex items-center justify-center',
+              isActive ? '' : iconColor
+            )} style={isActive ? { background: 'var(--accent-primary)', color: 'white', opacity: 0.9 } : undefined}>
+              <TabIcon size={15} weight={isActive ? "fill" : "duotone"} />
             </span>
           )}
           <span className="truncate">{tab.label}</span>
@@ -520,16 +524,16 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
 
   if (tabGroups) {
     return (
-      <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/20 p-3 space-y-4">
+      <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/30 p-3 space-y-5">
         {tabGroups.map((group, i) => (
           <div key={i}>
             {group.labelKey && (
-              <div className="px-3 pb-1.5 text-3xs font-semibold text-text-tertiary uppercase tracking-wider">
+              <div className="px-3 pb-2 text-2xs font-bold text-text-tertiary uppercase tracking-widest">
                 {t(group.labelKey)}
               </div>
             )}
             <div className="space-y-0.5">
-              {renderTabs(group.tabs)}
+              {renderTabs(group.tabs, group.color)}
             </div>
           </div>
         ))}
@@ -538,7 +542,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
   }
 
   return (
-    <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/20 p-3">
+    <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/30 p-3">
       <div className="space-y-0.5">
         {renderTabs(tabs.map(t => t.id))}
       </div>

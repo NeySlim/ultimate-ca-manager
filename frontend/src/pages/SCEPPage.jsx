@@ -407,8 +407,8 @@ export default function SCEPPage() {
         onTabChange={setActiveTab}
         tabLayout="sidebar"
         tabGroups={[
-          { labelKey: 'scep.groups.management', tabs: ['requests', 'challenge'] },
-          { labelKey: 'scep.groups.settings', tabs: ['config', 'info'] },
+          { labelKey: 'scep.groups.management', tabs: ['requests', 'challenge'], color: 'icon-bg-blue' },
+          { labelKey: 'scep.groups.settings', tabs: ['config', 'info'], color: 'icon-bg-emerald' },
         ]}
         stats={activeTab === 'requests' ? headerStats : undefined}
         helpPageKey="scep"

@@ -2073,10 +2073,10 @@ export default function SettingsPage() {
         onTabChange={handleCategoryChange}
         tabLayout="sidebar"
         tabGroups={[
-          { labelKey: 'settings.groups.system', tabs: ['general', 'updates', 'database', 'https', 'backup'] },
-          { labelKey: 'settings.groups.security', tabs: ['security', 'sso'] },
-          { labelKey: 'settings.groups.notifications', tabs: ['email', 'webhooks'] },
-          { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'] },
+          { labelKey: 'settings.groups.system', tabs: ['general', 'updates', 'database', 'https', 'backup'], color: 'icon-bg-blue' },
+          { labelKey: 'settings.groups.security', tabs: ['security', 'sso'], color: 'icon-bg-amber' },
+          { labelKey: 'settings.groups.notifications', tabs: ['email', 'webhooks'], color: 'icon-bg-teal' },
+          { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
         ]}
         helpPageKey="settings"
       >
