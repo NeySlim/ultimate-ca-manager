@@ -183,10 +183,14 @@ if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
     fi
 fi
 
-# Start service
+# Start/restart service
 systemctl daemon-reload
 systemctl enable %{name}
-systemctl start %{name} || true
+if systemctl is-active --quiet %{name}; then
+    systemctl restart %{name} || true
+else
+    systemctl start %{name} || true
+fi
 
 # Configure firewall if script exists
 if [ -x "$UCM_HOME/scripts/configure-firewall.sh" ]; then
