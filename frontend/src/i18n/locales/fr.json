@@ -1350,7 +1350,7 @@
   },
   "settings": {
     "appearance": {},
-    "appearanceSubtitle": "Personnalisez l'apparence de UCM",
+    "appearanceSubtitle": "Personnalisez l'apparence et la langue de UCM",
     "colorTheme": "Thème de couleur",
     "colorThemeDesc": "Choisissez un schéma de couleurs selon vos préférences",
     "appearanceMode": "Mode d'apparence",
@@ -1411,7 +1411,7 @@
     "updateAvailable": "Mise à jour disponible : v{{version}}",
     "subtitle": "Configuration du système",
     "tabs": {
-      "appearance": "Apparence",
+      "appearance": "Apparence et langue",
       "audit": "Audit",
       "backup": "Sauvegarde",
       "database": "Base de données",

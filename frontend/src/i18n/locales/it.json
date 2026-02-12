@@ -1404,7 +1404,7 @@
     "updateAvailable": "Aggiornamento disponibile",
     "subtitle": "Configurazione del sistema",
     "tabs": {
-      "appearance": "Aspetto",
+      "appearance": "Aspetto e lingua",
       "audit": "Audit",
       "backup": "Backup",
       "database": "Database",
@@ -1421,7 +1421,7 @@
     "baseUrlHelper": "URL pubblico di questa istanza UCM",
     "colorThemeDesc": "Scegli uno schema di colori in base alle tue preferenze",
     "appearanceModeDesc": "Controlla come si adatta la luminosità dell'interfaccia",
-    "appearanceSubtitle": "Personalizza l'aspetto di UCM",
+    "appearanceSubtitle": "Personalizza l'aspetto e la lingua di UCM",
     "followSystemDesc": "Cambia automaticamente in base alle impostazioni del sistema operativo",
     "lightDesc": "Usa sempre il tema chiaro",
     "darkDesc": "Usa sempre il tema scuro",

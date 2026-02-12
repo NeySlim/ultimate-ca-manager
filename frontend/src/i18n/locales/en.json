@@ -1159,7 +1159,7 @@
   },
   "settings": {
     "appearance": {},
-    "appearanceSubtitle": "Customize UCM appearance",
+    "appearanceSubtitle": "Customize UCM appearance and language",
     "colorTheme": "Color Theme",
     "colorThemeDesc": "Choose a color scheme according to your preferences",
     "appearanceMode": "Appearance Mode",
@@ -1342,7 +1342,7 @@
     "systemURL": "System URL",
     "tableCount": "Tables",
     "tabs": {
-      "appearance": "Appearance",
+      "appearance": "Appearance & Language",
       "audit": "Audit",
       "backup": "Backup",
       "database": "Database",

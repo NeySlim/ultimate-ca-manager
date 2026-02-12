@@ -1404,7 +1404,7 @@
     "updateAvailable": "アップデート利用可能",
     "subtitle": "システム構成",
     "tabs": {
-      "appearance": "外観",
+      "appearance": "外観と言語",
       "audit": "監査",
       "backup": "バックアップ",
       "database": "データベース",
@@ -1421,7 +1421,7 @@
     "baseUrlHelper": "このUCMインスタンスの公開URL",
     "colorThemeDesc": "お好みの配色を選択してください",
     "appearanceModeDesc": "インターフェースの明るさの調整方法を制御",
-    "appearanceSubtitle": "UCMの外観をカスタマイズ",
+    "appearanceSubtitle": "UCMの外観と言語をカスタマイズ",
     "followSystemDesc": "OSの設定に基づいて自動的に切り替え",
     "lightDesc": "常にライトテーマを使用",
     "darkDesc": "常にダークテーマを使用",

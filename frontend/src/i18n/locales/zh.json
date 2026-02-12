@@ -1404,7 +1404,7 @@
     "updateAvailable": "有可用更新",
     "subtitle": "系统配置",
     "tabs": {
-      "appearance": "外观",
+      "appearance": "外观与语言",
       "audit": "审计",
       "backup": "备份",
       "database": "数据库",
@@ -1421,7 +1421,7 @@
     "baseUrlHelper": "此 UCM 实例的公开 URL",
     "colorThemeDesc": "选择适合您偏好的配色方案",
     "appearanceModeDesc": "控制界面亮度的适应方式",
-    "appearanceSubtitle": "自定义UCM的外观",
+    "appearanceSubtitle": "自定义UCM的外观和语言",
     "followSystemDesc": "根据您的操作系统设置自动切换",
     "lightDesc": "始终使用浅色主题",
     "darkDesc": "始终使用深色主题",
