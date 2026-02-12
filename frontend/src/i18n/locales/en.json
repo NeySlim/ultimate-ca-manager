@@ -522,7 +522,10 @@
     "unnamedCA": "Unnamed CA",
     "subtitle_one": "{{count}} CA",
     "subtitle_other": "{{count}} CAs",
-    "subtitle": "{{count}} certificate authorities"
+    "subtitle": "{{count}} certificate authorities",
+    "certificateCount_one": "{{count}} certificate",
+    "certificateCount_other": "{{count}} certificates",
+    "certificateCount": "{{count}} certificates"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",

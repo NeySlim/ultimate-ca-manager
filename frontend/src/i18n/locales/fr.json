@@ -359,7 +359,10 @@
     "unnamedCA": "AC sans nom",
     "subtitle_one": "{{count}} AC",
     "subtitle_other": "{{count}} AC",
-    "subtitle": "{{count}} autorités de certification"
+    "subtitle": "{{count}} autorités de certification",
+    "certificateCount_one": "{{count}} certificat",
+    "certificateCount_other": "{{count}} certificats",
+    "certificateCount": "{{count}} certificats"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
