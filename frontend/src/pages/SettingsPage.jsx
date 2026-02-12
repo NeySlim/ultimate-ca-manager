@@ -10,7 +10,7 @@ import {
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
-  Bell, Copy
+  Bell, Copy, Power, ArrowClockwise
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -49,6 +49,91 @@ const SSO_PROVIDER_ICONS = {
   ldap: Database,
   oauth2: Globe,
   saml: Shield,
+}
+
+// Service Status Widget Component
+function ServiceStatusWidget() {
+  const { t } = useTranslation()
+  const { showSuccess, showError, showConfirm } = useNotification()
+  const { canWrite } = usePermission()
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [restarting, setRestarting] = useState(false)
+
+  const fetchStatus = async () => {
+    try {
+      const response = await systemService.getServiceStatus()
+      setStatus(response.data)
+    } catch {
+      setStatus(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchStatus()
+    const interval = setInterval(fetchStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const formatUptime = (seconds) => {
+    if (!seconds) return '-'
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    if (days > 0) return `${days}d ${hours}h ${mins}m`
+    if (hours > 0) return `${hours}h ${mins}m`
+    return `${mins}m`
+  }
+
+  const handleRestart = async () => {
+    const confirmed = await showConfirm({
+      title: t('settings.restartService'),
+      message: t('settings.restartConfirmMessage'),
+      confirmText: t('settings.restartNow'),
+      variant: 'danger'
+    })
+    if (!confirmed) return
+
+    setRestarting(true)
+    try {
+      await systemService.restartService()
+      showSuccess(t('settings.restartInitiated'))
+    } catch {
+      showError(t('settings.restartFailed'))
+      setRestarting(false)
+    }
+  }
+
+  return (
+    <DetailSection title={t('settings.serviceStatus')} icon={Power} iconClass="icon-bg-orange" className="mt-4">
+      {loading ? (
+        <LoadingSpinner size="sm" />
+      ) : status ? (
+        <div className="space-y-3">
+          <DetailGrid columns={2}>
+            <DetailField label={t('settings.version')} value={`v${status.version}`} />
+            <DetailField label="PID" value={status.pid} />
+            <DetailField label={t('settings.uptime')} value={formatUptime(status.uptime_seconds)} />
+            <DetailField label={t('settings.memory')} value={`${status.memory_mb} MB`} />
+            <DetailField label="Python" value={status.python_version} />
+            <DetailField label={t('settings.environment')} value={status.is_docker ? 'Docker' : 'System'} />
+          </DetailGrid>
+          {canWrite('settings') && (
+            <div className="pt-2">
+              <Button variant="outline" onClick={handleRestart} disabled={restarting}>
+                <ArrowClockwise size={16} className={restarting ? 'spin' : ''} />
+                {restarting ? t('settings.restarting') : t('settings.restartService')}
+              </Button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <p className="text-secondary">{t('settings.serviceStatusUnavailable')}</p>
+      )}
+    </DetailSection>
+  )
 }
 
 // Appearance Settings Component
@@ -1218,6 +1303,7 @@ export default function SettingsPage() {
                 )}
               </div>
             </DetailSection>
+            <ServiceStatusWidget />
           </DetailContent>
         )
 

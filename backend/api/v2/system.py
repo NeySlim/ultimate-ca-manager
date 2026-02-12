@@ -1218,3 +1218,70 @@ def run_chain_repair():
         })
     except Exception as e:
         return error_response(f"Chain repair failed: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/service/status', methods=['GET'])
+@require_auth(['read:settings'])
+def get_service_status():
+    """Get UCM service status: version, uptime, PID, memory"""
+    import psutil
+    from services.updates import get_current_version
+    
+    try:
+        proc = psutil.Process(os.getpid())
+        parent = proc.parent()
+        # Use parent (gunicorn master) if available, else current worker
+        main_proc = parent if parent and 'gunicorn' in (parent.name() or '') else proc
+        
+        create_time = datetime.fromtimestamp(main_proc.create_time(), tz=timezone.utc)
+        uptime_seconds = int((datetime.now(timezone.utc) - create_time).total_seconds())
+        
+        # Memory in MB
+        mem_info = main_proc.memory_info()
+        memory_mb = round(mem_info.rss / 1024 / 1024, 1)
+        
+        # Check if running in Docker
+        is_docker = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
+        
+        return success_response(data={
+            'version': get_current_version(),
+            'pid': main_proc.pid,
+            'uptime_seconds': uptime_seconds,
+            'started_at': create_time.isoformat(),
+            'memory_mb': memory_mb,
+            'is_docker': is_docker,
+            'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}"
+        })
+    except Exception as e:
+        return error_response(f"Failed to get service status: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/service/restart', methods=['POST'])
+@require_auth(['write:settings'])
+def restart_service():
+    """Restart the UCM service"""
+    import signal
+    
+    try:
+        is_docker = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
+        
+        AuditService.log(
+            action='service_restart',
+            resource_type='system',
+            details='Manual service restart requested from settings',
+            success=True
+        )
+        
+        if is_docker:
+            os.kill(os.getppid(), signal.SIGTERM)
+        else:
+            subprocess.Popen(
+                ['bash', '-c', 'sleep 1 && sudo systemctl restart ucm'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+        
+        return success_response(message='Service restart initiated. You may need to log in again.')
+    except Exception as e:
+        return error_response(f"Failed to restart service: {str(e)}", 500)
