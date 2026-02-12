@@ -238,18 +238,23 @@ def install_update(package_path):
     Install downloaded update package
     
     This will restart the service, so the response may not complete.
+    Requires sudoers entries for dpkg/rpm and systemctl.
     """
     if package_path.endswith('.deb'):
-        cmd = ['dpkg', '-i', package_path]
+        cmd = f'sudo dpkg -i {package_path}'
     elif package_path.endswith('.rpm'):
-        cmd = ['rpm', '-U', '--force', package_path]
+        cmd = f'sudo rpm -U --force {package_path}'
     else:
         raise Exception(f"Unknown package format: {package_path}")
     
     try:
+        import logging
+        logger = logging.getLogger('ucm.updates')
+        log_file = '/var/log/ucm/update.log'
+        logger.info(f"Auto-update: installing {package_path} with: {cmd}")
         # Run install in background so response can complete
         subprocess.Popen(
-            ['bash', '-c', f'sleep 2 && {" ".join(cmd)} && systemctl restart ucm'],
+            ['bash', '-c', f'sleep 2 && {cmd} >> {log_file} 2>&1 && sudo systemctl restart ucm >> {log_file} 2>&1'],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True

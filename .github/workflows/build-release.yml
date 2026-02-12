@@ -80,6 +80,11 @@ jobs:
 
           EOF
       
+      - name: Update VERSION file
+        run: |
+          echo "${{ steps.version.outputs.version }}" > VERSION
+          cd frontend && npm pkg set version="${{ steps.version.outputs.version }}"
+      
       - name: Build DEB package
         run: |
           # Create symlink for debian directory (dpkg expects debian/ at root)
@@ -339,14 +344,14 @@ jobs:
           Data is automatically migrated when upgrading. A backup is created in `/opt/ucm/data/backups/`.
           EOF
           
-          # Replace placeholders
+          # Replace placeholders (specific first, then generic)
           DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
           RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
-          sed -i "s|IMAGE|$IMAGE|g" notes.md
-          sed -i "s|VERSION|$VERSION|g" notes.md
           sed -i "s|DEB_VERSION|$DEB_VERSION|g" notes.md
           sed -i "s|RPM_VERSION|$RPM_VERSION|g" notes.md
+          sed -i "s|IMAGE|$IMAGE|g" notes.md
           sed -i "s|REPO|${{ github.repository }}|g" notes.md
+          sed -i "s|VERSION|$VERSION|g" notes.md
           
           cat notes.md
       
