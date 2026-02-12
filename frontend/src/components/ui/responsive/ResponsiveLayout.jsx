@@ -482,13 +482,16 @@ export function ResponsiveLayout({
 // =============================================================================
 
 function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
+  // Convert icon-bg-X class to icon-text-X for sidebar (no background needed)
+  const toTextColor = (bgClass) => bgClass ? bgClass.replace('icon-bg-', 'icon-text-') : ''
+  
   const renderTabs = (tabIds, groupColor) => {
     return tabIds.map(id => {
       const tab = tabs.find(tb => tb.id === id)
       if (!tab) return null
       const TabIcon = tab.icon
       const isActive = activeTab === id
-      const iconColor = groupColor || tab.color || ''
+      const iconColor = toTextColor(groupColor || tab.color)
       return (
         <button
           key={id}
