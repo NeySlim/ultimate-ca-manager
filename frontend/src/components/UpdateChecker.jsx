@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner } from '../components'
 import { apiClient } from '../services'
-import { useNotification } from '../contexts'
+import { useNotification, useTranslationReady } from '../contexts'
 import { formatRelativeTime } from '../lib/ui'
 
 export function UpdateChecker() {
@@ -17,7 +17,7 @@ export function UpdateChecker() {
   const [updateInfo, setUpdateInfo] = useState(null)
   const [error, setError] = useState(null)
   const [includePrereleases, setIncludePrereleases] = useState(false)
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
 
   const checkForUpdates = async (showNotification = false) => {
     setChecking(true)
@@ -46,9 +46,11 @@ export function UpdateChecker() {
   const installUpdate = async () => {
     if (!updateInfo?.update_available) return
     
-    if (!confirm(`Install update v${updateInfo.latest_version}?\n\nThe service will restart and you may need to log in again.`)) {
-      return
-    }
+    const confirmed = await showConfirm(
+      t('settings.installUpdateConfirm', { version: updateInfo.latest_version }),
+      { title: t('settings.installUpdate'), confirmText: t('settings.installUpdate'), variant: 'primary' }
+    )
+    if (!confirmed) return
 
     setInstalling(true)
     try {

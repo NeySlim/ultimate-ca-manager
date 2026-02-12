@@ -1498,6 +1498,8 @@
     "helpDatabase": "数据库管理",
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
+    "installUpdate": "安装更新",
+    "installUpdateConfirm": "安装更新 v{{version}}？\n\n服务将重新启动，您可能需要重新登录。",
     "prerelease": "Pre-release",
     "current": "Current",
     "edition": "Edition",

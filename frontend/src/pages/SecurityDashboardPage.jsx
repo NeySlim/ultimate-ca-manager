@@ -28,7 +28,7 @@ import { cn } from '../lib/utils'
 
 export default function SecurityDashboardPage() {
   const { t } = useTranslation()
-  const { showError, showSuccess } = useNotification()
+  const { showError, showSuccess, showConfirm } = useNotification()
   
   const [loading, setLoading] = useState(true)
   const [secretsStatus, setSecretsStatus] = useState(null)
@@ -69,7 +69,10 @@ export default function SecurityDashboardPage() {
       
       // Show instructions in alert
       if (data.instructions) {
-        alert(`${t('securityDashboard.secrets.rotationInstructions')}:\n\n${data.instructions.join('\n')}`)
+        await showConfirm(
+          `${t('securityDashboard.secrets.rotationInstructions')}:\n\n${data.instructions.join('\n')}`,
+          { title: t('securityDashboard.secrets.rotationSuccess'), confirmText: 'OK', cancelText: null }
+        )
       }
     } catch (error) {
       showError(error.message || t('securityDashboard.errors.rotateFailed'))

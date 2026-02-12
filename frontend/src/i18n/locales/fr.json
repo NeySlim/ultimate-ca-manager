@@ -1512,6 +1512,8 @@
     "helpDatabase": "Gestion de base de données",
     "updateAvailableTitle": "Mise à jour disponible",
     "upToDateTitle": "À jour",
+    "installUpdate": "Installer la mise à jour",
+    "installUpdateConfirm": "Installer la mise à jour v{{version}} ?\n\nLe service redémarrera et vous devrez peut-être vous reconnecter.",
     "prerelease": "Pré-version",
     "includePreReleaseVersions": "Inclure les pré-versions",
     "current": "Actuelle",

@@ -1498,6 +1498,8 @@
     "helpDatabase": "Gestione database",
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
+    "installUpdate": "Installa aggiornamento",
+    "installUpdateConfirm": "Installare l'aggiornamento v{{version}}?\n\nIl servizio verrà riavviato e potrebbe essere necessario effettuare nuovamente l'accesso.",
     "prerelease": "Pre-release",
     "current": "Current",
     "edition": "Edition",

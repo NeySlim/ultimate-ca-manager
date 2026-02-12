@@ -1498,6 +1498,8 @@
     "helpDatabase": "Керування базою даних",
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
+    "installUpdate": "Встановити оновлення",
+    "installUpdateConfirm": "Встановити оновлення v{{version}}?\n\nСервіс буде перезапущено, і вам може знадобитися увійти знову.",
     "prerelease": "Pre-release",
     "current": "Current",
     "edition": "Edition",

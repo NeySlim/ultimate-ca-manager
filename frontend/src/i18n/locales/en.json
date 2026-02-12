@@ -1167,6 +1167,8 @@
     "upToDate": "You are running the latest version",
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
+    "installUpdate": "Install Update",
+    "installUpdateConfirm": "Install update v{{version}}?\n\nThe service will restart and you may need to log in again.",
     "prerelease": "Pre-release",
     "includePreReleaseVersions": "Include pre-release versions",
     "current": "Current",

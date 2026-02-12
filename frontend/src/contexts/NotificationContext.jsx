@@ -147,13 +147,15 @@ export function NotificationProvider({ children }) {
             <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
               {confirmDialog?.title}
             </Dialog.Title>
-            <Dialog.Description className="text-xs text-text-secondary mb-4">
+            <Dialog.Description className="text-xs text-text-secondary mb-4 whitespace-pre-wrap">
               {confirmDialog?.message}
             </Dialog.Description>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => handleConfirm(false)}>
-                {confirmDialog?.cancelText}
-              </Button>
+              {confirmDialog?.cancelText !== null && (
+                <Button variant="secondary" size="sm" onClick={() => handleConfirm(false)}>
+                  {confirmDialog?.cancelText || 'Cancel'}
+                </Button>
+              )}
               <Button 
                 variant={confirmDialog?.variant === 'danger' ? 'danger' : 'primary'} 
                 size="sm"

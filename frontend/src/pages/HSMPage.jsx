@@ -46,7 +46,7 @@ export default function HSMPage() {
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [hsmStatus, setHsmStatus] = useState(null)
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { isMobile } = useMobile()
 
   useEffect(() => {
@@ -102,7 +102,8 @@ export default function HSMPage() {
   }
 
   const handleDelete = async (provider) => {
-    if (!confirm(CONFIRM.HSM.DELETE_PROVIDER.replace('{name}', provider.name))) return
+    const confirmed = await showConfirm(CONFIRM.HSM.DELETE_PROVIDER.replace('{name}', provider.name), { variant: 'danger', confirmText: t('common.delete') })
+    if (!confirmed) return
     try {
       await apiClient.delete(`/hsm/providers/${provider.id}`)
       showSuccess(SUCCESS.DELETE.PROVIDER)
@@ -158,7 +159,8 @@ export default function HSMPage() {
   }
 
   const handleDeleteKey = async (key) => {
-    if (!confirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.label))) return
+    const confirmed = await showConfirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.label), { variant: 'danger', confirmText: t('common.delete') })
+    if (!confirmed) return
     try {
       await apiClient.delete(`/hsm/keys/${key.id}`)
       showSuccess(SUCCESS.DELETE.KEY)

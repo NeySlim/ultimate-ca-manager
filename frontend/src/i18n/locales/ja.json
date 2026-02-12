@@ -1498,6 +1498,8 @@
     "helpDatabase": "データベース管理",
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
+    "installUpdate": "アップデートをインストール",
+    "installUpdateConfirm": "v{{version}}にアップデートしますか？\n\nサービスが再起動され、再ログインが必要になる場合があります。",
     "prerelease": "Pre-release",
     "current": "Current",
     "edition": "Edition",

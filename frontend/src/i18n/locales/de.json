@@ -1498,6 +1498,8 @@
     "helpDatabase": "Datenbankverwaltung",
     "updateAvailableTitle": "Update Available",
     "upToDateTitle": "Up to Date",
+    "installUpdate": "Update installieren",
+    "installUpdateConfirm": "Update v{{version}} installieren?\n\nDer Dienst wird neu gestartet und Sie müssen sich möglicherweise erneut anmelden.",
     "prerelease": "Pre-release",
     "current": "Current",
     "edition": "Edition",

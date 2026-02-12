@@ -82,7 +82,7 @@ const totalPermissions = Object.values(PERMISSION_CATEGORIES).reduce(
 
 export default function RBACPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
   const { isMobile } = useMobile()
   
@@ -146,7 +146,8 @@ export default function RBACPage() {
       showError(CONFIRM.RBAC.SYSTEM_ROLE)
       return
     }
-    if (!confirm(CONFIRM.RBAC.DELETE_ROLE.replace('{name}', role.name))) return
+    const confirmed = await showConfirm(CONFIRM.RBAC.DELETE_ROLE.replace('{name}', role.name), { variant: 'danger', confirmText: t('common.delete') })
+    if (!confirmed) return
     try {
       await apiClient.delete(`/rbac/roles/${role.id}`)
       showSuccess(SUCCESS.DELETE.ROLE)
