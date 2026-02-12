@@ -426,8 +426,9 @@ export default function CertificatesPage() {
     {
       key: 'valid_to',
       header: t('common.expires'),
-      priority: 4, // Show on mobile as tertiary
+      priority: 4,
       sortable: true,
+      mono: true,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {formatDate(val)}
@@ -438,7 +439,7 @@ export default function CertificatesPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
             <span className="text-text-tertiary">{t('common.expires').substring(0, 3)}:</span>
-            <span className="text-text-secondary">{formatDate(val)}</span>
+            <span className="text-text-secondary font-mono">{formatDate(val)}</span>
           </div>
           {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>{t('certificates.orphan')}</Badge>}
           {row.source === 'acme' && <Badge variant="cyan" size="xs" dot>LOCAL ACME</Badge>}
@@ -452,8 +453,9 @@ export default function CertificatesPage() {
       header: t('common.keyType'),
       hideOnMobile: true,
       sortable: true,
+      mono: true,
       render: (val, row) => (
-        <span className="text-xs font-mono text-text-secondary">
+        <span className="text-xs text-text-secondary">
           {row.key_algorithm || row.key_algo || val || 'RSA'}
         </span>
       )

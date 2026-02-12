@@ -343,6 +343,7 @@ export default function AuditLogsPage() {
       priority: 5,
       sortable: true,
       width: '100px',
+      mono: true,
       render: (value) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {formatTime(value)}
@@ -355,7 +356,7 @@ export default function AuditLogsPage() {
           {row.resource_type && (
             <span><span className="text-text-tertiary">Resource:</span> <span className="text-text-secondary">{row.resource_type}</span></span>
           )}
-          <span><span className="text-text-tertiary">Time:</span> <span className="text-text-secondary">{formatTime(value)}</span></span>
+          <span><span className="text-text-tertiary">Time:</span> <span className="text-text-secondary font-mono">{formatTime(value)}</span></span>
         </div>
       )
     },
@@ -365,8 +366,9 @@ export default function AuditLogsPage() {
       priority: 6,
       width: '120px',
       hideOnMobile: true,
+      mono: true,
       render: (value) => (
-        <span className="text-xs text-text-secondary font-mono">{value || '-'}</span>
+        <span className="text-xs text-text-secondary">{value || '-'}</span>
       )
     }
   ], [t]);

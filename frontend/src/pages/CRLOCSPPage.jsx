@@ -261,6 +261,7 @@ export default function CRLOCSPPage() {
       header: t('common.updated'),
       priority: 3,
       hideOnMobile: true,
+      mono: true,
       render: (v) => (
         <span className="text-text-secondary">
           {v ? formatDate(v, 'short') : '—'}

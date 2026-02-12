@@ -1257,6 +1257,7 @@ function DesktopTable({
                       className={cn(
                         dStyle.cell,
                         "transition-colors duration-200",
+                        col.mono && "font-mono",
                         col.className,
                         // Subtle column separator
                         !isLast && 'table-col-separator-subtle'
