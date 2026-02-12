@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.1.0-dev] - 2026-02-11
+## [2.1.0-dev] - 2026-02-12
 
 ### Architecture Refactor
 
@@ -24,11 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Human-readable file names** - Certificate and CA files now named `{cn-slug}-{refid}.ext` instead of UUID-only (e.g., `www.example.com-550e8400.crt`)
 - **SoftHSM integration** - Automatic SoftHSM2 setup across DEB, RPM, and Docker deployments with PKCS#11 key generation
 - **Webhooks** - Management tab in Settings for webhook CRUD, test, and event filtering
+- **AKI/SKI Chain Matching** - Certificate chain relationships now use cryptographic Authority Key Identifier / Subject Key Identifier matching instead of fragile DN-based matching. Reliable across imports, machines, and environments
+- **Chain Repair Scheduler** - Hourly background task that: backfills missing SKI/AKI fields from PEM data, re-chains orphan CAs and certificates via AKI→SKI matching, deduplicates CAs with identical Subject Key Identifiers
+- **Chain Repair Widget** - Visual progress bar on CAs page showing chain integrity status with countdown to next repair and manual "Run Now" button
+- **Smart Import Deduplication** - Certificate import detects and prevents duplicate CAs based on Subject Key Identifier
 
 ### Improvements
 
 - **Pre-release filter** - Update checker only considers alpha, beta, and rc tags as pre-releases
 - **RBAC-Users integration** - Users can be assigned custom roles with granular permissions
+- **Startup migration** - Automatic SKI/AKI population for certificates imported before v2.1.0
+- **Orphan detection accuracy** - Root CAs (self-signed) correctly excluded from orphan counts
 
 ### Bug Fixes
 
@@ -36,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dashboard expiration colors** - Updated thresholds: ≤7 days red, ≤15 days orange, ≤30 days yellow
 - **ACME DNS test** - Fixed import error for `get_dns_provider_instance`
 - **i18n cleanup** - Removed unused ACME translation keys, fixed hardcoded strings
+- **UTC timezone handling** - API timestamps now include 'Z' suffix for correct browser timezone parsing
+- **Certificate name cleanup** - Removed spurious "Imported:" prefix from CA and certificate names
 
 ### Security
 

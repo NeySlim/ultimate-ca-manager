@@ -68,7 +68,7 @@
 - [ ] **Bulk Operations** - Revoke, renew, export multiple certificates at once
 - [ ] **API Key Scoping** - Enforce per-key permissions (read-only, CA-specific)
 - [ ] **Expiry Alerts UI** - Configure email alerts in Settings (backend ready)
-- [ ] **Webhook Management UI** - Configure webhook endpoints in Settings (backend ready)
+- [x] **Webhook Management UI** - Configure webhook endpoints in Settings (backend ready)
 - [ ] **Auto-Renewal UI** - Enable/configure auto-renewal per CA (backend ready)
 - [ ] **Dashboard Widgets** - Expiring certs timeline, renewal status, webhook health
 
@@ -86,6 +86,12 @@
 - ✅ **Ukrainian** (Українська)
 - ✅ **Chinese** (中文)
 - ✅ **Japanese** (日本語)
+
+### PKI Chain Intelligence ✅
+- ✅ **AKI/SKI Chain Matching** - Cryptographic chain validation replacing DN-based matching
+- ✅ **Chain Repair Scheduler** - Hourly backfill, re-chain, and deduplication task
+- ✅ **Chain Repair Widget** - Visual progress on CAs page with manual run
+- ✅ **Smart Import Dedup** - Prevent duplicate CAs via SKI matching
 
 ### Integrations
 - [ ] Kubernetes cert-manager issuer
@@ -106,4 +112,4 @@
 
 ---
 
-**Last Updated:** 2026-02-10
+**Last Updated:** 2026-02-12

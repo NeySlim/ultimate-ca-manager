@@ -1327,6 +1327,43 @@ GET /api/v2/system/backup/{filename}/download
 POST /api/v2/system/backup/restore
 ```
 
+### Chain Repair
+```http
+# Get chain repair status and last run stats
+GET /api/v2/system/chain-repair
+
+# Response:
+{
+  "task": {
+    "name": "ski_aki_backfill",
+    "description": "Backfill SKI/AKI and repair certificate chain links",
+    "enabled": true,
+    "interval": 3600,
+    "last_run": "2026-02-12T01:51:14.502202Z",
+    "next_run": "2026-02-12T02:51:14.502204Z",
+    "run_count": 2,
+    "last_duration_ms": 9.2,
+    "last_error": null
+  },
+  "stats": {
+    "total_cas": 4,
+    "total_certs": 39,
+    "orphan_cas": 1,
+    "orphan_certs": 1,
+    "updated_cas": 0,
+    "updated_certs": 0,
+    "rechained_cas": 0,
+    "rechained_certs": 0,
+    "deduplicated": 0
+  }
+}
+
+# Trigger chain repair immediately
+POST /api/v2/system/chain-repair/run
+
+# Response: same as GET with updated stats
+```
+
 ---
 
 ## Import/Export

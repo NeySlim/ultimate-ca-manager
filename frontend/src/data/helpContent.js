@@ -13,7 +13,8 @@
 import {
   TreeStructure, Certificate, FileText, ClockCounterClockwise,
   ShieldCheck, Key, Users, Gear, Database, Lock, Globe,
-  ListChecks, CloudArrowUp, HardDrive, UsersFour, Fingerprint
+  ListChecks, CloudArrowUp, HardDrive, UsersFour, Fingerprint,
+  ArrowClockwise
 } from '@phosphor-icons/react'
 
 export const helpContent = {
@@ -66,7 +67,7 @@ export const helpContent = {
   cas: {
     title: 'Certificate Authorities',
     subtitle: 'Manage your PKI hierarchy',
-    overview: 'Certificate Authorities (CAs) are the foundation of your PKI. They sign and issue certificates to establish trust. UCM supports hierarchical CA structures with Root and Intermediate CAs.',
+    overview: 'Certificate Authorities (CAs) are the foundation of your PKI. They sign and issue certificates to establish trust. UCM supports hierarchical CA structures with Root and Intermediate CAs, with automatic AKI/SKI-based chain matching for reliable parent-child relationships.',
     sections: [
       {
         title: 'CA Hierarchy',
@@ -98,12 +99,23 @@ export const helpContent = {
           { label: 'Export', text: 'Download CA certificate in various formats (PEM, DER)' },
           { label: 'Renew', text: 'Create a new CA certificate with extended validity' },
         ]
+      },
+      {
+        title: 'Chain Repair',
+        icon: ArrowClockwise,
+        content: 'UCM automatically maintains certificate chain integrity:',
+        items: [
+          { label: 'AKI/SKI Matching', text: 'Chains are built using cryptographic key identifiers, not names - reliable across imports and environments.' },
+          { label: 'Automatic Repair', text: 'An hourly background task re-chains orphan CAs and certificates, and deduplicates entries with the same key.' },
+          { label: 'Run Now', text: 'Use the Chain Repair bar at the top of this page to trigger an immediate repair or check status.' },
+        ]
       }
     ],
     tips: [
       'Use a strong key algorithm: RSA 4096 or ECDSA P-384 for Root CAs',
       'Create at least one Intermediate CA for issuing end-entity certificates',
-      'Keep your Root CA private key secure - consider HSM storage'
+      'Keep your Root CA private key secure - consider HSM storage',
+      'The Chain Repair bar shows chain integrity status - click "Run Now" after importing multiple CAs to link them immediately'
     ],
     warnings: [
       'Deleting a CA will NOT revoke certificates it has issued',

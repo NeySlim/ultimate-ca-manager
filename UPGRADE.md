@@ -225,6 +225,24 @@ sudo systemctl start ucm
 2. Standard upgrade procedure
 3. Check logs after upgrade: `journalctl -u ucm -n 50`
 
+### Upgrading to v2.1.0 from v2.0.x
+
+**No breaking changes** - Safe to upgrade directly.
+
+**New features:**
+- AKI/SKI-based certificate chain matching (automatic migration at startup)
+- Chain repair scheduler (hourly background task)
+- Chain repair widget on CAs page
+- Smart import deduplication (prevents duplicate CAs)
+- Webhook management UI
+
+**Automatic migration:**
+- On first startup, UCM will populate SKI/AKI fields for all existing CAs and certificates
+- Orphan CAs and certificates will be automatically re-chained if their parent CA exists
+- Duplicate CAs (same Subject Key Identifier) will be merged
+
+**No action required** - all migration happens automatically at startup.
+
 ---
 
 ## Troubleshooting
@@ -366,5 +384,5 @@ sudo dpkg -i --force-downgrade ucm_1.8.3_all.deb
 
 ---
 
-**Last Updated:** 2026-01-09
-**Applies to:** UCM v1.8.3 and later
+**Last Updated:** 2026-02-12
+**Applies to:** UCM v2.0.0 and later

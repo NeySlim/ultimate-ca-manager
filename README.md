@@ -18,9 +18,11 @@
 - **Certificate Lifecycle** - Generate, sign, revoke, renew, export certificates
 - **CSR Management** - Create, import, sign Certificate Signing Requests
 - **Certificate Templates** - Predefined configurations for server, client, code signing certificates
+- **Chain Repair** - Automatic background task to repair and deduplicate certificate chains
 - **CRL & CDP** - Certificate Revocation Lists with HTTP/HTTPS distribution points
 - **OCSP Responder** - Real-time certificate status validation (RFC 6960)
 - **Trust Store** - Manage trusted root CA certificates
+- **AKI/SKI Chain Matching** - Cryptographic certificate chain validation using Authority/Subject Key Identifiers
 
 ### Certificate Toolbox
 - **SSL Checker** - Verify SSL certificates on any hostname (TLS version, cipher suite, expiry)
@@ -44,7 +46,7 @@
 - **Session Management** - Timeout warning, force password change
 - **Audit Logs** - Full action logging with hash chain integrity verification
 - **Rate Limiting** - Brute force protection on login
-- **JWT Sessions** - Secure httpOnly cookie authentication
+- **Session Cookies** - Secure httpOnly cookie + CSRF token authentication
 
 ### User & Group Management
 - **User Groups** - Organize users with role-based access
@@ -240,7 +242,7 @@ UCM provides a RESTful JSON API under `/api/v2/`. Full documentation in [OpenAPI
 - **Database:** SQLite (PostgreSQL supported)
 - **Server:** Gunicorn with gevent WebSocket
 - **Cryptography:** pyOpenSSL, cryptography
-- **Authentication:** JWT, WebAuthn/FIDO2, TOTP
+- **Authentication:** Session cookies, WebAuthn/FIDO2, TOTP
 
 ---
 

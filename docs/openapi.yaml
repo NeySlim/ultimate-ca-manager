@@ -6,22 +6,15 @@ info:
     
     ## Authentication
     
-    All endpoints require authentication via session cookies or JWT tokens.
+    All endpoints require authentication via session cookies.
     Use `/api/v2/auth/login` to obtain a session.
-    
-    ## Pro Features
-    
-    Endpoints marked with 🔒 require UCM Pro license:
-    - Groups & RBAC
-    - SSO (SAML/OIDC)
-    - HSM Integration
-  version: 2.0.0
+  version: 2.1.0
   contact:
     name: UCM Support
     url: https://github.com/NeySlim/ultimate-ca-manager
   license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
+    name: BSD-3-Clause
+    url: https://opensource.org/licenses/BSD-3-Clause
 
 servers:
   - url: /api/v2
