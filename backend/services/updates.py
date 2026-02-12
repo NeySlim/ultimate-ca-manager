@@ -221,12 +221,16 @@ def check_for_updates(include_prereleases=False):
 
 def download_update(download_url, package_name):
     """
-    Download update package to temp directory
+    Download update package to DATA_DIR/updates (accessible by ucm-updater.service)
+    
+    Note: Cannot use /tmp because ucm.service has PrivateTmp=true,
+    so files in /tmp are invisible to other services.
     
     Returns path to downloaded file
     """
-    temp_dir = tempfile.mkdtemp(prefix='ucm_update_')
-    file_path = os.path.join(temp_dir, package_name)
+    update_dir = os.path.join(str(DATA_DIR), 'updates')
+    os.makedirs(update_dir, exist_ok=True)
+    file_path = os.path.join(update_dir, package_name)
     
     try:
         import logging
@@ -244,7 +248,9 @@ def download_update(download_url, package_name):
         return file_path
     
     except Exception as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        # Clean up on failure
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise Exception(f"Download failed: {str(e)}")
 
 

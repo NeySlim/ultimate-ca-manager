@@ -51,10 +51,10 @@ else
 fi
 
 # Clean up downloaded package
-TEMP_DIR=$(dirname "$PACKAGE_PATH")
-if [[ "$TEMP_DIR" == /tmp/* ]]; then
-    rm -rf "$TEMP_DIR"
-    log "Cleaned up temp directory: $TEMP_DIR"
+PACKAGE_DIR=$(dirname "$PACKAGE_PATH")
+if [[ "$PACKAGE_DIR" == */updates ]]; then
+    rm -f "$PACKAGE_PATH"
+    log "Cleaned up package: $PACKAGE_PATH"
 fi
 
 # Restart UCM service
