@@ -79,10 +79,13 @@ class ChainBuilder:
         
         # Build subject -> cert mapping
         subject_map: Dict[str, List[ParsedObject]] = {}
+        ski_map: Dict[str, ParsedObject] = {}  # SKI → cert for AKI→SKI matching
         for cert in certs:
             if cert.subject not in subject_map:
                 subject_map[cert.subject] = []
             subject_map[cert.subject].append(cert)
+            if cert.ski:
+                ski_map[cert.ski] = cert
         
         # Find root CAs (self-signed)
         roots = [c for c in certs if c.is_self_signed and c.is_ca]
@@ -97,7 +100,7 @@ class ChainBuilder:
         
         # Build chain for each leaf
         for leaf in leaves:
-            chain = self._build_chain_for_leaf(leaf, subject_map, certs)
+            chain = self._build_chain_for_leaf(leaf, subject_map, ski_map, certs)
             chains.append(chain)
         
         # If no leaves, maybe we're importing just CAs
@@ -125,6 +128,7 @@ class ChainBuilder:
         self, 
         leaf: ParsedObject, 
         subject_map: Dict[str, List[ParsedObject]],
+        ski_map: Dict[str, ParsedObject],
         all_certs: List[ParsedObject]
     ) -> ChainInfo:
         """Build chain starting from a leaf certificate"""
@@ -139,23 +143,23 @@ class ChainBuilder:
         visited = {leaf.serial_number}
         
         while True:
-            issuer = current.issuer
+            # Find issuer: AKI→SKI first, then issuer DN fallback
+            issuer_cert = None
+            if current.aki and current.aki in ski_map:
+                candidate = ski_map[current.aki]
+                if candidate.serial_number not in visited and candidate.serial_number != current.serial_number:
+                    issuer_cert = candidate
             
-            # Find issuer certificate
-            issuer_certs = subject_map.get(issuer, [])
+            if not issuer_cert:
+                issuer_certs = subject_map.get(current.issuer, [])
+                issuer_certs = [
+                    c for c in issuer_certs 
+                    if c.serial_number not in visited and c.serial_number != current.serial_number
+                ]
+                if not issuer_certs:
+                    break
+                issuer_cert = next((c for c in issuer_certs if c.is_ca), issuer_certs[0])
             
-            # Filter out the current cert and already visited
-            issuer_certs = [
-                c for c in issuer_certs 
-                if c.serial_number not in visited and c.serial_number != current.serial_number
-            ]
-            
-            if not issuer_certs:
-                # No issuer found - chain is incomplete
-                break
-            
-            # Pick the issuer (prefer CA certificates)
-            issuer_cert = next((c for c in issuer_certs if c.is_ca), issuer_certs[0])
             visited.add(issuer_cert.serial_number)
             
             if issuer_cert.is_self_signed:
@@ -241,12 +245,20 @@ class ChainBuilder:
     def find_issuer_in_db(self, cert: ParsedObject) -> Optional[str]:
         """
         Try to find the issuing CA in the database.
+        Uses AKI→SKI matching first (cryptographically reliable),
+        then falls back to issuer DN matching.
         
         Returns CA refid if found, None otherwise.
         """
         from models import CA
         
-        # Search by subject matching issuer
+        # AKI→SKI matching (reliable)
+        if cert.aki:
+            ca = CA.query.filter_by(ski=cert.aki).first()
+            if ca:
+                return ca.refid
+        
+        # Fallback: issuer DN matching
         ca = CA.query.filter(CA.subject == cert.issuer).first()
         if ca:
             return ca.refid

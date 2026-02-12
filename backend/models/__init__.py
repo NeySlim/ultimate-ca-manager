@@ -168,6 +168,7 @@ class CA(db.Model):
     subject = db.Column(db.Text)
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100))  # Certificate serial number for duplicate detection
+    ski = db.Column(db.String(200))  # Subject Key Identifier (hex, colon-separated)
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
     
@@ -341,6 +342,7 @@ class CA(db.Model):
             "serial": self.serial,
             "caref": self.caref,
             "parent_id": parent_id,  # Numeric parent ID for frontend tree
+            "ski": self.ski,
             "subject": self.subject,
             "issuer": self.issuer,
             "valid_from": self.valid_from.isoformat() if self.valid_from else None,
@@ -411,6 +413,8 @@ class Certificate(db.Model):
     subject_cn = db.Column(db.String(255))  # Extracted CN for sorting
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100))
+    aki = db.Column(db.String(200))  # Authority Key Identifier (hex, colon-separated)
+    ski = db.Column(db.String(200))  # Subject Key Identifier (hex, colon-separated)
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
     key_algo = db.Column(db.String(50))  # RSA 2048, EC P-256, etc. (for sorting)
@@ -778,6 +782,8 @@ class Certificate(db.Model):
             "subject": self.subject,
             "issuer": self.issuer,
             "serial_number": self.serial_number,
+            "aki": self.aki,
+            "ski": self.ski,
             "valid_from": self.valid_from.isoformat() if self.valid_from else None,
             "valid_to": self.valid_to.isoformat() if self.valid_to else None,
             "revoked": self.revoked,

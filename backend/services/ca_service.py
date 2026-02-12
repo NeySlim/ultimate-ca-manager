@@ -115,6 +115,15 @@ class CAService:
         except ImportError:
             pass  # Security module not available
         
+        # Extract SKI from generated cert
+        from cryptography.x509.oid import ExtensionOID
+        ca_ski = None
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+            ca_ski = ext.value.key_identifier.hex(':').upper()
+        except Exception:
+            pass
+
         # Create CA record
         ca = CA(
             refid=str(uuid.uuid4()),
@@ -125,6 +134,7 @@ class CAService:
             caref=caref,
             subject=cert.subject.rfc4514_string(),
             issuer=cert.issuer.rfc4514_string(),
+            ski=ca_ski,
             valid_from=cert.not_valid_before,
             valid_to=cert.not_valid_after,
             imported_from='generated',

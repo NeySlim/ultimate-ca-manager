@@ -112,6 +112,7 @@ def is_ca_certificate(cert):
 def extract_cert_info(cert):
     """Extract common certificate information"""
     from cryptography.x509.oid import NameOID
+    from cryptography.x509.oid import ExtensionOID
     
     subject = cert.subject
     issuer = cert.issuer
@@ -125,6 +126,21 @@ def extract_cert_info(cert):
     # Get serial number as hex string for comparison
     serial_hex = format(cert.serial_number, 'x').upper()
     
+    # Extract SKI/AKI
+    ski = None
+    aki = None
+    try:
+        ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+        ski = ext.value.key_identifier.hex(':').upper()
+    except Exception:
+        pass
+    try:
+        ext = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+        if ext.value.key_identifier:
+            aki = ext.value.key_identifier.hex(':').upper()
+    except Exception:
+        pass
+    
     return {
         'cn': get_name_attr(subject, NameOID.COMMON_NAME),
         'org': get_name_attr(subject, NameOID.ORGANIZATION_NAME),
@@ -136,6 +152,8 @@ def extract_cert_info(cert):
         'valid_to': cert.not_valid_after_utc,
         'serial_number': cert.serial_number,
         'serial_hex': serial_hex,
+        'ski': ski,
+        'aki': aki,
     }
 
 

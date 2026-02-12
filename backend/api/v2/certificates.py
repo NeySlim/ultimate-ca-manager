@@ -382,6 +382,22 @@ def create_certificate():
         ).decode('utf-8')
         
         # Save to database
+        # Extract SKI/AKI from issued cert
+        from cryptography.x509.oid import ExtensionOID
+        cert_ski = None
+        cert_aki = None
+        try:
+            ext = new_cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+            cert_ski = ext.value.key_identifier.hex(':').upper()
+        except Exception:
+            pass
+        try:
+            ext = new_cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+            if ext.value.key_identifier:
+                cert_aki = ext.value.key_identifier.hex(':').upper()
+        except Exception:
+            pass
+
         db_cert = Certificate(
             refid=str(uuid.uuid4())[:8],
             descr=data.get('description', data['cn']),
@@ -392,6 +408,8 @@ def create_certificate():
             subject=','.join(f'{attr.oid._name}={attr.value}' for attr in subject),
             issuer=','.join(f'{attr.oid._name}={attr.value}' for attr in ca_cert.subject),
             serial_number=format(new_cert.serial_number, 'x'),
+            aki=cert_aki,
+            ski=cert_ski,
             valid_from=not_before,
             valid_to=not_after,
             san_dns=json.dumps(data.get('san_dns', [])),
@@ -1197,6 +1215,7 @@ def import_certificate():
                 existing_ca.issuer = cert_info['issuer']
                 existing_ca.valid_from = cert_info['valid_from']
                 existing_ca.valid_to = cert_info['valid_to']
+                existing_ca.ski = cert_info.get('ski')
                 
                 db.session.commit()
                 
@@ -1225,6 +1244,7 @@ def import_certificate():
                 serial=0,
                 subject=cert_info['subject'],
                 issuer=cert_info['issuer'],
+                ski=cert_info.get('ski'),
                 valid_from=cert_info['valid_from'],
                 valid_to=cert_info['valid_to'],
                 imported_from='manual'
@@ -1265,6 +1285,8 @@ def import_certificate():
                 existing_cert.prv = base64.b64encode(key_pem).decode('utf-8')
             existing_cert.valid_from = cert_info['valid_from']
             existing_cert.valid_to = cert_info['valid_to']
+            existing_cert.aki = cert_info.get('aki')
+            existing_cert.ski = cert_info.get('ski')
             
             # Update CA link if provided
             if ca_id:
@@ -1296,10 +1318,16 @@ def import_certificate():
             if ca:
                 caref = ca.refid
         else:
-            # Auto-link by matching issuer with CA subject
-            ca = CA.query.filter_by(subject=cert_info['issuer']).first()
-            if ca:
-                caref = ca.refid
+            # Auto-link: AKI→SKI first (cryptographically reliable), then issuer DN fallback
+            aki = cert_info.get('aki')
+            if aki:
+                ca = CA.query.filter_by(ski=aki).first()
+                if ca:
+                    caref = ca.refid
+            if not caref:
+                ca = CA.query.filter_by(subject=cert_info['issuer']).first()
+                if ca:
+                    caref = ca.refid
         
         # Create certificate record
         refid = str(uuid.uuid4())
@@ -1311,6 +1339,8 @@ def import_certificate():
             caref=caref,
             subject=cert_info['subject'],
             issuer=cert_info['issuer'],
+            aki=cert_info.get('aki'),
+            ski=cert_info.get('ski'),
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
             created_by='import'

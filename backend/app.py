@@ -378,6 +378,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register SKI/AKI backfill task (runs once at startup, then daily to catch new imports)
+        try:
+            from services.ski_aki_backfill import backfill_ski_aki
+            scheduler.register_task(
+                name="ski_aki_backfill",
+                func=backfill_ski_aki,
+                interval=86400,  # Daily (first run is immediate at startup)
+                description="Backfill SKI/AKI identifiers for certificate chain matching"
+            )
+            app.logger.info("Registered SKI/AKI backfill task")
+        except ImportError:
+            pass
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
         app.logger.info("Scheduler service started with all tasks")

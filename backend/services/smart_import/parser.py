@@ -47,6 +47,8 @@ class ParsedObject:
     is_self_signed: bool = False
     san_dns: List[str] = field(default_factory=list)
     san_ip: List[str] = field(default_factory=list)
+    ski: Optional[str] = None  # Subject Key Identifier (hex)
+    aki: Optional[str] = None  # Authority Key Identifier (hex)
     
     # Key-specific
     key_algorithm: str = ""
@@ -426,6 +428,19 @@ class SmartParser:
                     obj.san_dns.append(name.value)
                 elif isinstance(name, x509.IPAddress):
                     obj.san_ip.append(str(name.value))
+        except x509.ExtensionNotFound:
+            pass
+        
+        # Extract SKI/AKI for reliable chain matching
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+            obj.ski = ext.value.key_identifier.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+            if ext.value.key_identifier:
+                obj.aki = ext.value.key_identifier.hex(':').upper()
         except x509.ExtensionNotFound:
             pass
         

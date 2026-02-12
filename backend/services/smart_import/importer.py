@@ -229,6 +229,7 @@ class SmartImporter:
         
         # Map old subject to new refid for parent linking
         subject_to_refid: Dict[str, str] = {}
+        ski_to_refid: Dict[str, str] = {}
         
         for ca_obj in ca_objects:
             # Check duplicate
@@ -237,15 +238,21 @@ class SmartImporter:
                 if existing:
                     result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj.subject)}")
                     subject_to_refid[ca_obj.subject] = existing.refid
+                    if existing.ski:
+                        ski_to_refid[existing.ski] = existing.refid
                     continue
             
-            # Find parent CA
+            # Find parent CA: AKI→SKI first, then issuer DN fallback
             caref = None
             if not ca_obj.is_self_signed:
-                # Look in just-imported CAs
-                caref = subject_to_refid.get(ca_obj.issuer)
-                
-                # Look in database
+                if ca_obj.aki:
+                    caref = ski_to_refid.get(ca_obj.aki)
+                    if not caref:
+                        parent = CA.query.filter_by(ski=ca_obj.aki).first()
+                        if parent:
+                            caref = parent.refid
+                if not caref:
+                    caref = subject_to_refid.get(ca_obj.issuer)
                 if not caref:
                     parent = CA.query.filter(CA.subject == ca_obj.issuer).first()
                     if parent:
@@ -271,6 +278,7 @@ class SmartImporter:
                 subject=ca_obj.subject,
                 issuer=ca_obj.issuer,
                 serial_number=ca_obj.serial_number,
+                ski=ca_obj.ski,
                 valid_from=datetime.fromisoformat(ca_obj.not_before.replace('Z', '+00:00')) if ca_obj.not_before else None,
                 valid_to=datetime.fromisoformat(ca_obj.not_after.replace('Z', '+00:00')) if ca_obj.not_after else None,
                 imported_from="smart_import",
@@ -281,6 +289,8 @@ class SmartImporter:
             db.session.flush()
             
             subject_to_refid[ca_obj.subject] = refid
+            if ca_obj.ski:
+                ski_to_refid[ca_obj.ski] = refid
             result.cas_imported += 1
             result.imported_ids["cas"].append(ca.id)
             
@@ -310,11 +320,16 @@ class SmartImporter:
                     result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj.subject)}")
                     continue
             
-            # Find issuing CA
+            # Find issuing CA: AKI→SKI first, then issuer DN fallback
             caref = None
-            ca = CA.query.filter(CA.subject == cert_obj.issuer).first()
-            if ca:
-                caref = ca.refid
+            if cert_obj.aki:
+                ca = CA.query.filter_by(ski=cert_obj.aki).first()
+                if ca:
+                    caref = ca.refid
+            if not caref:
+                ca = CA.query.filter(CA.subject == cert_obj.issuer).first()
+                if ca:
+                    caref = ca.refid
             
             # Find matching private key
             prv = None
@@ -338,11 +353,13 @@ class SmartImporter:
                 caref=caref,
                 crt=base64.b64encode(cert_obj.raw_pem.encode()).decode(),
                 prv=prv,
-                cert_type="server_cert",  # Default, could be detected
+                cert_type="server_cert",
                 subject=cert_obj.subject,
                 subject_cn=cn,
                 issuer=cert_obj.issuer,
                 serial_number=cert_obj.serial_number,
+                aki=cert_obj.aki,
+                ski=cert_obj.ski,
                 valid_from=datetime.fromisoformat(cert_obj.not_before.replace('Z', '+00:00')) if cert_obj.not_before else None,
                 valid_to=datetime.fromisoformat(cert_obj.not_after.replace('Z', '+00:00')) if cert_obj.not_after else None,
                 san_dns=json.dumps(cert_obj.san_dns) if cert_obj.san_dns else None,

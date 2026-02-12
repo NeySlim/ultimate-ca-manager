@@ -425,6 +425,7 @@ def import_ca():
             serial=0,
             subject=cert_info['subject'],
             issuer=cert_info['issuer'],
+            ski=cert_info.get('ski'),
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
             imported_from='manual'
