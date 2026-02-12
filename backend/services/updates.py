@@ -64,12 +64,14 @@ def parse_version(version_str):
     # beta2 > beta1, rc1 > beta2
     prerelease_order = 0
     if prerelease:
+        num_match = re.search(r'\d+', prerelease)
+        num = int(num_match.group()) if num_match else 0
         if prerelease.startswith('alpha'):
-            prerelease_order = 100 + int(re.search(r'\d+', prerelease).group() or 0)
+            prerelease_order = 100 + num
         elif prerelease.startswith('beta'):
-            prerelease_order = 200 + int(re.search(r'\d+', prerelease).group() or 0)
+            prerelease_order = 200 + num
         elif prerelease.startswith('rc'):
-            prerelease_order = 300 + int(re.search(r'\d+', prerelease).group() or 0)
+            prerelease_order = 300 + num
     else:
         prerelease_order = 999  # Release version is highest
     
