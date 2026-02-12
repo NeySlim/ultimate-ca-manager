@@ -1351,7 +1351,7 @@
     "apiRateLimit": "Limite de taxa da API (requisições/minuto)",
     "appearanceMode": "Modo de aparência",
     "appearanceModeDesc": "Controle como o brilho da interface se adapta",
-    "appearanceSubtitle": "Personalize a aparência do UCM",
+    "appearanceSubtitle": "Personalize a aparência e o idioma do UCM",
     "applyAndRestart": "Apply & Risart",
     "applyCertificate": "Apply Certificatee",
     "applyCustomCert": "Aplicar certificado personalizado",
@@ -1516,7 +1516,7 @@
     "systemURL": "URL do sistema",
     "tableCount": "Tabelas",
     "tabs": {
-      "appearance": "Aparência",
+      "appearance": "Aparência e idioma",
       "audit": "Auditoria",
       "backup": "Cópia de segurança",
       "database": "Base de dados",

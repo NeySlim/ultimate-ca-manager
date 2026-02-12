@@ -1404,7 +1404,7 @@
     "updateAvailable": "Update verfügbar",
     "subtitle": "Systemkonfiguration",
     "tabs": {
-      "appearance": "Erscheinung",
+      "appearance": "Darstellung & Sprache",
       "audit": "Audit",
       "backup": "Sicherung",
       "database": "Datenbank",
@@ -1421,7 +1421,7 @@
     "baseUrlHelper": "Öffentliche URL dieser UCM-Instanz",
     "colorThemeDesc": "Wählen Sie ein Farbschema nach Ihren Vorlieben",
     "appearanceModeDesc": "Steuern Sie, wie sich die Schnittstellenhelligkeit anpasst",
-    "appearanceSubtitle": "Passen Sie das Erscheinungsbild von UCM an",
+    "appearanceSubtitle": "Passen Sie Darstellung und Sprache von UCM an",
     "followSystemDesc": "Automatisch basierend auf Ihren Betriebssystemeinstellungen wechseln",
     "lightDesc": "Immer helles Design verwenden",
     "darkDesc": "Immer dunkles Design verwenden",
