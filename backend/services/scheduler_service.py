@@ -167,6 +167,16 @@ class SchedulerService:
                 return True
             return False
     
+    def run_task_now(self, name: str) -> Optional[Dict[str, Any]]:
+        """Trigger immediate execution of a task, returns task status after run"""
+        with self.tasks_lock:
+            task = self.tasks.get(name)
+        if not task:
+            return None
+        self._run_task(task)
+        with self.tasks_lock:
+            return task.to_dict()
+    
     def get_task_status(self, name: str) -> Optional[Dict[str, Any]]:
         """Get status of a specific task"""
         with self.tasks_lock:

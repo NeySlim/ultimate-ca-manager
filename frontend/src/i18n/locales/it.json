@@ -836,6 +836,7 @@
     "widgetRecentCertificates": "Certificati recenti",
     "widgetCertificateAuthorities": "Autorità di certificazione",
     "widgetAcmeAccounts": "Account ACME",
+    "widgetChainRepair": "Riparazione catena",
     "widgetNextExpirations": "Prossime scadenze",
     "nextExpirations": "Prossime scadenze",
     "noExpirations": "Nessun certificato in scadenza",
@@ -847,7 +848,15 @@
     "expiresIn": "Scade tra",
     "expired": "Scaduto",
     "widgetCertificateActivity": "Attività certificati",
-    "widgetStatusDistribution": "Distribuzione stati"
+    "widgetStatusDistribution": "Distribuzione stati",
+    "chainRepair": "Riparazione catena",
+    "chainRepairRun": "Esegui ora",
+    "chainRepairLinked": "Certificati collegati",
+    "chainRepairCAs": "Autorità di certificazione",
+    "chainRepairCerts": "Certificati",
+    "chainRepairOrphans": "orfani",
+    "chainRepairNever": "Mai eseguito",
+    "chainRepairRunning": "In esecuzione..."
   },
   "details": {
     "pemCertificate": "PEM Certificate",

@@ -836,6 +836,7 @@
     "widgetRecentCertificates": "Нещодавні сертифікати",
     "widgetCertificateAuthorities": "Центри сертифікації",
     "widgetAcmeAccounts": "Облікові записи ACME",
+    "widgetChainRepair": "Відновлення ланцюга",
     "widgetNextExpirations": "Наступні закінчення",
     "nextExpirations": "Наступні закінчення",
     "noExpirations": "Немає сертифікатів для закінчення",
@@ -847,7 +848,15 @@
     "expiresIn": "Закінчується через",
     "expired": "Прострочений",
     "widgetCertificateActivity": "Активність сертифікатів",
-    "widgetStatusDistribution": "Розподіл статусів"
+    "widgetStatusDistribution": "Розподіл статусів",
+    "chainRepair": "Відновлення ланцюга",
+    "chainRepairRun": "Запустити зараз",
+    "chainRepairLinked": "Пов'язані сертифікати",
+    "chainRepairCAs": "Центри сертифікації",
+    "chainRepairCerts": "Сертифікати",
+    "chainRepairOrphans": "сироти",
+    "chainRepairNever": "Ніколи не запускалось",
+    "chainRepairRunning": "Виконується..."
   },
   "details": {
     "pemCertificate": "PEM Certificate",

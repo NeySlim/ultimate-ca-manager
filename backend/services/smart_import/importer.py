@@ -232,9 +232,13 @@ class SmartImporter:
         ski_to_refid: Dict[str, str] = {}
         
         for ca_obj in ca_objects:
-            # Check duplicate
+            # Check duplicate by SKI first, then serial_number
             if skip_duplicates:
-                existing = CA.query.filter_by(serial_number=ca_obj.serial_number).first()
+                existing = None
+                if ca_obj.ski:
+                    existing = CA.query.filter_by(ski=ca_obj.ski).first()
+                if not existing and ca_obj.serial_number:
+                    existing = CA.query.filter_by(serial_number=ca_obj.serial_number).first()
                 if existing:
                     result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj.subject)}")
                     subject_to_refid[ca_obj.subject] = existing.refid

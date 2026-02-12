@@ -836,6 +836,7 @@
     "widgetRecentCertificates": "最近の証明書",
     "widgetCertificateAuthorities": "認証局",
     "widgetAcmeAccounts": "ACMEアカウント",
+    "widgetChainRepair": "チェーン修復",
     "widgetNextExpirations": "次の有効期限",
     "nextExpirations": "次の有効期限",
     "noExpirations": "期限切れの証明書はありません",
@@ -847,7 +848,15 @@
     "expiresIn": "有効期限まで",
     "expired": "期限切れ",
     "widgetCertificateActivity": "証明書アクティビティ",
-    "widgetStatusDistribution": "ステータス分布"
+    "widgetStatusDistribution": "ステータス分布",
+    "chainRepair": "チェーン修復",
+    "chainRepairRun": "今すぐ実行",
+    "chainRepairLinked": "リンクされた証明書",
+    "chainRepairCAs": "認証局",
+    "chainRepairCerts": "証明書",
+    "chainRepairOrphans": "孤立",
+    "chainRepairNever": "未実行",
+    "chainRepairRunning": "実行中..."
   },
   "details": {
     "pemCertificate": "PEM Certificate",

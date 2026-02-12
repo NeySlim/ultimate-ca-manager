@@ -384,8 +384,8 @@ def create_app(config_name=None):
             scheduler.register_task(
                 name="ski_aki_backfill",
                 func=backfill_ski_aki,
-                interval=86400,  # Daily (first run is immediate at startup)
-                description="Backfill SKI/AKI identifiers for certificate chain matching"
+                interval=3600,  # Hourly — handles late imports (CA after its certs)
+                description="Backfill SKI/AKI and repair certificate chain links"
             )
             app.logger.info("Registered SKI/AKI backfill task")
         except ImportError:

@@ -836,6 +836,7 @@
     "widgetRecentCertificates": "最近证书",
     "widgetCertificateAuthorities": "证书颁发机构",
     "widgetAcmeAccounts": "ACME 账户",
+    "widgetChainRepair": "链修复",
     "widgetNextExpirations": "即将到期",
     "nextExpirations": "即将到期",
     "noExpirations": "没有即将到期的证书",
@@ -847,7 +848,15 @@
     "expiresIn": "到期时间",
     "expired": "已过期",
     "widgetCertificateActivity": "证书活动",
-    "widgetStatusDistribution": "状态分布"
+    "widgetStatusDistribution": "状态分布",
+    "chainRepair": "链修复",
+    "chainRepairRun": "立即运行",
+    "chainRepairLinked": "已链接的证书",
+    "chainRepairCAs": "证书颁发机构",
+    "chainRepairCerts": "证书",
+    "chainRepairOrphans": "孤立",
+    "chainRepairNever": "从未运行",
+    "chainRepairRunning": "运行中..."
   },
   "details": {
     "pemCertificate": "PEM Certificate",

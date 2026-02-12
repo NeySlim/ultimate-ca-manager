@@ -1183,3 +1183,38 @@ def get_hsm_status():
         return success_response(data=status)
     except Exception as e:
         return error_response(f"HSM status check failed: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/chain-repair', methods=['GET'])
+@require_auth(['read:settings'])
+def get_chain_repair_status():
+    """Get chain repair task status and last run stats"""
+    try:
+        from services.ski_aki_backfill import get_last_run_stats
+        from services.scheduler_service import get_scheduler
+        task_status = get_scheduler().get_task_status('ski_aki_backfill') or {}
+        stats = get_last_run_stats()
+        return success_response(data={
+            'task': task_status,
+            'stats': stats
+        })
+    except Exception as e:
+        return error_response(f"Failed to get chain repair status: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/chain-repair/run', methods=['POST'])
+@require_auth(['write:settings'])
+def run_chain_repair():
+    """Trigger immediate chain repair"""
+    try:
+        from services.scheduler_service import get_scheduler
+        result = get_scheduler().run_task_now('ski_aki_backfill')
+        if result is None:
+            return error_response("Chain repair task not found", 404)
+        from services.ski_aki_backfill import get_last_run_stats
+        return success_response(data={
+            'task': result,
+            'stats': get_last_run_stats()
+        })
+    except Exception as e:
+        return error_response(f"Chain repair failed: {str(e)}", 500)

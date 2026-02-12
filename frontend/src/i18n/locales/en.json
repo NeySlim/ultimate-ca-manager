@@ -441,6 +441,7 @@
     "widgetRecentCertificates": "Recent Certificates",
     "widgetCertificateAuthorities": "Certificate Authorities",
     "widgetAcmeAccounts": "ACME Accounts",
+    "widgetChainRepair": "Chain Repair",
     "widgetNextExpirations": "Next Expirations",
     "nextExpirations": "Next Expirations",
     "noExpirations": "No certificates to expire",
@@ -452,7 +453,15 @@
     "expiresIn": "Expires in",
     "expired": "Expired",
     "widgetCertificateActivity": "Certificate Activity",
-    "widgetStatusDistribution": "Status Distribution"
+    "widgetStatusDistribution": "Status Distribution",
+    "chainRepair": "Chain Repair",
+    "chainRepairRun": "Run now",
+    "chainRepairLinked": "Certificates linked",
+    "chainRepairCAs": "Certificate Authorities",
+    "chainRepairCerts": "Certificates",
+    "chainRepairOrphans": "orphans",
+    "chainRepairNever": "Never run",
+    "chainRepairRunning": "Running..."
   },
   "certificates": {
     "createCertificate": "Create Certificate",
