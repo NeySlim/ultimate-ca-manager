@@ -15,7 +15,7 @@ from flask import current_app
 
 import requests
 
-from config.settings import Config
+from config.settings import Config, DATA_DIR
 
 # GitHub repo (community only, pro is archived)
 REPO = "NeySlim/ultimate-ca-manager"
@@ -264,7 +264,7 @@ def install_update(package_path):
         from pathlib import Path
         logger = logging.getLogger('ucm.updates')
         
-        trigger_file = Path(Config.DATA_DIR) / '.update_pending'
+        trigger_file = Path(DATA_DIR) / '.update_pending'
         logger.info(f"Auto-update: writing trigger for {package_path}")
         trigger_file.write_text(package_path)
         
