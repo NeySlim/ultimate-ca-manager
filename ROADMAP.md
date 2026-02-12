@@ -93,6 +93,21 @@
 - ✅ **Chain Repair Widget** - Visual progress on CAs page with manual run
 - ✅ **Smart Import Dedup** - Prevent duplicate CAs via SKI matching
 
+### Integrations (moved to v2.2.0)
+
+### Microsoft AD CS Import
+- [ ] **AD Discovery via LDAP** - Connect to Active Directory PKI containers, list all published CAs (root, issuing, policy)
+- [ ] **CA Import (PKCS#12)** - Guided import following Microsoft's recommended `certutil -backupkey` / `Backup-CARoleService` procedure
+- [ ] **Issued Certificates Import (CSV)** - Bulk import from `certutil -view csv` export
+- [ ] **Migration Wizard** - Step-by-step UI: discovery → CA import → cert import → validation report
+- [ ] **Chain Validation** - Post-import AKI/SKI chain verification with orphan detection
+- [ ] **Rollback** - Batch-tagged imports with undo capability
+
+### Security
+- [ ] **LDAPS** - TLS-encrypted AD connection (port 636), warning on plain LDAP
+- [ ] **In-memory key handling** - PKCS#12 passwords never persisted or logged
+- [ ] **Audit trail** - All migration operations logged with batch IDs
+
 ### Integrations
 - [ ] Kubernetes cert-manager issuer
 - [ ] EST Protocol (RFC 7030)
@@ -104,7 +119,9 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| v2.0.3 | 2026-02-09 | Docker migration fix, null handling, auto-update |
+| v2.1.0-alpha | 2026-02-12 | AKI/SKI chain matching, chain repair, themed dialogs, auto-update fix |
+| v2.0.6 | 2026-02-12 | Auto-update sudo fix, cumulative fixes since v2.0.1 |
+| v2.0.1 | 2026-02-08 | SSO login, i18n sync, form fixes |
 | v2.0.0 | 2026-02-06 | React 18 UI, 12 themes, templates, groups |
 | v1.8.3 | 2026-01-10 | Standalone mode, packaging fixes |
 | v1.7.0 | 2026-01-08 | ACME, WebAuthn |
