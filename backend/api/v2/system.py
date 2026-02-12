@@ -1265,7 +1265,7 @@ def restart_service():
     try:
         is_docker = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
         
-        AuditService.log(
+        AuditService.log_action(
             action='service_restart',
             resource_type='system',
             details='Manual service restart requested from settings',
