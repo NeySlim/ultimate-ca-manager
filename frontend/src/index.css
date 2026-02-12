@@ -1872,10 +1872,27 @@ input:focus, select:focus, textarea:focus {
   color: var(--icon-teal-text);
 }
 
+.icon-bg-rose {
+  background: color-mix(in srgb, #F472B6 15%, transparent);
+  color: var(--icon-rose-text, #F472B6);
+}
+
 .icon-bg-gray {
   background: color-mix(in srgb, var(--text-tertiary) 15%, transparent);
   color: var(--text-secondary);
 }
+
+/* Icon text-only colors (no background) - for sidebar nav */
+.icon-text-orange { color: var(--icon-orange-text); }
+.icon-text-amber { color: var(--icon-amber-text); }
+.icon-text-emerald { color: var(--icon-emerald-text); }
+.icon-text-blue { color: var(--icon-blue-text); }
+.icon-text-violet { color: var(--icon-violet-text); }
+.icon-text-teal { color: var(--icon-teal-text); }
+.icon-text-green { color: var(--icon-emerald-text); }
+.icon-text-purple { color: var(--icon-violet-text); }
+.icon-text-cyan { color: var(--icon-teal-text); }
+.icon-text-rose { color: var(--icon-rose-text, #F472B6); }
 
 /* CA Type Icons - Gradient backgrounds with borders */
 .ca-icon-root {
