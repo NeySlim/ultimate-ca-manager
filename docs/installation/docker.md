@@ -311,13 +311,35 @@ See: [docker-compose.portainer.yml](../../docker-compose.portainer.yml)
 
 ### Reverse Proxy (Nginx)
 
+UCM uses WebSocket (Socket.IO) for real-time updates. Your reverse proxy must support WebSocket upgrade.
+
 ```nginx
+# Add at http {} level (outside server blocks)
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
 server {
     listen 443 ssl http2;
     server_name ucm.example.com;
 
     ssl_certificate /etc/nginx/ssl/ucm.crt;
     ssl_certificate_key /etc/nginx/ssl/ucm.key;
+
+    # Socket.IO WebSocket — must be before catch-all
+    location /socket.io/ {
+        proxy_pass https://localhost:8443/socket.io/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+    }
 
     location / {
         proxy_pass https://localhost:8443;
@@ -328,6 +350,14 @@ server {
     }
 }
 ```
+
+**Important:** Add the proxy origin to UCM's CORS allowlist:
+```bash
+# In .env or docker-compose environment
+CORS_EXTRA_ORIGINS=https://ucm.example.com
+```
+
+Without this, WebSocket connections from the proxy domain will be rejected.
 
 ### Multi-Architecture
 

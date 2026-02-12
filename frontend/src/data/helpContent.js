@@ -572,12 +572,18 @@ export const helpContent = {
         title: 'Appearance',
         icon: Gear,
         content: 'Choose from multiple color themes: Dark (default), Light, Ocean, Forest, Purple, Sunset, and more.'
+      },
+      {
+        title: 'Reverse Proxy',
+        icon: Globe,
+        content: 'If UCM is behind a reverse proxy (nginx, Caddy, NPM), add the proxy URL to CORS_EXTRA_ORIGINS in /etc/ucm/ucm.env (or .env for Docker). This is required for WebSocket real-time updates to work. The reverse proxy must also forward /socket.io/ with WebSocket upgrade headers.'
       }
     ],
     tips: [
       'Test email settings before enabling notifications',
       'Create regular database backups',
-      'Shorter session timeouts improve security'
+      'Shorter session timeouts improve security',
+      'Set CORS_EXTRA_ORIGINS when using a reverse proxy, or WebSocket will not connect'
     ],
     related: ['Users', 'Security']
   },
