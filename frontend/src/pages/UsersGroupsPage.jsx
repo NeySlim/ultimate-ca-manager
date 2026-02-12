@@ -295,9 +295,9 @@ export default function UsersGroupsPage() {
           ? (avatarColors[row.role] || avatarColors.viewer)
           : 'icon-bg-orange'
         return (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ring-1 ring-white/10",
+              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
               colorClass
             )}>
               {val?.charAt(0)?.toUpperCase() || '?'}
