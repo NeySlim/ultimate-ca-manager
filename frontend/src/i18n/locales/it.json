@@ -690,7 +690,12 @@
     "clientSecret": "Client Secret",
     "passwordMismatch": "Le password non corrispondono",
     "privateKey": "Private Key",
-    "imported": "Imported"
+    "imported": "Imported",
+    "acme": "ACME",
+    "scep": "SCEP",
+    "rbac": "Controllo accessi",
+    "operations": "Operazioni",
+    "logout": "Esci"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1103,14 +1108,6 @@
     "recent": "Recenti",
     "navigate": "Naviga",
     "select": "Seleziona"
-  },
-  "nav": {
-    "acme": "ACME",
-    "scep": "SCEP",
-    "rbac": "Controllo accessi",
-    "hsm": "HSM",
-    "logout": "Esci",
-    "operations": "Operazioni"
   },
   "operations": {
     "title": "Operazioni",

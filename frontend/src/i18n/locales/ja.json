@@ -690,7 +690,12 @@
     "clientSecret": "Client Secret",
     "passwordMismatch": "パスワードが一致しません",
     "privateKey": "Private Key",
-    "imported": "Imported"
+    "imported": "Imported",
+    "acme": "ACME",
+    "scep": "SCEP",
+    "rbac": "アクセス制御",
+    "operations": "オペレーション",
+    "logout": "ログアウト"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1103,14 +1108,6 @@
     "recent": "最近",
     "navigate": "ナビゲート",
     "select": "選択"
-  },
-  "nav": {
-    "acme": "ACME",
-    "scep": "SCEP",
-    "rbac": "アクセス制御",
-    "hsm": "HSM",
-    "logout": "ログアウト",
-    "operations": "オペレーション"
   },
   "operations": {
     "title": "オペレーション",

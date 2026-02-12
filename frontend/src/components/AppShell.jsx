@@ -30,8 +30,8 @@ const mobileNavItems = [
   { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
   { id: 'templates', icon: ListIcon, labelKey: 'common.templates', path: '/templates' },
   { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
-  { id: 'acme', icon: Key, labelKey: 'nav.acme', path: '/acme' },
-  { id: 'scep', icon: Robot, labelKey: 'nav.scep', path: '/scep-config' },
+  { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme' },
+  { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
   { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
   { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
   { id: 'import', icon: UploadSimple, labelKey: 'common.importExport', path: '/import' },
@@ -42,8 +42,8 @@ const mobileNavItems = [
 // Advanced features (formerly Pro) - labels are i18n keys
 const advancedNavItems = [
   { id: 'security', icon: Detective, labelKey: 'common.security', path: '/security' },
-  { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
-  { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
+  { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
+  { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
 ]
 
 export function AppShell() {
@@ -171,7 +171,7 @@ export function AppShell() {
           <span className="text-xs font-medium text-text-primary truncate max-w-[140px]">
             {activePage === '' ? t('common.dashboard') : 
              activePage === 'import' ? t('common.importExport') :
-             activePage === 'scep-config' ? t('nav.scep') :
+             activePage === 'scep-config' ? t('common.scep') :
              activePage === 'crl-ocsp' ? t('common.crlOcsp') :
              activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
           </span>

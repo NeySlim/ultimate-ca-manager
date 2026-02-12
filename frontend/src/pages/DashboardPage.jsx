@@ -479,7 +479,7 @@ export default function DashboardPage() {
               />
               <StatCard 
                 icon={Globe}
-                label={t('nav.acme')}
+                label={t('common.acme')}
                 value={acmeAccounts}
                 color="emerald"
                 onClick={() => navigate('/acme')}

@@ -58,17 +58,17 @@ export function Sidebar({ activePage }) {
     { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
     { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },
     { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
-    { id: 'acme', icon: Key, labelKey: 'nav.acme', path: '/acme' },
-    { id: 'scep', icon: Robot, labelKey: 'nav.scep', path: '/scep-config' },
+    { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme' },
+    { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
     { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
     { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
-    { id: 'operations', icon: Lightning, labelKey: 'nav.operations', path: '/operations' },
+    { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations' },
     { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
     { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
     { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
     // Advanced features
-    { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
-    { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
+    { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
+    { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
     { id: 'security', icon: Detective, labelKey: 'common.security', path: '/security' },
   ]
 

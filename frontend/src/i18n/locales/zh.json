@@ -690,7 +690,12 @@
     "clientSecret": "Client Secret",
     "passwordMismatch": "密码不匹配",
     "privateKey": "Private Key",
-    "imported": "Imported"
+    "imported": "Imported",
+    "acme": "ACME",
+    "scep": "SCEP",
+    "rbac": "访问控制",
+    "operations": "操作",
+    "logout": "退出登录"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1103,14 +1108,6 @@
     "recent": "最近",
     "navigate": "导航",
     "select": "选择"
-  },
-  "nav": {
-    "acme": "ACME",
-    "scep": "SCEP",
-    "rbac": "访问控制",
-    "hsm": "HSM",
-    "logout": "退出登录",
-    "operations": "操作"
   },
   "operations": {
     "title": "操作",

@@ -690,7 +690,12 @@
     "clientSecret": "Client Secret",
     "passwordMismatch": "Паролі не співпадають",
     "privateKey": "Private Key",
-    "imported": "Imported"
+    "imported": "Imported",
+    "acme": "ACME",
+    "scep": "SCEP",
+    "rbac": "Контроль доступу",
+    "operations": "Операції",
+    "logout": "Вийти"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1103,14 +1108,6 @@
     "recent": "Останні",
     "navigate": "Навігація",
     "select": "Вибрати"
-  },
-  "nav": {
-    "acme": "ACME",
-    "scep": "SCEP",
-    "rbac": "Контроль доступу",
-    "hsm": "HSM",
-    "logout": "Вийти",
-    "operations": "Операції"
   },
   "operations": {
     "title": "Операції",

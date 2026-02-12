@@ -303,7 +303,12 @@
     "clientSecret": "Client Secret",
     "passwordMismatch": "Passwords do not match",
     "privateKey": "Private Key",
-    "imported": "Imported"
+    "imported": "Imported",
+    "acme": "ACME",
+    "scep": "SCEP",
+    "rbac": "Access Control",
+    "operations": "Operations",
+    "logout": "Logout"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -313,14 +318,6 @@
     "recent": "Recent",
     "navigate": "Navigate",
     "select": "Select"
-  },
-  "nav": {
-    "acme": "ACME",
-    "scep": "SCEP",
-    "rbac": "Access Control",
-    "hsm": "HSM",
-    "logout": "Logout",
-    "operations": "Operations"
   },
   "operations": {
     "title": "Operations",
