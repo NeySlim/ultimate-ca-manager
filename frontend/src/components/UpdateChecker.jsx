@@ -4,9 +4,10 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket } from '@phosphor-icons/react'
-import { Card, Button, Badge, LoadingSpinner } from '../components'
+import { Card, Button, Badge, LoadingSpinner, ServiceReconnectOverlay } from '../components'
 import { apiClient } from '../services'
 import { useNotification, useTranslationReady } from '../contexts'
+import { useServiceReconnect } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
 
 export function UpdateChecker() {
@@ -18,6 +19,7 @@ export function UpdateChecker() {
   const [error, setError] = useState(null)
   const [includePrereleases, setIncludePrereleases] = useState(false)
   const { showSuccess, showError, showConfirm } = useNotification()
+  const { reconnecting, status, attempt, waitForRestart, cancel } = useServiceReconnect()
 
   const checkForUpdates = async (showNotification = false) => {
     setChecking(true)
@@ -57,12 +59,13 @@ export function UpdateChecker() {
       await apiClient.post('/system/updates/install', {
         include_prereleases: includePrereleases
       })
-      showSuccess(`Update to v${updateInfo.latest_version} initiated. Page will reload shortly...`)
+      showSuccess(`Update to v${updateInfo.latest_version} initiated...`)
       
-      // Wait and reload
-      setTimeout(() => {
-        window.location.reload()
-      }, 10000)
+      // Show reconnect overlay and poll until service is back
+      waitForRestart({
+        delay: 5000,
+        expectedVersion: updateInfo.latest_version
+      })
     } catch (err) {
       showError(err.message || 'Failed to install update')
       setInstalling(false)
@@ -85,7 +88,11 @@ export function UpdateChecker() {
   }
 
   return (
-    <Card className="p-4">
+    <>
+      {reconnecting && (
+        <ServiceReconnectOverlay status={status} attempt={attempt} onCancel={cancel} />
+      )}
+      <Card className="p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className={`p-2 rounded-lg ${updateInfo?.update_available ? 'bg-accent-success/15' : 'bg-bg-tertiary'}`}>
@@ -220,7 +227,8 @@ export function UpdateChecker() {
           </a>
         )}
       </div>
-    </Card>
+        </Card>
+    </>
   )
 }
 

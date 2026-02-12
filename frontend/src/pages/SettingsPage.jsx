@@ -17,12 +17,13 @@ import {
   Button, Input, Select, Badge, Textarea, Card, EmptyState, ConfirmModal,
   LoadingSpinner, FileUpload, Modal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
-  UpdateChecker
+  UpdateChecker, ServiceReconnectOverlay
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import LanguageSelector from '../components/ui/LanguageSelector'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
+import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
@@ -59,6 +60,7 @@ function ServiceStatusWidget() {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
+  const { reconnecting, status: reconnectStatus, attempt, waitForRestart, cancel } = useServiceReconnect()
 
   const fetchStatus = async () => {
     try {
@@ -98,7 +100,7 @@ function ServiceStatusWidget() {
     setRestarting(true)
     try {
       await systemService.restartService()
-      showSuccess(t('settings.restartInitiated'))
+      waitForRestart({ delay: 3000 })
     } catch {
       showError(t('settings.restartFailed'))
       setRestarting(false)
@@ -106,7 +108,11 @@ function ServiceStatusWidget() {
   }
 
   return (
-    <DetailSection title={t('settings.serviceStatus')} icon={Power} iconClass="icon-bg-orange" className="mt-4">
+    <>
+      {reconnecting && (
+        <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} onCancel={cancel} />
+      )}
+      <DetailSection title={t('settings.serviceStatus')} icon={Power} iconClass="icon-bg-orange" className="mt-4">
       {loading ? (
         <LoadingSpinner size="sm" />
       ) : status ? (
@@ -132,10 +138,9 @@ function ServiceStatusWidget() {
         <p className="text-secondary">{t('settings.serviceStatusUnavailable')}</p>
       )}
     </DetailSection>
+    </>
   )
 }
-
-// Appearance Settings Component
 function AppearanceSettings() {
   const { t } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
