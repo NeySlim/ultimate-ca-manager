@@ -208,10 +208,14 @@ ENVEOF
             chmod 644 "$UCM_DATA/https_cert.pem"
         fi
         
-        # Enable and start service
+        # Enable and start/restart service
         systemctl daemon-reload
         systemctl enable ucm
-        systemctl start ucm || true
+        if systemctl is-active --quiet ucm; then
+            systemctl restart ucm || true
+        else
+            systemctl start ucm || true
+        fi
         
         # ============================================================
         # FIREWALL CONFIGURATION
