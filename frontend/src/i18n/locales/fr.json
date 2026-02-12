@@ -1394,10 +1394,15 @@
     "subtitle": "Configuration du système",
     "tabs": {
       "appearance": "Apparence",
-      "backup": "Sauvegarde",
       "audit": "Audit",
-      "https": "HTTPS",
+      "backup": "Sauvegarde",
+      "database": "Base de données",
+      "email": "Email",
       "general": "Général",
+      "https": "HTTPS",
+      "security": "Sécurité",
+      "sso": "SSO",
+      "updates": "Mises à jour",
       "webhooks": "Webhooks"
     },
     "systemNameHelper": "Nom d'affichage du système UCM",

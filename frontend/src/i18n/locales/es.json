@@ -1376,10 +1376,15 @@
     "subtitle": "Configuración del sistema",
     "tabs": {
       "appearance": "Apariencia",
-      "backup": "Copia de seguridad",
       "audit": "Auditoría",
+      "backup": "Copia de seguridad",
+      "database": "Base de datos",
+      "email": "Correo",
+      "general": "General",
       "https": "HTTPS",
-      "general": "General"
+      "security": "Seguridad",
+      "sso": "SSO",
+      "updates": "Actualizaciones"
     },
     "systemNameHelper": "Nombre para mostrar del sistema UCM",
     "baseUrl": "Base URL",
