@@ -1,7 +1,7 @@
 /**
  * useServiceReconnect - Hook for waiting on service restart/update
  * Shows a fullscreen overlay that polls the health endpoint until the service is back.
- * Two phases: 1) wait for service to go DOWN, 2) wait for it to come back UP.
+ * Detects restart by comparing started_at timestamp from /api/health.
  */
 import { useState, useCallback, useRef } from 'react'
 
@@ -22,10 +22,16 @@ export function useServiceReconnect() {
     setStatus('waiting')
     setAttempt(0)
 
-    let sawDown = false
+    // Capture current started_at before restart
+    let initialStartedAt = null
+    fetch(HEALTH_URL, { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { initialStartedAt = d.started_at })
+      .catch(() => {})
+
     let attempts = 0
 
-    // Wait initial delay before polling (must be longer than service shutdown time)
+    // Wait initial delay before polling
     setTimeout(() => {
       setStatus('connecting')
 
@@ -47,12 +53,12 @@ export function useServiceReconnect() {
           })
 
           if (resp.ok) {
-            if (!sawDown) {
-              // Service hasn't gone down yet — keep waiting
+            const data = await resp.json()
+            // Wait until started_at changes (service actually restarted)
+            if (initialStartedAt && data.started_at && data.started_at <= initialStartedAt) {
               setTimeout(poll, POLL_INTERVAL)
               return
             }
-            const data = await resp.json()
             if (expectedVersion && data.version !== expectedVersion) {
               setTimeout(poll, POLL_INTERVAL)
               return
@@ -64,9 +70,8 @@ export function useServiceReconnect() {
             }, 500)
             return
           }
-          sawDown = true
         } catch {
-          sawDown = true
+          // Service not ready yet
         }
 
         setTimeout(poll, POLL_INTERVAL)

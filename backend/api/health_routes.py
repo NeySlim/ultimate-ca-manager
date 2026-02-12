@@ -2,11 +2,14 @@
 Health Check Routes
 Endpoints for load balancers, monitoring, and readiness checks.
 """
+import time
 from flask import Blueprint, jsonify, current_app
 from models import db
 import os
 
 health_bp = Blueprint('health', __name__)
+
+_started_at = time.time()
 
 
 @health_bp.route('/health')
@@ -15,10 +18,12 @@ def health():
     """
     Basic health check - fast response for load balancers.
     Always returns 200 if the application is running.
+    Includes started_at for restart detection by frontend.
     """
     return jsonify({
         'status': 'ok',
-        'service': 'ucm'
+        'service': 'ucm',
+        'started_at': _started_at
     })
 
 

@@ -27,8 +27,8 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LimitNOFILE=65536
 LimitNPROC=512
 
-# Restart policy
-Restart=on-failure
+# Restart policy (always: needed for signal-file based restart mechanism)
+Restart=always
 RestartSec=5s
 StartLimitInterval=60s
 StartLimitBurst=3

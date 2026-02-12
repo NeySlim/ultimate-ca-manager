@@ -3,6 +3,7 @@ Ultimate CA Manager - Main Application
 Flask application with HTTPS-only enforcement
 """
 import os
+import time
 from os import environ
 import sys
 from pathlib import Path
@@ -502,9 +503,11 @@ def create_app(config_name=None):
                 return redirect(url, code=301)
     
     # Health check endpoint
+    _started_at = time.time()
+    
     @app.route('/api/health')
     def health():
-        return {"status": "ok", "version": config.APP_VERSION}
+        return {"status": "ok", "version": config.APP_VERSION, "started_at": _started_at}
     
     # Restart signal detector (before_request middleware)
     @app.before_request
@@ -526,17 +529,20 @@ def create_app(config_name=None):
                 # Docker/Systemd will automatically restart the service
                 def do_shutdown():
                     import time
-                    import sys
+                    import signal
                     
                     print(f"🔄 Shutdown thread started, waiting 1 second...")
                     time.sleep(1)  # Wait for response to be sent
                     
-                    print(f"🔄 Executing os._exit(1) to trigger systemd/docker restart...")
-                    sys.stdout.flush()  # Ensure logs are written
+                    # Kill gunicorn master to trigger full process restart
+                    master_pid = os.getppid()
+                    print(f"🔄 Killing gunicorn master (PID {master_pid}) for restart...")
+                    sys.stdout.flush()
                     
-                    # Exit with code 1 to trigger systemd restart (Restart=on-failure)
-                    # Docker will restart regardless (restart: unless-stopped)
-                    os._exit(1)
+                    try:
+                        os.kill(master_pid, signal.SIGTERM)
+                    except OSError:
+                        os._exit(1)
                 
                 import threading
                 threading.Thread(target=do_shutdown, daemon=False).start()
