@@ -341,8 +341,8 @@ export default function HSMPage() {
           {provider.provider_type === 'pkcs11' && (
             <>
               <CompactGrid>
-                <CompactField label={t('hsm.pkcs11Config.slotId')} value={provider.pkcs11_slot_id ?? 'Auto'} />
-                <CompactField label={t('hsm.pkcs11Config.token')} value={provider.pkcs11_token_label || '-'} />
+                <CompactField autoIcon="slotId" label={t('hsm.pkcs11Config.slotId')} value={provider.pkcs11_slot_id ?? 'Auto'} />
+                <CompactField autoIcon="token" label={t('hsm.pkcs11Config.token')} value={provider.pkcs11_token_label || '-'} />
               </CompactGrid>
               <div className="mt-2 text-xs">
                 <span className="text-text-tertiary block mb-0.5">{t('hsm.pkcs11Config.libraryPath')}:</span>
@@ -354,9 +354,9 @@ export default function HSMPage() {
           )}
           {provider.provider_type === 'aws-cloudhsm' && (
             <CompactGrid>
-              <CompactField label={t('hsm.awsConfig.clusterId')} value={provider.aws_cluster_id} mono />
-              <CompactField label={t('hsm.awsConfig.region')} value={provider.aws_region} />
-              <CompactField label={t('hsm.awsConfig.cryptoUser')} value={provider.aws_crypto_user} />
+              <CompactField autoIcon="clusterId" label={t('hsm.awsConfig.clusterId')} value={provider.aws_cluster_id} mono />
+              <CompactField autoIcon="region" label={t('hsm.awsConfig.region')} value={provider.aws_region} />
+              <CompactField autoIcon="cryptoUser" label={t('hsm.awsConfig.cryptoUser')} value={provider.aws_crypto_user} />
             </CompactGrid>
           )}
           {provider.provider_type === 'azure-keyvault' && (
@@ -368,16 +368,16 @@ export default function HSMPage() {
                 </p>
               </div>
               <CompactGrid>
-                <CompactField label={t('hsm.azureConfig.tenant')} value={provider.azure_tenant_id} mono />
-                <CompactField label={t('hsm.azureConfig.client')} value={provider.azure_client_id} mono />
+                <CompactField autoIcon="tenant" label={t('hsm.azureConfig.tenant')} value={provider.azure_tenant_id} mono />
+                <CompactField autoIcon="client" label={t('hsm.azureConfig.client')} value={provider.azure_client_id} mono />
               </CompactGrid>
             </>
           )}
           {provider.provider_type === 'google-kms' && (
             <CompactGrid>
-              <CompactField label={t('hsm.gcpConfig.project')} value={provider.gcp_project_id} />
-              <CompactField label={t('hsm.gcpConfig.location')} value={provider.gcp_location} />
-              <CompactField label={t('hsm.gcpConfig.keyRing')} value={provider.gcp_keyring} />
+              <CompactField autoIcon="project" label={t('hsm.gcpConfig.project')} value={provider.gcp_project_id} />
+              <CompactField autoIcon="location" label={t('hsm.gcpConfig.location')} value={provider.gcp_location} />
+              <CompactField autoIcon="keyRing" label={t('hsm.gcpConfig.keyRing')} value={provider.gcp_keyring} />
             </CompactGrid>
           )}
         </CompactSection>

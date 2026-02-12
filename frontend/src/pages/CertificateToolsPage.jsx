@@ -705,12 +705,12 @@ export default function CertificateToolsPage() {
 
         {/* Certificate info */}
         <CompactGrid cols={2}>
-          <CompactField label={t('common.commonName')} value={data.subject?.commonName} copyable />
-          <CompactField label={t('common.issuer')} value={data.issuer?.commonName || data.issuer?.organizationName} />
-          <CompactField label={t('common.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
-          <CompactField label={t('common.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
-          <CompactField label={t('tools.daysLeft')} value={data.days_until_expiry} />
-          <CompactField label={t('common.status')} value={
+          <CompactField autoIcon="commonName" label={t('common.commonName')} value={data.subject?.commonName} copyable />
+          <CompactField autoIcon="issuer" label={t('common.issuer')} value={data.issuer?.commonName || data.issuer?.organizationName} />
+          <CompactField autoIcon="validFrom" label={t('common.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
+          <CompactField autoIcon="validUntil" label={t('common.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
+          <CompactField autoIcon="daysLeft" label={t('tools.daysLeft')} value={data.days_until_expiry} />
+          <CompactField autoIcon="status" label={t('common.status')} value={
             <Badge variant={data.status === 'valid' ? 'success' : 'danger'}>
               {data.status}
             </Badge>
@@ -719,10 +719,10 @@ export default function CertificateToolsPage() {
 
         {/* Connection info */}
         <CompactGrid cols={2}>
-          <CompactField label={t('tools.tlsVersion')} value={data.tls_version} />
-          <CompactField label={t('tools.cipher')} value={data.cipher?.name} />
-          <CompactField label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
-          <CompactField label={t('common.signature')} value={data.signature_algorithm} />
+          <CompactField autoIcon="tlsVersion" label={t('tools.tlsVersion')} value={data.tls_version} />
+          <CompactField autoIcon="cipher" label={t('tools.cipher')} value={data.cipher?.name} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
+          <CompactField autoIcon="signature" label={t('common.signature')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* SANs */}
@@ -739,7 +739,7 @@ export default function CertificateToolsPage() {
 
         {/* Fingerprints */}
         <CompactGrid cols={1}>
-          <CompactField label={t('common.sha256')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
+          <CompactField autoIcon="sha256" label={t('common.sha256')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
         </CompactGrid>
       </div>
     </CompactSection>
@@ -752,12 +752,12 @@ export default function CertificateToolsPage() {
     <CompactSection title={t('common.csrDetails')} defaultOpen>
       <div className="space-y-4">
         <CompactGrid cols={2}>
-          <CompactField label={t('common.commonName')} value={data.subject?.commonName} copyable />
-          <CompactField label={t('common.organization')} value={data.subject?.organizationName} />
-          <CompactField label={t('common.country')} value={data.subject?.countryName} />
-          <CompactField label={t('common.state')} value={data.subject?.stateOrProvinceName} />
-          <CompactField label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
-          <CompactField label={t('tools.signatureValid')} value={
+          <CompactField autoIcon="commonName" label={t('common.commonName')} value={data.subject?.commonName} copyable />
+          <CompactField autoIcon="organization" label={t('common.organization')} value={data.subject?.organizationName} />
+          <CompactField autoIcon="country" label={t('common.country')} value={data.subject?.countryName} />
+          <CompactField autoIcon="state" label={t('common.state')} value={data.subject?.stateOrProvinceName} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField autoIcon="signatureValid" label={t('tools.signatureValid')} value={
             <Badge variant={data.is_signature_valid ? 'success' : 'danger'}>
               {data.is_signature_valid ? t('common.yes') : t('common.no')}
             </Badge>
@@ -806,25 +806,25 @@ export default function CertificateToolsPage() {
 
         {/* Subject & Issuer */}
         <CompactGrid cols={2}>
-          <CompactField label={t('tools.subjectCn')} value={data.subject?.commonName} copyable />
-          <CompactField label={t('tools.issuerCn')} value={data.issuer?.commonName} />
-          <CompactField label={t('common.organization')} value={data.subject?.organizationName} />
-          <CompactField label={t('tools.issuerOrg')} value={data.issuer?.organizationName} />
+          <CompactField autoIcon="subjectCn" label={t('tools.subjectCn')} value={data.subject?.commonName} copyable />
+          <CompactField autoIcon="issuerCn" label={t('tools.issuerCn')} value={data.issuer?.commonName} />
+          <CompactField autoIcon="organization" label={t('common.organization')} value={data.subject?.organizationName} />
+          <CompactField autoIcon="issuerOrg" label={t('tools.issuerOrg')} value={data.issuer?.organizationName} />
         </CompactGrid>
 
         {/* Validity */}
         <CompactGrid cols={3}>
-          <CompactField label={t('common.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
-          <CompactField label={t('common.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
-          <CompactField label={t('tools.daysLeft')} value={data.days_until_expiry} />
+          <CompactField autoIcon="validFrom" label={t('common.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
+          <CompactField autoIcon="validUntil" label={t('common.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
+          <CompactField autoIcon="daysLeft" label={t('tools.daysLeft')} value={data.days_until_expiry} />
         </CompactGrid>
 
         {/* Technical */}
         <CompactGrid cols={2}>
-          <CompactField label={t('common.serialNumber')} value={data.serial_number} copyable mono />
-          <CompactField label={t('tools.version')} value={data.version} />
-          <CompactField label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
-          <CompactField label={t('common.signatureAlgorithm')} value={data.signature_algorithm} />
+          <CompactField autoIcon="serialNumber" label={t('common.serialNumber')} value={data.serial_number} copyable mono />
+          <CompactField autoIcon="version" label={t('tools.version')} value={data.version} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* Extensions */}
@@ -863,8 +863,8 @@ export default function CertificateToolsPage() {
 
         {/* Fingerprints */}
         <CompactGrid cols={1}>
-          <CompactField label={t('tools.sha1')} value={data.fingerprints?.sha1} copyable mono className="text-xs" />
-          <CompactField label={t('tools.sha256')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
+          <CompactField autoIcon="sha1" label={t('tools.sha1')} value={data.fingerprints?.sha1} copyable mono className="text-xs" />
+          <CompactField autoIcon="sha256" label={t('tools.sha256')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
         </CompactGrid>
       </div>
     </CompactSection>

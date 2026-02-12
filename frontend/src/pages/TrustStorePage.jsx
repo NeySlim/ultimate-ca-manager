@@ -374,7 +374,7 @@ export default function TrustStorePage() {
 
         {/* Issuer Section */}
         <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
-          <CompactField label={t('common.issuer')} value={selectedCert.issuer || selectedCert.issuer_cn} mono />
+          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer || selectedCert.issuer_cn} mono />
         </CompactSection>
 
         {/* Validity Section */}

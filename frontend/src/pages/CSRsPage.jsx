@@ -736,22 +736,22 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       {/* Subject Information */}
       <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField label={t('common.commonName')} value={csr.common_name || csr.cn} className="col-span-2" />
-          <CompactField label={t('common.organization')} value={csr.organization} />
-          <CompactField label={t('common.orgUnit')} value={csr.organizational_unit} />
-          <CompactField label={t('common.country')} value={csr.country} />
-          <CompactField label={t('common.state')} value={csr.state} />
-          <CompactField label={t('common.locality')} value={csr.locality} />
-          <CompactField label={t('common.email')} value={csr.email} />
+          <CompactField autoIcon="commonName" label={t('common.commonName')} value={csr.common_name || csr.cn} className="col-span-2" />
+          <CompactField autoIcon="organization" label={t('common.organization')} value={csr.organization} />
+          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={csr.organizational_unit} />
+          <CompactField autoIcon="country" label={t('common.country')} value={csr.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={csr.state} />
+          <CompactField autoIcon="locality" label={t('common.locality')} value={csr.locality} />
+          <CompactField autoIcon="email" label={t('common.email')} value={csr.email} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Information */}
       <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField label={t('common.algorithm')} value={csr.key_algorithm || 'RSA'} />
-          <CompactField label={t('common.keySize')} value={csr.key_size} />
-          <CompactField label={t('common.signature')} value={csr.signature_algorithm} />
+          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={csr.key_algorithm || 'RSA'} />
+          <CompactField autoIcon="keySize" label={t('common.keySize')} value={csr.key_size} />
+          <CompactField autoIcon="signature" label={t('common.signature')} value={csr.signature_algorithm} />
         </CompactGrid>
       </CompactSection>
 
@@ -771,8 +771,8 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       {/* Timeline */}
       <CompactSection title={t('common.timeline')}>
         <CompactGrid>
-          <CompactField label={t('common.created')} value={csr.created_at ? formatDate(csr.created_at) : '—'} />
-          <CompactField label={t('csrs.requester')} value={csr.requester || csr.created_by} />
+          <CompactField autoIcon="created" label={t('common.created')} value={csr.created_at ? formatDate(csr.created_at) : '—'} />
+          <CompactField autoIcon="requester" label={t('csrs.requester')} value={csr.requester || csr.created_by} />
         </CompactGrid>
       </CompactSection>
     </div>
@@ -829,11 +829,11 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       {/* Signing Information */}
       <CompactSection title={t('common.signingDetails')}>
         <CompactGrid>
-          <CompactField label={t('common.signedBy')} value={cert.signed_by || cert.issuer_name} className="col-span-2" />
-          <CompactField label={t('csrs.signed')} value={cert.signed_at ? formatDate(cert.signed_at) : formatDate(cert.valid_from)} />
-          <CompactField label={t('common.expires')} value={cert.valid_to ? formatDate(cert.valid_to) : '—'} />
+          <CompactField autoIcon="signedBy" label={t('common.signedBy')} value={cert.signed_by || cert.issuer_name} className="col-span-2" />
+          <CompactField autoIcon="signedAt" label={t('csrs.signed')} value={cert.signed_at ? formatDate(cert.signed_at) : formatDate(cert.valid_from)} />
+          <CompactField autoIcon="expires" label={t('common.expires')} value={cert.valid_to ? formatDate(cert.valid_to) : '—'} />
           <CompactField 
-            label={t('common.status')} 
+            autoIcon="status" label={t('common.status')} 
             value={
               <Badge variant={expiryVariant} size="sm">
                 {daysRemaining < 0 ? t('common.expired') : t('csrs.daysLeft', { days: daysRemaining })}
@@ -846,28 +846,28 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       {/* Subject Information */}
       <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField label={t('common.commonName')} value={cert.common_name || cert.cn} className="col-span-2" />
-          <CompactField label={t('common.organization')} value={cert.organization} />
-          <CompactField label={t('common.orgUnit')} value={cert.organizational_unit} />
-          <CompactField label={t('common.country')} value={cert.country} />
-          <CompactField label={t('common.state')} value={cert.state} />
+          <CompactField autoIcon="commonName" label={t('common.commonName')} value={cert.common_name || cert.cn} className="col-span-2" />
+          <CompactField autoIcon="organization" label={t('common.organization')} value={cert.organization} />
+          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={cert.organizational_unit} />
+          <CompactField autoIcon="country" label={t('common.country')} value={cert.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={cert.state} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Information */}
       <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField label={t('common.algorithm')} value={cert.key_algorithm || 'RSA'} />
-          <CompactField label={t('common.keySize')} value={cert.key_size} />
-          <CompactField label={t('common.serial')} value={cert.serial_number} copyable mono className="col-span-2" />
+          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={cert.key_algorithm || 'RSA'} />
+          <CompactField autoIcon="keySize" label={t('common.keySize')} value={cert.key_size} />
+          <CompactField autoIcon="serial" label={t('common.serial')} value={cert.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 
       {/* Timeline */}
       <CompactSection title={t('common.timeline')}>
         <CompactGrid>
-          <CompactField label={t('csrs.csrCreated')} value={cert.created_at ? formatDate(cert.created_at) : '—'} />
-          <CompactField label={t('csrs.certificateIssued')} value={cert.valid_from ? formatDate(cert.valid_from) : '—'} />
+          <CompactField autoIcon="created" label={t('csrs.csrCreated')} value={cert.created_at ? formatDate(cert.created_at) : '—'} />
+          <CompactField autoIcon="issued" label={t('csrs.certificateIssued')} value={cert.valid_from ? formatDate(cert.valid_from) : '—'} />
         </CompactGrid>
       </CompactSection>
     </div>

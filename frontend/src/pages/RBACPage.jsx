@@ -345,10 +345,10 @@ export default function RBACPage() {
 
       <CompactSection title={t('rbac.roleInformation')}>
         <CompactGrid>
-          <CompactField label={t('common.name')} value={role.name} />
-          <CompactField label={t('common.type')} value={role.is_system ? t('common.system') : t('common.custom')} />
+          <CompactField autoIcon="name" label={t('common.name')} value={role.name} />
+          <CompactField autoIcon="type" label={t('common.type')} value={role.is_system ? t('common.system') : t('common.custom')} />
           {role.inherits_from && (
-            <CompactField label={t('rbac.inheritsFrom')} value={role.parent_name || `Role #${role.inherits_from}`} />
+            <CompactField autoIcon="inheritsFrom" label={t('rbac.inheritsFrom')} value={role.parent_name || `Role #${role.inherits_from}`} />
           )}
         </CompactGrid>
         {role.description && <p className="text-xs text-text-secondary mt-2">{role.description}</p>}

@@ -376,25 +376,25 @@ export default function TemplatesPage() {
 
       <CompactSection title={t('templates.basicInfo')}>
         <CompactGrid columns={1}>
-          <CompactField label={t('common.name')} value={selectedTemplate.name} />
-          <CompactField label={t('common.type')} value={selectedTemplate.type === 'ca' ? t('common.certificateAuthority') : t('common.certificate')} />
-          <CompactField label={t('common.description')} value={selectedTemplate.description || '—'} />
+          <CompactField autoIcon="name" label={t('common.name')} value={selectedTemplate.name} />
+          <CompactField autoIcon="type" label={t('common.type')} value={selectedTemplate.type === 'ca' ? t('common.certificateAuthority') : t('common.certificate')} />
+          <CompactField autoIcon="description" label={t('common.description')} value={selectedTemplate.description || '—'} />
         </CompactGrid>
       </CompactSection>
 
       <CompactSection title={t('common.validityPeriod')} icon={Clock}>
         <CompactGrid columns={2}>
-          <CompactField label={t('common.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || 365 })} />
-          <CompactField label={t('templates.maximum')} value={t('templates.validityDays', { count: selectedTemplate.max_validity_days || 3650 })} />
+          <CompactField autoIcon="default" label={t('common.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || 365 })} />
+          <CompactField autoIcon="maximum" label={t('templates.maximum')} value={t('templates.validityDays', { count: selectedTemplate.max_validity_days || 3650 })} />
         </CompactGrid>
       </CompactSection>
 
       <CompactSection title={t('templates.subjectTemplate')} collapsible>
         <CompactGrid columns={2}>
-          <CompactField label={t('templates.country')} value={selectedTemplate.subject?.C || '—'} />
-          <CompactField label={t('templates.state')} value={selectedTemplate.subject?.ST || '—'} />
-          <CompactField label={t('templates.organization')} value={selectedTemplate.subject?.O || '—'} />
-          <CompactField label={t('templates.commonName')} value={selectedTemplate.subject?.CN || '—'} />
+          <CompactField autoIcon="country" label={t('templates.country')} value={selectedTemplate.subject?.C || '—'} />
+          <CompactField autoIcon="state" label={t('templates.state')} value={selectedTemplate.subject?.ST || '—'} />
+          <CompactField autoIcon="organization" label={t('templates.organization')} value={selectedTemplate.subject?.O || '—'} />
+          <CompactField autoIcon="commonName" label={t('templates.commonName')} value={selectedTemplate.subject?.CN || '—'} />
         </CompactGrid>
       </CompactSection>
 
@@ -402,10 +402,10 @@ export default function TemplatesPage() {
         <CompactSection title={t('common.keyUsage')} collapsible defaultOpen={false}>
           <CompactGrid columns={1}>
             {selectedTemplate.key_usage?.length > 0 && (
-              <CompactField label={t('common.keyUsage')} value={selectedTemplate.key_usage.join(', ')} />
+              <CompactField autoIcon="keyUsage" label={t('common.keyUsage')} value={selectedTemplate.key_usage.join(', ')} />
             )}
             {selectedTemplate.extended_key_usage?.length > 0 && (
-              <CompactField label={t('common.extKeyUsage')} value={selectedTemplate.extended_key_usage.join(', ')} />
+              <CompactField autoIcon="extKeyUsage" label={t('common.extKeyUsage')} value={selectedTemplate.extended_key_usage.join(', ')} />
             )}
           </CompactGrid>
         </CompactSection>

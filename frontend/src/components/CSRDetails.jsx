@@ -188,7 +188,7 @@ export function CSRDetails({
           <CompactField icon={Key} label={t('common.keyAlgorithm')} value={csr.key_algorithm || csr.key_type} />
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={csr.key_size} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={csr.signature_algorithm} />
-          <CompactField label={t('details.subjectDN')} value={csr.subject} mono colSpan={2} />
+          <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={csr.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
       

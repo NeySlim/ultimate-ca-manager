@@ -608,29 +608,29 @@ export default function AuditLogsPage() {
       <CompactSection title={t('common.details')}>
         <CompactGrid>
           <CompactField 
-            label={t('audit.timestamp')} 
+            autoIcon="created" label={t('audit.timestamp')} 
             value={new Date(selectedLog.timestamp).toLocaleString()} 
           />
           <CompactField 
-            label={t('common.user')} 
+            autoIcon="user" label={t('common.user')} 
             value={selectedLog.username || t('common.system')} 
           />
           <CompactField 
-            label={t('audit.action')} 
+            autoIcon="status" label={t('audit.action')} 
             value={selectedLog.action?.replace(/_/g, ' ')} 
           />
           <CompactField 
-            label={t('audit.target')} 
+            autoIcon="subject" label={t('audit.target')} 
             value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
           />
           <CompactField 
-            label={t('audit.ipAddress')} 
+            autoIcon="environment" label={t('audit.ipAddress')} 
             value={selectedLog.ip_address} 
             mono 
             copyable 
           />
           <CompactField 
-            label={t('common.status')} 
+            autoIcon="status" label={t('common.status')} 
             value={selectedLog.success ? t('common.success') : t('common.failed')} 
           />
         </CompactGrid>

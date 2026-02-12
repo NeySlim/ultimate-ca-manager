@@ -687,14 +687,14 @@ export default function ACMEPage() {
         <div className="space-y-3">
           <CompactSection title={t('common.accountInformation')}>
             <CompactGrid>
-              <CompactField label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
-              <CompactField label={t('common.status')}>
+              <CompactField autoIcon="email" label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
+              <CompactField autoIcon="status" label={t('common.status')}>
                 <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
                   {selectedAccount.status}
                 </StatusIndicator>
               </CompactField>
-              <CompactField label={t('common.keyType')} value={selectedAccount.key_type || 'RSA-2048'} />
-              <CompactField label={t('common.created')} value={formatDate(selectedAccount.created_at)} />
+              <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedAccount.key_type || 'RSA-2048'} />
+              <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedAccount.created_at)} />
             </CompactGrid>
           </CompactSection>
 
@@ -1095,6 +1095,7 @@ export default function ACMEPage() {
       <CompactSection title={t('acme.endpoints')} icon={Lightning}>
         <CompactGrid columns={1}>
           <CompactField 
+            autoIcon="environment"
             label={t('acme.directory')} 
             value={`${window.location.origin}/acme/directory`}
             mono
@@ -1126,6 +1127,7 @@ export default function ACMEPage() {
             <>
               <CompactGrid columns={1}>
                 <CompactField 
+                  autoIcon="environment"
                   label={t('acme.proxyEndpoint')} 
                   value={`${window.location.origin}/acme/proxy/directory`}
                   mono
@@ -1469,26 +1471,26 @@ export default function ACMEPage() {
       
       <CompactSection title={t('common.certificateDetails')}>
         <CompactGrid>
-          <CompactField label={t('common.commonName')} value={selectedCert.common_name} copyable />
-          <CompactField label={t('common.serialNumber')} value={selectedCert.serial} mono copyable />
-          <CompactField label={t('common.issuer')} value={selectedCert.issuer || t('common.unknown')} />
+          <CompactField autoIcon="commonName" label={t('common.commonName')} value={selectedCert.common_name} copyable />
+          <CompactField autoIcon="serialNumber" label={t('common.serialNumber')} value={selectedCert.serial} mono copyable />
+          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer || t('common.unknown')} />
         </CompactGrid>
       </CompactSection>
       
       <CompactSection title={t('common.validity')}>
         <CompactGrid>
-          <CompactField label={t('common.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : t('common.na')} />
-          <CompactField label={t('common.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : t('common.na')} />
-          <CompactField label={t('common.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : t('common.na')} />
+          <CompactField autoIcon="validFrom" label={t('common.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : t('common.na')} />
+          <CompactField autoIcon="validTo" label={t('common.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : t('common.na')} />
+          <CompactField autoIcon="issued" label={t('common.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : t('common.na')} />
         </CompactGrid>
       </CompactSection>
       
       {selectedCert.order && (
         <CompactSection title={t('acme.acmeOrder')}>
           <CompactGrid>
-            <CompactField label={t('acme.account')} value={selectedCert.order.account} />
-            <CompactField label={t('acme.orderStatus')} value={selectedCert.order.status} />
-            <CompactField label={t('acme.orderId')} value={selectedCert.order.order_id} mono copyable />
+            <CompactField autoIcon="account" label={t('acme.account')} value={selectedCert.order.account} />
+            <CompactField autoIcon="orderStatus" label={t('acme.orderStatus')} value={selectedCert.order.status} />
+            <CompactField autoIcon="orderId" label={t('acme.orderId')} value={selectedCert.order.order_id} mono copyable />
           </CompactGrid>
         </CompactSection>
       )}
@@ -1539,13 +1541,13 @@ export default function ACMEPage() {
       {/* Order Info */}
       <CompactSection title={t('acme.orderInfo')}>
         <CompactGrid>
-          <CompactField label={t('acme.environment')} value={selectedClientOrder.environment === 'production' ? t('acme.production') : t('acme.staging')} />
-          <CompactField label={t('acme.method')} value={selectedClientOrder.challenge_type?.toUpperCase()} />
-          <CompactField label={t('acme.provider')} value={selectedClientOrder.dns_provider_name || t('acme.manualDns')} />
-          <CompactField label={t('common.status')} value={selectedClientOrder.status} />
-          <CompactField label={t('common.created')} value={formatDate(selectedClientOrder.created_at)} />
+          <CompactField autoIcon="environment" label={t('acme.environment')} value={selectedClientOrder.environment === 'production' ? t('acme.production') : t('acme.staging')} />
+          <CompactField autoIcon="method" label={t('acme.method')} value={selectedClientOrder.challenge_type?.toUpperCase()} />
+          <CompactField autoIcon="provider" label={t('acme.provider')} value={selectedClientOrder.dns_provider_name || t('acme.manualDns')} />
+          <CompactField autoIcon="status" label={t('common.status')} value={selectedClientOrder.status} />
+          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedClientOrder.created_at)} />
           {selectedClientOrder.expires_at && (
-            <CompactField label={t('common.expires')} value={formatDate(selectedClientOrder.expires_at)} />
+            <CompactField autoIcon="expires" label={t('common.expires')} value={formatDate(selectedClientOrder.expires_at)} />
           )}
         </CompactGrid>
       </CompactSection>
@@ -1559,8 +1561,8 @@ export default function ACMEPage() {
                 <p className="text-sm font-medium text-text-primary mb-2">{domain}</p>
                 {selectedClientOrder.challenge_type === 'dns-01' && (
                   <div className="space-y-2 text-xs">
-                    <CompactField label={t('acme.dnsRecordName')} value={data.dns_txt_name || data.record_name} mono copyable />
-                    <CompactField label={t('acme.dnsRecordValue')} value={data.dns_txt_value || data.record_value} mono copyable />
+                    <CompactField autoIcon="dnsRecordName" label={t('acme.dnsRecordName')} value={data.dns_txt_name || data.record_name} mono copyable />
+                    <CompactField autoIcon="dnsRecordValue" label={t('acme.dnsRecordValue')} value={data.dns_txt_value || data.record_value} mono copyable />
                   </div>
                 )}
               </div>

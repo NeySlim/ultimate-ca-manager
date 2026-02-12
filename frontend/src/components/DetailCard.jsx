@@ -11,7 +11,8 @@ import {
   // Auto-icon mapping
   Globe, MapPin, Buildings, Flag, Key, ShieldCheck, 
   Hash, Calendar, Clock, Fingerprint, Envelope, User,
-  Certificate, FileText, Database
+  Certificate, FileText, Database, Lock, Lightning,
+  Link, Shield, ListBullets, Eye, Warning, ArrowsClockwise
 } from '@phosphor-icons/react'
 import { useMobile } from '../contexts'
 import { Badge } from './Badge'
@@ -21,32 +22,66 @@ import { Button } from './Button'
 const FIELD_ICONS = {
   // Location
   'country': Flag, 'state': MapPin, 'province': MapPin,
-  'locality': MapPin, 'city': MapPin,
+  'locality': MapPin, 'city': MapPin, 'stateProvince': MapPin,
   'organization': Buildings, 'orgUnit': Buildings,
-  // Certificate
-  'commonName': Globe, 'cn': Globe,
+  // Certificate / Identity
+  'commonName': Globe, 'cn': Globe, 'name': Globe,
   'serial': Hash, 'serialNumber': Hash,
   'keyType': Key, 'keyAlgorithm': Key, 'keySize': Key,
+  'algorithm': Key, 'signature': ShieldCheck,
   'signatureAlgorithm': ShieldCheck,
   'certType': Certificate, 'certificateType': Certificate, 'type': FileText,
-  // Security
+  // Security / Fingerprints
   'fingerprint': Fingerprint, 'thumbprint': Fingerprint,
   'sha-1': Fingerprint, 'sha-256': Fingerprint, 'sha1': Fingerprint, 'sha256': Fingerprint,
   // Time
-  'validFrom': Calendar, 'validUntil': Calendar,
+  'validFrom': Calendar, 'validUntil': Calendar, 'validTo': Calendar,
   'notBefore': Calendar, 'notAfter': Calendar,
   'expires': Clock, 'expiry': Clock, 'expiryDate': Clock,
   'created': Calendar, 'createdAt': Calendar, 'updated': Calendar, 'updatedAt': Calendar,
-  'signedAt': Calendar,
-  // Contact
-  'email': Envelope, 'user': User, 'username': User, 'createdBy': User, 'signedBy': User,
+  'signedAt': Calendar, 'lastLogin': Clock, 'lastUpdate': Calendar, 'nextUpdate': Calendar,
+  'revokedAt': Calendar, 'issued': Calendar,
+  // Contact / Users
+  'email': Envelope, 'user': User, 'username': User,
+  'createdBy': User, 'signedBy': User, 'requester': User,
+  'account': User,
   // Technical
   'issuer': Certificate, 'ca': Certificate,
   'caReference': Database, 'caref': Database,
   'referenceId': Hash, 'refid': Hash,
-  // Status
-  'status': ShieldCheck, 'role': User, 'description': FileText, 'name': Globe,
+  'subjectDN': FileText, 'issuerDN': FileText, 'importedFrom': Database,
+  'subject': Globe, 'transactionId': Hash,
+  // Status / Role
+  'status': ShieldCheck, 'role': User, 'description': FileText,
   'purpose': FileText, 'notes': FileText, 'version': Hash,
+  'default': Calendar, 'maximum': Clock,
+  // Revocation
+  'reason': Warning, 'revokedCount': Warning,
+  'crlNumber': Hash, 'caName': Certificate,
+  // Network / TLS
+  'tlsVersion': Lock, 'cipher': Lock, 'daysLeft': Clock,
+  'signatureValid': ShieldCheck,
+  // ACME
+  'environment': Globe, 'method': Key, 'provider': Database,
+  'orderStatus': ShieldCheck, 'orderId': Hash,
+  'dnsRecordName': FileText, 'dnsRecordValue': FileText,
+  // HSM
+  'slotId': Hash, 'token': Key, 'clusterId': Database,
+  'region': MapPin, 'cryptoUser': User,
+  'tenant': Database, 'client': Database,
+  'project': Database, 'location': MapPin, 'keyRing': Key,
+  // MFA
+  'enable2FA': Shield, 'totp': Shield,
+  // Key usage
+  'keyUsage': Key, 'extKeyUsage': Key,
+  // Source
+  'source': Database,
+  // Cache
+  'totalRequests': Lightning, 'cacheHits': Lightning, 'hitRate': Lightning,
+  // Custom role
+  'customRole': User, 'inheritsFrom': User,
+  // Tools
+  'subjectCn': Globe, 'issuerCn': Certificate, 'issuerOrg': Buildings,
 }
 
 /**

@@ -359,8 +359,8 @@ export function CertificateDetails({
               <span className="font-medium">{t('details.certificateRevoked')}</span>
             </div>
             <CompactGrid>
-              <CompactField label={t('details.revokedAt')} value={formatDate(cert.revoked_at)} />
-              <CompactField label={t('details.reason')} value={cert.revoke_reason || t('details.unspecified')} />
+              <CompactField autoIcon="revokedAt" label={t('details.revokedAt')} value={formatDate(cert.revoked_at)} />
+              <CompactField autoIcon="reason" label={t('details.reason')} value={cert.revoke_reason || t('details.unspecified')} />
             </CompactGrid>
           </div>
         </CompactSection>
@@ -369,11 +369,11 @@ export function CertificateDetails({
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField label={t('common.created')} value={formatDate(cert.created_at)} />
-          <CompactField label={t('details.createdBy')} value={cert.created_by} />
-          <CompactField label={t('common.source')} value={cert.source} />
-          <CompactField label={t('details.importedFrom')} value={cert.imported_from} />
-          <CompactField label={t('details.referenceId')} value={cert.refid} mono copyable colSpan={2} />
+          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(cert.created_at)} />
+          <CompactField autoIcon="createdBy" label={t('details.createdBy')} value={cert.created_by} />
+          <CompactField autoIcon="source" label={t('common.source')} value={cert.source} />
+          <CompactField autoIcon="importedFrom" label={t('details.importedFrom')} value={cert.imported_from} />
+          <CompactField autoIcon="referenceId" label={t('details.referenceId')} value={cert.refid} mono copyable colSpan={2} />
         </CompactGrid>
       </CompactSection>
     </div>

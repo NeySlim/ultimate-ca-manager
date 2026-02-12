@@ -1162,29 +1162,29 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
       {/* Subject Info */}
       <CompactSection title={t('common.subject')}>
         <CompactGrid>
-          <CompactField label={t('common.commonName')} value={ca.common_name} copyable className="col-span-2" />
-          <CompactField label={t('common.organization')} value={ca.organization} />
-          <CompactField label={t('common.country')} value={ca.country} />
-          <CompactField label={t('common.stateProvince')} value={ca.state} />
-          <CompactField label={t('cas.locality')} value={ca.locality} />
+          <CompactField autoIcon="commonName" label={t('common.commonName')} value={ca.common_name} copyable className="col-span-2" />
+          <CompactField autoIcon="organization" label={t('common.organization')} value={ca.organization} />
+          <CompactField autoIcon="country" label={t('common.country')} value={ca.country} />
+          <CompactField autoIcon="stateProvince" label={t('common.stateProvince')} value={ca.state} />
+          <CompactField autoIcon="locality" label={t('cas.locality')} value={ca.locality} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Info */}
       <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField label={t('common.algorithm')} value={ca.key_algorithm || 'RSA'} />
-          <CompactField label={t('common.keySize')} value={ca.key_size} />
-          <CompactField label={t('common.signature')} value={ca.signature_algorithm} />
+          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={ca.key_algorithm || 'RSA'} />
+          <CompactField autoIcon="keySize" label={t('common.keySize')} value={ca.key_size} />
+          <CompactField autoIcon="signature" label={t('common.signature')} value={ca.signature_algorithm} />
         </CompactGrid>
       </CompactSection>
 
       {/* Validity */}
       <CompactSection title={t('common.validity')}>
         <CompactGrid>
-          <CompactField label={t('common.validFrom')} value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
-          <CompactField label={t('common.validTo')} value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
-          <CompactField label={t('common.serialNumber')} value={ca.serial_number} copyable mono className="col-span-2" />
+          <CompactField autoIcon="validFrom" label={t('common.validFrom')} value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
+          <CompactField autoIcon="validTo" label={t('common.validTo')} value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
+          <CompactField autoIcon="serialNumber" label={t('common.serialNumber')} value={ca.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 
@@ -1193,10 +1193,10 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
         <CompactSection title={t('common.fingerprints')}>
           <CompactGrid>
             {ca.thumbprint_sha1 && (
-              <CompactField label="SHA-1" value={ca.thumbprint_sha1} copyable mono className="col-span-2" />
+              <CompactField autoIcon="sha1" label="SHA-1" value={ca.thumbprint_sha1} copyable mono className="col-span-2" />
             )}
             {ca.thumbprint_sha256 && (
-              <CompactField label="SHA-256" value={ca.thumbprint_sha256} copyable mono className="col-span-2" />
+              <CompactField autoIcon="sha256" label="SHA-256" value={ca.thumbprint_sha256} copyable mono className="col-span-2" />
             )}
           </CompactGrid>
         </CompactSection>

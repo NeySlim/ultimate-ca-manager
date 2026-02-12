@@ -216,7 +216,7 @@ export function TrustCertDetails({
       {/* Issuer */}
       {cert.issuer && (
         <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
-          <CompactField label={t('details.issuerDN')} value={cert.issuer} mono />
+          <CompactField autoIcon="issuerDN" label={t('details.issuerDN')} value={cert.issuer} mono />
         </CompactSection>
       )}
       
@@ -235,7 +235,7 @@ export function TrustCertDetails({
           <CompactField label={t('common.keyType')} value={cert.key_type} icon={Key} />
           <CompactField label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} autoIcon="signatureAlgorithm" />
           {cert.subject && (
-            <CompactField label={t('details.subjectDN')} value={cert.subject} className="col-span-2" mono />
+            <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={cert.subject} className="col-span-2" mono />
           )}
         </CompactGrid>
       </CompactSection>
@@ -297,7 +297,7 @@ export function TrustCertDetails({
           <CompactField label={t('details.addedAt')} value={formatDate(cert.created_at)} icon={Calendar} />
           <CompactField label={t('details.addedBy')} value={cert.created_by} icon={User} />
           {cert.notes && (
-            <CompactField label={t('common.notes')} value={cert.notes} className="col-span-2" />
+            <CompactField autoIcon="notes" label={t('common.notes')} value={cert.notes} className="col-span-2" />
           )}
         </CompactGrid>
       </CompactSection>

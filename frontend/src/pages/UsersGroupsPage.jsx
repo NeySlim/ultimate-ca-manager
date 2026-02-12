@@ -589,26 +589,26 @@ export default function UsersGroupsPage() {
 
       <CompactSection title={t('common.user') + ' ' + t('common.info')} icon={UserCircle} iconClass="icon-bg-blue">
         <CompactGrid columns={1}>
-          <CompactField label={t('common.name')} value={selectedUser.full_name || '—'} />
-          <CompactField label={t('common.email')} value={selectedUser.email} />
-          <CompactField label={t('common.role')} value={selectedUser.role} />
+          <CompactField autoIcon="name" label={t('common.name')} value={selectedUser.full_name || '—'} />
+          <CompactField autoIcon="email" label={t('common.email')} value={selectedUser.email} />
+          <CompactField autoIcon="role" label={t('common.role')} value={selectedUser.role} />
           {selectedUser.custom_role_name && (
-            <CompactField label={t('rbac.customRole')} value={selectedUser.custom_role_name} />
+            <CompactField autoIcon="customRole" label={t('rbac.customRole')} value={selectedUser.custom_role_name} />
           )}
         </CompactGrid>
       </CompactSection>
 
       <CompactSection title={t('common.lastLogin')} icon={Clock} iconClass="icon-bg-green">
         <CompactGrid columns={1}>
-          <CompactField label={t('common.created')} value={formatDate(selectedUser.created_at)} />
-          <CompactField label={t('common.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
+          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedUser.created_at)} />
+          <CompactField autoIcon="lastLogin" label={t('common.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
         </CompactGrid>
       </CompactSection>
 
       <CompactSection title={t('common.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
         <CompactGrid columns={1}>
-          <CompactField label={t('common.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
-          <CompactField label="TOTP" value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
+          <CompactField autoIcon="enable2FA" label={t('common.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
+          <CompactField autoIcon="totp" label="TOTP" value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
         </CompactGrid>
       </CompactSection>
     </div>
@@ -639,9 +639,9 @@ export default function UsersGroupsPage() {
 
       <CompactSection title={t('groups.group') + ' ' + t('common.info')} icon={Users} iconClass="icon-bg-orange">
         <CompactGrid columns={1}>
-          <CompactField label={t('common.name')} value={selectedGroup.name} />
-          <CompactField label={t('common.description')} value={selectedGroup.description || '—'} />
-          <CompactField label={t('common.created')} value={formatDate(selectedGroup.created_at)} />
+          <CompactField autoIcon="name" label={t('common.name')} value={selectedGroup.name} />
+          <CompactField autoIcon="description" label={t('common.description')} value={selectedGroup.description || '—'} />
+          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedGroup.created_at)} />
         </CompactGrid>
       </CompactSection>
 

@@ -359,10 +359,10 @@ export default function SCEPPage() {
 
       <CompactSection title={t('common.requestDetails')}>
         <CompactGrid>
-          <CompactField label={t('scep.transactionId')} value={selectedRequest.transaction_id} mono copyable />
-          <CompactField label={t('common.subject')} value={selectedRequest.subject} />
-          <CompactField label={t('common.status')} value={selectedRequest.status} />
-          <CompactField label={t('common.created')} value={formatDate(selectedRequest.created_at)} />
+          <CompactField autoIcon="transactionId" label={t('scep.transactionId')} value={selectedRequest.transaction_id} mono copyable />
+          <CompactField autoIcon="subject" label={t('common.subject')} value={selectedRequest.subject} />
+          <CompactField autoIcon="status" label={t('common.status')} value={selectedRequest.status} />
+          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedRequest.created_at)} />
         </CompactGrid>
       </CompactSection>
 

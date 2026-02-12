@@ -394,12 +394,12 @@ export default function CRLOCSPPage() {
       {/* CRL Configuration */}
       <CompactSection title={t('crlOcsp.crlConfig')} icon={LinkIcon}>
         <CompactGrid cols={2}>
-          <CompactField label={t('crlOcsp.caName')} value={selectedCA.descr || selectedCA.name} />
-          <CompactField label={t('common.status')} value={selectedCRL ? t('common.active') : t('crlOcsp.noCRL')} />
-          <CompactField label={t('crlOcsp.crlNumber')} value={selectedCRL?.crl_number || '-'} />
-          <CompactField label={t('crlOcsp.revokedCount')} value={selectedCRL?.revoked_count || 0} />
-          <CompactField label={t('common.lastUpdate')} value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
-          <CompactField label={t('crlOcsp.nextUpdate')} value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
+          <CompactField autoIcon="caName" label={t('crlOcsp.caName')} value={selectedCA.descr || selectedCA.name} />
+          <CompactField autoIcon="status" label={t('common.status')} value={selectedCRL ? t('common.active') : t('crlOcsp.noCRL')} />
+          <CompactField autoIcon="crlNumber" label={t('crlOcsp.crlNumber')} value={selectedCRL?.crl_number || '-'} />
+          <CompactField autoIcon="revokedCount" label={t('crlOcsp.revokedCount')} value={selectedCRL?.revoked_count || 0} />
+          <CompactField autoIcon="lastUpdate" label={t('common.lastUpdate')} value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
+          <CompactField autoIcon="nextUpdate" label={t('crlOcsp.nextUpdate')} value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
         </CompactGrid>
       </CompactSection>
 
@@ -407,12 +407,12 @@ export default function CRLOCSPPage() {
       <CompactSection title={t('crlOcsp.ocspConfig')} icon={Pulse}>
         <CompactGrid cols={2}>
           <CompactField 
-            label={t('common.status')} 
+            autoIcon="status" label={t('common.status')} 
             value={ocspStatus.enabled ? (ocspStatus.running ? t('common.running') : t('crlOcsp.stopped')) : t('common.disabled')} 
           />
-          <CompactField label={t('crlOcsp.totalRequests')} value={ocspStats.total_requests} />
-          <CompactField label={t('crlOcsp.cacheHits')} value={ocspStats.cache_hits} />
-          <CompactField label={t('crlOcsp.hitRate')} value={`${cacheHitRate}%`} />
+          <CompactField autoIcon="totalRequests" label={t('crlOcsp.totalRequests')} value={ocspStats.total_requests} />
+          <CompactField autoIcon="cacheHits" label={t('crlOcsp.cacheHits')} value={ocspStats.cache_hits} />
+          <CompactField autoIcon="hitRate" label={t('crlOcsp.hitRate')} value={`${cacheHitRate}%`} />
         </CompactGrid>
       </CompactSection>
 

@@ -199,7 +199,7 @@ export function CADetails({
           <CompactField icon={Hash} label={t('common.serial')} value={ca.serial} mono copyable />
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={ca.key_type} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={ca.signature_algorithm || ca.hash_algorithm} />
-          <CompactField label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />
+          <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
@@ -274,7 +274,7 @@ export function CADetails({
         <CompactGrid>
           <CompactField autoIcon="createdAt" label={t('common.created')} value={formatDate(ca.created_at)} />
           <CompactField autoIcon="createdBy" label={t('details.createdBy')} value={ca.created_by} />
-          <CompactField label={t('details.importedFrom')} value={ca.imported_from} colSpan={2} />
+          <CompactField autoIcon="importedFrom" label={t('details.importedFrom')} value={ca.imported_from} colSpan={2} />
         </CompactGrid>
       </CompactSection>
     </div>
