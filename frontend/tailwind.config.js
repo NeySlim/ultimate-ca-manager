@@ -50,8 +50,8 @@ export default {
         '3xs': ['0.5625rem', { lineHeight: '0.75rem' }],  // 9px
       },
       fontFamily: {
-        sans: ['Geist', 'system-ui', 'sans-serif'],
-        mono: ['SF Mono', 'Monaco', 'Cascadia Code', 'monospace'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['Fira Code', 'ui-monospace', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
