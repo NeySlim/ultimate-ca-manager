@@ -246,7 +246,8 @@
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} 个账户",
     "subtitle_other": "{{count}} 个账户",
-    "subtitle": "{{count}} 个 ACME 账户"
+    "subtitle": "{{count}} 个 ACME 账户",
+    "daysLeft": "剩余{{count}}天"
   },
   "audit": {
     "event": "事件",
@@ -356,7 +357,8 @@
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} 个 CA",
     "subtitle_other": "{{count}} 个 CA",
-    "subtitle": "{{count}} 个证书颁发机构"
+    "subtitle": "{{count}} 个证书颁发机构",
+    "daysLeft": "剩余{{count}}天"
   },
   "certificates": {
     "createCertificate": "创建证书",
@@ -695,7 +697,13 @@
     "scep": "SCEP",
     "rbac": "访问控制",
     "operations": "操作",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "allCAs": "所有CA",
+    "allStatuses": "所有状态",
+    "confirm": "确认",
+    "renew": "续期",
+    "revoke": "吊销",
+    "sign": "签名"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -710,7 +718,8 @@
     "differencesDescription": "Differences are highlighted in orange",
     "selectTwoToCompare": "Select two certificates to compare",
     "differences_one": "{{count}} 个差异",
-    "differences_other": "{{count}} 个差异"
+    "differences_other": "{{count}} 个差异",
+    "differences": "{{count}}处差异"
   },
   "crlOcsp": {
     "crl": "证书吊销列表",
@@ -895,7 +904,8 @@
     "ocspUrl": "OCSP URL",
     "addedAt": "Added At",
     "addedBy": "Added By",
-    "sanDns": "SAN DNS"
+    "sanDns": "SAN DNS",
+    "daysLeft": "剩余{{count}}天"
   },
   "groups": {
     "group": "组",
@@ -912,7 +922,8 @@
     "subtitle_other": "{{count}} 个组",
     "memberCount_one": "{{count}} 个成员",
     "memberCount_other": "{{count}} 个成员",
-    "subtitle": "{{count}} 个组"
+    "subtitle": "{{count}} 个组",
+    "memberCount": "{{count}}个成员"
   },
   "help": {
     "aboutCertificates": "关于证书",
@@ -1031,7 +1042,11 @@
     "browse": "浏览",
     "allFormats": "所有格式: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "此文件的解密密码",
-    "useGlobalPassword": "对所有文件使用相同密码"
+    "useGlobalPassword": "对所有文件使用相同密码",
+    "typeCaCertificate": "CA证书",
+    "typeCertificate": "证书",
+    "typeCsr": "CSR",
+    "typePrivateKey": "私钥"
   },
   "importExport": {
     "importCA": "导入CA",
@@ -1631,7 +1646,8 @@
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} 个模板",
     "subtitle_other": "{{count}} 个模板",
-    "subtitle": "{{count}} 个证书模板"
+    "subtitle": "{{count}} 个证书模板",
+    "validityDays": "{{count}}天"
   },
   "time": {
     "today": "今天",

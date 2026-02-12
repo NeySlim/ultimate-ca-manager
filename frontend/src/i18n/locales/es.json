@@ -246,7 +246,9 @@
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} cuenta",
     "subtitle_other": "{{count}} cuentas",
-    "subtitle": "{{count}} cuentas ACME"
+    "subtitle": "{{count}} cuentas ACME",
+    "daysLeft": "{{count}} días restantes",
+    "daysLeft_one": "{{count}} día restante"
   },
   "audit": {
     "event": "Evento",
@@ -356,7 +358,9 @@
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} CA",
     "subtitle_other": "{{count}} CAs",
-    "subtitle": "{{count}} autoridades de certificación"
+    "subtitle": "{{count}} autoridades de certificación",
+    "daysLeft": "{{count}} días restantes",
+    "daysLeft_one": "{{count}} día restante"
   },
   "certificates": {
     "createCertificate": "Crear certificado",
@@ -695,7 +699,13 @@
     "scep": "SCEP",
     "rbac": "Control de acceso",
     "operations": "Operaciones",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "allCAs": "Todas las CA",
+    "allStatuses": "Todos los estados",
+    "confirm": "Confirmar",
+    "renew": "Renovar",
+    "revoke": "Revocar",
+    "sign": "Firmar"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -710,7 +720,8 @@
     "differencesDescription": "Differences are highlighted in orange",
     "selectTwoToCompare": "Select two certificates to compare",
     "differences_one": "{{count}} diferencia",
-    "differences_other": "{{count}} diferencias"
+    "differences_other": "{{count}} diferencias",
+    "differences": "{{count}} diferencias"
   },
   "crlOcsp": {
     "crl": "Lista de revocación de certificados",
@@ -895,7 +906,9 @@
     "ocspUrl": "OCSP URL",
     "addedAt": "Added At",
     "addedBy": "Added By",
-    "sanDns": "SAN DNS"
+    "sanDns": "SAN DNS",
+    "daysLeft": "{{count}} días restantes",
+    "daysLeft_one": "{{count}} día restante"
   },
   "groups": {
     "group": "Grupo",
@@ -912,7 +925,8 @@
     "subtitle_other": "{{count}} grupos",
     "memberCount_one": "{{count}} miembro",
     "memberCount_other": "{{count}} miembros",
-    "subtitle": "{{count}} grupos"
+    "subtitle": "{{count}} grupos",
+    "memberCount": "{{count}} miembros"
   },
   "help": {
     "aboutCertificates": "Acerca de certificados",
@@ -1031,7 +1045,11 @@
     "browse": "examinar",
     "allFormats": "Todos los formatos: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "Contraseña de descifrado para este archivo",
-    "useGlobalPassword": "Usar la misma contraseña para todos los archivos"
+    "useGlobalPassword": "Usar la misma contraseña para todos los archivos",
+    "typeCaCertificate": "Certificado CA",
+    "typeCertificate": "Certificado",
+    "typeCsr": "CSR",
+    "typePrivateKey": "Clave privada"
   },
   "importExport": {
     "importCA": "Importar CA",
@@ -1631,7 +1649,9 @@
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} plantilla",
     "subtitle_other": "{{count}} plantillas",
-    "subtitle": "{{count}} plantillas de certificados"
+    "subtitle": "{{count}} plantillas de certificados",
+    "validityDays": "{{count}} días",
+    "validityDays_one": "{{count}} día"
   },
   "time": {
     "today": "Hoy",
