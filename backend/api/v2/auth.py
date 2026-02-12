@@ -385,11 +385,11 @@ def reset_password():
     # Audit log
     try:
         from services.audit_service import AuditService
-        AuditService.log(
+        AuditService.log_action(
             action='password_reset',
-            entity_type='user',
-            entity_id=user.id,
-            details={'method': 'email_reset'},
+            resource_type='user',
+            resource_id=str(user.id),
+            details='Password reset via email',
             user_id=user.id
         )
     except Exception:

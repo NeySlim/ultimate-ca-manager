@@ -250,33 +250,28 @@ def download_update(download_url, package_name):
 
 def install_update(package_path):
     """
-    Install downloaded update package
+    Install downloaded update package via systemd path-activated updater.
     
-    This will restart the service, so the response may not complete.
-    Requires sudoers entries for dpkg/rpm and systemctl.
+    Writes the package path to /opt/ucm/data/.update_pending which triggers
+    the ucm-updater.path systemd unit. The ucm-updater.service runs as root
+    (no NoNewPrivileges restriction) and handles dpkg/rpm install + restart.
     """
-    if package_path.endswith('.deb'):
-        cmd = f'sudo dpkg -i {package_path}'
-    elif package_path.endswith('.rpm'):
-        cmd = f'sudo rpm -U --force {package_path}'
-    else:
+    if not package_path.endswith('.deb') and not package_path.endswith('.rpm'):
         raise Exception(f"Unknown package format: {package_path}")
     
     try:
         import logging
+        from pathlib import Path
         logger = logging.getLogger('ucm.updates')
-        log_file = '/var/log/ucm/update.log'
-        logger.info(f"Auto-update: installing {package_path} with: {cmd}")
-        # Run install in background so response can complete
-        subprocess.Popen(
-            ['bash', '-c', f'sleep 2 && {cmd} >> {log_file} 2>&1 && sudo systemctl restart ucm >> {log_file} 2>&1'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
+        
+        trigger_file = Path(Config.DATA_DIR) / '.update_pending'
+        logger.info(f"Auto-update: writing trigger for {package_path}")
+        trigger_file.write_text(package_path)
+        
+        logger.info(f"Auto-update: trigger written, ucm-updater.path will handle install + restart")
         return True
     except Exception as e:
-        raise Exception(f"Install failed: {str(e)}")
+        raise Exception(f"Install trigger failed: {str(e)}")
 
 
 def get_update_history():

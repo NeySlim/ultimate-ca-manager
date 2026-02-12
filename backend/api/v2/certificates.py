@@ -424,10 +424,13 @@ def create_certificate():
         # Audit log
         try:
             from services.audit_service import AuditService
-            AuditService.log(
+            AuditService.log_action(
                 action='certificate_created',
-                user_id=g.current_user.id if hasattr(g, 'current_user') else None,
-                details={'certificate_id': db_cert.id, 'cn': data['cn'], 'ca_id': ca.id}
+                resource_type='certificate',
+                resource_id=str(db_cert.id),
+                resource_name=data['cn'],
+                details=f"CA: {ca.id}, CN: {data['cn']}",
+                user_id=g.current_user.id if hasattr(g, 'current_user') else None
             )
         except Exception:
             pass
@@ -1112,14 +1115,13 @@ def renew_certificate(cert_id):
         
         # Audit log
         try:
-            AuditService.log(
+            AuditService.log_action(
                 action='certificate_renewed',
-                user_id=g.current_user.id if hasattr(g, 'current_user') else None,
-                details={
-                    'certificate_id': cert_id,
-                    'subject': cert.subject,
-                    'valid_until': not_after.isoformat()
-                }
+                resource_type='certificate',
+                resource_id=str(cert_id),
+                resource_name=cert.subject,
+                details=f"Renewed until {not_after.isoformat()}",
+                user_id=g.current_user.id if hasattr(g, 'current_user') else None
             )
         except Exception:
             pass

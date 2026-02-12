@@ -86,14 +86,21 @@ case "$1" in
         fi
         # ============================================================
         
-        # Sudoers for service restart and auto-update
+        # Sudoers for service restart (auto-update handled by ucm-updater.service)
         cat > /etc/sudoers.d/ucm-service << 'SUDOERS'
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm, /usr/bin/systemctl start ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/dpkg -i /tmp/ucm_update_*
-ucm ALL=(ALL) NOPASSWD: /usr/bin/rpm -U --force /tmp/ucm_update_*
 SUDOERS
         chmod 440 /etc/sudoers.d/ucm-service
+        
+        # Install ucm-updater systemd units for auto-update
+        if [ -d "$UCM_HOME/systemd" ]; then
+            cp "$UCM_HOME/systemd/ucm-updater.path" /etc/systemd/system/
+            cp "$UCM_HOME/systemd/ucm-updater.service" /etc/systemd/system/
+            systemctl daemon-reload
+            systemctl enable ucm-updater.path
+            systemctl start ucm-updater.path
+        fi
         
         # Create config if not exists (fresh install)
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then

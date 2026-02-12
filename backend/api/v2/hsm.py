@@ -669,10 +669,12 @@ def install_dependencies():
         
         if result.returncode == 0:
             # Log the action
-            AuditService.log(
-                action='hsm.dependencies.install',
-                user_id=g.current_user.id if hasattr(g, 'current_user') else None,
-                details={'provider': provider, 'packages': packages}
+            AuditService.log_action(
+                action='hsm_dependencies_install',
+                resource_type='hsm',
+                resource_id=provider,
+                details=f"Installed packages: {', '.join(packages)}",
+                user_id=g.current_user.id if hasattr(g, 'current_user') else None
             )
             
             return success_response(

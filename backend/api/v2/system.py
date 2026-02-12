@@ -119,11 +119,11 @@ def reset_db():
         current_user = get_current_user()
         
         # Log this critical action before reset
-        AuditService.log(
+        AuditService.log_action(
             action='database_reset',
             resource_type='system',
             resource_id='database',
-            details={'initiated_by': current_user.get('username', 'unknown')},
+            details=f"Initiated by {current_user.get('username', 'unknown')}",
             user_id=current_user.get('id')
         )
         
@@ -1260,11 +1260,7 @@ def get_service_status():
 @require_auth(['write:settings'])
 def restart_service():
     """Restart the UCM service"""
-    import signal
-    
     try:
-        is_docker = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
-        
         AuditService.log_action(
             action='service_restart',
             resource_type='system',
@@ -1272,16 +1268,12 @@ def restart_service():
             success=True
         )
         
-        if is_docker:
-            os.kill(os.getppid(), signal.SIGTERM)
-        else:
-            subprocess.Popen(
-                ['bash', '-c', 'sleep 1 && sudo systemctl restart ucm'],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True
-            )
+        from utils.service_manager import restart_service as do_restart
+        success, message = do_restart()
         
-        return success_response(message='Service restart initiated. You may need to log in again.')
+        if success:
+            return success_response(message=message)
+        else:
+            return error_response(message, 500)
     except Exception as e:
         return error_response(f"Failed to restart service: {str(e)}", 500)

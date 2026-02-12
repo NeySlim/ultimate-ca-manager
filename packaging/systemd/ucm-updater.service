@@ -1,0 +1,11 @@
+[Unit]
+Description=UCM Auto-Update Handler
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ucm/scripts/ucm-update.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ucm-updater
