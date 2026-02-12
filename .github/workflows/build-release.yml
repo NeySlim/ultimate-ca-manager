@@ -293,11 +293,36 @@ jobs:
           VERSION="${{ needs.build-deb.outputs.version }}"
           IMAGE="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
           
-          cat > notes.md << 'EOF'
-          ## 🚀 Installation
+          # Extract highlights from CHANGELOG.md (lines with ***bold italic***)
+          # Find the section for this version, then grab highlighted entries
+          CHANGELOG_SECTION=""
+          if [ -f CHANGELOG.md ]; then
+            # Extract section between current version header and next version header
+            SECTION=$(sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | head -n -1)
+            if [ -z "$SECTION" ]; then
+              # Try without brackets (some formats)
+              SECTION=$(sed -n "/^## ${VERSION}/,/^## /p" CHANGELOG.md | head -n -1)
+            fi
+            # Extract lines containing *** (highlighted entries), clean to ** for display
+            HIGHLIGHTS=$(echo "$SECTION" | grep -E '^\s*- \*\*\*' | sed 's/\*\*\*/\*\*/g')
+            if [ -n "$HIGHLIGHTS" ]; then
+              CHANGELOG_SECTION="## Highlights
+
+${HIGHLIGHTS}
+
+See full [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for all changes.
+
+---
+"
+            fi
+          fi
+          
+          cat > notes.md << NOTES_EOF
+          ${CHANGELOG_SECTION}
+          ## Installation
           
           ### Docker (Recommended)
-          ```bash
+          \`\`\`bash
           # From Docker Hub
           docker pull neyslim/ultimate-ca-manager:VERSION
           
@@ -305,44 +330,46 @@ jobs:
           docker pull IMAGE:VERSION
           
           # Run
-          docker run -d -p 8443:8443 \
-            -e SECRET_KEY=$(openssl rand -hex 32) \
-            -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
+          docker run -d -p 8443:8443 \\
+            -e SECRET_KEY=\$(openssl rand -hex 32) \\
             --name ucm neyslim/ultimate-ca-manager:VERSION
-          ```
+          \`\`\`
           
           ### Debian/Ubuntu
-          ```bash
+          \`\`\`bash
           wget https://github.com/REPO/releases/download/vVERSION/ucm_DEB_VERSION_all.deb
           sudo dpkg -i ucm_*_all.deb
           sudo apt-get install -f
-          ```
+          \`\`\`
           
           ### Fedora/RHEL
-          ```bash
+          \`\`\`bash
           wget https://github.com/REPO/releases/download/vVERSION/ucm-RPM_VERSION-1.fc43.noarch.rpm
           sudo dnf install ./ucm-*.rpm
-          ```
+          \`\`\`
           
           ### Silent/Automated Install
-          ```bash
+          \`\`\`bash
           # Skip firewall prompts for CI/automation
           sudo UCM_PORT=8443 UCM_FIREWALL=no dpkg -i ucm_*.deb
-          ```
+          \`\`\`
           
-          ## 🔐 Default Credentials
-          - **Username:** `admin`
-          - **Password:** Check `/etc/ucm/ucm.env` after install, or shown during install
+          ## Default Credentials
+          - **Username:** \`admin\`
+          - **Password:** Check \`/etc/ucm/ucm.env\` after install, or shown during install
           
-          ⚠️ **Change the password immediately after first login!**
+          **Change the password immediately after first login!**
           
-          ## 📚 Documentation
+          ## Documentation
           - [Installation Guide](docs/INSTALLATION.md)
           - [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API)
           
-          ## ⬆️ Upgrading from v1.8.x
-          Data is automatically migrated when upgrading. A backup is created in `/opt/ucm/data/backups/`.
-          EOF
+          ## Upgrading from v1.8.x
+          Data is automatically migrated when upgrading. A backup is created in \`/opt/ucm/data/backups/\`.
+          NOTES_EOF
+          
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' notes.md
           
           # Replace placeholders (specific first, then generic)
           DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
@@ -355,12 +382,22 @@ jobs:
           
           cat notes.md
       
+      - name: Delete existing release assets
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          for asset in $(gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null || true); do
+            echo "Deleting existing asset: $asset"
+            gh release delete-asset "$TAG" "$asset" -y || true
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           body_path: notes.md
           draft: false
-          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') || contains(github.ref, 'dev') }}
           files: |
             artifacts/*
         env:

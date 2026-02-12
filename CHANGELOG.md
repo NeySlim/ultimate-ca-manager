@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.6] - 2026-02-12
+
+### New Features
+
+- ***SSO Login*** - OAuth2/OIDC, SAML 2.0, LDAP/Active Directory authentication
+- **i18n** - All 9 locales synchronized (1799 translation keys)
+
+### Security
+
+- ***CVE-2026-26007*** - Upgraded cryptography 46.0.3 → 46.0.5
+- **DN Validation** - Hardened across all endpoints (CAs, Certificates, CSRs)
+
+### Bug Fixes
+
+- ***Auto-Update*** - Fixed sudo permissions for package install (DEB/RPM), added sudoers entries
+- **Docker** - Fixed Python 3.13 recursion bug, unified data path to `/opt/ucm/data`
+- **OPNsense Import** - Import button not showing after connection test
+- **Certificate Form** - Fixed broken Select options and field names
+- **CA Creation** - Fixed crash with null validity/keySize values
+
+### Improvements
+
+- **VERSION Centralization** - Single source of truth for all platforms
+- **Auto-Update Logging** - Now logs to `/var/log/ucm/update.log`
+
+---
+
 ## [2.0.4] - 2026-02-11
 
 ### Bug Fixes
