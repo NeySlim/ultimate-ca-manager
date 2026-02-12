@@ -857,7 +857,6 @@
     "resetLayout": "Réinitialiser",
     "dragToReorder": "Glissez les widgets pour réorganiser",
     "expiresIn": "Expire dans",
-    "expired": "Expiré",
     "widgetCertificateActivity": "Activité des certificats",
     "widgetStatusDistribution": "Distribution des statuts",
     "chainRepair": "Rapprochement",
@@ -1345,7 +1344,6 @@
     "lightDesc": "Toujours utiliser le thème clair",
     "backup": "Sauvegarde & Restauration",
     "https": "Certificat HTTPS",
-    "updates": "Mises à jour",
     "systemName": "Nom du système",
     "systemURL": "URL du système",
     "timezone": "Fuseau horaire",
@@ -1400,11 +1398,6 @@
       "audit": "Audit",
       "https": "HTTPS",
       "general": "Général",
-      "email": "Email",
-      "security": "Sécurité",
-      "sso": "SSO",
-      "database": "Base de données",
-      "updates": "Mises à jour",
       "webhooks": "Webhooks"
     },
     "systemNameHelper": "Nom d'affichage du système UCM",
@@ -1539,7 +1532,9 @@
     "applyAndRestart": "Appliquer et redémarrer",
     "regenerateCertConfirm": "Régénérer le certificat HTTPS ? Cela redémarrera le serveur.",
     "regenerateAndRestart": "Régénérer et redémarrer",
-    "applyImportedCertConfirm": "Apply this imported certificate as HTTPS certificate? This will restart the server."
+    "applyImportedCertConfirm": "Apply this imported certificate as HTTPS certificate? This will restart the server.",
+    "version": "Version",
+    "environment": "Environnement"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

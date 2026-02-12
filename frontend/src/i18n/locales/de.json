@@ -851,7 +851,6 @@
     "resetLayout": "Layout zurücksetzen",
     "dragToReorder": "Widgets ziehen zum Neuanordnen",
     "expiresIn": "Läuft ab in",
-    "expired": "Abgelaufen",
     "widgetCertificateActivity": "Zertifikatsaktivität",
     "widgetStatusDistribution": "Statusverteilung",
     "chainRepair": "Kettenreparatur",
@@ -1322,7 +1321,6 @@
   "settings": {
     "backup": "Sicherung & Wiederherstellung",
     "https": "HTTPS-Zertifikat",
-    "updates": "Aktualisierungen",
     "systemName": "Systemname",
     "systemURL": "System-URL",
     "timezone": "Zeitzone",
@@ -1381,12 +1379,7 @@
       "backup": "Sicherung",
       "audit": "Audit",
       "https": "HTTPS",
-      "general": "Allgemein",
-      "email": "E-Mail",
-      "security": "Sicherheit",
-      "sso": "SSO",
-      "database": "Datenbank",
-      "updates": "Updates"
+      "general": "Allgemein"
     },
     "systemNameHelper": "Anzeigename für das UCM-System",
     "baseUrl": "Base URL",
@@ -1515,7 +1508,9 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": {}
+    "appearance": {},
+    "version": "Version",
+    "environment": "Umgebung"
   },
   "sso": {
     "saml": "SAML 2.0",

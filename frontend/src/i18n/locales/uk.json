@@ -851,7 +851,6 @@
     "resetLayout": "Скинути макет",
     "dragToReorder": "Перетягніть віджети для зміни порядку",
     "expiresIn": "Закінчується через",
-    "expired": "Прострочений",
     "widgetCertificateActivity": "Активність сертифікатів",
     "widgetStatusDistribution": "Розподіл статусів",
     "chainRepair": "Відновлення ланцюга",
@@ -1322,7 +1321,6 @@
   "settings": {
     "backup": "Резервне копіювання",
     "https": "Сертифікат HTTPS",
-    "updates": "Оновлення",
     "systemName": "Назва системи",
     "systemURL": "URL системи",
     "timezone": "Часовий пояс",
@@ -1381,12 +1379,7 @@
       "backup": "Резервне копіювання",
       "audit": "Аудит",
       "https": "HTTPS",
-      "general": "Загальні",
-      "email": "Пошта",
-      "security": "Безпека",
-      "sso": "SSO",
-      "database": "База даних",
-      "updates": "Оновлення"
+      "general": "Загальні"
     },
     "systemNameHelper": "Відображуване ім'я системи UCM",
     "baseUrl": "Base URL",
@@ -1515,7 +1508,9 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": {}
+    "appearance": {},
+    "version": "Версія",
+    "environment": "Середовище"
   },
   "sso": {
     "saml": "SAML 2.0",

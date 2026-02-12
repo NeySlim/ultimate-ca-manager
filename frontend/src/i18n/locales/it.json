@@ -851,7 +851,6 @@
     "resetLayout": "Ripristina layout",
     "dragToReorder": "Trascina i widget per riordinare",
     "expiresIn": "Scade tra",
-    "expired": "Scaduto",
     "widgetCertificateActivity": "Attività certificati",
     "widgetStatusDistribution": "Distribuzione stati",
     "chainRepair": "Riparazione catena",
@@ -1322,7 +1321,6 @@
   "settings": {
     "backup": "Backup e ripristino",
     "https": "Certificato HTTPS",
-    "updates": "Aggiornamenti",
     "systemName": "Nome sistema",
     "systemURL": "URL sistema",
     "timezone": "Fuso orario",
@@ -1381,12 +1379,7 @@
       "backup": "Backup",
       "audit": "Audit",
       "https": "HTTPS",
-      "general": "Generale",
-      "email": "Email",
-      "security": "Sicurezza",
-      "sso": "SSO",
-      "database": "Database",
-      "updates": "Aggiornamenti"
+      "general": "Generale"
     },
     "systemNameHelper": "Nome visualizzato per il sistema UCM",
     "baseUrl": "Base URL",
@@ -1515,7 +1508,9 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": {}
+    "appearance": {},
+    "version": "Versione",
+    "environment": "Ambiente"
   },
   "sso": {
     "saml": "SAML 2.0",

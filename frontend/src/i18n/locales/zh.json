@@ -851,7 +851,6 @@
     "resetLayout": "重置布局",
     "dragToReorder": "拖动小部件以重新排列",
     "expiresIn": "到期时间",
-    "expired": "已过期",
     "widgetCertificateActivity": "证书活动",
     "widgetStatusDistribution": "状态分布",
     "chainRepair": "链修复",
@@ -1322,7 +1321,6 @@
   "settings": {
     "backup": "备份与恢复",
     "https": "HTTPS证书",
-    "updates": "更新",
     "systemName": "系统名称",
     "systemURL": "系统URL",
     "timezone": "时区",
@@ -1381,12 +1379,7 @@
       "backup": "备份",
       "audit": "审计",
       "https": "HTTPS",
-      "general": "常规",
-      "email": "邮件",
-      "security": "安全",
-      "sso": "SSO",
-      "database": "数据库",
-      "updates": "更新"
+      "general": "常规"
     },
     "systemNameHelper": "UCM系统的显示名称",
     "baseUrl": "Base URL",
@@ -1515,7 +1508,9 @@
     "finalConfirmation": "Final Confirmation",
     "regenerateAndRestart": "Regenerate & Risart",
     "deleteBackup": "Dandhande Backup",
-    "appearance": {}
+    "appearance": {},
+    "version": "版本",
+    "environment": "环境"
   },
   "sso": {
     "saml": "SAML 2.0",
