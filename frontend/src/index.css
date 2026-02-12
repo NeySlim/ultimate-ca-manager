@@ -486,28 +486,28 @@ html, body, #root {
    ============================================ */
 
 /* Success (green) */
-.status-success-bg { background-color: color-mix(in srgb, var(--accent-success) 15%, transparent); }
+.status-success-bg { background-color: color-mix(in srgb, var(--accent-success) 15%, var(--bg-tertiary)); }
 .status-success-bg-solid { background-color: var(--accent-success); }
 .status-success-text { color: var(--accent-success); }
 .status-success-border { border-color: color-mix(in srgb, var(--accent-success) 30%, transparent); }
 .status-success-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-success) 30%, transparent); }
 
 /* Warning (amber/yellow) */
-.status-warning-bg { background-color: color-mix(in srgb, var(--accent-warning) 15%, transparent); }
+.status-warning-bg { background-color: color-mix(in srgb, var(--accent-warning) 15%, var(--bg-tertiary)); }
 .status-warning-bg-solid { background-color: var(--accent-warning); }
 .status-warning-text { color: var(--accent-warning); }
 .status-warning-border { border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent); }
 .status-warning-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-warning) 30%, transparent); }
 
 /* Danger (red) */
-.status-danger-bg { background-color: color-mix(in srgb, var(--accent-danger) 15%, transparent); }
+.status-danger-bg { background-color: color-mix(in srgb, var(--accent-danger) 15%, var(--bg-tertiary)); }
 .status-danger-bg-solid { background-color: var(--accent-danger); }
 .status-danger-text { color: var(--accent-danger); }
 .status-danger-border { border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent); }
 .status-danger-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-danger) 30%, transparent); }
 
 /* Primary (blue) */
-.status-primary-bg { background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent); }
+.status-primary-bg { background-color: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-tertiary)); }
 .status-primary-bg-solid { background-color: var(--accent-primary); }
 .status-primary-text { color: var(--accent-primary); }
 .status-primary-border { border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent); }
@@ -559,7 +559,7 @@ html, body, #root {
 }
 
 /* Purple (HSM/special) */
-.status-purple-bg { background-color: color-mix(in srgb, var(--accent-purple) 15%, transparent); }
+.status-purple-bg { background-color: color-mix(in srgb, var(--accent-purple) 15%, var(--bg-tertiary)); }
 .status-purple-bg-solid { background-color: var(--accent-purple); }
 .status-purple-text { color: var(--accent-purple); }
 .status-purple-border { border-color: color-mix(in srgb, var(--accent-purple) 30%, transparent); }
