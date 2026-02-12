@@ -246,7 +246,9 @@
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} обліковий запис",
     "subtitle_other": "{{count}} облікових записів",
-    "subtitle": "{{count}} облікових записів ACME"
+    "subtitle": "{{count}} облікових записів ACME",
+    "daysLeft": "{{count}} днів залишилось",
+    "daysLeft_one": "{{count}} день залишився"
   },
   "audit": {
     "event": "Подія",
@@ -356,7 +358,9 @@
     "noIntermediate": "Немає проміжних ЦС",
     "orgView": "Вигляд органіграми",
     "orphanCAs": "Сирітські ЦС",
-    "subtitle": "{{count}} центрів сертифікації"
+    "subtitle": "{{count}} центрів сертифікації",
+    "daysLeft": "{{count}} днів залишилось",
+    "daysLeft_one": "{{count}} день залишився"
   },
   "certificates": {
     "createCertificate": "Створити сертифікат",
@@ -695,7 +699,13 @@
     "scep": "SCEP",
     "rbac": "Контроль доступу",
     "operations": "Операції",
-    "logout": "Вийти"
+    "logout": "Вийти",
+    "allCAs": "Усі CA",
+    "allStatuses": "Усі статуси",
+    "confirm": "Підтвердити",
+    "renew": "Оновити",
+    "revoke": "Відкликати",
+    "sign": "Підписати"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -710,7 +720,8 @@
     "differencesDescription": "Differences are highlighted in orange",
     "selectTwoToCompare": "Select two certificates to compare",
     "differences_one": "{{count}} відмінність",
-    "differences_other": "{{count}} відмінностей"
+    "differences_other": "{{count}} відмінностей",
+    "differences": "{{count}} відмінностей"
   },
   "crlOcsp": {
     "crl": "Список відкликаних сертифікатів",
@@ -895,7 +906,9 @@
     "ocspUrl": "OCSP URL",
     "addedAt": "Added At",
     "addedBy": "Added By",
-    "sanDns": "SAN DNS"
+    "sanDns": "SAN DNS",
+    "daysLeft": "{{count}} днів залишилось",
+    "daysLeft_one": "{{count}} день залишився"
   },
   "groups": {
     "group": "Група",
@@ -912,7 +925,8 @@
     "subtitle_other": "{{count}} груп",
     "memberCount_one": "{{count}} учасник",
     "memberCount_other": "{{count}} учасників",
-    "subtitle": "{{count}} груп"
+    "subtitle": "{{count}} груп",
+    "memberCount": "{{count}} учасників"
   },
   "help": {
     "aboutCertificates": "Про сертифікати",
@@ -1031,7 +1045,11 @@
     "browse": "огляд",
     "allFormats": "Усі формати: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "Пароль розшифрування для цього файлу",
-    "useGlobalPassword": "Використовувати однаковий пароль для всіх файлів"
+    "useGlobalPassword": "Використовувати однаковий пароль для всіх файлів",
+    "typeCaCertificate": "Сертифікат CA",
+    "typeCertificate": "Сертифікат",
+    "typeCsr": "CSR",
+    "typePrivateKey": "Приватний ключ"
   },
   "importExport": {
     "importCA": "Імпортувати ЦС",
@@ -1631,7 +1649,9 @@
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} шаблон",
     "subtitle_other": "{{count}} шаблонів",
-    "subtitle": "{{count}} шаблонів сертифікатів"
+    "subtitle": "{{count}} шаблонів сертифікатів",
+    "validityDays": "{{count}} днів",
+    "validityDays_one": "{{count}} день"
   },
   "time": {
     "today": "Сьогодні",

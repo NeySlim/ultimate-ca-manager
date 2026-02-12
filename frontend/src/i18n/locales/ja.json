@@ -246,7 +246,8 @@
     "autoApproveDesc": "Automatically approve requests without manual review",
     "subtitle_one": "{{count}} 件のアカウント",
     "subtitle_other": "{{count}} 件のアカウント",
-    "subtitle": "{{count}} 件の ACME アカウント"
+    "subtitle": "{{count}} 件の ACME アカウント",
+    "daysLeft": "残り{{count}}日"
   },
   "audit": {
     "event": "イベント",
@@ -356,7 +357,8 @@
     "passwordTooShort": "Password must be at least 4 characters",
     "subtitle_one": "{{count}} 件の CA",
     "subtitle_other": "{{count}} 件の CA",
-    "subtitle": "{{count}} 件の認証局"
+    "subtitle": "{{count}} 件の認証局",
+    "daysLeft": "残り{{count}}日"
   },
   "certificates": {
     "createCertificate": "証明書を作成",
@@ -695,7 +697,13 @@
     "scep": "SCEP",
     "rbac": "アクセス制御",
     "operations": "オペレーション",
-    "logout": "ログアウト"
+    "logout": "ログアウト",
+    "allCAs": "すべてのCA",
+    "allStatuses": "すべてのステータス",
+    "confirm": "確認",
+    "renew": "更新",
+    "revoke": "失効",
+    "sign": "署名"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -710,7 +718,8 @@
     "differencesDescription": "Differences are highlighted in orange",
     "selectTwoToCompare": "Select two certificates to compare",
     "differences_one": "{{count}} 件の相違",
-    "differences_other": "{{count}} 件の相違"
+    "differences_other": "{{count}} 件の相違",
+    "differences": "{{count}}件の差異"
   },
   "crlOcsp": {
     "crl": "証明書失効リスト",
@@ -895,7 +904,8 @@
     "ocspUrl": "OCSP URL",
     "addedAt": "Added At",
     "addedBy": "Added By",
-    "sanDns": "SAN DNS"
+    "sanDns": "SAN DNS",
+    "daysLeft": "残り{{count}}日"
   },
   "groups": {
     "group": "グループ",
@@ -912,7 +922,8 @@
     "subtitle_other": "{{count}} 件のグループ",
     "memberCount_one": "{{count}} 人のメンバー",
     "memberCount_other": "{{count}} 人のメンバー",
-    "subtitle": "{{count}} 件のグループ"
+    "subtitle": "{{count}} 件のグループ",
+    "memberCount": "{{count}}人のメンバー"
   },
   "help": {
     "aboutCertificates": "証明書について",
@@ -1031,7 +1042,11 @@
     "browse": "参照",
     "allFormats": "全形式対応: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "このファイルの復号パスワード",
-    "useGlobalPassword": "すべてのファイルに同じパスワードを使用"
+    "useGlobalPassword": "すべてのファイルに同じパスワードを使用",
+    "typeCaCertificate": "CA証明書",
+    "typeCertificate": "証明書",
+    "typeCsr": "CSR",
+    "typePrivateKey": "秘密鍵"
   },
   "importExport": {
     "importCA": "CAをインポート",
@@ -1631,7 +1646,8 @@
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} 件のテンプレート",
     "subtitle_other": "{{count}} 件のテンプレート",
-    "subtitle": "{{count}} 件の証明書テンプレート"
+    "subtitle": "{{count}} 件の証明書テンプレート",
+    "validityDays": "{{count}}日"
   },
   "time": {
     "today": "今日",

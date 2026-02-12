@@ -308,7 +308,13 @@
     "scep": "SCEP",
     "rbac": "Access Control",
     "operations": "Operations",
-    "logout": "Logout"
+    "logout": "Logout",
+    "allCAs": "All CAs",
+    "allStatuses": "All Statuses",
+    "confirm": "Confirm",
+    "renew": "Renew",
+    "revoke": "Revoke",
+    "sign": "Sign"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -530,7 +536,9 @@
     "subtitle": "{{count}} certificate authorities",
     "certificateCount_one": "{{count}} certificate",
     "certificateCount_other": "{{count}} certificates",
-    "certificateCount": "{{count}} certificates"
+    "certificateCount": "{{count}} certificates",
+    "daysLeft": "{{count}} days left",
+    "daysLeft_one": "{{count}} day left"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -639,7 +647,9 @@
     "cnRequired": "CN Required",
     "subtitle_one": "{{count}} template",
     "subtitle_other": "{{count}} templates",
-    "subtitle": "{{count}} certificate templates"
+    "subtitle": "{{count}} certificate templates",
+    "validityDays": "{{count}} days",
+    "validityDays_one": "{{count}} day"
   },
   "users": {
     "createUser": "Create User",
@@ -676,7 +686,8 @@
     "subtitle_other": "{{count}} groups",
     "memberCount_one": "{{count}} member",
     "memberCount_other": "{{count}} members",
-    "subtitle": "{{count}} groups"
+    "subtitle": "{{count}} groups",
+    "memberCount": "{{count}} members"
   },
   "acme": {
     "title": "ACME Protocol",
@@ -851,7 +862,9 @@
     "domainTestFailed": "DNS access test failed",
     "subtitle_one": "{{count}} account",
     "subtitle_other": "{{count}} accounts",
-    "subtitle": "{{count}} ACME accounts"
+    "subtitle": "{{count}} ACME accounts",
+    "daysLeft": "{{count}} days left",
+    "daysLeft_one": "{{count}} day left"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -1744,7 +1757,9 @@
     "ocspUrl": "OCSP URL",
     "addedAt": "Added At",
     "addedBy": "Added By",
-    "sanDns": "SAN DNS"
+    "sanDns": "SAN DNS",
+    "daysLeft": "{{count}} days left",
+    "daysLeft_one": "{{count}} day left"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -1759,7 +1774,8 @@
     "differencesDescription": "Differences are highlighted in orange",
     "selectTwoToCompare": "Select two certificates to compare",
     "differences_one": "{{count}} difference",
-    "differences_other": "{{count}} differences"
+    "differences_other": "{{count}} differences",
+    "differences": "{{count}} differences"
   },
   "members": {
     "manageMembers": "Manage Members",
@@ -1829,7 +1845,11 @@
     "browse": "browse",
     "allFormats": "All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B",
     "filePassword": "Decryption password for this file",
-    "useGlobalPassword": "Use same password for all files"
+    "useGlobalPassword": "Use same password for all files",
+    "typeCaCertificate": "CA Certificate",
+    "typeCertificate": "Certificate",
+    "typeCsr": "CSR",
+    "typePrivateKey": "Private Key"
   },
   "webhooks": {
     "title": "Webhooks",
