@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, useAuth } from './contexts'
-import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange } from './components'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, SafeModeOverlay } from './components'
 
 // Lazy load pages for code splitting
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -111,6 +111,7 @@ export default function App() {
           <AuthProvider>
             <NotificationProvider>
               <MobileProvider>
+                <SafeModeOverlay />
                 <AppRoutes />
               </MobileProvider>
             </NotificationProvider>

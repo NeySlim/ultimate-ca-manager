@@ -295,10 +295,12 @@ class BackupService:
                 'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
             }
             
-            # Store unencrypted key temporarily (will be encrypted later)
+            # Decrypt at-rest encryption before export (backup uses its own encryption)
             if ca.prv:
                 try:
-                    ca_data['_private_key_plaintext'] = base64.b64decode(ca.prv).decode()
+                    from security.encryption import decrypt_private_key
+                    prv_decrypted = decrypt_private_key(ca.prv)
+                    ca_data['_private_key_plaintext'] = base64.b64decode(prv_decrypted).decode()
                 except:
                     ca_data['_private_key_plaintext'] = ca.prv
             
@@ -335,10 +337,12 @@ class BackupService:
                 'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
             }
             
-            # Store unencrypted key temporarily
+            # Decrypt at-rest encryption before export
             if cert.prv:
                 try:
-                    cert_data['_private_key_plaintext'] = base64.b64decode(cert.prv).decode()
+                    from security.encryption import decrypt_private_key
+                    prv_decrypted = decrypt_private_key(cert.prv)
+                    cert_data['_private_key_plaintext'] = base64.b64decode(prv_decrypted).decode()
                 except:
                     cert_data['_private_key_plaintext'] = cert.prv
             
@@ -803,8 +807,16 @@ class BackupService:
             if existing:
                 existing.descr = ca_data.get('descr')
                 existing.crt = base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None
-                existing.prv = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                if prv_b64:
+                    from security.encryption import encrypt_private_key
+                    prv_b64 = encrypt_private_key(prv_b64)
+                existing.prv = prv_b64
             else:
+                prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                if prv_b64:
+                    from security.encryption import encrypt_private_key
+                    prv_b64 = encrypt_private_key(prv_b64)
                 new_ca = CA(
                     refid=ca_data['refid'],
                     descr=ca_data.get('descr'),
@@ -813,7 +825,7 @@ class BackupService:
                     serial=ca_data.get('serial'),
                     caref=ca_data.get('caref'),
                     crt=base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None,
-                    prv=base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                    prv=prv_b64
                 )
                 db.session.add(new_ca)
             results['cas'] += 1
@@ -833,8 +845,16 @@ class BackupService:
             if existing:
                 existing.descr = cert_data.get('descr')
                 existing.crt = base64.b64encode(cert_data['certificate_pem'].encode()).decode() if cert_data.get('certificate_pem') else None
-                existing.prv = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                if prv_b64:
+                    from security.encryption import encrypt_private_key
+                    prv_b64 = encrypt_private_key(prv_b64)
+                existing.prv = prv_b64
             else:
+                prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                if prv_b64:
+                    from security.encryption import encrypt_private_key
+                    prv_b64 = encrypt_private_key(prv_b64)
                 new_cert = Certificate(
                     refid=cert_data['refid'],
                     descr=cert_data.get('descr'),
@@ -844,7 +864,7 @@ class BackupService:
                     issuer=cert_data.get('issuer'),
                     serial_number=cert_data.get('serial_number'),
                     crt=base64.b64encode(cert_data['certificate_pem'].encode()).decode() if cert_data.get('certificate_pem') else None,
-                    prv=base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                    prv=prv_b64
                 )
                 db.session.add(new_cert)
             results['certificates'] += 1

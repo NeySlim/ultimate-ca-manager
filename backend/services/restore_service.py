@@ -290,6 +290,18 @@ class RestoreService:
                     master_key
                 )
             
+            # Re-encrypt if at-rest encryption is active
+            if private_key:
+                try:
+                    from security.encryption import key_encryption
+                    if key_encryption.is_enabled:
+                        import base64
+                        prv_b64 = base64.b64encode(private_key.encode()).decode()
+                        prv_b64 = key_encryption.encrypt(prv_b64)
+                        private_key = base64.b64decode(prv_b64).decode()
+                except Exception:
+                    pass
+            
             # Create CA
             ca = CA(
                 refid=ca_data['refid'],
@@ -348,6 +360,18 @@ class RestoreService:
                     cert_data['private_key_pem_encrypted'],
                     master_key
                 )
+            
+            # Re-encrypt if at-rest encryption is active
+            if private_key:
+                try:
+                    from security.encryption import key_encryption
+                    if key_encryption.is_enabled:
+                        import base64
+                        prv_b64 = base64.b64encode(private_key.encode()).decode()
+                        prv_b64 = key_encryption.encrypt(prv_b64)
+                        private_key = base64.b64decode(prv_b64).decode()
+                except Exception:
+                    pass
             
             # Create certificate
             cert = Certificate(

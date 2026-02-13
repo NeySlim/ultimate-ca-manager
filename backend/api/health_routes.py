@@ -20,11 +20,16 @@ def health():
     Always returns 200 if the application is running.
     Includes started_at for restart detection by frontend.
     """
-    return jsonify({
+    from flask import current_app
+    result = {
         'status': 'ok',
         'service': 'ucm',
         'started_at': _started_at
-    })
+    }
+    if current_app.config.get('SAFE_MODE'):
+        result['safe_mode'] = True
+        result['safe_mode_reason'] = 'encryption_key_missing'
+    return jsonify(result)
 
 
 @health_bp.route('/health/ready')

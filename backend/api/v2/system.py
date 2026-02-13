@@ -632,18 +632,10 @@ def restore_backup():
 @bp.route('/api/v2/system/security/encryption-status', methods=['GET'])
 @require_auth(['admin:system'])
 def get_encryption_status():
-    """
-    Get private key encryption status
-    
-    Returns:
-    - enabled: bool - Whether encryption is configured
-    - encrypted_count: int - Number of encrypted keys
-    - unencrypted_count: int - Number of unencrypted keys
-    """
+    """Get private key encryption status"""
     try:
-        from security.encryption import key_encryption
+        from security.encryption import key_encryption, MASTER_KEY_PATH
         
-        # Count encrypted vs unencrypted
         encrypted = 0
         unencrypted = 0
         
@@ -661,32 +653,131 @@ def get_encryption_status():
         
         return success_response(data={
             'enabled': key_encryption.is_enabled,
+            'key_source': key_encryption.key_source,
+            'key_file_path': str(MASTER_KEY_PATH),
+            'key_file_exists': key_encryption.key_file_exists(),
             'encrypted_count': encrypted,
             'unencrypted_count': unencrypted,
             'total_keys': encrypted + unencrypted
         })
         
-    except ImportError:
-        return success_response(data={
-            'enabled': False,
-            'encrypted_count': 0,
-            'unencrypted_count': 0,
-            'total_keys': 0,
-            'error': 'Security module not available'
-        })
     except Exception as e:
         return error_response(f"Failed to get encryption status: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/enable-encryption', methods=['POST'])
+@require_auth(['admin:system'])
+def enable_encryption():
+    """
+    Enable private key encryption.
+    Generates a master key, writes it to /etc/ucm/master.key,
+    and encrypts all existing private keys in the database.
+    """
+    try:
+        from security.encryption import (
+            KeyEncryption, key_encryption, encrypt_all_keys as do_encrypt
+        )
+        
+        if key_encryption.is_enabled:
+            return error_response("Encryption is already enabled", 400)
+        
+        # Generate key and write to file
+        key = KeyEncryption.generate_key()
+        KeyEncryption.write_key_file(key)
+        
+        # Reload singleton to pick up the new key
+        key_encryption.reload()
+        
+        if not key_encryption.is_enabled:
+            KeyEncryption.remove_key_file()
+            return error_response("Failed to initialize encryption after key generation", 500)
+        
+        # Encrypt all existing keys
+        encrypted, skipped, errors = do_encrypt(dry_run=False)
+        
+        AuditService.log_action(
+            action='encryption_enabled',
+            resource_type='system',
+            resource_name='Private Key Encryption',
+            details=f'Encryption enabled. Encrypted {encrypted} keys, {skipped} already encrypted.',
+            success=True
+        )
+        
+        return success_response(
+            message=f"Encryption enabled. {encrypted} keys encrypted.",
+            data={
+                'enabled': True,
+                'key_file': str(KeyEncryption.key_file_exists() and '/etc/ucm/master.key'),
+                'encrypted': encrypted,
+                'skipped': skipped,
+                'errors': errors
+            }
+        )
+        
+    except PermissionError:
+        return error_response(
+            "Permission denied: cannot write to /etc/ucm/master.key. "
+            "Ensure the UCM process has write access to /etc/ucm/.", 403
+        )
+    except Exception as e:
+        return error_response(f"Failed to enable encryption: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])
+@require_auth(['admin:system'])
+def disable_encryption():
+    """
+    Disable private key encryption.
+    Decrypts all keys in database, then removes the master key file.
+    """
+    try:
+        from security.encryption import (
+            KeyEncryption, key_encryption, decrypt_all_keys as do_decrypt
+        )
+        
+        if not key_encryption.is_enabled:
+            return error_response("Encryption is not enabled", 400)
+        
+        # Decrypt all keys first (while we still have the key)
+        decrypted, skipped, errors = do_decrypt(dry_run=False)
+        
+        if errors:
+            return error_response(
+                f"Failed to decrypt some keys: {', '.join(errors[:3])}. "
+                "Encryption NOT disabled to prevent data loss.", 500
+            )
+        
+        # Remove key file
+        KeyEncryption.remove_key_file()
+        
+        # Reload singleton
+        key_encryption.reload()
+        
+        AuditService.log_action(
+            action='encryption_disabled',
+            resource_type='system',
+            resource_name='Private Key Encryption',
+            details=f'Encryption disabled. Decrypted {decrypted} keys.',
+            success=True
+        )
+        
+        return success_response(
+            message=f"Encryption disabled. {decrypted} keys decrypted.",
+            data={
+                'enabled': False,
+                'decrypted': decrypted,
+                'skipped': skipped
+            }
+        )
+        
+    except Exception as e:
+        return error_response(f"Failed to disable encryption: {str(e)}", 500)
 
 
 @bp.route('/api/v2/system/security/encrypt-all-keys', methods=['POST'])
 @require_auth(['admin:system'])
 def encrypt_all_keys():
-    """
-    Encrypt all unencrypted private keys in the database
-    
-    POST body (optional):
-    - dry_run: bool (default: true) - If true, only count without modifying
-    """
+    """Encrypt all unencrypted private keys in the database"""
     try:
         from security.encryption import encrypt_all_keys as do_encrypt
         
@@ -718,8 +809,6 @@ def encrypt_all_keys():
             }
         )
         
-    except ImportError:
-        return error_response("Security module not available", 500)
     except Exception as e:
         return error_response(f"Encryption failed: {str(e)}", 500)
 
@@ -727,32 +816,11 @@ def encrypt_all_keys():
 @bp.route('/api/v2/system/security/generate-key', methods=['GET'])
 @require_auth(['admin:system'])
 def generate_encryption_key():
-    """
-    Generate a new encryption key for KEY_ENCRYPTION_KEY env var
-    
-    The key should be stored securely in /etc/ucm/ucm.env
-    """
+    """Generate a new encryption key (for reference only)"""
     try:
         from security.encryption import KeyEncryption
-        
         key = KeyEncryption.generate_key()
-        
-        return success_response(
-            message="Add this key to /etc/ucm/ucm.env as KEY_ENCRYPTION_KEY",
-            data={
-                'key': key,
-                'env_line': f'KEY_ENCRYPTION_KEY={key}',
-                'instructions': [
-                    '1. Edit /etc/ucm/ucm.env',
-                    '2. Add: KEY_ENCRYPTION_KEY=' + key,
-                    '3. Restart UCM service: systemctl restart ucm',
-                    '4. Run encrypt-all-keys to encrypt existing keys'
-                ]
-            }
-        )
-        
-    except ImportError:
-        return error_response("Security module not available", 500)
+        return success_response(data={'key': key})
     except Exception as e:
         return error_response(f"Key generation failed: {str(e)}", 500)
 
@@ -1061,7 +1129,7 @@ def secrets_status():
     from config.settings import Config
     
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
-    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY'))
+    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or os.path.exists('/etc/ucm/master.key')
     
     return success_response(data={
         'session_secret': {

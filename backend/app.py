@@ -404,6 +404,27 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
+    # ===== SAFE MODE DETECTION =====
+    # If DB has encrypted keys but no master key, enter safe mode
+    try:
+        with app.app_context():
+            from security.encryption import key_encryption, has_encrypted_keys_in_db
+            key_encryption.reload()
+            enabled = key_encryption.is_enabled
+            has_enc = has_encrypted_keys_in_db()
+            app.logger.info(f"🔐 Encryption check: enabled={enabled}, has_encrypted_keys={has_enc}, key_source={key_encryption.key_source}")
+            if not enabled and has_enc:
+                app.config['SAFE_MODE'] = True
+                app.logger.error(
+                    "🔒 SAFE MODE: Encrypted private keys found but no encryption key available. "
+                    "Place your master.key file at /etc/ucm/master.key and restart UCM."
+                )
+            else:
+                app.config['SAFE_MODE'] = False
+    except Exception as e:
+        app.config['SAFE_MODE'] = False
+        app.logger.debug(f"Safe mode check skipped: {e}")
+    
     # HSM availability check at startup
     try:
         from utils.hsm_check import log_hsm_warning
@@ -507,7 +528,40 @@ def create_app(config_name=None):
     
     @app.route('/api/health')
     def health():
-        return {"status": "ok", "version": config.APP_VERSION, "started_at": _started_at}
+        result = {"status": "ok", "version": config.APP_VERSION, "started_at": _started_at}
+        if app.config.get('SAFE_MODE'):
+            result['safe_mode'] = True
+            result['safe_mode_reason'] = 'encryption_key_missing'
+        return result
+    
+    # Safe mode middleware — block most API calls when key is missing
+    @app.before_request
+    def check_safe_mode():
+        if not app.config.get('SAFE_MODE'):
+            return None
+        
+        # Allow health, auth, static, and frontend routes
+        allowed_prefixes = (
+            '/api/health', '/health',
+            '/api/v2/auth/', '/api/auth/',
+            '/api/v2/system/security/encryption-status',
+            '/static/', '/assets/', '/favicon',
+            '/socket.io/',
+        )
+        if request.path.startswith(allowed_prefixes):
+            return None
+        
+        # Allow frontend routes (no /api/ prefix)
+        if not request.path.startswith('/api/'):
+            return None
+        
+        from flask import jsonify as _jsonify
+        return _jsonify({
+            'error': True,
+            'message': 'UCM is in safe mode: encryption key missing. '
+                       'Place your master.key at /etc/ucm/master.key and restart UCM.',
+            'safe_mode': True
+        }), 503
     
     # Restart signal detector (before_request middleware)
     @app.before_request

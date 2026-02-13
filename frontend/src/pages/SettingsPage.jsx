@@ -10,7 +10,7 @@ import {
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
-  Bell, Copy, Power, ArrowClockwise
+  Bell, Copy, Power, ArrowClockwise, LockKey
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -763,6 +763,14 @@ export default function SettingsPage() {
   const [webhookTesting, setWebhookTesting] = useState(null)
   const [webhookConfirmDelete, setWebhookConfirmDelete] = useState(null)
 
+  // Encryption states
+  const [encryptionStatus, setEncryptionStatus] = useState(null)
+  const [showEnableEncryptionModal, setShowEnableEncryptionModal] = useState(false)
+  const [showDisableEncryptionModal, setShowDisableEncryptionModal] = useState(false)
+  const [encryptionLoading, setEncryptionLoading] = useState(false)
+  const [encryptionConfirmText, setEncryptionConfirmText] = useState('')
+  const [encryptionChecks, setEncryptionChecks] = useState({ backup: false, keyFile: false, lostKeys: false })
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -775,6 +783,7 @@ export default function SettingsPage() {
     loadDbStats()
     loadSsoProviders()
     loadWebhooks()
+    loadEncryptionStatus()
   }, [])
 
   const loadSettings = async () => {
@@ -1010,6 +1019,46 @@ export default function SettingsPage() {
       setCertificates(validCerts)
     } catch (error) {
       console.error('Failed to load certificates:', error)
+    }
+  }
+
+  // Encryption management
+  const loadEncryptionStatus = async () => {
+    try {
+      const response = await apiClient.get('/system/security/encryption-status')
+      setEncryptionStatus(response.data)
+    } catch (error) {
+      console.error('Failed to load encryption status:', error)
+    }
+  }
+
+  const handleEnableEncryption = async () => {
+    setEncryptionLoading(true)
+    try {
+      await apiClient.post('/system/security/enable-encryption')
+      showSuccess(t('settings.encryptionEnabled'))
+      setShowEnableEncryptionModal(false)
+      setEncryptionConfirmText('')
+      setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
+      await loadEncryptionStatus()
+    } catch (error) {
+      showError(error.response?.data?.message || t('settings.encryptionEnableFailed'))
+    } finally {
+      setEncryptionLoading(false)
+    }
+  }
+
+  const handleDisableEncryption = async () => {
+    setEncryptionLoading(true)
+    try {
+      await apiClient.post('/system/security/disable-encryption')
+      showSuccess(t('settings.encryptionDisabled'))
+      setShowDisableEncryptionModal(false)
+      await loadEncryptionStatus()
+    } catch (error) {
+      showError(error.response?.data?.message || t('settings.encryptionDisableFailed'))
+    } finally {
+      setEncryptionLoading(false)
     }
   }
 
@@ -1401,6 +1450,59 @@ export default function SettingsPage() {
               title={t('common.securitySettings')}
               subtitle={t('settings.securitySubtitle')}
             />
+            <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-rose">
+              {encryptionStatus ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
+                      {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
+                    </Badge>
+                    {encryptionStatus.enabled && encryptionStatus.key_source && (
+                      <span className="text-xs text-text-tertiary">
+                        {t('settings.keySource')}: {encryptionStatus.key_file_path}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {encryptionStatus.total_keys > 0 && (
+                    <div className="flex gap-4 text-sm">
+                      <span className="text-text-secondary">
+                        {t('settings.encryptedKeys')}: <strong className="text-text-primary">{encryptionStatus.encrypted_count}</strong>
+                      </span>
+                      <span className="text-text-secondary">
+                        {t('settings.unencryptedKeys')}: <strong className="text-text-primary">{encryptionStatus.unencrypted_count}</strong>
+                      </span>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-text-secondary">{t('settings.encryptionDesc')}</p>
+
+                  {hasPermission('admin:system') && (
+                    <div>
+                      {!encryptionStatus.enabled ? (
+                        <Button 
+                          onClick={() => setShowEnableEncryptionModal(true)}
+                          variant="primary"
+                        >
+                          <LockKey size={16} />
+                          {t('settings.enableEncryption')}
+                        </Button>
+                      ) : (
+                        <Button 
+                          onClick={() => setShowDisableEncryptionModal(true)}
+                          variant="outline"
+                        >
+                          <Lock size={16} />
+                          {t('settings.disableEncryption')}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <LoadingSpinner size="sm" />
+              )}
+            </DetailSection>
             <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -2210,6 +2312,107 @@ export default function SettingsPage() {
         variant="danger"
       />
       
+      {/* Enable Encryption Modal */}
+      <Modal
+        open={showEnableEncryptionModal}
+        onClose={() => {
+          setShowEnableEncryptionModal(false)
+          setEncryptionConfirmText('')
+          setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
+        }}
+        title={t('settings.enableEncryption')}
+        maxWidth="lg"
+      >
+        <div className="p-4 space-y-4">
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <div className="flex items-start gap-2">
+              <WarningCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" weight="fill" />
+              <div className="text-sm text-text-primary">
+                <p className="font-semibold mb-1">{t('settings.encryptionWarningTitle')}</p>
+                <p className="text-text-secondary">{t('settings.encryptionWarningDesc')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={encryptionChecks.keyFile}
+                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, keyFile: e.target.checked }))}
+                className="rounded border-border bg-bg-tertiary mt-0.5"
+              />
+              <span className="text-sm text-text-primary">{t('settings.encryptionCheckKeyFile')}</span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={encryptionChecks.backup}
+                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, backup: e.target.checked }))}
+                className="rounded border-border bg-bg-tertiary mt-0.5"
+              />
+              <span className="text-sm text-text-primary">{t('settings.encryptionCheckBackup')}</span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={encryptionChecks.lostKeys}
+                onChange={(e) => setEncryptionChecks(prev => ({ ...prev, lostKeys: e.target.checked }))}
+                className="rounded border-border bg-bg-tertiary mt-0.5"
+              />
+              <span className="text-sm text-text-primary">{t('settings.encryptionCheckLostKeys')}</span>
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">
+              {t('settings.typeToConfirm', { word: 'ENCRYPT' })}
+            </label>
+            <Input
+              value={encryptionConfirmText}
+              onChange={(e) => setEncryptionConfirmText(e.target.value)}
+              placeholder="ENCRYPT"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => {
+              setShowEnableEncryptionModal(false)
+              setEncryptionConfirmText('')
+              setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
+            }}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleEnableEncryption}
+              disabled={
+                encryptionLoading ||
+                encryptionConfirmText !== 'ENCRYPT' ||
+                !encryptionChecks.backup ||
+                !encryptionChecks.keyFile ||
+                !encryptionChecks.lostKeys
+              }
+            >
+              {encryptionLoading ? <LoadingSpinner size="sm" /> : <LockKey size={16} />}
+              {t('settings.enableEncryption')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Disable Encryption Modal */}
+      <ConfirmModal
+        open={showDisableEncryptionModal}
+        onClose={() => setShowDisableEncryptionModal(false)}
+        onConfirm={handleDisableEncryption}
+        title={t('settings.disableEncryption')}
+        message={t('settings.disableEncryptionConfirm')}
+        confirmText={t('settings.disableEncryption')}
+        variant="danger"
+        loading={encryptionLoading}
+      />
+
       {/* Smart Import Modal for HTTPS certificate */}
       <SmartImportModal
         isOpen={showHttpsImportModal}
