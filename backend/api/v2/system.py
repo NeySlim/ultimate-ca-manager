@@ -601,8 +601,12 @@ def restore_backup():
         if len(password) < 12:
             return error_response("Password must be at least 12 characters", 400)
         
-        # Read file content
-        backup_bytes = file.read()
+        # Read file content with size validation
+        from utils.file_validation import validate_upload, BACKUP_EXTENSIONS
+        try:
+            backup_bytes, _ = validate_upload(file, BACKUP_EXTENSIONS, max_size=100 * 1024 * 1024)
+        except ValueError as e:
+            return error_response(str(e), 400)
         
         service = BackupService()
         results = service.restore_backup(backup_bytes, password)

@@ -596,7 +596,7 @@ def convert_certificate():
                         # Extract certs from P7B
                         pem_output = subprocess.check_output([
                             'openssl', 'pkcs7', '-print_certs', '-in', temp_p7b, '-inform', 'DER'
-                        ], stderr=subprocess.DEVNULL)
+                        ], stderr=subprocess.DEVNULL, timeout=30)
                         # Parse extracted PEM certs
                         for c in x509.load_pem_x509_certificates(pem_output):
                             certs.append(c)
@@ -768,7 +768,7 @@ def convert_certificate():
             try:
                 p7_data = subprocess.check_output([
                     'openssl', 'crl2pkcs7', '-nocrl', '-certfile', temp_pem
-                ])
+                ], timeout=30)
                 result = {
                     'format': 'pkcs7',
                     'data': p7_data.decode(),

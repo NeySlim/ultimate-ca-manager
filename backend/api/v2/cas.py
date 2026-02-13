@@ -352,8 +352,11 @@ def import_ca():
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        file_data = file.read()
-        filename = file.filename
+        from utils.file_validation import validate_upload, CERT_EXTENSIONS
+        try:
+            file_data, filename = validate_upload(file, CERT_EXTENSIONS)
+        except ValueError as e:
+            return error_response(str(e), 400)
     elif request.form.get('pem_content'):
         pem_content = request.form.get('pem_content')
         file_data = pem_content.encode('utf-8')
@@ -654,7 +657,7 @@ def export_all_cas():
                     'openssl', 'crl2pkcs7', '-nocrl',
                     '-certfile', pem_file,
                     '-outform', 'DER'
-                ], stderr=subprocess.DEVNULL)
+                ], stderr=subprocess.DEVNULL, timeout=30)
                 
                 return Response(
                     p7b_output,
@@ -823,7 +826,7 @@ def export_ca(ca_id):
                     'openssl', 'crl2pkcs7', '-nocrl',
                     '-certfile', pem_file,
                     '-outform', 'DER'
-                ], stderr=subprocess.DEVNULL)
+                ], stderr=subprocess.DEVNULL, timeout=30)
                 
                 return Response(
                     p7b_output,
@@ -969,7 +972,7 @@ def bulk_export_cas():
             try:
                 p7b_output = subprocess.check_output(
                     ['openssl', 'crl2pkcs7', '-nocrl', '-certfile', pem_file, '-outform', 'DER'],
-                    stderr=subprocess.DEVNULL)
+                    stderr=subprocess.DEVNULL, timeout=30)
                 return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
                     headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'})
             finally:
