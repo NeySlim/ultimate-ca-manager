@@ -18,6 +18,7 @@ import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsi
 import { useNotification, useMobile } from '../contexts'
 import { apiClient } from '../services/apiClient'
 import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },
@@ -656,10 +657,11 @@ function ProviderModal({ provider, onSave, onClose }) {
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={formData.enabled} onChange={e => handleChange('enabled', e.target.checked)} />
-        {t('common.enableProvider')}
-      </label>
+      <ToggleSwitch
+        checked={formData.enabled}
+        onChange={(val) => handleChange('enabled', val)}
+        label={t('common.enableProvider')}
+      />
     </FormModal>
   )
 }

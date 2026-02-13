@@ -28,6 +28,7 @@ import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { apiClient } from '../services/apiClient'
 
 // Settings categories with colors for visual distinction
@@ -395,15 +396,11 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             ]}
           />
         )}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={formData.enabled}
-            onChange={e => handleChange('enabled', e.target.checked)}
-            className="rounded border-border bg-bg-tertiary"
-          />
-          <span className="text-sm text-text-primary">{t('common.enableProvider')}</span>
-        </label>
+        <ToggleSwitch
+          checked={formData.enabled}
+          onChange={(val) => handleChange('enabled', val)}
+          label={t('common.enableProvider')}
+        />
       </div>
 
       {/* Connection Settings */}
@@ -427,15 +424,12 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
                 onChange={e => handleChange('ldap_port', parseInt(e.target.value))}
               />
             </div>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.ldap_use_ssl}
-                onChange={e => handleChange('ldap_use_ssl', e.target.checked)}
-                className="rounded border-border bg-bg-tertiary"
-              />
-              <span className="text-sm text-text-primary">{t('sso.ldapUseSsl')}</span>
-            </label>
+            <ToggleSwitch
+              checked={formData.ldap_use_ssl}
+              onChange={(val) => handleChange('ldap_use_ssl', val)}
+              label={t('sso.ldapUseSsl')}
+              size="sm"
+            />
             <Input
               label={t('sso.bindDn')}
               value={formData.ldap_bind_dn}
@@ -545,24 +539,16 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           ]}
         />
         <div className="space-y-2">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.auto_create_users}
-              onChange={e => handleChange('auto_create_users', e.target.checked)}
-              className="rounded border-border bg-bg-tertiary"
-            />
-            <span className="text-sm text-text-primary">{t('sso.autoCreateUsers')}</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.auto_update_users}
-              onChange={e => handleChange('auto_update_users', e.target.checked)}
-              className="rounded border-border bg-bg-tertiary"
-            />
-            <span className="text-sm text-text-primary">{t('sso.autoUpdateUsers')}</span>
-          </label>
+          <ToggleSwitch
+            checked={formData.auto_create_users}
+            onChange={(val) => handleChange('auto_create_users', val)}
+            label={t('sso.autoCreateUsers')}
+          />
+          <ToggleSwitch
+            checked={formData.auto_update_users}
+            onChange={(val) => handleChange('auto_update_users', val)}
+            label={t('sso.autoUpdateUsers')}
+          />
         </div>
       </div>
 
@@ -684,15 +670,11 @@ function WebhookForm({ webhook, onSave, onCancel }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={formData.enabled}
-          onChange={e => handleChange('enabled', e.target.checked)}
-          className="rounded border-border bg-bg-tertiary"
-        />
-        <span className="text-sm text-text-primary">{t('webhooks.enableOnCreate')}</span>
-      </label>
+      <ToggleSwitch
+        checked={formData.enabled}
+        onChange={(val) => handleChange('enabled', val)}
+        label={t('webhooks.enableOnCreate')}
+      />
 
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>
@@ -1478,15 +1460,12 @@ export default function SettingsPage() {
                   onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
                   placeholder={t('settings.fromEmailPlaceholder')}
                 />
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.smtp_use_tls || false}
-                    onChange={(e) => updateSetting('smtp_use_tls', e.target.checked)}
-                    className="rounded border-border bg-bg-tertiary"
-                  />
-                  <span className="text-sm text-text-primary">{t('settings.useTls')}</span>
-                </label>
+                <ToggleSwitch
+                  checked={settings.smtp_use_tls || false}
+                  onChange={(val) => updateSetting('smtp_use_tls', val)}
+                  label={t('settings.useTls')}
+                  size="sm"
+                />
                 {canWrite('settings') && (
                   <div className="flex gap-2 pt-2">
                     <Button variant="secondary" onClick={handleTestEmail}>
@@ -1566,18 +1545,12 @@ export default function SettingsPage() {
               )}
             </DetailSection>
             <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.enforce_2fa || false}
-                  onChange={(e) => updateSetting('enforce_2fa', e.target.checked)}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">{t('settings.enforce2fa')}</p>
-                  <p className="text-xs text-text-secondary">{t('settings.enforce2faDesc')}</p>
-                </div>
-              </label>
+              <ToggleSwitch
+                checked={settings.enforce_2fa || false}
+                onChange={(val) => updateSetting('enforce_2fa', val)}
+                label={t('settings.enforce2fa')}
+                description={t('settings.enforce2faDesc')}
+              />
             </DetailSection>
             <DetailSection title={t('settings.passwordPolicy')} icon={Lock} iconClass="icon-bg-violet">
               <div className="space-y-4">
@@ -1590,33 +1563,24 @@ export default function SettingsPage() {
                   max="32"
                 />
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.password_require_uppercase || false}
-                      onChange={(e) => updateSetting('password_require_uppercase', e.target.checked)}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{t('settings.requireUppercase')}</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.password_require_numbers || false}
-                      onChange={(e) => updateSetting('password_require_numbers', e.target.checked)}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{t('settings.requireNumbers')}</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={settings.password_require_special || false}
-                      onChange={(e) => updateSetting('password_require_special', e.target.checked)}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{t('settings.requireSpecial')}</span>
-                  </label>
+                  <ToggleSwitch
+                    checked={settings.password_require_uppercase || false}
+                    onChange={(val) => updateSetting('password_require_uppercase', val)}
+                    label={t('settings.requireUppercase')}
+                    size="sm"
+                  />
+                  <ToggleSwitch
+                    checked={settings.password_require_numbers || false}
+                    onChange={(val) => updateSetting('password_require_numbers', val)}
+                    label={t('settings.requireNumbers')}
+                    size="sm"
+                  />
+                  <ToggleSwitch
+                    checked={settings.password_require_special || false}
+                    onChange={(val) => updateSetting('password_require_special', val)}
+                    label={t('settings.requireSpecial')}
+                    size="sm"
+                  />
                 </div>
               </div>
             </DetailSection>
@@ -1791,18 +1755,12 @@ export default function SettingsPage() {
             />
             <DetailSection title={t('settings.automaticBackups')} icon={Database} iconClass="icon-bg-emerald">
               <div className="space-y-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.auto_backup_enabled || false}
-                    onChange={(e) => updateSetting('auto_backup_enabled', e.target.checked)}
-                    className="rounded border-border bg-bg-tertiary"
-                  />
-                  <div>
-                    <p className="text-sm text-text-primary font-medium">{t('settings.enableAutoBackups')}</p>
-                    <p className="text-xs text-text-secondary">{t('settings.autoBackupsDesc')}</p>
-                  </div>
-                </label>
+                <ToggleSwitch
+                  checked={settings.auto_backup_enabled || false}
+                  onChange={(val) => updateSetting('auto_backup_enabled', val)}
+                  label={t('settings.enableAutoBackups')}
+                  description={t('settings.autoBackupsDesc')}
+                />
 
                 {settings.auto_backup_enabled && (
                   <>
@@ -1905,18 +1863,12 @@ export default function SettingsPage() {
             />
             <DetailSection title={t('settings.auditLogging')} icon={ListBullets} iconClass="icon-bg-orange">
               <div className="space-y-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.audit_enabled || true}
-                    onChange={(e) => updateSetting('audit_enabled', e.target.checked)}
-                    className="rounded border-border bg-bg-tertiary"
-                  />
-                  <div>
-                    <p className="text-sm text-text-primary font-medium">{t('settings.enableAuditLogging')}</p>
-                    <p className="text-xs text-text-secondary">{t('settings.enableAuditLoggingDesc')}</p>
-                  </div>
-                </label>
+                <ToggleSwitch
+                  checked={settings.audit_enabled || true}
+                  onChange={(val) => updateSetting('audit_enabled', val)}
+                  label={t('settings.enableAuditLogging')}
+                  description={t('settings.enableAuditLoggingDesc')}
+                />
 
                 <Input
                   label={t('settings.logRetention')}
@@ -1961,17 +1913,11 @@ export default function SettingsPage() {
             <DetailSection title={t('settings.remoteSyslog')} icon={Globe} iconClass="icon-bg-purple">
               <div className="space-y-4">
                 <p className="text-xs text-text-secondary">{t('settings.remoteSyslogDesc')}</p>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={syslogConfig.enabled}
-                    onChange={(e) => updateSyslogConfig('enabled', e.target.checked)}
-                    className="rounded border-border bg-bg-tertiary"
-                  />
-                  <div>
-                    <p className="text-sm text-text-primary font-medium">{t('settings.enableSyslog')}</p>
-                  </div>
-                </label>
+                <ToggleSwitch
+                  checked={syslogConfig.enabled}
+                  onChange={(val) => updateSyslogConfig('enabled', val)}
+                  label={t('settings.enableSyslog')}
+                />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label={t('settings.syslogHost')}
@@ -2031,15 +1977,12 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 {syslogConfig.protocol === 'tcp' && (
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={syslogConfig.tls}
-                      onChange={(e) => updateSyslogConfig('tls', e.target.checked)}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{t('settings.syslogTls')}</span>
-                  </label>
+                  <ToggleSwitch
+                    checked={syslogConfig.tls}
+                    onChange={(val) => updateSyslogConfig('tls', val)}
+                    label={t('settings.syslogTls')}
+                    size="sm"
+                  />
                 )}
                 {hasPermission('admin:system') && (
                   <div className="flex gap-2">
