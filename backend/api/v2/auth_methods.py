@@ -203,7 +203,8 @@ def login_password():
             'role': user.role,
             'permissions': permissions,
             'auth_method': 'password',
-            'csrf_token': csrf_token
+            'csrf_token': csrf_token,
+            'force_password_change': user.force_password_change or False
         },
         message='Login successful'
     )

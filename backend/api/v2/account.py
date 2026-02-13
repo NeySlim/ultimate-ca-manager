@@ -129,6 +129,7 @@ def change_password():
     
     # Update password
     user.password_hash = generate_password_hash(new_password)
+    user.force_password_change = False
     db.session.commit()
     
     # Audit log
