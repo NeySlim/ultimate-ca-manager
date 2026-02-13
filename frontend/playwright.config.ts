@@ -23,6 +23,7 @@ export default defineConfig({
   
   use: {
     baseURL: process.env.UCM_BASE_URL || 'https://localhost:8443',
+    locale: 'en-US',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

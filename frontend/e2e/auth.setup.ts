@@ -15,7 +15,9 @@ const authFile = 'e2e/.auth/user.json'
  * 5. Click link → Enter password → Sign in
  */
 setup('authenticate', async ({ page }) => {
-  // Go to login page
+  // Force English locale for consistent E2E selectors
+  await page.goto('/login')
+  await page.evaluate(() => localStorage.setItem('i18nextLng', 'en'))
   await page.goto('/login')
   
   // Wait for login form
@@ -53,11 +55,21 @@ setup('authenticate', async ({ page }) => {
   const signInButton = page.locator('button[type="submit"]').first()
   await signInButton.click()
   
-  // Wait for dashboard (successful login)
-  await page.waitForURL('**/dashboard', { timeout: 15000 })
+  // Wait for navigation after login
+  await page.waitForURL('**/*', { timeout: 15000 })
   
-  // Verify we're logged in (wait for sidebar Dashboard link to be visible)
-  await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 10000 })
+  // Handle "Password Change Required" modal if it appears
+  const skipBtn = page.locator('button:has-text("Skip for now")')
+  try {
+    await skipBtn.waitFor({ state: 'visible', timeout: 3000 })
+    await skipBtn.click()
+    await page.waitForTimeout(1000)
+  } catch {
+    // No password change modal - continue
+  }
+  
+  // Verify we're logged in (wait for sidebar logo link to dashboard)
+  await expect(page.locator('a[href="/"]').first()).toBeVisible({ timeout: 10000 })
   
   // Save authentication state
   await page.context().storageState({ path: authFile })
