@@ -36,7 +36,7 @@ const TOOLS = [
   },
   {
     id: 'cert-decoder',
-    nameKey: 'tools.certDecoder',
+    nameKey: 'tools.decoder',
     descKey: 'tools.certDecoderDesc',
     icon: Certificate,
     color: 'purple'
