@@ -1560,7 +1560,11 @@
     "syslogSaved": "Syslog configuration saved",
     "syslogSaveFailed": "Failed to save syslog configuration",
     "syslogTestSuccess": "Test message sent successfully",
-    "syslogTestFailed": "Failed to send test message"
+    "syslogTestFailed": "Failed to send test message",
+    "syslogFacilityHelp": "Syslogサーバーでメッセージをルーティングするためのカテゴリ。不明な場合はlocal0を使用してください。",
+    "syslogFacilityLocal0": "カスタムアプリ推奨",
+    "syslogFacilityAuth": "認証とセキュリティ",
+    "syslogFacilityDaemon": "システムサービス"
   },
   "sso": {
     "saml": "SAML 2.0",

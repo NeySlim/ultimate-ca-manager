@@ -1424,7 +1424,11 @@
     "syslogSaved": "Syslog configuration saved",
     "syslogSaveFailed": "Failed to save syslog configuration",
     "syslogTestSuccess": "Test message sent successfully",
-    "syslogTestFailed": "Failed to send test message"
+    "syslogTestFailed": "Failed to send test message",
+    "syslogFacilityHelp": "Syslog category used to route messages on your syslog server. Use local0 if unsure.",
+    "syslogFacilityLocal0": "Recommended for custom apps",
+    "syslogFacilityAuth": "Authentication & security",
+    "syslogFacilityDaemon": "System services"
   },
   "account": {
     "profile": "Profile",

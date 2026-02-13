@@ -1560,7 +1560,11 @@
     "syslogSaved": "Syslog configuration saved",
     "syslogSaveFailed": "Failed to save syslog configuration",
     "syslogTestSuccess": "Test message sent successfully",
-    "syslogTestFailed": "Failed to send test message"
+    "syslogTestFailed": "Failed to send test message",
+    "syslogFacilityHelp": "用于在Syslog服务器上路由消息的类别。不确定时使用local0。",
+    "syslogFacilityLocal0": "推荐用于自定义应用",
+    "syslogFacilityAuth": "身份验证与安全",
+    "syslogFacilityDaemon": "系统服务"
   },
   "sso": {
     "saml": "SAML 2.0",

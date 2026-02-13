@@ -1562,7 +1562,11 @@
     "syslogSaved": "Configuration syslog enregistrée",
     "syslogSaveFailed": "Échec de l'enregistrement de la configuration syslog",
     "syslogTestSuccess": "Message de test envoyé avec succès",
-    "syslogTestFailed": "Échec de l'envoi du message de test"
+    "syslogTestFailed": "Échec de l'envoi du message de test",
+    "syslogFacilityHelp": "Catégorie syslog utilisée pour router les messages sur votre serveur. Utilisez local0 en cas de doute.",
+    "syslogFacilityLocal0": "Recommandé pour les apps",
+    "syslogFacilityAuth": "Authentification & sécurité",
+    "syslogFacilityDaemon": "Services système"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

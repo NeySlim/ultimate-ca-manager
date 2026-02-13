@@ -1560,7 +1560,11 @@
     "syslogSaved": "Syslog configuration saved",
     "syslogSaveFailed": "Failed to save syslog configuration",
     "syslogTestSuccess": "Test message sent successfully",
-    "syslogTestFailed": "Failed to send test message"
+    "syslogTestFailed": "Failed to send test message",
+    "syslogFacilityHelp": "Categoría syslog utilizada para enrutar mensajes en su servidor. Use local0 en caso de duda.",
+    "syslogFacilityLocal0": "Recomendado para aplicaciones",
+    "syslogFacilityAuth": "Autenticación y seguridad",
+    "syslogFacilityDaemon": "Servicios del sistema"
   },
   "sso": {
     "saml": "SAML 2.0",

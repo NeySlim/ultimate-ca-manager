@@ -2003,7 +2003,7 @@ export default function SettingsPage() {
                     value={syslogConfig.facility}
                     onChange={(e) => updateSyslogConfig('facility', e.target.value)}
                     options={[
-                      { value: 'local0', label: 'local0' },
+                      { value: 'local0', label: 'local0 — ' + t('settings.syslogFacilityLocal0') },
                       { value: 'local1', label: 'local1' },
                       { value: 'local2', label: 'local2' },
                       { value: 'local3', label: 'local3' },
@@ -2011,11 +2011,11 @@ export default function SettingsPage() {
                       { value: 'local5', label: 'local5' },
                       { value: 'local6', label: 'local6' },
                       { value: 'local7', label: 'local7' },
-                      { value: 'auth', label: 'auth' },
-                      { value: 'daemon', label: 'daemon' },
-                      { value: 'user', label: 'user' },
+                      { value: 'auth', label: 'auth — ' + t('settings.syslogFacilityAuth') },
+                      { value: 'daemon', label: 'daemon — ' + t('settings.syslogFacilityDaemon') },
                     ]}
                   />
+                  <p className="text-xs text-text-tertiary -mt-1">{t('settings.syslogFacilityHelp')}</p>
                 </div>
                 {syslogConfig.protocol === 'tcp' && (
                   <label className="flex items-center gap-2 cursor-pointer">

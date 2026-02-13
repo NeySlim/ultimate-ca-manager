@@ -1560,7 +1560,11 @@
     "syslogSaved": "Syslog configuration saved",
     "syslogSaveFailed": "Failed to save syslog configuration",
     "syslogTestSuccess": "Test message sent successfully",
-    "syslogTestFailed": "Failed to send test message"
+    "syslogTestFailed": "Failed to send test message",
+    "syslogFacilityHelp": "Категорія syslog для маршрутизації повідомлень на сервері. Використовуйте local0, якщо не впевнені.",
+    "syslogFacilityLocal0": "Рекомендовано для додатків",
+    "syslogFacilityAuth": "Автентифікація та безпека",
+    "syslogFacilityDaemon": "Системні служби"
   },
   "sso": {
     "saml": "SAML 2.0",
