@@ -3,15 +3,12 @@ ACME Client API Routes
 Endpoints for requesting certificates from Let's Encrypt
 """
 import json
-import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import AcmeClientService
 from services.audit_service import AuditService
-
-logger = logging.getLogger('ucm.acme_client')
 
 bp = Blueprint('acme_client', __name__)
 
@@ -38,19 +35,11 @@ def get_settings():
     staging_account = SystemConfig.query.filter_by(key='acme.client.staging.account_url').first()
     production_account = SystemConfig.query.filter_by(key='acme.client.production.account_url').first()
     
-    # Get revoke on renewal setting
-    revoke_on_renewal = SystemConfig.query.filter_by(key='acme.client.revoke_on_renewal').first()
-    
-    # Count superseded certificates (old certs from renewed orders)
-    superseded_count = _count_superseded_certificates()
-    
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
         'environment': env_cfg.value if env_cfg else 'staging',
         'renewal_enabled': renewal_enabled.value == 'true' if renewal_enabled else True,
         'renewal_days': int(renewal_days.value) if renewal_days else 30,
-        'revoke_on_renewal': revoke_on_renewal.value == 'true' if revoke_on_renewal else False,
-        'superseded_count': superseded_count,
         'has_staging_account': bool(staging_account),
         'has_production_account': bool(production_account),
     })
@@ -89,18 +78,6 @@ def update_settings():
         _set_config('acme.client.renewal_days', str(days), 'ACME renewal days before expiry')
         updates.append('renewal_days')
     
-    if 'revoke_on_renewal' in data:
-        _set_config('acme.client.revoke_on_renewal',
-                   'true' if data['revoke_on_renewal'] else 'false',
-                   'Revoke old certificate after ACME renewal')
-        updates.append('revoke_on_renewal')
-        
-        # If enabling and revoke_superseded requested, revoke existing superseded certs
-        if data['revoke_on_renewal'] and data.get('revoke_superseded'):
-            revoked = _revoke_superseded_certificates()
-            if revoked > 0:
-                updates.append(f'revoked {revoked} superseded cert(s)')
-    
     db.session.commit()
     
     AuditService.log_action(
@@ -123,66 +100,6 @@ def _set_config(key: str, value: str, description: str = ''):
         config.value = value
     else:
         db.session.add(SystemConfig(key=key, value=value, description=description))
-
-
-def _count_superseded_certificates():
-    """Count old certificates that have been replaced by ACME renewal"""
-    from models import Certificate
-    # Find orders that have been renewed (have a certificate_id and last_renewal_at)
-    renewed_orders = AcmeClientOrder.query.filter(
-        AcmeClientOrder.last_renewal_at.isnot(None),
-        AcmeClientOrder.certificate_id.isnot(None)
-    ).all()
-    
-    if not renewed_orders:
-        return 0
-    
-    # Get all certificate IDs that are current (active) in orders
-    current_cert_ids = {o.certificate_id for o in AcmeClientOrder.query.filter(
-        AcmeClientOrder.certificate_id.isnot(None)
-    ).all()}
-    
-    # Find ACME-sourced certs that aren't current and aren't already revoked
-    count = Certificate.query.filter(
-        Certificate.source.in_(['acme', 'acme_renewal', 'acme-renewal']),
-        Certificate.revoked == False,
-        ~Certificate.id.in_(current_cert_ids)
-    ).count() if current_cert_ids else 0
-    
-    return count
-
-
-def _revoke_superseded_certificates():
-    """Revoke all superseded ACME certificates"""
-    from models import Certificate
-    from services.cert_service import CertificateService
-    
-    current_cert_ids = {o.certificate_id for o in AcmeClientOrder.query.filter(
-        AcmeClientOrder.certificate_id.isnot(None)
-    ).all()}
-    
-    if not current_cert_ids:
-        return 0
-    
-    superseded = Certificate.query.filter(
-        Certificate.source.in_(['acme', 'acme_renewal', 'acme-renewal']),
-        Certificate.revoked == False,
-        ~Certificate.id.in_(current_cert_ids)
-    ).all()
-    
-    revoked_count = 0
-    for cert in superseded:
-        try:
-            CertificateService.revoke_certificate(
-                cert_id=cert.id,
-                reason='superseded',
-                username='system'
-            )
-            revoked_count += 1
-        except Exception as e:
-            logger.warning(f"Failed to revoke superseded cert {cert.id}: {e}")
-    
-    return revoked_count
 
 
 # =============================================================================

@@ -801,6 +801,7 @@
     "autoRenewalDesc": "Automatically renew certificates 30 days before expiration",
     "revokeOnRenewal": "Revoke old certificate after renewal",
     "revokeOnRenewalDesc": "Automatically revoke the previous certificate with reason 'superseded' when a new one is issued",
+    "renewalPolicy": "Renewal Policy",
     "revokeExistingSuperseded": "Also revoke {{count}} existing superseded certificate(s)",
     "revokeExistingSupersededDesc": "Revoke old certificates that have already been replaced by renewals",
     "revokeSupersededConfirmTitle": "Revoke Superseded Certificates",

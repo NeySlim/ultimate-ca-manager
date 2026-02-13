@@ -185,19 +185,19 @@ export default function ACMEPage() {
   }
 
   const handleToggleRevokeOnRenewal = (enabled) => {
-    if (enabled && revokeSuperseded && clientSettings.superseded_count > 0) {
+    if (enabled && revokeSuperseded && acmeSettings.superseded_count > 0) {
       setShowRevokeConfirm(true)
     } else {
-      handleUpdateClientSetting('revoke_on_renewal', enabled)
+      updateSetting('revoke_on_renewal', enabled)
       if (enabled) setRevokeSuperseded(false)
     }
   }
 
   const handleConfirmRevokeSuperseded = async () => {
     try {
-      setClientSettings(prev => ({ ...prev, revoke_on_renewal: true }))
-      await acmeService.updateClientSettings({ revoke_on_renewal: true, revoke_superseded: true })
-      showSuccess(t('acme.supersededRevoked', { count: clientSettings.superseded_count }))
+      setAcmeSettings(prev => ({ ...prev, revoke_on_renewal: true }))
+      await acmeService.updateSettings({ ...acmeSettings, revoke_on_renewal: true, revoke_superseded: true })
+      showSuccess(t('acme.supersededRevoked', { count: acmeSettings.superseded_count }))
       setShowRevokeConfirm(false)
       setRevokeSuperseded(false)
       loadData()
@@ -894,39 +894,6 @@ export default function ACMEPage() {
               <p className="text-xs text-text-secondary">{t('acme.autoRenewalDesc')}</p>
             </div>
           </label>
-
-          {/* Revoke on renewal */}
-          <div className="border border-border rounded-lg p-3 space-y-2">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={clientSettings.revoke_on_renewal || false}
-                onChange={(e) => handleToggleRevokeOnRenewal(e.target.checked)}
-                className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-              />
-              <div>
-                <p className="text-sm text-text-primary font-medium">{t('acme.revokeOnRenewal')}</p>
-                <p className="text-xs text-text-secondary">{t('acme.revokeOnRenewalDesc')}</p>
-              </div>
-            </label>
-            
-            {!clientSettings.revoke_on_renewal && clientSettings.superseded_count > 0 && (
-              <label className="flex items-center gap-3 cursor-pointer ml-7 p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={revokeSuperseded}
-                  onChange={(e) => setRevokeSuperseded(e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-warning focus:ring-accent-warning/50"
-                />
-                <div>
-                  <p className="text-sm text-accent-warning font-medium">
-                    {t('acme.revokeExistingSuperseded', { count: clientSettings.superseded_count })}
-                  </p>
-                  <p className="text-xs text-text-secondary">{t('acme.revokeExistingSupersededDesc')}</p>
-                </div>
-              </label>
-            )}
-          </div>
         </div>
       </CompactSection>
     </div>
@@ -1146,6 +1113,41 @@ export default function ACMEPage() {
               label: ca.name || ca.common_name 
             }))}
           />
+        </div>
+      </CompactSection>
+
+      {/* Certificate Renewal Policy */}
+      <CompactSection title={t('acme.renewalPolicy')} icon={ArrowsClockwise}>
+        <div className="space-y-2">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={acmeSettings.revoke_on_renewal || false}
+              onChange={(e) => handleToggleRevokeOnRenewal(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+            />
+            <div>
+              <p className="text-sm text-text-primary font-medium">{t('acme.revokeOnRenewal')}</p>
+              <p className="text-xs text-text-secondary">{t('acme.revokeOnRenewalDesc')}</p>
+            </div>
+          </label>
+          
+          {!acmeSettings.revoke_on_renewal && acmeSettings.superseded_count > 0 && (
+            <label className="flex items-center gap-3 cursor-pointer ml-7 p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={revokeSuperseded}
+                onChange={(e) => setRevokeSuperseded(e.target.checked)}
+                className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-warning focus:ring-accent-warning/50"
+              />
+              <div>
+                <p className="text-sm text-accent-warning font-medium">
+                  {t('acme.revokeExistingSuperseded', { count: acmeSettings.superseded_count })}
+                </p>
+                <p className="text-xs text-text-secondary">{t('acme.revokeExistingSupersededDesc')}</p>
+              </div>
+            </label>
+          )}
         </div>
       </CompactSection>
 
@@ -1901,7 +1903,7 @@ export default function ACMEPage() {
             <div className="text-sm">
               <p className="font-medium text-accent-warning">{t('common.warning')}</p>
               <p className="text-text-secondary mt-1">
-                {t('acme.revokeSupersededConfirmDesc', { count: clientSettings.superseded_count })}
+                {t('acme.revokeSupersededConfirmDesc', { count: acmeSettings.superseded_count })}
               </p>
             </div>
           </div>
@@ -1910,7 +1912,7 @@ export default function ACMEPage() {
               {t('common.cancel')}
             </Button>
             <Button variant="danger" onClick={handleConfirmRevokeSuperseded}>
-              {t('acme.revokeSupersededConfirmAction', { count: clientSettings.superseded_count })}
+              {t('acme.revokeSupersededConfirmAction', { count: acmeSettings.superseded_count })}
             </Button>
           </div>
         </div>

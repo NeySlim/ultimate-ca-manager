@@ -188,6 +188,7 @@
     "autoRenewalDesc": "Renouveler automatiquement les certificats 30 jours avant expiration",
     "revokeOnRenewal": "Révoquer l'ancien certificat après renouvellement",
     "revokeOnRenewalDesc": "Révoquer automatiquement le certificat précédent avec la raison 'superseded' lors de l'émission d'un nouveau",
+    "renewalPolicy": "Politique de renouvellement",
     "revokeExistingSuperseded": "Révoquer aussi {{count}} certificat(s) déjà remplacé(s)",
     "revokeExistingSupersededDesc": "Révoquer les anciens certificats déjà remplacés par des renouvellements",
     "revokeSupersededConfirmTitle": "Révoquer les certificats remplacés",

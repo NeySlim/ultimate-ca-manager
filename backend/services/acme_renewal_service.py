@@ -217,7 +217,7 @@ def renew_certificate(order) -> bool:
     if old_certificate_id and old_certificate_id != cert_id:
         try:
             from models import SystemConfig
-            revoke_setting = SystemConfig.query.filter_by(key='acme.client.revoke_on_renewal').first()
+            revoke_setting = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
             if revoke_setting and revoke_setting.value == 'true':
                 from services.cert_service import CertificateService
                 CertificateService.revoke_certificate(
