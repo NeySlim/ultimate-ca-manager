@@ -104,17 +104,14 @@ def change_password():
     
     current_password = data.get('current_password')
     new_password = data.get('new_password')
-    confirm_password = data.get('confirm_password')
+    force_change = data.get('force_change', False)
     
     # Validation
-    if not current_password:
+    if not force_change and not current_password:
         return error_response('Current password is required', 400)
     
     if not new_password:
         return error_response('New password is required', 400)
-    
-    if new_password != confirm_password:
-        return error_response('Passwords do not match', 400)
     
     if len(new_password) < 8:
         return error_response('Password must be at least 8 characters', 400)
@@ -123,8 +120,10 @@ def change_password():
     if not user:
         return error_response('User not found', 404)
     
-    # Verify current password
-    if not check_password_hash(user.password_hash, current_password):
+    # Skip current password check only if force_password_change is set
+    if force_change and user.force_password_change:
+        pass
+    elif not current_password or not check_password_hash(user.password_hash, current_password):
         return error_response('Current password is incorrect', 401)
     
     # Update password
