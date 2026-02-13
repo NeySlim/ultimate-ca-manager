@@ -84,6 +84,9 @@ def renew_certificate(order) -> bool:
     
     logger.info(f"Renewing certificate for {order.primary_domain} (order {order.id})")
     
+    # Save old certificate ID for potential revocation
+    old_certificate_id = order.certificate_id
+    
     # Get DNS provider
     dns_provider_model = DnsProvider.query.get(order.dns_provider_id)
     if not dns_provider_model:
@@ -209,4 +212,21 @@ def renew_certificate(order) -> bool:
         )
     
     logger.info(f"Successfully renewed certificate for {order.primary_domain} (new cert ID: {cert_id})")
+    
+    # Revoke old certificate if setting is enabled
+    if old_certificate_id and old_certificate_id != cert_id:
+        try:
+            from models import SystemConfig
+            revoke_setting = SystemConfig.query.filter_by(key='acme.client.revoke_on_renewal').first()
+            if revoke_setting and revoke_setting.value == 'true':
+                from services.cert_service import CertificateService
+                CertificateService.revoke_certificate(
+                    cert_id=old_certificate_id,
+                    reason='superseded',
+                    username='system'
+                )
+                logger.info(f"Revoked superseded certificate {old_certificate_id}")
+        except Exception as e:
+            logger.warning(f"Failed to revoke old certificate {old_certificate_id}: {e}")
+    
     return True
