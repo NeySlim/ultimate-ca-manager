@@ -305,7 +305,10 @@ def get_system_status():
         acme_enabled = db.session.execute(text("SELECT value FROM system_config WHERE key = 'acme.enabled'")).scalar()
         acme_count = db.session.execute(text("SELECT COUNT(*) FROM acme_accounts")).scalar() or 0
         
-        if acme_enabled == 'true' or acme_enabled == '1':
+        # Default to enabled when no config key exists (matches acme.py settings logic)
+        is_enabled = acme_enabled != 'false' and acme_enabled != '0'
+        
+        if is_enabled:
             if acme_count > 0:
                 status['acme'] = {'status': 'online', 'message': f'{acme_count} accounts'}
             else:
