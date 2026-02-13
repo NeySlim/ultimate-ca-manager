@@ -227,6 +227,13 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   // Read a single file
   const readFile = async (file) => {
     const ext = '.' + file.name.split('.').pop().toLowerCase()
+    const allFormats = [...SUPPORTED_FORMATS.text, ...SUPPORTED_FORMATS.binary]
+    
+    if (!allFormats.includes(ext)) {
+      showError(t('import.unsupportedFormat', { name: file.name, formats: allFormats.join(', ') }))
+      return null
+    }
+    
     const isBinary = SUPPORTED_FORMATS.binary.includes(ext)
     
     try {

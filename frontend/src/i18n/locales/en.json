@@ -1853,6 +1853,7 @@
     "complete": "Complete",
     "incomplete": "Incomplete",
     "pleaseAddFiles": "Please add files or paste PEM content",
+    "unsupportedFormat": "Unsupported file: {{name}}. Accepted formats: {{formats}}",
     "analyzeFailed": "Failed to analyze content",
     "successImported": "Successfully imported {{count}} object(s)",
     "files": "Files",

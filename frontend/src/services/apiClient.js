@@ -17,7 +17,7 @@ const HTTP_ERROR_MESSAGES = {
   405: 'This operation is not supported.',
   408: 'The request timed out. Please try again.',
   409: 'Conflict: this resource already exists or is in use.',
-  413: 'The file is too large. Maximum upload size is 10 MB.',
+  413: 'The file is too large. Maximum upload size is 50 MB.',
   415: 'Unsupported file type.',
   422: 'The data provided is invalid. Please check and try again.',
   429: 'Too many requests. Please wait a moment and try again.',

@@ -183,7 +183,7 @@ class Config:
     HTTPS_AUTO_GENERATE = os.getenv("HTTPS_AUTO_GENERATE", "true").lower() == "true"
     
     # File Upload Limits (security)
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB max for certificate uploads
+    MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
     
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability

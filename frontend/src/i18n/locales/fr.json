@@ -1059,6 +1059,7 @@
     "complete": "Complète",
     "incomplete": "Incomplète",
     "pleaseAddFiles": "Veuillez ajouter des fichiers ou coller du contenu PEM",
+    "unsupportedFormat": "Fichier non supporté : {{name}}. Formats acceptés : {{formats}}",
     "analyzeFailed": "Échec de l'analyse du contenu",
     "successImported": "{{count}} objet(s) importé(s) avec succès",
     "files": "Fichiers",
