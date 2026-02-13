@@ -6,7 +6,7 @@ import json
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import db, AcmeDomain, DnsProvider
+from models import db, AcmeDomain, DnsProvider, CA
 from services.audit_service import AuditService
 
 bp = Blueprint('acme_domains', __name__)
@@ -63,10 +63,20 @@ def create_domain():
     if not _is_valid_domain(domain_name):
         return error_response('Invalid domain format', 400)
     
+    # Validate issuing CA if specified
+    issuing_ca_id = data.get('issuing_ca_id')
+    if issuing_ca_id:
+        ca = CA.query.get(issuing_ca_id)
+        if not ca:
+            return error_response('Issuing CA not found', 404)
+        if not ca.prv:
+            return error_response('Selected CA has no private key', 400)
+    
     # Create domain
     domain = AcmeDomain(
         domain=domain_name,
         dns_provider_id=dns_provider_id,
+        issuing_ca_id=issuing_ca_id,
         is_wildcard_allowed=data.get('is_wildcard_allowed', True),
         auto_approve=data.get('auto_approve', True),
         created_by=g.user.username if hasattr(g, 'user') and g.user else None
@@ -114,6 +124,17 @@ def update_domain(domain_id):
     
     if 'auto_approve' in data:
         domain.auto_approve = bool(data['auto_approve'])
+    
+    if 'issuing_ca_id' in data:
+        if data['issuing_ca_id']:
+            ca = CA.query.get(data['issuing_ca_id'])
+            if not ca:
+                return error_response('Issuing CA not found', 404)
+            if not ca.prv:
+                return error_response('Selected CA has no private key', 400)
+            domain.issuing_ca_id = data['issuing_ca_id']
+        else:
+            domain.issuing_ca_id = None
     
     db.session.commit()
     
@@ -183,6 +204,7 @@ def resolve_domain():
             'dns_provider_type': result['provider'].provider_type,
             'is_wildcard_allowed': result['is_wildcard_allowed'],
             'auto_approve': result['auto_approve'],
+            'issuing_ca_id': result.get('issuing_ca_id'),
         })
     else:
         return error_response(
@@ -278,7 +300,7 @@ def find_provider_for_domain(domain: str) -> dict | None:
         domain: The domain to resolve (e.g., "api.dev.example.com")
     
     Returns:
-        dict with 'provider', 'matched_domain', 'is_wildcard_allowed', 'auto_approve'
+        dict with 'provider', 'matched_domain', 'is_wildcard_allowed', 'auto_approve', 'issuing_ca_id'
         or None if not found
     """
     domain = domain.strip().lower()
@@ -295,6 +317,7 @@ def find_provider_for_domain(domain: str) -> dict | None:
             'matched_domain': acme_domain.domain,
             'is_wildcard_allowed': acme_domain.is_wildcard_allowed,
             'auto_approve': acme_domain.auto_approve,
+            'issuing_ca_id': acme_domain.issuing_ca_id,
         }
     
     # Try parent domains
@@ -308,6 +331,7 @@ def find_provider_for_domain(domain: str) -> dict | None:
                 'matched_domain': acme_domain.domain,
                 'is_wildcard_allowed': acme_domain.is_wildcard_allowed,
                 'auto_approve': acme_domain.auto_approve,
+                'issuing_ca_id': acme_domain.issuing_ca_id,
             }
     
     # No match found

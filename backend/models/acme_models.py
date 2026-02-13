@@ -417,12 +417,13 @@ class AcmeClientOrder(db.Model):
 
 
 class AcmeDomain(db.Model):
-    """ACME Domain - Maps domains to DNS providers for ACME Proxy"""
+    """ACME Domain - Maps domains to DNS providers and issuing CAs"""
     __tablename__ = 'acme_domains'
     
     id = db.Column(db.Integer, primary_key=True)
     domain = db.Column(db.String(255), unique=True, nullable=False, index=True)
     dns_provider_id = db.Column(db.Integer, db.ForeignKey('dns_providers.id'), nullable=False)
+    issuing_ca_id = db.Column(db.Integer, db.ForeignKey('certificate_authorities.id'), nullable=True)
     is_wildcard_allowed = db.Column(db.Boolean, default=True)
     auto_approve = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -431,6 +432,7 @@ class AcmeDomain(db.Model):
     
     # Relationships
     dns_provider = db.relationship('DnsProvider', backref=db.backref('domains', lazy='dynamic'))
+    issuing_ca = db.relationship('CA', foreign_keys='AcmeDomain.issuing_ca_id')
     
     def to_dict(self):
         """Convert to dictionary for API responses"""
@@ -440,6 +442,8 @@ class AcmeDomain(db.Model):
             'dns_provider_id': self.dns_provider_id,
             'dns_provider_name': self.dns_provider.name if self.dns_provider else None,
             'dns_provider_type': self.dns_provider.provider_type if self.dns_provider else None,
+            'issuing_ca_id': self.issuing_ca_id,
+            'issuing_ca_name': self.issuing_ca.common_name if self.issuing_ca else None,
             'is_wildcard_allowed': self.is_wildcard_allowed,
             'auto_approve': self.auto_approve,
             'created_at': self.created_at.isoformat() if self.created_at else None,

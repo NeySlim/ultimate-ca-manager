@@ -1089,6 +1089,16 @@ export default function ACMEPage() {
               )
             },
             {
+              key: 'issuing_ca_name',
+              label: t('acme.issuingCA'),
+              sortable: true,
+              render: (val) => (
+                <span className={val ? 'text-text-primary' : 'text-text-tertiary'}>
+                  {val || t('acme.defaultCA')}
+                </span>
+              )
+            },
+            {
               key: 'is_wildcard_allowed',
               label: t('acme.wildcard'),
               render: (val) => (
@@ -1856,6 +1866,7 @@ export default function ACMEPage() {
         <DomainForm
           domain={selectedAcmeDomain}
           dnsProviders={dnsProviders}
+          cas={cas}
           onSubmit={selectedAcmeDomain ? handleUpdateDomain : handleCreateDomain}
           onCancel={() => { setShowDomainModal(false); setSelectedAcmeDomain(null) }}
         />
@@ -2232,18 +2243,25 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
 }
 
 // Domain Form Component
-function DomainForm({ domain, dnsProviders, onSubmit, onCancel }) {
+function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
     domain: domain?.domain || '',
     dns_provider_id: domain?.dns_provider_id || (dnsProviders[0]?.id || ''),
+    issuing_ca_id: domain?.issuing_ca_id || '',
     is_wildcard_allowed: domain?.is_wildcard_allowed ?? true,
     auto_approve: domain?.auto_approve ?? true,
   })
 
+  // Filter CAs that have private keys (can sign)
+  const signingCas = (cas || []).filter(ca => ca.has_private_key)
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSubmit(formData)
+    onSubmit({
+      ...formData,
+      issuing_ca_id: formData.issuing_ca_id || null,
+    })
   }
 
   return (
@@ -2267,6 +2285,19 @@ function DomainForm({ domain, dnsProviders, onSubmit, onCancel }) {
           label: `${p.name} (${p.provider_type})`
         }))}
         required
+      />
+
+      <Select
+        label={t('acme.issuingCA')}
+        value={formData.issuing_ca_id}
+        onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val ? parseInt(val) : '' }))}
+        options={[
+          { value: '', label: t('acme.useDefaultCA') },
+          ...signingCas.map(ca => ({
+            value: ca.id,
+            label: ca.common_name || ca.descr || `CA #${ca.id}`
+          }))
+        ]}
       />
 
       <ToggleSwitch
