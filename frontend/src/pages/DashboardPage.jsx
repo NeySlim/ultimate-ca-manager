@@ -350,8 +350,8 @@ export default function DashboardPage() {
   const isVisible = (id) => widgets.find(w => w.id === id)?.visible
 
   return (
-    <div className={`flex-1 h-full flex flex-col bg-bg-primary ${isDesktopGrid ? 'overflow-hidden' : 'overflow-auto'}`}>
-      <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : ''}`}>
+    <div className={`flex-1 flex flex-col bg-bg-primary ${isDesktopGrid ? 'h-full overflow-hidden' : 'min-h-full overflow-y-auto'}`}>
+      <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : 'pb-6'}`}>
         
         {/* Hero Header — compact bar */}
         <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-3 py-1.5 mb-1.5">
@@ -385,15 +385,15 @@ export default function DashboardPage() {
                 <>
                   <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
                     <Plus size={14} weight="bold" />
-                    <span className="hidden sm:inline">{t('common.issueCert')}</span>
+                    {t('common.cert')}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
                     <Plus size={14} weight="bold" />
-                    <span className="hidden sm:inline">{t('common.createCA')}</span>
+                    {t('common.ca')}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => navigate('/csrs')} className="hidden md:flex">
                     <ListChecks size={14} weight="bold" />
-                    {t('common.signCSR')}
+                    {t('common.csr')}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={loadDashboard} title={t('common.refresh')} className="hidden md:flex">
                     <ArrowsClockwise size={14} />
