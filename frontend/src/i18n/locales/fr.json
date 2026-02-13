@@ -245,6 +245,7 @@
     "localDomainHelper": "Entrez le domaine pour lequel cette CA émettra des certificats. Les sous-domaines seront automatiquement rattachés.",
     "noLocalDomains": "Aucun domaine local configuré",
     "noLocalDomainsDesc": "Ajoutez un mapping domaine → CA pour que le serveur ACME local sache quelle CA signe les certificats de chaque domaine.",
+    "localDomainsHelp": "Associez des domaines à des CAs spécifiques. Le serveur ACME local utilise ces mappings pour signer les certificats avec la bonne CA.",
     "wildcard": "Générique",
     "autoApprove": "Auto-approbation",
     "allowWildcard": "Autoriser les certificats wildcard",

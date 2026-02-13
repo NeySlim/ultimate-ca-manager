@@ -253,10 +253,26 @@
     "localAcmeLabel": "ACME LOCAL",
     "localAcme": "ACME Local",
     "groups": {
-      "certificates": "Certificados",
-      "providers": "Proveedores",
-      "management": "Gestión"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "ACME Local"
+    },
+    "defaultCA": "CA predeterminada",
+    "issuingCA": "CA emisora",
+    "localDomainHelper": "Ingrese el dominio para el cual esta CA emitirá certificados. Los subdominios se asociarán automáticamente.",
+    "localDomains": "Dominios locales",
+    "localDomainsHelp": "Asigne dominios a CAs específicas. El servidor ACME local usará esta asignación para firmar certificados con la CA correcta.",
+    "noLocalDomains": "No hay dominios locales configurados",
+    "noLocalDomainsDesc": "Agregue un mapeo dominio → CA para que el servidor ACME local sepa qué CA firma los certificados de cada dominio.",
+    "renewalPolicy": "Política de renovación",
+    "revokeExistingSuperseded": "Revocar certificados existentes",
+    "revokeExistingSupersededDesc": "Revocar los certificados ya emitidos para estos dominios con el motivo 'superseded'",
+    "revokeOnRenewal": "Revocar certificado antiguo tras renovación",
+    "revokeOnRenewalDesc": "Revocar automáticamente el certificado anterior con el motivo 'superseded' al emitir uno nuevo",
+    "revokeSupersededConfirmAction": "Revocar",
+    "revokeSupersededConfirmDesc": "Esto revocará todos los certificados existentes para los dominios configurados. Esta acción no se puede deshacer.",
+    "revokeSupersededConfirmTitle": "¿Revocar certificados existentes?",
+    "supersededRevoked": "Certificado revocado como reemplazado",
+    "useDefaultCA": "Usar CA predeterminada"
   },
   "audit": {
     "event": "Evento",
@@ -1204,7 +1220,8 @@
     "mustBeDifferent": "New contraseña must be different from actual",
     "incorrect": "Incorrect contraseña",
     "changeSuccess": "Contraseña changed éxitofully",
-    "changeFailed": "Error to change contraseña"
+    "changeFailed": "Error to change contraseña",
+    "skipForNow": "Omitir por ahora"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",

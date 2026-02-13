@@ -253,10 +253,26 @@
     "daysLeft_one": "{{count}} day left",
     "localAcme": "本地ACME",
     "groups": {
-      "certificates": "证书",
-      "providers": "提供商",
-      "management": "管理"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "本地ACME"
+    },
+    "defaultCA": "默认CA",
+    "issuingCA": "签发CA",
+    "localDomainHelper": "输入此CA将为其签发证书的域名。子域名将自动匹配。",
+    "localDomains": "本地域名",
+    "localDomainsHelp": "将域名分配给特定的CA。本地ACME服务器将使用此映射来用正确的CA签署证书。",
+    "noLocalDomains": "未配置本地域名",
+    "noLocalDomainsDesc": "添加域名→CA映射，以便本地ACME服务器知道每个域名应使用哪个CA签署证书。",
+    "renewalPolicy": "续期策略",
+    "revokeExistingSuperseded": "吊销现有证书",
+    "revokeExistingSupersededDesc": "以'superseded'为由吊销这些域名的已签发证书",
+    "revokeOnRenewal": "续期后吊销旧证书",
+    "revokeOnRenewalDesc": "签发新证书时自动以'superseded'为由吊销前一个证书",
+    "revokeSupersededConfirmAction": "吊销",
+    "revokeSupersededConfirmDesc": "这将吊销已配置域名的所有现有证书。此操作无法撤消。",
+    "revokeSupersededConfirmTitle": "吊销现有证书？",
+    "supersededRevoked": "证书已被标记为已替代并吊销",
+    "useDefaultCA": "使用默认CA"
   },
   "audit": {
     "event": "事件",
@@ -1204,7 +1220,8 @@
     "mustBeDifferent": "新密码必须与当前密码不同",
     "incorrect": "密码错误",
     "changeSuccess": "密码更改成功",
-    "changeFailed": "更改密码失败"
+    "changeFailed": "更改密码失败",
+    "skipForNow": "暂时跳过"
   },
   "rbac": {
     "title": "基于角色的访问控制",

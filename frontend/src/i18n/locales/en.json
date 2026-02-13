@@ -858,6 +858,7 @@
     "localDomainHelper": "Enter the domain this CA should issue certificates for. Subdomains will be matched automatically.",
     "noLocalDomains": "No local domains configured",
     "noLocalDomainsDesc": "Add a domain-to-CA mapping so the local ACME server knows which CA signs certificates for each domain.",
+    "localDomainsHelp": "Map domains to specific CAs. The local ACME server uses these mappings to sign certificates with the correct CA for each domain.",
     "wildcard": "Wildcard",
     "autoApprove": "Auto-Approve",
     "allowWildcard": "Allow Wildcard Certificates",

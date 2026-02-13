@@ -253,10 +253,26 @@
     "localAcmeLabel": "ACME LOCAL",
     "localAcme": "ACME Local",
     "groups": {
-      "certificates": "Certificados",
-      "providers": "Provedores",
-      "management": "Gestão"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "ACME Local"
+    },
+    "defaultCA": "CA padrão",
+    "issuingCA": "CA emissora",
+    "localDomainHelper": "Insira o domínio para o qual esta CA emitirá certificados. Os subdomínios serão automaticamente associados.",
+    "localDomains": "Domínios locais",
+    "localDomainsHelp": "Associe domínios a CAs específicas. O servidor ACME local usará esse mapeamento para assinar certificados com a CA correta.",
+    "noLocalDomains": "Nenhum domínio local configurado",
+    "noLocalDomainsDesc": "Adicione um mapeamento domínio → CA para que o servidor ACME local saiba qual CA assina os certificados de cada domínio.",
+    "renewalPolicy": "Política de renovação",
+    "revokeExistingSuperseded": "Revogar certificados existentes",
+    "revokeExistingSupersededDesc": "Revogar os certificados já emitidos para estes domínios com o motivo 'superseded'",
+    "revokeOnRenewal": "Revogar certificado antigo após renovação",
+    "revokeOnRenewalDesc": "Revogar automaticamente o certificado anterior com o motivo 'superseded' ao emitir um novo",
+    "revokeSupersededConfirmAction": "Revogar",
+    "revokeSupersededConfirmDesc": "Isto revogará todos os certificados existentes para os domínios configurados. Esta ação não pode ser desfeita.",
+    "revokeSupersededConfirmTitle": "Revogar certificados existentes?",
+    "supersededRevoked": "Certificado revogado como substituído",
+    "useDefaultCA": "Usar CA padrão"
   },
   "audit": {
     "action": "Ação",
@@ -1204,7 +1220,8 @@
     "minLength": "Palavra-passe deve ser em least 8 characters",
     "mustBeDifferent": "New password deve ser different de current",
     "newRequired": "New password é required",
-    "securityReason": "para security reasons, you deve change your password before continuing."
+    "securityReason": "para security reasons, you deve change your password before continuing.",
+    "skipForNow": "Pular por agora"
   },
   "rbac": {
     "assignedUsers": "Utilizadores atribuídos",

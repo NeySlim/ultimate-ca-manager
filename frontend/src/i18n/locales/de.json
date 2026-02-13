@@ -253,10 +253,26 @@
     "localAcmeLabel": "LOKALE ACME",
     "localAcme": "Lokale ACME",
     "groups": {
-      "certificates": "Zertifikate",
-      "providers": "Anbieter",
-      "management": "Verwaltung"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "Lokales ACME"
+    },
+    "defaultCA": "Standard-CA",
+    "issuingCA": "Ausstellende CA",
+    "localDomainHelper": "Geben Sie die Domain ein, für die diese CA Zertifikate ausstellen soll. Subdomains werden automatisch zugeordnet.",
+    "localDomains": "Lokale Domains",
+    "localDomainsHelp": "Ordnen Sie Domains bestimmten CAs zu. Der lokale ACME-Server verwendet diese Zuordnung, um Zertifikate mit der richtigen CA zu signieren.",
+    "noLocalDomains": "Keine lokalen Domains konfiguriert",
+    "noLocalDomainsDesc": "Fügen Sie eine Domain-zu-CA-Zuordnung hinzu, damit der lokale ACME-Server weiß, welche CA Zertifikate für jede Domain signiert.",
+    "renewalPolicy": "Erneuerungsrichtlinie",
+    "revokeExistingSuperseded": "Bestehende Zertifikate widerrufen",
+    "revokeExistingSupersededDesc": "Bereits ausgestellte Zertifikate für diese Domains mit dem Grund 'superseded' widerrufen",
+    "revokeOnRenewal": "Altes Zertifikat nach Erneuerung widerrufen",
+    "revokeOnRenewalDesc": "Das vorherige Zertifikat automatisch mit dem Grund 'superseded' widerrufen, wenn ein neues ausgestellt wird",
+    "revokeSupersededConfirmAction": "Widerrufen",
+    "revokeSupersededConfirmDesc": "Dies widerruft alle bestehenden Zertifikate für die konfigurierten Domains. Diese Aktion kann nicht rückgängig gemacht werden.",
+    "revokeSupersededConfirmTitle": "Bestehende Zertifikate widerrufen?",
+    "supersededRevoked": "Zertifikat als ersetzt widerrufen",
+    "useDefaultCA": "Standard-CA verwenden"
   },
   "audit": {
     "event": "Ereignis",
@@ -1204,7 +1220,8 @@
     "mustBeDifferent": "Neues Passwort muss sich vom aktuellen unterscheiden",
     "incorrect": "Falsches Passwort",
     "changeSuccess": "Passwort erfolgreich geändert",
-    "changeFailed": "Fehler beim Ändern des Passworts"
+    "changeFailed": "Fehler beim Ändern des Passworts",
+    "skipForNow": "Vorerst überspringen"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

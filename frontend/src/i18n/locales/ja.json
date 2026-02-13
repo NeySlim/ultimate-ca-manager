@@ -253,10 +253,26 @@
     "daysLeft_one": "{{count}} day left",
     "localAcme": "ローカルACME",
     "groups": {
-      "certificates": "証明書",
-      "providers": "プロバイダー",
-      "management": "管理"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "ローカルACME"
+    },
+    "defaultCA": "デフォルトCA",
+    "issuingCA": "発行CA",
+    "localDomainHelper": "このCAが証明書を発行するドメインを入力してください。サブドメインは自動的にマッチされます。",
+    "localDomains": "ローカルドメイン",
+    "localDomainsHelp": "ドメインを特定のCAに割り当てます。ローカルACMEサーバーはこのマッピングを使用して、正しいCAで証明書に署名します。",
+    "noLocalDomains": "ローカルドメインが設定されていません",
+    "noLocalDomainsDesc": "ドメイン→CAマッピングを追加して、ローカルACMEサーバーが各ドメインの証明書にどのCAで署名するかを設定してください。",
+    "renewalPolicy": "更新ポリシー",
+    "revokeExistingSuperseded": "既存の証明書を失効させる",
+    "revokeExistingSupersededDesc": "これらのドメインの既発行証明書を'superseded'の理由で失効させます",
+    "revokeOnRenewal": "更新後に古い証明書を失効させる",
+    "revokeOnRenewalDesc": "新しい証明書の発行時に前の証明書を'superseded'の理由で自動的に失効させます",
+    "revokeSupersededConfirmAction": "失効させる",
+    "revokeSupersededConfirmDesc": "設定されたドメインの既存の証明書がすべて失効されます。この操作は元に戻せません。",
+    "revokeSupersededConfirmTitle": "既存の証明書を失効させますか？",
+    "supersededRevoked": "証明書が置き換えとして失効しました",
+    "useDefaultCA": "デフォルトCAを使用"
   },
   "audit": {
     "event": "イベント",
@@ -1204,7 +1220,8 @@
     "mustBeDifferent": "新しいパスワードは現在のパスワードと異なる必要があります",
     "incorrect": "パスワードが正しくありません",
     "changeSuccess": "パスワードが正常に変更されました",
-    "changeFailed": "パスワードの変更に失敗しました"
+    "changeFailed": "パスワードの変更に失敗しました",
+    "skipForNow": "今はスキップ"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

@@ -253,10 +253,26 @@
     "localAcmeLabel": "ЛОКАЛЬНИЙ ACME",
     "localAcme": "Локальний ACME",
     "groups": {
-      "certificates": "Сертифікати",
-      "providers": "Провайдери",
-      "management": "Керування"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "Локальний ACME"
+    },
+    "defaultCA": "CA за замовчуванням",
+    "issuingCA": "CA-емітент",
+    "localDomainHelper": "Введіть домен, для якого цей CA видаватиме сертифікати. Субдомени будуть автоматично зіставлені.",
+    "localDomains": "Локальні домени",
+    "localDomainsHelp": "Прив'яжіть домени до конкретних CA. Локальний ACME-сервер використовуватиме це зіставлення для підпису сертифікатів відповідним CA.",
+    "noLocalDomains": "Локальні домени не налаштовані",
+    "noLocalDomainsDesc": "Додайте зіставлення домен → CA, щоб локальний ACME-сервер знав, який CA підписує сертифікати для кожного домену.",
+    "renewalPolicy": "Політика оновлення",
+    "revokeExistingSuperseded": "Відкликати існуючі сертифікати",
+    "revokeExistingSupersededDesc": "Відкликати вже видані сертифікати для цих доменів з причиною 'superseded'",
+    "revokeOnRenewal": "Відкликати старий сертифікат після оновлення",
+    "revokeOnRenewalDesc": "Автоматично відкликати попередній сертифікат з причиною 'superseded' при видачі нового",
+    "revokeSupersededConfirmAction": "Відкликати",
+    "revokeSupersededConfirmDesc": "Це відкличе всі існуючі сертифікати для налаштованих доменів. Цю дію не можна скасувати.",
+    "revokeSupersededConfirmTitle": "Відкликати існуючі сертифікати?",
+    "supersededRevoked": "Сертифікат відкликано як замінений",
+    "useDefaultCA": "Використовувати CA за замовчуванням"
   },
   "audit": {
     "event": "Подія",
@@ -1204,7 +1220,8 @@
     "mustBeDifferent": "Новий password must be different from current",
     "incorrect": "Невірний пароль",
     "changeSuccess": "Пароль changed успішноfully",
-    "changeFailed": "Невдало to change password"
+    "changeFailed": "Невдало to change password",
+    "skipForNow": "Пропустити поки що"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",

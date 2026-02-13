@@ -253,10 +253,26 @@
     "localAcmeLabel": "ACME LOCALE",
     "localAcme": "ACME Locale",
     "groups": {
-      "certificates": "Certificati",
-      "providers": "Provider",
-      "management": "Gestione"
-    }
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "ACME Locale"
+    },
+    "defaultCA": "CA predefinita",
+    "issuingCA": "CA emittente",
+    "localDomainHelper": "Inserisci il dominio per cui questa CA emetterà certificati. I sottodomini verranno associati automaticamente.",
+    "localDomains": "Domini locali",
+    "localDomainsHelp": "Associa domini a CA specifiche. Il server ACME locale userà questa mappatura per firmare i certificati con la CA corretta.",
+    "noLocalDomains": "Nessun dominio locale configurato",
+    "noLocalDomainsDesc": "Aggiungi una mappatura dominio → CA affinché il server ACME locale sappia quale CA firma i certificati per ogni dominio.",
+    "renewalPolicy": "Politica di rinnovo",
+    "revokeExistingSuperseded": "Revoca certificati esistenti",
+    "revokeExistingSupersededDesc": "Revoca i certificati già emessi per questi domini con il motivo 'superseded'",
+    "revokeOnRenewal": "Revoca vecchio certificato dopo il rinnovo",
+    "revokeOnRenewalDesc": "Revoca automaticamente il certificato precedente con il motivo 'superseded' quando ne viene emesso uno nuovo",
+    "revokeSupersededConfirmAction": "Revoca",
+    "revokeSupersededConfirmDesc": "Questo revocherà tutti i certificati esistenti per i domini configurati. Questa azione non può essere annullata.",
+    "revokeSupersededConfirmTitle": "Revocare i certificati esistenti?",
+    "supersededRevoked": "Certificato revocato come sostituito",
+    "useDefaultCA": "Usa CA predefinita"
   },
   "audit": {
     "event": "Evento",
@@ -1204,7 +1220,8 @@
     "mustBeDifferent": "La nuova password deve essere diversa dalla attuale",
     "incorrect": "Password non corretta",
     "changeSuccess": "Password cambiata con successo",
-    "changeFailed": "Cambio password fallito"
+    "changeFailed": "Cambio password fallito",
+    "skipForNow": "Salta per ora"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",

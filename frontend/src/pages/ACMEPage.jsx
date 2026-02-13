@@ -686,6 +686,10 @@ export default function ACMEPage() {
           {t('acme.aboutAcmeInfo')}
         </HelpCard>
 
+        <HelpCard variant="info" title={t('acme.localDomains')}>
+          {t('acme.localDomainsHelp')}
+        </HelpCard>
+
         <HelpCard variant="warning" title={t('common.warning')}>
           {t('acme.accountSecurityWarning')}
         </HelpCard>
