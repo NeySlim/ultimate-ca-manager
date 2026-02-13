@@ -15,7 +15,6 @@ export function ForcePasswordChange({ onComplete }) {
   const { showSuccess, showError } = useNotification()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    current_password: '',
     new_password: '',
     confirm_password: ''
   })
@@ -24,16 +23,10 @@ export function ForcePasswordChange({ onComplete }) {
   const validate = () => {
     const newErrors = {}
     
-    if (!formData.current_password) {
-      newErrors.current_password = t('password.currentRequired')
-    }
-    
     if (!formData.new_password) {
       newErrors.new_password = t('password.newRequired')
     } else if (formData.new_password.length < 8) {
       newErrors.new_password = t('password.minLength')
-    } else if (formData.new_password === formData.current_password) {
-      newErrors.new_password = t('password.mustBeDifferent')
     }
     
     if (formData.new_password !== formData.confirm_password) {
@@ -52,8 +45,8 @@ export function ForcePasswordChange({ onComplete }) {
     setLoading(true)
     try {
       await accountService.changePassword({
-        current_password: formData.current_password,
-        new_password: formData.new_password
+        new_password: formData.new_password,
+        force_change: true
       })
       
       showSuccess(t('password.changeSuccess'))
@@ -85,16 +78,6 @@ export function ForcePasswordChange({ onComplete }) {
           </div>
         </div>
 
-        <Input
-          label={t('common.currentPassword')}
-          type="password"
-          value={formData.current_password}
-          onChange={(e) => setFormData(prev => ({ ...prev, current_password: e.target.value }))}
-          error={errors.current_password}
-          autoFocus
-          required
-        />
-        
         <Input
           label={t('common.newPassword')}
           type="password"
