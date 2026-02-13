@@ -274,7 +274,11 @@
     "dataRetention": "Conservation des données",
     "exportOptions": "Options d'exportation",
     "cleanedUpLogs": "{{count}} anciens journaux nettoyés",
-    "cleanupFailed": "Échec du nettoyage"
+    "cleanupFailed": "Échec du nettoyage",
+    "verifyIntegrity": "Vérifier l'intégrité",
+    "integrityVerified": "Intégrité des journaux vérifiée ({{count}} entrées vérifiées)",
+    "integrityFailed": "Échec de la vérification d'intégrité ({{errors}} erreurs trouvées)",
+    "integrityError": "Erreur lors de la vérification d'intégrité"
   },
   "auth": {
     "continue": "Continuer",
@@ -1301,59 +1305,6 @@
       "settings": "Paramètres"
     }
   },
-  "securityDashboard": {
-    "title": "Tableau de bord de sécurité",
-    "secretsStatus": "État des secrets",
-    "anomalies": "Anomalies de connexion",
-    "auditVerify": "Vérification d'audit",
-    "rotateSecrets": "Rotation du secret de session",
-    "verifyChain": "Vérifier la chaîne de hachage",
-    "chainValid": "La chaîne de hachage est valide",
-    "chainInvalid": "Intégrité de la chaîne de hachage compromise",
-    "noAnomalies": "Aucune anomalie détectée",
-    "subtitle": "Surveiller l'état de sécurité et gérer les secrets",
-    "anomalyDetection": "Détection d'anomalies",
-    "auditLogIntegrity": "Intégrité des journaux d'audit",
-    "verifyAuditIntegrity": "Vérifier l'intégrité d'audit",
-    "noAnomaliesDescription": "L'activité des dernières 24 heures semble normale",
-    "alerts": "{{count}} alertes",
-    "unknownAnomaly": "Anomalie inconnue",
-    "userNumber": "Utilisateur #{{id}}",
-    "stats": {
-      "notSet": "Non défini",
-      "anomalies24h": "Anomalies (24h)",
-      "auditIntegrity": "Intégrité d'audit",
-      "verified": "Vérifié",
-      "notChecked": "Non vérifié"
-    },
-    "secrets": {
-      "jwtSecret": "Secret de session",
-      "sessionSecret": "Secret de session",
-      "encryptionKey": "Clé de chiffrement",
-      "notSet": "Non défini (clés non chiffrées)",
-      "rotationInProgress": "Rotation en cours",
-      "rotationSuccess": "Nouveau secret généré - suivre les instructions pour appliquer",
-      "rotationInstructions": "Instructions de rotation",
-      "previousKeyExpires": "L'ancienne clé expire le : {{date}}"
-    },
-    "audit": {
-      "integrityVerified": "Intégrité vérifiée",
-      "integrityFailed": "Échec de la vérification d'intégrité",
-      "entriesChecked": "{{count}} entrées vérifiées",
-      "errorsFound": "{{count}} erreurs trouvées",
-      "description": "Les journaux d'audit utilisent une chaîne de hachage cryptographique."
-    },
-    "errors": {
-      "loadFailed": "Échec du chargement des données de sécurité",
-      "rotateFailed": "Échec de la rotation des secrets",
-      "verifyFailed": "Échec de la vérification d'audit"
-    },
-    "success": {
-      "auditVerified": "Intégrité d'audit vérifiée ({{count}} entrées)"
-    },
-    "anomaliesDetected_one": "{{count}} anomalie détectée",
-    "anomaliesDetected_other": "{{count}} anomalies détectées"
-  },
   "session": {
     "expiring": "Session en cours d'expiration",
     "willExpireIn": "Votre session expirera dans",
@@ -1490,6 +1441,16 @@
     "encryptionCheckLostKeys": "Je comprends que sans ce fichier, toutes les clés privées sont définitivement perdues — nécessitant une réinstallation complète et une restauration",
     "typeToConfirm": "Tapez {{word}} pour confirmer",
     "disableEncryptionConfirm": "Les clés privées seront déchiffrées et stockées en clair en base de données. Êtes-vous sûr ?",
+    "anomalyDetection": "Détection d'anomalies",
+    "noAnomalies": "Aucune anomalie détectée",
+    "noAnomaliesDesc": "Aucune activité suspecte dans les dernières 24 heures",
+    "unknownAnomaly": "Anomalie inconnue",
+    "secretsStatus": "État des secrets",
+    "sessionSecret": "Secret de session",
+    "encryptionKeyStatus": "Clé de chiffrement",
+    "rotateSecrets": "Rotation des secrets",
+    "secretsRotated": "Secrets renouvelés. Le service va redémarrer.",
+    "secretsRotateFailed": "Échec de la rotation des secrets",
     "minPasswordLength": "Longueur minimale du mot de passe",
     "enforce2fa": "Imposer l'authentification à deux facteurs",
     "enforce2faDesc": "Exiger que tous les utilisateurs activent la 2FA",

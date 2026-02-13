@@ -8,7 +8,7 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
-  UserCircle, Palette, Question, Detective, SignOut, Globe
+  UserCircle, Palette, Question, SignOut, Globe
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
@@ -41,7 +41,6 @@ const mobileNavItems = [
 
 // Advanced features (formerly Pro) - labels are i18n keys
 const advancedNavItems = [
-  { id: 'security', icon: Detective, labelKey: 'common.security', path: '/security' },
   { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
   { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
 ]
@@ -81,7 +80,7 @@ export function AppShell() {
     'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
     'import', 'tools', 'audit', 'account',
     // Pro pages
-    'rbac', 'hsm', 'security'
+    'rbac', 'hsm'
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
 

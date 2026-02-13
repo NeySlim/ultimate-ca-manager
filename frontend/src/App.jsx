@@ -24,7 +24,6 @@ const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
 const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
 const RBACPage = lazy(() => import('./pages/RBACPage'))
 const HSMPage = lazy(() => import('./pages/HSMPage'))
-const SecurityDashboardPage = lazy(() => import('./pages/SecurityDashboardPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -94,7 +93,7 @@ function AppRoutes() {
           <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
           <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
-          <Route path="/security" element={<ProtectedRoute><SecurityDashboardPage /></ProtectedRoute>} />
+          <Route path="/security" element={<Navigate to="/settings?tab=security" replace />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />

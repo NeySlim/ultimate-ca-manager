@@ -1168,7 +1168,11 @@
     "dataRetention": "Data Retention",
     "exportOptions": "Export Options",
     "cleanedUpLogs": "Cleaned up {{count}} old logs",
-    "cleanupFailed": "Cleanup failed"
+    "cleanupFailed": "Cleanup failed",
+    "verifyIntegrity": "Verify Integrity",
+    "integrityVerified": "Audit log integrity verified ({{count}} entries checked)",
+    "integrityFailed": "Audit log integrity check failed ({{errors}} errors found)",
+    "integrityError": "Failed to verify audit log integrity"
   },
   "settings": {
     "appearance": {},
@@ -1345,6 +1349,16 @@
     "encryptionCheckLostKeys": "I understand that without this key file, all private keys are permanently lost — requiring a full reinstall and backup restore",
     "typeToConfirm": "Type {{word}} to confirm",
     "disableEncryptionConfirm": "This will decrypt all private keys in the database. They will be stored unencrypted. Are you sure?",
+    "anomalyDetection": "Anomaly Detection",
+    "noAnomalies": "No anomalies detected",
+    "noAnomaliesDesc": "No suspicious activity in the last 24 hours",
+    "unknownAnomaly": "Unknown anomaly",
+    "secretsStatus": "Secrets Status",
+    "sessionSecret": "Session Secret",
+    "encryptionKeyStatus": "Encryption Key",
+    "rotateSecrets": "Rotate Secrets",
+    "secretsRotated": "Secrets rotated successfully. The service will restart.",
+    "secretsRotateFailed": "Failed to rotate secrets",
     "selectCertOrKeyFile": "Select certificate or key file (PEM format)",
     "sendTestEmail": "Send Test Email",
     "sessionDuration": "Session Duration (hours)",
@@ -1654,59 +1668,6 @@
     "keepExisting": "••••••• (leave empty to keep)",
     "roles": {},
     "configuredProviders": "Configured Providers"
-  },
-  "securityDashboard": {
-    "title": "Security Dashboard",
-    "subtitle": "Monitor security status and manage secrets",
-    "secretsStatus": "Secrets Status",
-    "anomalyDetection": "Anomaly Detection",
-    "auditLogIntegrity": "Audit Log Integrity",
-    "rotateSecrets": "Rotate Session Secret",
-    "verifyAuditIntegrity": "Verify Audit Integrity",
-    "verifyChain": "Verify Hash Chain",
-    "chainValid": "Hash chain is valid",
-    "chainInvalid": "Hash chain integrity compromised",
-    "noAnomalies": "No anomalies detected",
-    "noAnomaliesDescription": "Last 24 hours activity looks normal",
-    "alerts": "{{count}} alerts",
-    "unknownAnomaly": "Unknown anomaly",
-    "userNumber": "User #{{id}}",
-    "stats": {
-      "notSet": "Not Set",
-      "anomalies24h": "Anomalies (24h)",
-      "auditIntegrity": "Audit Integrity",
-      "verified": "Verified",
-      "notChecked": "Not Checked"
-    },
-    "secrets": {
-      "jwtSecret": "Session Secret",
-      "sessionSecret": "Session Secret",
-      "encryptionKey": "Encryption Key",
-      "notSet": "Not set (keys encrypted)",
-      "rotationInProgress": "Rotation in progress",
-      "rotationSuccess": "New secret generated - follow instructions to apply",
-      "rotationInstructions": "Rotation Instructions",
-      "previousKeyExpires": "Previous key expires: {{date}}"
-    },
-    "audit": {
-      "integrityVerified": "Integrity Verified",
-      "integrityFailed": "Integrity Check Failed",
-      "entriesChecked": "{{count}} entries checked",
-      "errorsFound": "{{count}} errors found",
-      "description": "Audit logs use a cryptographic hash chain. Each entry contains a hash of the previous entry, making it impossible to modify or delete logs without detection."
-    },
-    "errors": {
-      "loadFailed": "Failed to load security data",
-      "rotateFailed": "Failed to rotate secrets",
-      "verifyFailed": "Failed to verify audit"
-    },
-    "success": {
-      "auditVerified": "Audit integrity verified ({{count}} entries)"
-    },
-    "anomalies": "Login Anomalies",
-    "auditVerify": "Audit Verification",
-    "anomaliesDetected_one": "{{count}} anomaly detected",
-    "anomaliesDetected_other": "{{count}} anomalies detected"
   },
   "notifications": {
     "certificateIssued": "Certificate issued: {{name}}",
