@@ -8,6 +8,8 @@ import re
 import logging
 from pathlib import Path
 
+import time
+
 import requests
 
 from config.settings import Config, DATA_DIR
@@ -16,6 +18,9 @@ logger = logging.getLogger('ucm.updates')
 
 # GitHub repo
 REPO = "NeySlim/ultimate-ca-manager"
+
+# Simple cache to avoid GitHub rate limits (5 min TTL)
+_releases_cache = {'data': None, 'ts': 0, 'ttl': 300}
 
 
 def get_edition():
@@ -104,16 +109,26 @@ def check_for_updates(include_prereleases=False):
     current = get_current_version()
     
     try:
-        # Get releases from GitHub API
-        url = f"https://api.github.com/repos/{repo}/releases"
-        headers = {'Accept': 'application/vnd.github.v3+json'}
-        
-        try:
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            releases = response.json()
-        except requests.exceptions.HTTPError as e:
-            raise
+        # Get releases from GitHub API (with cache to avoid rate limits)
+        now = time.time()
+        if _releases_cache['data'] and (now - _releases_cache['ts']) < _releases_cache['ttl']:
+            releases = _releases_cache['data']
+        else:
+            url = f"https://api.github.com/repos/{repo}/releases"
+            headers = {'Accept': 'application/vnd.github.v3+json'}
+            # Use token if available (60 req/h without, 5000 with)
+            github_token = os.environ.get('GITHUB_TOKEN') or os.environ.get('UCM_GITHUB_TOKEN')
+            if github_token:
+                headers['Authorization'] = f'token {github_token}'
+            
+            try:
+                response = requests.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                releases = response.json()
+                _releases_cache['data'] = releases
+                _releases_cache['ts'] = now
+            except requests.exceptions.HTTPError as e:
+                raise
         
         if not releases:
             return {
