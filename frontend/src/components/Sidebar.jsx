@@ -28,6 +28,20 @@ export function Sidebar({ activePage }) {
   
   // Expiring certificates badge
   const [expiringCount, setExpiringCount] = useState(0)
+  const [badgeDismissed, setBadgeDismissed] = useState(() => {
+    const stored = localStorage.getItem('ucm_badge_dismissed')
+    return stored ? JSON.parse(stored) : { count: 0, at: 0 }
+  })
+  
+  const isBadgeDismissed = badgeDismissed.count === expiringCount && expiringCount > 0
+  
+  const dismissBadge = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const state = { count: expiringCount, at: Date.now() }
+    setBadgeDismissed(state)
+    localStorage.setItem('ucm_badge_dismissed', JSON.stringify(state))
+  }
   
   // Load expiring count on mount and periodically
   useEffect(() => {
@@ -47,10 +61,10 @@ export function Sidebar({ activePage }) {
     return () => clearInterval(interval)
   }, [])
   
-  // Sizes based on screen width (smaller icons for refined look)
-  const iconSize = isLargeScreen ? 20 : 16
-  const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-8 h-8'
-  const sidebarWidth = isLargeScreen ? 'w-14' : 'w-11'
+  // Sizes based on screen width
+  const iconSize = isLargeScreen ? 22 : 18
+  const buttonSize = isLargeScreen ? 'w-10 h-9' : 'w-8 h-7'
+  const sidebarWidth = isLargeScreen ? 'w-[52px]' : 'w-10'
 
   const pages = [
     // Dashboard
@@ -112,7 +126,7 @@ export function Sidebar({ activePage }) {
         }
         const Icon = page.icon
         const isActive = activePage === page.id
-        const showBadge = page.id === 'certificates' && expiringCount > 0
+        const showBadge = page.id === 'certificates' && expiringCount > 0 && !isBadgeDismissed
         const label = t(page.labelKey)
         return (
           <Link
@@ -133,8 +147,12 @@ export function Sidebar({ activePage }) {
             )}
             {/* Expiring badge */}
             {showBadge && (
-              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-status-warning border border-bg-secondary flex items-center justify-center">
-                <span className="text-3xs font-bold text-white">
+              <div
+                onClick={dismissBadge}
+                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-status-warning border border-bg-secondary flex items-center justify-center cursor-pointer hover:opacity-70 transition-opacity"
+                title={t('common.dismiss')}
+              >
+                <span className="text-3xs font-bold text-black/80">
                   {expiringCount > 9 ? '9+' : expiringCount}
                 </span>
               </div>
