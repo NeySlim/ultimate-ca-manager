@@ -46,6 +46,7 @@ import {
 } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
+import { apiClient } from '../services/apiClient';
 import { ERRORS } from '../lib/messages';
 
 // Action icons mapping
@@ -123,6 +124,7 @@ export default function AuditLogsPage() {
   // Slide-over states
   const [showHelp, setShowHelp] = useState(false);
   const [showDateFilters, setShowDateFilters] = useState(false);
+  const [verifyingIntegrity, setVerifyingIntegrity] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -213,6 +215,23 @@ export default function AuditLogsPage() {
       showError(t('audit.cleanupFailed'));
     } finally {
       setCleanupLoading(false);
+    }
+  };
+
+  const handleVerifyIntegrity = async () => {
+    setVerifyingIntegrity(true);
+    try {
+      const response = await apiClient.get('/audit/verify');
+      const data = response.data || response;
+      if (data.valid) {
+        showSuccess(t('audit.integrityVerified', { count: data.checked }));
+      } else {
+        showError(t('audit.integrityFailed', { errors: data.errors?.length || 0 }));
+      }
+    } catch (error) {
+      showError(t('audit.integrityError'));
+    } finally {
+      setVerifyingIntegrity(false);
     }
   };
 
@@ -678,6 +697,10 @@ export default function AuditLogsPage() {
       <Button variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
         <Trash size={14} className="text-status-danger" />
         <span className="hidden md:inline">{t('audit.cleanupLogs')}</span>
+      </Button>
+      <Button variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity} className="hidden md:inline-flex">
+        <ShieldCheck size={14} />
+        <span>{t('audit.verifyIntegrity')}</span>
       </Button>
       {/* Mobile: More filters */}
       <Button 

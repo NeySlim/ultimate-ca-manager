@@ -274,7 +274,11 @@
     "ipAddress": "Endereço IP",
     "noLogs": "Sem registos de auditoria",
     "target": "Alvo",
-    "timestamp": "Data/Hora"
+    "timestamp": "Data/Hora",
+    "verifyIntegrity": "Verify Integrity",
+    "integrityVerified": "Audit log integrity verified ({{count}} entries checked)",
+    "integrityFailed": "Audit log integrity check failed ({{errors}} errors found)",
+    "integrityError": "Failed to verify audit log integrity"
   },
   "auth": {
     "authenticating": "A autenticar...",
@@ -1300,59 +1304,6 @@
       "settings": "Configurações"
     }
   },
-  "securityDashboard": {
-    "alerts": "{{count}} alertas",
-    "anomalies": "Anomalias de acesso",
-    "anomaliesDetected_one": "{{count}} anomalia detectada",
-    "anomaliesDetected_other": "{{count}} anomalias detectadas",
-    "anomalyDetection": "Deteção de anomalias",
-    "audit": {
-      "description": "Auditoria logs use uma cryptographic hash chain. Each entry contains uma hash de o previous entry, making it impossible para modify ou delete logs without detection.",
-      "entriesChecked": "{{count}} entradas verificadas",
-      "errorsFound": "{{count}} erros encontrados",
-      "integrityFailed": "Integridade Verificar Falhado",
-      "integrityVerified": "Integridade Verified"
-    },
-    "auditLogIntegrity": "Integridade do registo de auditoria",
-    "auditVerify": "Verificação de auditoria",
-    "chainInvalid": "Integridade da cadeia comprometida",
-    "chainValid": "Cadeia hash válida",
-    "errors": {
-      "loadFailed": "Falhado para load security data",
-      "rotateFailed": "Falhado para rotate secrets",
-      "verifyFailed": "Falhado para verify audit"
-    },
-    "noAnomalies": "Sem anomalias detetadas",
-    "noAnomaliesDescription": "Último 24 hours activity looks normal",
-    "rotateSecrets": "Rodar segredo JWT",
-    "secrets": {
-      "encryptionKey": "Encriptação Chave",
-      "jwtSecret": "JWT Secret",
-      "notSet": "Not set (keys unencrypted)",
-      "previousKeyExpires": "Anterior key expira: {{date}}",
-      "rotationInProgress": "Rotation em progress",
-      "rotationInstructions": "Instruções de Rotação",
-      "rotationSuccess": "New secret generated - follow instructions para apply",
-      "sessionSecret": "Segredo de Sessão"
-    },
-    "secretsStatus": "Estado dos segredos",
-    "stats": {
-      "anomalies24h": "Anomalias (24h)",
-      "auditIntegrity": "Auditoria Integridade",
-      "notChecked": "Não Verificado",
-      "notSet": "Não Definido",
-      "verified": "Verificado"
-    },
-    "subtitle": "Monitor security status e manage secrets",
-    "success": {
-      "auditVerified": "Auditoria integrity verified ({{count}} entries)"
-    },
-    "title": "Painel de segurança",
-    "unknownAnomaly": "Anomalia desconhecida",
-    "userNumber": "Utilizador #{{id}}",
-    "verifyAuditIntegrity": "Verificar Auditoria Integridade",
-    "verifyChain": "Verificar cadeia hash"
-  },
   "session": {
     "clickToContinue": "Click below para continue working, ou you'll ser logged out automatically.",
     "expiring": "Session a expirar",
@@ -1592,7 +1543,17 @@
       "security": "Segurança",
       "notifications": "Notificações",
       "interface": "Interface"
-    }
+    },
+    "anomalyDetection": "Anomaly Detection",
+    "noAnomalies": "No anomalies detected",
+    "noAnomaliesDesc": "No suspicious activity in the last 24 hours",
+    "unknownAnomaly": "Unknown anomaly",
+    "secretsStatus": "Secrets Status",
+    "sessionSecret": "Session Secret",
+    "encryptionKeyStatus": "Encryption Key",
+    "rotateSecrets": "Rotate Secrets",
+    "secretsRotated": "Secrets rotated successfully. The service will restart.",
+    "secretsRotateFailed": "Failed to rotate secrets"
   },
   "sso": {
     "authUrl": "URL de autorização",

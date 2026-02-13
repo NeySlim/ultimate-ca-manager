@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Lock, FileX, Vault, Wrench, Detective
+  UsersThree, Shield, Lock, FileX, Vault, Wrench
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -69,7 +69,6 @@ export function Sidebar({ activePage }) {
     // Advanced features
     { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
     { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
-    { id: 'security', icon: Detective, labelKey: 'common.security', path: '/security' },
   ]
 
   const handleLogout = async () => {

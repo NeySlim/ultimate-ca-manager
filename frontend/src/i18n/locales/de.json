@@ -274,7 +274,11 @@
     "dataRetention": "Datenaufbewahrung",
     "exportOptions": "Exportoptionen",
     "cleanupFailed": "Bereinigung fehlgeschlagen",
-    "cleanedUpLogs": "{{count}} alte Logs bereinigt"
+    "cleanedUpLogs": "{{count}} alte Logs bereinigt",
+    "verifyIntegrity": "Verify Integrity",
+    "integrityVerified": "Audit log integrity verified ({{count}} entries checked)",
+    "integrityFailed": "Audit log integrity check failed ({{errors}} errors found)",
+    "integrityError": "Failed to verify audit log integrity"
   },
   "auth": {
     "continue": "Weiter",
@@ -1300,59 +1304,6 @@
       "settings": "Einstellungen"
     }
   },
-  "securityDashboard": {
-    "title": "Sicherheits-Dashboard",
-    "secretsStatus": "Geheimnisstatus",
-    "anomalies": "Anmeldeanormalien",
-    "auditVerify": "Audit-Verifizierung",
-    "rotateSecrets": "JWT-Geheimnis rotieren",
-    "verifyChain": "Hash-Kette verifizieren",
-    "chainValid": "Hash-Kette ist gültig",
-    "chainInvalid": "Hash-Ketten-Integrität kompromittiert",
-    "noAnomalies": "Keine Anomalien erkannt",
-    "subtitle": "Sicherheitsstatus überwachen und Secrets verwalten",
-    "anomalyDetection": "Anomalieerkennung",
-    "auditLogIntegrity": "Audit-Log-Integrität",
-    "verifyAuditIntegrity": "Audit-Integrität verifizieren",
-    "noAnomaliesDescription": "Aktivitäten der letzten 24 Stunden sehen normal aus",
-    "alerts": "{{count}} Warnungen",
-    "unknownAnomaly": "Unbekannte Anomalie",
-    "userNumber": "Benutzer #{{id}}",
-    "stats": {
-      "notSet": "Nicht gesetzt",
-      "anomalies24h": "Anomalien (24h)",
-      "auditIntegrity": "Audit-Integrität",
-      "verified": "Verifiziert",
-      "notChecked": "Nicht geprüft"
-    },
-    "secrets": {
-      "jwtSecret": "JWT Secret",
-      "sessionSecret": "Session-Secret",
-      "encryptionKey": "Verschlüsselungsschlüssel",
-      "notSet": "Not set (keys unencrypted)",
-      "rotationInProgress": "Rotation läuft",
-      "rotationSuccess": "Neues Secret generiert - folgen Sie den Anweisungen zur Anwendung",
-      "rotationInstructions": "Rotations-Anweisungen",
-      "previousKeyExpires": "Vorheriger Schlüssel läuft ab: {{date}}"
-    },
-    "audit": {
-      "integrityVerified": "Integrität verifiziert",
-      "integrityFailed": "Integritätsprüfung fehlgeschlagen",
-      "entriesChecked": "{{count}} Einträge geprüft",
-      "errorsFound": "{{count}} Fehler gefunden",
-      "description": "Audit-Logs verwenden eine kryptografische Hash-Kette. Jeder Eintrag enthält einen Hash des vorherigen Eintrags, wodurch es unmöglich wird, Logs ohne Erkennung zu ändern oder zu löschen."
-    },
-    "errors": {
-      "loadFailed": "Fehler beim Laden der Sicherheitsdaten",
-      "rotateFailed": "Fehler beim Rotieren der Secrets",
-      "verifyFailed": "Fehler beim Verifizieren des Audits"
-    },
-    "success": {
-      "auditVerified": "Audit-Integrität verifiziert ({{count}} Einträge)"
-    },
-    "anomaliesDetected_one": "{{count}} Anomalie erkannt",
-    "anomaliesDetected_other": "{{count}} Anomalien erkannt"
-  },
   "session": {
     "expiring": "Session läuft ab",
     "willExpireIn": "Ihre Session läuft ab in",
@@ -1592,7 +1543,17 @@
       "security": "Sicherheit",
       "notifications": "Benachrichtigungen",
       "interface": "Oberfläche"
-    }
+    },
+    "anomalyDetection": "Anomaly Detection",
+    "noAnomalies": "No anomalies detected",
+    "noAnomaliesDesc": "No suspicious activity in the last 24 hours",
+    "unknownAnomaly": "Unknown anomaly",
+    "secretsStatus": "Secrets Status",
+    "sessionSecret": "Session Secret",
+    "encryptionKeyStatus": "Encryption Key",
+    "rotateSecrets": "Rotate Secrets",
+    "secretsRotated": "Secrets rotated successfully. The service will restart.",
+    "secretsRotateFailed": "Failed to rotate secrets"
   },
   "sso": {
     "saml": "SAML 2.0",

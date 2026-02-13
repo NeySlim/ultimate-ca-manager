@@ -274,7 +274,11 @@
     "dataRetention": "データ保持",
     "exportOptions": "エクスポートオプション",
     "cleanupFailed": "クリーンアップに失敗しました",
-    "cleanedUpLogs": "{{count}} 件の古いログをクリーンアップしました"
+    "cleanedUpLogs": "{{count}} 件の古いログをクリーンアップしました",
+    "verifyIntegrity": "Verify Integrity",
+    "integrityVerified": "Audit log integrity verified ({{count}} entries checked)",
+    "integrityFailed": "Audit log integrity check failed ({{errors}} errors found)",
+    "integrityError": "Failed to verify audit log integrity"
   },
   "auth": {
     "continue": "続行",
@@ -1300,59 +1304,6 @@
       "settings": "設定"
     }
   },
-  "securityDashboard": {
-    "title": "セキュリティダッシュボード",
-    "secretsStatus": "シークレットステータス",
-    "anomalies": "ログイン異常",
-    "auditVerify": "監査検証",
-    "rotateSecrets": "JWTシークレットをローテート",
-    "verifyChain": "ハッシュチェーンを検証",
-    "chainValid": "ハッシュチェーンは有効です",
-    "chainInvalid": "ハッシュチェーンの整合性が損なわれています",
-    "noAnomalies": "異常は検出されませんでした",
-    "subtitle": "セキュリティステータスの監視とシークレットの管理",
-    "anomalyDetection": "異常検出",
-    "auditLogIntegrity": "監査ログの整合性",
-    "verifyAuditIntegrity": "監査の整合性を検証",
-    "noAnomaliesDescription": "過去24時間の活動は正常です",
-    "alerts": "{{count}} 件のアラート",
-    "unknownAnomaly": "不明な異常",
-    "userNumber": "ユーザー #{{id}}",
-    "stats": {
-      "notSet": "未設定",
-      "anomalies24h": "異常 (24時間)",
-      "auditIntegrity": "監査の整合性",
-      "verified": "確認済み",
-      "notChecked": "未確認"
-    },
-    "secrets": {
-      "jwtSecret": "JWT Secret",
-      "sessionSecret": "セッションシークレット",
-      "encryptionKey": "暗号化キー",
-      "notSet": "Not set (keys unencrypted)",
-      "rotationInProgress": "ローテーション進行中",
-      "rotationSuccess": "新しいシークレットが生成されました - 手順に従って適用してください",
-      "rotationInstructions": "ローテーション手順",
-      "previousKeyExpires": "以前のキーの有効期限: {{date}}"
-    },
-    "audit": {
-      "integrityVerified": "整合性確認済み",
-      "integrityFailed": "整合性チェック失敗",
-      "entriesChecked": "{{count}} エントリを確認済み",
-      "errorsFound": "{{count}} エラーが見つかりました",
-      "description": "監査ログは暗号化ハッシュチェーンを使用しています。各エントリには前のエントリのハッシュが含まれており、検出されずにログを変更または削除することは不可能です。"
-    },
-    "errors": {
-      "loadFailed": "セキュリティデータの読み込みに失敗しました",
-      "rotateFailed": "シークレットのローテーションに失敗しました",
-      "verifyFailed": "監査の検証に失敗しました"
-    },
-    "success": {
-      "auditVerified": "監査の整合性が確認されました ({{count}} エントリ)"
-    },
-    "anomaliesDetected_one": "{{count}} 件の異常を検出",
-    "anomaliesDetected_other": "{{count}} 件の異常を検出"
-  },
   "session": {
     "expiring": "セッションの有効期限",
     "willExpireIn": "セッションはあとで期限切れになります：",
@@ -1592,7 +1543,17 @@
       "security": "セキュリティ",
       "notifications": "通知",
       "interface": "インターフェース"
-    }
+    },
+    "anomalyDetection": "Anomaly Detection",
+    "noAnomalies": "No anomalies detected",
+    "noAnomaliesDesc": "No suspicious activity in the last 24 hours",
+    "unknownAnomaly": "Unknown anomaly",
+    "secretsStatus": "Secrets Status",
+    "sessionSecret": "Session Secret",
+    "encryptionKeyStatus": "Encryption Key",
+    "rotateSecrets": "Rotate Secrets",
+    "secretsRotated": "Secrets rotated successfully. The service will restart.",
+    "secretsRotateFailed": "Failed to rotate secrets"
   },
   "sso": {
     "saml": "SAML 2.0",

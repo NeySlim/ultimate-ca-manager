@@ -10,7 +10,7 @@ import {
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
-  Bell, Copy, Power, ArrowClockwise, LockKey
+  Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -771,6 +771,12 @@ export default function SettingsPage() {
   const [encryptionConfirmText, setEncryptionConfirmText] = useState('')
   const [encryptionChecks, setEncryptionChecks] = useState({ backup: false, keyFile: false, lostKeys: false })
 
+  // Anomaly detection & secrets states
+  const [anomalies, setAnomalies] = useState([])
+  const [anomaliesLoading, setAnomaliesLoading] = useState(false)
+  const [secretsStatus, setSecretsStatus] = useState(null)
+  const [rotating, setRotating] = useState(false)
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -784,6 +790,8 @@ export default function SettingsPage() {
     loadSsoProviders()
     loadWebhooks()
     loadEncryptionStatus()
+    loadAnomalies()
+    loadSecretsStatus()
   }, [])
 
   const loadSettings = async () => {
@@ -1059,6 +1067,42 @@ export default function SettingsPage() {
       showError(error.response?.data?.message || t('settings.encryptionDisableFailed'))
     } finally {
       setEncryptionLoading(false)
+    }
+  }
+
+  // Anomaly detection
+  const loadAnomalies = async () => {
+    setAnomaliesLoading(true)
+    try {
+      const response = await apiClient.get('/system/security/anomalies')
+      setAnomalies(response.data?.anomalies || response.anomalies || [])
+    } catch (error) {
+      console.error('Failed to load anomalies:', error)
+    } finally {
+      setAnomaliesLoading(false)
+    }
+  }
+
+  // Secrets status
+  const loadSecretsStatus = async () => {
+    try {
+      const response = await apiClient.get('/system/security/secrets-status')
+      setSecretsStatus(response.data || response)
+    } catch (error) {
+      console.error('Failed to load secrets status:', error)
+    }
+  }
+
+  const handleRotateSecrets = async () => {
+    setRotating(true)
+    try {
+      await apiClient.post('/system/security/rotate-secrets', {})
+      showSuccess(t('settings.secretsRotated'))
+      await loadSecretsStatus()
+    } catch (error) {
+      showError(error.message || t('settings.secretsRotateFailed'))
+    } finally {
+      setRotating(false)
     }
   }
 
@@ -1556,6 +1600,90 @@ export default function SettingsPage() {
                     <span className="text-sm text-text-primary">{t('settings.requireSpecial')}</span>
                   </label>
                 </div>
+              </div>
+            </DetailSection>
+            <DetailSection title={t('settings.anomalyDetection')} icon={Warning} iconClass="icon-bg-orange"
+              badge={anomalies.length > 0 ? anomalies.length : null}
+              badgeColor={anomalies.length > 0 ? 'warning' : undefined}
+            >
+              <div className="space-y-3">
+                {anomaliesLoading ? (
+                  <LoadingSpinner size="sm" />
+                ) : anomalies.length === 0 ? (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success/10">
+                    <CheckCircle size={20} weight="fill" className="text-status-success" />
+                    <div>
+                      <div className="text-sm font-medium text-text-primary">{t('settings.noAnomalies')}</div>
+                      <div className="text-xs text-text-secondary">{t('settings.noAnomaliesDesc')}</div>
+                    </div>
+                  </div>
+                ) : (
+                  anomalies.map((anomaly, i) => (
+                    <div key={i} className={`p-3 rounded-lg flex items-start gap-3 ${anomaly.details?.severity === 'high' ? 'bg-status-danger/10' : 'bg-status-warning/10'}`}>
+                      <Warning size={18} weight="fill" className={anomaly.details?.severity === 'high' ? 'text-status-danger' : 'text-status-warning'} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-text-primary">{anomaly.details?.type || t('settings.unknownAnomaly')}</div>
+                        <div className="text-xs text-text-secondary">{anomaly.details?.message}</div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />
+                            {new Date(anomaly.timestamp).toLocaleString()}
+                          </span>
+                          {anomaly.details?.ip && (
+                            <span className="flex items-center gap-1">
+                              <Globe size={12} />
+                              {anomaly.details.ip}
+                            </span>
+                          )}
+                          {anomaly.details?.user_id && (
+                            <span className="flex items-center gap-1">
+                              <User size={12} />
+                              #{anomaly.details.user_id}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <Button variant="secondary" size="sm" onClick={loadAnomalies} loading={anomaliesLoading}>
+                  <ArrowsClockwise size={14} />
+                  {t('common.refresh')}
+                </Button>
+              </div>
+            </DetailSection>
+            <DetailSection title={t('settings.secretsStatus')} icon={Key} iconClass="icon-bg-purple">
+              <div className="space-y-3">
+                {secretsStatus ? (
+                  <>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        {secretsStatus.session_secret?.configured ? (
+                          <CheckCircle size={18} weight="fill" className="text-status-success" />
+                        ) : (
+                          <XCircle size={18} weight="fill" className="text-status-danger" />
+                        )}
+                        <span className="text-sm text-text-primary">{t('settings.sessionSecret')}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {secretsStatus.encryption_key?.configured ? (
+                          <CheckCircle size={18} weight="fill" className="text-status-success" />
+                        ) : (
+                          <Warning size={18} weight="fill" className="text-status-warning" />
+                        )}
+                        <span className="text-sm text-text-primary">{t('settings.encryptionKeyStatus')}</span>
+                      </div>
+                    </div>
+                    {hasPermission('admin:system') && (
+                      <Button variant="secondary" size="sm" onClick={handleRotateSecrets} loading={rotating}>
+                        <ArrowsClockwise size={14} />
+                        {t('settings.rotateSecrets')}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <LoadingSpinner size="sm" />
+                )}
               </div>
             </DetailSection>
             <DetailSection title={t('settings.sessionRateLimits')} icon={Timer} iconClass="icon-bg-teal">
