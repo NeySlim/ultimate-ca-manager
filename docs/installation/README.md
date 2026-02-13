@@ -8,7 +8,7 @@ This guide covers all installation methods for Ultimate CA Manager.
 - **CPU:** 2 cores
 - **RAM:** 2 GB
 - **Storage:** 5 GB free space
-- **OS:** Linux (any distribution), Windows with WSL2, macOS
+- **OS:** Linux (any distribution)
 
 ### Recommended Requirements
 - **CPU:** 4 cores
@@ -38,7 +38,7 @@ docker run -d \
   neyslim/ultimate-ca-manager:latest
 ```
 
-**Access:** https://localhost:8443
+**Access:** https://localhost:8443  
 **Default credentials:** admin / changeme123 ⚠️ CHANGE IMMEDIATELY
 
 ---
@@ -47,15 +47,13 @@ docker run -d \
 
 **Native installation for Debian, Ubuntu, and derivatives.**
 
-See: [Debian/Ubuntu Installation Guide](debian-ubuntu.md)
-
 ```bash
-# Download package
+# Download latest package
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
 
 # Install
-sudo dpkg -i ucm_2.0.3_all.deb
-sudo apt-get install -f # Fix any dependencies
+sudo dpkg -i ucm_*_all.deb
+sudo apt-get install -f  # Fix any dependencies
 
 # Enable and start
 sudo systemctl enable ucm
@@ -71,14 +69,12 @@ sudo systemctl status ucm
 
 **Native installation for RedHat, Rocky Linux, AlmaLinux, and derivatives.**
 
-See: [RHEL/Rocky/Alma Installation Guide](rhel-rocky-alma.md)
-
 ```bash
-# Download package
+# Download latest package
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm.noarch.rpm
 
 # Install
-sudo dnf install ucm-*.noarch.rpm
+sudo dnf install ./ucm-*.noarch.rpm
 
 # Enable and start
 sudo systemctl enable ucm
@@ -94,24 +90,19 @@ sudo systemctl status ucm
 
 **For development or custom deployments.**
 
-See: [Source Installation Guide](from-source.md)
-
 ```bash
 # Clone repository
 git clone https://github.com/NeySlim/ultimate-ca-manager.git
 cd ultimate-ca-manager
 
 # Create virtual environment
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 
-# Initialize database
-python backend/init_db.py
-
-# Run development server
+# Run
 python wsgi.py
 ```
 
@@ -134,19 +125,19 @@ After installation, access UCM at **https://localhost:8443**
 ## Data Locations
 
 ### Docker
-- **Data:** `/opt/ucm/data` (inside container)
+- **Data:** `/opt/ucm/data` (inside container, mount as volume)
 - **Volume:** `ucm-data` (Docker volume)
-- **Config:** Auto-generated from environment variables
+- **Config:** Environment variables
 
 ### DEB/RPM Packages
-- **Data:** `/opt/ucm/backend/data`
-- **Config:** `/etc/ucm/config.json`
+- **Data:** `/opt/ucm/data`
+- **Config:** `/etc/ucm/ucm.env`
 - **Logs:** `/var/log/ucm/`
-- **Service:** `/lib/systemd/system/ucm.service`
+- **Service:** `/etc/systemd/system/ucm.service`
 
 ### Source Installation
-- **Data:** `./backend/data`
-- **Config:** `.env` file in repository root
+- **Data:** `./backend/data` (relative to repository root)
+- **Config:** Environment variables or `.env` file
 - **Logs:** stdout/stderr
 
 ---
@@ -155,24 +146,23 @@ After installation, access UCM at **https://localhost:8443**
 
 After installation:
 
-1. **Change default password** - Go to Settings → User Management
-2. **Configure HTTPS certificate** - Upload trusted certificate or use auto-generated
-3. **Create your first CA** - Dashboard → Create Certificate Authority
-4. **Configure email notifications** (optional) - Settings → System Configuration
-5. **Enable ACME/SCEP** (optional) - Settings → Protocol Configuration
+1. **Change default password** — Settings → Users & Groups
+2. **Configure HTTPS certificate** — Upload a trusted certificate or use the auto-generated one
+3. **Create your first CA** — Dashboard → Create Certificate Authority
+4. **Configure email notifications** (optional) — Settings → SMTP
+5. **Enable ACME/SCEP** (optional) — ACME / SCEP pages
 
 ---
 
 ## Additional Resources
 
 - [Docker Deployment Guide](docker.md)
-- [Configuration Guide](../administration/configuration.md)
 - [Upgrade Guide](../../UPGRADE.md)
-- [Troubleshooting](../administration/troubleshooting.md)
+- [Redis for HA](../REDIS.md)
 
 ---
 
-## 🆘 Support
+## Support
 
 - **Issues:** [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - **Wiki:** [GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)

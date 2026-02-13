@@ -30,7 +30,7 @@ Technical documentation for Ultimate CA Manager.
 |-----------|-------|
 | Backend | Flask + SQLAlchemy |
 | API | REST v2 (`/api/v2`) |
-| Auth | Session-based (JWT) |
+| Auth | Session-based |
 | Database | SQLite |
 | Frontend | React 18 + Radix UI + Vite |
 
