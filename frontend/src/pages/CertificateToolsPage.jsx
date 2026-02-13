@@ -11,7 +11,8 @@ import {
 } from '@phosphor-icons/react'
 import {
   Button, Badge, Textarea, Input,
-  CompactSection, CompactGrid, CompactField
+  CompactSection, CompactGrid, CompactField,
+  DetailHeader, DetailContent, DetailSection
 } from '../components'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { apiClient } from '../services'
@@ -366,7 +367,14 @@ export default function CertificateToolsPage() {
 
   // Render SSL Checker
   const renderSSLChecker = () => (
-    <div className="space-y-4">
+    <DetailContent>
+      <DetailHeader
+        icon={Globe}
+        title={t('tools.sslChecker')}
+        subtitle={t('tools.sslCheckerDesc')}
+      />
+      <DetailSection>
+      <div className="space-y-4">
       <div className="flex gap-3">
         <div className="flex-1">
           <Input
@@ -390,10 +398,19 @@ export default function CertificateToolsPage() {
         {t('tools.checkSSL')}
       </Button>
     </div>
+    </DetailSection>
+    </DetailContent>
   )
 
   // Render CSR Decoder
   const renderCSRDecoder = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={FileMagnifyingGlass}
+        title={t('tools.csrDecoder')}
+        subtitle={t('tools.csrDecoderDesc')}
+      />
+      <DetailSection>
     <div className="space-y-4">
       <TextareaWithUpload
         label={t('tools.csrPemLabel')}
@@ -408,10 +425,19 @@ export default function CertificateToolsPage() {
         {t('tools.decodeCsr')}
       </Button>
     </div>
+    </DetailSection>
+    </DetailContent>
   )
 
   // Render Certificate Decoder
   const renderCertDecoder = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={Certificate}
+        title={t('tools.decoder')}
+        subtitle={t('tools.certDecoderDesc')}
+      />
+      <DetailSection>
     <div className="space-y-4">
       <TextareaWithUpload
         label={t('tools.certPemLabel')}
@@ -426,10 +452,19 @@ export default function CertificateToolsPage() {
         {t('tools.decodeCert')}
       </Button>
     </div>
+    </DetailSection>
+    </DetailContent>
   )
 
   // Render Key Matcher
   const renderKeyMatcher = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={Key}
+        title={t('tools.keyMatcher')}
+        subtitle={t('tools.keyMatcherDesc')}
+      />
+      <DetailSection>
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <TextareaWithUpload
@@ -470,10 +505,19 @@ export default function CertificateToolsPage() {
         {t('tools.matchKeys')}
       </Button>
     </div>
+    </DetailSection>
+    </DetailContent>
   )
 
   // Render Converter
   const renderConverter = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={ArrowsLeftRight}
+        title={t('tools.converter')}
+        subtitle={t('tools.converterDesc')}
+      />
+      <DetailSection>
     <div className="space-y-4">
       {/* Input section */}
       <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
@@ -618,6 +662,8 @@ export default function CertificateToolsPage() {
         {t('tools.convert')}
       </Button>
     </div>
+    </DetailSection>
+    </DetailContent>
   )
 
   // Render SSL result
