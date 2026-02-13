@@ -3,27 +3,41 @@ import { lazy, Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, useAuth } from './contexts'
 import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, SafeModeOverlay } from './components'
 
+// Auto-reload on chunk load failure (stale cache after update)
+function lazyWithRetry(importFn) {
+  return lazy(() => importFn().catch(() => {
+    // Chunk failed to load (likely 404 after update) — reload once
+    const key = 'chunk_reload'
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1')
+      window.location.reload()
+    }
+    sessionStorage.removeItem(key)
+    return importFn()
+  }))
+}
+
 // Lazy load pages for code splitting
-const LoginPage = lazy(() => import('./pages/LoginPage'))
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const CertificatesPage = lazy(() => import('./pages/CertificatesPage'))
-const CAsPage = lazy(() => import('./pages/CAsPage'))
-const CSRsPage = lazy(() => import('./pages/CSRsPage'))
-const TemplatesPage = lazy(() => import('./pages/TemplatesPage'))
-const UsersGroupsPage = lazy(() => import('./pages/UsersGroupsPage'))
-const ACMEPage = lazy(() => import('./pages/ACMEPage'))
-const SCEPPage = lazy(() => import('./pages/SCEPPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const OperationsPage = lazy(() => import('./pages/OperationsPage'))
-const CertificateToolsPage = lazy(() => import('./pages/CertificateToolsPage'))
-const AccountPage = lazy(() => import('./pages/AccountPage'))
-const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
-const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
-const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
-const RBACPage = lazy(() => import('./pages/RBACPage'))
-const HSMPage = lazy(() => import('./pages/HSMPage'))
+const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
+const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
+const DashboardPage = lazyWithRetry(() => import('./pages/DashboardPage'))
+const CertificatesPage = lazyWithRetry(() => import('./pages/CertificatesPage'))
+const CAsPage = lazyWithRetry(() => import('./pages/CAsPage'))
+const CSRsPage = lazyWithRetry(() => import('./pages/CSRsPage'))
+const TemplatesPage = lazyWithRetry(() => import('./pages/TemplatesPage'))
+const UsersGroupsPage = lazyWithRetry(() => import('./pages/UsersGroupsPage'))
+const ACMEPage = lazyWithRetry(() => import('./pages/ACMEPage'))
+const SCEPPage = lazyWithRetry(() => import('./pages/SCEPPage'))
+const SettingsPage = lazyWithRetry(() => import('./pages/SettingsPage'))
+const OperationsPage = lazyWithRetry(() => import('./pages/OperationsPage'))
+const CertificateToolsPage = lazyWithRetry(() => import('./pages/CertificateToolsPage'))
+const AccountPage = lazyWithRetry(() => import('./pages/AccountPage'))
+const AuditLogsPage = lazyWithRetry(() => import('./pages/AuditLogsPage'))
+const CRLOCSPPage = lazyWithRetry(() => import('./pages/CRLOCSPPage'))
+const TrustStorePage = lazyWithRetry(() => import('./pages/TrustStorePage'))
+const RBACPage = lazyWithRetry(() => import('./pages/RBACPage'))
+const HSMPage = lazyWithRetry(() => import('./pages/HSMPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
