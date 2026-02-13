@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
-  SignOut, Palette, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
+  SignOut, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
   UsersThree, Shield, Lock, FileX, Vault, Wrench
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -52,23 +52,30 @@ export function Sidebar({ activePage }) {
   const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-9 h-9'
 
   const pages = [
+    // Dashboard
     { id: '', icon: House, labelKey: 'common.dashboard', path: '/' },
+    'separator',
+    // PKI
     { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
     { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
     { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
     { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },
-    { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
+    'separator',
+    // Protocols
     { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme' },
     { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
     { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
+    'separator',
+    // Data
     { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
     { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations' },
     { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
-    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
-    { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
-    // Advanced features
+    'separator',
+    // Admin
+    { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
     { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
     { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
+    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
   ]
 
   const handleLogout = async () => {
@@ -79,12 +86,15 @@ export function Sidebar({ activePage }) {
   return (
     <div className="w-14 h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px">
       {/* Logo */}
-      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title={t('common.dashboard')}>
-        <Logo variant="compact" size="sm" withText={false} />
+      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-1")} title={t('common.dashboard')}>
+        <Logo variant="compact" size="xs" withText={false} />
       </Link>
 
       {/* Page Icons */}
-      {pages.map(page => {
+      {pages.map((page, idx) => {
+        if (page === 'separator') {
+          return <div key={`sep-${idx}`} className="w-6 h-px bg-border/40 my-1" />
+        }
         const Icon = page.icon
         const isActive = activePage === page.id
         const showBadge = page.id === 'certificates' && expiringCount > 0
@@ -127,13 +137,37 @@ export function Sidebar({ activePage }) {
 
       <div className="flex-1" />
 
-      {/* Theme Selector */}
+      {/* Settings */}
+      <Link
+        to="/settings"
+        className={cn(
+          buttonSize,
+          "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
+          activePage === 'settings'
+            ? "sidebar-active-gradient text-accent-primary border border-accent-primary/20"
+            : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
+        )}
+        title={t('common.settings')}
+      >
+        <Gear size={iconSize} weight={activePage === 'settings' ? 'fill' : 'regular'} />
+        {activePage === 'settings' && (
+          <div className="absolute left-0 w-0.5 h-5 bg-accent-primary rounded-r-full" />
+        )}
+        <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+          {t('common.settings')}
+        </div>
+      </Link>
+
+      {/* WebSocket Indicator */}
+      <WebSocketIndicator className="mx-auto" />
+
+      {/* User Menu (with Theme) */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className={cn(buttonSize, "rounded-sm flex items-center justify-center text-text-secondary hover:bg-bg-tertiary hover:text-text-primary transition-all group")}>
-            <Palette size={iconSize} />
+          <button className={cn(buttonSize, "rounded-sm bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary hover:bg-accent-primary/20 transition-all group")}>
+            <UserCircle size={iconSize} weight="bold" />
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-              {t('settings.theme')}
+              {user?.username || 'User'}
             </div>
           </button>
         </DropdownMenu.Trigger>
@@ -144,6 +178,25 @@ export function Sidebar({ activePage }) {
             sideOffset={5}
             side="right"
           >
+            <DropdownMenu.Item
+              onClick={() => navigate('/account')}
+              className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
+            >
+              <UserCircle size={16} />
+              <span>{t('common.account')}</span>
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Item
+              onClick={() => navigate('/settings')}
+              className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
+            >
+              <Gear size={16} />
+              <span>{t('common.settings')}</span>
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Separator className="h-px bg-border my-1" />
+
+            {/* Theme sub-section */}
             <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
               {t('settings.colorTheme')}
             </DropdownMenu.Label>
@@ -185,45 +238,6 @@ export function Sidebar({ activePage }) {
                 )}
               </DropdownMenu.Item>
             ))}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
-
-      {/* WebSocket Indicator */}
-      <WebSocketIndicator className="mx-auto" />
-
-      {/* User Menu */}
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger asChild>
-          <button className={cn(buttonSize, "rounded-sm bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary hover:bg-accent-primary/20 transition-all group")}>
-            <UserCircle size={iconSize} weight="bold" />
-            <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-              {user?.username || 'User'}
-            </div>
-          </button>
-        </DropdownMenu.Trigger>
-
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content 
-            className="min-w-[180px] bg-bg-secondary border border-border rounded-sm shadow-lg p-1 z-50"
-            sideOffset={5}
-            side="right"
-          >
-            <DropdownMenu.Item
-              onClick={() => navigate('/account')}
-              className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
-            >
-              <UserCircle size={16} />
-              <span>{t('common.account')}</span>
-            </DropdownMenu.Item>
-
-            <DropdownMenu.Item
-              onClick={() => navigate('/settings')}
-              className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
-            >
-              <Gear size={16} />
-              <span>{t('common.settings')}</span>
-            </DropdownMenu.Item>
 
             <DropdownMenu.Separator className="h-px bg-border my-1" />
 
