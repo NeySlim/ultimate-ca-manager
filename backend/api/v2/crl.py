@@ -55,7 +55,7 @@ def get_crl(ca_id):
         
     crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(CRLMetadata.crl_number.desc()).first()
     if not crl:
-        return error_response('CRL not found', 404)
+        return success_response(data=None)
     
     data = crl.to_dict(include_crl_data=True)
     data['caref'] = ca.refid
