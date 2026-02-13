@@ -49,7 +49,8 @@ export function Sidebar({ activePage }) {
   
   // Sizes based on screen width (smaller icons for refined look)
   const iconSize = isLargeScreen ? 20 : 16
-  const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-9 h-9'
+  const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-8 h-8'
+  const sidebarWidth = isLargeScreen ? 'w-14' : 'w-11'
 
   const pages = [
     // Dashboard
@@ -84,9 +85,9 @@ export function Sidebar({ activePage }) {
   }
 
   return (
-    <div className="w-14 h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px">
+    <div className={cn(sidebarWidth, "h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px")}>
       {/* Logo - fluid, scales with sidebar width */}
-      <Link to="/" className="w-full px-3 py-2 flex items-center justify-center mb-1" title={t('common.dashboard')}>
+      <Link to="/" className={cn(isLargeScreen ? "px-3" : "px-2", "w-full py-2 flex items-center justify-center mb-1")} title={t('common.dashboard')}>
         <div className="flex items-center" style={{ gap: '4%', width: '100%', justifyContent: 'center' }}>
           {[0, 1, 2].map(i => (
             <div
