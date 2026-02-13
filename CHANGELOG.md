@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-alpha3] - 2026-02-13
+
+### Security
+
+- **Auto-Update** - Fixed DEB postinst: updater systemd units were never enabled (wrong path check)
+
+### Bug Fixes
+
+- **Truststore** - Delete now returns 200 with message instead of broken 204 (was causing UI to not refresh)
+- **CRL** - Returns null data instead of 404 when CRL not yet generated for a CA
+- **i18n** - Fixed certificate decoder translation key (tools.certDecoder -> tools.decoder)
+- **Server** - Suppress noisy SSL tracebacks from reverse proxy health checks
+
+### Improvements
+
+- **Auto-Update** - Clean unused imports, daily scheduled update check
+- **Documentation** - Complete API reference (~270 endpoints), README audit, refreshed screenshots
+
+---
+
 ## [2.1.0-dev] - 2026-02-12
 
 ### Architecture Refactor
