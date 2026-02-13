@@ -98,4 +98,5 @@ logs/
 /test_*.py
 /migrate_*.py
 data/
+!frontend/src/data/
 CLAUDE.md
