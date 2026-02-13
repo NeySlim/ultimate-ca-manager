@@ -101,8 +101,8 @@ export function Sidebar({ activePage }) {
   return (
     <div className={cn(sidebarWidth, "h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px")}>
       {/* Logo */}
-      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title={t('common.dashboard')}>
-        <Logo variant="icon" withText={false} size={isLargeScreen ? 'sm' : 'xs'} />
+      <Link to="/" className="flex items-center justify-center mb-2" style={{ width: isLargeScreen ? 42 : 34, height: isLargeScreen ? 42 : 34 }} title={t('common.dashboard')}>
+        <Logo variant="icon" withText={false} size={isLargeScreen ? 'md' : 'sm'} />
       </Link>
 
       {/* Page Icons */}

@@ -10,9 +10,8 @@
       <stop offset="100%" stop-color="#f97316"/>
     </linearGradient>
   </defs>
-  <ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#g1)" stroke-width="3" stroke-dasharray="8 4" opacity="0.3"/>
-  <path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#g2)" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#g1)" stroke-width="4.5" stroke-linecap="round"/>
-  <circle cx="38" cy="12" r="3" fill="url(#g2)"/>
+  <path d="M5 34 A22 22 0 0 1 5 14" fill="none" stroke="url(#g2)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M43 14 A22 22 0 0 1 43 34" fill="none" stroke="url(#g1)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M16 13v13a8 8 0 0 0 16 0V13" fill="none" stroke="url(#g1)" stroke-width="5.5" stroke-linecap="round"/>
+  <circle cx="39" cy="10" r="3.5" fill="url(#g2)"/>
 </svg>

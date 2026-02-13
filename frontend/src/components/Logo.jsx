@@ -3,17 +3,21 @@
  * Stylized U letter with protective orbital arcs
  * Uses CSS variables for gradient colors
  */
+import { useId } from 'react'
 import { cn } from '../lib/utils'
 
 const sizes = {
-  xs: 16,
-  sm: 24,
+  xs: 20,
+  sm: 26,
   md: 32,
   lg: 48,
   xl: 64,
 }
 
 function LogoIcon({ size = 32, className }) {
+  const uid = useId()
+  const g1 = `ucm-g1-${uid}`
+  const g2 = `ucm-g2-${uid}`
   return (
     <svg
       viewBox="0 0 48 48"
@@ -24,26 +28,24 @@ function LogoIcon({ size = 32, className }) {
       className={className}
     >
       <defs>
-        <linearGradient id="ucm-g1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={g1} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="var(--logo-gradient-start)" />
           <stop offset="50%" stopColor="var(--logo-gradient-mid)" />
           <stop offset="100%" stopColor="var(--logo-gradient-end)" />
         </linearGradient>
-        <linearGradient id="ucm-g2" x1="100%" y1="0%" x2="0%" y2="100%">
+        <linearGradient id={g2} x1="100%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor="var(--logo-gradient-accent)" />
           <stop offset="100%" stopColor="var(--logo-gradient-start)" />
         </linearGradient>
       </defs>
-      {/* Dashed orbit ring */}
-      <ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#ucm-g1)" strokeWidth="3" strokeDasharray="8 4" opacity="0.3" />
-      {/* Left arc */}
-      <path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#ucm-g2)" strokeWidth="3.5" strokeLinecap="round" />
-      {/* Right arc */}
-      <path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#ucm-g1)" strokeWidth="3.5" strokeLinecap="round" />
+      {/* Left protective arc */}
+      <path d="M5 34 A22 22 0 0 1 5 14" fill="none" stroke={`url(#${g2})`} strokeWidth="4" strokeLinecap="round" />
+      {/* Right protective arc */}
+      <path d="M43 14 A22 22 0 0 1 43 34" fill="none" stroke={`url(#${g1})`} strokeWidth="4" strokeLinecap="round" />
       {/* U letter */}
-      <path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#ucm-g1)" strokeWidth="4.5" strokeLinecap="round" />
+      <path d="M16 13v13a8 8 0 0 0 16 0V13" fill="none" stroke={`url(#${g1})`} strokeWidth="5.5" strokeLinecap="round" />
       {/* Accent dot */}
-      <circle cx="38" cy="12" r="3" fill="url(#ucm-g2)" />
+      <circle cx="39" cy="10" r="3.5" fill={`url(#${g2})`} />
     </svg>
   )
 }
