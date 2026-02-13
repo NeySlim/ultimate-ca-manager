@@ -61,7 +61,6 @@ export default function ACMEPage() {
   const [showDnsProviderModal, setShowDnsProviderModal] = useState(false)
   const [showDomainModal, setShowDomainModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [proxyEmail, setProxyEmail] = useState('')
   const [revokeSuperseded, setRevokeSuperseded] = useState(false)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
   
@@ -140,33 +139,6 @@ export default function ACMEPage() {
 
   const updateSetting = (key, value) => {
     setAcmeSettings(prev => ({ ...prev, [key]: value }))
-  }
-
-  const handleRegisterProxy = async () => {
-    if (!proxyEmail) {
-      showError(ERRORS.VALIDATION.REQUIRED_FIELD)
-      return
-    }
-    try {
-      await acmeService.registerProxy(proxyEmail)
-      showSuccess(t('acme.proxyRegisteredSuccess'))
-      setProxyEmail('')
-      loadData()
-    } catch (error) {
-      showError(error.message || t('acme.proxyRegistrationFailed'))
-    }
-  }
-
-  const handleUnregisterProxy = async () => {
-    const confirmed = await showConfirm(t('acme.confirmUnregisterProxy'))
-    if (!confirmed) return
-    try {
-      await acmeService.unregisterProxy()
-      showSuccess(t('acme.proxyUnregisteredSuccess'))
-      loadData()
-    } catch (error) {
-      showError(error.message || t('acme.proxyUnregistrationFailed'))
-    }
   }
 
   // =========================================================================
@@ -616,22 +588,12 @@ export default function ACMEPage() {
               {acmeSettings.enabled ? t('common.enabled') : t('common.disabled')}
             </StatusIndicator>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">{t('acme.leProxy')}</span>
-            <StatusIndicator status={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'success' : 'warning') : 'inactive'}>
-              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? t('common.active') : t('acme.setupRequired')) : t('common.disabled')}
-            </StatusIndicator>
-          </div>
         </div>
       </Card>
 
       <div className="space-y-3">
         <HelpCard variant="info" title={t('common.aboutAcme')}>
           {t('acme.aboutAcmeInfo')}
-        </HelpCard>
-        
-        <HelpCard variant="tip" title={t('acme.letsEncryptProxy')}>
-          {t('acme.letsEncryptProxyTip')}
         </HelpCard>
 
         <HelpCard variant="warning" title={t('common.warning')}>
@@ -1165,92 +1127,6 @@ export default function ACMEPage() {
         <p className="text-xs text-text-tertiary mt-2">
           {t('acme.certbotUsage')} <code className="bg-bg-tertiary px-1 rounded">--server {window.location.origin}/acme/directory</code>
         </p>
-      </CompactSection>
-
-      {/* Let's Encrypt Proxy */}
-      <CompactSection title={t('acme.letsEncryptProxy')} icon={ShieldCheck}>
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={acmeSettings.proxy_enabled || false}
-              onChange={(e) => updateSetting('proxy_enabled', e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-            />
-            <div>
-              <p className="text-sm text-text-primary font-medium">{t('acme.enableLetsEncryptProxy')}</p>
-              <p className="text-xs text-text-secondary">{t('acme.enableLetsEncryptProxyDesc')}</p>
-            </div>
-          </label>
-
-          {acmeSettings.proxy_enabled && (
-            <>
-              <CompactGrid columns={1}>
-                <CompactField 
-                  autoIcon="environment"
-                  label={t('acme.proxyEndpoint')} 
-                  value={`${window.location.origin}/acme/proxy/directory`}
-                  mono
-                  copyable
-                />
-              </CompactGrid>
-              
-              {/* Instructions */}
-              <div className="p-3 bg-bg-tertiary/50 rounded-lg space-y-2">
-                <p className="text-xs font-medium text-text-secondary">{t('acme.proxyUsage')}</p>
-                <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono">
-{`certbot certonly \\
-  --server ${window.location.origin}/acme/proxy/directory \\
-  --preferred-challenges dns \\
-  -d example.com`}
-                </pre>
-                <p className="text-xs text-text-tertiary">{t('acme.proxyUsageNote')}</p>
-              </div>
-              
-              {acmeSettings.proxy_registered ? (
-                <div className="p-3 rounded-lg status-success-bg status-success-border border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="status-success-text" weight="fill" />
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">{t('acme.proxyRegistered')}</p>
-                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={handleUnregisterProxy}
-                      className="status-danger-text hover:status-danger-bg"
-                    >
-                      <Trash size={14} />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3 p-3 bg-bg-tertiary/30 rounded-lg">
-                  <Input
-                    label={t('common.emailAddress')}
-                    type="email"
-                    value={proxyEmail}
-                    onChange={(e) => setProxyEmail(e.target.value)}
-                    placeholder={t('acme.emailPlaceholder')}
-                    helperText={t('common.emailRequired')}
-                  />
-                  <Button 
-                    variant="secondary" 
-                    size="sm"
-                    onClick={handleRegisterProxy}
-                    disabled={!proxyEmail}
-                  >
-                    <Key size={14} />
-                    {t('acme.registerAccount')}
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
       </CompactSection>
 
       {/* Save Button */}
