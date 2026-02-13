@@ -973,7 +973,11 @@
     "proTips": "Astuces",
     "seeAlso": "Voir aussi",
     "minimize": "Réduire",
-    "expand": "Agrandir"
+    "expand": "Agrandir",
+    "quickHelp": "Aide rapide",
+    "guide": "Guide",
+    "guideComingSoon": "Guide détaillé à venir.",
+    "tableOfContents": "Sommaire"
   },
   "hsm": {
     "statusUnavailable": "Les fonctionnalités HSM ne sont pas disponibles",

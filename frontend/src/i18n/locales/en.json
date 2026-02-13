@@ -1731,7 +1731,11 @@
     "proTips": "Pro Tips",
     "seeAlso": "See Also",
     "minimize": "Minimize",
-    "expand": "Expand"
+    "expand": "Expand",
+    "quickHelp": "Quick Help",
+    "guide": "Guide",
+    "guideComingSoon": "Detailed guide coming soon.",
+    "tableOfContents": "Contents"
   },
   "time": {
     "today": "Today",

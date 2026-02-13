@@ -973,7 +973,11 @@
     "proTips": "实用技巧",
     "seeAlso": "另请参阅",
     "minimize": "最小化",
-    "expand": "展开"
+    "expand": "展开",
+    "quickHelp": "快速帮助",
+    "guide": "指南",
+    "guideComingSoon": "详细指南即将推出。",
+    "tableOfContents": "目录"
   },
   "hsm": {
     "addHSM": "添加HSM",

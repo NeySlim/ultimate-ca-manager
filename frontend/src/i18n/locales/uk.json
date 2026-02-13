@@ -973,7 +973,11 @@
     "proTips": "Поради",
     "seeAlso": "Дивіться також",
     "minimize": "Згорнути",
-    "expand": "Розгорнути"
+    "expand": "Розгорнути",
+    "quickHelp": "Швидка допомога",
+    "guide": "Посібник",
+    "guideComingSoon": "Детальний посібник незабаром.",
+    "tableOfContents": "Зміст"
   },
   "hsm": {
     "addHSM": "Додати HSM",

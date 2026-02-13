@@ -973,7 +973,11 @@
     "proTips": "ヒント",
     "seeAlso": "関連項目",
     "minimize": "最小化",
-    "expand": "展開"
+    "expand": "展開",
+    "quickHelp": "クイックヘルプ",
+    "guide": "ガイド",
+    "guideComingSoon": "詳細ガイドは近日公開予定。",
+    "tableOfContents": "目次"
   },
   "hsm": {
     "addHSM": "HSMを追加",

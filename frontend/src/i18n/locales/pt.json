@@ -982,7 +982,11 @@
     "seeAlso": "Ver também",
     "statusLegend": "Legenda de estados",
     "minimize": "Minimizar",
-    "expand": "Expandir"
+    "expand": "Expandir",
+    "quickHelp": "Ajuda rápida",
+    "guide": "Guia",
+    "guideComingSoon": "Guia detalhado em breve.",
+    "tableOfContents": "Conteúdo"
   },
   "hsm": {
     "addHSM": "Adicionar HSM",

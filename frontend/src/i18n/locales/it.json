@@ -973,7 +973,11 @@
     "proTips": "Suggerimenti",
     "seeAlso": "Vedi anche",
     "minimize": "Riduci",
-    "expand": "Espandi"
+    "expand": "Espandi",
+    "quickHelp": "Aiuto rapido",
+    "guide": "Guida",
+    "guideComingSoon": "Guida dettagliata in arrivo.",
+    "tableOfContents": "Contenuto"
   },
   "hsm": {
     "addHSM": "Aggiungi HSM",
