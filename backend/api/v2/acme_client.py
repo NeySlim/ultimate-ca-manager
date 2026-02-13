@@ -35,6 +35,10 @@ def get_settings():
     staging_account = SystemConfig.query.filter_by(key='acme.client.staging.account_url').first()
     production_account = SystemConfig.query.filter_by(key='acme.client.production.account_url').first()
     
+    # LE Proxy settings
+    proxy_email_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
+    proxy_enabled_cfg = SystemConfig.query.filter_by(key='acme.proxy_enabled').first()
+    
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
         'environment': env_cfg.value if env_cfg else 'staging',
@@ -42,6 +46,9 @@ def get_settings():
         'renewal_days': int(renewal_days.value) if renewal_days else 30,
         'has_staging_account': bool(staging_account),
         'has_production_account': bool(production_account),
+        'proxy_enabled': proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False,
+        'proxy_email': proxy_email_cfg.value if proxy_email_cfg else None,
+        'proxy_registered': bool(proxy_email_cfg),
     })
 
 
@@ -78,6 +85,12 @@ def update_settings():
         _set_config('acme.client.renewal_days', str(days), 'ACME renewal days before expiry')
         updates.append('renewal_days')
     
+    if 'proxy_enabled' in data:
+        _set_config('acme.proxy_enabled',
+                    'true' if data['proxy_enabled'] else 'false',
+                    'Let\'s Encrypt proxy enabled')
+        updates.append('proxy_enabled')
+    
     db.session.commit()
     
     AuditService.log_action(
@@ -100,6 +113,61 @@ def _set_config(key: str, value: str, description: str = ''):
         config.value = value
     else:
         db.session.add(SystemConfig(key=key, value=value, description=description))
+
+
+# =============================================================================
+# LE Proxy
+# =============================================================================
+
+@bp.route('/api/v2/acme/client/proxy/register', methods=['POST'])
+@require_auth(['write:acme'])
+def register_proxy_account():
+    """Register Let's Encrypt proxy account"""
+    data = request.json
+    
+    if not data or not data.get('email'):
+        return error_response('Email is required', 400)
+    
+    email = data['email']
+    
+    _set_config('acme.proxy_email', email, 'Let\'s Encrypt proxy account email')
+    db.session.commit()
+    
+    AuditService.log_action(
+        action='le_proxy_register',
+        resource_type='acme_client',
+        resource_name='LE Proxy',
+        details=f'Registered Let\'s Encrypt proxy account: {email}',
+        success=True
+    )
+    
+    return success_response(
+        data={'registered': True, 'email': email},
+        message='Proxy account registered'
+    )
+
+
+@bp.route('/api/v2/acme/client/proxy/unregister', methods=['POST'])
+@require_auth(['write:acme'])
+def unregister_proxy_account():
+    """Unregister Let's Encrypt proxy account"""
+    proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
+    if proxy_cfg:
+        db.session.delete(proxy_cfg)
+        db.session.commit()
+    
+    AuditService.log_action(
+        action='le_proxy_unregister',
+        resource_type='acme_client',
+        resource_name='LE Proxy',
+        details='Unregistered Let\'s Encrypt proxy account',
+        success=True
+    )
+    
+    return success_response(
+        data={'registered': False},
+        message='Proxy account unregistered'
+    )
 
 
 # =============================================================================

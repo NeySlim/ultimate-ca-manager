@@ -23,13 +23,9 @@ def get_acme_settings():
     # Get settings from SystemConfig
     enabled_cfg = SystemConfig.query.filter_by(key='acme.enabled').first()
     ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
-    proxy_email_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
-    proxy_enabled_cfg = SystemConfig.query.filter_by(key='acme.proxy_enabled').first()
     
     enabled = enabled_cfg.value == 'true' if enabled_cfg else True
     ca_id = ca_id_cfg.value if ca_id_cfg else None
-    proxy_email = proxy_email_cfg.value if proxy_email_cfg else None
-    proxy_enabled = proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False
     
     # Revoke on renewal setting
     revoke_on_renewal_cfg = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
@@ -55,9 +51,6 @@ def get_acme_settings():
         'issuing_ca_name': ca_name,
         'provider': 'Built-in ACME Server',
         'contact_email': 'admin@ucm.local',
-        'proxy_enabled': proxy_enabled,
-        'proxy_email': proxy_email,
-        'proxy_registered': bool(proxy_email),
         'revoke_on_renewal': revoke_on_renewal,
         'superseded_count': superseded_count,
     })
@@ -84,14 +77,6 @@ def update_acme_settings():
             ca_id_cfg = SystemConfig(key='acme.issuing_ca_id', description='ACME issuing CA refid')
             db.session.add(ca_id_cfg)
         ca_id_cfg.value = data['issuing_ca_id'] if data['issuing_ca_id'] else ''
-    
-    # Update proxy enabled
-    if 'proxy_enabled' in data:
-        proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_enabled').first()
-        if not proxy_cfg:
-            proxy_cfg = SystemConfig(key='acme.proxy_enabled', description='ACME proxy enabled')
-            db.session.add(proxy_cfg)
-        proxy_cfg.value = 'true' if data['proxy_enabled'] else 'false'
     
     # Update revoke on renewal
     if 'revoke_on_renewal' in data:
@@ -359,62 +344,6 @@ def list_account_challenges(account_id):
                 })
     
     return success_response(data=data)
-
-
-@bp.route('/api/v2/acme/proxy/register', methods=['POST'])
-@require_auth(['write:acme'])
-def register_proxy_account():
-    """Register ACME proxy account"""
-    data = request.json
-    
-    if not data or not data.get('email'):
-        return error_response('Email is required', 400)
-    
-    email = data['email']
-    
-    # Store proxy email in SystemConfig
-    proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
-    if not proxy_cfg:
-        proxy_cfg = SystemConfig(key='acme.proxy_email', description='ACME proxy account email')
-        db.session.add(proxy_cfg)
-    proxy_cfg.value = email
-    db.session.commit()
-    
-    AuditService.log_action(
-        action='acme_proxy_register',
-        resource_type='acme',
-        resource_name='ACME Proxy',
-        details=f'Registered ACME proxy account: {email}',
-        success=True
-    )
-    
-    return success_response(
-        data={'registered': True, 'email': email},
-        message='Proxy account registered'
-    )
-
-
-@bp.route('/api/v2/acme/proxy/unregister', methods=['POST'])
-@require_auth(['write:acme'])
-def unregister_proxy_account():
-    """Unregister ACME proxy account"""
-    proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
-    if proxy_cfg:
-        db.session.delete(proxy_cfg)
-        db.session.commit()
-    
-    AuditService.log_action(
-        action='acme_proxy_unregister',
-        resource_type='acme',
-        resource_name='ACME Proxy',
-        details='Unregistered ACME proxy account',
-        success=True
-    )
-    
-    return success_response(
-        data={'registered': False},
-        message='Proxy account unregistered'
-    )
 
 
 @bp.route('/api/v2/acme/history', methods=['GET'])
