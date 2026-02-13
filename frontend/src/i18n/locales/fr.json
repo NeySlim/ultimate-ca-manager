@@ -265,9 +265,8 @@
     "daysLeft": "{{count}} jours restants",
     "daysLeft_one": "{{count}} jour restant",
     "groups": {
-      "certificates": "Certificats",
-      "providers": "Fournisseurs",
-      "management": "Gestion"
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "ACME Local"
     }
   },
   "audit": {

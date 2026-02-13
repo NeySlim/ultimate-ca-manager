@@ -878,9 +878,8 @@
     "daysLeft": "{{count}} days left",
     "daysLeft_one": "{{count}} day left",
     "groups": {
-      "certificates": "Certificates",
-      "providers": "Providers",
-      "management": "Management"
+      "letsEncrypt": "Let's Encrypt",
+      "localAcme": "Local ACME"
     }
   },
   "scep": {
