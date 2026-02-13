@@ -21,6 +21,7 @@ import { useNotification } from '../contexts'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
 export default function SCEPPage() {
   const { t } = useTranslation()
@@ -479,18 +480,12 @@ export default function SCEPPage() {
                   <Plugs size={24} className={config.enabled ? 'status-success-text' : 'text-text-tertiary'} weight="duotone" />
                 </div>
                 <div className="flex-1">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.enabled || false}
-                      onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
-                      className="w-5 h-5 rounded border-border bg-bg-tertiary accent-accent-primary"
-                    />
-                    <div>
-                      <p className="text-sm text-text-primary font-semibold">{t('scep.enableScep')}</p>
-                      <p className="text-xs text-text-secondary">{t('scep.enableScepDesc')}</p>
-                    </div>
-                  </label>
+                  <ToggleSwitch
+                    checked={config.enabled || false}
+                    onChange={(val) => setConfig({ ...config, enabled: val })}
+                    label={t('scep.enableScep')}
+                    description={t('scep.enableScepDesc')}
+                  />
                 </div>
               </div>
             </Card>
@@ -534,19 +529,13 @@ export default function SCEPPage() {
               </h3>
               
               <div className="p-3 bg-bg-tertiary rounded-lg">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.auto_approve || false}
-                    onChange={(e) => setConfig({ ...config, auto_approve: e.target.checked })}
-                    className="w-5 h-5 rounded border-border bg-bg-secondary accent-accent-primary"
-                    disabled={!config.enabled}
-                  />
-                  <div>
-                    <p className="text-sm text-text-primary font-medium">{t('scep.autoApprove')}</p>
-                    <p className="text-xs text-text-secondary">{t('scep.autoApproveDesc')}</p>
-                  </div>
-                </label>
+                <ToggleSwitch
+                  checked={config.auto_approve || false}
+                  onChange={(val) => setConfig({ ...config, auto_approve: val })}
+                  disabled={!config.enabled}
+                  label={t('scep.autoApprove')}
+                  description={t('scep.autoApproveDesc')}
+                />
                 {config.auto_approve && (
                   <div className="mt-2 flex items-start gap-2 status-warning-text text-xs">
                     <Warning size={14} className="flex-shrink-0 mt-0.5" />

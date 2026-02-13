@@ -877,36 +877,24 @@ export default function ACMEPage() {
             helperText={t('acme.contactEmailHelper')}
           />
           
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={clientSettings.auto_renewal ?? true}
-              onChange={(e) => handleUpdateClientSetting('auto_renewal', e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-            />
-            <div>
-              <p className="text-sm text-text-primary font-medium">{t('acme.autoRenewal')}</p>
-              <p className="text-xs text-text-secondary">{t('acme.autoRenewalDesc')}</p>
-            </div>
-          </label>
+          <ToggleSwitch
+            checked={clientSettings.auto_renewal ?? true}
+            onChange={(val) => handleUpdateClientSetting('auto_renewal', val)}
+            label={t('acme.autoRenewal')}
+            description={t('acme.autoRenewalDesc')}
+          />
         </div>
       </CompactSection>
 
       {/* Let's Encrypt Proxy */}
       <CompactSection title={t('acme.letsEncryptProxy')} icon={ShieldCheck}>
         <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={acmeSettings.proxy_enabled || false}
-              onChange={(e) => updateSetting('proxy_enabled', e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-            />
-            <div>
-              <p className="text-sm text-text-primary font-medium">{t('acme.enableLetsEncryptProxy')}</p>
-              <p className="text-xs text-text-secondary">{t('acme.enableLetsEncryptProxyDesc')}</p>
-            </div>
-          </label>
+          <ToggleSwitch
+            checked={acmeSettings.proxy_enabled || false}
+            onChange={(val) => updateSetting('proxy_enabled', val)}
+            label={t('acme.enableLetsEncryptProxy')}
+            description={t('acme.enableLetsEncryptProxyDesc')}
+          />
 
           {acmeSettings.proxy_enabled && (
             <>
@@ -1169,18 +1157,12 @@ export default function ACMEPage() {
       {/* ACME Server */}
       <CompactSection title={t('acme.acmeServer')} icon={Globe}>
         <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={acmeSettings.enabled || false}
-              onChange={(e) => updateSetting('enabled', e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-            />
-            <div>
-              <p className="text-sm text-text-primary font-medium">{t('acme.enableAcmeServer')}</p>
-              <p className="text-xs text-text-secondary">{t('acme.enableAcmeServerDesc')}</p>
-            </div>
-          </label>
+          <ToggleSwitch
+            checked={acmeSettings.enabled || false}
+            onChange={(val) => updateSetting('enabled', val)}
+            label={t('acme.enableAcmeServer')}
+            description={t('acme.enableAcmeServerDesc')}
+          />
 
           <Select
             label={t('acme.defaultIssuingCA')}
@@ -2287,31 +2269,19 @@ function DomainForm({ domain, dnsProviders, onSubmit, onCancel }) {
         required
       />
 
-      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-        <input
-          type="checkbox"
-          checked={formData.is_wildcard_allowed}
-          onChange={(e) => setFormData(prev => ({ ...prev, is_wildcard_allowed: e.target.checked }))}
-          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-        />
-        <div>
-          <span className="text-sm text-text-primary">{t('acme.allowWildcard')}</span>
-          <p className="text-xs text-text-tertiary">{t('acme.allowWildcardDesc')}</p>
-        </div>
-      </label>
+      <ToggleSwitch
+        checked={formData.is_wildcard_allowed}
+        onChange={(val) => setFormData(prev => ({ ...prev, is_wildcard_allowed: val }))}
+        label={t('acme.allowWildcard')}
+        description={t('acme.allowWildcardDesc')}
+      />
 
-      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-        <input
-          type="checkbox"
-          checked={formData.auto_approve}
-          onChange={(e) => setFormData(prev => ({ ...prev, auto_approve: e.target.checked }))}
-          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-        />
-        <div>
-          <span className="text-sm text-text-primary">{t('acme.autoApproveRequests')}</span>
-          <p className="text-xs text-text-tertiary">{t('acme.autoApproveDesc')}</p>
-        </div>
-      </label>
+      <ToggleSwitch
+        checked={formData.auto_approve}
+        onChange={(val) => setFormData(prev => ({ ...prev, auto_approve: val }))}
+        label={t('acme.autoApproveRequests')}
+        description={t('acme.autoApproveDesc')}
+      />
       
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
