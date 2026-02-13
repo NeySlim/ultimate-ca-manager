@@ -98,7 +98,7 @@ class DatabaseManagementService:
             for table in tables:
                 if table in ALLOWED_TABLES:
                     try:
-                        cursor.execute("SELECT COUNT(*) FROM " + table)
+                        cursor.execute(f'SELECT COUNT(*) FROM "{table}"')
                         count = cursor.fetchone()[0]
                         stats['tables'][table] = count
                     except Exception as e:

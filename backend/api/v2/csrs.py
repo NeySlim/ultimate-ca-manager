@@ -305,7 +305,11 @@ def import_csr():
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        csr_pem = file.read()
+        from utils.file_validation import validate_upload, CERT_EXTENSIONS
+        try:
+            csr_pem, _ = validate_upload(file, CERT_EXTENSIONS)
+        except ValueError as e:
+            return error_response(str(e), 400)
     elif request.form.get('pem_content'):
         csr_pem = request.form.get('pem_content').encode('utf-8')
     else:

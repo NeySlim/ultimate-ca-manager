@@ -425,7 +425,12 @@ def import_template():
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        json_data = file.read().decode('utf-8')
+        from utils.file_validation import validate_upload, JSON_EXTENSIONS
+        try:
+            raw, _ = validate_upload(file, JSON_EXTENSIONS)
+            json_data = raw.decode('utf-8')
+        except ValueError as e:
+            return error_response(str(e), 400)
     elif request.form.get('json_content'):
         json_data = request.form.get('json_content')
     else:

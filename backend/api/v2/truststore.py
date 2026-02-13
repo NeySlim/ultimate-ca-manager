@@ -96,14 +96,18 @@ def import_trusted_certificate():
     if not file.filename:
         return error_response('No file selected', 400)
     
-    name = request.form.get('name', file.filename.rsplit('.', 1)[0])
+    from utils.file_validation import validate_upload, CERT_EXTENSIONS
+    try:
+        file_content, safe_filename = validate_upload(file, CERT_EXTENSIONS)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    
+    name = request.form.get('name', safe_filename.rsplit('.', 1)[0])
     purpose = request.form.get('purpose', 'custom')
     description = request.form.get('description', '')
     notes = request.form.get('notes', '')
     
     try:
-        file_content = file.read()
-        
         # Try PEM first
         if b'-----BEGIN CERTIFICATE-----' in file_content:
             pem_data = file_content.decode('utf-8')
