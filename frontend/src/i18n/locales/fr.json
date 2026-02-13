@@ -1204,7 +1204,8 @@
     "mustBeDifferent": "Le nouveau mot de passe doit être différent de l'actuel",
     "incorrect": "Mot de passe incorrect",
     "changeSuccess": "Mot de passe modifié avec succès",
-    "changeFailed": "Échec du changement de mot de passe"
+    "changeFailed": "Échec du changement de mot de passe",
+    "skipForNow": "Plus tard"
   },
   "rbac": {
     "title": "Contrôle d'accès basé sur les rôles",

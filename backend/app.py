@@ -823,6 +823,7 @@ def init_database(app):
                 active=True
             )
             admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
+            admin.force_password_change = True
             db.session.add(admin)
             
             # Add initial system config

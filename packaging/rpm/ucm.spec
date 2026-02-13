@@ -124,7 +124,7 @@ if [ -n "$V1_DB" ]; then
 fi
 
 # Generate secrets
-ADMIN_PASS=$(openssl rand -hex 8)
+ADMIN_PASS="changeme123"
 SECRET_KEY=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 

@@ -1818,7 +1818,8 @@
     "mustBeDifferent": "New password must be different from current",
     "incorrect": "Incorrect password",
     "changeSuccess": "Password changed successfully",
-    "changeFailed": "Failed to change password"
+    "changeFailed": "Failed to change password",
+    "skipForNow": "Skip for now"
   },
   "import": {
     "smartImport": "Smart Import",

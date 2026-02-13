@@ -4,7 +4,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Lock, Warning } from '@phosphor-icons/react'
+import { Lock, Warning, SkipForward } from '@phosphor-icons/react'
 import { Modal, Button, Input } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { accountService } from '../services'
@@ -114,7 +114,11 @@ export function ForcePasswordChange({ onComplete }) {
           required
         />
 
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-between pt-2">
+          <Button variant="ghost" onClick={() => onComplete?.()} type="button">
+            <SkipForward size={16} />
+            {t('password.skipForNow')}
+          </Button>
           <Button type="submit" disabled={loading}>
             <Lock size={16} />
             {loading ? t('common.loading') : t('common.changePassword')}

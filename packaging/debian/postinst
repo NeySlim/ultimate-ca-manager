@@ -103,7 +103,7 @@ SUDOERS
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
             JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-            ADMIN_PASS=$(python3 -c 'import secrets; print(secrets.token_hex(8))')
+            ADMIN_PASS="changeme123"
             
             cat > "$UCM_CONFIG/ucm.env" << ENVEOF
 # ============================================================
