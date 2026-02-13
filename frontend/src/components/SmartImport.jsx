@@ -339,7 +339,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       setStep('preview')
     } catch (err) {
       console.error('[SmartImport] Analysis error:', err)
-      showError(err.response?.data?.error || err.message || t('import.analyzeFailed'))
+      showError(err.message || t('import.analyzeFailed'))
     } finally {
       setIsAnalyzing(false)
     }
@@ -369,7 +369,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         showSuccess(t('import.successImported', { count: totalImported }))
       }
     } catch (err) {
-      showError(err.response?.data?.error || t('common.importFailed'))
+      showError(err.message || t('common.importFailed'))
       setStep('preview')
     } finally {
       setIsImporting(false)

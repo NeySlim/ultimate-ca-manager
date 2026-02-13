@@ -8,6 +8,36 @@ const API_BASE_URL = '/api/v2'
 // CSRF token storage key
 const CSRF_TOKEN_KEY = 'ucm_csrf_token'
 
+// Human-readable error messages for HTTP status codes
+const HTTP_ERROR_MESSAGES = {
+  400: 'Invalid request. Please check your input and try again.',
+  401: 'Your session has expired. Please log in again.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested resource was not found.',
+  405: 'This operation is not supported.',
+  408: 'The request timed out. Please try again.',
+  409: 'Conflict: this resource already exists or is in use.',
+  413: 'The file is too large. Maximum upload size is 10 MB.',
+  415: 'Unsupported file type.',
+  422: 'The data provided is invalid. Please check and try again.',
+  429: 'Too many requests. Please wait a moment and try again.',
+  500: 'An internal server error occurred. Please try again later.',
+  502: 'The server is temporarily unavailable. Please try again later.',
+  503: 'The service is currently unavailable. Please try again later.',
+  504: 'The server took too long to respond. Please try again.',
+}
+
+/**
+ * Build a user-friendly error message from an HTTP response.
+ * Priority: backend message > status-code message > generic fallback.
+ */
+function buildErrorMessage(status, data, fallback = 'Request failed') {
+  const backendMsg = (typeof data === 'object' && data !== null)
+    ? (data.message || data.error)
+    : null
+  return backendMsg || HTTP_ERROR_MESSAGES[status] || fallback
+}
+
 class APIClient {
   constructor() {
     this.baseURL = API_BASE_URL
@@ -83,7 +113,8 @@ class APIClient {
       }
 
       if (!response.ok) {
-        const error = new Error(data.message || data.error || 'Request failed')
+        const msg = buildErrorMessage(response.status, data)
+        const error = new Error(msg)
         error.status = response.status
         error.data = data
         console.error(`❌ API error ${response.status}:`, error.message)
@@ -164,7 +195,8 @@ class APIClient {
       const data = await response.json()
 
       if (!response.ok) {
-        const error = new Error(data.message || data.error || 'Upload failed')
+        const msg = buildErrorMessage(response.status, data, 'Upload failed')
+        const error = new Error(msg)
         error.status = response.status
         error.data = data
         throw error
@@ -197,7 +229,8 @@ class APIClient {
     const response = await fetch(url, config)
     
     if (!response.ok) {
-      throw new Error('Download failed')
+      const msg = HTTP_ERROR_MESSAGES[response.status] || 'Download failed'
+      throw new Error(msg)
     }
     
     return response.blob()
