@@ -854,28 +854,30 @@ export const helpContent = {
   // SECURITY DASHBOARD (Pro)
   // ===========================================
   security: {
-    title: 'Security Dashboard',
-    subtitle: 'Monitor and manage security settings (Pro)',
-    overview: 'The Security Dashboard provides visibility into UCM security status. Monitor secrets, detect anomalies, and verify audit log integrity.',
+    title: 'Security Settings',
+    subtitle: 'Security configuration and monitoring',
+    overview: 'Security settings let you manage encryption, authentication policies, and monitor for suspicious activity. Audit log integrity can be verified from the Audit Logs page.',
     sections: [
       {
-        title: 'Secrets Management',
-        icon: Key,
-        content: 'UCM uses cryptographic secrets for session management:',
-        definitions: [
-          { term: 'Session Secret', description: 'Encrypts server-side sessions (32+ bytes recommended)' },
-          { term: 'Encryption Key', description: 'Optional key for encrypting private keys at rest' },
+        title: 'Private Key Encryption',
+        icon: Lock,
+        content: 'Encrypt private keys at rest using AES-256 (Fernet):',
+        items: [
+          { label: 'Enable', text: 'Click "Enable Encryption" to generate a master key and encrypt all stored private keys' },
+          { label: 'Key File', text: 'Master key is stored at /etc/ucm/master.key — back it up securely' },
+          { label: 'Safe Mode', text: 'If the key file is missing at startup, UCM enters safe mode until it is restored' },
+          { label: 'Disable', text: 'Decrypts all keys and removes the master key file' },
         ]
       },
       {
-        title: 'Secret Rotation',
+        title: 'Authentication Policies',
         icon: ShieldCheck,
-        content: 'Rotate secrets periodically for security:',
-        items: [
-          { label: 'Generate', text: 'Click "Rotate Session Secret" to generate a new secret' },
-          { label: 'Apply', text: 'Copy the new secret to your environment variables' },
-          { label: 'Restart', text: 'Restart UCM backend to apply the new secret' },
-          { label: 'Sessions', text: 'Existing sessions will be invalidated after rotation' },
+        content: 'Configure security policies for user authentication:',
+        definitions: [
+          { term: 'Two-Factor Auth', description: 'Enforce TOTP-based 2FA for all users' },
+          { term: 'Password Policy', description: 'Set minimum length and character requirements' },
+          { term: 'Session Duration', description: 'Control how long sessions remain valid' },
+          { term: 'Rate Limiting', description: 'Limit API requests per minute per user' },
         ]
       },
       {
@@ -888,28 +890,18 @@ export const helpContent = {
           { term: 'New Device', description: 'Login from previously unseen device/location' },
           { term: 'Brute Force', description: 'Rapid login attempts on same account' },
         ]
-      },
-      {
-        title: 'Audit Integrity',
-        icon: Lock,
-        content: 'Audit logs use a cryptographic hash chain. Each entry contains a hash of the previous entry, making it impossible to modify or delete logs without detection.',
-        items: [
-          { label: 'Verify', text: 'Click "Verify Audit Integrity" to check the hash chain' },
-          { label: 'Green', text: 'All entries verified - no tampering detected' },
-          { label: 'Red', text: 'Hash mismatch - investigate immediately' },
-        ]
       }
     ],
     tips: [
-      'Rotate session secrets every 90 days',
-      'Review anomalies daily for suspicious activity',
-      'Verify audit integrity after any incident',
-      'Use strong secrets (32+ random bytes)'
+      'Enable encryption to protect private keys at rest',
+      'Review anomalies regularly for suspicious activity',
+      'Enforce 2FA for all users in production environments',
+      'Always back up your master.key file securely'
     ],
     warnings: [
-      'Rotating secrets invalidates all existing sessions',
-      'Keep backup of current secrets before rotation',
-      'Audit integrity failures may indicate compromise'
+      'Losing the master.key file with encryption enabled will lock you out',
+      'Enabling encryption requires a service restart on other workers',
+      'Always create a backup before enabling or disabling encryption'
     ],
     related: ['Audit Logs', 'Users', 'Settings']
   }

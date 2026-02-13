@@ -771,11 +771,9 @@ export default function SettingsPage() {
   const [encryptionConfirmText, setEncryptionConfirmText] = useState('')
   const [encryptionChecks, setEncryptionChecks] = useState({ backup: false, keyFile: false, lostKeys: false })
 
-  // Anomaly detection & secrets states
+  // Anomaly detection state
   const [anomalies, setAnomalies] = useState([])
   const [anomaliesLoading, setAnomaliesLoading] = useState(false)
-  const [secretsStatus, setSecretsStatus] = useState(null)
-  const [rotating, setRotating] = useState(false)
 
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
@@ -791,7 +789,6 @@ export default function SettingsPage() {
     loadWebhooks()
     loadEncryptionStatus()
     loadAnomalies()
-    loadSecretsStatus()
   }, [])
 
   const loadSettings = async () => {
@@ -1080,29 +1077,6 @@ export default function SettingsPage() {
       console.error('Failed to load anomalies:', error)
     } finally {
       setAnomaliesLoading(false)
-    }
-  }
-
-  // Secrets status
-  const loadSecretsStatus = async () => {
-    try {
-      const response = await apiClient.get('/system/security/secrets-status')
-      setSecretsStatus(response.data || response)
-    } catch (error) {
-      console.error('Failed to load secrets status:', error)
-    }
-  }
-
-  const handleRotateSecrets = async () => {
-    setRotating(true)
-    try {
-      await apiClient.post('/system/security/rotate-secrets', {})
-      showSuccess(t('settings.secretsRotated'))
-      await loadSecretsStatus()
-    } catch (error) {
-      showError(error.message || t('settings.secretsRotateFailed'))
-    } finally {
-      setRotating(false)
     }
   }
 
@@ -1650,40 +1624,6 @@ export default function SettingsPage() {
                   <ArrowsClockwise size={14} />
                   {t('common.refresh')}
                 </Button>
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.secretsStatus')} icon={Key} iconClass="icon-bg-purple">
-              <div className="space-y-3">
-                {secretsStatus ? (
-                  <>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        {secretsStatus.session_secret?.configured ? (
-                          <CheckCircle size={18} weight="fill" className="text-status-success" />
-                        ) : (
-                          <XCircle size={18} weight="fill" className="text-status-danger" />
-                        )}
-                        <span className="text-sm text-text-primary">{t('settings.sessionSecret')}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {secretsStatus.encryption_key?.configured ? (
-                          <CheckCircle size={18} weight="fill" className="text-status-success" />
-                        ) : (
-                          <Warning size={18} weight="fill" className="text-status-warning" />
-                        )}
-                        <span className="text-sm text-text-primary">{t('settings.encryptionKeyStatus')}</span>
-                      </div>
-                    </div>
-                    {hasPermission('admin:system') && (
-                      <Button variant="secondary" size="sm" onClick={handleRotateSecrets} loading={rotating}>
-                        <ArrowsClockwise size={14} />
-                        {t('settings.rotateSecrets')}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <LoadingSpinner size="sm" />
-                )}
               </div>
             </DetailSection>
             <DetailSection title={t('settings.sessionRateLimits')} icon={Timer} iconClass="icon-bg-teal">
