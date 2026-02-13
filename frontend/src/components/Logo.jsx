@@ -1,106 +1,88 @@
 /**
- * UCM Logo Component - Certificate Chain
- * Based on design from docs/design/logo-chain-complete.html
- * Uses CSS variables from :root for colors
+ * UCM Logo Component - U Orbit
+ * Stylized U letter with protective orbital arcs
+ * Uses CSS variables for gradient colors
  */
 import { cn } from '../lib/utils'
 
-export function Logo({ 
+const sizes = {
+  xs: 16,
+  sm: 24,
+  md: 32,
+  lg: 48,
+  xl: 64,
+}
+
+function LogoIcon({ size = 32, className }) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      className={className}
+    >
+      <defs>
+        <linearGradient id="ucm-g1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--logo-gradient-start)" />
+          <stop offset="50%" stopColor="var(--logo-gradient-mid)" />
+          <stop offset="100%" stopColor="var(--logo-gradient-end)" />
+        </linearGradient>
+        <linearGradient id="ucm-g2" x1="100%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="var(--logo-gradient-accent)" />
+          <stop offset="100%" stopColor="var(--logo-gradient-start)" />
+        </linearGradient>
+      </defs>
+      {/* Dashed orbit ring */}
+      <ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#ucm-g1)" strokeWidth="3" strokeDasharray="8 4" opacity="0.3" />
+      {/* Left arc */}
+      <path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#ucm-g2)" strokeWidth="3.5" strokeLinecap="round" />
+      {/* Right arc */}
+      <path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#ucm-g1)" strokeWidth="3.5" strokeLinecap="round" />
+      {/* U letter */}
+      <path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#ucm-g1)" strokeWidth="4.5" strokeLinecap="round" />
+      {/* Accent dot */}
+      <circle cx="38" cy="12" r="3" fill="url(#ucm-g2)" />
+    </svg>
+  )
+}
+
+export function Logo({
   variant = 'horizontal', // 'horizontal' | 'vertical' | 'compact' | 'icon'
   withText = true,
   size = 'md', // 'xs' | 'sm' | 'md' | 'lg' | 'xl'
-  filled = false,
-  className 
+  className
 }) {
-  // Chain configuration based on variant (from reference design)
-  const configs = {
-    horizontal: {
-      container: 'flex items-center',
-      gap: size === 'xs' ? '1px' : size === 'sm' ? '2px' : '4px',
-      linkWidth: size === 'xs' ? '8px' : size === 'sm' ? '12px' : size === 'lg' ? '24px' : '16px',
-      linkHeight: size === 'xs' ? '13px' : size === 'sm' ? '18px' : size === 'lg' ? '36px' : '24px',
-      borderWidth: size === 'xs' ? '1.5px' : size === 'sm' ? '2px' : size === 'lg' ? '4px' : '3px',
-      borderRadius: size === 'xs' ? '4px' : '8px',
-      transforms: [
-        'translateY(0)',
-        size === 'xs' ? 'translateY(4px)' : size === 'sm' ? 'translateY(6px)' : size === 'lg' ? 'translateY(12px)' : 'translateY(8px)',
-        size === 'xs' ? 'translateY(-2px)' : size === 'sm' ? 'translateY(-3px)' : size === 'lg' ? 'translateY(-6px)' : 'translateY(-4px)'
-      ]
-    },
-    compact: {
-      container: 'flex items-center',
-      gap: size === 'xs' ? '1px' : '2px',
-      linkWidth: size === 'xs' ? '8px' : '12px',
-      linkHeight: size === 'xs' ? '14px' : '20px',
-      borderWidth: size === 'xs' ? '1.5px' : '2px',
-      borderRadius: size === 'xs' ? '4px' : '8px',
-      transforms: size === 'xs'
-        ? ['translateY(0)', 'translateY(4px)', 'translateY(-2px)']
-        : ['translateY(0)', 'translateY(6px)', 'translateY(-3px)']
-    },
-    vertical: {
-      container: 'flex flex-col items-center',
-      gap: '4px',
-      linkWidth: '24px',
-      linkHeight: '16px',
-      borderWidth: '3px',
-      borderRadius: '8px',
-      transforms: ['translateX(0)', 'translateX(8px)', 'translateX(-4px)']
-    },
-    icon: {
-      container: 'flex items-center',
-      gap: '4px',
-      linkWidth: '16px',
-      linkHeight: '24px',
-      borderWidth: '3px',
-      borderRadius: '8px',
-      transforms: ['translateY(0)', 'translateY(8px)', 'translateY(-4px)']
-    }
-  }
-
-  const config = configs[variant] || configs.horizontal
-
-  const chainIcon = (
-    <div className={config.container} style={{ gap: config.gap }}>
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className={filled ? 'chain-link-filled' : 'chain-link-gradient'}
-          style={{
-            width: config.linkWidth,
-            height: config.linkHeight,
-            borderWidth: filled ? '0' : config.borderWidth,
-            borderRadius: config.borderRadius,
-            transform: config.transforms[i]
-          }}
-        />
-      ))}
-    </div>
-  )
+  const iconPx = sizes[size] || sizes.md
 
   if (!withText || variant === 'icon') {
-    return <div className={className}>{chainIcon}</div>
+    return (
+      <div className={className}>
+        <LogoIcon size={iconPx} />
+      </div>
+    )
   }
 
-  // With text - vertical variant
-  if (variant === 'vertical') {
+  // Vertical variant
+  if (variant === 'vertical' || variant === 'stacked') {
     return (
       <div className={cn('flex flex-col items-center', className)} style={{ gap: '12px' }}>
-        {chainIcon}
+        <LogoIcon size={iconPx} />
         <div className="text-center">
-          <div 
+          <div
             className="font-black tracking-tight leading-none logo-text-gradient"
-            style={{ fontSize: '32px', letterSpacing: '-1px' }}
+            style={{ fontSize: size === 'lg' ? '32px' : '24px', letterSpacing: '-1px' }}
           >
             UCM
           </div>
-          <div 
-            className="font-semibold uppercase" 
-            style={{ 
-              fontSize: '9px', 
-              letterSpacing: '2px', 
-              color: 'var(--text-tertiary)', 
-              marginTop: '2px' 
+          <div
+            className="font-semibold uppercase"
+            style={{
+              fontSize: '9px',
+              letterSpacing: '2px',
+              color: 'var(--text-tertiary)',
+              marginTop: '2px'
             }}
           >
             Certificate Manager
@@ -110,26 +92,24 @@ export function Logo({
     )
   }
 
-  // Horizontal with text (main logo)
+  // Horizontal / compact with text
+  const fontSize = variant === 'compact' ? '18px' : size === 'lg' ? '32px' : '24px'
   return (
-    <div className={cn('flex items-center', className)} style={{ gap: '12px' }}>
-      {chainIcon}
+    <div className={cn('flex items-center', className)} style={{ gap: variant === 'compact' ? '8px' : '12px' }}>
+      <LogoIcon size={iconPx} />
       <div className="flex flex-col">
-        <div 
+        <div
           className="font-black tracking-tight leading-none logo-text-gradient"
-          style={{ 
-            fontSize: variant === 'compact' ? '18px' : '32px',
-            letterSpacing: '-1px'
-          }}
+          style={{ fontSize, letterSpacing: '-1px' }}
         >
           UCM
         </div>
         {variant !== 'compact' && (
-          <div 
-            className="font-semibold uppercase" 
-            style={{ 
-              fontSize: '9px', 
-              letterSpacing: '2px', 
+          <div
+            className="font-semibold uppercase"
+            style={{
+              fontSize: '9px',
+              letterSpacing: '2px',
               color: 'var(--text-tertiary)',
               marginTop: '2px'
             }}

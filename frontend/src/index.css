@@ -81,8 +81,10 @@
   --border-strong: rgba(255, 255, 255, 0.12);
   
   /* Logo gradient colors */
-  --logo-gradient-start: #5a9cf7;
-  --logo-gradient-end: #a78bfa;
+  --logo-gradient-start: #fb923c;
+  --logo-gradient-mid: #f97316;
+  --logo-gradient-end: #ea580c;
+  --logo-gradient-accent: #fbbf24;
   
   /* ===== ENHANCED SHADOW SYSTEM ===== */
   --shadow-color: 220deg 40% 2%;
@@ -194,8 +196,10 @@
   /* Icon colors removed - managed by ThemeContext */
   
   /* Logo gradient colors - light */
-  --logo-gradient-start: #3B82F6;
-  --logo-gradient-end: #8B5CF6;
+  --logo-gradient-start: #f97316;
+  --logo-gradient-mid: #ea580c;
+  --logo-gradient-end: #c2410c;
+  --logo-gradient-accent: #f59e0b;
   
   /* Light theme shadow adjustments */
   --shadow-color: 220deg 20% 50%;
@@ -275,7 +279,7 @@
 }
 
 .logo-text-gradient {
-  background: linear-gradient(135deg, var(--logo-gradient-start), var(--logo-gradient-end));
+  background: linear-gradient(135deg, var(--logo-gradient-start), var(--logo-gradient-mid), var(--logo-gradient-end));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UCM Logo Concepts</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; }
+  h1 { text-align: center; margin-bottom: 40px; font-size: 28px; color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; max-width: 1200px; margin: 0 auto; }
+  .card { background: #1a1d27; border: 1px solid #2a2d37; border-radius: 16px; padding: 40px; text-align: center; }
+  .card h2 { margin-bottom: 8px; font-size: 18px; color: #fff; }
+  .card p { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .logo-area { display: flex; align-items: center; justify-content: center; gap: 40px; margin-bottom: 20px; min-height: 100px; }
+  .icon-only { width: 48px; height: 48px; }
+  .icon-sm { width: 32px; height: 32px; }
+  .with-text { display: flex; align-items: center; gap: 12px; }
+  .logo-text { font-weight: 900; font-size: 28px; letter-spacing: -1px; }
+  .logo-sub { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-top: 2px; }
+  .sizes { display: flex; gap: 20px; align-items: center; justify-content: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a2d37; }
+  .sizes span { font-size: 11px; color: #666; }
+
+  /* ========================================
+     CONCEPT 1: Shield with checkmark gradient
+     ======================================== */
+  .c1-shield {
+    position: relative;
+  }
+  .c1-shield svg { filter: drop-shadow(0 4px 12px rgba(99, 102, 241, 0.3)); }
+
+  /* ========================================
+     CONCEPT 2: Seal / stamp with U
+     ======================================== */
+  .c2-seal {
+    position: relative;
+  }
+  .c2-seal svg { filter: drop-shadow(0 4px 12px rgba(236, 72, 153, 0.3)); }
+
+  /* ========================================
+     CONCEPT 3: Lock keyhole with gradient ring
+     ======================================== */
+  .c3-lock {
+    position: relative;
+  }
+  .c3-lock svg { filter: drop-shadow(0 4px 12px rgba(14, 165, 233, 0.3)); }
+
+  /* ========================================
+     CONCEPT 4: Hexagon with key
+     ======================================== */
+  .c4-hex {
+    position: relative;
+  }
+  .c4-hex svg { filter: drop-shadow(0 4px 12px rgba(34, 197, 94, 0.3)); }
+
+  /* ========================================
+     CONCEPT 5: Abstract U / orbit
+     ======================================== */
+  .c5-orbit {
+    position: relative;
+  }
+  .c5-orbit svg { filter: drop-shadow(0 4px 12px rgba(251, 146, 60, 0.3)); }
+</style>
+</head>
+<body>
+
+<h1>🎨 UCM Logo Concepts — Modern / Gradient</h1>
+
+<div class="grid">
+
+  <!-- CONCEPT 1: Shield + Checkmark -->
+  <div class="card">
+    <h2>① Shield + Checkmark</h2>
+    <p>Protection, certification validée. Dégradé violet → bleu.</p>
+    <div class="logo-area">
+      <div class="c1-shield icon-only">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#818cf8"/>
+              <stop offset="50%" stop-color="#6366f1"/>
+              <stop offset="100%" stop-color="#4f46e5"/>
+            </linearGradient>
+            <linearGradient id="g1b" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a5b4fc"/>
+              <stop offset="100%" stop-color="#818cf8"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 4L6 12v12c0 11 8 18 18 22 10-4 18-11 18-22V12L24 4z" fill="url(#g1)" opacity="0.9"/>
+          <path d="M24 8L10 14v10c0 9 6.5 15 14 18.5 7.5-3.5 14-9.5 14-18.5V14L24 8z" fill="none" stroke="url(#g1b)" stroke-width="1.5" opacity="0.5"/>
+          <path d="M17 24l5 5 9-10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="with-text">
+        <div class="c1-shield" style="width:36px;height:36px">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M24 4L6 12v12c0 11 8 18 18 22 10-4 18-11 18-22V12L24 4z" fill="url(#g1)" opacity="0.9"/>
+            <path d="M17 24l5 5 9-10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-text" style="background: linear-gradient(135deg, #818cf8, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">UCM</div>
+          <div class="logo-sub">Certificate Manager</div>
+        </div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="c1-shield" style="width:16px;height:16px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 4L6 12v12c0 11 8 18 18 22 10-4 18-11 18-22V12L24 4z" fill="url(#g1)"/><path d="M17 24l5 5 9-10" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>16px</span>
+      <div class="c1-shield" style="width:24px;height:24px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 4L6 12v12c0 11 8 18 18 22 10-4 18-11 18-22V12L24 4z" fill="url(#g1)"/><path d="M17 24l5 5 9-10" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>24px</span>
+      <div class="c1-shield" style="width:48px;height:48px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 4L6 12v12c0 11 8 18 18 22 10-4 18-11 18-22V12L24 4z" fill="url(#g1)"/><path d="M17 24l5 5 9-10" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>48px</span>
+    </div>
+  </div>
+
+  <!-- CONCEPT 2: Seal / Rosette -->
+  <div class="card">
+    <h2>② Seal / Cachet</h2>
+    <p>Certification officielle. Dégradé rose → violet.</p>
+    <div class="logo-area">
+      <div class="c2-seal icon-only">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f472b6"/>
+              <stop offset="100%" stop-color="#a855f7"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 2l3.5 6.5L34 6l1 7 7 1-2.5 6.5L46 24l-6.5 3.5L42 34l-7 1-1 7-6.5-2.5L24 46l-3.5-6.5L14 42l-1-7-7-1 2.5-6.5L2 24l6.5-3.5L6 14l7-1 1-7 6.5 2.5z" fill="url(#g2)"/>
+          <circle cx="24" cy="24" r="12" fill="none" stroke="white" stroke-width="1.5" opacity="0.4"/>
+          <path d="M18 24l4 4 8-8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="with-text">
+        <div class="c2-seal" style="width:36px;height:36px">
+          <svg viewBox="0 0 48 48" fill="none"><path d="M24 2l3.5 6.5L34 6l1 7 7 1-2.5 6.5L46 24l-6.5 3.5L42 34l-7 1-1 7-6.5-2.5L24 46l-3.5-6.5L14 42l-1-7-7-1 2.5-6.5L2 24l6.5-3.5L6 14l7-1 1-7 6.5 2.5z" fill="url(#g2)"/><path d="M18 24l4 4 8-8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </div>
+        <div>
+          <div class="logo-text" style="background: linear-gradient(135deg, #f472b6, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">UCM</div>
+          <div class="logo-sub">Certificate Manager</div>
+        </div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="c2-seal" style="width:16px;height:16px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 2l3.5 6.5L34 6l1 7 7 1-2.5 6.5L46 24l-6.5 3.5L42 34l-7 1-1 7-6.5-2.5L24 46l-3.5-6.5L14 42l-1-7-7-1 2.5-6.5L2 24l6.5-3.5L6 14l7-1 1-7 6.5 2.5z" fill="url(#g2)"/><path d="M18 24l4 4 8-8" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>16px</span>
+      <div class="c2-seal" style="width:24px;height:24px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 2l3.5 6.5L34 6l1 7 7 1-2.5 6.5L46 24l-6.5 3.5L42 34l-7 1-1 7-6.5-2.5L24 46l-3.5-6.5L14 42l-1-7-7-1 2.5-6.5L2 24l6.5-3.5L6 14l7-1 1-7 6.5 2.5z" fill="url(#g2)"/><path d="M18 24l4 4 8-8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>24px</span>
+      <div class="c2-seal" style="width:48px;height:48px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 2l3.5 6.5L34 6l1 7 7 1-2.5 6.5L46 24l-6.5 3.5L42 34l-7 1-1 7-6.5-2.5L24 46l-3.5-6.5L14 42l-1-7-7-1 2.5-6.5L2 24l6.5-3.5L6 14l7-1 1-7 6.5 2.5z" fill="url(#g2)"/><path d="M18 24l4 4 8-8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>48px</span>
+    </div>
+  </div>
+
+  <!-- CONCEPT 3: Lock / Keyhole circle -->
+  <div class="card">
+    <h2>③ Lock Ring</h2>
+    <p>Sécurité, confiance. Dégradé cyan → bleu.</p>
+    <div class="logo-area">
+      <div class="c3-lock icon-only">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee"/>
+              <stop offset="100%" stop-color="#3b82f6"/>
+            </linearGradient>
+          </defs>
+          <circle cx="24" cy="24" r="20" fill="url(#g3)"/>
+          <circle cx="24" cy="24" r="16" fill="none" stroke="white" stroke-width="1" opacity="0.2"/>
+          <!-- Lock body -->
+          <rect x="17" y="22" width="14" height="12" rx="3" fill="white" opacity="0.95"/>
+          <!-- Lock shackle -->
+          <path d="M19 22v-4a5 5 0 0 1 10 0v4" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
+          <!-- Keyhole -->
+          <circle cx="24" cy="27" r="2" fill="url(#g3)"/>
+          <rect x="23" y="28" width="2" height="3" rx="1" fill="url(#g3)"/>
+        </svg>
+      </div>
+      <div class="with-text">
+        <div class="c3-lock" style="width:36px;height:36px">
+          <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" fill="url(#g3)"/><rect x="17" y="22" width="14" height="12" rx="3" fill="white" opacity="0.95"/><path d="M19 22v-4a5 5 0 0 1 10 0v4" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/><circle cx="24" cy="27" r="2" fill="url(#g3)"/><rect x="23" y="28" width="2" height="3" rx="1" fill="url(#g3)"/></svg>
+        </div>
+        <div>
+          <div class="logo-text" style="background: linear-gradient(135deg, #22d3ee, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">UCM</div>
+          <div class="logo-sub">Certificate Manager</div>
+        </div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="c3-lock" style="width:16px;height:16px"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" fill="url(#g3)"/><rect x="17" y="22" width="14" height="12" rx="3" fill="white"/><path d="M19 22v-4a5 5 0 0 1 10 0v4" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+      <span>16px</span>
+      <div class="c3-lock" style="width:24px;height:24px"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" fill="url(#g3)"/><rect x="17" y="22" width="14" height="12" rx="3" fill="white"/><path d="M19 22v-4a5 5 0 0 1 10 0v4" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="27" r="2" fill="url(#g3)"/></svg></div>
+      <span>24px</span>
+      <div class="c3-lock" style="width:48px;height:48px"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" fill="url(#g3)"/><rect x="17" y="22" width="14" height="12" rx="3" fill="white"/><path d="M19 22v-4a5 5 0 0 1 10 0v4" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="27" r="2" fill="url(#g3)"/><rect x="23" y="28" width="2" height="3" rx="1" fill="url(#g3)"/></svg></div>
+      <span>48px</span>
+    </div>
+  </div>
+
+  <!-- CONCEPT 4: Hexagon + Key -->
+  <div class="card">
+    <h2>④ Hex Key</h2>
+    <p>Tech, infrastructure. Dégradé vert → émeraude.</p>
+    <div class="logo-area">
+      <div class="c4-hex icon-only">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#34d399"/>
+              <stop offset="100%" stop-color="#059669"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 3L43 14v18L24 45 5 32V14z" fill="url(#g4)"/>
+          <path d="M24 7L39 16v16L24 41 9 30V16z" fill="none" stroke="white" stroke-width="0.8" opacity="0.2"/>
+          <!-- Key -->
+          <circle cx="21" cy="22" r="5" fill="none" stroke="white" stroke-width="2.5"/>
+          <path d="M25 25l8 8" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M30 30l3-1" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M32 32l2.5-1" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="with-text">
+        <div class="c4-hex" style="width:36px;height:36px">
+          <svg viewBox="0 0 48 48" fill="none"><path d="M24 3L43 14v18L24 45 5 32V14z" fill="url(#g4)"/><circle cx="21" cy="22" r="5" fill="none" stroke="white" stroke-width="2.5"/><path d="M25 25l8 8" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M30 30l3-1M32 32l2.5-1" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="logo-text" style="background: linear-gradient(135deg, #34d399, #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">UCM</div>
+          <div class="logo-sub">Certificate Manager</div>
+        </div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="c4-hex" style="width:16px;height:16px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 3L43 14v18L24 45 5 32V14z" fill="url(#g4)"/><circle cx="21" cy="22" r="5" fill="none" stroke="white" stroke-width="3.5"/><path d="M25 25l8 8" stroke="white" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+      <span>16px</span>
+      <div class="c4-hex" style="width:24px;height:24px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 3L43 14v18L24 45 5 32V14z" fill="url(#g4)"/><circle cx="21" cy="22" r="5" fill="none" stroke="white" stroke-width="3"/><path d="M25 25l8 8" stroke="white" stroke-width="3" stroke-linecap="round"/><path d="M30 30l3-1" stroke="white" stroke-width="3" stroke-linecap="round"/></svg></div>
+      <span>24px</span>
+      <div class="c4-hex" style="width:48px;height:48px"><svg viewBox="0 0 48 48" fill="none"><path d="M24 3L43 14v18L24 45 5 32V14z" fill="url(#g4)"/><circle cx="21" cy="22" r="5" fill="none" stroke="white" stroke-width="2.5"/><path d="M25 25l8 8" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M30 30l3-1M32 32l2.5-1" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+      <span>48px</span>
+    </div>
+  </div>
+
+  <!-- CONCEPT 5: Abstract U / Orbit -->
+  <div class="card">
+    <h2>⑤ U Orbit</h2>
+    <p>Lettre U stylisée avec orbite protectrice. Dégradé orange → ambre.</p>
+    <div class="logo-area">
+      <div class="c5-orbit icon-only">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#fb923c"/>
+              <stop offset="50%" stop-color="#f97316"/>
+              <stop offset="100%" stop-color="#ea580c"/>
+            </linearGradient>
+            <linearGradient id="g5b" x1="100%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#fbbf24"/>
+              <stop offset="100%" stop-color="#f97316"/>
+            </linearGradient>
+          </defs>
+          <!-- Orbit ring -->
+          <ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#g5)" stroke-width="3" stroke-dasharray="8 4" opacity="0.3"/>
+          <!-- Solid arc (protective shield arc) -->
+          <path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#g5b)" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#g5)" stroke-width="3.5" stroke-linecap="round"/>
+          <!-- U letter -->
+          <path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#g5)" stroke-width="4.5" stroke-linecap="round"/>
+          <!-- Dot accent -->
+          <circle cx="38" cy="12" r="3" fill="url(#g5b)"/>
+        </svg>
+      </div>
+      <div class="with-text">
+        <div class="c5-orbit" style="width:36px;height:36px">
+          <svg viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#g5)" stroke-width="3" stroke-dasharray="8 4" opacity="0.3"/><path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#g5b)" stroke-width="3.5" stroke-linecap="round"/><path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#g5)" stroke-width="3.5" stroke-linecap="round"/><path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#g5)" stroke-width="4.5" stroke-linecap="round"/><circle cx="38" cy="12" r="3" fill="url(#g5b)"/></svg>
+        </div>
+        <div>
+          <div class="logo-text" style="background: linear-gradient(135deg, #fb923c, #ea580c); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">UCM</div>
+          <div class="logo-sub">Certificate Manager</div>
+        </div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div class="c5-orbit" style="width:16px;height:16px"><svg viewBox="0 0 48 48" fill="none"><path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#g5b)" stroke-width="5" stroke-linecap="round"/><path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#g5)" stroke-width="5" stroke-linecap="round"/><path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#g5)" stroke-width="6" stroke-linecap="round"/></svg></div>
+      <span>16px</span>
+      <div class="c5-orbit" style="width:24px;height:24px"><svg viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#g5)" stroke-width="3" stroke-dasharray="8 4" opacity="0.3"/><path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#g5b)" stroke-width="4" stroke-linecap="round"/><path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#g5)" stroke-width="4" stroke-linecap="round"/><path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#g5)" stroke-width="5" stroke-linecap="round"/><circle cx="38" cy="12" r="3" fill="url(#g5b)"/></svg></div>
+      <span>24px</span>
+      <div class="c5-orbit" style="width:48px;height:48px"><svg viewBox="0 0 48 48" fill="none"><ellipse cx="24" cy="24" rx="21" ry="21" fill="none" stroke="url(#g5)" stroke-width="3" stroke-dasharray="8 4" opacity="0.3"/><path d="M6 32 A21 21 0 0 1 6 16" fill="none" stroke="url(#g5b)" stroke-width="3.5" stroke-linecap="round"/><path d="M42 16 A21 21 0 0 1 42 32" fill="none" stroke="url(#g5)" stroke-width="3.5" stroke-linecap="round"/><path d="M16 14v12a8 8 0 0 0 16 0V14" fill="none" stroke="url(#g5)" stroke-width="4.5" stroke-linecap="round"/><circle cx="38" cy="12" r="3" fill="url(#g5b)"/></svg></div>
+      <span>48px</span>
+    </div>
+  </div>
+
+  <!-- CONCEPT 6: Rounded square with fingerprint/certificate -->
+  <div class="card">
+    <h2>⑥ Certificate Badge</h2>
+    <p>Certificat moderne, sceau digital. Dégradé bleu → indigo.</p>
+    <div class="logo-area">
+      <div class="icon-only">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#60a5fa"/>
+              <stop offset="50%" stop-color="#818cf8"/>
+              <stop offset="100%" stop-color="#a78bfa"/>
+            </linearGradient>
+          </defs>
+          <rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g6)"/>
+          <!-- Certificate/document icon -->
+          <rect x="14" y="10" width="20" height="24" rx="2" fill="white" opacity="0.9"/>
+          <rect x="18" y="15" width="12" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.6"/>
+          <rect x="18" y="19" width="8" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.4"/>
+          <!-- Seal at bottom -->
+          <circle cx="24" cy="38" r="6" fill="white" opacity="0.9"/>
+          <circle cx="24" cy="38" r="4" fill="url(#g6)"/>
+          <path d="M22 38l1.5 1.5 3-3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <div class="with-text">
+        <div style="width:36px;height:36px">
+          <svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g6)"/><rect x="14" y="10" width="20" height="24" rx="2" fill="white" opacity="0.9"/><rect x="18" y="15" width="12" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.6"/><rect x="18" y="19" width="8" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.4"/><circle cx="24" cy="38" r="6" fill="white" opacity="0.9"/><circle cx="24" cy="38" r="4" fill="url(#g6)"/><path d="M22 38l1.5 1.5 3-3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+        </div>
+        <div>
+          <div class="logo-text" style="background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">UCM</div>
+          <div class="logo-sub">Certificate Manager</div>
+        </div>
+      </div>
+    </div>
+    <div class="sizes">
+      <div style="width:16px;height:16px"><svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g6)"/><rect x="14" y="10" width="20" height="24" rx="2" fill="white" opacity="0.9"/><circle cx="24" cy="38" r="5" fill="white"/><circle cx="24" cy="38" r="3.5" fill="url(#g6)"/></svg></div>
+      <span>16px</span>
+      <div style="width:24px;height:24px"><svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g6)"/><rect x="14" y="10" width="20" height="24" rx="2" fill="white" opacity="0.9"/><rect x="18" y="15" width="12" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.6"/><circle cx="24" cy="38" r="5.5" fill="white"/><circle cx="24" cy="38" r="3.5" fill="url(#g6)"/></svg></div>
+      <span>24px</span>
+      <div style="width:48px;height:48px"><svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#g6)"/><rect x="14" y="10" width="20" height="24" rx="2" fill="white" opacity="0.9"/><rect x="18" y="15" width="12" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.6"/><rect x="18" y="19" width="8" height="1.5" rx="0.75" fill="url(#g6)" opacity="0.4"/><circle cx="24" cy="38" r="6" fill="white" opacity="0.9"/><circle cx="24" cy="38" r="4" fill="url(#g6)"/><path d="M22 38l1.5 1.5 3-3" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg></div>
+      <span>48px</span>
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align:center; margin-top:40px; color:#666; font-size:13px;">
+  <p>Preview page — open at <code>https://netsuit.lan.pew.pet:8443/logo-concepts.html</code></p>
+</div>
+
+</body>
+</html>

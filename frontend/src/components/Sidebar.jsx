@@ -100,29 +100,15 @@ export function Sidebar({ activePage }) {
 
   return (
     <div className={cn(sidebarWidth, "h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px")}>
-      {/* Logo - fluid, scales with sidebar width */}
-      <Link to="/" className={cn(isLargeScreen ? "px-3" : "px-2", "w-full py-2 flex items-center justify-center mb-1")} title={t('common.dashboard')}>
-        <div className="flex items-center" style={{ gap: '4%', width: '100%', justifyContent: 'center' }}>
-          {[0, 1, 2].map(i => (
-            <div
-              key={i}
-              className="chain-link-gradient"
-              style={{
-                width: '28%',
-                aspectRatio: '0.6',
-                borderWidth: '2px',
-                borderRadius: '4px',
-                transform: i === 0 ? 'translateY(0)' : i === 1 ? 'translateY(30%)' : 'translateY(-15%)',
-              }}
-            />
-          ))}
-        </div>
+      {/* Logo */}
+      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title={t('common.dashboard')}>
+        <Logo variant="icon" withText={false} size={isLargeScreen ? 'sm' : 'xs'} />
       </Link>
 
       {/* Page Icons */}
       {pages.map((page, idx) => {
         if (page === 'separator') {
-          return <div key={`sep-${idx}`} className="w-6 h-px bg-border/40 my-1" />
+          return <div key={`sep-${idx}`} className="w-6 h-px bg-border/40 my-2" />
         }
         const Icon = page.icon
         const isActive = activePage === page.id
