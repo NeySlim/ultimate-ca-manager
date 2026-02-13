@@ -890,13 +890,13 @@ export default function ACMEPage() {
       <CompactSection title={t('acme.letsEncryptProxy')} icon={ShieldCheck}>
         <div className="space-y-3">
           <ToggleSwitch
-            checked={acmeSettings.proxy_enabled || false}
-            onChange={(val) => updateSetting('proxy_enabled', val)}
+            checked={clientSettings.proxy_enabled || false}
+            onChange={(val) => handleUpdateClientSetting('proxy_enabled', val)}
             label={t('acme.enableLetsEncryptProxy')}
             description={t('acme.enableLetsEncryptProxyDesc')}
           />
 
-          {acmeSettings.proxy_enabled && (
+          {clientSettings.proxy_enabled && (
             <>
               <CompactGrid columns={1}>
                 <CompactField 
@@ -919,14 +919,14 @@ export default function ACMEPage() {
                 <p className="text-xs text-text-tertiary">{t('acme.proxyUsageNote')}</p>
               </div>
               
-              {acmeSettings.proxy_registered ? (
+              {clientSettings.proxy_registered ? (
                 <div className="p-3 rounded-lg status-success-bg status-success-border border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CheckCircle size={18} className="status-success-text" weight="fill" />
                       <div>
                         <p className="text-sm font-medium text-text-primary">{t('acme.proxyRegistered')}</p>
-                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
+                        <p className="text-xs text-text-secondary">{clientSettings.proxy_email}</p>
                       </div>
                     </div>
                     <Button 

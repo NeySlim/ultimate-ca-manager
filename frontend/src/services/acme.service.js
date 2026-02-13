@@ -17,15 +17,6 @@ export const acmeService = {
     return apiClient.get('/acme/stats')
   },
 
-  // Proxy
-  async registerProxy(email) {
-    return apiClient.post('/acme/proxy/register', { email })
-  },
-
-  async unregisterProxy() {
-    return apiClient.post('/acme/proxy/unregister')
-  },
-
   // Accounts (ACME Server accounts)
   async getAccounts() {
     return apiClient.get('/acme/accounts')
@@ -72,6 +63,15 @@ export const acmeService = {
 
   async updateClientSettings(data) {
     return apiClient.patch('/acme/client/settings', data)
+  },
+
+  // LE Proxy
+  async registerProxy(email) {
+    return apiClient.post('/acme/client/proxy/register', { email })
+  },
+
+  async unregisterProxy() {
+    return apiClient.post('/acme/client/proxy/unregister')
   },
 
   // Client Account (Let's Encrypt account)
