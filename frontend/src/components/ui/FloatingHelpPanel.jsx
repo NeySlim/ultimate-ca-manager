@@ -8,7 +8,9 @@ import {
   X, ArrowsOutSimple, ArrowsInSimple, BookOpen, Lightbulb,
   Warning, ArrowRight, Sparkle, Info, Link as LinkIcon,
   List, BookBookmark, CaretRight, CaretDown, Code,
-  Lightning, CheckCircle
+  Lightning, CheckCircle, TextAa, Sun, Moon,
+  MagnifyingGlass, ArrowsOutLineVertical, ArrowsInLineVertical,
+  TextAlignLeft, Rows, Eye
 } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 import { useMobile } from '../../contexts/MobileContext'
@@ -17,15 +19,35 @@ import { helpContent as helpData } from '../../data/helpContent'
 import { helpGuides } from '../../data/helpGuides'
 
 const STORAGE_KEY = 'ucm-help-panel'
-const MIN_W = 380
-const MAX_W = 720
+const READER_KEY = 'ucm-help-reader'
+const MIN_W = 420
+const MAX_W = 900
 const MIN_H = 320
-const DEF_W = 500
-const DEF_H = 560
+const DEF_W = 640
+const DEF_H = 580
 
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
 }
+
+const DEFAULT_READER = { fontSize: 1, contrast: 'normal', spacing: 'compact' }
+function loadReaderPrefs() {
+  try { return { ...DEFAULT_READER, ...JSON.parse(localStorage.getItem(READER_KEY)) } } catch { return { ...DEFAULT_READER } }
+}
+function saveReaderPrefs(prefs) {
+  try { localStorage.setItem(READER_KEY, JSON.stringify(prefs)) } catch {}
+}
+
+const FONT_SIZES = [
+  { label: 'S', size: '11px', lineHeight: '1.5' },
+  { label: 'M', size: '13px', lineHeight: '1.6' },
+  { label: 'L', size: '15px', lineHeight: '1.7' },
+]
+const CONTRAST_MODES = [
+  { key: 'normal', label: 'Normal' },
+  { key: 'high', label: 'High' },
+  { key: 'sepia', label: 'Sepia' },
+]
 
 export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   const { t } = useTranslation()
@@ -46,8 +68,10 @@ export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
 
 function DesktopPanel({ quickContent, guideContent, onClose, t }) {
   const panelRef = useRef(null)
+  const bodyRef = useRef(null)
   const [minimized, setMinimized] = useState(false)
   const posRef = useRef(null)
+  const isDragging = useRef(false)
 
   // Init position once
   if (!posRef.current) {
@@ -65,8 +89,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
     const el = panelRef.current
     if (!el) return
     const p = posRef.current
-    el.style.left = p.x + 'px'
-    el.style.top = p.y + 'px'
+    el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`
     el.style.width = p.w + 'px'
     if (!minimized) el.style.height = p.h + 'px'
   }, [minimized])
@@ -106,6 +129,9 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
     const sp = { ...posRef.current }
     let raf = 0
 
+    document.body.style.userSelect = 'none'
+    isDragging.current = true
+    if (bodyRef.current) bodyRef.current.style.pointerEvents = 'none'
     const onMove = (e) => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
@@ -115,10 +141,13 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
     }
     const onUp = () => {
       cancelAnimationFrame(raf)
+      isDragging.current = false
+      document.body.style.userSelect = ''
+      if (bodyRef.current) bodyRef.current.style.pointerEvents = ''
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current)) } catch {}
-      forceUpdate(n => n + 1) // sync React state
+      forceUpdate(n => n + 1)
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
@@ -132,6 +161,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
     const sp = { ...posRef.current }
     let raf = 0
 
+    document.body.style.userSelect = 'none'
     const onMove = (e) => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
@@ -147,6 +177,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
     }
     const onUp = () => {
       cancelAnimationFrame(raf)
+      document.body.style.userSelect = ''
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current)) } catch {}
@@ -174,14 +205,15 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
       ref={panelRef}
       className={cn(
         'fixed z-50 flex flex-col',
-        'bg-bg-primary border border-border rounded-xl shadow-2xl',
-        'animate-in fade-in-0 zoom-in-95 duration-200'
+        'bg-bg-primary border border-border rounded-xl',
       )}
       style={{
-        left: p.x, top: p.y, width: p.w,
+        left: 0, top: 0,
+        transform: `translate3d(${p.x}px, ${p.y}px, 0)`,
+        width: p.w,
         height: minimized ? 48 : p.h,
         transition: minimized ? 'height 0.2s ease' : undefined,
-        willChange: 'left, top, width, height',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
       }}
     >
       {/* Resize handles */}
@@ -225,7 +257,9 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
 
       {/* Body — tabs + content */}
       {!minimized && (
-        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} />
+        <div ref={bodyRef} className="flex-1 flex flex-col min-h-0">
+        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} />
+        </div>
       )}
     </div>
   )
@@ -235,7 +269,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
 // HELP BODY — Tab switching Quick / Guide
 // =============================================================================
 
-function HelpBody({ quickContent, guideContent, t }) {
+function HelpBody({ quickContent, guideContent, t, isMobileView }) {
   const hasQuick = !!quickContent
   const hasGuide = !!guideContent
   const defaultTab = hasGuide ? 'guide' : 'quick'
@@ -282,7 +316,7 @@ function HelpBody({ quickContent, guideContent, t }) {
           </div>
         )}
         {tab === 'guide' && hasGuide && (
-          <GuideContent markdown={guideContent.content} t={t} />
+          <GuideContent markdown={guideContent.content} t={t} isMobileView={isMobileView} />
         )}
         {tab === 'guide' && !hasGuide && (
           <div className="p-6 text-center text-xs text-text-tertiary">
@@ -428,10 +462,25 @@ function QuickSection({ section }) {
 // GUIDE CONTENT — Markdown renderer with TOC
 // =============================================================================
 
-function GuideContent({ markdown, t }) {
+function GuideContent({ markdown, t, isMobileView }) {
   const { toc, sections } = useMemo(() => parseMarkdown(markdown), [markdown])
   const [openSections, setOpenSections] = useState(() => new Set(toc.map((_, i) => i)))
+  const [readerPrefs, setReaderPrefs] = useState(loadReaderPrefs)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState(0)
+  const [tocCollapsed, setTocCollapsed] = useState(false)
   const sectionRefs = useRef({})
+  const contentRef = useRef(null)
+  const searchRef = useRef(null)
+
+  const updatePref = (key, val) => {
+    setReaderPrefs(prev => {
+      const next = { ...prev, [key]: val }
+      saveReaderPrefs(next)
+      return next
+    })
+  }
 
   const toggleSection = (idx) => {
     setOpenSections(prev => {
@@ -441,58 +490,356 @@ function GuideContent({ markdown, t }) {
     })
   }
 
+  const expandAll = () => setOpenSections(new Set(toc.map((_, i) => i)))
+  const collapseAll = () => setOpenSections(new Set())
+  const allExpanded = openSections.size === toc.length
+
   const scrollTo = (idx) => {
     setOpenSections(prev => new Set([...prev, idx]))
+    setActiveSection(idx)
     setTimeout(() => {
       sectionRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }
 
+  // Track active section on scroll
+  useEffect(() => {
+    const container = contentRef.current
+    if (!container) return
+    const onScroll = () => {
+      const containerTop = container.getBoundingClientRect().top
+      let closest = 0
+      let closestDist = Infinity
+      for (const [idx, el] of Object.entries(sectionRefs.current)) {
+        if (!el) continue
+        const dist = Math.abs(el.getBoundingClientRect().top - containerTop)
+        if (dist < closestDist) { closestDist = dist; closest = parseInt(idx) }
+      }
+      setActiveSection(closest)
+    }
+    container.addEventListener('scroll', onScroll, { passive: true })
+    return () => container.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Ctrl+F to open search
+  useEffect(() => {
+    const h = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        setSearchOpen(true)
+        setTimeout(() => searchRef.current?.focus(), 50)
+      }
+      if (e.key === 'Escape' && searchOpen) {
+        setSearchOpen(false)
+        setSearchQuery('')
+      }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [searchOpen])
+
+  // Search highlight via CSS Custom Highlight API (or fallback)
+  useEffect(() => {
+    const container = contentRef.current
+    if (!container) return
+    if (!searchQuery || searchQuery.length < 2) {
+      // Clear highlights
+      if (CSS.highlights) CSS.highlights.delete('search-results')
+      return
+    }
+    if (!CSS.highlights) return // Fallback: no highlight API
+    const ranges = []
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+    const query = searchQuery.toLowerCase()
+    while (walker.nextNode()) {
+      const node = walker.currentNode
+      const text = node.textContent.toLowerCase()
+      let idx = 0
+      while ((idx = text.indexOf(query, idx)) !== -1) {
+        const range = new Range()
+        range.setStart(node, idx)
+        range.setEnd(node, idx + query.length)
+        ranges.push(range)
+        idx += query.length
+      }
+    }
+    const highlight = new Highlight(...ranges)
+    CSS.highlights.set('search-results', highlight)
+    // Scroll to first result
+    if (ranges.length > 0) {
+      const rect = ranges[0].getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
+        const el = ranges[0].startContainer.parentElement
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+    return () => { if (CSS.highlights) CSS.highlights.delete('search-results') }
+  }, [searchQuery])
+
+  const fs = FONT_SIZES[readerPrefs.fontSize]
+  const contrastStyles = readerPrefs.contrast === 'high'
+    ? { background: 'var(--bg-primary)', color: 'var(--text-primary)', filter: 'contrast(1.2)' }
+    : readerPrefs.contrast === 'sepia'
+    ? { background: '#f4ecd8', color: '#5b4636' }
+    : {}
+
+  const showSidebar = !isMobileView && toc.length > 2 && !tocCollapsed
+
   return (
-    <div className="flex flex-col min-h-0">
-      {/* TOC */}
-      {toc.length > 2 && (
-        <div className="shrink-0 px-3 py-2 border-b border-border bg-bg-tertiary/30">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <List size={12} className="text-text-tertiary" />
-            <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-              {t('help.tableOfContents', 'Contents')}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {toc.map((item, idx) => (
-              <button key={idx} onClick={() => scrollTo(idx)}
-                className="px-2 py-0.5 rounded text-[10px] text-text-secondary hover:text-accent-primary hover:bg-accent-primary/10 transition-colors truncate max-w-[180px]">
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
+    <div className="flex flex-col min-h-0 flex-1">
+      {/* Reader Toolbar */}
+      <ReaderToolbar
+        readerPrefs={readerPrefs}
+        updatePref={updatePref}
+        allExpanded={allExpanded}
+        expandAll={expandAll}
+        collapseAll={collapseAll}
+        searchOpen={searchOpen}
+        setSearchOpen={setSearchOpen}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchRef={searchRef}
+        tocCollapsed={tocCollapsed}
+        setTocCollapsed={setTocCollapsed}
+        showSidebarToggle={!isMobileView && toc.length > 2}
+        t={t}
+      />
+
+      {/* Mobile TOC dropdown */}
+      {isMobileView && toc.length > 2 && (
+        <MobileTocDropdown toc={toc} activeSection={activeSection} scrollTo={scrollTo} t={t} />
       )}
 
-      {/* Sections */}
-      <div className="flex-1 overflow-y-auto">
-        {sections.map((section, idx) => (
-          <div key={idx} ref={el => sectionRefs.current[idx] = el} className="border-b border-border last:border-b-0">
-            <button
-              onClick={() => toggleSection(idx)}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-bg-tertiary/50 transition-colors"
-            >
-              {openSections.has(idx)
-                ? <CaretDown size={12} weight="bold" className="text-accent-primary shrink-0" />
-                : <CaretRight size={12} weight="bold" className="text-text-tertiary shrink-0" />}
-              <span className={cn('text-xs font-semibold', openSections.has(idx) ? 'text-text-primary' : 'text-text-secondary')}>
-                {section.title}
-              </span>
-            </button>
-            {openSections.has(idx) && (
-              <div className="px-4 pb-3">
-                <MarkdownBlock lines={section.lines} />
-              </div>
-            )}
+      {/* Main content area */}
+      <div className="flex-1 flex min-h-0">
+        {/* Desktop Sidebar TOC */}
+        {showSidebar && (
+          <div className="w-[150px] shrink-0 border-r border-border overflow-y-auto bg-bg-secondary/30">
+            <div className="py-2">
+              {toc.map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => scrollTo(idx)}
+                  className={cn(
+                    'w-full text-left px-3 py-1.5 text-[11px] leading-snug transition-colors border-l-2',
+                    activeSection === idx
+                      ? 'border-accent-primary text-accent-primary bg-accent-primary/5 font-medium'
+                      : 'border-transparent text-text-tertiary hover:text-text-secondary hover:bg-bg-tertiary/50'
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
+
+        {/* Scrollable content */}
+        <div
+          ref={contentRef}
+          className="flex-1 overflow-y-auto"
+          style={{
+            ...contrastStyles,
+            fontSize: fs.size,
+            lineHeight: fs.lineHeight,
+          }}
+        >
+          {sections.map((section, idx) => (
+            <div
+              key={idx}
+              ref={el => sectionRefs.current[idx] = el}
+              className="border-b border-border last:border-b-0"
+              style={readerPrefs.contrast === 'sepia' ? { borderColor: '#d4c5a9' } : undefined}
+            >
+              <button
+                onClick={() => toggleSection(idx)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors',
+                  readerPrefs.contrast === 'sepia' ? 'hover:bg-[#ebe0c8]' : 'hover:bg-bg-tertiary/50'
+                )}
+              >
+                {openSections.has(idx)
+                  ? <CaretDown size={12} weight="bold" className={readerPrefs.contrast === 'sepia' ? 'text-[#8b6914] shrink-0' : 'text-accent-primary shrink-0'} />
+                  : <CaretRight size={12} weight="bold" className="text-text-tertiary shrink-0" />}
+                <span className={cn(
+                  'font-semibold',
+                  openSections.has(idx)
+                    ? (readerPrefs.contrast === 'sepia' ? 'text-[#3d2b1f]' : 'text-text-primary')
+                    : 'text-text-secondary'
+                )} style={{ fontSize: `calc(${fs.size} + 1px)` }}>
+                  {section.title}
+                </span>
+              </button>
+              {openSections.has(idx) && (
+                <div className={cn('px-4 pb-3', readerPrefs.spacing === 'comfortable' ? 'space-y-3' : '')}>
+                  <MarkdownBlock lines={section.lines} searchQuery={searchQuery} contrast={readerPrefs.contrast} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// READER TOOLBAR — Font size, contrast, spacing, search, expand/collapse
+// =============================================================================
+
+function ReaderToolbar({
+  readerPrefs, updatePref, allExpanded, expandAll, collapseAll,
+  searchOpen, setSearchOpen, searchQuery, setSearchQuery, searchRef,
+  tocCollapsed, setTocCollapsed, showSidebarToggle, t
+}) {
+  return (
+    <div className="shrink-0 border-b border-border bg-bg-secondary/40">
+      <div className="flex items-center gap-1 px-2 py-1.5 flex-wrap">
+        {/* Sidebar toggle */}
+        {showSidebarToggle && (
+          <ToolbarBtn
+            icon={tocCollapsed ? <Rows size={13} /> : <TextAlignLeft size={13} />}
+            title={tocCollapsed ? 'Show index' : 'Hide index'}
+            active={!tocCollapsed}
+            onClick={() => setTocCollapsed(!tocCollapsed)}
+          />
+        )}
+
+        {showSidebarToggle && <div className="w-px h-4 bg-border mx-0.5" />}
+
+        {/* Font size */}
+        <div className="flex items-center gap-0.5 rounded-md border border-border bg-bg-primary">
+          {FONT_SIZES.map((f, idx) => (
+            <button
+              key={idx}
+              onClick={() => updatePref('fontSize', idx)}
+              className={cn(
+                'px-1.5 py-0.5 text-[10px] font-bold transition-colors rounded-sm',
+                readerPrefs.fontSize === idx
+                  ? 'bg-accent-primary text-white'
+                  : 'text-text-tertiary hover:text-text-primary'
+              )}
+              style={{ fontSize: idx === 0 ? '9px' : idx === 2 ? '12px' : '10px' }}
+            >
+              A
+            </button>
+          ))}
+        </div>
+
+        <div className="w-px h-4 bg-border mx-0.5" />
+
+        {/* Contrast modes */}
+        {CONTRAST_MODES.map(mode => (
+          <ToolbarBtn
+            key={mode.key}
+            icon={mode.key === 'normal' ? <Sun size={13} /> : mode.key === 'high' ? <Eye size={13} /> : <Moon size={13} />}
+            title={mode.label}
+            active={readerPrefs.contrast === mode.key}
+            onClick={() => updatePref('contrast', mode.key)}
+          />
+        ))}
+
+        <div className="w-px h-4 bg-border mx-0.5" />
+
+        {/* Spacing */}
+        <ToolbarBtn
+          icon={readerPrefs.spacing === 'compact' ? <ArrowsOutLineVertical size={13} /> : <ArrowsInLineVertical size={13} />}
+          title={readerPrefs.spacing === 'compact' ? 'Comfortable' : 'Compact'}
+          onClick={() => updatePref('spacing', readerPrefs.spacing === 'compact' ? 'comfortable' : 'compact')}
+        />
+
+        {/* Expand/Collapse all */}
+        <ToolbarBtn
+          icon={allExpanded ? <ArrowsInSimple size={13} /> : <ArrowsOutSimple size={13} />}
+          title={allExpanded ? 'Collapse all' : 'Expand all'}
+          onClick={allExpanded ? collapseAll : expandAll}
+        />
+
+        <div className="flex-1" />
+
+        {/* Search */}
+        {searchOpen ? (
+          <div className="flex items-center gap-1 bg-bg-primary border border-border rounded-md px-1.5">
+            <MagnifyingGlass size={12} className="text-text-tertiary shrink-0" />
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={t('common.search', 'Search...')}
+              className="bg-transparent text-xs text-text-primary outline-none w-[100px] py-0.5"
+            />
+            <button onClick={() => { setSearchOpen(false); setSearchQuery('') }}
+              className="text-text-tertiary hover:text-text-primary">
+              <X size={11} />
+            </button>
+          </div>
+        ) : (
+          <ToolbarBtn
+            icon={<MagnifyingGlass size={13} />}
+            title="Search (Ctrl+F)"
+            onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50) }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ToolbarBtn({ icon, title, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={cn(
+        'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
+        active
+          ? 'bg-accent-primary/15 text-accent-primary'
+          : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
+      )}
+    >
+      {icon}
+    </button>
+  )
+}
+
+// =============================================================================
+// MOBILE TOC DROPDOWN
+// =============================================================================
+
+function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="shrink-0 border-b border-border">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-bg-tertiary/50 transition-colors"
+      >
+        <List size={13} className="text-text-tertiary shrink-0" />
+        <span className="text-[11px] font-medium text-text-secondary flex-1 truncate">
+          {toc[activeSection] || t('help.tableOfContents', 'Contents')}
+        </span>
+        {open ? <CaretDown size={11} className="text-text-tertiary" /> : <CaretRight size={11} className="text-text-tertiary" />}
+      </button>
+      {open && (
+        <div className="px-2 pb-2 space-y-0.5">
+          {toc.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => { scrollTo(idx); setOpen(false) }}
+              className={cn(
+                'w-full text-left px-3 py-1.5 rounded-md text-[11px] transition-colors',
+                activeSection === idx
+                  ? 'bg-accent-primary/10 text-accent-primary font-medium'
+                  : 'text-text-tertiary hover:bg-bg-tertiary'
+              )}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -531,8 +878,13 @@ function parseMarkdown(md) {
   return { toc, sections }
 }
 
-function MarkdownBlock({ lines }) {
-  const elements = useMemo(() => renderLines(lines), [lines])
+function MarkdownBlock({ lines, searchQuery, contrast }) {
+  const elements = useMemo(() => renderLines(lines, contrast), [lines, contrast])
+  
+  // Search highlighting wrapper
+  if (searchQuery && searchQuery.length >= 2) {
+    return <div className="space-y-2 reader-search-highlight" data-search={searchQuery}>{elements}</div>
+  }
   return <div className="space-y-2">{elements}</div>
 }
 
@@ -773,7 +1125,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
           </div>
         </div>
 
-        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} />
+        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={true} />
       </div>
     </div>
   )
