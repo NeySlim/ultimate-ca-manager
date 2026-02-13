@@ -1,7 +1,7 @@
 # Ultimate CA Manager
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
-![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
+![License](https://img.shields.io/badge/license-BSD--3--Clause%20%2B%20Commons%20Clause-green.svg)
 ![Docker](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker&color=blue)
 
 **Ultimate CA Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and certificate lifecycle management.
@@ -47,16 +47,18 @@ docker run -d --restart=unless-stopped \
 
 ### Debian/Ubuntu
 
+Download the `.deb` package from the [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest):
+
 ```bash
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
 sudo dpkg -i ucm_*.deb
 sudo systemctl enable --now ucm
 ```
 
 ### RHEL/Rocky/Fedora
 
+Download the `.rpm` package from the [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest):
+
 ```bash
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm.noarch.rpm
 sudo dnf install ./ucm-*.rpm
 sudo systemctl enable --now ucm
 ```
@@ -122,7 +124,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 
 ## License
 
-BSD 3-Clause License -- see [LICENSE](LICENSE).
+BSD 3-Clause License with Commons Clause -- see [LICENSE](LICENSE).
 
 ---
 
@@ -130,5 +132,4 @@ BSD 3-Clause License -- see [LICENSE](LICENSE).
 
 - [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - [GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-- [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
 
