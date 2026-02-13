@@ -71,6 +71,7 @@ override_dh_auto_install:
 	find debian/ucm/opt/ucm -type f -exec chmod 644 {} \;
 	find debian/ucm/opt/ucm -type d -exec chmod 755 {} \;
 	chmod +x debian/ucm/opt/ucm/start-ucm.sh
+	chmod +x debian/ucm/opt/ucm/scripts/*.sh
 	chmod +x debian/ucm/opt/ucm/backend/app.py || true
 
 override_dh_installinit:
