@@ -2304,3 +2304,9 @@ input:focus, select:focus, textarea:focus {
   transform: scale(0.95);
   background: var(--bg-secondary);
 }
+
+/* Search highlight for Help reader */
+::highlight(search-results) {
+  background-color: #fbbf24;
+  color: #1a1a1a;
+}
