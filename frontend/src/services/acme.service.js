@@ -186,5 +186,25 @@ export const acmeService = {
       domain, 
       dns_provider_id: dnsProviderId 
     })
+  },
+
+  // =========================================================================
+  // Local ACME Domains (Domain to CA mapping)
+  // =========================================================================
+
+  async getLocalDomains() {
+    return apiClient.get('/acme/local-domains')
+  },
+
+  async createLocalDomain(data) {
+    return apiClient.post('/acme/local-domains', data)
+  },
+
+  async updateLocalDomain(id, data) {
+    return apiClient.put(`/acme/local-domains/${id}`, data)
+  },
+
+  async deleteLocalDomain(id) {
+    return apiClient.delete(`/acme/local-domains/${id}`)
   }
 }

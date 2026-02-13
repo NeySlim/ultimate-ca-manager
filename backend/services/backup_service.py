@@ -75,6 +75,7 @@ class BackupService:
                 'auth_certificates': True,
                 'dns_providers': True,
                 'acme_domains': True,
+                'acme_local_domains': True,
             }
         
         # Build backup data structure
@@ -98,6 +99,7 @@ class BackupService:
             'auth_certificates': self._export_auth_certificates(include.get('auth_certificates', True)),
             'dns_providers': self._export_dns_providers(include.get('dns_providers', True)),
             'acme_domains': self._export_acme_domains(include.get('acme_domains', True)),
+            'acme_local_domains': self._export_acme_local_domains(include.get('acme_local_domains', True)),
             'https_server': self._export_https_files(),
         }
         
@@ -659,6 +661,21 @@ class BackupService:
             })
         return domains
 
+    def _export_acme_local_domains(self, include: bool) -> List[Dict[str, Any]]:
+        """Export local ACME domain-to-CA mappings"""
+        if not include:
+            return []
+        from models.acme_models import AcmeLocalDomain
+        domains = []
+        for ld in AcmeLocalDomain.query.all():
+            domains.append({
+                'domain': ld.domain,
+                'issuing_ca_id': ld.issuing_ca_id,
+                'auto_approve': ld.auto_approve,
+                'created_by': ld.created_by,
+            })
+        return domains
+
     def _export_https_files(self) -> Dict[str, Any]:
         """Export HTTPS server certificate and key files"""
         result = {}
@@ -768,6 +785,7 @@ class BackupService:
             'auth_certificates': 0,
             'dns_providers': 0,
             'acme_domains': 0,
+            'acme_local_domains': 0,
             'https_server': 0,
         }
         
@@ -1289,6 +1307,24 @@ class BackupService:
                 )
                 db.session.add(new_ad)
             results['acme_domains'] += 1
+        
+        # Restore ACME local domains
+        from models.acme_models import AcmeLocalDomain
+        for ld_data in backup_data.get('acme_local_domains', []):
+            existing = AcmeLocalDomain.query.filter_by(domain=ld_data['domain']).first()
+            if existing:
+                existing.issuing_ca_id = ld_data.get('issuing_ca_id')
+                existing.auto_approve = ld_data.get('auto_approve', True)
+                existing.created_by = ld_data.get('created_by')
+            else:
+                new_ld = AcmeLocalDomain(
+                    domain=ld_data['domain'],
+                    issuing_ca_id=ld_data.get('issuing_ca_id'),
+                    auto_approve=ld_data.get('auto_approve', True),
+                    created_by=ld_data.get('created_by'),
+                )
+                db.session.add(new_ld)
+            results['acme_local_domains'] += 1
         
         # Restore HTTPS server files
         https_data = backup_data.get('https_server', {})

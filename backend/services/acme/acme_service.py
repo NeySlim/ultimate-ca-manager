@@ -613,14 +613,24 @@ class AcmeService:
         """Resolve which CA should sign for the given domains.
         
         Resolution order:
-        1. Domain-specific CA from acme_domains table
-        2. Global default from acme.issuing_ca_id config
-        3. None (will fall back to first available CA in _sign_certificate_with_ca)
+        1. Local ACME domain mapping (acme_local_domains table)
+        2. DNS domain-specific CA (acme_domains.issuing_ca_id)
+        3. Global default from acme.issuing_ca_id config
+        4. None (will fall back to first available CA in _sign_certificate_with_ca)
         """
+        from api.v2.acme_local_domains import find_local_domain_ca
         from api.v2.acme_domains import find_provider_for_domain
         from models import SystemConfig, CA
         
-        # Check domain-specific CA
+        # Check local ACME domain mapping first
+        for domain in domains:
+            ca_id = find_local_domain_ca(domain)
+            if ca_id:
+                ca = CA.query.get(ca_id)
+                if ca and ca.prv:
+                    return ca.refid
+        
+        # Check DNS domain-specific CA
         for domain in domains:
             result = find_provider_for_domain(domain)
             if result and result.get('issuing_ca_id'):

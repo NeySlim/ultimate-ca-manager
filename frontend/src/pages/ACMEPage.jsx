@@ -13,7 +13,7 @@ import {
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, LockKey, GlobeHemisphereWest
+  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple
 } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import {
@@ -48,6 +48,7 @@ export default function ACMEPage() {
   const [dnsProviders, setDnsProviders] = useState([])
   const [dnsProviderTypes, setDnsProviderTypes] = useState([])
   const [acmeDomains, setAcmeDomains] = useState([])
+  const [localDomains, setLocalDomains] = useState([])
   const [selectedClientOrder, setSelectedClientOrder] = useState(null)
   const [selectedDnsProvider, setSelectedDnsProvider] = useState(null)
   const [selectedAcmeDomain, setSelectedAcmeDomain] = useState(null)
@@ -61,6 +62,8 @@ export default function ACMEPage() {
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [showDnsProviderModal, setShowDnsProviderModal] = useState(false)
   const [showDomainModal, setShowDomainModal] = useState(false)
+  const [showLocalDomainModal, setShowLocalDomainModal] = useState(false)
+  const [selectedLocalDomain, setSelectedLocalDomain] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [revokeSuperseded, setRevokeSuperseded] = useState(false)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
@@ -82,7 +85,7 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
@@ -91,7 +94,8 @@ export default function ACMEPage() {
         acmeService.getClientSettings().catch(() => ({ data: {} })),
         acmeService.getDnsProviders().catch(() => ({ data: [] })),
         acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
-        acmeService.getDomains().catch(() => ({ data: [] }))
+        acmeService.getDomains().catch(() => ({ data: [] })),
+        acmeService.getLocalDomains().catch(() => ({ data: [] }))
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
@@ -102,6 +106,7 @@ export default function ACMEPage() {
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
       setAcmeDomains(domainsRes.data || [])
+      setLocalDomains(localDomainsRes.data || [])
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.ACME)
     } finally {
@@ -466,6 +471,51 @@ export default function ACMEPage() {
     }
   }
 
+  // Local Domain handlers
+  const handleCreateLocalDomain = async (data) => {
+    try {
+      await acmeService.createLocalDomain(data)
+      showSuccess(t('acme.domainCreatedSuccess'))
+      setShowLocalDomainModal(false)
+      setSelectedLocalDomain(null)
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.domainCreateFailed'))
+    }
+  }
+
+  const handleUpdateLocalDomain = async (data) => {
+    if (!selectedLocalDomain) return
+    try {
+      await acmeService.updateLocalDomain(selectedLocalDomain.id, data)
+      showSuccess(t('acme.domainUpdatedSuccess'))
+      setShowLocalDomainModal(false)
+      setSelectedLocalDomain(null)
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.domainUpdateFailed'))
+    }
+  }
+
+  const handleDeleteLocalDomain = async (domain) => {
+    const confirmed = await showConfirm(
+      t('acme.confirmDeleteDomain', { domain: domain.domain }),
+      {
+        title: t('acme.deleteDomain'),
+        confirmText: t('common.delete'),
+        variant: 'danger'
+      }
+    )
+    if (!confirmed) return
+    try {
+      await acmeService.deleteLocalDomain(domain.id)
+      showSuccess(t('acme.domainDeletedSuccess'))
+      loadData()
+    } catch (error) {
+      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+    }
+  }
+
   // Computed stats
   const stats = useMemo(() => ({
     total: accounts.length,
@@ -548,6 +598,7 @@ export default function ACMEPage() {
     { id: 'dns', label: t('acme.dnsProviders'), icon: PlugsConnected, count: dnsProviders.length },
     { id: 'domains', label: t('acme.domains'), icon: GlobeHemisphereWest, count: acmeDomains.length },
     { id: 'config', label: t('acme.server'), icon: Gear },
+    { id: 'localdomains', label: t('acme.localDomains'), icon: GlobeHemisphereWest, count: localDomains.length },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
     { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: history.length }
   ]
@@ -574,6 +625,12 @@ export default function ACMEPage() {
       )}
       {activeTab === 'domains' && (
         <Button size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
+          <Plus size={14} />
+          <span className="hidden sm:inline">{t('acme.addDomain')}</span>
+        </Button>
+      )}
+      {activeTab === 'localdomains' && (
+        <Button size="sm" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.addDomain')}</span>
         </Button>
@@ -1243,6 +1300,77 @@ export default function ACMEPage() {
     </div>
   )
 
+  // Local Domains content — domain to CA mapping
+  const localDomainsContent = (
+    <ResponsiveDataTable
+      data={localDomains}
+      columns={[
+        {
+          key: 'domain',
+          label: t('acme.domain'),
+          sortable: true,
+          render: (val) => (
+            <span className="font-mono text-sm">{val}</span>
+          )
+        },
+        {
+          key: 'issuing_ca_name',
+          label: t('acme.issuingCA'),
+          sortable: true,
+          render: (val) => (
+            <span className="text-text-primary">{val || '-'}</span>
+          )
+        },
+        {
+          key: 'auto_approve',
+          label: t('acme.autoApprove'),
+          render: (val) => (
+            <Badge variant={val ? 'success' : 'warning'}>
+              {val ? t('common.auto') : t('common.manual')}
+            </Badge>
+          )
+        },
+        {
+          key: 'actions',
+          label: '',
+          render: (_, row) => (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); setSelectedLocalDomain(row); setShowLocalDomainModal(true) }}
+                title={t('common.edit')}
+              >
+                <PencilSimple size={14} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); handleDeleteLocalDomain(row) }}
+                title={t('common.delete')}
+                className="text-status-error hover:text-status-error"
+              >
+                <Trash size={14} />
+              </Button>
+            </div>
+          )
+        }
+      ]}
+      emptyState={{
+        icon: GlobeHemisphereWest,
+        title: t('acme.noLocalDomains'),
+        description: t('acme.noLocalDomainsDesc'),
+        action: (
+          <Button onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
+            <Plus size={14} />
+            {t('acme.addDomain')}
+          </Button>
+        )
+      }}
+      onRowClick={(row) => { setSelectedLocalDomain(row); setShowLocalDomainModal(true) }}
+    />
+  )
+
   // Accounts content with table
   const accountsContent = (
     <ResponsiveDataTable
@@ -1765,7 +1893,7 @@ export default function ACMEPage() {
         tabLayout="sidebar"
         tabGroups={[
           { labelKey: 'acme.groups.letsEncrypt', tabs: ['letsencrypt', 'dns', 'domains'], color: 'icon-bg-emerald' },
-          { labelKey: 'acme.groups.localAcme', tabs: ['config', 'accounts', 'history'], color: 'icon-bg-violet' },
+          { labelKey: 'acme.groups.localAcme', tabs: ['config', 'localdomains', 'accounts', 'history'], color: 'icon-bg-violet' },
         ]}
         onTabChange={(tab) => {
           setActiveTab(tab)
@@ -1810,6 +1938,7 @@ export default function ACMEPage() {
         {activeTab === 'dns' && dnsProvidersContent}
         {activeTab === 'domains' && domainsContent}
         {activeTab === 'config' && configContent}
+        {activeTab === 'localdomains' && localDomainsContent}
         {activeTab === 'accounts' && accountsContent}
         {activeTab === 'history' && historyContent}
       </ResponsiveLayout>
@@ -1868,6 +1997,20 @@ export default function ACMEPage() {
           cas={cas}
           onSubmit={selectedAcmeDomain ? handleUpdateDomain : handleCreateDomain}
           onCancel={() => { setShowDomainModal(false); setSelectedAcmeDomain(null) }}
+        />
+      </Modal>
+
+      {/* Local Domain Modal */}
+      <Modal
+        open={showLocalDomainModal}
+        onClose={() => { setShowLocalDomainModal(false); setSelectedLocalDomain(null) }}
+        title={selectedLocalDomain ? t('acme.editDomain') : t('acme.addDomain')}
+      >
+        <LocalDomainForm
+          domain={selectedLocalDomain}
+          cas={cas}
+          onSubmit={selectedLocalDomain ? handleUpdateLocalDomain : handleCreateLocalDomain}
+          onCancel={() => { setShowLocalDomainModal(false); setSelectedLocalDomain(null) }}
         />
       </Modal>
 
@@ -2313,6 +2456,68 @@ function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
         description={t('acme.autoApproveDesc')}
       />
       
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit">
+          <FloppyDisk size={14} />
+          {domain ? t('common.update') : t('common.create')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+
+function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
+  const { t } = useTranslation()
+  const [formData, setFormData] = useState({
+    domain: domain?.domain || '',
+    issuing_ca_id: domain?.issuing_ca_id || '',
+    auto_approve: domain?.auto_approve ?? true,
+  })
+
+  const signingCas = (cas || []).filter(ca => ca.has_private_key)
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit({
+      ...formData,
+      issuing_ca_id: formData.issuing_ca_id ? parseInt(formData.issuing_ca_id) : null,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <Input
+        label={t('acme.domainName')}
+        value={formData.domain}
+        onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value.toLowerCase() }))}
+        required
+        placeholder="example.com"
+        helperText={t('acme.localDomainHelper')}
+        disabled={!!domain}
+      />
+
+      <Select
+        label={t('acme.issuingCA')}
+        value={formData.issuing_ca_id}
+        onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val }))}
+        options={signingCas.map(ca => ({
+          value: ca.id,
+          label: ca.common_name || ca.descr || `CA #${ca.id}`
+        }))}
+        required
+      />
+
+      <ToggleSwitch
+        checked={formData.auto_approve}
+        onChange={(val) => setFormData(prev => ({ ...prev, auto_approve: val }))}
+        label={t('acme.autoApproveRequests')}
+        description={t('acme.autoApproveDesc')}
+      />
+
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}

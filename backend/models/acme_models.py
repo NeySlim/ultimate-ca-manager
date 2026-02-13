@@ -453,3 +453,33 @@ class AcmeDomain(db.Model):
     
     def __repr__(self):
         return f'<AcmeDomain {self.domain} -> {self.dns_provider.name if self.dns_provider else "?"}>'
+
+
+class AcmeLocalDomain(db.Model):
+    """Local ACME Domain - Maps domains to issuing CAs for the local ACME server"""
+    __tablename__ = 'acme_local_domains'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    domain = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    issuing_ca_id = db.Column(db.Integer, db.ForeignKey('certificate_authorities.id'), nullable=False)
+    auto_approve = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = db.Column(db.String(80))
+    
+    issuing_ca = db.relationship('CA', foreign_keys='AcmeLocalDomain.issuing_ca_id')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'domain': self.domain,
+            'issuing_ca_id': self.issuing_ca_id,
+            'issuing_ca_name': self.issuing_ca.common_name if self.issuing_ca else None,
+            'auto_approve': self.auto_approve,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'created_by': self.created_by,
+        }
+    
+    def __repr__(self):
+        return f'<AcmeLocalDomain {self.domain} -> CA#{self.issuing_ca_id}>'

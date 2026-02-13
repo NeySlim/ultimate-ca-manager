@@ -34,6 +34,7 @@ from api.v2.tools import tools_bp
 from api.v2.dns_providers import bp as dns_providers_bp
 from api.v2.acme_client import bp as acme_client_bp
 from api.v2.acme_domains import bp as acme_domains_bp
+from api.v2.acme_local_domains import bp as acme_local_domains_bp
 from api.v2.hsm import bp as hsm_bp
 from api.v2.sso import bp as sso_bp
 from api.v2.policies import bp as policies_bp
@@ -70,6 +71,7 @@ API_V2_BLUEPRINTS = [
     dns_providers_bp,
     acme_client_bp,
     acme_domains_bp,
+    acme_local_domains_bp,
     hsm_bp,
     sso_bp,
     policies_bp,
