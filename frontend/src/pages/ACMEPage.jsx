@@ -545,10 +545,7 @@ export default function ACMEPage() {
   // Main tabs
   const tabs = [
     { id: 'letsencrypt', label: t('acme.letsEncrypt'), icon: Globe },
-    { id: 'dns', label: t('acme.dnsProviders'), icon: PlugsConnected, count: dnsProviders.length },
-    { id: 'domains', label: t('acme.domains'), icon: GlobeHemisphereWest, count: acmeDomains.length },
-    { id: 'config', label: t('acme.server'), icon: Gear },
-    { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
+    { id: 'server', label: t('acme.server'), icon: Gear },
     { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: history.length }
   ]
 
@@ -566,18 +563,6 @@ export default function ACMEPage() {
         <ArrowsClockwise size={14} />
         {t('common.refresh')}
       </Button>
-      {activeTab === 'accounts' && (
-        <Button size="sm" onClick={() => setShowCreateModal(true)}>
-          <Plus size={14} />
-          <span className="hidden sm:inline">{t('acme.newAccount')}</span>
-        </Button>
-      )}
-      {activeTab === 'domains' && (
-        <Button size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
-          <Plus size={14} />
-          <span className="hidden sm:inline">{t('acme.addDomain')}</span>
-        </Button>
-      )}
     </>
   )
 
@@ -964,196 +949,127 @@ export default function ACMEPage() {
           )}
         </div>
       </CompactSection>
-    </div>
-  )
-  
-  // =========================================================================
-  // DNS Providers Tab Content
-  // =========================================================================
-  
-  const dnsProvidersContent = (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.dnsProviders')} compact>
-        {t('acme.dnsProvidersAboutDesc')}
-      </HelpCard>
-      
-      <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
-          <Plus size={14} />
-          {t('common.addDnsProvider')}
-        </Button>
-      </div>
-      
-      {dnsProviders.length === 0 ? (
-        <div className="text-center py-8 text-text-secondary">
-          <PlugsConnected size={40} className="mx-auto mb-2 opacity-40" />
-          <p>{t('acme.noDnsProviders')}</p>
-          <p className="text-sm text-text-tertiary mt-1">{t('acme.noDnsProvidersDesc')}</p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {dnsProviders.map(provider => (
-            <Card key={provider.id} className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                    provider.is_default ? "icon-bg-emerald" : "icon-bg-blue"
-                  )}>
-                    <PlugsConnected size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{provider.name}</p>
-                    <p className="text-xs text-text-tertiary">{provider.provider_type}</p>
-                  </div>
-                </div>
-                {provider.is_default && (
-                  <Badge variant="success" size="sm">{t('common.default')}</Badge>
-                )}
-              </div>
-              
-              <div className="flex gap-2 mt-3">
-                <Button 
-                  size="sm" 
-                  variant="secondary"
-                  onClick={() => handleTestDnsProvider(provider)}
-                >
-                  <Play size={12} />
-                  {t('common.test')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="secondary"
-                  onClick={() => { setSelectedDnsProvider(provider); setShowDnsProviderModal(true) }}
-                >
-                  <Gear size={12} />
-                  {t('common.edit')}
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="danger"
-                  onClick={() => handleDeleteDnsProvider(provider)}
-                >
-                  <Trash size={12} />
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 
-  // Domains content - Map domains to DNS providers for ACME Proxy
-  const domainsContent = (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.domainsHelp')} compact>
-        {t('acme.domainsHelpDesc')}
-      </HelpCard>
+      {/* DNS Providers */}
+      <CompactSection title={t('acme.dnsProviders')} icon={PlugsConnected} defaultOpen={dnsProviders.length > 0}>
+        <div className="space-y-3">
+          <p className="text-xs text-text-secondary">{t('acme.dnsProvidersAboutDesc')}</p>
+          <Button size="sm" onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
+            <Plus size={14} />
+            {t('common.addDnsProvider')}
+          </Button>
+          {dnsProviders.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {dnsProviders.map(provider => (
+                <Card key={provider.id} className="p-4">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                        provider.is_default ? "icon-bg-emerald" : "icon-bg-blue"
+                      )}>
+                        <PlugsConnected size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary truncate">{provider.name}</p>
+                        <p className="text-xs text-text-tertiary">{provider.provider_type}</p>
+                      </div>
+                    </div>
+                    {provider.is_default && (
+                      <Badge variant="success" size="sm">{t('common.default')}</Badge>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <Button size="sm" variant="secondary" onClick={() => handleTestDnsProvider(provider)}>
+                      <Play size={12} />
+                      {t('common.test')}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => { setSelectedDnsProvider(provider); setShowDnsProviderModal(true) }}>
+                      <Gear size={12} />
+                      {t('common.edit')}
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => handleDeleteDnsProvider(provider)}>
+                      <Trash size={12} />
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </CompactSection>
 
-      {acmeDomains.length === 0 ? (
-        <Card className="p-8 text-center">
-          <GlobeHemisphereWest size={48} className="mx-auto text-text-tertiary mb-4" />
-          <h3 className="text-lg font-medium text-text-primary mb-2">
-            {t('acme.noDomainsYet')}
-          </h3>
-          <p className="text-sm text-text-secondary mb-4">
-            {t('acme.noDomainsDesc')}
-          </p>
-          <Button onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
+      {/* DNS Domains (domain → DNS provider mapping for proxy) */}
+      <CompactSection title={t('acme.domains')} icon={GlobeHemisphereWest} defaultOpen={acmeDomains.length > 0}>
+        <div className="space-y-3">
+          <p className="text-xs text-text-secondary">{t('acme.domainsHelpDesc')}</p>
+          <Button size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
             <Plus size={14} />
             {t('acme.addDomain')}
           </Button>
-        </Card>
-      ) : (
-        <ResponsiveDataTable
-          data={acmeDomains}
-          columns={[
-            {
-              key: 'domain',
-              label: t('acme.domain'),
-              sortable: true,
-              render: (val) => (
-                <span className="font-mono text-sm">{val}</span>
-              )
-            },
-            {
-              key: 'dns_provider_name',
-              label: t('acme.provider'),
-              sortable: true,
-              render: (val, row) => (
-                <div className="flex items-center gap-2">
-                  <PlugsConnected size={14} className="text-accent-primary" />
-                  <span>{val || row.dns_provider_type}</span>
-                </div>
-              )
-            },
-            {
-              key: 'issuing_ca_name',
-              label: t('acme.issuingCA'),
-              sortable: true,
-              render: (val) => (
-                <span className={val ? 'text-text-primary' : 'text-text-tertiary'}>
-                  {val || t('acme.defaultCA')}
-                </span>
-              )
-            },
-            {
-              key: 'is_wildcard_allowed',
-              label: t('acme.wildcard'),
-              render: (val) => (
-                <Badge variant={val ? 'success' : 'secondary'}>
-                  {val ? t('common.yes') : t('common.no')}
-                </Badge>
-              )
-            },
-            {
-              key: 'auto_approve',
-              label: t('acme.autoApprove'),
-              render: (val) => (
-                <Badge variant={val ? 'success' : 'warning'}>
-                  {val ? t('common.auto') : t('common.manual')}
-                </Badge>
-              )
-            },
-            {
-              key: 'actions',
-              label: '',
-              render: (_, row) => (
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleTestDomainAccess(row) }}
-                    title={t('acme.testDnsAccess')}
-                  >
-                    <Play size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); setSelectedAcmeDomain(row); setShowDomainModal(true) }}
-                    title={t('common.edit')}
-                  >
-                    <Gear size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleDeleteDomain(row) }}
-                    title={t('common.delete')}
-                    className="text-status-error hover:text-status-error"
-                  >
-                    <Trash size={14} />
-                  </Button>
-                </div>
-              )
-            }
-          ]}
-          onRowClick={(row) => { setSelectedAcmeDomain(row); setShowDomainModal(true) }}
-          emptyMessage={t('acme.noDomains')}
-        />
-      )}
+          {acmeDomains.length > 0 && (
+            <ResponsiveDataTable
+              data={acmeDomains}
+              columns={[
+                {
+                  key: 'domain',
+                  label: t('acme.domain'),
+                  sortable: true,
+                  render: (val) => <span className="font-mono text-sm">{val}</span>
+                },
+                {
+                  key: 'dns_provider_name',
+                  label: t('acme.provider'),
+                  sortable: true,
+                  render: (val, row) => (
+                    <div className="flex items-center gap-2">
+                      <PlugsConnected size={14} className="text-accent-primary" />
+                      <span>{val || row.dns_provider_type}</span>
+                    </div>
+                  )
+                },
+                {
+                  key: 'is_wildcard_allowed',
+                  label: t('acme.wildcard'),
+                  render: (val) => (
+                    <Badge variant={val ? 'success' : 'secondary'}>
+                      {val ? t('common.yes') : t('common.no')}
+                    </Badge>
+                  )
+                },
+                {
+                  key: 'auto_approve',
+                  label: t('acme.autoApprove'),
+                  render: (val) => (
+                    <Badge variant={val ? 'success' : 'warning'}>
+                      {val ? t('common.auto') : t('common.manual')}
+                    </Badge>
+                  )
+                },
+                {
+                  key: 'actions',
+                  label: '',
+                  render: (_, row) => (
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleTestDomainAccess(row) }} title={t('acme.testDnsAccess')}>
+                        <Play size={14} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedAcmeDomain(row); setShowDomainModal(true) }} title={t('common.edit')}>
+                        <Gear size={14} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteDomain(row) }} title={t('common.delete')} className="text-status-error hover:text-status-error">
+                        <Trash size={14} />
+                      </Button>
+                    </div>
+                  )
+                }
+              ]}
+              onRowClick={(row) => { setSelectedAcmeDomain(row); setShowDomainModal(true) }}
+              emptyMessage={t('acme.noDomains')}
+            />
+          )}
+        </div>
+      </CompactSection>
     </div>
   )
 
@@ -1240,39 +1156,67 @@ export default function ACMEPage() {
           {saving ? t('common.saving') : t('common.saveConfiguration')}
         </Button>
       </div>
-    </div>
-  )
 
-  // Accounts content with table
-  const accountsContent = (
-    <ResponsiveDataTable
-      data={filteredAccounts}
-      columns={accountColumns}
-      searchable
-      searchPlaceholder={t('acme.searchAccounts')}
-      onSearch={setSearchQuery}
-      onRowClick={selectAccount}
-      selectedRow={selectedAccount}
-      getRowId={(row) => row.id}
-      pagination={{
-        page,
-        total: filteredAccounts.length,
-        perPage,
-        onChange: setPage,
-        onPerPageChange: (v) => { setPerPage(v); setPage(1) }
-      }}
-      emptyState={{
-        icon: Key,
-        title: t('acme.noAccounts'),
-        description: searchQuery ? t('acme.noMatchingAccounts') : t('acme.noAccountsDesc'),
-        action: !searchQuery && (
-          <Button onClick={() => setShowCreateModal(true)}>
+      {/* Local Domains — domain → CA mapping */}
+      <CompactSection title={t('acme.localDomains')} icon={GlobeHemisphereWest} defaultOpen={acmeDomains.filter(d => d.issuing_ca_id).length > 0}>
+        <div className="space-y-3">
+          <p className="text-xs text-text-secondary">{t('acme.localDomainsDesc')}</p>
+          {acmeDomains.filter(d => d.issuing_ca_id).length > 0 ? (
+            <div className="space-y-2">
+              {acmeDomains.filter(d => d.issuing_ca_id).map(d => (
+                <div key={d.id} className="flex items-center justify-between p-3 bg-bg-tertiary/50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-sm text-text-primary">{d.domain}</span>
+                    <span className="text-text-tertiary">→</span>
+                    <span className="text-sm text-text-secondary">{d.issuing_ca_name}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedAcmeDomain(d); setShowDomainModal(true) }}>
+                    <Gear size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-text-tertiary italic">{t('acme.noLocalDomains')}</p>
+          )}
+          <p className="text-xs text-text-tertiary">{t('acme.localDomainsNote')}</p>
+        </div>
+      </CompactSection>
+
+      {/* Accounts */}
+      <CompactSection title={t('acme.accounts')} icon={Key} defaultOpen={accounts.length > 0}>
+        <div className="space-y-3">
+          <Button size="sm" onClick={() => setShowCreateModal(true)}>
             <Plus size={14} />
             {t('acme.createAccount')}
           </Button>
-        )
-      }}
-    />
+          {accounts.length > 0 && (
+            <ResponsiveDataTable
+              data={filteredAccounts}
+              columns={accountColumns}
+              searchable
+              searchPlaceholder={t('acme.searchAccounts')}
+              onSearch={setSearchQuery}
+              onRowClick={selectAccount}
+              selectedRow={selectedAccount}
+              getRowId={(row) => row.id}
+              pagination={{
+                page,
+                total: filteredAccounts.length,
+                perPage,
+                onChange: setPage,
+                onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+              }}
+              emptyState={{
+                icon: Key,
+                title: t('acme.noAccounts'),
+                description: searchQuery ? t('acme.noMatchingAccounts') : t('acme.noAccountsDesc'),
+              }}
+            />
+          )}
+        </div>
+      </CompactSection>
+    </div>
   )
 
   // History content
@@ -1764,9 +1708,8 @@ export default function ACMEPage() {
         activeTab={activeTab}
         tabLayout="sidebar"
         tabGroups={[
-          { labelKey: 'acme.groups.certificates', tabs: ['letsencrypt', 'domains'], color: 'icon-bg-emerald' },
-          { labelKey: 'acme.groups.providers', tabs: ['dns', 'accounts'], color: 'icon-bg-blue' },
-          { labelKey: 'acme.groups.management', tabs: ['config', 'history'], color: 'icon-bg-violet' },
+          { labelKey: 'acme.groups.certificates', tabs: ['letsencrypt'], color: 'icon-bg-emerald' },
+          { labelKey: 'acme.groups.management', tabs: ['server', 'history'], color: 'icon-bg-violet' },
         ]}
         onTabChange={(tab) => {
           setActiveTab(tab)
@@ -1778,29 +1721,29 @@ export default function ACMEPage() {
         actions={headerActions}
         helpPageKey="acme"
         
-        // Split view for letsencrypt, accounts and history tabs
-        splitView={activeTab === 'letsencrypt' || activeTab === 'accounts' || activeTab === 'history'}
+        // Split view for letsencrypt, server (accounts) and history tabs
+        splitView={activeTab === 'letsencrypt' || activeTab === 'server' || activeTab === 'history'}
         slideOverOpen={
           activeTab === 'letsencrypt' ? !!selectedClientOrder :
-          activeTab === 'accounts' ? !!selectedAccount : 
+          activeTab === 'server' ? !!selectedAccount : 
           !!selectedCert
         }
         slideOverTitle={
           activeTab === 'letsencrypt'
             ? (selectedClientOrder?.primary_domain || t('acme.orderDetails'))
-            : activeTab === 'accounts' 
+            : activeTab === 'server' 
               ? (selectedAccount?.email || t('common.details'))
               : (selectedCert?.common_name || t('common.certificateDetails'))
         }
         slideOverContent={
           activeTab === 'letsencrypt' ? orderDetailContent :
-          activeTab === 'accounts' ? accountDetailContent : 
+          activeTab === 'server' ? accountDetailContent : 
           certDetailContent
         }
         onSlideOverClose={() => {
           if (activeTab === 'letsencrypt') {
             setSelectedClientOrder(null)
-          } else if (activeTab === 'accounts') {
+          } else if (activeTab === 'server') {
             setSelectedAccount(null)
           } else {
             setSelectedCert(null)
@@ -1808,10 +1751,7 @@ export default function ACMEPage() {
         }}
       >
         {activeTab === 'letsencrypt' && letsEncryptContent}
-        {activeTab === 'dns' && dnsProvidersContent}
-        {activeTab === 'domains' && domainsContent}
-        {activeTab === 'config' && configContent}
-        {activeTab === 'accounts' && accountsContent}
+        {activeTab === 'server' && configContent}
         {activeTab === 'history' && historyContent}
       </ResponsiveLayout>
 
