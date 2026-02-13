@@ -255,7 +255,7 @@ describe('API Client', () => {
 
       const { apiClient } = await import('../apiClient')
       
-      await expect(apiClient.download('/certificates/999/download')).rejects.toThrow('Download failed')
+      await expect(apiClient.download('/certificates/999/download')).rejects.toThrow('The requested resource was not found.')
     })
   })
 
