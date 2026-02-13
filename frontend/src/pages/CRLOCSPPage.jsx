@@ -9,7 +9,6 @@ import {
   Database, Pulse, Calendar, Hash, XCircle,
   Info as LinkIcon
 } from '@phosphor-icons/react'
-import * as Switch from '@radix-ui/react-switch'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
@@ -17,6 +16,7 @@ import {
   LoadingSpinner, StatusIndicator, HelpCard,
   CompactSection, CompactGrid, CompactField
 } from '../components'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
@@ -227,15 +227,14 @@ export default function CRLOCSPPage() {
       priority: 3,
       hideOnMobile: true,
       render: (v, row) => (
-        <Switch.Root
-          checked={v}
-          onCheckedChange={() => handleToggleAutoRegen(row)}
-          disabled={!row.has_private_key || !canWrite('crl')}
-          className="w-7 h-3.5 bg-bg-tertiary rounded-full relative data-[state=checked]:bg-accent-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Switch.Thumb className="block w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-100 translate-x-0.5 data-[state=checked]:translate-x-[13px]" />
-        </Switch.Root>
+        <div onClick={(e) => e.stopPropagation()}>
+          <ToggleSwitch
+            checked={v}
+            onChange={() => handleToggleAutoRegen(row)}
+            disabled={!row.has_private_key || !canWrite('crl')}
+            size="sm"
+          />
+        </div>
       )
     },
     {
