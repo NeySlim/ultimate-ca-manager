@@ -1549,7 +1549,20 @@
       "security": "Sécurité",
       "notifications": "Notifications",
       "interface": "Interface"
-    }
+    },
+    "remoteSyslog": "Syslog distant",
+    "remoteSyslogDesc": "Transférer les événements d'audit vers un serveur syslog distant pour la centralisation des logs et l'intégration SIEM.",
+    "enableSyslog": "Activer le transfert syslog distant",
+    "syslogHost": "Serveur Syslog",
+    "syslogPort": "Port",
+    "syslogProtocol": "Protocole",
+    "syslogFacility": "Facility",
+    "syslogTls": "Activer le chiffrement TLS (TCP uniquement)",
+    "syslogTest": "Tester la connexion",
+    "syslogSaved": "Configuration syslog enregistrée",
+    "syslogSaveFailed": "Échec de l'enregistrement de la configuration syslog",
+    "syslogTestSuccess": "Message de test envoyé avec succès",
+    "syslogTestFailed": "Échec de l'envoi du message de test"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

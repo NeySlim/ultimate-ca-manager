@@ -520,7 +520,8 @@ export const helpContent = {
     tips: [
       'Filter by action type to investigate specific events',
       'Export logs regularly for long-term retention',
-      'Set up alerts for suspicious activities'
+      'Set up alerts for suspicious activities',
+      'Use remote syslog to forward audit events to a SIEM'
     ],
     related: ['Settings', 'Users']
   },

@@ -432,6 +432,14 @@ def create_app(config_name=None):
     except Exception as e:
         app.logger.debug(f"HSM check skipped: {e}")
     
+    # Load syslog forwarder config
+    try:
+        with app.app_context():
+            from services.syslog_service import syslog_forwarder
+            syslog_forwarder.load_from_db()
+    except Exception as e:
+        app.logger.debug(f"Syslog config load skipped: {e}")
+    
     # Enable CSRF protection middleware
     try:
         from security.csrf import init_csrf_middleware

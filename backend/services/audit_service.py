@@ -102,6 +102,14 @@ class AuditService:
             else:
                 logger.warning(log_msg)
             
+            # Forward to remote syslog if configured
+            try:
+                from services.syslog_service import syslog_forwarder
+                if syslog_forwarder.is_enabled:
+                    syslog_forwarder.send(audit_log)
+            except Exception:
+                pass  # Never fail audit logging due to syslog
+            
             return audit_log
             
         except Exception as e:

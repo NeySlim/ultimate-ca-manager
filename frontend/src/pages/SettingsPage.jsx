@@ -775,6 +775,11 @@ export default function SettingsPage() {
   const [anomalies, setAnomalies] = useState([])
   const [anomaliesLoading, setAnomaliesLoading] = useState(false)
 
+  // Syslog state
+  const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', facility: 'local0', tls: false })
+  const [syslogTesting, setSyslogTesting] = useState(false)
+  const [syslogSaving, setSyslogSaving] = useState(false)
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -789,6 +794,7 @@ export default function SettingsPage() {
     loadWebhooks()
     loadEncryptionStatus()
     loadAnomalies()
+    loadSyslogConfig()
   }, [])
 
   const loadSettings = async () => {
@@ -1078,6 +1084,44 @@ export default function SettingsPage() {
     } finally {
       setAnomaliesLoading(false)
     }
+  }
+
+  // Syslog config
+  const loadSyslogConfig = async () => {
+    try {
+      const response = await apiClient.get('/system/audit/syslog')
+      setSyslogConfig(response.data || response)
+    } catch (error) {
+      console.error('Failed to load syslog config:', error)
+    }
+  }
+
+  const handleSaveSyslog = async () => {
+    setSyslogSaving(true)
+    try {
+      await apiClient.put('/system/audit/syslog', syslogConfig)
+      showSuccess(t('settings.syslogSaved'))
+    } catch (error) {
+      showError(error.response?.data?.message || t('settings.syslogSaveFailed'))
+    } finally {
+      setSyslogSaving(false)
+    }
+  }
+
+  const handleTestSyslog = async () => {
+    setSyslogTesting(true)
+    try {
+      const response = await apiClient.post('/system/audit/syslog/test')
+      showSuccess(response.message || t('settings.syslogTestSuccess'))
+    } catch (error) {
+      showError(error.response?.data?.message || error.message || t('settings.syslogTestFailed'))
+    } finally {
+      setSyslogTesting(false)
+    }
+  }
+
+  const updateSyslogConfig = (key, value) => {
+    setSyslogConfig(prev => ({ ...prev, [key]: value }))
   }
 
   const handleSave = async (section) => {
@@ -1910,6 +1954,92 @@ export default function SettingsPage() {
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
+                  </div>
+                )}
+              </div>
+            </DetailSection>
+            <DetailSection title={t('settings.remoteSyslog')} icon={Globe} iconClass="icon-bg-purple">
+              <div className="space-y-4">
+                <p className="text-xs text-text-secondary">{t('settings.remoteSyslogDesc')}</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={syslogConfig.enabled}
+                    onChange={(e) => updateSyslogConfig('enabled', e.target.checked)}
+                    className="rounded border-border bg-bg-tertiary"
+                  />
+                  <div>
+                    <p className="text-sm text-text-primary font-medium">{t('settings.enableSyslog')}</p>
+                  </div>
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label={t('settings.syslogHost')}
+                    value={syslogConfig.host}
+                    onChange={(e) => updateSyslogConfig('host', e.target.value)}
+                    placeholder="syslog.example.com"
+                  />
+                  <Input
+                    label={t('settings.syslogPort')}
+                    type="number"
+                    value={syslogConfig.port}
+                    onChange={(e) => updateSyslogConfig('port', parseInt(e.target.value) || 514)}
+                    min="1"
+                    max="65535"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Select
+                    label={t('settings.syslogProtocol')}
+                    value={syslogConfig.protocol}
+                    onChange={(e) => updateSyslogConfig('protocol', e.target.value)}
+                    options={[
+                      { value: 'udp', label: 'UDP' },
+                      { value: 'tcp', label: 'TCP' },
+                    ]}
+                  />
+                  <Select
+                    label={t('settings.syslogFacility')}
+                    value={syslogConfig.facility}
+                    onChange={(e) => updateSyslogConfig('facility', e.target.value)}
+                    options={[
+                      { value: 'local0', label: 'local0' },
+                      { value: 'local1', label: 'local1' },
+                      { value: 'local2', label: 'local2' },
+                      { value: 'local3', label: 'local3' },
+                      { value: 'local4', label: 'local4' },
+                      { value: 'local5', label: 'local5' },
+                      { value: 'local6', label: 'local6' },
+                      { value: 'local7', label: 'local7' },
+                      { value: 'auth', label: 'auth' },
+                      { value: 'daemon', label: 'daemon' },
+                      { value: 'user', label: 'user' },
+                    ]}
+                  />
+                </div>
+                {syslogConfig.protocol === 'tcp' && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={syslogConfig.tls}
+                      onChange={(e) => updateSyslogConfig('tls', e.target.checked)}
+                      className="rounded border-border bg-bg-tertiary"
+                    />
+                    <span className="text-sm text-text-primary">{t('settings.syslogTls')}</span>
+                  </label>
+                )}
+                {hasPermission('admin:system') && (
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveSyslog} loading={syslogSaving}>
+                      <FloppyDisk size={16} />
+                      {t('common.saveChanges')}
+                    </Button>
+                    {syslogConfig.enabled && syslogConfig.host && (
+                      <Button variant="secondary" onClick={handleTestSyslog} loading={syslogTesting}>
+                        <Lightning size={16} />
+                        {t('settings.syslogTest')}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

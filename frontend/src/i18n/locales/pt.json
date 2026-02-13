@@ -1547,7 +1547,20 @@
     "anomalyDetection": "Anomaly Detection",
     "noAnomalies": "No anomalies detected",
     "noAnomaliesDesc": "No suspicious activity in the last 24 hours",
-    "unknownAnomaly": "Unknown anomaly"
+    "unknownAnomaly": "Unknown anomaly",
+    "remoteSyslog": "Remote Syslog",
+    "remoteSyslogDesc": "Forward audit log events to a remote syslog server for centralized logging and SIEM integration.",
+    "enableSyslog": "Enable remote syslog forwarding",
+    "syslogHost": "Syslog Server",
+    "syslogPort": "Port",
+    "syslogProtocol": "Protocol",
+    "syslogFacility": "Facility",
+    "syslogTls": "Enable TLS encryption (TCP only)",
+    "syslogTest": "Test Connection",
+    "syslogSaved": "Syslog configuration saved",
+    "syslogSaveFailed": "Failed to save syslog configuration",
+    "syslogTestSuccess": "Test message sent successfully",
+    "syslogTestFailed": "Failed to send test message"
   },
   "sso": {
     "authUrl": "URL de autorização",
