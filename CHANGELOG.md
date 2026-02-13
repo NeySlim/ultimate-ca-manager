@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.7] - 2026-02-13
+
+### Security
+
+- **Auto-Update** - Replaced shell command injection vulnerability with systemd path-activated updater
+
+### Bug Fixes
+
+- **Packaging** - Restart service on upgrade instead of start (preserves running state)
+
+### Improvements
+
+- **Auto-Update** - Download to DATA_DIR/updates instead of /tmp (PrivateTmp-safe)
+- **Auto-Update** - Daily scheduled update check (logs available updates)
+- **Packaging** - DEB/RPM now install and enable ucm-updater.path systemd unit
+
+---
+
 ## [2.0.6] - 2026-02-12
 
 ### New Features
