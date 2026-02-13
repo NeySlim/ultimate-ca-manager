@@ -8,7 +8,7 @@ import { cn } from '../lib/utils'
 export function Logo({ 
   variant = 'horizontal', // 'horizontal' | 'vertical' | 'compact' | 'icon'
   withText = true,
-  size = 'md', // 'sm' | 'md' | 'lg' | 'xl'
+  size = 'md', // 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   filled = false,
   className 
 }) {
@@ -16,25 +16,27 @@ export function Logo({
   const configs = {
     horizontal: {
       container: 'flex items-center',
-      gap: size === 'sm' ? '2px' : '4px',
-      linkWidth: size === 'sm' ? '12px' : size === 'lg' ? '24px' : '16px',
-      linkHeight: size === 'sm' ? '18px' : size === 'lg' ? '36px' : '24px',
-      borderWidth: size === 'sm' ? '2px' : size === 'lg' ? '4px' : '3px',
-      borderRadius: '8px',
+      gap: size === 'xs' ? '1px' : size === 'sm' ? '2px' : '4px',
+      linkWidth: size === 'xs' ? '8px' : size === 'sm' ? '12px' : size === 'lg' ? '24px' : '16px',
+      linkHeight: size === 'xs' ? '13px' : size === 'sm' ? '18px' : size === 'lg' ? '36px' : '24px',
+      borderWidth: size === 'xs' ? '1.5px' : size === 'sm' ? '2px' : size === 'lg' ? '4px' : '3px',
+      borderRadius: size === 'xs' ? '4px' : '8px',
       transforms: [
         'translateY(0)',
-        size === 'sm' ? 'translateY(6px)' : size === 'lg' ? 'translateY(12px)' : 'translateY(8px)',
-        size === 'sm' ? 'translateY(-3px)' : size === 'lg' ? 'translateY(-6px)' : 'translateY(-4px)'
+        size === 'xs' ? 'translateY(4px)' : size === 'sm' ? 'translateY(6px)' : size === 'lg' ? 'translateY(12px)' : 'translateY(8px)',
+        size === 'xs' ? 'translateY(-2px)' : size === 'sm' ? 'translateY(-3px)' : size === 'lg' ? 'translateY(-6px)' : 'translateY(-4px)'
       ]
     },
     compact: {
       container: 'flex items-center',
-      gap: '2px',
-      linkWidth: '12px',
-      linkHeight: '20px',
-      borderWidth: '2px',
-      borderRadius: '8px',
-      transforms: ['translateY(0)', 'translateY(6px)', 'translateY(-3px)']
+      gap: size === 'xs' ? '1px' : '2px',
+      linkWidth: size === 'xs' ? '8px' : '12px',
+      linkHeight: size === 'xs' ? '14px' : '20px',
+      borderWidth: size === 'xs' ? '1.5px' : '2px',
+      borderRadius: size === 'xs' ? '4px' : '8px',
+      transforms: size === 'xs'
+        ? ['translateY(0)', 'translateY(4px)', 'translateY(-2px)']
+        : ['translateY(0)', 'translateY(6px)', 'translateY(-3px)']
     },
     vertical: {
       container: 'flex flex-col items-center',

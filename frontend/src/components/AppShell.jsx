@@ -29,12 +29,12 @@ const mobileNavItems = [
   { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
   { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
   { id: 'templates', icon: ListIcon, labelKey: 'common.templates', path: '/templates' },
-  { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
   { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme' },
   { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
   { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
   { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
   { id: 'import', icon: UploadSimple, labelKey: 'common.importExport', path: '/import' },
+  { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
   { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
   { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
 ]
