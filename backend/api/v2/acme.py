@@ -123,39 +123,70 @@ def update_acme_settings():
 
 
 def _count_superseded_certificates():
-    """Count old ACME certificates that have been replaced by renewals"""
-    from models.acme_models import AcmeClientOrder
+    """Count old Local ACME server certificates that have been replaced by renewals.
+    For each unique set of identifiers, only the latest order's certificate is current."""
+    from models.acme_models import AcmeOrder
     
-    current_cert_ids = {o.certificate_id for o in AcmeClientOrder.query.filter(
-        AcmeClientOrder.certificate_id.isnot(None)
-    ).all()}
+    # Get all valid orders with certificates
+    orders = AcmeOrder.query.filter(
+        AcmeOrder.certificate_id.isnot(None),
+        AcmeOrder.status == 'valid'
+    ).order_by(AcmeOrder.created_at.desc()).all()
     
-    if not current_cert_ids:
+    if not orders:
+        return 0
+    
+    # For each unique identifiers set, keep only the latest cert_id
+    current_cert_ids = set()
+    seen_identifiers = set()
+    all_cert_ids = set()
+    for order in orders:
+        all_cert_ids.add(order.certificate_id)
+        ident_key = order.identifiers  # JSON string, same domains = same key
+        if ident_key not in seen_identifiers:
+            seen_identifiers.add(ident_key)
+            current_cert_ids.add(order.certificate_id)
+    
+    superseded_ids = all_cert_ids - current_cert_ids
+    if not superseded_ids:
         return 0
     
     return Certificate.query.filter(
-        Certificate.source.in_(['acme', 'acme_renewal', 'acme-renewal']),
-        Certificate.revoked == False,
-        ~Certificate.id.in_(current_cert_ids)
+        Certificate.id.in_(superseded_ids),
+        Certificate.revoked == False
     ).count()
 
 
 def _revoke_superseded_certificates():
-    """Revoke all superseded ACME certificates"""
-    from models.acme_models import AcmeClientOrder
+    """Revoke all superseded Local ACME server certificates"""
+    from models.acme_models import AcmeOrder
     from services.cert_service import CertificateService
     
-    current_cert_ids = {o.certificate_id for o in AcmeClientOrder.query.filter(
-        AcmeClientOrder.certificate_id.isnot(None)
-    ).all()}
+    orders = AcmeOrder.query.filter(
+        AcmeOrder.certificate_id.isnot(None),
+        AcmeOrder.status == 'valid'
+    ).order_by(AcmeOrder.created_at.desc()).all()
     
-    if not current_cert_ids:
+    if not orders:
+        return 0
+    
+    current_cert_ids = set()
+    seen_identifiers = set()
+    all_cert_ids = set()
+    for order in orders:
+        all_cert_ids.add(order.certificate_id)
+        ident_key = order.identifiers
+        if ident_key not in seen_identifiers:
+            seen_identifiers.add(ident_key)
+            current_cert_ids.add(order.certificate_id)
+    
+    superseded_ids = all_cert_ids - current_cert_ids
+    if not superseded_ids:
         return 0
     
     superseded = Certificate.query.filter(
-        Certificate.source.in_(['acme', 'acme_renewal', 'acme-renewal']),
-        Certificate.revoked == False,
-        ~Certificate.id.in_(current_cert_ids)
+        Certificate.id.in_(superseded_ids),
+        Certificate.revoked == False
     ).all()
     
     revoked_count = 0
