@@ -38,18 +38,21 @@ class SyslogForwarder:
             cls._instance._initialized = False
         return cls._instance
 
+    # All available event categories (resource_type values)
+    ALL_CATEGORIES = ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system']
+
     def _initialize(self):
         self._enabled = False
         self._host = ''
         self._port = 514
         self._protocol = 'udp'
-        self._facility = 'local0'
         self._tls = False
+        self._categories = list(self.ALL_CATEGORIES)  # all enabled by default
         self._socket = None
         self._initialized = True
 
     def configure(self, enabled=False, host='', port=514, protocol='udp',
-                  facility='local0', tls=False):
+                  tls=False, categories=None):
         """Configure the syslog forwarder."""
         if not self._initialized:
             self._initialize()
@@ -60,12 +63,12 @@ class SyslogForwarder:
         self._host = host
         self._port = int(port) if port else 514
         self._protocol = protocol.lower() if protocol else 'udp'
-        self._facility = facility.lower() if facility else 'local0'
         self._tls = tls and self._protocol == 'tcp'
+        self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
 
         if self._enabled and self._host:
             logger.info(f"📡 Syslog forwarder configured: {self._protocol.upper()}://{self._host}:{self._port} "
-                        f"(facility={self._facility}, tls={self._tls})")
+                        f"(tls={self._tls}, categories={self._categories})")
         else:
             logger.info("📡 Syslog forwarder disabled")
 
@@ -106,7 +109,7 @@ class SyslogForwarder:
 
     def _build_message(self, audit_log) -> bytes:
         """Build RFC 5424 syslog message from audit log entry."""
-        facility_code = FACILITY_MAP.get(self._facility, 16)
+        facility_code = FACILITY_MAP['local0']
         severity_code = SEVERITY_MAP['info'] if audit_log.success else SEVERITY_MAP['warning']
         pri = (facility_code * 8) + severity_code
 
@@ -141,6 +144,11 @@ class SyslogForwarder:
     def send(self, audit_log):
         """Send an audit log entry to the remote syslog server. Non-blocking on failure."""
         if not self._enabled or not self._host:
+            return False
+
+        # Filter by event category
+        resource_type = getattr(audit_log, 'resource_type', None) or ''
+        if self._categories and resource_type and resource_type not in self._categories:
             return False
 
         try:
@@ -186,7 +194,7 @@ class SyslogForwarder:
             if not sock:
                 return {'success': False, 'error': 'Failed to connect'}
 
-            facility_code = FACILITY_MAP.get(self._facility, 16)
+            facility_code = FACILITY_MAP['local0']
             pri = (facility_code * 8) + SEVERITY_MAP['info']
             timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             message = f'<{pri}>1 {timestamp} - UCM - - [ucm@0 action="test"] UCM syslog test message'
@@ -211,13 +219,16 @@ class SyslogForwarder:
                 c = SystemConfig.query.filter_by(key=key).first()
                 return c.value if c else default
 
+            categories_raw = _get('syslog_categories', '')
+            categories = [c.strip() for c in categories_raw.split(',') if c.strip()] if categories_raw else list(self.ALL_CATEGORIES)
+
             self.configure(
                 enabled=_get('syslog_enabled', 'false').lower() == 'true',
                 host=_get('syslog_host', ''),
                 port=int(_get('syslog_port', '514')),
                 protocol=_get('syslog_protocol', 'udp'),
-                facility=_get('syslog_facility', 'local0'),
                 tls=_get('syslog_tls', 'false').lower() == 'true',
+                categories=categories,
             )
         except Exception as e:
             logger.debug(f"Syslog config load skipped: {e}")
@@ -234,8 +245,8 @@ class SyslogForwarder:
             'host': self._host,
             'port': self._port,
             'protocol': self._protocol,
-            'facility': self._facility,
             'tls': self._tls,
+            'categories': self._categories,
         }
 
 

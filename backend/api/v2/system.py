@@ -901,9 +901,9 @@ def update_syslog_config():
         host = data.get('host', '').strip()
         port = int(data.get('port', 514))
         protocol = data.get('protocol', 'udp').lower()
-        facility = data.get('facility', 'local0').lower()
         enabled = bool(data.get('enabled', False))
         tls = bool(data.get('tls', False))
+        categories = data.get('categories', list(syslog_forwarder.ALL_CATEGORIES))
 
         if protocol not in ('udp', 'tcp'):
             return error_response("Protocol must be 'udp' or 'tcp'", 400)
@@ -917,14 +917,14 @@ def update_syslog_config():
         set_config('syslog_host', host)
         set_config('syslog_port', str(port))
         set_config('syslog_protocol', protocol)
-        set_config('syslog_facility', facility)
         set_config('syslog_tls', str(tls).lower())
+        set_config('syslog_categories', ','.join(categories) if categories else '')
         db.session.commit()
 
         # Reconfigure forwarder
         syslog_forwarder.configure(
             enabled=enabled, host=host, port=port,
-            protocol=protocol, facility=facility, tls=tls
+            protocol=protocol, tls=tls, categories=categories
         )
 
         AuditService.log_system(

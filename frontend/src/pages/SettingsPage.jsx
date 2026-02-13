@@ -776,7 +776,7 @@ export default function SettingsPage() {
   const [anomaliesLoading, setAnomaliesLoading] = useState(false)
 
   // Syslog state
-  const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', facility: 'local0', tls: false })
+  const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', tls: false, categories: ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system'] })
   const [syslogTesting, setSyslogTesting] = useState(false)
   const [syslogSaving, setSyslogSaving] = useState(false)
 
@@ -1998,24 +1998,37 @@ export default function SettingsPage() {
                       { value: 'tcp', label: 'TCP' },
                     ]}
                   />
-                  <Select
-                    label={t('settings.syslogFacility')}
-                    value={syslogConfig.facility}
-                    onChange={(e) => updateSyslogConfig('facility', e.target.value)}
-                    options={[
-                      { value: 'local0', label: 'local0 — ' + t('settings.syslogFacilityLocal0') },
-                      { value: 'local1', label: 'local1' },
-                      { value: 'local2', label: 'local2' },
-                      { value: 'local3', label: 'local3' },
-                      { value: 'local4', label: 'local4' },
-                      { value: 'local5', label: 'local5' },
-                      { value: 'local6', label: 'local6' },
-                      { value: 'local7', label: 'local7' },
-                      { value: 'auth', label: 'auth — ' + t('settings.syslogFacilityAuth') },
-                      { value: 'daemon', label: 'daemon — ' + t('settings.syslogFacilityDaemon') },
-                    ]}
-                  />
-                  <p className="text-xs text-text-tertiary -mt-1">{t('settings.syslogFacilityHelp')}</p>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary mb-2">{t('settings.syslogCategories')}</p>
+                    <p className="text-xs text-text-tertiary mb-3">{t('settings.syslogCategoriesHelp')}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {[
+                        { value: 'certificate', label: t('settings.syslogCatCertificates') },
+                        { value: 'ca', label: t('settings.syslogCatCAs') },
+                        { value: 'csr', label: t('settings.syslogCatCSRs') },
+                        { value: 'user', label: t('settings.syslogCatUsers') },
+                        { value: 'acme', label: 'ACME' },
+                        { value: 'scep', label: 'SCEP' },
+                        { value: 'system', label: t('settings.syslogCatSystem') },
+                      ].map(cat => (
+                        <label key={cat.value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={(syslogConfig.categories || []).includes(cat.value)}
+                            onChange={(e) => {
+                              const cats = syslogConfig.categories || []
+                              updateSyslogConfig('categories', e.target.checked
+                                ? [...cats, cat.value]
+                                : cats.filter(c => c !== cat.value)
+                              )
+                            }}
+                            className="rounded border-border bg-bg-tertiary"
+                          />
+                          <span className="text-sm text-text-primary">{cat.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 {syslogConfig.protocol === 'tcp' && (
                   <label className="flex items-center gap-2 cursor-pointer">
