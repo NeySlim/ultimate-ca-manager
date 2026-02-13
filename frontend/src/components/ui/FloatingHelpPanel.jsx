@@ -21,7 +21,8 @@ import { helpGuides } from '../../data/helpGuides'
 const STORAGE_KEY = 'ucm-help-panel'
 const READER_KEY = 'ucm-help-reader'
 const MIN_W = 420
-const MAX_W = 900
+const SOFT_MAX_W = 900
+const HARD_MAX_W = 1400
 const MIN_H = 320
 const DEF_W = 640
 const DEF_H = 580
@@ -116,7 +117,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
     return {
       x: Math.max(0, Math.min(p.x, vw - 100)),
       y: Math.max(0, Math.min(p.y, vh - 48)),
-      w: Math.max(MIN_W, Math.min(p.w, MAX_W)),
+      w: Math.max(MIN_W, Math.min(p.w, Math.min(HARD_MAX_W, vw - 20))),
       h: Math.max(MIN_H, Math.min(p.h, vh - 40)),
     }
   }, [])
@@ -258,7 +259,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
       {/* Body — tabs + content */}
       {!minimized && (
         <div ref={bodyRef} className="flex-1 flex flex-col min-h-0">
-        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} />
+        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} panelWidth={p.w} />
         </div>
       )}
     </div>
@@ -269,7 +270,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
 // HELP BODY — Tab switching Quick / Guide
 // =============================================================================
 
-function HelpBody({ quickContent, guideContent, t, isMobileView }) {
+function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
   const hasQuick = !!quickContent
   const hasGuide = !!guideContent
   const defaultTab = hasGuide ? 'guide' : 'quick'
@@ -309,14 +310,14 @@ function HelpBody({ quickContent, guideContent, t, isMobileView }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div className={cn('flex-1 min-h-0', tab === 'quick' ? 'overflow-y-auto' : 'flex flex-col')}>
         {tab === 'quick' && hasQuick && (
           <div className="p-4 space-y-3">
             <QuickHelpContent content={quickContent} t={t} />
           </div>
         )}
         {tab === 'guide' && hasGuide && (
-          <GuideContent markdown={guideContent.content} t={t} isMobileView={isMobileView} />
+          <GuideContent markdown={guideContent.content} t={t} isMobileView={isMobileView} panelWidth={panelWidth} />
         )}
         {tab === 'guide' && !hasGuide && (
           <div className="p-6 text-center text-xs text-text-tertiary">
@@ -462,7 +463,7 @@ function QuickSection({ section }) {
 // GUIDE CONTENT — Markdown renderer with TOC
 // =============================================================================
 
-function GuideContent({ markdown, t, isMobileView }) {
+function GuideContent({ markdown, t, isMobileView, panelWidth }) {
   const { toc, sections } = useMemo(() => parseMarkdown(markdown), [markdown])
   const [openSections, setOpenSections] = useState(() => new Set(toc.map((_, i) => i)))
   const [readerPrefs, setReaderPrefs] = useState(loadReaderPrefs)
@@ -578,6 +579,12 @@ function GuideContent({ markdown, t, isMobileView }) {
   }, [searchQuery])
 
   const fs = FONT_SIZES[readerPrefs.fontSize]
+  // Dynamic font boost: beyond SOFT_MAX_W, each extra 100px = +1px font
+  const widthBoost = panelWidth > SOFT_MAX_W ? (panelWidth - SOFT_MAX_W) / 100 : 0
+  const baseFontPx = parseFloat(fs.size)
+  const effectiveFont = `${(baseFontPx + widthBoost).toFixed(1)}px`
+  const effectiveLine = `${(parseFloat(fs.lineHeight) + widthBoost * 0.02).toFixed(2)}`
+
   const contrastStyles = readerPrefs.contrast === 'high'
     ? { background: 'var(--bg-primary)', color: 'var(--text-primary)', filter: 'contrast(1.2)' }
     : readerPrefs.contrast === 'sepia'
@@ -641,8 +648,8 @@ function GuideContent({ markdown, t, isMobileView }) {
           className="flex-1 overflow-y-auto"
           style={{
             ...contrastStyles,
-            fontSize: fs.size,
-            lineHeight: fs.lineHeight,
+            fontSize: effectiveFont,
+            lineHeight: effectiveLine,
           }}
         >
           {sections.map((section, idx) => (
@@ -667,7 +674,7 @@ function GuideContent({ markdown, t, isMobileView }) {
                   openSections.has(idx)
                     ? (readerPrefs.contrast === 'sepia' ? 'text-[#3d2b1f]' : 'text-text-primary')
                     : 'text-text-secondary'
-                )} style={{ fontSize: `calc(${fs.size} + 1px)` }}>
+                )} style={{ fontSize: `calc(${effectiveFont} + 1px)` }}>
                   {section.title}
                 </span>
               </button>
