@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for UCM update requests
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
+
+[Path]
+PathExists=/opt/ucm/data/.update_pending
+MakeDirectory=yes
+
+[Install]
+WantedBy=multi-user.target

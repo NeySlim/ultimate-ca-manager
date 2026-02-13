@@ -52,8 +52,11 @@ find %{buildroot}%{ucm_home} -name '*.pyc' -delete
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
 install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.sh
 install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
+install -m 755 packaging/scripts/ucm-update.sh %{buildroot}%{ucm_home}/scripts/
 install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/services/
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
+install -m 644 packaging/systemd/ucm-updater.path %{buildroot}%{_unitdir}/%{name}-updater.path
+install -m 644 packaging/systemd/ucm-updater.service %{buildroot}%{_unitdir}/%{name}-updater.service
 
 %pre
 getent group %{name} >/dev/null || groupadd -r %{name}
@@ -62,18 +65,20 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %post
 %systemd_post %{name}.service
 
-# Install sudoers for service management and auto-update
+# Install sudoers for service management
 cat > /etc/sudoers.d/ucm << 'SUDOERSEOF'
 # UCM service management - allows ucm user to restart service without password
-# This is required for HTTPS certificate application and other system operations
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload ucm
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm
 ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/dpkg -i /tmp/ucm_update_*
-ucm ALL=(ALL) NOPASSWD: /usr/bin/rpm -U --force /tmp/ucm_update_*
 SUDOERSEOF
 chmod 440 /etc/sudoers.d/ucm
+
+# Enable ucm-updater path watcher for auto-updates
+systemctl daemon-reload
+systemctl enable ucm-updater.path 2>/dev/null || true
+systemctl start ucm-updater.path 2>/dev/null || true
 
 # Paths (same as DEB)
 UCM_HOME=%{ucm_home}
@@ -199,6 +204,7 @@ fi
 
 %preun
 %systemd_preun %{name}.service
+%systemd_preun %{name}-updater.path
 
 %postun
 %systemd_postun_with_restart %{name}.service
@@ -208,6 +214,8 @@ fi
 %dir %{_sysconfdir}/%{name}/
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
+%{_unitdir}/%{name}-updater.path
+%{_unitdir}/%{name}-updater.service
 /usr/lib/firewalld/services/ucm.xml
 
 %changelog

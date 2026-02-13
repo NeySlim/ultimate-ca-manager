@@ -5,32 +5,26 @@ UCM is now fully open-source (Community edition).
 """
 import os
 import re
-import json
-import shutil
-import tempfile
-import subprocess
-from datetime import datetime
-from functools import lru_cache
-from flask import current_app
+import logging
+from pathlib import Path
 
 import requests
 
-from config.settings import Config
+from config.settings import Config, DATA_DIR
 
-# GitHub repo (community only, pro is archived)
+logger = logging.getLogger('ucm.updates')
+
+# GitHub repo
 REPO = "NeySlim/ultimate-ca-manager"
-
-# Cache timeout for version check (5 minutes)
-VERSION_CACHE_TIMEOUT = 300
 
 
 def get_edition():
-    """UCM is community edition (pro archived)"""
+    """UCM is now fully open-source community edition"""
     return 'community'
 
 
 def get_github_repo():
-    """Get GitHub repo for updates"""
+    """Get the GitHub repo"""
     return REPO
 
 
@@ -64,12 +58,16 @@ def parse_version(version_str):
     # beta2 > beta1, rc1 > beta2
     prerelease_order = 0
     if prerelease:
-        if prerelease.startswith('alpha'):
-            prerelease_order = 100 + int(re.search(r'\d+', prerelease).group() or 0)
+        num_match = re.search(r'\d+', prerelease)
+        num = int(num_match.group()) if num_match else 0
+        if prerelease.startswith('dev'):
+            prerelease_order = 50 + num
+        elif prerelease.startswith('alpha'):
+            prerelease_order = 100 + num
         elif prerelease.startswith('beta'):
-            prerelease_order = 200 + int(re.search(r'\d+', prerelease).group() or 0)
+            prerelease_order = 200 + num
         elif prerelease.startswith('rc'):
-            prerelease_order = 300 + int(re.search(r'\d+', prerelease).group() or 0)
+            prerelease_order = 300 + num
     else:
         prerelease_order = 999  # Release version is highest
     
@@ -114,7 +112,7 @@ def check_for_updates(include_prereleases=False):
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             releases = response.json()
-        except requests.exceptions.HTTPError:
+        except requests.exceptions.HTTPError as e:
             raise
         
         if not releases:
@@ -131,8 +129,14 @@ def check_for_updates(include_prereleases=False):
         for release in releases:
             if release.get('draft'):
                 continue
-            if release.get('prerelease') and not include_prereleases:
-                continue
+            if release.get('prerelease'):
+                if not include_prereleases:
+                    continue
+                # Only include alpha, beta, rc — skip dev and other tags
+                tag = release.get('tag_name', '').lstrip('v')
+                suffix = tag.split('-', 1)[1] if '-' in tag else ''
+                if not any(suffix.startswith(p) for p in ('alpha', 'beta', 'rc')):
+                    continue
             latest_release = release
             break
         
@@ -211,61 +215,73 @@ def check_for_updates(include_prereleases=False):
 
 def download_update(download_url, package_name):
     """
-    Download update package to temp directory
+    Download update package to DATA_DIR/updates (accessible by ucm-updater.service)
+    
+    Note: Cannot use /tmp because ucm.service has PrivateTmp=true,
+    so files in /tmp are invisible to other services.
     
     Returns path to downloaded file
     """
-    temp_dir = tempfile.mkdtemp(prefix='ucm_update_')
-    file_path = os.path.join(temp_dir, package_name)
+    update_dir = os.path.join(str(DATA_DIR), 'updates')
+    os.makedirs(update_dir, exist_ok=True)
+    file_path = os.path.join(update_dir, package_name)
     
     try:
-        response = requests.get(download_url, stream=True, timeout=300)
+        logger.info(f"Auto-update: downloading {download_url} to {file_path}")
+        response = requests.get(download_url, stream=True, timeout=300, allow_redirects=True)
         response.raise_for_status()
         
         with open(file_path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         
+        file_size = os.path.getsize(file_path)
+        logger.info(f"Auto-update: downloaded {file_size} bytes to {file_path}")
         return file_path
     
     except Exception as e:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        # Clean up on failure
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise Exception(f"Download failed: {str(e)}")
 
 
 def install_update(package_path):
     """
-    Install downloaded update package
+    Install downloaded update package via systemd path-activated updater.
     
-    This will restart the service, so the response may not complete.
-    Requires sudoers entries for dpkg/rpm and systemctl.
+    Writes the package path to /opt/ucm/data/.update_pending which triggers
+    the ucm-updater.path systemd unit. The ucm-updater.service runs as root
+    (no NoNewPrivileges restriction) and handles dpkg/rpm install + restart.
     """
-    if package_path.endswith('.deb'):
-        cmd = f'sudo dpkg -i {package_path}'
-    elif package_path.endswith('.rpm'):
-        cmd = f'sudo rpm -U --force {package_path}'
-    else:
+    if not package_path.endswith('.deb') and not package_path.endswith('.rpm'):
         raise Exception(f"Unknown package format: {package_path}")
     
     try:
-        import logging
-        logger = logging.getLogger('ucm.updates')
-        log_file = '/var/log/ucm/update.log'
-        logger.info(f"Auto-update: installing {package_path} with: {cmd}")
-        # Run install in background so response can complete
-        subprocess.Popen(
-            ['bash', '-c', f'sleep 2 && {cmd} >> {log_file} 2>&1 && sudo systemctl restart ucm >> {log_file} 2>&1'],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True
-        )
+        trigger_file = Path(DATA_DIR) / '.update_pending'
+        logger.info(f"Auto-update: writing trigger for {package_path}")
+        trigger_file.write_text(package_path)
+        
+        logger.info(f"Auto-update: trigger written, ucm-updater.path will handle install + restart")
         return True
     except Exception as e:
-        raise Exception(f"Install failed: {str(e)}")
+        raise Exception(f"Install trigger failed: {str(e)}")
 
 
 def get_update_history():
     """Get history of updates (from audit log)"""
-    # This would query audit logs for update events
-    # For now, return empty list
     return []
+
+
+def scheduled_update_check():
+    """Scheduled task: check for available updates and log result"""
+    try:
+        result = check_for_updates(include_prereleases=False)
+        if result.get('update_available'):
+            logger.info(
+                f"Update available: {result['current_version']} -> {result['latest_version']}"
+            )
+        elif result.get('error'):
+            logger.warning(f"Update check failed: {result['error']}")
+    except Exception as e:
+        logger.warning(f"Scheduled update check error: {e}")
