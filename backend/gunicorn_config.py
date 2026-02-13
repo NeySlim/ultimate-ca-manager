@@ -71,3 +71,25 @@ def worker_int(worker):
 
 def worker_abort(worker):
     worker.log.info("Worker received SIGABRT signal")
+
+def post_worker_init(worker):
+    """Suppress noisy SSL/connection tracebacks from gevent.
+
+    Reverse proxy health checks and port scanners cause SSL handshake
+    failures that produce ~20-line tracebacks every few minutes.
+    This replaces the default gevent hub error handler with one that
+    logs these as single-line DEBUG messages instead.
+    """
+    import ssl
+    import gevent
+
+    hub = gevent.get_hub()
+    _original_handle_error = hub.handle_error
+
+    def _quiet_handle_error(context, type, value, tb):
+        if type and issubclass(type, (ssl.SSLError, ConnectionResetError, BrokenPipeError, OSError)):
+            worker.log.debug("Connection error suppressed: %s", value)
+            return
+        _original_handle_error(context, type, value, tb)
+
+    hub.handle_error = _quiet_handle_error
