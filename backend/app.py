@@ -392,6 +392,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register update check task (runs daily)
+        try:
+            from services.updates import scheduled_update_check
+            scheduler.register_task(
+                name="update_check",
+                func=scheduled_update_check,
+                interval=86400,  # 24 hours
+                description="Check for available UCM updates"
+            )
+            app.logger.info("Registered update check task (daily)")
+        except ImportError:
+            pass
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
         app.logger.info("Scheduler service started with all tasks")

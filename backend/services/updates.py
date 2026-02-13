@@ -5,23 +5,17 @@ UCM is now fully open-source (Community edition).
 """
 import os
 import re
-import json
-import shutil
-import tempfile
-import subprocess
-from datetime import datetime
-from functools import lru_cache
-from flask import current_app
+import logging
+from pathlib import Path
 
 import requests
 
 from config.settings import Config, DATA_DIR
 
-# GitHub repo (community only, pro is archived)
-REPO = "NeySlim/ultimate-ca-manager"
+logger = logging.getLogger('ucm.updates')
 
-# Cache timeout for version check (5 minutes)
-VERSION_CACHE_TIMEOUT = 300
+# GitHub repo
+REPO = "NeySlim/ultimate-ca-manager"
 
 
 def get_edition():
@@ -233,8 +227,6 @@ def download_update(download_url, package_name):
     file_path = os.path.join(update_dir, package_name)
     
     try:
-        import logging
-        logger = logging.getLogger('ucm.updates')
         logger.info(f"Auto-update: downloading {download_url} to {file_path}")
         response = requests.get(download_url, stream=True, timeout=300, allow_redirects=True)
         response.raise_for_status()
@@ -266,10 +258,6 @@ def install_update(package_path):
         raise Exception(f"Unknown package format: {package_path}")
     
     try:
-        import logging
-        from pathlib import Path
-        logger = logging.getLogger('ucm.updates')
-        
         trigger_file = Path(DATA_DIR) / '.update_pending'
         logger.info(f"Auto-update: writing trigger for {package_path}")
         trigger_file.write_text(package_path)
@@ -282,6 +270,18 @@ def install_update(package_path):
 
 def get_update_history():
     """Get history of updates (from audit log)"""
-    # This would query audit logs for update events
-    # For now, return empty list
     return []
+
+
+def scheduled_update_check():
+    """Scheduled task: check for available updates and log result"""
+    try:
+        result = check_for_updates(include_prereleases=False)
+        if result.get('update_available'):
+            logger.info(
+                f"Update available: {result['current_version']} -> {result['latest_version']}"
+            )
+        elif result.get('error'):
+            logger.warning(f"Update check failed: {result['error']}")
+    except Exception as e:
+        logger.warning(f"Scheduled update check error: {e}")

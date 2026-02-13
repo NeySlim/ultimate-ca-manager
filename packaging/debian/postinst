@@ -93,14 +93,11 @@ ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm, /usr/bin/systemctl start uc
 SUDOERS
         chmod 440 /etc/sudoers.d/ucm-service
         
-        # Install ucm-updater systemd units for auto-update
-        if [ -d "$UCM_HOME/systemd" ]; then
-            cp "$UCM_HOME/systemd/ucm-updater.path" /etc/systemd/system/
-            cp "$UCM_HOME/systemd/ucm-updater.service" /etc/systemd/system/
-            systemctl daemon-reload
-            systemctl enable ucm-updater.path
-            systemctl start ucm-updater.path
-        fi
+        # Enable ucm-updater systemd units for auto-update
+        # Units are installed to /lib/systemd/system/ by the package
+        systemctl daemon-reload
+        systemctl enable ucm-updater.path 2>/dev/null || true
+        systemctl start ucm-updater.path 2>/dev/null || true
         
         # Create config if not exists (fresh install)
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
