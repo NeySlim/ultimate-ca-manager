@@ -518,7 +518,7 @@ class AcmeService:
         Args:
             order_id: Order identifier
             csr_pem: PEM-encoded Certificate Signing Request
-            ca_refid: CA to sign with (optional, uses default if not provided)
+            ca_refid: CA to sign with (optional, resolved from domain config → global default → first available)
             
         Returns:
             Tuple of (success, error_message)
@@ -547,6 +547,10 @@ class AcmeService:
         
         if set(csr_domains) != set(order_domains):
             return False, f"CSR domains {csr_domains} don't match order domains {order_domains}"
+        
+        # Resolve CA: domain-specific → global default → first available
+        if not ca_refid:
+            ca_refid = self._resolve_ca_for_domains(order_domains)
         
         # Sign certificate with UCM CA
         success, cert_id, error = self._sign_certificate_with_ca(
@@ -604,6 +608,39 @@ class AcmeService:
             pass
         
         return domains
+    
+    def _resolve_ca_for_domains(self, domains: list) -> Optional[str]:
+        """Resolve which CA should sign for the given domains.
+        
+        Resolution order:
+        1. Domain-specific CA from acme_domains table
+        2. Global default from acme.issuing_ca_id config
+        3. None (will fall back to first available CA in _sign_certificate_with_ca)
+        """
+        from api.v2.acme_domains import find_provider_for_domain
+        from models import SystemConfig, CA
+        
+        # Check domain-specific CA
+        for domain in domains:
+            result = find_provider_for_domain(domain)
+            if result and result.get('issuing_ca_id'):
+                ca = CA.query.get(result['issuing_ca_id'])
+                if ca and ca.prv:
+                    return ca.refid
+        
+        # Fall back to global default
+        ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        if ca_id_cfg and ca_id_cfg.value:
+            ca = CA.query.filter_by(refid=ca_id_cfg.value).first()
+            if not ca:
+                try:
+                    ca = CA.query.get(int(ca_id_cfg.value))
+                except (ValueError, TypeError):
+                    pass
+            if ca and ca.prv:
+                return ca.refid
+        
+        return None
     
     def _sign_certificate_with_ca(
         self,

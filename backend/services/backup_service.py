@@ -652,6 +652,7 @@ class BackupService:
             domains.append({
                 'domain': ad.domain,
                 'dns_provider_id': ad.dns_provider_id,
+                'issuing_ca_id': ad.issuing_ca_id,
                 'is_wildcard_allowed': ad.is_wildcard_allowed,
                 'auto_approve': ad.auto_approve,
                 'created_by': ad.created_by,
@@ -1275,11 +1276,13 @@ class BackupService:
             if existing:
                 existing.is_wildcard_allowed = ad_data.get('is_wildcard_allowed', True)
                 existing.auto_approve = ad_data.get('auto_approve', True)
+                existing.issuing_ca_id = ad_data.get('issuing_ca_id')
                 existing.created_by = ad_data.get('created_by')
             else:
                 new_ad = AcmeDomain(
                     domain=ad_data['domain'],
                     dns_provider_id=ad_data.get('dns_provider_id', 1),
+                    issuing_ca_id=ad_data.get('issuing_ca_id'),
                     is_wildcard_allowed=ad_data.get('is_wildcard_allowed', True),
                     auto_approve=ad_data.get('auto_approve', True),
                     created_by=ad_data.get('created_by'),
