@@ -18,52 +18,49 @@ import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { cn } from '../lib/utils'
 
-// Tool definitions - only static data, names/descriptions are translated in component
+// Tool definitions with tab-compatible format for sidebar layout
 const TOOLS = [
   {
     id: 'ssl-checker',
     nameKey: 'tools.sslChecker',
     descKey: 'tools.sslCheckerDesc',
     icon: Globe,
-    color: 'green'
+    color: 'icon-bg-emerald',
+    labelKey: 'tools.sslChecker'
   },
   {
     id: 'csr-decoder',
     nameKey: 'tools.csrDecoder',
     descKey: 'tools.csrDecoderDesc',
     icon: FileMagnifyingGlass,
-    color: 'blue'
+    color: 'icon-bg-blue',
+    labelKey: 'tools.csrDecoder'
   },
   {
     id: 'cert-decoder',
     nameKey: 'tools.decoder',
     descKey: 'tools.certDecoderDesc',
     icon: Certificate,
-    color: 'purple'
+    color: 'icon-bg-violet',
+    labelKey: 'tools.decoder'
   },
   {
     id: 'key-matcher',
     nameKey: 'tools.keyMatcher',
     descKey: 'tools.keyMatcherDesc',
     icon: Key,
-    color: 'orange'
+    color: 'icon-bg-orange',
+    labelKey: 'tools.keyMatcher'
   },
   {
     id: 'converter',
     nameKey: 'tools.converter',
     descKey: 'tools.converterDesc',
     icon: ArrowsLeftRight,
-    color: 'teal'
+    color: 'icon-bg-teal',
+    labelKey: 'tools.converter'
   }
 ]
-
-const iconColors = {
-  green: 'icon-bg-emerald',
-  blue: 'icon-bg-blue',
-  purple: 'icon-bg-violet',
-  orange: 'icon-bg-orange',
-  teal: 'icon-bg-teal'
-}
 
 export default function CertificateToolsPage() {
   const { t } = useTranslation()
@@ -355,33 +352,17 @@ export default function CertificateToolsPage() {
     )
   }
 
-  // Render tool selector
-  const renderToolSelector = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-      {TOOLS.map(tool => {
-        const Icon = tool.icon
-        const isActive = activeTool === tool.id
-        return (
-          <button
-            key={tool.id}
-            onClick={() => { setActiveTool(tool.id); resetResult() }}
-            className={cn(
-              'p-3 rounded-lg border text-left transition-all',
-              isActive
-                ? 'border-accent-primary bg-accent-primary/10'
-                : 'border-border bg-bg-secondary hover:border-accent-primary/50'
-            )}
-          >
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2', iconColors[tool.color])}>
-              <Icon size={18} weight="duotone" className="text-text-primary" />
-            </div>
-            <div className="text-sm font-medium text-text-primary">{t(tool.nameKey)}</div>
-            <div className="text-xs text-text-secondary mt-0.5 line-clamp-2">{t(tool.descKey)}</div>
-          </button>
-        )
-      })}
-    </div>
-  )
+  const handleToolChange = (toolId) => {
+    setActiveTool(toolId)
+    resetResult()
+  }
+
+  const tabs = TOOLS.map(tool => ({
+    id: tool.id,
+    label: t(tool.labelKey),
+    icon: tool.icon,
+    color: tool.color
+  }))
 
   // Render SSL Checker
   const renderSSLChecker = () => (
@@ -1003,23 +984,20 @@ export default function CertificateToolsPage() {
       title={t('common.tools')}
       subtitle={t('tools.subtitle')}
       icon={Wrench}
+      tabs={tabs}
+      activeTab={activeTool}
+      onTabChange={handleToolChange}
+      tabLayout="sidebar"
+      tabGroups={[
+        { labelKey: 'tools.groups.analysis', tabs: ['ssl-checker', 'csr-decoder', 'cert-decoder'], color: 'icon-bg-blue' },
+        { labelKey: 'tools.groups.verification', tabs: ['key-matcher'], color: 'icon-bg-orange' },
+        { labelKey: 'tools.groups.conversion', tabs: ['converter'], color: 'icon-bg-teal' },
+      ]}
       helpPageKey="certTools"
     >
-      <div className="space-y-6 p-4">
-        {/* Tool selector */}
-        {renderToolSelector()}
-
-        {/* Tool form */}
-        <div className="bg-bg-primary border border-border rounded-lg p-4">
-          {renderToolForm()}
-        </div>
-
-        {/* Result */}
-        {result && (
-          <div className="mt-4">
-            {renderResult()}
-          </div>
-        )}
+      <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+        {renderToolForm()}
+        {result && renderResult()}
       </div>
     </ResponsiveLayout>
   )

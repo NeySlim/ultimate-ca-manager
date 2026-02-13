@@ -1725,6 +1725,11 @@
     "daysAgo_other": "il y a {{count}} jours"
   },
   "tools": {
+    "groups": {
+      "analysis": "Analyse",
+      "verification": "Vérification",
+      "conversion": "Conversion"
+    },
     "sslChecker": "Vérificateur SSL",
     "decoder": "Décodeur de certificat",
     "converter": "Convertisseur de format",

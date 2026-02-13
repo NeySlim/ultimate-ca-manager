@@ -1071,6 +1071,11 @@
   },
   "tools": {
     "subtitle": "SSL checker, decoders, converters and key matcher",
+    "groups": {
+      "analysis": "Analysis",
+      "verification": "Verification",
+      "conversion": "Conversion"
+    },
     "sslChecker": "SSL Checker",
     "sslCheckerDesc": "Check SSL certificate of a remote server",
     "csrDecoder": "CSR Decoder",
