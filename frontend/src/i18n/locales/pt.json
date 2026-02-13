@@ -980,7 +980,9 @@
     "exportFormats": "Formatos de exportação",
     "proTips": "Dicas",
     "seeAlso": "Ver também",
-    "statusLegend": "Legenda de estados"
+    "statusLegend": "Legenda de estados",
+    "minimize": "Minimizar",
+    "expand": "Expandir"
   },
   "hsm": {
     "addHSM": "Adicionar HSM",

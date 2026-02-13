@@ -971,7 +971,9 @@
     "aboutHTTPS": "关于HTTPS证书",
     "aboutWebAuthn": "关于安全密钥",
     "proTips": "实用技巧",
-    "seeAlso": "另请参阅"
+    "seeAlso": "另请参阅",
+    "minimize": "最小化",
+    "expand": "展开"
   },
   "hsm": {
     "addHSM": "添加HSM",

@@ -25,7 +25,7 @@ import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
 import { FilterSelect } from '../Select'
-import { HelpModal } from '../HelpModal'
+import { FloatingHelpPanel } from '../FloatingHelpPanel'
 
 // =============================================================================
 // PANEL WIDTH CONSTANTS
@@ -71,11 +71,8 @@ export function ResponsiveLayout({
   activeFilters = 0, // count of active filters
   onClearFilters,
   
-  // Help - pass pageKey to show contextual help modal
+  // Help - pass pageKey to show contextual help panel
   helpPageKey, // e.g., 'cas', 'certificates', 'settings'
-  // Legacy support - JSX content (deprecated)
-  helpContent,
-  helpTitle = 'Help',
   
   // Slide-over panel
   slideOverOpen = false,
@@ -218,7 +215,7 @@ export function ResponsiveLayout({
           onClearFilters={onClearFilters}
           onOpenFilters={() => setFilterDrawerOpen(true)}
           actions={actions}
-          showHelp={!!helpPageKey || !!helpContent}
+          showHelp={!!helpPageKey}
           onHelpClick={() => setHelpDrawerOpen(true)}
           isMobile={false}
         />
@@ -445,33 +442,13 @@ export function ResponsiveLayout({
         </MobileDrawer>
       )}
       
-      {/* HELP MODAL - New contextual help system */}
+      {/* FLOATING HELP PANEL */}
       {helpPageKey && (
-        <HelpModal
+        <FloatingHelpPanel
           isOpen={helpDrawerOpen}
           onClose={() => setHelpDrawerOpen(false)}
           pageKey={helpPageKey}
         />
-      )}
-      
-      {/* LEGACY HELP DRAWER - For backwards compatibility with JSX content */}
-      {!helpPageKey && helpContent && (
-        isMobile ? (
-          <MobileDrawer
-            open={helpDrawerOpen}
-            onClose={() => setHelpDrawerOpen(false)}
-            title={helpTitle}
-          >
-            {helpContent}
-          </MobileDrawer>
-        ) : helpDrawerOpen && (
-          <DesktopHelpPanel
-            title={helpTitle}
-            onClose={() => setHelpDrawerOpen(false)}
-          >
-            {helpContent}
-          </DesktopHelpPanel>
-        )
       )}
     </div>
   )
@@ -945,59 +922,6 @@ function MobileDrawer({ open, onClose, title, children }) {
 }
 
 // =============================================================================
-// DESKTOP HELP PANEL (slide-over from right)
-// =============================================================================
-
-function DesktopHelpPanel({ title, onClose, children }) {
-  // Close on Escape
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose?.()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-  
-  return (
-    <div className="fixed inset-0 z-50">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/20 animate-fade-in"
-        onClick={onClose}
-      />
-      
-      {/* Panel */}
-      <aside className={cn(
-        'absolute top-4 right-4 bottom-4 w-80 bg-bg-primary rounded-xl',
-        'flex flex-col overflow-hidden shadow-2xl border border-border',
-        'animate-slide-in-right'
-      )}>
-        {/* Header */}
-        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="font-semibold text-sm text-text-primary">
-            {title}
-          </h2>
-          <button
-            onClick={onClose}
-            className={cn(
-              'w-7 h-7 rounded-md flex items-center justify-center',
-              'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary',
-              'transition-colors'
-            )}
-          >
-            <X size={16} />
-          </button>
-        </div>
-        
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-4">
-          {children}
-        </div>
-      </aside>
-    </div>
-  )
-}
-
 // =============================================================================
 // FILTER CONTENT
 // =============================================================================

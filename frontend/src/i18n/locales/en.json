@@ -1729,7 +1729,9 @@
     "aboutHTTPS": "About HTTPS Certificate",
     "aboutWebAuthn": "About Security Keys",
     "proTips": "Pro Tips",
-    "seeAlso": "See Also"
+    "seeAlso": "See Also",
+    "minimize": "Minimize",
+    "expand": "Expand"
   },
   "time": {
     "today": "Today",

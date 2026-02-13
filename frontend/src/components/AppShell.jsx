@@ -13,7 +13,7 @@ import {
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
-import { HelpModal } from './ui/HelpModal'
+import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
 import LanguageSelector from './ui/LanguageSelector'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
@@ -69,7 +69,9 @@ export function AppShell() {
     'scep-config': 'scep',
     'import': 'importExport',
     'audit': 'auditLogs',
-    'crl-ocsp': 'crlocsp'
+    'crl-ocsp': 'crlocsp',
+    'users': 'usersGroups',
+    'tools': 'certTools'
   }
   const helpPageKey = helpPageKeyMap[activePage] || activePage
   
@@ -78,7 +80,7 @@ export function AppShell() {
     // Core pages
     'certificates', 'cas', 'csrs', 'users', 'templates', 
     'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
-    'import', 'tools', 'audit', 'account',
+    'import', 'tools', 'audit', 'account', 'operations',
     // Pro pages
     'rbac', 'hsm'
   ]
@@ -357,14 +359,12 @@ export function AppShell() {
         onOpenChange={setCommandPaletteOpen}
       />
       
-      {/* Mobile Help Modal */}
-      {isMobile && (
-        <HelpModal
-          isOpen={helpModalOpen}
-          onClose={() => setHelpModalOpen(false)}
-          pageKey={helpPageKey}
-        />
-      )}
+      {/* Help Panel (floating desktop / bottom sheet mobile) */}
+      <FloatingHelpPanel
+        isOpen={helpModalOpen}
+        onClose={() => setHelpModalOpen(false)}
+        pageKey={helpPageKey}
+      />
     </div>
     </div>
   )

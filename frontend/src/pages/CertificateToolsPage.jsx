@@ -72,33 +72,7 @@ export default function CertificateToolsPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
-  // Help content with translations
-  const helpContent = {
-    title: t('common.tools'),
-    description: t('tools.helpDescription'),
-    sections: [
-      {
-        title: t('tools.sslChecker'),
-        content: t('tools.helpSslChecker')
-      },
-      {
-        title: t('tools.csrDecoder'),
-        content: t('tools.helpCsrDecoder')
-      },
-      {
-        title: t('tools.decoder'),
-        content: t('tools.helpCertDecoder')
-      },
-      {
-        title: t('tools.keyMatcher'),
-        content: t('tools.helpKeyMatcher')
-      },
-      {
-        title: t('tools.converter'),
-        content: t('tools.helpConverter')
-      }
-    ]
-  }
+  // Help content now provided via FloatingHelpPanel (helpPageKey="certTools")
 
   // SSL Checker state
   const [sslHostname, setSslHostname] = useState('')
@@ -1029,7 +1003,7 @@ export default function CertificateToolsPage() {
       title={t('common.tools')}
       subtitle={t('tools.subtitle')}
       icon={Wrench}
-      helpContent={helpContent}
+      helpPageKey="certTools"
     >
       <div className="space-y-6 p-4">
         {/* Tool selector */}

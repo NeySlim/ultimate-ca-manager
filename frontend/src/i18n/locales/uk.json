@@ -971,7 +971,9 @@
     "aboutHTTPS": "Про сертифікат HTTPS",
     "aboutWebAuthn": "Про ключі безпеки",
     "proTips": "Поради",
-    "seeAlso": "Дивіться також"
+    "seeAlso": "Дивіться також",
+    "minimize": "Згорнути",
+    "expand": "Розгорнути"
   },
   "hsm": {
     "addHSM": "Додати HSM",

@@ -971,7 +971,9 @@
     "aboutHTTPS": "À propos du certificat HTTPS",
     "aboutWebAuthn": "À propos des clés de sécurité",
     "proTips": "Astuces",
-    "seeAlso": "Voir aussi"
+    "seeAlso": "Voir aussi",
+    "minimize": "Réduire",
+    "expand": "Agrandir"
   },
   "hsm": {
     "statusUnavailable": "Les fonctionnalités HSM ne sont pas disponibles",

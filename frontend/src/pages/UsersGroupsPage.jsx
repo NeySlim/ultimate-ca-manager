@@ -14,7 +14,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select,
-  HelpCard, LoadingSpinner, MemberTransferModal,
+  LoadingSpinner, MemberTransferModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService } from '../services'
@@ -481,72 +481,7 @@ export default function UsersGroupsPage() {
     ] : [])
   ], [canDelete, t])
 
-  // ============= HELP CONTENT =============
-  
-  const helpContent = (
-    <div className="space-y-4">
-      {/* Quick Stats */}
-      <div className="visual-section">
-        <div className="visual-section-header">
-          <Users size={16} className="status-primary-text" />
-          {activeTab === 'users' ? t('common.users') + ' ' + t('common.details') : t('common.groups') + ' ' + t('common.details')}
-        </div>
-        <div className="visual-section-body">
-          {activeTab === 'users' ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="help-stat-card">
-                <div className="help-stat-value help-stat-value-success">{users.filter(u => u.active).length}</div>
-                <div className="help-stat-label">{t('common.active')}</div>
-              </div>
-              <div className="help-stat-card">
-                <div className="help-stat-value">{users.filter(u => !u.active).length}</div>
-                <div className="help-stat-label">{t('common.disabled')}</div>
-              </div>
-              <div className="help-stat-card">
-                <div className="help-stat-value help-stat-value-primary">{users.filter(u => u.role === 'admin').length}</div>
-                <div className="help-stat-label">{t('users.admin')}</div>
-              </div>
-              <div className="help-stat-card">
-                <div className="help-stat-value">{users.length}</div>
-                <div className="help-stat-label">{t('common.total')}</div>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="help-stat-card">
-                <div className="help-stat-value help-stat-value-primary">{groups.length}</div>
-                <div className="help-stat-label">{t('common.groups')}</div>
-              </div>
-              <div className="help-stat-card">
-                <div className="help-stat-value">{users.length}</div>
-                <div className="help-stat-label">{t('common.users')}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <HelpCard title={t('common.users')} variant="info">
-        {t('common.users')}
-      </HelpCard>
-      <HelpCard title={t('common.role')} variant="tip">
-        <div className="space-y-1.5 mt-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm" dot>{t('users.admin')}</Badge>
-            <span className="text-xs">{t('common.all')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>{t('common.operator')}</Badge>
-            <span className="text-xs">{t('common.certificates')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm" dot>{t('common.viewer')}</Badge>
-            <span className="text-xs">{t('common.details')}</span>
-          </div>
-        </div>
-      </HelpCard>
-    </div>
-  )
+  // Help is now provided via FloatingHelpPanel (helpPageKey="usersGroups")
 
   // ============= DETAIL PANEL =============
   
@@ -750,8 +685,7 @@ export default function UsersGroupsPage() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         tabLayout="sidebar"
-        helpContent={helpContent}
-        helpTitle={t('common.users')}
+        helpPageKey="usersGroups"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">

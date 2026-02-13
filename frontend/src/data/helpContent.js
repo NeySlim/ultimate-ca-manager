@@ -1,911 +1,772 @@
 /**
- * Help content for all UCM pages
- * Structure:
- * - title: Modal header title
- * - subtitle: Short description
- * - overview: Introduction paragraph
- * - sections: Array of content sections
- * - tips: Array of helpful tips
- * - warnings: Array of important warnings
- * - related: Array of related pages/topics
+ * Help content for all UCM pages — v2.1.0
+ * Each entry: { title, subtitle, overview, sections[], tips[], warnings[], related[] }
+ * Section: { title, icon, content?, items?[], definitions?[], example? }
+ * Item: string | { label, text }
  */
 
 import {
   TreeStructure, Certificate, FileText, ClockCounterClockwise,
   ShieldCheck, Key, Users, Gear, Database, Lock, Globe,
   ListChecks, CloudArrowUp, HardDrive, UsersFour, Fingerprint,
-  ArrowClockwise
+  ArrowClockwise, Wrench, Stack, Robot
 } from '@phosphor-icons/react'
 
 export const helpContent = {
-  // ===========================================
-  // DASHBOARD
-  // ===========================================
+
+  // ===== DASHBOARD =====
   dashboard: {
     title: 'Dashboard',
     subtitle: 'System overview and monitoring',
-    overview: 'The dashboard provides a real-time overview of your PKI infrastructure. Monitor certificate status, expiring certificates, and system health at a glance.',
+    overview: 'Real-time overview of your PKI infrastructure. Widgets display certificate status, expiry alerts, system health, and recent activity. The layout is fully customizable with drag-and-drop.',
     sections: [
       {
-        title: 'Key Metrics',
+        title: 'Widgets',
         icon: ListChecks,
         items: [
-          { label: 'Total CAs', text: 'Number of Certificate Authorities (Root + Intermediate)' },
-          { label: 'Active Certificates', text: 'Valid certificates currently in use' },
-          { label: 'Pending CSRs', text: 'Certificate Signing Requests awaiting approval' },
-          { label: 'Expiring Soon', text: 'Certificates expiring within 30 days' },
+          { label: 'Statistics', text: 'Total CAs, active certificates, pending CSRs, and expiring soon counts' },
+          { label: 'Certificate Trend', text: 'Issuance history chart over time' },
+          { label: 'Status Distribution', text: 'Pie chart breakdown: valid / expiring / expired / revoked' },
+          { label: 'Next Expiry', text: 'Certificates expiring within 30 days' },
+          { label: 'System Status', text: 'Service health, uptime, ACME / SCEP / CRL / OCSP status' },
+          { label: 'Recent Activity', text: 'Latest operations across the system' },
+          { label: 'Recent Certificates', text: 'Recently issued or imported certificates' },
+          { label: 'Certificate Authorities', text: 'CA list with chain information' },
+          { label: 'ACME Accounts', text: 'Registered ACME client accounts' },
         ]
       },
-      {
-        title: 'Certificate Status',
-        icon: Certificate,
-        content: 'Certificates are categorized by their current status:',
-        definitions: [
-          { term: 'Valid', description: 'Active and not expired' },
-          { term: 'Expiring', description: 'Will expire within 30 days' },
-          { term: 'Expired', description: 'Past validity period' },
-          { term: 'Revoked', description: 'Manually invalidated before expiry' },
-        ]
-      },
-      {
-        title: 'Recent Activity',
-        icon: ClockCounterClockwise,
-        content: 'Shows the latest operations performed on your PKI: certificate issuance, revocations, CA operations, and user actions.'
-      }
     ],
     tips: [
-      'Set up email alerts to be notified before certificates expire',
-      'Click on any metric card to see detailed information',
-      'Review expiring certificates regularly to avoid service disruption'
+      'Drag widgets to rearrange your dashboard layout',
+      'Click the eye icon in the header to show/hide specific widgets',
+      'The dashboard updates in real-time via WebSocket — no manual refresh needed',
+      'Layout is saved per-user and persists across sessions',
     ],
-    related: ['Certificates', 'CAs', 'Audit Logs']
+    related: ['Certificates', 'CAs', 'Settings']
   },
 
-  // ===========================================
-  // CERTIFICATE AUTHORITIES
-  // ===========================================
+  // ===== CERTIFICATE AUTHORITIES =====
   cas: {
     title: 'Certificate Authorities',
     subtitle: 'Manage your PKI hierarchy',
-    overview: 'Certificate Authorities (CAs) are the foundation of your PKI. They sign and issue certificates to establish trust. UCM supports hierarchical CA structures with Root and Intermediate CAs, with automatic AKI/SKI-based chain matching for reliable parent-child relationships.',
+    overview: 'Create and manage Root and Intermediate Certificate Authorities. Build a complete trust chain for your organization. CAs with private keys can sign certificates directly.',
     sections: [
       {
-        title: 'CA Hierarchy',
+        title: 'Views',
         icon: TreeStructure,
-        content: 'A typical PKI hierarchy consists of:',
         items: [
-          { label: 'Root CA', text: 'The top-level CA that signs intermediate CAs. Keep offline for maximum security.' },
-          { label: 'Intermediate CA', text: 'Signs end-entity certificates. Used for daily operations.' },
-          { label: 'End-Entity', text: 'Server/client certificates issued to users and services.' },
+          { label: 'Tree View', text: 'Hierarchical display showing parent-child CA relationships' },
+          { label: 'List View', text: 'Flat table view with sorting and filtering' },
+          { label: 'Org View', text: 'Grouped by organization for multi-tenant setups' },
         ]
       },
       {
-        title: 'Creating a CA',
+        title: 'Actions',
         icon: Certificate,
-        content: 'When creating a new CA, you\'ll need to specify:',
         items: [
-          { label: 'Common Name', text: 'Unique identifier (e.g., "My Company Root CA")' },
-          { label: 'Key Algorithm', text: 'RSA (2048/4096) or ECDSA (P-256/P-384)' },
-          { label: 'Validity', text: 'Root CAs: 10-20 years, Intermediate: 5-10 years' },
-          { label: 'Key Usage', text: 'Certificate signing, CRL signing capabilities' },
+          { label: 'Create Root CA', text: 'Self-signed top-level authority' },
+          { label: 'Create Intermediate', text: 'CA signed by a parent CA in the chain' },
+          { label: 'Import CA', text: 'Import existing CA certificate (with or without private key)' },
+          { label: 'Export', text: 'PEM, DER, or PKCS#12 (P12/PFX) with password protection' },
+          { label: 'Renew CA', text: 'Re-issue the CA certificate with a new validity period' },
+          { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
         ]
       },
-      {
-        title: 'CA Operations',
-        icon: Gear,
-        items: [
-          { label: 'Issue Certificate', text: 'Sign a new certificate under this CA' },
-          { label: 'Generate CRL', text: 'Create a Certificate Revocation List' },
-          { label: 'Export', text: 'Download CA certificate in various formats (PEM, DER)' },
-          { label: 'Renew', text: 'Create a new CA certificate with extended validity' },
-        ]
-      },
-      {
-        title: 'Chain Repair',
-        icon: ArrowClockwise,
-        content: 'UCM automatically maintains certificate chain integrity:',
-        items: [
-          { label: 'AKI/SKI Matching', text: 'Chains are built using cryptographic key identifiers, not names - reliable across imports and environments.' },
-          { label: 'Automatic Repair', text: 'An hourly background task re-chains orphan CAs and certificates, and deduplicates entries with the same key.' },
-          { label: 'Run Now', text: 'Use the Chain Repair bar at the top of this page to trigger an immediate repair or check status.' },
-        ]
-      }
     ],
     tips: [
-      'Use a strong key algorithm: RSA 4096 or ECDSA P-384 for Root CAs',
-      'Create at least one Intermediate CA for issuing end-entity certificates',
-      'Keep your Root CA private key secure - consider HSM storage',
-      'The Chain Repair bar shows chain integrity status - click "Run Now" after importing multiple CAs to link them immediately'
+      'CAs with a key icon (🔑) have a private key and can sign certificates',
+      'Use intermediate CAs for day-to-day signing, keep root CA offline when possible',
+      'PKCS#12 export includes the full chain and is ideal for backup',
     ],
     warnings: [
-      'Deleting a CA will NOT revoke certificates it has issued',
-      'Root CA compromise affects your entire PKI - protect it carefully'
+      'Deleting a CA will NOT revoke certificates it has issued — revoke them first',
+      'Private keys are stored encrypted; losing the database means losing the keys',
     ],
-    related: ['Certificates', 'CRL/OCSP', 'Templates', 'HSM']
+    related: ['Certificates', 'Templates', 'CRL/OCSP']
   },
 
-  // ===========================================
-  // CERTIFICATES
-  // ===========================================
+  // ===== CERTIFICATES =====
   certificates: {
     title: 'Certificates',
-    subtitle: 'Issue and manage X.509 certificates',
-    overview: 'Certificates bind a public key to an identity. UCM manages the full certificate lifecycle: issuance, renewal, and revocation.',
+    subtitle: 'Issue, manage, and monitor certificates',
+    overview: 'Central management for all X.509 certificates. Issue new certificates from your CAs, import existing ones, track expiry dates, and handle renewals and revocations.',
     sections: [
       {
-        title: 'Certificate Types',
+        title: 'Certificate Status',
         icon: Certificate,
         definitions: [
-          { term: 'Server (TLS)', description: 'For HTTPS websites and services' },
-          { term: 'Client', description: 'For user/device authentication' },
-          { term: 'Code Signing', description: 'For signing software and scripts' },
-          { term: 'S/MIME', description: 'For email encryption and signing' },
+          { term: 'Valid', description: 'Within validity period and not revoked' },
+          { term: 'Expiring', description: 'Will expire within 30 days' },
+          { term: 'Expired', description: 'Past the "Not After" date' },
+          { term: 'Revoked', description: 'Explicitly revoked (published in CRL)' },
+          { term: 'Orphan', description: 'Issuing CA no longer exists in the system' },
         ]
       },
       {
-        title: 'Issuing a Certificate',
-        icon: FileText,
-        content: 'You can issue certificates by:',
-        items: [
-          'Filling in the certificate details manually',
-          'Using a pre-configured template',
-          'Signing an existing CSR (Certificate Signing Request)',
-          'Using SCEP or ACME for automated enrollment'
-        ]
-      },
-      {
-        title: 'Key Fields',
+        title: 'Actions',
         icon: Key,
-        definitions: [
-          { term: 'Common Name', description: 'Primary identifier (e.g., domain name for TLS)' },
-          { term: 'SAN', description: 'Subject Alternative Names - additional domains/IPs' },
-          { term: 'Key Usage', description: 'What the key can be used for (signing, encryption)' },
-          { term: 'Extended Key Usage', description: 'Specific purposes (serverAuth, clientAuth, etc.)' },
+        items: [
+          { label: 'Issue', text: 'Create a new certificate signed by one of your CAs' },
+          { label: 'Import', text: 'Import an existing certificate (PEM, DER, or PKCS#12)' },
+          { label: 'Renew', text: 'Re-issue with the same subject and a new validity period' },
+          { label: 'Revoke', text: 'Mark as revoked — will appear in CRL' },
+          { label: 'Revoke & Replace', text: 'Revoke and immediately issue a replacement' },
+          { label: 'Export', text: 'Download in PEM, DER, or PKCS#12 format' },
+          { label: 'Compare', text: 'Side-by-side comparison of two certificates' },
         ]
       },
-      {
-        title: 'Export Formats',
-        icon: CloudArrowUp,
-        definitions: [
-          { term: 'PEM', description: 'Base64 encoded, used by Apache/Nginx' },
-          { term: 'DER', description: 'Binary format' },
-          { term: 'PKCS#12 (P12)', description: 'Contains cert + private key, password protected' },
-          { term: 'Chain', description: 'Full certificate chain including intermediates' },
-        ]
-      }
     ],
     tips: [
-      'Always include the full certificate chain when deploying TLS certificates',
-      'Use PKCS#12 format when you need to export the private key',
-      'Set up auto-renewal via ACME for public-facing services'
+      'Star ⭐ important certificates to add them to your favorites list',
+      'Use filters to quickly find certificates by status, CA, or search text',
+      'Renewing preserves the same subject but generates a new key pair',
     ],
     warnings: [
-      'Never share private keys - export only to authorized systems',
-      'Revoke compromised certificates immediately'
+      'Revocation is permanent — a revoked certificate cannot be un-revoked',
+      'Deleting a certificate removes it from UCM but does not revoke it',
     ],
-    related: ['CAs', 'CSRs', 'Templates', 'SCEP', 'ACME']
+    related: ['CAs', 'CSRs', 'Templates', 'CRL/OCSP']
   },
 
-  // ===========================================
-  // TEMPLATES
-  // ===========================================
+  // ===== CSRs =====
+  csrs: {
+    title: 'Certificate Signing Requests',
+    subtitle: 'Manage CSR workflow',
+    overview: 'Upload, review, and sign Certificate Signing Requests. CSRs allow external systems to request certificates from your CAs without exposing private keys.',
+    sections: [
+      {
+        title: 'Workflow',
+        icon: FileText,
+        items: [
+          { label: 'Upload CSR', text: 'Accept PEM-encoded CSR files or paste PEM text' },
+          { label: 'Review', text: 'Inspect subject, SANs, key type, and signature before signing' },
+          { label: 'Sign', text: 'Select a CA, set validity period, and issue the certificate' },
+          { label: 'Download', text: 'Download the original CSR in PEM format' },
+        ]
+      },
+      {
+        title: 'Tabs',
+        icon: ListChecks,
+        items: [
+          { label: 'Pending', text: 'CSRs awaiting review and signing' },
+          { label: 'History', text: 'Previously signed or rejected CSRs' },
+        ]
+      },
+    ],
+    tips: [
+      'CSRs preserve the requester\'s private key — it never leaves their system',
+      'You can add a private key to a CSR after signing if needed for PKCS#12 export',
+    ],
+    related: ['Certificates', 'CAs', 'Templates']
+  },
+
+  // ===== TEMPLATES =====
   templates: {
     title: 'Certificate Templates',
-    subtitle: 'Pre-configured certificate profiles',
-    overview: 'Templates define default values for certificate issuance, ensuring consistency and compliance. They specify key usage, validity periods, and other certificate attributes.',
+    subtitle: 'Reusable certificate profiles',
+    overview: 'Define reusable certificate profiles with pre-configured subject fields, key usage, extended key usage, validity periods, and other extensions. Apply templates when issuing or signing certificates.',
     sections: [
       {
         title: 'Template Types',
         icon: FileText,
         definitions: [
-          { term: 'CA Template', description: 'For creating new Certificate Authorities' },
-          { term: 'Certificate Template', description: 'For issuing end-entity certificates' },
+          { term: 'End-Entity', description: 'For server, client, code signing, and email certificates' },
+          { term: 'CA', description: 'For creating intermediate Certificate Authorities' },
         ]
       },
       {
-        title: 'Common Templates',
-        icon: ListChecks,
-        items: [
-          { label: 'TLS Server', text: 'Web servers - includes serverAuth EKU and DNS SANs' },
-          { label: 'TLS Client', text: 'Client authentication - includes clientAuth EKU' },
-          { label: 'Code Signing', text: 'Software signing - includes codeSigning EKU' },
-          { label: 'S/MIME', text: 'Email security - includes emailProtection EKU' },
-        ]
-      },
-      {
-        title: 'Template Fields',
+        title: 'Features',
         icon: Gear,
-        definitions: [
-          { term: 'Validity', description: 'Default certificate lifetime (days)' },
-          { term: 'Key Algorithm', description: 'RSA/ECDSA key type and size' },
-          { term: 'Key Usage', description: 'Digital signature, key encipherment, etc.' },
-          { term: 'Extended Key Usage', description: 'serverAuth, clientAuth, codeSigning, etc.' },
-          { term: 'Allowed SANs', description: 'DNS, IP, Email, URI types permitted' },
-        ]
-      }
-    ],
-    tips: [
-      'Create templates for each certificate type used in your organization',
-      'Use templates with SCEP/ACME for consistent automated enrollment',
-      'Restrict templates to specific CAs if needed'
-    ],
-    related: ['Certificates', 'CAs', 'SCEP', 'ACME']
-  },
-
-  // ===========================================
-  // CSRs
-  // ===========================================
-  csrs: {
-    title: 'Certificate Signing Requests',
-    subtitle: 'Review and sign CSRs',
-    overview: 'A CSR contains a public key and identity information, submitted by a requester for CA signature. Review CSRs carefully before signing.',
-    sections: [
-      {
-        title: 'CSR Workflow',
-        icon: FileText,
         items: [
-          'Requester generates a key pair and creates a CSR',
-          'CSR is uploaded or submitted via SCEP',
-          'Administrator reviews the request details',
-          'CA signs the CSR to create a certificate',
-          'Certificate is returned to the requester'
+          { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City' },
+          { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
+          { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
+          { label: 'Validity', text: 'Default validity period in days' },
+          { label: 'Duplicate', text: 'Clone an existing template and modify it' },
+          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances' },
         ]
       },
-      {
-        title: 'Review Checklist',
-        icon: ShieldCheck,
-        items: [
-          'Verify the Common Name matches the intended use',
-          'Check SANs for valid domains/IPs',
-          'Confirm key algorithm meets security requirements',
-          'Verify the requester\'s identity through your process'
-        ]
-      }
     ],
     tips: [
-      'Use templates to ensure signed certificates have correct attributes',
-      'Set up automatic signing for trusted SCEP/ACME clients'
+      'Create separate templates for TLS servers, clients, and code signing',
+      'Use the Duplicate action to quickly create variations of a template',
     ],
-    warnings: [
-      'Never sign a CSR without verifying the requester\'s identity',
-      'Rejected CSRs should be investigated for potential abuse'
-    ],
-    related: ['Certificates', 'SCEP', 'ACME']
+    related: ['Certificates', 'CSRs', 'CAs']
   },
 
-  // ===========================================
-  // CRL/OCSP
-  // ===========================================
+  // ===== CRL/OCSP =====
   crlocsp: {
     title: 'CRL & OCSP',
-    subtitle: 'Certificate revocation management',
-    overview: 'CRL (Certificate Revocation List) and OCSP (Online Certificate Status Protocol) allow clients to check if a certificate has been revoked.',
+    subtitle: 'Certificate revocation services',
+    overview: 'Manage Certificate Revocation Lists (CRL) and Online Certificate Status Protocol (OCSP) services. These services allow clients to verify whether a certificate has been revoked.',
     sections: [
       {
-        title: 'CRL vs OCSP',
-        icon: ShieldCheck,
-        definitions: [
-          { term: 'CRL', description: 'A signed list of all revoked certificates. Downloaded periodically by clients.' },
-          { term: 'OCSP', description: 'Real-time protocol to check individual certificate status.' },
-        ]
-      },
-      {
-        title: 'CRL Configuration',
+        title: 'CRL Management',
         icon: ClockCounterClockwise,
         items: [
-          { label: 'Auto-Regeneration', text: 'Automatically update CRL on schedule' },
-          { label: 'Validity', text: 'How long the CRL is valid (nextUpdate field)' },
-          { label: 'Distribution Points', text: 'URLs where clients can download the CRL' },
+          { label: 'Auto-Regeneration', text: 'Toggle automatic CRL regeneration per CA' },
+          { label: 'Manual Regenerate', text: 'Force CRL regeneration immediately' },
+          { label: 'Download CRL', text: 'Download the CRL file in DER or PEM format' },
+          { label: 'CDP URL', text: 'CRL Distribution Point URL to embed in certificates' },
         ]
       },
       {
-        title: 'OCSP Responder',
+        title: 'OCSP Service',
         icon: Globe,
-        content: 'UCM includes a built-in OCSP responder. Configure the OCSP URL in your CA settings to enable real-time revocation checking.',
-      }
+        items: [
+          { label: 'Status', text: 'Indicates whether the OCSP responder is active' },
+          { label: 'AIA URL', text: 'Authority Information Access URL for certificates' },
+          { label: 'Cache Hit Rate', text: 'Percentage of OCSP queries served from cache' },
+          { label: 'Total Queries', text: 'Number of OCSP requests processed' },
+        ]
+      },
     ],
     tips: [
-      'Enable auto-regeneration to keep CRLs current',
-      'Use OCSP for time-sensitive applications',
-      'Publish CRLs to a highly available endpoint'
+      'Enable auto-regeneration to keep CRLs fresh after certificate revocations',
+      'Copy CDP and AIA URLs to embed them in your certificate profiles',
+      'OCSP provides real-time revocation checking and is preferred over CRL',
     ],
-    warnings: [
-      'Expired CRLs may cause clients to reject valid certificates',
-      'Large CRLs can impact client performance'
-    ],
-    related: ['CAs', 'Certificates']
+    related: ['Certificates', 'CAs']
   },
 
-  // ===========================================
-  // SCEP
-  // ===========================================
+  // ===== SCEP =====
   scep: {
     title: 'SCEP',
     subtitle: 'Simple Certificate Enrollment Protocol',
-    overview: 'SCEP allows devices to automatically request and receive certificates. Commonly used for network devices, MDM solutions, and IoT.',
+    overview: 'SCEP enables network devices (routers, switches, firewalls) and MDM solutions to automatically request and obtain certificates. Devices authenticate using a challenge password.',
     sections: [
       {
-        title: 'How SCEP Works',
-        icon: Certificate,
+        title: 'Tabs',
+        icon: ListChecks,
         items: [
-          'Client generates a key pair',
-          'Client creates a CSR with challenge password',
-          'CSR is sent to SCEP server encrypted',
-          'Server validates the challenge password',
-          'If approved, CA signs and returns the certificate'
+          { label: 'Requests', text: 'Pending, approved, and rejected SCEP enrollment requests' },
+          { label: 'Configuration', text: 'SCEP server settings: CA selection, CA identifier, auto-approve' },
+          { label: 'Challenge Passwords', text: 'Manage per-CA challenge passwords for device enrollment' },
+          { label: 'Information', text: 'SCEP endpoint URLs and integration instructions' },
         ]
       },
       {
         title: 'Configuration',
         icon: Gear,
-        definitions: [
-          { term: 'Challenge Password', description: 'Shared secret for enrollment authentication' },
-          { term: 'CA', description: 'Which CA will sign SCEP requests' },
-          { term: 'Template', description: 'Certificate profile for issued certificates' },
-          { term: 'Auto-Approve', description: 'Automatically sign matching requests' },
+        items: [
+          { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates' },
+          { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
+          { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
         ]
       },
-      {
-        title: 'SCEP URL',
-        icon: Globe,
-        content: 'The SCEP endpoint is available at:',
-        example: 'https://your-ucm-server:8443/scep/{config-name}/pkiclient.exe'
-      }
     ],
     tips: [
-      'Use unique challenge passwords per device or device group',
-      'Enable auto-approval only for trusted network segments',
-      'Test SCEP with sscep or micromdm/scepclient before deployment'
+      'Use unique challenge passwords per CA for better security auditing',
+      'Auto-approve is convenient but review requests manually in high-security environments',
+      'SCEP URL format: https://your-server:port/scep',
     ],
     warnings: [
-      'Challenge passwords are sensitive - distribute securely',
-      'Monitor pending requests for unauthorized enrollment attempts'
+      'Challenge passwords are transmitted in the SCEP request — use HTTPS for transport security',
     ],
-    related: ['Certificates', 'Templates', 'CAs']
+    related: ['Certificates', 'CAs']
   },
 
-  // ===========================================
-  // ACME
-  // ===========================================
+  // ===== ACME =====
   acme: {
     title: 'ACME',
-    subtitle: 'Automated Certificate Management Environment',
-    overview: 'ACME automates certificate issuance and renewal, similar to Let\'s Encrypt. Supports HTTP-01 and DNS-01 challenges for domain validation.',
+    subtitle: 'Automated Certificate Management',
+    overview: 'UCM supports two ACME modes: Let\'s Encrypt client for public certificates, and Local ACME server for internal PKI automation. The local ACME server supports multi-CA domain mapping.',
     sections: [
       {
-        title: 'ACME Flow',
-        icon: Certificate,
-        items: [
-          'Client registers an account with the ACME server',
-          'Client creates an order for a certificate',
-          'Server issues challenges to verify domain ownership',
-          'Client completes challenges (HTTP or DNS)',
-          'Server validates and issues the certificate'
-        ]
-      },
-      {
-        title: 'Challenge Types',
-        icon: ShieldCheck,
-        definitions: [
-          { term: 'HTTP-01', description: 'Place a file at /.well-known/acme-challenge/ on the web server' },
-          { term: 'DNS-01', description: 'Create a TXT record _acme-challenge.domain.com' },
-        ]
-      },
-      {
-        title: 'ACME Directory',
+        title: "Let's Encrypt",
         icon: Globe,
-        content: 'The ACME directory URL is:',
-        example: 'https://your-ucm-server:8443/acme/{server-name}/directory'
-      }
+        items: [
+          { label: 'Client', text: 'Request public certificates from Let\'s Encrypt via ACME protocol' },
+          { label: 'DNS Providers', text: 'Configure DNS-01 challenge providers (Cloudflare, Route53, etc.)' },
+          { label: 'Domains', text: 'Map domains to DNS providers for automatic validation' },
+        ]
+      },
+      {
+        title: 'Local ACME Server',
+        icon: HardDrive,
+        items: [
+          { label: 'Configuration', text: 'Enable/disable the built-in ACME server, select default CA' },
+          { label: 'Local Domains', text: 'Map internal domains to specific CAs for multi-CA issuance' },
+          { label: 'Accounts', text: 'View and manage registered ACME client accounts' },
+          { label: 'History', text: 'Track all ACME certificate issuance orders' },
+        ]
+      },
+      {
+        title: 'Multi-CA Resolution',
+        icon: TreeStructure,
+        content: 'When an ACME client requests a certificate, UCM resolves the signing CA in this order:',
+        items: [
+          '1. Local Domain mapping — exact domain match, then parent domain',
+          '2. DNS Domain mapping — checks the issuing CA configured for the DNS provider',
+          '3. Global default — the CA set in ACME server configuration',
+          '4. First available CA with a private key',
+        ]
+      },
     ],
     tips: [
-      'Use certbot or acme.sh for easy ACME client integration',
-      'DNS-01 challenges work for wildcard certificates',
-      'Set up auto-renewal with cron or systemd timers'
+      'ACME directory URL: https://your-server:port/acme/directory',
+      'Use Local Domains to assign different CAs to different internal domains',
+      'Any CA with a private key can be selected as the issuing CA',
+      'Wildcard domains (*.example.com) require DNS-01 validation for Let\'s Encrypt',
     ],
-    related: ['Certificates', 'CAs']
+    warnings: [
+      "Let's Encrypt requires domain validation — your server must be reachable or DNS configured",
+    ],
+    related: ['Certificates', 'CAs', 'DNS Providers']
   },
 
-  // ===========================================
-  // TRUSTSTORE
-  // ===========================================
+  // ===== TRUST STORE =====
   truststore: {
     title: 'Trust Store',
-    subtitle: 'Manage trusted external CAs',
-    overview: 'The trust store contains CA certificates from external sources that you trust. Useful for validating client certificates from partner organizations.',
+    subtitle: 'Manage trusted certificates',
+    overview: 'Import and manage trusted root and intermediate CA certificates. The trust store is used for chain validation and can be synchronized with the operating system trust store.',
     sections: [
       {
-        title: 'Trust Store Sources',
-        icon: Certificate,
-        items: [
-          { label: 'Manual Import', text: 'Upload CA certificates manually' },
-          { label: 'Remote URL', text: 'Fetch certificates from a URL' },
-          { label: 'System CA Bundle', text: 'Sync with the operating system trust store' },
-        ]
-      },
-      {
-        title: 'Use Cases',
+        title: 'Certificate Types',
         icon: ShieldCheck,
-        items: [
-          'Validate client certificates from partner CAs',
-          'Trust certificates for mTLS connections',
-          'Import public root CAs for verification'
-        ]
-      }
-    ],
-    tips: [
-      'Only import CAs you actually need to trust',
-      'Review imported CA validity and purpose',
-      'Use tags to organize certificates by source or purpose'
-    ],
-    warnings: [
-      'Trusting a CA means trusting all certificates it signs',
-      'Regularly review and clean up unused trust entries'
-    ],
-    related: ['Certificates', 'CAs']
-  },
-
-  // ===========================================
-  // USERS
-  // ===========================================
-  users: {
-    title: 'Users',
-    subtitle: 'User account management',
-    overview: 'Manage user accounts that can access UCM. Configure authentication methods and permissions.',
-    sections: [
-      {
-        title: 'Authentication Methods',
-        icon: Fingerprint,
         definitions: [
-          { term: 'Password', description: 'Traditional username/password login' },
-          { term: 'WebAuthn', description: 'Hardware security keys (YubiKey, etc.) or biometrics' },
-          { term: 'SSO', description: 'Single Sign-On via SAML or OIDC (Pro feature)' },
+          { term: 'Root CA', description: 'Self-signed top-level trust anchor' },
+          { term: 'Intermediate', description: 'CA certificate signed by a root or another intermediate' },
+          { term: 'Client Auth', description: 'Certificate used for client authentication (mTLS)' },
+          { term: 'Code Signing', description: 'Certificate used for code signature verification' },
+          { term: 'Custom', description: 'Manually categorized trusted certificate' },
         ]
       },
       {
-        title: 'User Properties',
-        icon: Users,
-        definitions: [
-          { term: 'Username', description: 'Unique login identifier' },
-          { term: 'Email', description: 'For notifications and recovery' },
-          { term: 'Role', description: 'Permission level (Admin, Operator, Viewer)' },
-          { term: 'Status', description: 'Active or disabled' },
+        title: 'Actions',
+        icon: CloudArrowUp,
+        items: [
+          { label: 'Import File', text: 'Upload PEM, DER, or PKCS#7 certificate files' },
+          { label: 'Import URL', text: 'Fetch a certificate from a remote URL' },
+          { label: 'Add PEM', text: 'Paste PEM-encoded certificate text directly' },
+          { label: 'Sync from System', text: 'Import OS trusted CAs into UCM' },
+          { label: 'Export', text: 'Download trusted certificates individually' },
         ]
-      }
+      },
     ],
     tips: [
-      'Enable WebAuthn for stronger authentication',
-      'Use role-based access for least-privilege security',
-      'Review user accounts regularly and disable unused ones'
+      'Use "Sync from System" to quickly populate the trust store with OS-level CAs',
+      'Filter by purpose to focus on specific certificate categories',
     ],
-    warnings: [
-      'Deleting a user cannot be undone',
-      'Disabling an admin could lock you out if you\'re the only one'
-    ],
-    related: ['Groups', 'RBAC', 'Settings']
+    related: ['CAs', 'Certificates']
   },
 
-  // ===========================================
-  // AUDIT LOGS
-  // ===========================================
+  // ===== USERS & GROUPS =====
+  usersGroups: {
+    title: 'Users & Groups',
+    subtitle: 'Identity and access management',
+    overview: 'Manage user accounts and group memberships. Assign roles to control access to UCM features. Groups allow bulk permission management for teams.',
+    sections: [
+      {
+        title: 'Users',
+        icon: Users,
+        items: [
+          { label: 'Create User', text: 'Add a new user with username, email, and initial password' },
+          { label: 'Roles', text: 'Assign system or custom roles to control permissions' },
+          { label: 'Status', text: 'Enable or disable user accounts' },
+          { label: 'Password Reset', text: 'Reset a user\'s password (admin action)' },
+          { label: 'API Keys', text: 'Manage per-user API keys for programmatic access' },
+        ]
+      },
+      {
+        title: 'Groups',
+        icon: UsersFour,
+        items: [
+          { label: 'Create Group', text: 'Define a group and assign members' },
+          { label: 'Role Inheritance', text: 'Groups can inherit roles — all members get group permissions' },
+          { label: 'Member Management', text: 'Add or remove users from groups' },
+        ]
+      },
+    ],
+    tips: [
+      'Use groups to manage permissions for teams rather than individual users',
+      'Disabled users cannot log in but their data is preserved',
+    ],
+    warnings: [
+      'Deleting a user is permanent — consider disabling instead',
+    ],
+    related: ['RBAC', 'Audit Logs', 'Settings']
+  },
+
+  // ===== RBAC =====
+  rbac: {
+    title: 'Role-Based Access Control',
+    subtitle: 'Fine-grained permission management',
+    overview: 'Define custom roles with granular permissions. System roles (Admin, Operator, Viewer) are built-in. Custom roles let you control exactly which operations each user can perform.',
+    sections: [
+      {
+        title: 'System Roles',
+        icon: ShieldCheck,
+        definitions: [
+          { term: 'Admin', description: 'Full access to all features and settings' },
+          { term: 'Operator', description: 'Can manage certificates and CAs but not system settings' },
+          { term: 'Viewer', description: 'Read-only access to certificates and CAs' },
+        ]
+      },
+      {
+        title: 'Custom Roles',
+        icon: Key,
+        items: [
+          { label: 'Create Role', text: 'Define a new role with a name and description' },
+          { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Users, etc.)' },
+          { label: 'Coverage', text: 'Visual percentage of total permissions granted to the role' },
+          { label: 'User Count', text: 'See how many users are assigned to each role' },
+        ]
+      },
+    ],
+    tips: [
+      'Follow the principle of least privilege — grant only necessary permissions',
+      'System roles cannot be modified or deleted',
+      'Toggle entire categories on/off for quick role setup',
+    ],
+    related: ['Users & Groups', 'Audit Logs']
+  },
+
+  // ===== AUDIT LOGS =====
   auditLogs: {
     title: 'Audit Logs',
-    subtitle: 'Activity and security logging',
-    overview: 'Audit logs record all significant actions in UCM for compliance and security investigation.',
+    subtitle: 'Activity tracking and compliance',
+    overview: 'Complete audit trail of all operations performed in UCM. Track who did what, when, and from where. Supports filtering, search, export, and integrity verification.',
     sections: [
       {
-        title: 'Logged Events',
+        title: 'Filters',
         icon: ListChecks,
         items: [
-          'User authentication (login, logout, failures)',
-          'Certificate operations (issue, revoke, export)',
-          'CA management (create, delete, sign)',
-          'Configuration changes',
-          'User management operations'
+          { label: 'Action Type', text: 'Filter by operation type (create, update, delete, login, etc.)' },
+          { label: 'User', text: 'Filter by the user who performed the action' },
+          { label: 'Status', text: 'Show only successful or failed operations' },
+          { label: 'Date Range', text: 'Set from/to dates to narrow the time window' },
+          { label: 'Search', text: 'Free-text search across all log entries' },
         ]
       },
       {
-        title: 'Log Entry Fields',
-        icon: FileText,
-        definitions: [
-          { term: 'Timestamp', description: 'When the event occurred' },
-          { term: 'User', description: 'Who performed the action' },
-          { term: 'Action', description: 'What was done' },
-          { term: 'Resource', description: 'What was affected' },
-          { term: 'IP Address', description: 'Where the request came from' },
-          { term: 'Details', description: 'Additional context' },
+        title: 'Actions',
+        icon: Database,
+        items: [
+          { label: 'Export', text: 'Download logs in JSON or CSV format' },
+          { label: 'Cleanup', text: 'Purge old logs with configurable retention (days)' },
+          { label: 'Verify Integrity', text: 'Check log chain integrity to detect tampering' },
         ]
-      }
+      },
     ],
     tips: [
-      'Filter by action type to investigate specific events',
-      'Export logs regularly for long-term retention',
-      'Set up alerts for suspicious activities',
-      'Use remote syslog to forward audit events to a SIEM'
+      'Export logs regularly for compliance and archival purposes',
+      'Failed login attempts are logged with source IP for security monitoring',
+      'Log entries include User Agent for identifying client applications',
     ],
-    related: ['Settings', 'Users']
+    warnings: [
+      'Log cleanup is irreversible — exported data cannot be re-imported',
+    ],
+    related: ['Settings', 'Users & Groups', 'RBAC']
   },
 
-  // ===========================================
-  // SETTINGS
-  // ===========================================
+  // ===== SETTINGS =====
   settings: {
     title: 'Settings',
     subtitle: 'System configuration',
-    overview: 'Configure UCM behavior, security settings, email notifications, and more.',
+    overview: 'Configure all aspects of the UCM system. Settings are organized by category: general, appearance, email, security, SSO, backup, audit, database, HTTPS, updates, and webhooks.',
     sections: [
       {
-        title: 'General',
+        title: 'Categories',
         icon: Gear,
-        definitions: [
-          { term: 'Instance Name', description: 'Display name for this UCM installation' },
-          { term: 'Base URL', description: 'Public URL for certificate distribution points' },
+        items: [
+          { label: 'General', text: 'Instance name, hostname, and system-wide defaults' },
+          { label: 'Appearance', text: 'Theme selection (light/dark/system), accent color, desktop mode' },
+          { label: 'Email (SMTP)', text: 'SMTP server, port, credentials for email notifications' },
+          { label: 'Security', text: 'Password policies, session timeout, rate limiting, IP restrictions' },
+          { label: 'SSO', text: 'SAML and OIDC single sign-on integration' },
+          { label: 'Backup', text: 'Manual and scheduled database backups' },
+          { label: 'Audit', text: 'Log retention, syslog forwarding, integrity verification' },
+          { label: 'Database', text: 'Database path, size, and migration status' },
+          { label: 'HTTPS', text: 'TLS certificate for the UCM web interface' },
+          { label: 'Updates', text: 'Check for new versions and view changelog' },
+          { label: 'Webhooks', text: 'HTTP webhooks for certificate events (issue, revoke, expire)' },
         ]
       },
-      {
-        title: 'Security',
-        icon: Lock,
-        definitions: [
-          { term: 'Session Timeout', description: 'Auto-logout after inactivity' },
-          { term: 'Password Policy', description: 'Minimum length and complexity' },
-          { term: 'Two-Factor Auth', description: 'Require 2FA for all users' },
-        ]
-      },
-      {
-        title: 'Database',
-        icon: Database,
-        definitions: [
-          { term: 'Backup', description: 'Create database backups' },
-          { term: 'Restore', description: 'Restore from a previous backup' },
-          { term: 'Optimization', description: 'Vacuum and analyze the database' },
-        ]
-      },
-      {
-        title: 'Email (SMTP)',
-        icon: Globe,
-        definitions: [
-          { term: 'Server', description: 'SMTP server hostname and port' },
-          { term: 'Authentication', description: 'Username/password for SMTP' },
-          { term: 'Notifications', description: 'Certificate expiry alerts' },
-        ]
-      },
-      {
-        title: 'Appearance',
-        icon: Gear,
-        content: 'Choose from multiple color themes: Dark (default), Light, Ocean, Forest, Purple, Sunset, and more.'
-      },
-      {
-        title: 'Reverse Proxy',
-        icon: Globe,
-        content: 'If UCM is behind a reverse proxy (nginx, Caddy, NPM), add the proxy URL to CORS_EXTRA_ORIGINS in /etc/ucm/ucm.env (or .env for Docker). This is required for WebSocket real-time updates to work. The reverse proxy must also forward /socket.io/ with WebSocket upgrade headers.'
-      }
     ],
     tips: [
-      'Test email settings before enabling notifications',
-      'Create regular database backups',
-      'Shorter session timeouts improve security',
-      'Set CORS_EXTRA_ORIGINS when using a reverse proxy, or WebSocket will not connect'
+      'Use the System Status widget at the top to quickly check service health',
+      'Test SMTP settings before relying on email notifications',
+      'Schedule automatic backups for production environments',
     ],
-    related: ['Users', 'Security']
+    warnings: [
+      'Changing the HTTPS certificate requires a service restart',
+      'Modifying security settings may lock out users — verify access before saving',
+    ],
+    related: ['Users & Groups', 'Audit Logs', 'Account']
   },
 
-  // ===========================================
-  // ACCOUNT
-  // ===========================================
+  // ===== ACCOUNT =====
   account: {
     title: 'My Account',
     subtitle: 'Personal settings and security',
-    overview: 'Manage your personal account settings, security options, and view your activity.',
+    overview: 'Manage your profile, security settings, and API keys. Enable two-factor authentication and register security keys for enhanced account protection.',
     sections: [
       {
         title: 'Profile',
         icon: Users,
         items: [
-          'Update your display name and email',
-          'Change your password',
-          'Manage notification preferences'
+          { label: 'Full Name', text: 'Your display name shown across the application' },
+          { label: 'Email', text: 'Used for notifications and account recovery' },
+          { label: 'Account Info', text: 'Creation date, last login, total login count' },
         ]
       },
       {
         title: 'Security',
-        icon: Fingerprint,
+        icon: Lock,
         items: [
-          { label: 'WebAuthn Keys', text: 'Add hardware security keys or biometric authenticators' },
-          { label: 'Active Sessions', text: 'View and revoke logged-in sessions' },
-          { label: 'Password', text: 'Change your password' },
+          { label: 'Password', text: 'Change your current password' },
+          { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app' },
+          { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
+          { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
         ]
       },
       {
-        title: 'Activity',
-        icon: ClockCounterClockwise,
-        content: 'View your recent actions in UCM: logins, certificate operations, and other activities.'
-      }
+        title: 'API Keys',
+        icon: Key,
+        items: [
+          { label: 'Create Key', text: 'Generate a new API key with optional expiration' },
+          { label: 'Permissions', text: 'API keys inherit your role permissions' },
+          { label: 'Revoke', text: 'Immediately invalidate an API key' },
+        ]
+      },
     ],
     tips: [
-      'Register multiple WebAuthn keys for backup access',
-      'Review active sessions and revoke unfamiliar ones',
-      'Use a strong, unique password'
+      'Enable at least one second factor (TOTP or Security Key) for admin accounts',
+      'API keys can be scoped with an expiration date for short-lived integrations',
+      'Scan the QR code with any TOTP app: Google Authenticator, Authy, 1Password, etc.',
     ],
-    related: ['Users', 'Settings']
+    related: ['Settings', 'Users & Groups']
   },
 
-  // ===========================================
-  // IMPORT/EXPORT
-  // ===========================================
+  // ===== IMPORT/EXPORT =====
   importExport: {
     title: 'Import & Export',
-    subtitle: 'Backup and migration',
-    overview: 'Import and export UCM data for backup, migration, or integration with other systems.',
+    subtitle: 'Data migration and backup',
+    overview: 'Import certificates from external sources and export your PKI data. Smart Import auto-detects file types. OPNsense integration allows direct sync with your firewall.',
     sections: [
       {
-        title: 'Export Options',
+        title: 'Import',
         icon: CloudArrowUp,
         items: [
-          { label: 'Full Backup', text: 'Complete UCM data including keys (encrypted)' },
-          { label: 'CA Export', text: 'Export specific CAs with or without private keys' },
-          { label: 'Certificate Export', text: 'Batch export certificates' },
+          { label: 'Smart Import', text: 'Upload any certificate file — UCM auto-detects format (PEM, DER, P12, P7B)' },
+          { label: 'OPNsense Sync', text: 'Connect to OPNsense firewall and import its certificates and CAs' },
         ]
       },
       {
-        title: 'Import Options',
+        title: 'Export',
         icon: Database,
         items: [
-          { label: 'From Backup', text: 'Restore from a UCM backup file' },
-          { label: 'External CA', text: 'Import CA certificate and optionally private key' },
-          { label: 'From Host', text: 'Import system CA certificates' },
+          { label: 'Export Certificates', text: 'Bulk download certificates as PEM or PKCS#7 bundle' },
+          { label: 'Export CAs', text: 'Bulk download CA certificates and chains' },
         ]
-      }
+      },
+      {
+        title: 'OPNsense Integration',
+        icon: Globe,
+        items: [
+          { label: 'Connection', text: 'Provide OPNsense URL, API key, and API secret' },
+          { label: 'Test Connection', text: 'Verify connectivity before importing' },
+          { label: 'Select Items', text: 'Choose which certificates and CAs to import' },
+        ]
+      },
     ],
     tips: [
-      'Encrypt exports containing private keys',
-      'Store backups in a secure, separate location',
-      'Test restore procedure periodically'
+      'Smart Import handles PEM bundles with multiple certificates in a single file',
+      'Test the OPNsense connection before running a full import',
+      'PKCS#12 files require the correct password to import private keys',
+    ],
+    related: ['Certificates', 'CAs', 'Operations']
+  },
+
+  // ===== CERTIFICATE TOOLS =====
+  certTools: {
+    title: 'Certificate Tools',
+    subtitle: 'Decode, convert, and verify certificates',
+    overview: 'A suite of tools for working with certificates, CSRs, and keys. Decode certificates to inspect their contents, convert between formats, check remote SSL endpoints, and verify key matches.',
+    sections: [
+      {
+        title: 'Available Tools',
+        icon: Wrench,
+        items: [
+          { label: 'SSL Checker', text: 'Connect to a remote host and inspect its SSL/TLS certificate chain' },
+          { label: 'CSR Decoder', text: 'Paste a CSR in PEM format to view its subject, SANs, and key info' },
+          { label: 'Certificate Decoder', text: 'Paste a certificate in PEM format to inspect all fields' },
+          { label: 'Key Matcher', text: 'Verify that a certificate, CSR, and private key belong together' },
+          { label: 'Converter', text: 'Convert between PEM, DER, PKCS#12, and PKCS#7 formats' },
+        ]
+      },
+      {
+        title: 'Converter Details',
+        icon: ArrowClockwise,
+        items: [
+          'PEM ↔ DER conversion',
+          'PEM → PKCS#12 with password and full chain',
+          'PKCS#12 → PEM extraction',
+          'PEM → PKCS#7 (P7B) chain bundling',
+        ]
+      },
+    ],
+    tips: [
+      'SSL Checker supports custom ports — use it to check any TLS service',
+      'Key Matcher compares modulus hashes to verify matching pairs',
+      'Converter preserves the full certificate chain when creating PKCS#12',
+    ],
+    related: ['Certificates', 'CSRs', 'Import/Export']
+  },
+
+  // ===== OPERATIONS =====
+  operations: {
+    title: 'Operations',
+    subtitle: 'Bulk actions and data management',
+    overview: 'Perform bulk operations across multiple resources. Import/export data, sync with OPNsense, and execute batch actions like revoke, renew, delete, or export on multiple items at once.',
+    sections: [
+      {
+        title: 'Tabs',
+        icon: Stack,
+        items: [
+          { label: 'Import/Export', text: 'Smart Import for bulk file upload, export bundles' },
+          { label: 'OPNsense', text: 'Sync certificates and CAs from OPNsense firewalls' },
+          { label: 'Bulk Actions', text: 'Select resource type and perform batch operations' },
+        ]
+      },
+      {
+        title: 'Bulk Actions',
+        icon: ListChecks,
+        items: [
+          { label: 'Certificates', text: 'Bulk revoke, renew, delete, or export certificates' },
+          { label: 'CAs', text: 'Bulk delete or export CAs' },
+          { label: 'CSRs', text: 'Bulk sign or delete CSRs' },
+          { label: 'Templates', text: 'Bulk delete or export templates' },
+          { label: 'Users', text: 'Bulk disable or delete users' },
+        ]
+      },
+    ],
+    tips: [
+      'Use the transfer panel to move items between the available and selected lists',
+      'Preview changes before confirming bulk operations',
     ],
     warnings: [
-      'Importing overwrites existing data with the same IDs',
-      'Private key exports require admin privileges'
+      'Bulk delete is irreversible — always create a backup first',
+      'Bulk revoke will publish updated CRLs for all affected CAs',
+    ],
+    related: ['Certificates', 'CAs', 'Import/Export']
+  },
+
+  // ===== HSM =====
+  hsm: {
+    title: 'Hardware Security Modules',
+    subtitle: 'External key storage',
+    overview: 'Integrate with Hardware Security Modules for secure private key storage. Support for PKCS#11, AWS CloudHSM, Azure Key Vault, and Google Cloud KMS.',
+    sections: [
+      {
+        title: 'Supported Providers',
+        icon: HardDrive,
+        definitions: [
+          { term: 'PKCS#11', description: 'Industry standard HSM interface (Thales, Entrust, SoftHSM)' },
+          { term: 'AWS CloudHSM', description: 'Amazon Web Services cloud-based HSM' },
+          { term: 'Azure Key Vault', description: 'Microsoft Azure managed key storage' },
+          { term: 'Google KMS', description: 'Google Cloud Key Management Service' },
+        ]
+      },
+      {
+        title: 'Actions',
+        icon: Key,
+        items: [
+          { label: 'Add Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
+          { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid' },
+          { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
+          { label: 'Status', text: 'Monitor provider connection health' },
+        ]
+      },
+    ],
+    tips: [
+      'Use SoftHSM for testing before deploying with a physical HSM',
+      'Keys generated on an HSM never leave the hardware — they cannot be exported',
+      'Test connection before using an HSM provider for CA signing',
+    ],
+    warnings: [
+      'HSM provider misconfiguration can prevent certificate signing',
+      'Losing access to the HSM means losing access to the keys stored on it',
     ],
     related: ['CAs', 'Certificates', 'Settings']
   },
 
-  // ===========================================
-  // PRO FEATURES
-  // ===========================================
-
-  // GROUPS (Community feature)
-  groups: {
-    title: 'Groups',
-    subtitle: 'Team and access management',
-    overview: 'Groups allow you to organize users into teams and apply permissions at the group level. Members inherit the group\'s role-based permissions.',
-    sections: [
-      {
-        title: 'Group Management',
-        icon: UsersFour,
-        items: [
-          'Create groups for departments or teams',
-          'Add and remove members',
-          'Assign roles to groups',
-          'View group activity'
-        ]
-      },
-      {
-        title: 'Group Properties',
-        icon: Users,
-        definitions: [
-          { term: 'Name', description: 'Unique group identifier' },
-          { term: 'Description', description: 'Purpose of the group' },
-          { term: 'Members', description: 'Users belonging to this group' },
-          { term: 'Role', description: 'Permissions applied to all members' },
-        ]
-      }
-    ],
-    tips: [
-      'Use groups for role-based access instead of per-user permissions',
-      'Name groups by function (e.g., "PKI-Admins", "Certificate-Operators")',
-      'Review group memberships during employee offboarding'
-    ],
-    related: ['Users', 'RBAC']
-  },
-
-  // RBAC (Pro)
-  rbac: {
-    title: 'Role-Based Access Control',
-    subtitle: 'Fine-grained permissions (Pro)',
-    overview: 'RBAC lets you define custom roles with specific permissions. Assign roles to users or groups to control who can perform which operations.',
-    sections: [
-      {
-        title: 'Built-in Roles',
-        icon: ShieldCheck,
-        definitions: [
-          { term: 'Admin', description: 'Full access to all features' },
-          { term: 'Operator', description: 'Can manage certificates and CAs' },
-          { term: 'Viewer', description: 'Read-only access' },
-          { term: 'Auditor', description: 'Access to audit logs only' },
-        ]
-      },
-      {
-        title: 'Permission Categories',
-        icon: Key,
-        items: [
-          { label: 'CAs', text: 'Create, delete, sign with CAs' },
-          { label: 'Certificates', text: 'Issue, revoke, export certificates' },
-          { label: 'Users', text: 'Create, modify, delete users' },
-          { label: 'Settings', text: 'Modify system configuration' },
-          { label: 'Audit', text: 'View and export audit logs' },
-        ]
-      },
-      {
-        title: 'Custom Roles',
-        icon: Gear,
-        content: 'Create custom roles by selecting specific permissions. Useful for compliance requirements or specialized teams.'
-      }
-    ],
-    tips: [
-      'Follow least-privilege principle - grant only needed permissions',
-      'Use groups + RBAC together for scalable access management',
-      'Audit role assignments regularly'
-    ],
-    warnings: [
-      'Removing admin role from all users could lock you out',
-      'Test custom roles before assigning to production users'
-    ],
-    related: ['Users', 'Groups']
-  },
-
-  // HSM (Pro)
-  hsm: {
-    title: 'HSM Integration',
-    subtitle: 'Hardware Security Modules (Pro)',
-    overview: 'Hardware Security Modules provide tamper-resistant storage for cryptographic keys. UCM supports PKCS#11 compatible HSMs.',
-    sections: [
-      {
-        title: 'Supported HSMs',
-        icon: HardDrive,
-        items: [
-          'Thales/Gemalto Luna',
-          'AWS CloudHSM',
-          'Azure Dedicated HSM',
-          'nCipher nShield',
-          'YubiHSM 2',
-          'SoftHSM (for testing)'
-        ]
-      },
-      {
-        title: 'HSM Configuration',
-        icon: Key,
-        definitions: [
-          { term: 'Library Path', description: 'Path to PKCS#11 library (.so/.dll)' },
-          { term: 'Slot', description: 'HSM slot or token identifier' },
-          { term: 'PIN', description: 'Authentication PIN for the slot' },
-        ]
-      },
-      {
-        title: 'HSM Operations',
-        icon: ShieldCheck,
-        items: [
-          'Generate keys directly in HSM',
-          'Sign certificates using HSM-stored keys',
-          'Keys never leave the HSM boundary',
-          'Automatic failover for clustered HSMs'
-        ]
-      }
-    ],
-    tips: [
-      'Test HSM integration with SoftHSM first',
-      'Configure HSM cluster for high availability',
-      'Store Root CA keys in HSM for maximum security'
-    ],
-    warnings: [
-      'HSM PINs are highly sensitive - store securely',
-      'Lost HSM access = lost keys (no recovery)',
-      'HSM performance may be slower than software keys'
-    ],
-    related: ['CAs', 'Settings']
-  },
-
-  // SSO (Pro)
+  // ===== SSO (sub-page of Settings, kept for reference) =====
   sso: {
     title: 'Single Sign-On',
-    subtitle: 'SAML & OIDC integration (Pro)',
-    overview: 'Integrate UCM with your identity provider for seamless authentication. Supports SAML 2.0 and OpenID Connect.',
+    subtitle: 'SAML and OIDC integration',
+    overview: 'Configure Single Sign-On to allow users to authenticate via their organization identity provider. Supports both SAML 2.0 and OpenID Connect (OIDC) protocols.',
     sections: [
       {
-        title: 'Supported Protocols',
-        icon: Globe,
-        definitions: [
-          { term: 'SAML 2.0', description: 'Enterprise SSO standard (Okta, Azure AD, ADFS)' },
-          { term: 'OpenID Connect', description: 'Modern OAuth2-based SSO (Google, Auth0, Keycloak)' },
-        ]
-      },
-      {
-        title: 'SAML Configuration',
-        icon: Gear,
-        definitions: [
-          { term: 'IdP Metadata', description: 'Import from your identity provider' },
-          { term: 'Entity ID', description: 'UCM service provider identifier' },
-          { term: 'ACS URL', description: 'Assertion Consumer Service endpoint' },
-          { term: 'Attribute Mapping', description: 'Map IdP attributes to UCM fields' },
-        ]
-      },
-      {
-        title: 'OIDC Configuration',
+        title: 'SAML 2.0',
         icon: Lock,
-        definitions: [
-          { term: 'Client ID', description: 'OAuth2 client identifier' },
-          { term: 'Client Secret', description: 'OAuth2 client secret' },
-          { term: 'Discovery URL', description: '.well-known/openid-configuration endpoint' },
-          { term: 'Scopes', description: 'openid, profile, email' },
+        items: [
+          { label: 'Identity Provider', text: 'Configure IDP metadata URL or upload XML' },
+          { label: 'Entity ID', text: 'UCM service provider entity identifier' },
+          { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
+          { label: 'Attribute Mapping', text: 'Map IDP attributes to UCM user fields' },
         ]
-      }
+      },
+      {
+        title: 'OpenID Connect',
+        icon: Globe,
+        items: [
+          { label: 'Discovery URL', text: 'OIDC provider .well-known/openid-configuration URL' },
+          { label: 'Client ID/Secret', text: 'OAuth2 client credentials from your IDP' },
+          { label: 'Scopes', text: 'OpenID scopes to request (openid, profile, email)' },
+          { label: 'Auto-Create Users', text: 'Automatically create UCM accounts on first SSO login' },
+        ]
+      },
     ],
     tips: [
-      'Enable Just-In-Time provisioning to auto-create users',
-      'Map IdP groups to UCM groups for role assignment',
-      'Keep local admin account as backup access'
+      'Test SSO with a non-admin account first to avoid lockouts',
+      'Keep local admin login available as a fallback',
+      'Map the IDP email attribute to ensure unique user identification',
     ],
     warnings: [
-      'Test SSO with a non-admin user first',
-      'IdP outage = users can\'t login (keep local backup)',
-      'Attribute mapping errors may prevent login'
+      'Misconfigured SSO can lock all users out — always keep a local admin',
     ],
-    related: ['Users', 'Groups', 'RBAC']
+    related: ['Settings', 'Users & Groups']
   },
 
-  // ===========================================
-  // SECURITY DASHBOARD (Pro)
-  // ===========================================
+  // ===== SECURITY (sub-page of Settings) =====
   security: {
     title: 'Security Settings',
-    subtitle: 'Security configuration and monitoring',
-    overview: 'Security settings let you manage encryption, authentication policies, and monitor for suspicious activity. Audit log integrity can be verified from the Audit Logs page.',
+    subtitle: 'Authentication and access policies',
+    overview: 'Configure password policies, session management, rate limiting, and network security. These settings apply system-wide and affect all user accounts.',
     sections: [
       {
-        title: 'Private Key Encryption',
+        title: 'Password Policy',
         icon: Lock,
-        content: 'Encrypt private keys at rest using AES-256 (Fernet):',
         items: [
-          { label: 'Enable', text: 'Click "Enable Encryption" to generate a master key and encrypt all stored private keys' },
-          { label: 'Key File', text: 'Master key is stored at /etc/ucm/master.key — back it up securely' },
-          { label: 'Safe Mode', text: 'If the key file is missing at startup, UCM enters safe mode until it is restored' },
-          { label: 'Disable', text: 'Decrypts all keys and removes the master key file' },
+          { label: 'Minimum Length', text: 'Minimum number of characters required' },
+          { label: 'Complexity', text: 'Require uppercase, lowercase, numbers, special characters' },
+          { label: 'Expiry', text: 'Force password change after a set number of days' },
+          { label: 'History', text: 'Prevent reuse of previous passwords' },
         ]
       },
       {
-        title: 'Authentication Policies',
-        icon: ShieldCheck,
-        content: 'Configure security policies for user authentication:',
-        definitions: [
-          { term: 'Two-Factor Auth', description: 'Enforce TOTP-based 2FA for all users' },
-          { term: 'Password Policy', description: 'Set minimum length and character requirements' },
-          { term: 'Session Duration', description: 'Control how long sessions remain valid' },
-          { term: 'Rate Limiting', description: 'Limit API requests per minute per user' },
+        title: 'Session & Access',
+        icon: Fingerprint,
+        items: [
+          { label: 'Session Timeout', text: 'Auto-logout after inactivity period' },
+          { label: 'Rate Limiting', text: 'Limit login attempts to prevent brute force attacks' },
+          { label: 'IP Restrictions', text: 'Allow or deny access from specific IP ranges' },
+          { label: '2FA Enforcement', text: 'Require two-factor authentication for all users' },
         ]
       },
-      {
-        title: 'Anomaly Detection',
-        icon: ShieldCheck,
-        content: 'Automatic detection of suspicious login patterns:',
-        definitions: [
-          { term: 'Credential Stuffing', description: 'Multiple failed logins from same IP' },
-          { term: 'Unusual Hours', description: 'Logins outside normal business hours' },
-          { term: 'New Device', description: 'Login from previously unseen device/location' },
-          { term: 'Brute Force', description: 'Rapid login attempts on same account' },
-        ]
-      }
     ],
     tips: [
-      'Enable encryption to protect private keys at rest',
-      'Review anomalies regularly for suspicious activity',
-      'Enforce 2FA for all users in production environments',
-      'Always back up your master.key file securely'
+      'Enable rate limiting to protect against automated attack tools',
+      'Use IP restrictions to limit admin access to trusted networks',
     ],
     warnings: [
-      'Losing the master.key file with encryption enabled will lock you out',
-      'Enabling encryption requires a service restart on other workers',
-      'Always create a backup before enabling or disabling encryption'
+      'Locking the password policy too tightly may frustrate users',
+      'Always ensure at least one admin can access the system before enabling IP restrictions',
     ],
-    related: ['Audit Logs', 'Users', 'Settings']
-  }
+    related: ['Account', 'Users & Groups', 'Settings']
+  },
 }
 
 export default helpContent

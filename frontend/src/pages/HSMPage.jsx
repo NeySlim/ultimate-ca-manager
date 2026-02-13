@@ -11,7 +11,7 @@ import {
   Cloud, HardDrive, ArrowsClockwise, Lock, Warning
 } from '@phosphor-icons/react'
 import { 
-  Badge, Button, FormModal, Input, Select, HelpCard,
+  Badge, Button, FormModal, Input, Select,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
@@ -282,16 +282,7 @@ export default function HSMPage() {
   }, [providers, t])
 
   // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard title={t('common.securityNote')} variant="warning">
-        {t('hsm.helpSecurity')}
-      </HelpCard>
-      <HelpCard title={t('common.bestPractices')} variant="info">
-        {t('hsm.helpBestPractice')}
-      </HelpCard>
-    </div>
-  )
+  // Help content now provided via FloatingHelpPanel (helpPageKey="hsm")
 
   // Details panel content
   const renderDetails = (provider) => {
@@ -448,8 +439,6 @@ export default function HSMPage() {
         subtitle={t('hsm.subtitle', { count: providers.length })}
         icon={Key}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle={t('common.hsm')}
         helpPageKey="hsm"
         splitView={true}
         splitEmptyContent={

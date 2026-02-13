@@ -10,7 +10,7 @@ import {
   Shield, Plus, Trash, Lock, CheckCircle, XCircle, Warning, UsersThree
 } from '@phosphor-icons/react'
 import {
-  Badge, Button, Input, FormModal, HelpCard,
+  Badge, Button, Input, FormModal,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader,
   FormSelect
 } from '../components'
@@ -293,16 +293,7 @@ export default function RBACPage() {
   }, [roles, t])
 
   // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard title="RBAC" variant="info">
-        {t('rbac.helpInfo')}
-      </HelpCard>
-      <HelpCard title={t('common.system')} variant="warning">
-        {t('rbac.helpSystemRoles')}
-      </HelpCard>
-    </div>
-  )
+  // Help content now provided via FloatingHelpPanel (helpPageKey="rbac")
 
   // Details panel content
   const renderDetails = (role) => (
@@ -430,8 +421,6 @@ export default function RBACPage() {
         subtitle={t('rbac.subtitle', { count: roles.length })}
         icon={Shield}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle={t('rbac.helpTitle')}
         helpPageKey="rbac"
         splitView={true}
         splitEmptyContent={

@@ -971,7 +971,9 @@
     "aboutHTTPS": "Über HTTPS-Zertifikat",
     "aboutWebAuthn": "Über Sicherheitsschlüssel",
     "proTips": "Profi-Tipps",
-    "seeAlso": "Siehe auch"
+    "seeAlso": "Siehe auch",
+    "minimize": "Minimieren",
+    "expand": "Erweitern"
   },
   "hsm": {
     "addHSM": "HSM hinzufügen",

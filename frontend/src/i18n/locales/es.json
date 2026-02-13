@@ -971,7 +971,9 @@
     "aboutHTTPS": "Acerca del certificado HTTPS",
     "aboutWebAuthn": "Acerca de llaves de seguridad",
     "proTips": "Consejos",
-    "seeAlso": "Ver también"
+    "seeAlso": "Ver también",
+    "minimize": "Minimizar",
+    "expand": "Expandir"
   },
   "hsm": {
     "addHSM": "Agregar HSM",

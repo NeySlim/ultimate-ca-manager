@@ -971,7 +971,9 @@
     "aboutHTTPS": "HTTPS証明書について",
     "aboutWebAuthn": "セキュリティキーについて",
     "proTips": "ヒント",
-    "seeAlso": "関連項目"
+    "seeAlso": "関連項目",
+    "minimize": "最小化",
+    "expand": "展開"
   },
   "hsm": {
     "addHSM": "HSMを追加",
