@@ -362,8 +362,6 @@ jobs:
           - [Installation Guide](docs/INSTALLATION.md)
           - [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API)
           
-          ## Upgrading from v1.8.x
-          Data is automatically migrated when upgrading. A backup is created in `/opt/ucm/data/backups/`.
           INSTALL_EOF
           } > notes.md
           
