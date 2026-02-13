@@ -59,7 +59,7 @@ Restart UCM service using signal file mechanism (no sudo required).
 ```python
 success, message = restart_service()
 # success: True
-# message: "✅ Service restart initiated. Please wait 5 seconds..."
+# message: "Service restart initiated. Please wait 5 seconds..."
 ```
 
 ### reload_service()
@@ -122,7 +122,7 @@ Cancel a previously scheduled restart.
 
 ### Signal File Mechanism
 
-1. Function creates `/opt/ucm/backend/data/.restart_requested`
+1. Function creates `<DATA_DIR>/.restart_requested`
 2. Next HTTP request detects the file via middleware
 3. Middleware initiates graceful shutdown (`os._exit(0)`)
 4. Systemd detects shutdown and automatically restarts
@@ -140,11 +140,11 @@ Cancel a previously scheduled restart.
 ### Before (Old Code)
 
 ```python
-# ❌ Don't do this anymore
+# DON'T: call systemctl directly
 import subprocess
 subprocess.Popen(['systemctl', 'restart', 'ucm'])
 
-# ❌ Or this
+# DON'T: or this
 from config.settings import restart_ucm_service
 success, message = restart_ucm_service()
 ```
@@ -152,7 +152,7 @@ success, message = restart_ucm_service()
 ### After (New Code)
 
 ```python
-# ✅ Use this instead
+# DO: Use this instead
 from utils import restart_service
 success, message = restart_service()
 ```
@@ -192,20 +192,17 @@ def update_config():
 ```python
 @ui_bp.route('/api/ui/settings/apply', methods=['POST'])
 @login_required
-def apply_settings_ui():
-    # Apply settings
-    save_settings(request.form)
+def apply_settings():
+    """API endpoint example"""
+    save_settings(request.json)
 
-    # Restart service
     from utils import restart_service
     success, message = restart_service()
 
     if success:
-        flash(message, 'success')
+        return jsonify({'message': message}), 200
     else:
-        flash(message, 'error')
-
-    return redirect('/settings')
+        return jsonify({'error': message}), 500
 ```
 
 ## Testing
@@ -229,7 +226,7 @@ print(f"Status: {get_service_status()}")
 
 1. Check signal file was created:
    ```bash
-   ls -la /opt/ucm/backend/data/.restart_requested
+   ls -la /opt/ucm/data/.restart_requested
    ```
 
 2. Check systemd configuration:

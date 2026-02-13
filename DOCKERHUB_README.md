@@ -2,304 +2,163 @@
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
-![GitHub release](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager)
-[![CI/CD](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml)
 
- **Enterprise-grade Certificate Authority Management System**
+**Web-based Certificate Authority management with PKI protocol support.**
 
-Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP, ACME, CRL) with multi-factor authentication and a modern, intuitive interface.
+UCM provides certificate lifecycle management, CA hierarchy, and industry-standard protocols (SCEP, OCSP, ACME, CRL/CDP) with multi-factor authentication.
 
-**Multi-arch support:** `amd64`, `arm64`
-**Registry:** GitHub Container Registry (GHCR)
-
-## Dashboard Preview
-
-![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/dash.png)
-*Professional Dashboard - Amber Dark Theme*
+**Multi-arch:** `linux/amd64`, `linux/arm64`
 
 ---
 
 ## Quick Start
 
-### Docker (Recommended)
-
 ```bash
-# Pull from GHCR (GitHub Container Registry)
-docker pull neyslim/ultimate-ca-manager:latest
-
-# Run with SQLite
 docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
   neyslim/ultimate-ca-manager:latest
-
-# Access: https://localhost:8443
-# Default login: admin / changeme123 ⚠️ CHANGE IMMEDIATELY!
 ```
+
+**Access:** https://localhost:8443
+**Credentials:** admin / changeme123 -- change immediately.
 
 ### Docker Compose
 
-```bash
-# Clone repository
-git clone https://github.com/NeySlim/ultimate-ca-manager.git
-cd ultimate-ca-manager
+```yaml
+services:
+  ucm:
+    image: neyslim/ultimate-ca-manager:latest
+    container_name: ucm
+    ports:
+      - "8443:8443"
+    volumes:
+      - ucm-data:/opt/ucm/data
+    environment:
+      - UCM_FQDN=ucm.example.com
+    restart: unless-stopped
 
-# Start with Docker Compose
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f ucm
+volumes:
+  ucm-data:
 ```
-
-### Linux Installation (Auto-detect)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./scripts/install/install.sh | sudo bash
-```
-
-**Supports**: Debian, Ubuntu, RHEL, CentOS, Rocky, Alpine, Arch, openSUSE (10+ distributions)
 
 ---
 
 ## Features
 
-### Certificate Authority Management
-- Create and manage multiple CAs (Root and Intermediate)
-- Import existing CAs (PEM, PKCS#12)
-- Support for RSA (2048-4096) and ECDSA (P-256, P-384, P-521)
-- Flexible hash algorithms (SHA-256, SHA-384, SHA-512)
-- CA hierarchy visualization
-
-### Certificate Operations
-- Issue certificates (server, client, code signing, email)
-- Import and sign CSRs
-- Certificate revocation with CRL support
-- Export to PEM, DER, PKCS#12
-- Certificate lifecycle tracking
-- Expiration monitoring
-
-### Industry-Standard Protocols
-- **SCEP Server** (RFC 8894) - Zero-touch device enrollment
-- **OCSP Responder** (RFC 6960) - Real-time certificate status
-- **CRL Distribution** (RFC 5280) - Certificate Revocation Lists
-- Compatible with iOS, Android, Windows, Cisco, Palo Alto
-
-### Modern Web Interface
-- **8 Professional Themes** - Sentinel, Amber, Blossom, Nebula (Light & Dark)
-- **Responsive Design** - Desktop, tablet, mobile optimized
-- **Full Dark Mode** - Complete dark theme support
-- **Modern SPA** - HTMX-powered fast navigation
-- **Custom Scrollbars** - Theme-aware styled scrollbars
-
-### Security
-- HTTPS-only access (TLS 1.2+)
-- HSM support (SoftHSM included, hardware HSM via PKCS#11)
-- Role-based access control (Admin, Operator, Viewer)
-- JWT authentication for API
-- Audit logging
-- OWASP Top 10 2021 compliant
-- Non-root container execution
-
-### REST API
-- Complete programmatic access
-- JWT authentication
-- Comprehensive endpoints
-- API documentation
+- **CA Management** -- Root and intermediate CAs, hierarchy view, import/export
+- **Certificate Lifecycle** -- Issue, sign, revoke, renew, export (PEM, DER, PKCS#12)
+- **CSR Management** -- Create, import, sign Certificate Signing Requests
+- **Certificate Templates** -- Server, client, code signing, email presets
+- **Certificate Toolbox** -- SSL checker, CSR/cert decoder, key matcher, format converter
+- **Trust Store** -- Manage trusted root CA certificates
+- **Chain Repair** -- AKI/SKI-based chain validation with automatic repair
+- **SCEP** -- RFC 8894 device auto-enrollment
+- **ACME** -- Let's Encrypt compatible (certbot, acme.sh)
+- **OCSP** -- RFC 6960 real-time certificate status
+- **CRL/CDP** -- Certificate Revocation List distribution
+- **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
+- **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
+- **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
+- **12 Themes** -- 6 color schemes x Light/Dark
+- **i18n** -- 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
+- **Real-time** -- WebSocket live updates
 
 ---
 
-## More Screenshots
+## Architecture
 
-### Certificate Management
-![Certificate List](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/05-certificates-list_amber-dark.png)
-*Comprehensive Certificate Management Interface*
-
-### 8 Beautiful Themes Available
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/08-theme-sentinel-light.png" width="350"/><br/>
-      <b>Sentinel Light</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/09-theme-nebula-dark.png" width="350"/><br/>
-      <b>Nebula Dark</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/10-theme-blossom-light.png" width="350"/><br/>
-      <b>Blossom Light</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/dash.png" width="350"/><br/>
-      <b>Amber Dark</b>
-    </td>
-  </tr>
-</table>
+| Component | Technology |
+|-----------|------------|
+| Frontend | React 18, Vite, Radix UI |
+| Backend | Python 3.11+, Flask, SQLAlchemy |
+| Database | SQLite (PostgreSQL supported) |
+| Server | Gunicorn + gevent WebSocket |
+| Auth | Session cookies, WebAuthn/FIDO2, TOTP, mTLS |
 
 ---
 
-## Docker Hub
+## Environment Variables
 
-**Images available:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `UCM_FQDN` | `ucm.example.com` | Server FQDN |
+| `UCM_HTTPS_PORT` | `8443` | HTTPS port |
+| `UCM_SECRET_KEY` | auto-generated | Session secret |
+| `UCM_ACME_ENABLED` | `true` | Enable ACME protocol |
+| `UCM_SMTP_ENABLED` | `false` | Enable email notifications |
 
-```bash
-# Latest stable
-docker pull neyslim/ultimate-ca-manager:latest
+---
 
-# Specific version
-docker pull neyslim/ultimate-ca-manager:latest
+## Tags
 
-# Major version
-docker pull neyslim/ultimate-ca-manager:latest
+- `latest` -- Latest stable release
+- Semantic version tags (e.g. `2.0.6`, `2.0`, `2`)
 
-# Architecture-specific
-docker pull neyslim/ultimate-ca-manager:latest # Multi-arch (amd64, arm64)
-```
+## Image Details
 
-**Tags**:
-- `latest` - Latest stable release
-- Semantic version tags (e.g. `2.0.3`, `2.0`, `2`)
-- `v*.*.*` - Specific releases
-
-**Image Details**:
 - Base: Python 3.11 Alpine
-- Size: ~266 MB (optimized multi-stage build)
 - User: Non-root (UID 1000)
 - Server: Gunicorn production WSGI
 - Platforms: linux/amd64, linux/arm64
 
 ---
 
-## Documentation
+## Data Persistence
 
-- **[README.md](README.md)** - Project overview and features
-- **[DOCKER.md](DOCKER.md)** - Complete Docker deployment guide
-- **[DOCKER_FEATURES.md](DOCKER_FEATURES.md)** - Configuration reference
-- **[DISTRIBUTIONS.md](DISTRIBUTIONS.md)** - Linux compatibility matrix
-- **[docs/MIGRATION_EXAMPLE.md](docs/MIGRATION_EXAMPLE.md)** - Migration guide
-- **[.env.docker.example](.env.docker.example)** - Configuration template
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
-
----
-
-## Configuration
-
-All Docker settings configurable via `.env` file:
-
-```env
-# Network
-UCM_HTTPS_PORT=8443
-
-# Storage
-UCM_DATA_DIR=./data
-POSTGRES_DATA_DIR=./postgres-data
-
-# Database (PostgreSQL)
-POSTGRES_DB=ucm
-POSTGRES_USER=ucm
-POSTGRES_PASSWORD=changeme123
-```
-
-See [.env.docker.example](.env.docker.example) for complete configuration.
-
----
-
-## Migration
-
-Move UCM between hosts in 5 minutes:
+Mount `/opt/ucm/data` as a volume:
 
 ```bash
-# Source host
-docker-compose down
-tar -czf ucm-backup.tar.gz data/ postgres-data/ .env
-scp ucm-backup.tar.gz user@new-host:/opt/ucm/
-
-# Destination host
-cd /opt/ucm
-tar -xzf ucm-backup.tar.gz
-docker-compose up -d
+docker run -v ucm-data:/opt/ucm/data ...
 ```
 
-See [docs/MIGRATION_EXAMPLE.md](docs/MIGRATION_EXAMPLE.md) for detailed guide.
+Contents: SQLite database, HTTPS certificates, CA files, backups.
 
 ---
 
-## Architecture
+## Backup & Restore
 
-- **Backend**: Python 3.11, Flask, SQLAlchemy
-- **Database**: SQLite (default), PostgreSQL (supported)
-- **Frontend**: HTML5, CSS3, JavaScript (Vanilla)
-- **Server**: Gunicorn WSGI (auto-scaling workers)
-- **Protocols**: HTTPS/TLS, SCEP, OCSP, REST API
-- **Deployment**: Docker, Linux native, Kubernetes-ready
+```bash
+# Backup
+docker run --rm -v ucm-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/ucm-backup.tar.gz -C /data .
 
----
-
-## Security
-
-- Non-root container execution
-- Minimal Linux capabilities
-- Auto-generated HTTPS certificates
-- No hardcoded secrets
-- Production WSGI server
-- Regular security audits
-
-**Security Score**: 9.5/10
+# Restore
+docker run --rm -v ucm-data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/ucm-backup.tar.gz -C /data
+```
 
 ---
 
-## Requirements
+## Migration Between Hosts
 
-**Docker**:
-- Docker 20.10+
-- Docker Compose 2.0+
+```bash
+# Source
+docker stop ucm
+docker run --rm -v ucm-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/ucm-data.tar.gz -C /data .
+scp ucm-data.tar.gz user@new-host:~/
 
-**Linux**:
-- Python 3.10+
-- OpenSSL 1.1.1+
-- 512 MB RAM (minimum)
-- 1 GB disk space
+# Destination
+docker volume create ucm-data
+docker run --rm -v ucm-data:/data -v $(pwd):/backup \
+  alpine tar xzf /backup/ucm-data.tar.gz -C /data
+# Then start container as usual
+```
 
 ---
 
-## Contributing
+## Documentation
 
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
+- [README](https://github.com/NeySlim/ultimate-ca-manager)
+- [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
+- [CHANGELOG](https://github.com/NeySlim/ultimate-ca-manager/blob/main/CHANGELOG.md)
+- [Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 
 ---
 
 ## License
 
-BSD 3-Clause License - see [LICENSE](LICENSE) for details.
-
----
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
-- **Documentation**: [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-- **Docker Hub**: [neyslim/ultimate-ca-manager](https://hub.docker.com/r/neyslim/ultimate-ca-manager)
-
----
-
-## Star History
-
-If you find UCM useful, please consider giving it a star!
-
----
-
-**Version**: See GitHub releases
-**Status**: Production Ready ✅
-**Last Updated**: 2026-01-06
+BSD 3-Clause License

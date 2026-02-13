@@ -39,7 +39,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443  
-**Default credentials:** admin / changeme123 ⚠️ CHANGE IMMEDIATELY
+**Default credentials:** admin / changeme123 -- CHANGE IMMEDIATELY
 
 ---
 
@@ -118,7 +118,7 @@ After installation, access UCM at **https://localhost:8443**
 - **Username:** admin
 - **Password:** changeme123
 
-⚠️ **IMPORTANT:** Change the default password immediately after first login!
+**IMPORTANT:** Change the default password immediately after first login!
 
 ---
 

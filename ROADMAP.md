@@ -5,43 +5,43 @@
 
 ---
 
-## ✅ v2.0.0 - Complete UI Rewrite (RELEASED)
+## v2.0.0 - Complete UI Rewrite (RELEASED)
 
-### Frontend Rewrite ✅
-- ✅ **React 18 + Vite** - Modern SPA replacing HTMX
-- ✅ **Radix UI Components** - Accessible, professional UI
-- ✅ **12 Theme Variants** - 6 colors × Light/Dark modes
-- ✅ **Split-View Layout** - Sidebar, explorer, details panels
-- ✅ **Responsive Design** - Mobile-first, works on all devices
+### Frontend Rewrite
+- [x] **React 18 + Vite** - Modern SPA replacing HTMX
+- [x] **Radix UI Components** - Accessible, professional UI
+- [x] **12 Theme Variants** - 6 colors x Light/Dark modes
+- [x] **Split-View Layout** - Sidebar, explorer, details panels
+- [x] **Responsive Design** - Mobile-first, works on all devices
 
-### Core Features ✅
-- ✅ **Certificate Management** - Full lifecycle (create, sign, revoke, renew)
-- ✅ **CA Hierarchy** - Root, Intermediate, Issuing CAs
-- ✅ **Certificate Templates** - Predefined configurations
-- ✅ **User Groups** - Permission-based organization
-- ✅ **Audit Logs** - Complete action logging with export
+### Core Features
+- [x] **Certificate Management** - Full lifecycle (create, sign, revoke, renew)
+- [x] **CA Hierarchy** - Root, Intermediate, Issuing CAs
+- [x] **Certificate Templates** - Predefined configurations
+- [x] **User Groups** - Permission-based organization
+- [x] **Audit Logs** - Complete action logging with export
 
-### Protocols ✅
-- ✅ **SCEP** - RFC 8894 device enrollment
-- ✅ **OCSP** - RFC 6960 status checking
-- ✅ **ACME** - Let's Encrypt compatible (certbot, acme.sh)
-- ✅ **CRL/CDP** - Certificate revocation distribution
+### Protocols
+- [x] **SCEP** - RFC 8894 device enrollment
+- [x] **OCSP** - RFC 6960 status checking
+- [x] **ACME** - Let's Encrypt compatible (certbot, acme.sh)
+- [x] **CRL/CDP** - Certificate revocation distribution
 
-### Authentication ✅
-- ✅ **Username/Password** - Standard login
-- ✅ **WebAuthn/FIDO2** - Hardware security keys
-- ✅ **TOTP 2FA** - Google Authenticator compatible
-- ✅ **mTLS** - Client certificate authentication
+### Authentication
+- [x] **Username/Password** - Standard login
+- [x] **WebAuthn/FIDO2** - Hardware security keys
+- [x] **TOTP 2FA** - Google Authenticator compatible
+- [x] **mTLS** - Client certificate authentication
 
-### Deployment ✅
-- ✅ **DEB Package** - Debian/Ubuntu
-- ✅ **RPM Package** - RHEL/Fedora
-- ✅ **Docker** - Multi-arch images
-- ✅ **Auto-migration** - From v1.8.x
+### Deployment
+- [x] **DEB Package** - Debian/Ubuntu
+- [x] **RPM Package** - RHEL/Fedora
+- [x] **Docker** - Multi-arch images
+- [x] **Auto-migration** - From v1.8.x
 
 ---
 
-## ✅ v2.0.0 Stable (RELEASED - 2026-02-07)
+## v2.0.0 Stable (RELEASED - 2026-02-07)
 
 ### Polish & Stability
 - [x] Docker image published to GHCR and Docker Hub
@@ -62,7 +62,7 @@
 - **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault, GCP KMS (UI + backend, needs real HSM testing)
 - **RBAC** - Custom roles and permissions (UI + API, enforcement in progress)
 - **SSO** - LDAP, OAuth2/OIDC, SAML 2.0 (UI + backend, needs production validation)
-- ✅ **Security Dashboard** - Secrets management, anomaly detection
+- [x] **Security Dashboard** - Secrets management, anomaly detection
 
 ### Planned for v2.1.0
 - [ ] **Bulk Operations** - Revoke, renew, export multiple certificates at once
@@ -76,22 +76,22 @@
 
 ## v2.1.0 - Next Release
 
-### Internationalization (i18n) ✅
-- ✅ **English** (default)
-- ✅ **French** (Français)
-- ✅ **German** (Deutsch)
-- ✅ **Spanish** (Español)
-- ✅ **Italian** (Italiano)
-- ✅ **Portuguese** (Português)
-- ✅ **Ukrainian** (Українська)
-- ✅ **Chinese** (中文)
-- ✅ **Japanese** (日本語)
+### Internationalization (i18n)
+- [x] **English** (default)
+- [x] **French** (Francais)
+- [x] **German** (Deutsch)
+- [x] **Spanish** (Espanol)
+- [x] **Italian** (Italiano)
+- [x] **Portuguese** (Portugues)
+- [x] **Ukrainian**
+- [x] **Chinese**
+- [x] **Japanese**
 
-### PKI Chain Intelligence ✅
-- ✅ **AKI/SKI Chain Matching** - Cryptographic chain validation replacing DN-based matching
-- ✅ **Chain Repair Scheduler** - Hourly backfill, re-chain, and deduplication task
-- ✅ **Chain Repair Widget** - Visual progress on CAs page with manual run
-- ✅ **Smart Import Dedup** - Prevent duplicate CAs via SKI matching
+### PKI Chain Intelligence
+- [x] **AKI/SKI Chain Matching** - Cryptographic chain validation replacing DN-based matching
+- [x] **Chain Repair Scheduler** - Hourly backfill, re-chain, and deduplication task
+- [x] **Chain Repair Widget** - Visual progress on CAs page with manual run
+- [x] **Smart Import Dedup** - Prevent duplicate CAs via SKI matching
 
 ### Integrations (moved to v2.2.0)
 

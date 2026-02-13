@@ -9,25 +9,20 @@ Ultimate CA Manager implements comprehensive security features to protect your P
 All private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-256-CBC with HMAC-SHA256).
 
 #### Configuration
+
+Private key encryption is managed from **Settings** > **Security** in the web UI. The master key is stored at `/etc/ucm/master.key`.
+
+Alternatively, via API (using session cookies):
+
 ```bash
-# Generate encryption key
-curl -X GET https://localhost:8443/api/v2/system/security/generate-key \
-  -H "Authorization: Bearer $TOKEN"
-
-# Add to environment
-echo "KEY_ENCRYPTION_KEY=<generated-key>" >> /etc/ucm/ucm.env
-
-# Restart service
-systemctl restart ucm
-
 # Encrypt existing keys (dry run first)
-curl -X POST https://localhost:8443/api/v2/system/security/encrypt-all-keys \
-  -H "Authorization: Bearer $TOKEN" \
+curl -k -b cookies.txt -X POST https://localhost:8443/api/v2/system/security/encrypt-all-keys \
+  -H "Content-Type: application/json" \
   -d '{"dry_run": true}'
 
 # Then actually encrypt
-curl -X POST https://localhost:8443/api/v2/system/security/encrypt-all-keys \
-  -H "Authorization: Bearer $TOKEN" \
+curl -k -b cookies.txt -X POST https://localhost:8443/api/v2/system/security/encrypt-all-keys \
+  -H "Content-Type: application/json" \
   -d '{"dry_run": false}'
 ```
 
@@ -273,4 +268,4 @@ If you discover a security vulnerability, please report it responsibly:
 | Version | Date | Changes |
 |---------|------|---------|
 | 2.0.2 | 2026-01-31 | Private key encryption, CSRF, password policy, rate limiting |
-| 2.0.0 | 2026-01-29 | Initial security framework, JWT auth, RBAC |
+| 2.0.0 | 2026-01-29 | Initial security framework, session auth, RBAC |

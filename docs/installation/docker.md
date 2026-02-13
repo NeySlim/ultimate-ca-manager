@@ -97,7 +97,6 @@ services:
 
       # Security
       - UCM_SESSION_TIMEOUT=3600
-      - UCM_JWT_EXPIRATION=86400
 
       # Features
       - UCM_ACME_ENABLED=true
@@ -150,9 +149,7 @@ volumes:
 | `UCM_DEBUG` | `false` | Enable debug mode |
 | `UCM_LOG_LEVEL` | `INFO` | Log level (DEBUG/INFO/WARNING/ERROR) |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
-| `UCM_JWT_SECRET` | auto-generated | JWT secret key |
 | `UCM_SESSION_TIMEOUT` | `3600` | Session timeout (seconds) |
-| `UCM_JWT_EXPIRATION` | `86400` | JWT token expiration (seconds) |
 | `UCM_ACME_ENABLED` | `true` | Enable ACME protocol |
 | `UCM_CACHE_ENABLED` | `true` | Enable response caching |
 | `UCM_SMTP_ENABLED` | `false` | Enable email notifications |
@@ -371,9 +368,9 @@ Docker automatically pulls the correct architecture.
 
 ## Next Steps
 
-- [Configuration Guide](../administration/configuration.md)
-- [First Steps](../user-guide/first-steps.md)
-- [CA Management](../user-guide/ca-management.md)
+- [User Guide](../USER_GUIDE.md)
+- [Admin Guide](../ADMIN_GUIDE.md)
+- [API Reference](../API_REFERENCE.md)
 
 ---
 

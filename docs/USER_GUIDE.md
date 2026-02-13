@@ -15,9 +15,9 @@ Quick start guide for using Ultimate CA Manager.
 ### Navigation
 
 UCM uses a 3-panel layout:
-- **Sidebar** (left, 56px) - Main navigation icons
-- **Explorer** (320px) - List of items for current page
-- **Details** (flex) - Selected item details and actions
+- **Sidebar** (left, 52px) -- Main navigation icons
+- **Explorer** -- List of items for current page
+- **Details** (flex) -- Selected item details and actions
 
 ### Keyboard Shortcuts
 
@@ -220,14 +220,16 @@ Real-time certificate validation:
 
 Change the UI theme:
 
-1. Click **Palette icon** in sidebar (bottom)
-2. Select theme:
-   - Dark Gray (default)
+1. Click your **user avatar** (bottom of sidebar) to open the user menu
+2. Select **Theme** submenu
+3. Choose from 6 color schemes, each with Light and Dark variants:
+   - Gray (default)
    - Blue Ocean
    - Purple Night
    - Green Forest
    - Orange Sunset
    - Cyber Pink
+4. Or select **Follow System** to match your OS light/dark preference
 
 Theme persists across sessions.
 

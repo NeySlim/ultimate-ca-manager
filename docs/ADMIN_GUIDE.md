@@ -6,10 +6,11 @@ Administration and configuration guide for Ultimate CA Manager.
 
 ## Configuration Overview
 
-UCM stores configuration in:
-- **Database** - `/var/lib/ucm/ucm.db` (SQLite)
-- **Data Directory** - `/var/lib/ucm/` (certificates, keys)
-- **Logs** - `/var/log/ucm/` (application logs)
+UCM stores data in:
+- **Database** -- `/opt/ucm/data/ucm.db` (SQLite)
+- **Data Directory** -- `/opt/ucm/data/` (certificates, keys, backups)
+- **Config** -- `/etc/ucm/ucm.env` (DEB/RPM) or environment variables (Docker)
+- **Logs** -- `/var/log/ucm/` (DEB/RPM) or stdout (Docker)
 
 ---
 
@@ -19,10 +20,10 @@ UCM stores configuration in:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UCM_SECRET_KEY` | (generated) | JWT signing key |
+| `UCM_SECRET_KEY` | (generated) | Session signing key |
 | `UCM_HOST` | `0.0.0.0` | Bind address |
 | `UCM_PORT` | `8443` | HTTPS port |
-| `UCM_DATA_DIR` | `/var/lib/ucm` | Data storage |
+| `UCM_DATA_DIR` | `/opt/ucm/data` | Data storage |
 | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
 | `UCM_HTTPS_CERT` | (auto) | Server certificate |
 | `UCM_HTTPS_KEY` | (auto) | Server private key |
@@ -43,12 +44,16 @@ sudo journalctl -u ucm -f
 sudo systemctl enable ucm
 ```
 
+The service runs as user `ucm` with restricted permissions (NoNewPrivileges, ProtectSystem=strict).
+
 ### Log Rotation
 
 Logs are rotated automatically via logrotate:
 - Location: `/etc/logrotate.d/ucm`
-- Rotation: Weekly, 4 copies kept
+- Rotation: Daily, 14 copies kept
 - Compression: gzip
+
+See [LOG_ROTATION.md](LOG_ROTATION.md) for details.
 
 ---
 
@@ -60,23 +65,22 @@ UCM auto-generates a self-signed certificate on first run.
 
 **Replace with trusted certificate:**
 
-1. Go to **Settings** → **Security** tab
+1. Go to **Settings** > **Security** tab
 2. Select certificate from your CA
 3. Click **Apply HTTPS Certificate**
 4. Restart service: `sudo systemctl restart ucm`
 
 **Or via files:**
 ```bash
-# Copy your certificate and key
-sudo cp /path/to/cert.pem /var/lib/ucm/https/server.crt
-sudo cp /path/to/key.pem /var/lib/ucm/https/server.key
-sudo chown ucm:ucm /var/lib/ucm/https/*
+sudo cp /path/to/cert.pem /opt/ucm/data/https_cert.pem
+sudo cp /path/to/key.pem /opt/ucm/data/https_key.pem
+sudo chown ucm:ucm /opt/ucm/data/https_*.pem
 sudo systemctl restart ucm
 ```
 
 ### Session Security
 
-Configure in **Settings** → **Security**:
+Configure in **Settings** > **Security**:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -86,12 +90,12 @@ Configure in **Settings** → **Security**:
 
 ### Authentication Methods
 
-Enable/disable in **Settings** → **Security**:
+Enable/disable in **Settings** > **Security**:
 
-- **Password** - Standard username/password
-- **2FA TOTP** - Time-based one-time password
-- **WebAuthn** - Hardware security keys
-- **mTLS** - Client certificate authentication
+- **Password** -- Standard username/password
+- **2FA TOTP** -- Time-based one-time password
+- **WebAuthn** -- Hardware security keys
+- **mTLS** -- Client certificate authentication
 
 ---
 
@@ -100,32 +104,25 @@ Enable/disable in **Settings** → **Security**:
 ### Creating Backups
 
 **Via UI:**
-1. Go to **Settings** → **Backup** tab
+1. Go to **Settings** > **Backup** tab
 2. Click **Create Backup**
 3. Enter encryption password
 4. Download `.ucmbkp` file
 
-**Via CLI:**
+**Via command line:**
 ```bash
-cd /opt/ucm
-./bin/ucm-backup --output backup.ucmbkp --password "YourPassword"
+sudo systemctl stop ucm
+sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
+sudo systemctl start ucm
 ```
 
 ### Restoring Backups
 
 **Via UI:**
-1. Go to **Settings** → **Backup** tab
+1. Go to **Settings** > **Backup** tab
 2. Click **Restore Backup**
 3. Upload `.ucmbkp` file
 4. Enter encryption password
-
-**Via CLI:**
-```bash
-cd /opt/ucm
-sudo systemctl stop ucm
-./bin/ucm-restore --input backup.ucmbkp --password "YourPassword"
-sudo systemctl start ucm
-```
 
 ### Backup Contents
 
@@ -135,32 +132,24 @@ sudo systemctl start ucm
 - Audit logs
 - Templates
 
-### Automated Backups
-
-Create cron job:
-```bash
-# Daily backup at 2 AM
-0 2 * * * /opt/ucm/bin/ucm-backup -o /backup/ucm-$(date +\%Y\%m\%d).ucmbkp -p "$BACKUP_PASSWORD"
-```
-
 ---
 
 ## Database Management
 
 ### SQLite Database
 
-Location: `/var/lib/ucm/ucm.db`
+Location: `/opt/ucm/data/ucm.db`
 
 **Vacuum database:**
 ```bash
 sudo systemctl stop ucm
-sqlite3 /var/lib/ucm/ucm.db "VACUUM;"
+sqlite3 /opt/ucm/data/ucm.db "VACUUM;"
 sudo systemctl start ucm
 ```
 
 **Export database:**
 ```bash
-sqlite3 /var/lib/ucm/ucm.db ".dump" > ucm_dump.sql
+sqlite3 /opt/ucm/data/ucm.db ".dump" > ucm_dump.sql
 ```
 
 ### Database Tables
@@ -184,16 +173,8 @@ sqlite3 /var/lib/ucm/ucm.db ".dump" > ucm_dump.sql
 
 **Configure CRL endpoint:**
 1. CRL URL: `https://your-server:8443/crl/<ca-id>.crl`
-2. Configure in CA settings → CRL tab
+2. Configure in CA settings > CRL tab
 3. Set regeneration interval
-
-**Manual CRL regeneration:**
-```bash
-curl -X POST https://localhost:8443/api/v2/crl/regenerate \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"ca_id": 1}'
-```
 
 ### OCSP Configuration
 
@@ -204,36 +185,18 @@ OCSP responder runs automatically:
 
 ### ACME Administration
 
-**View ACME accounts:**
-```bash
-curl https://localhost:8443/api/v2/acme/accounts \
-  -H "Authorization: Bearer $TOKEN"
-```
+View ACME accounts and orders in the ACME page, or via API:
 
-**Revoke ACME certificate:**
 ```bash
-curl -X POST https://localhost:8443/api/v2/acme/revoke \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"certificate_id": 123}'
+curl -k -b cookies.txt https://localhost:8443/api/v2/acme/accounts
 ```
 
 ### SCEP Administration
 
-**View pending requests:**
-```bash
-curl https://localhost:8443/api/v2/scep/requests?status=pending \
-  -H "Authorization: Bearer $TOKEN"
-```
+View pending SCEP requests in the SCEP page, or via API:
 
-**Approve/reject requests:**
 ```bash
-# Approve
-curl -X POST https://localhost:8443/api/v2/scep/requests/1/approve \
-  -H "Authorization: Bearer $TOKEN"
-
-# Reject
-curl -X POST https://localhost:8443/api/v2/scep/requests/1/reject \
-  -H "Authorization: Bearer $TOKEN"
+curl -k -b cookies.txt https://localhost:8443/api/v2/scep/requests?status=pending
 ```
 
 ---
@@ -249,12 +212,6 @@ curl -X POST https://localhost:8443/api/v2/scep/requests/1/reject \
 4. Set temporary password
 5. User must change on next login
 
-**CLI reset:**
-```bash
-cd /opt/ucm
-./bin/ucm-reset-password --user admin --password "NewPassword123"
-```
-
 ### Role Management
 
 | Role | Certificates | CAs | Users | Settings |
@@ -266,10 +223,10 @@ cd /opt/ucm
 ### API Keys
 
 Users can create API keys for automation:
-1. Go to **Account** → **API Keys**
+1. Go to **Account** > **API Keys**
 2. Click **Generate Key**
 3. Copy key (shown only once)
-4. Use in Authorization header: `Bearer <api-key>`
+4. Use in `X-API-Key` header
 
 ---
 
@@ -278,8 +235,7 @@ Users can create API keys for automation:
 ### Health Check
 
 ```bash
-curl -k https://localhost:8443/api/v2/health
-# {"status": "healthy", "version": "2.0.x", ...}
+curl -k https://localhost:8443/api/health
 ```
 
 ### Metrics
@@ -301,24 +257,6 @@ All actions are logged:
 
 ## Upgrades
 
-### Standard Upgrade
-
-```bash
-# Docker
-docker pull neyslim/ultimate-ca-manager:latest
-docker-compose up -d
-
-# Package
-sudo apt update && sudo apt upgrade ucm
-
-# Source
-cd /opt/ucm
-git pull
-./bin/ucm-upgrade
-```
-
-### Migration Guide
-
 See [UPGRADE.md](../UPGRADE.md) for version-specific migration steps.
 
 ---
@@ -332,8 +270,8 @@ See [UPGRADE.md](../UPGRADE.md) for version-specific migration steps.
 sudo journalctl -u ucm -n 100
 
 # Check permissions
-ls -la /var/lib/ucm/
-sudo chown -R ucm:ucm /var/lib/ucm/
+ls -la /opt/ucm/data/
+sudo chown -R ucm:ucm /opt/ucm/data/
 
 # Check port
 sudo netstat -tlpn | grep 8443
@@ -343,23 +281,12 @@ sudo netstat -tlpn | grep 8443
 
 ```bash
 # Find locking process
-fuser /var/lib/ucm/ucm.db
+fuser /opt/ucm/data/ucm.db
 
 # Stop service and fix
 sudo systemctl stop ucm
-sqlite3 /var/lib/ucm/ucm.db "PRAGMA integrity_check;"
+sqlite3 /opt/ucm/data/ucm.db "PRAGMA integrity_check;"
 sudo systemctl start ucm
-```
-
-### Certificate Issues
-
-```bash
-# Verify certificate
-openssl x509 -in /var/lib/ucm/https/server.crt -text -noout
-
-# Check key match
-openssl x509 -noout -modulus -in server.crt | md5sum
-openssl rsa -noout -modulus -in server.key | md5sum
 ```
 
 ---

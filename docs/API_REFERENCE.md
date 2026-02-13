@@ -145,11 +145,6 @@ GET /api/v2/auth/verify
 POST /api/v2/auth/logout
 ```
 
-### Refresh Token
-```http
-POST /api/v2/auth/refresh
-```
-
 ---
 
 ## Account Management

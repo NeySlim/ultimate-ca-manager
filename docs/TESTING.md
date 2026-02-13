@@ -6,8 +6,8 @@ UCM uses a comprehensive testing strategy with unit tests and E2E tests.
 
 | Test Type | Framework | Status |
 |-----------|-----------|--------|
-| Unit Tests | Vitest + React Testing Library | 76 passing (51% coverage) |
-| E2E Tests | Playwright | 45 passing |
+| Unit Tests | Vitest + React Testing Library | Active |
+| E2E Tests | Playwright | Active |
 
 ## Unit Tests
 
@@ -80,9 +80,6 @@ npm run test:e2e
 
 # Run with UI
 npm run test:e2e:headed
-
-# Run advanced feature tests
-npm run test:e2e:pro
 ```
 
 ### Test Structure
@@ -204,11 +201,11 @@ jobs:
 
 ## Coverage Goals
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Unit Test Coverage | 51% | 80% |
-| E2E Pass Rate | 66% | 95% |
-| Critical Paths | 100% | 100% |
+| Metric | Target |
+|--------|--------|
+| Unit Test Coverage | 80% |
+| E2E Pass Rate | 95% |
+| Critical Paths | 100% |
 
 ## Troubleshooting
 

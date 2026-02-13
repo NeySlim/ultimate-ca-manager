@@ -15,8 +15,8 @@
 | `text-2xl` | 24px | Page titles |
 
 ### Font Families
-- `font-sans` - Geist (UI text)
-- `font-mono` - SF Mono (code, serials, hashes)
+- `font-sans` - Inter (UI text)
+- `font-mono` - Fira Code (code, serials, hashes)
 
 ## Colors
 
@@ -211,7 +211,7 @@ Defined in `ThemeContext.jsx`, applied via CSS custom properties:
 
 ## Do's and Don'ts
 
-### ✅ Do
+### Do
 ```jsx
 // Use design tokens
 <p className="text-sm text-text-secondary">
@@ -223,15 +223,15 @@ Defined in `ThemeContext.jsx`, applied via CSS custom properties:
 <div className="p-4 space-y-4">
 ```
 
-### ❌ Don't
+### Don't
 ```jsx
 // Hardcoded colors
-<p className="text-gray-500"> // ❌
-<span className="text-red-500"> // ❌
+<p className="text-gray-500"> // BAD
+<span className="text-red-500"> // BAD
 
 // Arbitrary values
-<p className="text-[13px]"> // ❌ Use text-sm or text-xs
+<p className="text-[13px]"> // BAD - Use text-sm or text-xs
 
 // Inline styles for colors
-<div style={{ color: '#ff0000' }}> // ❌
+<div style={{ color: '#ff0000' }}> // BAD
 ```
