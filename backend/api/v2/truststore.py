@@ -312,9 +312,7 @@ def remove_trusted_certificate(cert_id):
             success=True
         )
         
-        return no_content_response(
-            message=f'Certificate {cert_name} removed from trust store'
-        )
+        return success_response(message=f'Certificate {cert_name} removed from trust store')
     except Exception as e:
         db.session.rollback()
         return error_response(f'Failed to remove certificate: {str(e)}', 500)
