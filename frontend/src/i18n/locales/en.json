@@ -1031,7 +1031,7 @@
   "importExport": {
     "subtitle": "Transfer certificates and CAs",
     "tabs": {
-      "opnsense": "OpnSense",
+      "opnsense": "OPNsense",
       "exportCerts": "Export Certs"
     },
     "smartImport": {
@@ -1039,8 +1039,8 @@
       "description": "Import certificates, keys, CSRs, and chains from any format"
     },
     "opnsense": {
-      "title": "OpnSense Connection",
-      "description": "Import certificates from OpnSense firewall",
+      "title": "OPNsense Connection",
+      "description": "Import certificates from OPNsense firewall",
       "hostLabel": "Host / IP",
       "apiKeyLabel": "API Key",
       "apiSecretLabel": "API Secret",
@@ -1054,7 +1054,8 @@
       "selectAll": "Select all",
       "importSelected": "Import {{count}} selected",
       "importSuccess": "Successfully imported {{count}} items ({{skipped}} skipped)",
-      "noItemsSelected": "Please select at least one item to import"
+      "noItemsSelected": "Please select at least one item to import",
+      "ignoreCert": "Ignore SSL certificate (self-signed)"
     },
     "export": {
       "allCertsTitle": "Export All Certificates",

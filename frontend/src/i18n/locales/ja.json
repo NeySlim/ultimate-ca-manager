@@ -1104,7 +1104,7 @@
     "exportAll": "すべてエクスポート",
     "subtitle": "証明書とCAの転送",
     "tabs": {
-      "opnsense": "OpnSense",
+      "opnsense": "OPNsense",
       "exportCerts": "証明書エクスポート"
     },
     "smartImport": {
@@ -1112,8 +1112,8 @@
       "description": "任意の形式から証明書、キー、CSR、およびチェーンをインポートします"
     },
     "opnsense": {
-      "title": "OpnSense接続",
-      "description": "OpnSenseファイアウォールから証明書をインポート",
+      "title": "OPNsense接続",
+      "description": "OPNsenseファイアウォールから証明書をインポート",
       "hostLabel": "ホスト / IP",
       "apiKeyLabel": "APIキー",
       "apiSecretLabel": "APIシークレット",
@@ -1127,7 +1127,8 @@
       "selectAll": "すべて選択",
       "importSelected": "{{count}} 件をインポート",
       "importSuccess": "{{count}} 件を正常にインポートしました（{{skipped}} 件スキップ）",
-      "noItemsSelected": "少なくとも1つのアイテムを選択してください"
+      "noItemsSelected": "少なくとも1つのアイテムを選択してください",
+      "ignoreCert": "SSL証明書を無視する（自己署名）"
     },
     "export": {
       "allCertsTitle": "すべての証明書をエクスポート",

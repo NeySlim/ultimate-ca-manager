@@ -275,6 +275,7 @@ export default function OperationsPage() {
   const [opnsensePort, setOpnsensePort] = useState('443')
   const [opnsenseApiKey, setOpnsenseApiKey] = useState('')
   const [opnsenseApiSecret, setOpnsenseApiSecret] = useState('')
+  const [opnsenseVerifySsl, setOpnsenseVerifySsl] = useState(false)
   const [testResult, setTestResult] = useState(null)
   const [testItems, setTestItems] = useState([])
 
@@ -303,6 +304,7 @@ export default function OperationsPage() {
         setOpnsensePort(config.port || '443')
         setOpnsenseApiKey(config.api_key || '')
         setOpnsenseApiSecret(config.api_secret || '')
+        setOpnsenseVerifySsl(config.verify_ssl || false)
       }
     } catch (e) {}
     loadCAs()
@@ -376,7 +378,8 @@ export default function OperationsPage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         host: opnsenseHost, port: opnsensePort,
-        api_key: opnsenseApiKey, api_secret: opnsenseApiSecret
+        api_key: opnsenseApiKey, api_secret: opnsenseApiSecret,
+        verify_ssl: opnsenseVerifySsl
       }))
       showSuccess(t('importExport.opnsense.configSaved'))
     } catch (e) {}
@@ -389,7 +392,8 @@ export default function OperationsPage() {
     try {
       const result = await opnsenseService.test({
         host: opnsenseHost, port: opnsensePort,
-        api_key: opnsenseApiKey, api_secret: opnsenseApiSecret
+        api_key: opnsenseApiKey, api_secret: opnsenseApiSecret,
+        verify_ssl: opnsenseVerifySsl
       })
       setTestResult({ success: true, stats: result.stats })
       setTestItems((result.items || []).map(item => ({ ...item, selected: true })))
@@ -423,6 +427,7 @@ export default function OperationsPage() {
       const result = await opnsenseService.import({
         host: opnsenseHost, port: opnsensePort,
         api_key: opnsenseApiKey, api_secret: opnsenseApiSecret,
+        verify_ssl: opnsenseVerifySsl,
         items: selectedItems
       })
       const imported = (result.imported?.cas || 0) + (result.imported?.certificates || 0)
@@ -640,6 +645,10 @@ export default function OperationsPage() {
             <Input label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} placeholder={t('importExport.opnsense.apiKeyLabel')} />
             <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
           </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={!opnsenseVerifySsl} onChange={(e) => setOpnsenseVerifySsl(!e.target.checked)} className="w-4 h-4 rounded border-border text-accent-primary" />
+            <span className="text-sm text-text-secondary">{t('importExport.opnsense.ignoreCert')}</span>
+          </label>
 
           {testResult && (
             <>

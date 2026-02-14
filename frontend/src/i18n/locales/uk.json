@@ -1104,7 +1104,7 @@
     "exportAll": "Експортувати все",
     "subtitle": "Передача сертифікатів та CA",
     "tabs": {
-      "opnsense": "OpnSense",
+      "opnsense": "OPNsense",
       "exportCerts": "Експорт Certs"
     },
     "smartImport": {
@@ -1112,8 +1112,8 @@
       "description": "Імпорт certificates, keys, CSRs, and chains from any format"
     },
     "opnsense": {
-      "title": "З'єднання OpnSense",
-      "description": "Імпорт certificates from OpnSense firewall",
+      "title": "З'єднання OPNsense",
+      "description": "Імпорт certificates from OPNsense firewall",
       "hostLabel": "Хост / IP",
       "apiKeyLabel": "API Ключ",
       "apiSecretLabel": "Секрет API",
@@ -1127,7 +1127,8 @@
       "selectAll": "Вибрати все",
       "importSelected": "Імпортувати {{count}} вибраних",
       "importSuccess": "Успішно імпортовано {{count}} елементів ({{skipped}} пропущено)",
-      "noItemsSelected": "Будь ласка, виберіть хоча б один елемент для імпорту"
+      "noItemsSelected": "Будь ласка, виберіть хоча б один елемент для імпорту",
+      "ignoreCert": "Ігнорувати SSL-сертифікат (самопідписаний)"
     },
     "export": {
       "allCertsTitle": "Експорт Усі Сертифікатs",
