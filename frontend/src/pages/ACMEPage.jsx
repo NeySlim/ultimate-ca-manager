@@ -1895,6 +1895,7 @@ export default function ACMEPage() {
         tabs={tabs}
         activeTab={activeTab}
         tabLayout="sidebar"
+        sidebarContentClass=""
         tabGroups={[
           { labelKey: 'acme.groups.letsEncrypt', tabs: ['letsencrypt', 'dns', 'domains'], color: 'icon-bg-emerald' },
           { labelKey: 'acme.groups.localAcme', tabs: ['config', 'localdomains', 'accounts', 'history'], color: 'icon-bg-violet' },

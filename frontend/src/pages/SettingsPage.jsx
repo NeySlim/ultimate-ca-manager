@@ -2336,9 +2336,7 @@ export default function SettingsPage() {
         ]}
         helpPageKey="settings"
       >
-        <div className="max-w-4xl mx-auto p-4 md:p-6">
-          {renderCategoryContent()}
-        </div>
+        {renderCategoryContent()}
       </ResponsiveLayout>
 
       {/* Backup Password Modal */}
