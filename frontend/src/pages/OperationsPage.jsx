@@ -30,7 +30,7 @@ function useResourceTypes(t) {
   return useMemo(() => ({
     certificates: {
       icon: Certificate,
-      color: 'icon-bg-blue',
+      color: 'icon-bg-teal',
       actions: ['revoke', 'renew', 'delete', 'export'],
       columns: [
         {
@@ -762,7 +762,7 @@ export default function OperationsPage() {
             onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
           >
-            <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg icon-bg-emerald flex items-center justify-center">
               <FileText size={20} weight="fill" className="text-white" />
             </div>
             <div>
@@ -777,7 +777,7 @@ export default function OperationsPage() {
             onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')}
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
           >
-            <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg icon-bg-orange flex items-center justify-center">
               <Package size={20} weight="fill" className="text-white" />
             </div>
             <div>

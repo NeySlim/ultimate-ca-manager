@@ -40,7 +40,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'sso', labelKey: 'settings.tabs.sso', icon: Key, color: 'icon-bg-purple' },
   { id: 'backup', labelKey: 'settings.tabs.backup', icon: Database, color: 'icon-bg-emerald' },
   { id: 'audit', labelKey: 'settings.tabs.audit', icon: ListBullets, color: 'icon-bg-orange' },
-  { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-blue' },
+  { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-teal' },
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
@@ -192,7 +192,7 @@ function AboutSection() {
       </div>
 
       {/* System info */}
-      <DetailSection title={t('settings.about.systemInfo')} icon={HardDrives} iconClass="icon-bg-blue">
+      <DetailSection title={t('settings.about.systemInfo')} icon={HardDrives} iconClass="icon-bg-teal">
         <DetailGrid>
           <DetailField label={t('settings.about.version')} value={info?.version || '—'} />
           <DetailField label={t('settings.about.pythonVersion')} value={info?.python_version || '—'} />
@@ -1566,7 +1566,7 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title={t('settings.emailOptions')} icon={EnvelopeSimple} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.emailOptions')} icon={EnvelopeSimple} iconClass="icon-bg-teal">
               <div className="space-y-4">
                 <Input
                   label={t('settings.fromEmail')}
@@ -1924,7 +1924,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title={t('settings.availableBackups')} icon={Download} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.availableBackups')} icon={Download} iconClass="icon-bg-emerald">
               {backups.length === 0 ? (
                 <div className="p-6 text-center">
                   <p className="text-sm text-text-secondary">{t('settings.noBackups')}</p>
@@ -1996,7 +1996,7 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title={t('settings.eventsToLog')} icon={Eye} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.eventsToLog')} icon={Eye} iconClass="icon-bg-orange">
               <div className="space-y-2">
                 {[
                   { key: 'userLoginLogout', label: t('settings.eventUserLoginLogout') },
@@ -2126,7 +2126,7 @@ export default function SettingsPage() {
               title={t('settings.helpDatabase')}
               subtitle={t('settings.databaseSubtitle')}
             />
-            <DetailSection title={t('settings.databaseStatistics')} icon={HardDrives} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.databaseStatistics')} icon={HardDrives} iconClass="icon-bg-teal">
               <DetailGrid>
                 <DetailField
                   label={t('settings.totalCertificates')}
@@ -2194,7 +2194,7 @@ export default function SettingsPage() {
                 </Badge>
               )}
             />
-            <DetailSection title={t('settings.currentCertificate')} icon={Certificate} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.currentCertificate')} icon={Certificate} iconClass="icon-bg-emerald">
               <DetailGrid>
                 <DetailField
                   label={t('common.commonName')}

@@ -542,7 +542,7 @@ export default function ACMEPage() {
       priority: 1,
       render: (_, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
             <Key size={14} weight="duotone" />
           </div>
           <span className="font-medium text-text-primary">
@@ -553,7 +553,7 @@ export default function ACMEPage() {
       mobileRender: (_, row) => (
         <div className="flex items-center justify-between gap-2 w-full">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
               <Key size={14} weight="duotone" />
             </div>
             <span className="font-medium truncate">
@@ -1059,7 +1059,7 @@ export default function ACMEPage() {
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                    provider.is_default ? "icon-bg-emerald" : "icon-bg-blue"
+                    provider.is_default ? "icon-bg-emerald" : "icon-bg-violet"
                   )}>
                     <PlugsConnected size={16} />
                   </div>

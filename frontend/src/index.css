@@ -1962,6 +1962,11 @@ input:focus, select:focus, textarea:focus {
   color: var(--status-danger);
 }
 
+.icon-bg-sky {
+  background: color-mix(in srgb, #38BDF8 15%, transparent);
+  color: #38BDF8;
+}
+
 /* ============================================
    CA TREE VIEW — Organigramme + Columns styles
    ============================================ */
