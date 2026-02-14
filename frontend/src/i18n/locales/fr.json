@@ -1428,7 +1428,8 @@
       "security": "Sécurité",
       "sso": "SSO",
       "updates": "Mises à jour",
-      "webhooks": "Webhooks"
+      "webhooks": "Webhooks",
+      "about": "À propos"
     },
     "systemNameHelper": "Nom d'affichage du système UCM",
     "baseUrl": "URL de base",
@@ -1591,7 +1592,8 @@
       "system": "Système",
       "security": "Sécurité",
       "notifications": "Notifications",
-      "interface": "Interface"
+      "interface": "Interface",
+      "about": "Info"
     },
     "remoteSyslog": "Syslog distant",
     "remoteSyslogDesc": "Transférer les événements d'audit vers un serveur syslog distant pour la centralisation des logs et l'intégration SIEM.",
@@ -1611,7 +1613,26 @@
     "syslogCatCAs": "Autorités de certification",
     "syslogCatCSRs": "Demandes de signature",
     "syslogCatUsers": "Utilisateurs & Auth.",
-    "syslogCatSystem": "Système & Config"
+    "syslogCatSystem": "Système & Config",
+    "about": {
+      "title": "À propos de UCM",
+      "subtitle": "Version, informations système et liens",
+      "systemInfo": "Informations système",
+      "version": "Version",
+      "edition": "Édition",
+      "pythonVersion": "Python",
+      "uptime": "Temps de fonctionnement",
+      "memory": "Mémoire utilisée",
+      "environment": "Environnement",
+      "links": "Liens & Ressources",
+      "sourceCode": "Code source et versions",
+      "issues": "Problèmes",
+      "reportBugs": "Signaler des bugs et demander des fonctionnalités",
+      "documentation": "Documentation",
+      "wikiGuides": "Wiki et guides utilisateur",
+      "license": "Licence",
+      "licenseDesc": "Logiciel libre et open-source."
+    }
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

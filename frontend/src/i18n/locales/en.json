@@ -1444,7 +1444,8 @@
       "security": "Security",
       "sso": "SSO",
       "updates": "Updates",
-      "webhooks": "Webhooks"
+      "webhooks": "Webhooks",
+      "about": "About"
     },
     "testEmail": "Test Email",
     "theme": "Theme",
@@ -1463,7 +1464,8 @@
       "system": "System",
       "security": "Security",
       "notifications": "Notifications",
-      "interface": "Interface"
+      "interface": "Interface",
+      "about": "Info"
     },
     "remoteSyslog": "Remote Syslog",
     "remoteSyslogDesc": "Forward audit log events to a remote syslog server for centralized logging and SIEM integration.",
@@ -1483,7 +1485,26 @@
     "syslogCatCAs": "Certificate Authorities",
     "syslogCatCSRs": "Signing Requests",
     "syslogCatUsers": "Users & Authentication",
-    "syslogCatSystem": "System & Config"
+    "syslogCatSystem": "System & Config",
+    "about": {
+      "title": "About UCM",
+      "subtitle": "Version, system information and links",
+      "systemInfo": "System Information",
+      "version": "Version",
+      "edition": "Edition",
+      "pythonVersion": "Python",
+      "uptime": "Uptime",
+      "memory": "Memory Usage",
+      "environment": "Environment",
+      "links": "Links & Resources",
+      "sourceCode": "Source code and releases",
+      "issues": "Issues",
+      "reportBugs": "Report bugs and feature requests",
+      "documentation": "Documentation",
+      "wikiGuides": "Wiki and user guides",
+      "license": "License",
+      "licenseDesc": "Free and open-source software."
+    }
   },
   "account": {
     "profile": "Profile",

@@ -10,12 +10,12 @@ import {
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
-  Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User
+  Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User, GithubLogo
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
   Button, Input, Select, Badge, Textarea, Card, EmptyState, ConfirmModal,
-  LoadingSpinner, FileUpload, Modal, HelpCard,
+  LoadingSpinner, FileUpload, Modal, HelpCard, Logo,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   UpdateChecker, ServiceReconnectOverlay
 } from '../components'
@@ -44,6 +44,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
+  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-sky' },
 ]
 
 // SSO Provider type icons
@@ -142,6 +143,122 @@ function ServiceStatusWidget() {
     </>
   )
 }
+
+function AboutSection() {
+  const { t } = useTranslation()
+  const [info, setInfo] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      try {
+        const response = await systemService.getServiceStatus()
+        setInfo(response.data)
+      } catch {
+        setInfo(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchInfo()
+  }, [])
+
+  const formatUptime = (seconds) => {
+    if (!seconds) return '—'
+    const d = Math.floor(seconds / 86400)
+    const h = Math.floor((seconds % 86400) / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    if (d > 0) return `${d}d ${h}h ${m}m`
+    if (h > 0) return `${h}h ${m}m`
+    return `${m}m`
+  }
+
+  return (
+    <DetailContent>
+      <DetailHeader
+        icon={Info}
+        title={t('settings.about.title')}
+        subtitle={t('settings.about.subtitle')}
+      />
+
+      {/* Logo & branding */}
+      <div className="flex flex-col items-center py-6 mb-4">
+        <Logo variant="vertical" size="lg" />
+        <div className="mt-3 flex items-center gap-2">
+          <Badge variant="accent" size="sm">
+            {loading ? '...' : `v${info?.version || '2.1.0'}`}
+          </Badge>
+          <Badge variant="outline" size="sm">Community Edition</Badge>
+        </div>
+      </div>
+
+      {/* System info */}
+      <DetailSection title={t('settings.about.systemInfo')} icon={HardDrives} iconClass="icon-bg-blue">
+        <DetailGrid>
+          <DetailField label={t('settings.about.version')} value={info?.version || '—'} />
+          <DetailField label={t('settings.about.edition')} value="Community" />
+          <DetailField label={t('settings.about.pythonVersion')} value={info?.python_version || '—'} />
+          <DetailField label={t('settings.about.uptime')} value={formatUptime(info?.uptime_seconds)} />
+          <DetailField label={t('settings.about.memory')} value={info?.memory_mb ? `${info.memory_mb} MB` : '—'} />
+          <DetailField label={t('settings.about.environment')} value={info?.is_docker ? 'Docker' : 'Native'} />
+        </DetailGrid>
+      </DetailSection>
+
+      {/* Links */}
+      <DetailSection title={t('settings.about.links')} icon={Globe} iconClass="icon-bg-teal" className="mt-4">
+        <div className="space-y-2">
+          <a
+            href="https://github.com/NeySlim/ultimate-ca-manager"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg hover:bg-bg-tertiary transition-colors"
+          >
+            <GithubLogo size={20} className="text-text-secondary" />
+            <div>
+              <div className="text-sm font-medium text-text-primary">GitHub</div>
+              <div className="text-xs text-text-secondary">{t('settings.about.sourceCode')}</div>
+            </div>
+          </a>
+          <a
+            href="https://github.com/NeySlim/ultimate-ca-manager/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg hover:bg-bg-tertiary transition-colors"
+          >
+            <WarningCircle size={20} className="text-text-secondary" />
+            <div>
+              <div className="text-sm font-medium text-text-primary">{t('settings.about.issues')}</div>
+              <div className="text-xs text-text-secondary">{t('settings.about.reportBugs')}</div>
+            </div>
+          </a>
+          <a
+            href="https://github.com/NeySlim/ultimate-ca-manager/wiki"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg hover:bg-bg-tertiary transition-colors"
+          >
+            <Globe size={20} className="text-text-secondary" />
+            <div>
+              <div className="text-sm font-medium text-text-primary">{t('settings.about.documentation')}</div>
+              <div className="text-xs text-text-secondary">{t('settings.about.wikiGuides')}</div>
+            </div>
+          </a>
+        </div>
+      </DetailSection>
+
+      {/* License */}
+      <DetailSection title={t('settings.about.license')} icon={Shield} iconClass="icon-bg-emerald" className="mt-4">
+        <div className="p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+          <p className="text-sm text-text-primary font-medium">MIT License</p>
+          <p className="text-xs text-text-secondary mt-1">
+            © 2024-2026 NeySlim — {t('settings.about.licenseDesc')}
+          </p>
+        </div>
+      </DetailSection>
+    </DetailContent>
+  )
+}
+
 function AppearanceSettings() {
   const { t } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
@@ -2261,6 +2378,9 @@ export default function SettingsPage() {
           </DetailContent>
         )
 
+      case 'about':
+        return <AboutSection />
+
       default:
         return null
     }
@@ -2333,6 +2453,7 @@ export default function SettingsPage() {
           { labelKey: 'settings.groups.security', tabs: ['security', 'sso'], color: 'icon-bg-amber' },
           { labelKey: 'settings.groups.notifications', tabs: ['email', 'webhooks'], color: 'icon-bg-teal' },
           { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
+          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-sky' },
         ]}
         helpPageKey="settings"
       >
