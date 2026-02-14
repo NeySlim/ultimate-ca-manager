@@ -1111,6 +1111,7 @@
     "keyPasswordPlaceholder": "Optional password for encrypted key",
     "inputAnyFormat": "Input (any format)",
     "supportsFormats": "Supports: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
+    "binaryFileLoaded": "Binary file loaded",
     "outputFormat": "Output Format",
     "pemText": "PEM (Text)",
     "derBinary": "DER (Binary)",
