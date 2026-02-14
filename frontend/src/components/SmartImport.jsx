@@ -496,7 +496,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         value={pemContent}
         onChange={(e) => setPemContent(e.target.value)}
         placeholder={t('import.pastePemPlaceholder')}
-        className="w-full h-32 p-3 font-mono text-xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
+        className="w-full h-32 p-3 font-mono text-2xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
       />
       
       {/* Global password for encrypted content */}
