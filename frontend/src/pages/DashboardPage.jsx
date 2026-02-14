@@ -351,7 +351,7 @@ export default function DashboardPage() {
           <div className="relative flex items-center justify-between gap-4">
             {/* Branding */}
             <div className="flex items-center gap-3">
-              <Logo variant="icon" size="sm" />
+              <Logo variant="icon" size="md" />
               <div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-black tracking-tight logo-text-gradient">UCM</span>
