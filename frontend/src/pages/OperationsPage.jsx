@@ -529,7 +529,7 @@ export default function OperationsPage() {
       if (statusFilter === 'valid') data = data.filter(c => !c.revoked && (!c.valid_to || new Date(c.valid_to) > new Date()))
       if (statusFilter === 'expired') data = data.filter(c => c.valid_to && new Date(c.valid_to) < new Date())
       if (statusFilter === 'revoked') data = data.filter(c => c.revoked)
-      if (caFilter) data = data.filter(c => c.caref === caFilter || c.issuer_id === parseInt(caFilter))
+      if (caFilter) data = data.filter(c => c.caref === caFilter || String(c.issuer_id) === caFilter)
     }
     return data
   }, [bulkData, statusFilter, caFilter, bulkResourceType])
@@ -554,7 +554,7 @@ export default function OperationsPage() {
         value: caFilter,
         onChange: setCaFilter,
         placeholder: t('common.allCAs', 'All CAs'),
-        options: cas.map(ca => ({ value: String(ca.id || ca.refid), label: ca.descr || ca.subject || `CA #${ca.id}` }))
+        options: cas.map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || `CA #${ca.id}` }))
       }
     ]
   }, [bulkResourceType, statusFilter, caFilter, cas, t])
@@ -879,8 +879,8 @@ export default function OperationsPage() {
             <CaretDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
           </div>
         ) : (
-          /* Desktop: toolbar row — chips + search + view toggle */
-          <div className="flex items-center gap-3 flex-wrap">
+          /* Desktop: two rows — chips, then search + filters + toggle */
+          <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
                 const Icon = config.icon
@@ -912,40 +912,68 @@ export default function OperationsPage() {
               })}
             </div>
 
-            {/* Inline search */}
-            <div className="relative flex-1 min-w-[140px] max-w-[260px]">
-              <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-              <input
-                type="text"
-                value={bulkSearch}
-                onChange={(e) => setBulkSearch(e.target.value)}
-                placeholder={t('common.search')}
-                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary transition-all"
-              />
-            </div>
+            <div className="flex items-center gap-2">
+              {/* Search */}
+              <div className="relative flex-1 min-w-0">
+                <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                <input
+                  type="text"
+                  value={bulkSearch}
+                  onChange={(e) => setBulkSearch(e.target.value)}
+                  placeholder={t('common.search')}
+                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary transition-all"
+                />
+              </div>
 
-            {/* View mode toggle */}
-            <div className="flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border shrink-0 ml-auto">
-              <button
-                onClick={() => setBulkViewMode('table')}
-                className={cn(
-                  "p-1.5 rounded-md transition-all",
-                  bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
-                )}
-                title={t('operations.tableView', 'Table View')}
-              >
-                <Table size={16} />
-              </button>
-              <button
-                onClick={() => setBulkViewMode('basket')}
-                className={cn(
-                  "p-1.5 rounded-md transition-all",
-                  bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
-                )}
-                title={t('operations.basketView', 'Basket View')}
-              >
-                <ShoppingCart size={16} />
-              </button>
+              {/* Status & CA filters — only for certificates */}
+              {bulkResourceType === 'certificates' && (
+                <>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
+                  >
+                    <option value="">{t('common.allStatuses', 'All Statuses')}</option>
+                    <option value="valid">{t('common.valid', 'Valid')}</option>
+                    <option value="expired">{t('common.expired', 'Expired')}</option>
+                    <option value="revoked">{t('common.revoked', 'Revoked')}</option>
+                  </select>
+                  <select
+                    value={caFilter}
+                    onChange={(e) => setCaFilter(e.target.value)}
+                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary max-w-[180px] truncate"
+                  >
+                    <option value="">{t('common.allCAs', 'All CAs')}</option>
+                    {cas.map(ca => (
+                      <option key={ca.id} value={ca.refid || String(ca.id)}>{ca.descr || ca.subject || `CA #${ca.id}`}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+
+              {/* View mode toggle */}
+              <div className="flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border shrink-0">
+                <button
+                  onClick={() => setBulkViewMode('table')}
+                  className={cn(
+                    "p-1.5 rounded-md transition-all",
+                    bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                  )}
+                  title={t('operations.tableView', 'Table View')}
+                >
+                  <Table size={16} />
+                </button>
+                <button
+                  onClick={() => setBulkViewMode('basket')}
+                  className={cn(
+                    "p-1.5 rounded-md transition-all",
+                    bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                  )}
+                  title={t('operations.basketView', 'Basket View')}
+                >
+                  <ShoppingCart size={16} />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -967,7 +995,7 @@ export default function OperationsPage() {
             searchPlaceholder={t('common.search')}
             searchKeys={['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
             sortable
-            toolbarFilters={bulkToolbarFilters}
+            toolbarFilters={isMobile ? bulkToolbarFilters : undefined}
             loading={bulkLoading}
             pagination={true}
             defaultPerPage={25}
