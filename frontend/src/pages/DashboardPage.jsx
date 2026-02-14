@@ -165,7 +165,12 @@ export default function DashboardPage() {
   const FIXED_ROW_HEIGHT = 40
   const [gridWidth, setGridWidth] = useState(1280)
   const [dynamicRowHeight, setDynamicRowHeight] = useState(FIXED_ROW_HEIGHT)
-  const [currentBreakpoint, setCurrentBreakpoint] = useState('lg')
+  const [currentBreakpoint, setCurrentBreakpoint] = useState(() => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1280
+    if (w >= 1024) return 'lg'
+    if (w >= 640) return 'md'
+    return 'sm'
+  })
   const [gridMounted, setGridMounted] = useState(false)
   const gridObserverRef = useRef(null)
   
@@ -356,7 +361,7 @@ export default function DashboardPage() {
   const isVisible = (id) => widgets.find(w => w.id === id)?.visible
 
   return (
-    <div className={`flex-1 flex flex-col bg-bg-primary ${isDesktopGrid ? 'h-full overflow-hidden' : 'min-h-full overflow-y-auto'}`}>
+    <div className={`flex-1 flex flex-col bg-bg-primary ${isDesktopGrid ? 'h-full overflow-hidden' : ''}`}>
       <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : 'pb-6'}`}>
         
         {/* Dashboard Header */}
@@ -431,7 +436,7 @@ export default function DashboardPage() {
 
         {/* Grid Layout — flex-1 fills remaining space on desktop, natural flow on mobile */}
         <div ref={gridContainerRef} className={isDesktopGrid ? 'flex-1 min-h-0' : ''}>
-        {gridMounted && (
+        {gridMounted && isDesktopGrid && (
         <Responsive
           key={gridKey}
           className={`dashboard-grid ${editMode ? 'edit-mode' : ''}`}
@@ -443,8 +448,9 @@ export default function DashboardPage() {
           margin={[GRID_MARGIN, GRID_MARGIN]}
           containerPadding={[0, 0]}
           onBreakpointChange={(bp) => setCurrentBreakpoint(bp)}
-          dragConfig={{ enabled: editMode, handle: '.widget-drag-handle' }}
-          resizeConfig={{ enabled: editMode }}
+          isDraggable={editMode}
+          isResizable={editMode}
+          draggableHandle={editMode ? '.widget-drag-handle' : undefined}
           compactor={verticalCompactor}
           onLayoutChange={handleLayoutChange}
         >
@@ -921,6 +927,60 @@ export default function DashboardPage() {
           </div>
           )}
         </Responsive>
+        )}
+        {/* Mobile: simple stacked layout — no RGL touch interference */}
+        {gridMounted && !isDesktopGrid && (
+          <div className="space-y-2 pb-4">
+            {isVisible('stats') && (
+            <div>
+              <div className="grid grid-cols-4 gap-1.5 sm:gap-3">
+                <StatCard icon={Certificate} label={t('common.certificates')} value={totalCerts} color="blue" live={isConnected} onClick={() => navigate('/certificates')} />
+                <StatCard icon={ShieldCheck} label={t('common.cas')} value={totalCAs} color="purple" live={isConnected} onClick={() => navigate('/cas')} />
+                <StatCard icon={ListChecks} label={t('common.csrs')} value={pendingCSRs} color={pendingCSRs > 0 ? 'yellow' : 'slate'} badge={pendingCSRs > 0 ? t('common.pending') : null} onClick={() => navigate('/csrs')} />
+                <StatCard icon={Globe} label={t('common.acme')} value={acmeAccounts} color="emerald" onClick={() => navigate('/acme')} />
+              </div>
+            </div>
+            )}
+            {isVisible('nextExpiry') && nextExpirations.length > 0 && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={Clock} iconColor="red" title={t('dashboard.nextExpirations')} subtitle={t('dashboard.expiringCertificates', { count: nextExpirations.length })} compact />
+              <Card.Body className="space-y-0.5 !pt-0 !pb-2">
+                {nextExpirations.slice(0, 5).map(cert => {
+                  const daysLeft = cert.valid_to 
+                    ? Math.max(0, Math.ceil((new Date(cert.valid_to) - new Date()) / (1000 * 60 * 60 * 24)))
+                    : null
+                  return (
+                  <div key={cert.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-bg-hover rounded-lg cursor-pointer" onClick={() => navigate(`/certificates/${cert.id}`)}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-text-primary truncate">{cert.common_name}</p>
+                      <p className="text-[10px] text-text-tertiary">{cert.issuer_cn}</p>
+                    </div>
+                    {daysLeft !== null && <Badge variant={daysLeft <= 7 ? 'danger' : daysLeft <= 30 ? 'warning' : 'info'} size="sm">{daysLeft}d</Badge>}
+                  </div>
+                  )
+                })}
+              </Card.Body>
+            </Card>
+            )}
+            {isVisible('activity') && activityLog.length > 0 && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={ClockCounterClockwise} iconColor="blue" title={t('dashboard.recentActivity')} compact />
+              <Card.Body className="space-y-0.5 !pt-0 !pb-2">
+                {activityLog.slice(0, 5).map((a, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${a.action === 'create' ? 'bg-accent-success/15 text-accent-success' : a.action === 'delete' ? 'bg-status-danger/15 text-status-danger' : 'bg-accent-primary/15 text-accent-primary'}`}>
+                      {a.action === 'create' ? <Plus size={10} /> : a.action === 'delete' ? <Trash size={10} /> : <PencilSimple size={10} />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-text-primary truncate">{a.subject || a.details}</p>
+                      <p className="text-[10px] text-text-tertiary">{a.action} • {a.time_ago}</p>
+                    </div>
+                  </div>
+                ))}
+              </Card.Body>
+            </Card>
+            )}
+          </div>
         )}
         </div>
 

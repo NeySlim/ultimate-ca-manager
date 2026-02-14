@@ -75,7 +75,7 @@ export function FloatingWindow({
       ref={panelRef}
       className={cn(
         'fixed flex flex-col',
-        'bg-bg-primary border border-border rounded-xl',
+        'bg-bg-secondary rounded-xl',
         className,
       )}
       style={{
@@ -85,7 +85,8 @@ export function FloatingWindow({
         width: p.w,
         height: minimized ? 48 : p.h,
         transition: minimized ? 'height 0.2s ease' : undefined,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+        border: '1px solid var(--border-strong)',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.20), 0 2px 10px rgba(0,0,0,0.12)',
       }}
       onMouseDown={onFocus}
     >
@@ -102,23 +103,24 @@ export function FloatingWindow({
       {/* Header — draggable */}
       <div
         className={cn(
-          'shrink-0 flex items-center justify-between gap-2 px-3 py-2',
-          'border-b border-border cursor-grab active:cursor-grabbing select-none',
-          'rounded-t-xl bg-bg-secondary/50'
+          'shrink-0 flex items-center justify-between gap-2 px-3 py-1.5',
+          'border-b border-border/60 cursor-grab active:cursor-grabbing select-none',
+          'rounded-t-xl',
         )}
+        style={{ background: 'linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))' }}
         onMouseDown={onDragStart}
         onDoubleClick={toggleMaximize}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {Icon && (
-            <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', iconClass.includes('bg-') ? iconClass : `bg-accent-primary/15`)}>
-              <Icon size={14} weight="duotone" className={iconClass.includes('text-') ? iconClass.split(' ').find(c => c.startsWith('text-')) : 'text-accent-primary'} />
+            <div className={cn('w-6 h-6 rounded-md flex items-center justify-center shrink-0', iconClass.split(' ').find(c => c.startsWith('bg-')) || 'bg-accent-primary/15')}>
+              <Icon size={13} weight="duotone" className={iconClass.split(' ').find(c => c.startsWith('text-')) || 'text-accent-primary'} />
             </div>
           )}
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary truncate">{title}</h3>
+            <h3 className="text-xs font-semibold text-text-primary truncate">{title}</h3>
             {!minimized && subtitle && (
-              <p className="text-[11px] text-text-tertiary truncate">{subtitle}</p>
+              <p className="text-[10px] text-text-tertiary truncate leading-tight">{subtitle}</p>
             )}
           </div>
         </div>
@@ -127,25 +129,25 @@ export function FloatingWindow({
           {onMinimizeToggle && (
             <button
               onClick={(e) => { e.stopPropagation(); onMinimizeToggle() }}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+              className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors"
               title={minimized ? 'Expand' : 'Minimize'}
             >
-              {minimized ? <ArrowsOutSimple size={14} /> : <ArrowsInSimple size={14} />}
+              {minimized ? <ArrowsOutSimple size={13} /> : <ArrowsInSimple size={13} />}
             </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); toggleMaximize() }}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+            className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors"
             title={isMaximized ? 'Restore' : 'Maximize'}
           >
-            {isMaximized ? <CornersIn size={14} /> : <CornersOut size={14} />}
+            {isMaximized ? <CornersIn size={13} /> : <CornersOut size={13} />}
           </button>
           {onClose && (
             <button
               onClick={(e) => { e.stopPropagation(); onClose() }}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-text-tertiary hover:text-status-danger hover:bg-status-danger/10 transition-colors"
+              className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-status-danger hover:bg-status-danger/10 transition-colors"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
