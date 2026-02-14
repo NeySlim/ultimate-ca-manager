@@ -58,12 +58,14 @@ export function AppShell() {
   const { showWarning } = useNotification()
   
   // Extract current page from pathname (empty string for dashboard)
-  const activePage = location.pathname.split('/')[1] || ''
+  const rawPage = location.pathname.split('/')[1] || ''
+  // Map URL segments to nav item IDs when they differ
+  const pageIdMap = { 'scep-config': 'scep' }
+  const activePage = pageIdMap[rawPage] || rawPage
   
   // Map URL paths to helpContent keys
   const helpPageKeyMap = {
     '': 'dashboard',
-    'scep-config': 'scep',
     'audit': 'auditLogs',
     'crl-ocsp': 'crlocsp',
     'users': 'usersGroups',
@@ -75,7 +77,7 @@ export function AppShell() {
   const pagesWithHelp = [
     // Core pages
     'certificates', 'cas', 'csrs', 'users', 'templates', 
-    'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
+    'acme', 'scep', 'settings', 'truststore', 'crl-ocsp', 
     'tools', 'audit', 'account', 'operations',
     // Pro pages
     'rbac', 'hsm'
