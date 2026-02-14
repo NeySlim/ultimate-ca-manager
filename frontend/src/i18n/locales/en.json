@@ -314,7 +314,12 @@
     "confirm": "Confirm",
     "renew": "Renew",
     "revoke": "Revoke",
-    "sign": "Sign"
+    "sign": "Sign",
+    "casShort": "CA",
+    "csrsShort": "CSR",
+    "certificatesShort": "Certificates",
+    "templatesShort": "Templates",
+    "usersShort": "Users"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",

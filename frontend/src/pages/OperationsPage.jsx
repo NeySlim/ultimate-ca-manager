@@ -9,7 +9,7 @@ import {
   UploadSimple, DownloadSimple, CloudArrowUp, Lightning,
   CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Key, Trash, 
   ArrowsClockwise, Prohibit, PencilSimple, FileText, Warning, User, Crown, Info,
-  Table, ShoppingCart, Package, CaretDown
+  Table, ShoppingCart, Package, CaretDown, MagnifyingGlass
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, ResponsiveDataTable, Button, Input, 
@@ -291,6 +291,7 @@ export default function OperationsPage() {
   const [caFilter, setCaFilter] = useState('')
   const [bulkViewMode, setBulkViewMode] = useState('table') // 'table' | 'basket'
   const [resourceCounts, setResourceCounts] = useState({})
+  const [bulkSearch, setBulkSearch] = useState('')
 
   // Load on mount
   useEffect(() => {
@@ -863,14 +864,14 @@ export default function OperationsPage() {
           <div className="relative">
             <select
               value={bulkResourceType}
-              onChange={(e) => { setBulkResourceType(e.target.value); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+              onChange={(e) => { setBulkResourceType(e.target.value); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
               className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-medium focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
             >
               {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
                 const count = resourceCounts[key]
                 return (
                   <option key={key} value={key}>
-                    {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}{count !== undefined ? ` (${count})` : ''}
+                    {t(`common.${key}Short`, key)}{count !== undefined ? ` (${count})` : ''}
                   </option>
                 )
               })}
@@ -889,7 +890,7 @@ export default function OperationsPage() {
                   return (
                     <button
                       key={key}
-                      onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+                      onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
                       className={cn(
                         "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all whitespace-nowrap",
                         isActive
@@ -900,7 +901,7 @@ export default function OperationsPage() {
                       <div className={cn("w-5.5 h-5.5 rounded-md flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary/80")}>
                         <Icon size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : "text-text-tertiary"} />
                       </div>
-                      {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                      {t(`common.${key}Short`, key)}
                       {count !== undefined && (
                         <span className={cn(
                           "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
@@ -913,6 +914,18 @@ export default function OperationsPage() {
                   )
                 })}
               </div>
+            </div>
+
+            {/* Inline search */}
+            <div className="relative flex-1 min-w-[140px] max-w-[260px]">
+              <MagnifyingGlass size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <input
+                type="text"
+                value={bulkSearch}
+                onChange={(e) => setBulkSearch(e.target.value)}
+                placeholder={t('common.search')}
+                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border/50 bg-bg-secondary/40 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary transition-all"
+              />
             </div>
 
             {/* View mode toggle - desktop only */}
@@ -952,7 +965,9 @@ export default function OperationsPage() {
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
             bulkActions={renderBulkActionButtons()}
-            searchable
+            searchable={isMobile}
+            externalSearch={isMobile ? undefined : bulkSearch}
+            onSearchChange={isMobile ? undefined : setBulkSearch}
             searchPlaceholder={t('common.search')}
             searchKeys={['cn', 'descr', 'name', 'subject', 'username', 'email', 'common_name']}
             sortable
