@@ -20,6 +20,7 @@ import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { apiClient } from '../services'
 import { useNotification } from '../contexts'
+import { useWindowManager } from '../contexts/WindowManagerContext'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useModals, useRecentHistory } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
@@ -30,6 +31,7 @@ export default function CAsPage() {
   const { id: urlCAId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
+  const { openWindow } = useWindowManager()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -98,10 +100,14 @@ export default function CAsPage() {
 
   // Deep-link: auto-select CA from URL param /cas/:id
   useEffect(() => {
-    if (urlCAId && !loading && cas.length > 0 && !selectedCA) {
+    if (urlCAId && !loading && cas.length > 0) {
       const id = parseInt(urlCAId, 10)
       if (!isNaN(id)) {
-        loadCADetails({ id })
+        if (!isMobile) {
+          openWindow('ca', id)
+        } else {
+          loadCADetails({ id })
+        }
         navigate('/cas', { replace: true })
       }
     }
@@ -134,11 +140,22 @@ export default function CAsPage() {
   }
 
   const loadCADetails = async (ca) => {
+    // Desktop: open floating window
+    if (!isMobile) {
+      openWindow('ca', ca.id)
+      addToHistory({
+        id: ca.id,
+        name: ca.common_name || ca.descr || `CA ${ca.id}`,
+        subtitle: ca.is_root ? t('common.rootCA') : (ca.parent_name || t('common.intermediate'))
+      })
+      return
+    }
+
+    // Mobile: slide-over
     try {
       const caData = await casService.getById(ca.id)
       const fullCA = extractData(caData) || ca
       setSelectedCA(fullCA)
-      // Add to recent history
       addToHistory({
         id: fullCA.id,
         name: fullCA.common_name || fullCA.descr || `CA ${fullCA.id}`,
@@ -373,20 +390,20 @@ export default function CAsPage() {
         afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} t={t} />}
         helpPageKey="cas"
         // Split view on xl+ screens - panel always visible
-        splitView={true}
-        splitEmptyContent={
+        splitView={isMobile}
+        splitEmptyContent={isMobile ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <ShieldCheck size={24} className="text-text-tertiary" />
             </div>
             <p className="text-sm text-text-secondary">{t('cas.selectToView')}</p>
           </div>
-        }
-        slideOverOpen={!!selectedCA}
+        ) : undefined}
+        slideOverOpen={isMobile && !!selectedCA}
         onSlideOverClose={() => setSelectedCA(null)}
         slideOverTitle={t('cas.caDetails')}
         slideOverWidth="wide"
-        slideOverContent={selectedCA && (
+        slideOverContent={isMobile && selectedCA ? (
           <CADetailsPanel 
             ca={selectedCA}
             canWrite={canWrite}
@@ -395,7 +412,7 @@ export default function CAsPage() {
             onDelete={() => handleDelete(selectedCA.id)}
             t={t}
           />
-        )}
+        ) : null}
       >
         {/* Tree View Content */}
         <div className="flex flex-col h-full">

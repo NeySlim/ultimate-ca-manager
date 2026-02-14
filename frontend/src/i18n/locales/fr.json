@@ -1998,5 +1998,10 @@
     "step2Title": "Puis redémarrez le service :",
     "lostKeyHint": "Si vous avez perdu la clé maître, restaurez à partir d'une sauvegarde pour récupérer vos clés privées.",
     "polling": "Vérification en cours..."
+  },
+  "windows": {
+    "tile": "Mosaïque",
+    "stack": "Cascade",
+    "closeAll": "Fermer tout"
   }
 }

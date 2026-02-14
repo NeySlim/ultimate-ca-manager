@@ -19,6 +19,8 @@ import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
+import { useWindowManager } from '../contexts/WindowManagerContext'
+import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
@@ -27,6 +29,8 @@ export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
+  const { isMobile } = useMobile()
+  const { openWindow } = useWindowManager()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { modals, open: openModal, close: closeModal } = useModals(['add'])
@@ -76,6 +80,12 @@ export default function TrustStorePage() {
   }
 
   const handleSelectCert = async (cert) => {
+    // Desktop: floating window
+    if (!isMobile) {
+      openWindow('truststore', cert.id)
+      return
+    }
+    // Mobile: slide-over
     try {
       const response = await truststoreService.getById(cert.id)
       setSelectedCert(response.data || cert)
@@ -86,10 +96,14 @@ export default function TrustStorePage() {
 
   // Deep-link: auto-select cert from URL param /truststore/:id
   useEffect(() => {
-    if (urlCertId && !loading && certificates.length > 0 && !selectedCert) {
+    if (urlCertId && !loading && certificates.length > 0) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
-        handleSelectCert({ id })
+        if (!isMobile) {
+          openWindow('truststore', id)
+        } else {
+          handleSelectCert({ id })
+        }
         navigate('/truststore', { replace: true })
       }
     }
@@ -519,18 +533,18 @@ export default function TrustStorePage() {
         icon={ShieldCheck}
         stats={stats}
         helpPageKey="truststore"
-        splitView={true}
-        splitEmptyContent={
+        splitView={isMobile}
+        splitEmptyContent={isMobile ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <Certificate size={24} className="text-text-tertiary" />
             </div>
             <p className="text-sm text-text-secondary">{t('trustStore.selectToView')}</p>
           </div>
-        }
-        slideOverOpen={!!selectedCert}
+        ) : undefined}
+        slideOverOpen={isMobile && !!selectedCert}
         slideOverTitle={selectedCert?.name || t('common.certificate')}
-        slideOverContent={detailContent}
+        slideOverContent={isMobile ? detailContent : null}
         onSlideOverClose={() => setSelectedCert(null)}
       >
         <ResponsiveDataTable

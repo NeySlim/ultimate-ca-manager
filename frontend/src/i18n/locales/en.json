@@ -1998,5 +1998,10 @@
     "step2Title": "Then restart the service:",
     "lostKeyHint": "If you lost the master key, restore from a backup to recover your private keys.",
     "polling": "Checking for resolution..."
+  },
+  "windows": {
+    "tile": "Tile Windows",
+    "stack": "Cascade Windows",
+    "closeAll": "Close All Windows"
   }
 }

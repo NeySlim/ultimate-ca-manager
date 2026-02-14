@@ -17,7 +17,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService, truststoreService } from '../services'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useRecentHistory, useFavorites } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
@@ -27,6 +27,7 @@ export default function CertificatesPage() {
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
+  const { openWindow } = useWindowManager()
   const { addToHistory } = useRecentHistory('certificates')
   const { isFavorite, toggleFavorite } = useFavorites('certificates')
   
@@ -117,17 +118,30 @@ export default function CertificatesPage() {
     }
   }
 
-  // Load cert details for slide-over
+  // Load cert details — floating window on desktop, slide-over on mobile
   const handleSelectCert = useCallback(async (cert) => {
     if (!cert) {
       setSelectedCert(null)
       return
     }
+
+    // Desktop: open floating detail window
+    if (!isMobile) {
+      openWindow('certificate', cert.id)
+      // Add to recent history
+      addToHistory({
+        id: cert.id,
+        name: cert.common_name || extractCN(cert.subject) || `Certificate ${cert.id}`,
+        subtitle: cert.issuer ? extractCN(cert.issuer) : ''
+      })
+      return
+    }
+
+    // Mobile: slide-over
     try {
       const res = await certificatesService.getById(cert.id)
       const fullCert = res.data || cert
       setSelectedCert(fullCert)
-      // Add to recent history
       addToHistory({
         id: fullCert.id,
         name: fullCert.common_name || extractCN(fullCert.subject) || `Certificate ${fullCert.id}`,
@@ -136,15 +150,18 @@ export default function CertificatesPage() {
     } catch {
       setSelectedCert(cert)
     }
-  }, [addToHistory])
+  }, [addToHistory, isMobile, openWindow])
 
   // Deep-link: auto-select certificate from URL param
   useEffect(() => {
-    if (urlCertId && !loading && certificates.length > 0 && !selectedCert) {
+    if (urlCertId && !loading && certificates.length > 0) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
-        handleSelectCert({ id })
-        // Clean URL to /certificates after selection
+        if (!isMobile) {
+          openWindow('certificate', id)
+        } else {
+          handleSelectCert({ id })
+        }
         navigate('/certificates', { replace: true })
       }
     }
@@ -675,18 +692,18 @@ export default function CertificatesPage() {
         onStatClick={handleStatClick}
         activeStatFilter={filterStatus}
         helpPageKey="certificates"
-        splitView={true}
-        splitEmptyContent={
+        splitView={isMobile}
+        splitEmptyContent={isMobile ? (
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <Certificate size={24} className="text-text-tertiary" />
             </div>
             <p className="text-sm text-text-secondary">{t('certificates.noCertificates')}</p>
           </div>
-        }
-        slideOverOpen={!!selectedCert}
+        ) : undefined}
+        slideOverOpen={isMobile && !!selectedCert}
         slideOverTitle={selectedCert?.cn || selectedCert?.common_name || t('common.certificate')}
-        slideOverContent={slideOverContent}
+        slideOverContent={isMobile ? slideOverContent : null}
         slideOverWidth="wide"
         slideOverActions={selectedCert && (
           <button

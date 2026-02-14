@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
-import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, useAuth } from './contexts'
-import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, SafeModeOverlay } from './components'
+import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, WindowManagerProvider, useAuth } from './contexts'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, SafeModeOverlay, DetailWindowLayer } from './components'
 
 // Auto-reload on chunk load failure (stale cache after update)
 function lazyWithRetry(importFn) {
@@ -127,8 +127,11 @@ export default function App() {
           <AuthProvider>
             <NotificationProvider>
               <MobileProvider>
-                <SafeModeOverlay />
-                <AppRoutes />
+                <WindowManagerProvider>
+                  <SafeModeOverlay />
+                  <AppRoutes />
+                  <DetailWindowLayer />
+                </WindowManagerProvider>
               </MobileProvider>
             </NotificationProvider>
           </AuthProvider>

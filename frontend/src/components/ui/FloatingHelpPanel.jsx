@@ -1,6 +1,6 @@
 /**
- * FloatingHelpPanel v2 — Help system with Quick Help + Guide tabs
- * Desktop: Draggable (RAF-based, no React re-renders), resizable, localStorage
+ * FloatingHelpPanel v3 — Uses shared FloatingWindow shell
+ * Desktop: FloatingWindow (drag, resize, minimize, maximize)
  * Mobile: Bottom sheet with swipe-to-close
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -17,19 +17,10 @@ import { useMobile } from '../../contexts/MobileContext'
 import { useTranslation } from 'react-i18next'
 import { helpContent as helpData } from '../../data/helpContent'
 import { helpGuides } from '../../data/helpGuides'
+import { FloatingWindow } from './FloatingWindow'
 
 const STORAGE_KEY = 'ucm-help-panel'
 const READER_KEY = 'ucm-help-reader'
-const MIN_W = 420
-const SOFT_MAX_W = 900
-const HARD_MAX_W = 1400
-const MIN_H = 320
-const DEF_W = 640
-const DEF_H = 580
-
-function loadSaved() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
-}
 
 const DEFAULT_READER = { fontSize: 1, contrast: 'normal', spacing: 'compact' }
 function loadReaderPrefs() {
@@ -64,205 +55,33 @@ export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
 }
 
 // =============================================================================
-// DESKTOP — RAF-based drag & resize (no re-renders during drag)
+// DESKTOP — Using shared FloatingWindow component
 // =============================================================================
 
 function DesktopPanel({ quickContent, guideContent, onClose, t }) {
-  const panelRef = useRef(null)
-  const bodyRef = useRef(null)
-  const [minimized, setMinimized] = useState(false)
-  const posRef = useRef(null)
-  const isDragging = useRef(false)
-
-  // Init position once
-  if (!posRef.current) {
-    const saved = loadSaved()
-    posRef.current = saved || {
-      x: window.innerWidth - DEF_W - 24,
-      y: window.innerHeight - DEF_H - 24,
-      w: DEF_W, h: DEF_H,
-    }
-  }
-  // Force initial render with saved pos
-  const [, forceUpdate] = useState(0)
-
-  const applyPos = useCallback(() => {
-    const el = panelRef.current
-    if (!el) return
-    const p = posRef.current
-    el.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`
-    el.style.width = p.w + 'px'
-    if (!minimized) el.style.height = p.h + 'px'
-  }, [minimized])
-
-  // Apply on mount
-  useEffect(() => { applyPos() }, [applyPos])
-
-  // Save to localStorage on close or unmount
-  useEffect(() => {
-    return () => {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current)) } catch {}
-    }
-  }, [])
-
-  // Escape to close
-  useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
-  const clamp = useCallback((p) => {
-    const vw = window.innerWidth, vh = window.innerHeight
-    return {
-      x: Math.max(0, Math.min(p.x, vw - 100)),
-      y: Math.max(0, Math.min(p.y, vh - 48)),
-      w: Math.max(MIN_W, Math.min(p.w, Math.min(HARD_MAX_W, vw - 20))),
-      h: Math.max(MIN_H, Math.min(p.h, vh - 40)),
-    }
-  }, [])
-
-  // --- DRAG (RAF, no setState) ---
-  const onDragStart = useCallback((e) => {
-    if (e.button !== 0) return
-    e.preventDefault()
-    const sx = e.clientX, sy = e.clientY
-    const sp = { ...posRef.current }
-    let raf = 0
-
-    document.body.style.userSelect = 'none'
-    isDragging.current = true
-    if (bodyRef.current) bodyRef.current.style.pointerEvents = 'none'
-    const onMove = (e) => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        posRef.current = clamp({ ...sp, x: sp.x + e.clientX - sx, y: sp.y + e.clientY - sy })
-        applyPos()
-      })
-    }
-    const onUp = () => {
-      cancelAnimationFrame(raf)
-      isDragging.current = false
-      document.body.style.userSelect = ''
-      if (bodyRef.current) bodyRef.current.style.pointerEvents = ''
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current)) } catch {}
-      forceUpdate(n => n + 1)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }, [clamp, applyPos])
-
-  // --- RESIZE (RAF, no setState) ---
-  const onResizeStart = useCallback((edge, e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const sx = e.clientX, sy = e.clientY
-    const sp = { ...posRef.current }
-    let raf = 0
-
-    document.body.style.userSelect = 'none'
-    const onMove = (e) => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        const dx = e.clientX - sx, dy = e.clientY - sy
-        let next = { ...sp }
-        if (edge.includes('e')) next.w = sp.w + dx
-        if (edge.includes('w')) { next.x = sp.x + dx; next.w = sp.w - dx }
-        if (edge.includes('s')) next.h = sp.h + dy
-        if (edge.includes('n')) { next.y = sp.y + dy; next.h = sp.h - dy }
-        posRef.current = clamp(next)
-        applyPos()
-      })
-    }
-    const onUp = () => {
-      cancelAnimationFrame(raf)
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current)) } catch {}
-      forceUpdate(n => n + 1)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }, [clamp, applyPos])
-
-  const edges = ['n','s','e','w','ne','nw','se','sw']
-  const cursors = { n:'ns-resize', s:'ns-resize', e:'ew-resize', w:'ew-resize', ne:'nesw-resize', nw:'nwse-resize', se:'nwse-resize', sw:'nesw-resize' }
-  const eStyles = {
-    n:{top:-3,left:8,right:8,height:6}, s:{bottom:-3,left:8,right:8,height:6},
-    e:{top:8,right:-3,bottom:8,width:6}, w:{top:8,left:-3,bottom:8,width:6},
-    ne:{top:-3,right:-3,width:14,height:14}, nw:{top:-3,left:-3,width:14,height:14},
-    se:{bottom:-3,right:-3,width:14,height:14}, sw:{bottom:-3,left:-3,width:14,height:14},
-  }
-
-  const p = posRef.current
   const title = quickContent?.title || guideContent?.title || 'Help'
   const subtitle = quickContent?.subtitle || ''
 
+  const defaultPos = {
+    x: window.innerWidth - 640 - 24,
+    y: window.innerHeight - 580 - 24,
+    w: 640, h: 580,
+  }
+
   return (
-    <div
-      ref={panelRef}
-      className={cn(
-        'fixed z-50 flex flex-col',
-        'bg-bg-primary border border-border rounded-xl',
-      )}
-      style={{
-        left: 0, top: 0,
-        transform: `translate3d(${p.x}px, ${p.y}px, 0)`,
-        width: p.w,
-        height: minimized ? 48 : p.h,
-        transition: minimized ? 'height 0.2s ease' : undefined,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
-      }}
+    <FloatingWindow
+      storageKey="ucm-help-panel"
+      defaultPos={defaultPos}
+      constraints={{ minW: 420, maxW: 1400, minH: 320 }}
+      title={title}
+      subtitle={subtitle}
+      icon={BookOpen}
+      iconClass="bg-accent-primary/15 text-accent-primary"
+      zIndex={50}
+      onClose={onClose}
     >
-      {/* Resize handles */}
-      {!minimized && edges.map(edge => (
-        <div key={edge} className="absolute z-10" style={{ ...eStyles[edge], cursor: cursors[edge] }}
-          onMouseDown={(e) => onResizeStart(edge, e)} />
-      ))}
-
-      {/* Header — draggable */}
-      <div
-        className={cn(
-          'shrink-0 flex items-center justify-between gap-2 px-3 py-2',
-          'border-b border-border cursor-grab active:cursor-grabbing select-none',
-          'rounded-t-xl bg-bg-secondary/50'
-        )}
-        onMouseDown={onDragStart}
-      >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-accent-primary/15 flex items-center justify-center shrink-0">
-            <BookOpen size={14} weight="duotone" className="text-accent-primary" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-text-primary truncate">{title}</h3>
-            {!minimized && subtitle && (
-              <p className="text-[11px] text-text-tertiary truncate">{subtitle}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <button onClick={(e) => { e.stopPropagation(); setMinimized(!minimized) }}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-            title={minimized ? t('help.expand') : t('help.minimize')}>
-            {minimized ? <ArrowsOutSimple size={14} /> : <ArrowsInSimple size={14} />}
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); onClose() }}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors">
-            <X size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* Body — tabs + content */}
-      {!minimized && (
-        <div ref={bodyRef} className="flex-1 flex flex-col min-h-0">
-        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} panelWidth={p.w} />
-        </div>
-      )}
-    </div>
+      <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} panelWidth={640} />
+    </FloatingWindow>
   )
 }
 
