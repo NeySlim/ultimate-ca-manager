@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, ResponsiveDataTable, Button, Input, 
-  DetailSection, ConfirmModal, Badge, KeyIndicator, TransferPanel
+  DetailSection, DetailHeader, DetailContent, ConfirmModal, Badge, KeyIndicator, TransferPanel
 } from '../components'
 import { SmartImportWidget } from '../components/SmartImport'
 import { 
@@ -590,6 +590,12 @@ export default function OperationsPage() {
 
   // ===== TAB CONTENT =====
   const renderImportTab = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={UploadSimple}
+        title={t('operations.importHeader')}
+        subtitle={t('operations.importHeaderDesc')}
+      />
     <div className="max-w-3xl mx-auto space-y-6">
       <DetailSection 
         title={t('importExport.smartImport.title')}
@@ -673,9 +679,16 @@ export default function OperationsPage() {
         )}
       </div>
     </div>
+    </DetailContent>
   )
 
   const renderExportTab = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={DownloadSimple}
+        title={t('operations.exportHeader')}
+        subtitle={t('operations.exportHeaderDesc')}
+      />
     <div className="max-w-3xl mx-auto space-y-6">
       <DetailSection title={t('importExport.export.allCertsTitle')} icon={Certificate} iconClass="icon-bg-blue" description={t('importExport.export.allCertsDesc')}>
         <div className="grid grid-cols-2 gap-3">
@@ -699,6 +712,7 @@ export default function OperationsPage() {
         </div>
       </DetailSection>
     </div>
+    </DetailContent>
   )
 
   // Render item for basket/transfer view — compact row per resource type
@@ -766,6 +780,13 @@ export default function OperationsPage() {
 
   const renderBulkTab = () => (
     <div className="flex flex-col h-full min-h-0">
+      <div className="px-4 md:px-6 pt-4">
+        <DetailHeader
+          icon={Lightning}
+          title={t('operations.bulkHeader')}
+          subtitle={t('operations.bulkHeaderDesc')}
+        />
+      </div>
       {/* Resource type selector + view toggle */}
       <div className="flex items-center gap-2 flex-wrap shrink-0 px-4 md:px-6 pt-3 pb-2">
         {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
