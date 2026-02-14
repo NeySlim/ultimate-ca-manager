@@ -337,6 +337,62 @@ def bulk_delete_templates():
     return success_response(data=results, message=f'{len(results["success"])} templates deleted')
 
 
+@bp.route('/api/v2/templates/<int:template_id>/duplicate', methods=['POST'])
+@require_auth(["write:templates"])
+def duplicate_template(template_id):
+    """
+    Duplicate (clone) a template
+
+    POST /api/v2/templates/{template_id}/duplicate
+    """
+    template = CertificateTemplate.query.get(template_id)
+    if not template:
+        return error_response('Template not found', 404)
+
+    # Generate unique name
+    base_name = template.name + ' (Copy)'
+    name = base_name
+    counter = 2
+    while CertificateTemplate.query.filter_by(name=name).first():
+        name = f'{base_name} {counter}'
+        counter += 1
+
+    clone = CertificateTemplate(
+        name=name,
+        description=template.description,
+        template_type=template.template_type,
+        key_type=template.key_type,
+        validity_days=template.validity_days,
+        digest=template.digest,
+        dn_template=template.dn_template,
+        extensions_template=template.extensions_template,
+        is_system=False,
+        is_active=template.is_active,
+        created_by=g.current_user.username
+    )
+
+    try:
+        db.session.add(clone)
+        db.session.commit()
+
+        AuditService.log_action(
+            action='template_duplicate',
+            resource_type='template',
+            resource_id=str(clone.id),
+            resource_name=clone.name,
+            details=f'Duplicated from template: {template.name} (id={template.id})',
+            success=True
+        )
+
+        return created_response(
+            data=clone.to_dict(),
+            message=f'Template duplicated as {clone.name}'
+        )
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'Failed to duplicate template: {str(e)}', 500)
+
+
 @bp.route('/api/v2/templates/<int:template_id>/export', methods=['GET'])
 @require_auth(['read:templates'])
 def export_template(template_id):
