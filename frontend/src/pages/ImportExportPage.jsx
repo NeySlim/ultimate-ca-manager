@@ -368,6 +368,7 @@ export default function ImportExportPage() {
       activeTab={activeTab}
       onTabChange={handleTabChange}
       tabLayout="sidebar"
+      sidebarContentClass=""
       tabGroups={[
         { labelKey: 'importExport.groups.import', tabs: ['import', 'opnsense'], color: 'icon-bg-blue' },
         { labelKey: 'importExport.groups.export', tabs: ['export-certs', 'export-cas'], color: 'icon-bg-emerald' },

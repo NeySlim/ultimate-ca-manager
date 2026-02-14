@@ -407,6 +407,7 @@ export default function SCEPPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         tabLayout="sidebar"
+        sidebarContentClass=""
         tabGroups={[
           { labelKey: 'scep.groups.management', tabs: ['requests', 'challenge'], color: 'icon-bg-blue' },
           { labelKey: 'scep.groups.settings', tabs: ['config', 'info'], color: 'icon-bg-emerald' },

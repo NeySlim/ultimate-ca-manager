@@ -888,15 +888,10 @@ export default function OperationsPage() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       tabLayout="sidebar"
+      sidebarContentClass={activeTab === 'bulk' ? '' : undefined}
       helpPageKey="operations"
     >
-      {activeTab === 'bulk' ? (
-        renderContent()
-      ) : (
-        <div className="p-4 md:p-6">
-          {renderContent()}
-        </div>
-      )}
+      {renderContent()}
 
       {/* Confirm modal for bulk actions (not export/sign — they have their own) */}
       <ConfirmModal
