@@ -357,7 +357,11 @@
     "allSelected": "All items in basket",
     "addAll": "Add all",
     "removeAll": "Remove all",
-    "itemsSelected": "item(s) selected"
+    "itemsSelected": "item(s) selected",
+    "groups": {
+      "actions": "Actions"
+    },
+    "selectResource": "Resource type"
   },
   "auth": {
     "login": "Sign In",

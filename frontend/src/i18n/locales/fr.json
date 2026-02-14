@@ -1205,7 +1205,11 @@
     "allSelected": "Tous les éléments sont dans le panier",
     "addAll": "Tout ajouter",
     "removeAll": "Tout retirer",
-    "itemsSelected": "élément(s) sélectionné(s)"
+    "itemsSelected": "élément(s) sélectionné(s)",
+    "groups": {
+      "actions": "Actions"
+    },
+    "selectResource": "Type de ressource"
   },
   "notifications": {
     "certificateIssued": "Certificat émis : {{name}}",
