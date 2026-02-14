@@ -849,44 +849,47 @@ export default function OperationsPage() {
           icon={Lightning}
           title={t('operations.bulkHeader')}
           subtitle={t('operations.bulkHeaderDesc')}
-          compact
         />
       </div>
 
       {/* Resource type tabs */}
       <div className="shrink-0 px-4 md:px-6 pb-1">
-        <div className="flex items-center gap-1 border-b border-border">
-          {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-            const Icon = config.icon
-            const isActive = bulkResourceType === key
-            const count = resourceCounts[key]
-            return (
-              <button
-                key={key}
-                onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px",
-                  isActive
-                    ? "border-accent-primary text-accent-primary"
-                    : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
-                )}
-              >
-                <Icon size={16} />
-                {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
-                {count !== undefined && (
-                  <span className={cn(
-                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
-                    isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
-                  )}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        <div className="flex items-center border-b border-border overflow-x-auto">
+          <div className="flex items-center gap-1 min-w-max">
+            {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
+              const Icon = config.icon
+              const isActive = bulkResourceType === key
+              const count = resourceCounts[key]
+              return (
+                <button
+                  key={key}
+                  onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap",
+                    isActive
+                      ? "border-accent-primary text-accent-primary"
+                      : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
+                  )}
+                >
+                  <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary")}>
+                    <Icon size={12} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : ""} />
+                  </div>
+                  {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                  {count !== undefined && (
+                    <span className={cn(
+                      "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
+                      isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
+                    )}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
 
           {/* View mode toggle */}
-          <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border mb-1.5">
+          <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border mb-1.5 shrink-0">
             <button
               onClick={() => setBulkViewMode('table')}
               className={cn(
