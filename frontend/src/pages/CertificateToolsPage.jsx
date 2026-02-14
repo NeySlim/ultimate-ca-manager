@@ -315,7 +315,7 @@ export default function CertificateToolsPage() {
               value={value}
               onChange={onChange}
               rows={rows}
-              mono
+              inputClassName="font-mono text-2xs"
             />
           </>
         )}
@@ -541,7 +541,7 @@ export default function CertificateToolsPage() {
           value={convertPem}
           onChange={(e) => setConvertPem(e.target.value)}
           rows={4}
-          mono
+          inputClassName="font-mono text-2xs"
           disabled={!!convertFileData}
         />
       </div>
@@ -602,7 +602,7 @@ export default function CertificateToolsPage() {
               value={convertKey}
               onChange={(e) => setConvertKey(e.target.value)}
               rows={3}
-              mono
+              inputClassName="font-mono text-2xs"
             />
           )}
           
@@ -612,7 +612,7 @@ export default function CertificateToolsPage() {
             value={convertChain}
             onChange={(e) => setConvertChain(e.target.value)}
             rows={3}
-            mono
+            inputClassName="font-mono text-2xs"
           />
         </div>
       )}
@@ -624,7 +624,7 @@ export default function CertificateToolsPage() {
           value={convertChain}
           onChange={(e) => setConvertChain(e.target.value)}
           rows={4}
-          mono
+          inputClassName="font-mono text-2xs"
         />
       )}
 
