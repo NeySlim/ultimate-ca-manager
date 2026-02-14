@@ -1169,6 +1169,7 @@ input:focus, select:focus, textarea:focus {
 .stat-card-enhanced.warning { --card-accent: var(--accent-warning); }
 .stat-card-enhanced.danger { --card-accent: var(--accent-danger); }
 .stat-card-enhanced.primary { --card-accent: var(--accent-primary); }
+.stat-card-enhanced.pro { --card-accent: var(--accent-pro); }
 
 /* === DASHBOARD GRID LAYOUT === */
 .dashboard-grid .react-grid-item {

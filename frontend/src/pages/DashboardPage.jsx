@@ -481,7 +481,7 @@ export default function DashboardPage() {
               <Card variant="elevated" className="h-full flex flex-col p-0">
                 <Card.Header 
                   icon={Lightning}
-                  iconColor="blue"
+                  iconColor="amber"
                   title={t('dashboard.certificateActivity')}
                   subtitle={t('dashboard.last7Days')}
                 />
@@ -655,7 +655,7 @@ export default function DashboardPage() {
               <Card variant="elevated" className="h-full flex flex-col p-0">
                 <Card.Header 
                   icon={ShieldCheck}
-                  iconColor="violet"
+                  iconColor="emerald"
                   title={t('dashboard.recentCAs')}
                   action={
                     <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>
@@ -763,7 +763,7 @@ export default function DashboardPage() {
               <Card variant="elevated" className="h-full flex flex-col p-0">
                 <Card.Header 
                   icon={Heartbeat}
-                  iconColor="emerald"
+                  iconColor="blue"
                   title={t('dashboard.systemHealth')}
                   action={
                     <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/settings')}>
@@ -820,7 +820,7 @@ export default function DashboardPage() {
               <Card variant="elevated" className="h-full flex flex-col p-0">
                 <Card.Header 
                   icon={Globe}
-                  iconColor="orange"
+                  iconColor="violet"
                   title={t('dashboard.acmeAccounts')}
                   action={
                     <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>
@@ -970,7 +970,7 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
 function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   const accentMap = {
     blue: '--accent-primary',
-    purple: '--accent-primary',
+    purple: '--accent-pro',
     yellow: '--accent-warning',
     emerald: '--accent-success',
     slate: '--text-tertiary',
@@ -978,7 +978,7 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   
   const colorClasses = {
     blue: 'primary',
-    purple: 'primary',
+    purple: 'pro',
     yellow: 'warning',
     emerald: 'success',
     slate: '',
