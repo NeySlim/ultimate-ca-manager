@@ -15,7 +15,7 @@ import {
   CertificateDetails, CertificateCompareModal, KeyIndicator
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
-import { certificatesService, casService } from '../services'
+import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useRecentHistory, useFavorites } from '../hooks'
@@ -216,6 +216,18 @@ export default function CertificatesPage() {
       setSelectedCert(null)
     } catch (error) {
       showError(error.message || ERRORS.DELETE_FAILED.CERTIFICATE)
+    }
+  }
+
+  const handleAddToTrustStore = async (caRefid) => {
+    try {
+      await truststoreService.addFromCA(caRefid)
+      showSuccess(t('details.addedToTrustStore'))
+      // Refresh cert detail to update chain_status
+      const res = await certificatesService.getById(selectedCert.id)
+      setSelectedCert(res.data)
+    } catch (error) {
+      showError(error.response?.data?.error || error.message || t('details.addToTrustStoreFailed'))
     }
   }
 
@@ -632,6 +644,7 @@ export default function CertificatesPage() {
       onRenew={selectedCert.has_private_key && !selectedCert.revoked ? () => handleRenew(selectedCert.id) : null}
       onDelete={() => handleDelete(selectedCert.id)}
       onUploadKey={() => setShowKeyModal(true)}
+      onAddToTrustStore={handleAddToTrustStore}
       canWrite={canWrite('certificates')}
       canDelete={canDelete('certificates')}
     />

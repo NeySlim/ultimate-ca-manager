@@ -576,3 +576,71 @@ def get_expiring_trusted_certs():
     
     except Exception as e:
         return error_response(f'Failed to get expiring certificates: {str(e)}', 500)
+
+
+@bp.route('/api/v2/truststore/add-from-ca/<string:ca_refid>', methods=['POST'])
+@require_auth(['write:truststore'])
+def add_ca_to_truststore(ca_refid):
+    """
+    Add a managed CA's certificate to the Trust Store.
+    
+    POST /api/v2/truststore/add-from-ca/<ca_refid>
+    Body (optional): { "purpose": "root_ca", "notes": "..." }
+    """
+    from models import CA
+    
+    ca = CA.query.filter_by(refid=ca_refid).first()
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    try:
+        pem_data = base64.b64decode(ca.crt).decode('utf-8')
+    except Exception:
+        return error_response('Failed to decode CA certificate', 500)
+    
+    # Check if already in Trust Store
+    cert_info = parse_certificate(pem_data)
+    if not cert_info:
+        return error_response('Failed to parse CA certificate', 500)
+    
+    existing = TrustedCertificate.query.filter_by(
+        fingerprint_sha256=cert_info['fingerprint_sha256']
+    ).first()
+    if existing:
+        return error_response('This CA is already in the Trust Store', 409)
+    
+    body = request.get_json(silent=True) or {}
+    purpose = body.get('purpose', 'root_ca' if ca.is_root else 'intermediate_ca')
+    
+    trusted = TrustedCertificate(
+        name=ca.common_name or ca.descr or cert_info['subject'],
+        certificate_pem=pem_data,
+        subject=cert_info['subject'],
+        issuer=cert_info['issuer'],
+        serial_number=cert_info['serial_number'],
+        not_before=cert_info['not_before'],
+        not_after=cert_info['not_after'],
+        fingerprint_sha256=cert_info['fingerprint_sha256'],
+        fingerprint_sha1=cert_info['fingerprint_sha1'],
+        purpose=purpose,
+        added_by=g.current_user.username,
+        notes=body.get('notes', f'Added from managed CA: {ca.descr or ca.common_name}'),
+    )
+    
+    db.session.add(trusted)
+    db.session.commit()
+    
+    AuditService.log(
+        action='truststore.add_from_ca',
+        target=f'CA:{ca_refid}',
+        details=f'Added managed CA "{ca.common_name or ca.descr}" to Trust Store',
+        user=g.current_user.username,
+        status='success'
+    )
+    
+    return created_response(data={
+        'id': trusted.id,
+        'name': trusted.name,
+        'fingerprint_sha256': trusted.fingerprint_sha256,
+        'purpose': trusted.purpose,
+    }, message=f'CA "{trusted.name}" added to Trust Store')

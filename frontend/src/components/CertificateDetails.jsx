@@ -121,6 +121,7 @@ export function CertificateDetails({
   onDelete,
   onRenew,
   onUploadKey,
+  onAddToTrustStore,
   canWrite = false,
   canDelete = false,
   compact = false,
@@ -337,6 +338,24 @@ export function CertificateDetails({
                     )}>{link.name}</span>
                   </span>
                 ))}
+              </div>
+            )}
+            {cert.chain_status.status === 'incomplete' && (
+              <div className="mt-2 p-2 rounded-lg bg-accent-warning/5 border border-accent-warning/20">
+                <p className="text-[11px] text-text-secondary">
+                  {t('details.chainIncompleteHint')}
+                </p>
+                {onAddToTrustStore && cert.caref && (
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    className="mt-1.5"
+                    onClick={() => onAddToTrustStore(cert.caref)}
+                  >
+                    <ShieldCheck size={12} className="mr-1" />
+                    {t('details.addIssuerToTrustStore')}
+                  </Button>
+                )}
               </div>
             )}
           </div>

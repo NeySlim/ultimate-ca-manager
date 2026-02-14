@@ -1864,7 +1864,11 @@
     "chainIncomplete": "Chain incomplete",
     "chainPartial": "Partial chain",
     "managedCA": "Managed CA",
-    "trustAnchor": "Trust anchor"
+    "trustAnchor": "Trust anchor",
+    "chainIncompleteHint": "The issuing CA is not in the Trust Store or managed CAs. Import the issuer certificate in the Trust Store to complete the chain.",
+    "addIssuerToTrustStore": "Add Issuer to Trust Store",
+    "addedToTrustStore": "CA added to Trust Store successfully",
+    "addToTrustStoreFailed": "Failed to add CA to Trust Store"
   },
   "compare": {
     "title": "Compare Certificates",

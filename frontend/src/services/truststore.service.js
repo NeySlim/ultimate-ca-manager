@@ -57,5 +57,9 @@ export const truststoreService = {
 
   async getExpiring(days = 90) {
     return apiClient.get(`/truststore/expiring?days=${days}`)
+  },
+
+  async addFromCA(caRefid, options = {}) {
+    return apiClient.post(`/truststore/add-from-ca/${caRefid}`, options)
   }
 }

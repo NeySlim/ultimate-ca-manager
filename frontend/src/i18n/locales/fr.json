@@ -953,7 +953,11 @@
     "chainIncomplete": "Chaîne incomplète",
     "chainPartial": "Chaîne partielle",
     "managedCA": "CA gérée",
-    "trustAnchor": "Ancre de confiance"
+    "trustAnchor": "Ancre de confiance",
+    "chainIncompleteHint": "La CA émettrice n'est pas dans le Trust Store ni dans les CAs gérées. Importez le certificat de l'émetteur dans le Trust Store pour compléter la chaîne.",
+    "addIssuerToTrustStore": "Ajouter l'émetteur au Trust Store",
+    "addedToTrustStore": "CA ajoutée au Trust Store avec succès",
+    "addToTrustStoreFailed": "Échec de l'ajout de la CA au Trust Store"
   },
   "groups": {
     "group": "Groupe",
