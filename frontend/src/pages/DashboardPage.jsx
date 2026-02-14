@@ -360,6 +360,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs font-semibold text-text-primary">UCM</span>
                   <span className="text-xs text-text-tertiary">v{versionInfo.version}</span>
                   {versionInfo.update_available && (
                     <Badge variant="warning" size="sm" dot>{t('common.updateAvailable')}</Badge>
