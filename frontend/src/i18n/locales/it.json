@@ -1104,7 +1104,7 @@
     "exportAll": "Esporta tutto",
     "subtitle": "Trasferisci certificati e CA",
     "tabs": {
-      "opnsense": "OpnSense",
+      "opnsense": "OPNsense",
       "exportCerts": "Esporta Cert"
     },
     "smartImport": {
@@ -1112,8 +1112,8 @@
       "description": "Importa certificati, chiavi, CSR e catene da qualsiasi formato"
     },
     "opnsense": {
-      "title": "Connessione OpnSense",
-      "description": "Importa certificati dal firewall OpnSense",
+      "title": "Connessione OPNsense",
+      "description": "Importa certificati dal firewall OPNsense",
       "hostLabel": "Host / IP",
       "apiKeyLabel": "Chiave API",
       "apiSecretLabel": "Segreto API",
@@ -1127,7 +1127,8 @@
       "selectAll": "Seleziona tutto",
       "importSelected": "Importa {{count}} selezionati",
       "importSuccess": "{{count}} elementi importati con successo ({{skipped}} saltati)",
-      "noItemsSelected": "Seleziona almeno un elemento da importare"
+      "noItemsSelected": "Seleziona almeno un elemento da importare",
+      "ignoreCert": "Ignora certificato SSL (autofirmato)"
     },
     "export": {
       "allCertsTitle": "Esporta Tutti i Certificati",

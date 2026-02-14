@@ -1104,7 +1104,7 @@
     "exportAll": "导出全部",
     "subtitle": "传输证书和 CA",
     "tabs": {
-      "opnsense": "OpnSense",
+      "opnsense": "OPNsense",
       "exportCerts": "导出证书"
     },
     "smartImport": {
@@ -1112,8 +1112,8 @@
       "description": "从任何格式导入证书、密钥、CSR 和证书链"
     },
     "opnsense": {
-      "title": "OpnSense 连接",
-      "description": "从 OpnSense 防火墙导入证书",
+      "title": "OPNsense 连接",
+      "description": "从 OPNsense 防火墙导入证书",
       "hostLabel": "主机 / IP",
       "apiKeyLabel": "API Key",
       "apiSecretLabel": "API Secret",
@@ -1127,7 +1127,8 @@
       "selectAll": "全选",
       "importSelected": "导入 {{count}} 个已选",
       "importSuccess": "成功导入 {{count}} 个项目（跳过 {{skipped}} 个）",
-      "noItemsSelected": "请至少选择一个要导入的项目"
+      "noItemsSelected": "请至少选择一个要导入的项目",
+      "ignoreCert": "忽略SSL证书（自签名）"
     },
     "export": {
       "allCertsTitle": "导出所有证书",

@@ -1129,7 +1129,7 @@
       "connectedSuccessfully": "Ligado successfully",
       "connectionFailed": "Ligação failed. Verificar your credentials.",
       "connectionResult": "Ligação Result",
-      "description": "Importar certificates de OpnSense firewall",
+      "description": "Importar certificates de OPNsense firewall",
       "foundCertificates": "Found {{count}} certificates available para import",
       "hostLabel": "Host / IP",
       "hostPlaceholder": "192.168.1.1",
@@ -1138,7 +1138,8 @@
       "importSuccess": "{{count}} itens importados com sucesso ({{skipped}} ignorados)",
       "noItemsSelected": "Selecione pelo menos um item para importar",
       "selectAll": "Selecionar tudo",
-      "title": "OpnSense Ligação"
+      "title": "OPNsense Ligação",
+      "ignoreCert": "Ignorar certificado SSL (autoassinado)"
     },
     "selectFile": "Selecionar ficheiro",
     "smartImport": {
@@ -1149,7 +1150,7 @@
     "supportedFormats": "Formatos suportados",
     "tabs": {
       "exportCerts": "Exportar Certs",
-      "opnsense": "OpnSense"
+      "opnsense": "OPNsense"
     },
     "groups": {
       "import": "Importar",
