@@ -6,6 +6,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
   CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star, ArrowsLeftRight
@@ -23,6 +24,8 @@ import { formatDate, extractCN, cn } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { t } = useTranslation()
+  const { id: urlCertId } = useParams()
+  const navigate = useNavigate()
   const { isMobile } = useMobile()
   const { addToHistory } = useRecentHistory('certificates')
   const { isFavorite, toggleFavorite } = useFavorites('certificates')
@@ -134,6 +137,18 @@ export default function CertificatesPage() {
       setSelectedCert(cert)
     }
   }, [addToHistory])
+
+  // Deep-link: auto-select certificate from URL param
+  useEffect(() => {
+    if (urlCertId && !loading && certificates.length > 0 && !selectedCert) {
+      const id = parseInt(urlCertId, 10)
+      if (!isNaN(id)) {
+        handleSelectCert({ id })
+        // Clean URL to /certificates after selection
+        navigate('/certificates', { replace: true })
+      }
+    }
+  }, [urlCertId, loading, certificates.length])
 
   // Export certificate
   const handleExport = async (format) => {

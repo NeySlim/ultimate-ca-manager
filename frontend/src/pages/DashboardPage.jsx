@@ -881,7 +881,7 @@ export default function DashboardPage() {
                   iconColor="orange"
                   title={t('dashboard.trustStoreExpiry')}
                   action={
-                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/trust-store')}>
+                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/truststore')}>
                       {t('common.viewAll')} <CaretRight size={12} />
                     </Button>
                   }
@@ -892,7 +892,7 @@ export default function DashboardPage() {
                   ) : (
                     <div className="space-y-0.5">
                       {trustStoreExpiring.expired.slice(0, 2).map((cert) => (
-                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate('/trust-store')}>
+                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
                           <div className="w-7 h-7 rounded-lg bg-status-danger/10 flex items-center justify-center shrink-0">
                             <Warning size={14} weight="duotone" className="text-status-danger" />
                           </div>
@@ -903,7 +903,7 @@ export default function DashboardPage() {
                         </div>
                       ))}
                       {trustStoreExpiring.expiring.slice(0, 3).map((cert) => (
-                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate('/trust-store')}>
+                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
                           <div className="w-7 h-7 rounded-lg bg-accent-warning/10 flex items-center justify-center shrink-0">
                             <Clock size={14} weight="duotone" className="text-accent-warning" />
                           </div>

@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { 
   Key, Download, Trash,
   Certificate, UploadSimple, Clock, Plus, CaretRight, CaretDown,
@@ -27,6 +27,8 @@ import { extractData, formatDate, cn } from '../lib/utils'
 
 export default function CAsPage() {
   const { t } = useTranslation()
+  const { id: urlCAId } = useParams()
+  const navigate = useNavigate()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -93,6 +95,17 @@ export default function CAsPage() {
       }
     }
   }, [cas, searchParams])
+
+  // Deep-link: auto-select CA from URL param /cas/:id
+  useEffect(() => {
+    if (urlCAId && !loading && cas.length > 0 && !selectedCA) {
+      const id = parseInt(urlCAId, 10)
+      if (!isNaN(id)) {
+        loadCADetails({ id })
+        navigate('/cas', { replace: true })
+      }
+    }
+  }, [urlCAId, loading, cas.length])
 
   // Expand all root nodes by default
   useEffect(() => {
