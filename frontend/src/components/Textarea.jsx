@@ -10,6 +10,7 @@ export function Textarea({
   maxLength,
   showCount = false,
   className,
+  inputClassName,
   value = '',
   ...props 
 }) {
@@ -37,7 +38,8 @@ export function Textarea({
           "transition-all duration-200 resize-y",
           "hover:border-text-secondary/50 hover:bg-bg-tertiary",
           error && "border-accent-danger focus:ring-accent-danger/50",
-          !error && "border-border"
+          !error && "border-border",
+          inputClassName
         )}
         value={value}
         maxLength={maxLength}
