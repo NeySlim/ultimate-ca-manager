@@ -618,32 +618,34 @@ export const helpContent = {
   // ===== OPERATIONS =====
   operations: {
     title: 'Operations',
-    subtitle: 'Bulk actions and data management',
-    overview: 'Perform bulk operations across multiple resources. Import/export data, sync with OPNsense, and execute batch actions like revoke, renew, delete, or export on multiple items at once.',
+    subtitle: 'Import, export & bulk actions',
+    overview: 'Centralized operations center. Import certificates from files or OPNsense, export bundles in PEM/P7B formats, and perform bulk actions across all resource types with inline search and filters.',
     sections: [
       {
-        title: 'Tabs',
+        title: 'Sidebar Tabs',
         icon: Stack,
         items: [
-          { label: 'Import/Export', text: 'Smart Import for bulk file upload, export bundles' },
-          { label: 'OPNsense', text: 'Sync certificates and CAs from OPNsense firewalls' },
-          { label: 'Bulk Actions', text: 'Select resource type and perform batch operations' },
+          { label: 'Import', text: 'Smart Import with automatic format detection, plus OPNsense sync to pull certificates from firewalls' },
+          { label: 'Export', text: 'Download certificate bundles per resource type in PEM or P7B format via action cards' },
+          { label: 'Bulk Actions', text: 'Select a resource type and perform batch operations on multiple items' },
         ]
       },
       {
         title: 'Bulk Actions',
         icon: ListChecks,
         items: [
-          { label: 'Certificates', text: 'Bulk revoke, renew, delete, or export certificates' },
-          { label: 'CAs', text: 'Bulk delete or export CAs' },
-          { label: 'CSRs', text: 'Bulk sign or delete CSRs' },
-          { label: 'Templates', text: 'Bulk delete or export templates' },
-          { label: 'Users', text: 'Bulk disable or delete users' },
+          { label: 'Certificates', text: 'Revoke, renew, delete, or export — filter by status and issuing CA' },
+          { label: 'CAs', text: 'Delete or export certificate authorities' },
+          { label: 'CSRs', text: 'Sign with a CA or delete pending requests' },
+          { label: 'Templates', text: 'Delete certificate templates' },
+          { label: 'Users', text: 'Delete user accounts' },
         ]
       },
     ],
     tips: [
-      'Use the transfer panel to move items between the available and selected lists',
+      'Use the resource chips to quickly switch between resource types',
+      'The inline search and filters (Status, CA) let you narrow down items without leaving the toolbar',
+      'Switch between Table and Basket (transfer panel) view modes on desktop',
       'Preview changes before confirming bulk operations',
     ],
     warnings: [
