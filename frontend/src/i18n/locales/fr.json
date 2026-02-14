@@ -736,7 +736,12 @@
     "confirm": "Confirmer",
     "renew": "Renouveler",
     "revoke": "Révoquer",
-    "sign": "Signer"
+    "sign": "Signer",
+    "casShort": "CA",
+    "csrsShort": "CSR",
+    "certificatesShort": "Certificats",
+    "templatesShort": "Modèles",
+    "usersShort": "Utilisateurs"
   },
   "compare": {
     "title": "Comparer les certificats",
