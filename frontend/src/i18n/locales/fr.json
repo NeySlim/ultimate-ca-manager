@@ -741,7 +741,8 @@
     "csrsShort": "CSR",
     "certificatesShort": "Certificats",
     "templatesShort": "Modèles",
-    "usersShort": "Utilisateurs"
+    "usersShort": "Utilisateurs",
+    "cert": "Cert"
   },
   "compare": {
     "title": "Comparer les certificats",
