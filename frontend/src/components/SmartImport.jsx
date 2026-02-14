@@ -119,8 +119,20 @@ function ChainCard({ chain, index }) {
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-medium">{t('import.chain')} {index + 1}</span>
         {chain.is_complete ? <Badge variant="green" size="xs">{t('import.complete')}</Badge> : <Badge variant="amber" size="xs">{t('import.incomplete')}</Badge>}
+        {chain.trust_source === 'trust_store' && (
+          <Badge variant="teal" size="xs">✓ {t('import.verifiedTrustStore')}</Badge>
+        )}
+        {chain.trust_source === 'managed_ca' && (
+          <Badge variant="primary" size="xs">✓ {t('import.linkedToCA')}</Badge>
+        )}
         <span className="text-xs text-text-secondary ml-auto">{chain.chain_length} {t('common.certificates').toLowerCase()}</span>
       </div>
+      
+      {chain.trust_anchor && (
+        <div className="text-[10px] text-text-tertiary mb-1.5">
+          {t('import.trustAnchor')}: {chain.trust_anchor}
+        </div>
+      )}
       
       <div className="flex items-center gap-1 text-xs flex-wrap">
         {chain.root && (

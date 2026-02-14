@@ -47,5 +47,15 @@ export const truststoreService = {
   // Alias for backwards compatibility
   async delete(id) {
     return this.remove(id)
+  },
+
+  async exportBundle(format = 'pem', purpose = 'all') {
+    return apiClient.get(`/truststore/export?format=${format}&purpose=${purpose}`, {
+      responseType: 'blob'
+    })
+  },
+
+  async getExpiring(days = 90) {
+    return apiClient.get(`/truststore/expiring?days=${days}`)
   }
 }

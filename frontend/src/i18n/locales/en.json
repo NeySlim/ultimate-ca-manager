@@ -478,7 +478,10 @@
     "chainRepairCerts": "Certificates",
     "chainRepairOrphans": "orphans",
     "chainRepairNever": "Never run",
-    "chainRepairRunning": "Running..."
+    "chainRepairRunning": "Running...",
+    "widgetTrustStoreExpiry": "Trust Store Expiry",
+    "trustStoreExpiry": "Trust Store Expiry",
+    "noTrustStoreExpiring": "All trusted certificates are valid"
   },
   "certificates": {
     "createCertificate": "Create Certificate",
@@ -1033,7 +1036,14 @@
     "alreadyInTruststore": "Already in trust store",
     "addedFromManaged": "Added from managed CAs",
     "addedCount": "{{count}} CA(s) added to trust store",
-    "addSelected": "Add {{count}} selected"
+    "addSelected": "Add {{count}} selected",
+    "exportBundle": "Export Bundle",
+    "bundleExported": "Certificate bundle exported",
+    "exportFailed": "Failed to export bundle",
+    "allStatuses": "All statuses",
+    "expiringSoon": "Expiring soon",
+    "trustStoreExpiring": "Trust Store Expiring",
+    "trustStoreExpiringDesc": "{{count}} trusted certificate(s) expiring within {{days}} days"
   },
   "importExport": {
     "subtitle": "Transfer certificates and CAs",
@@ -1940,7 +1950,10 @@
     "typeCaCertificate": "CA Certificate",
     "typeCertificate": "Certificate",
     "typeCsr": "CSR",
-    "typePrivateKey": "Private Key"
+    "typePrivateKey": "Private Key",
+    "verifiedTrustStore": "Trust Store",
+    "linkedToCA": "Managed CA",
+    "trustAnchor": "Trust anchor"
   },
   "webhooks": {
     "title": "Webhooks",

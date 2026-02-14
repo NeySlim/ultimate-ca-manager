@@ -907,7 +907,10 @@
     "chainRepairCerts": "Certificats",
     "chainRepairOrphans": "orphelins",
     "chainRepairNever": "Jamais exécuté",
-    "chainRepairRunning": "En cours..."
+    "chainRepairRunning": "En cours...",
+    "widgetTrustStoreExpiry": "Expiration Trust Store",
+    "trustStoreExpiry": "Expiration Trust Store",
+    "noTrustStoreExpiring": "Tous les certificats de confiance sont valides"
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -1095,7 +1098,10 @@
     "typeCaCertificate": "Certificat CA",
     "typeCertificate": "Certificat",
     "typeCsr": "CSR",
-    "typePrivateKey": "Clé privée"
+    "typePrivateKey": "Clé privée",
+    "verifiedTrustStore": "Trust Store",
+    "linkedToCA": "CA gérée",
+    "trustAnchor": "Ancre de confiance"
   },
   "importExport": {
     "importCA": "Importer une AC",
@@ -1912,7 +1918,14 @@
     "alreadyInTruststore": "Déjà dans le trust store",
     "addedFromManaged": "Ajouté depuis les CA gérées",
     "addedCount": "{{count}} CA(s) ajoutée(s) au trust store",
-    "addSelected": "Ajouter {{count}} sélectionné(s)"
+    "addSelected": "Ajouter {{count}} sélectionné(s)",
+    "exportBundle": "Exporter le bundle",
+    "bundleExported": "Bundle de certificats exporté",
+    "exportFailed": "Échec de l'export du bundle",
+    "allStatuses": "Tous les statuts",
+    "expiringSoon": "Expire bientôt",
+    "trustStoreExpiring": "Trust Store - Expirations",
+    "trustStoreExpiringDesc": "{{count}} certificat(s) de confiance expirent dans {{days}} jours"
   },
   "users": {
     "createUser": "Créer un utilisateur",

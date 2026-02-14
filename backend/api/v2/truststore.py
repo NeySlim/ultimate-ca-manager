@@ -443,3 +443,136 @@ def sync_trust_store():
     except Exception as e:
         db.session.rollback()
         return error_response(f'Failed to sync trust store: {str(e)}', 500)
+
+
+@bp.route('/api/v2/truststore/export', methods=['GET'])
+@require_auth(['read:truststore'])
+def export_trust_bundle():
+    """
+    Export trust store as a certificate bundle.
+    
+    GET /api/v2/truststore/export?format=pem&purpose=root_ca
+    
+    Query params:
+      - format: pem (default), p7b
+      - purpose: root_ca, intermediate_ca, system, all (default)
+    """
+    from flask import Response
+    
+    fmt = request.args.get('format', 'pem')
+    purpose = request.args.get('purpose', 'all')
+    
+    if fmt not in ('pem', 'p7b'):
+        return error_response('Unsupported format. Use: pem, p7b', 400)
+    
+    try:
+        query = TrustedCertificate.query
+        if purpose != 'all':
+            query = query.filter_by(purpose=purpose)
+        
+        certs = query.order_by(TrustedCertificate.name).all()
+        
+        if not certs:
+            return error_response('No certificates found matching criteria', 404)
+        
+        if fmt == 'pem':
+            bundle_lines = []
+            for cert in certs:
+                bundle_lines.append(f'# {cert.name}')
+                bundle_lines.append(cert.certificate_pem.strip())
+                bundle_lines.append('')
+            
+            bundle = '\n'.join(bundle_lines)
+            filename = f'truststore-{purpose}-bundle.pem'
+            
+            return Response(
+                bundle,
+                mimetype='application/x-pem-file',
+                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+            )
+        
+        elif fmt == 'p7b':
+            from cryptography.hazmat.primitives.serialization import pkcs7
+            
+            x509_certs = []
+            for cert in certs:
+                try:
+                    x509_cert = x509.load_pem_x509_certificate(
+                        cert.certificate_pem.encode(), default_backend()
+                    )
+                    x509_certs.append(x509_cert)
+                except Exception:
+                    continue
+            
+            if not x509_certs:
+                return error_response('No valid certificates to export', 400)
+            
+            p7b_data = pkcs7.serialize_certificates(x509_certs, serialization.Encoding.DER)
+            
+            filename = f'truststore-{purpose}-bundle.p7b'
+            return Response(
+                p7b_data,
+                mimetype='application/x-pkcs7-certificates',
+                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+            )
+    
+    except Exception as e:
+        return error_response(f'Failed to export bundle: {str(e)}', 500)
+
+
+@bp.route('/api/v2/truststore/expiring', methods=['GET'])
+@require_auth(['read:truststore'])
+def get_expiring_trusted_certs():
+    """
+    Get trusted certificates expiring within N days.
+    
+    GET /api/v2/truststore/expiring?days=90
+    """
+    from sqlalchemy import and_
+    
+    days = request.args.get('days', 90, type=int)
+    
+    try:
+        now = datetime.utcnow()
+        from datetime import timedelta
+        threshold = now + timedelta(days=days)
+        
+        # Expiring soon (valid but within threshold)
+        expiring = TrustedCertificate.query.filter(
+            and_(
+                TrustedCertificate.not_after != None,
+                TrustedCertificate.not_after > now,
+                TrustedCertificate.not_after <= threshold
+            )
+        ).order_by(TrustedCertificate.not_after.asc()).all()
+        
+        # Already expired
+        expired = TrustedCertificate.query.filter(
+            and_(
+                TrustedCertificate.not_after != None,
+                TrustedCertificate.not_after <= now
+            )
+        ).order_by(TrustedCertificate.not_after.desc()).all()
+        
+        def cert_to_dict(c):
+            days_left = (c.not_after - now).days if c.not_after else None
+            return {
+                'id': c.id,
+                'name': c.name,
+                'subject': c.subject,
+                'purpose': c.purpose,
+                'not_after': c.not_after.isoformat() if c.not_after else None,
+                'days_remaining': days_left,
+                'fingerprint_sha256': c.fingerprint_sha256,
+            }
+        
+        return success_response(data={
+            'expiring': [cert_to_dict(c) for c in expiring],
+            'expired': [cert_to_dict(c) for c in expired],
+            'expiring_count': len(expiring),
+            'expired_count': len(expired),
+            'threshold_days': days,
+        })
+    
+    except Exception as e:
+        return error_response(f'Failed to get expiring certificates: {str(e)}', 500)

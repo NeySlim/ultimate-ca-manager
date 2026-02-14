@@ -180,31 +180,119 @@ class ImportValidator:
             result.add_error(f"Failed to validate CSR: {str(e)}")
     
     def _validate_chain(self, chain: ChainInfo, result: ValidationResult):
-        """Validate a certificate chain"""
+        """Validate a certificate chain against managed CAs and Trust Store"""
         from models import CA
         
         if not chain.is_complete:
             if chain.leaf:
                 # Check if issuer CA exists in database
                 issuer = chain.leaf.issuer
+                top_cert = chain.leaf
                 # Walk up the chain to find the top
                 if chain.intermediates:
                     issuer = chain.intermediates[-1].issuer
+                    top_cert = chain.intermediates[-1]
                 
-                # Look for issuer in database by subject
-                existing_ca = CA.query.filter(CA.subject == issuer).first()
+                # 1. Look for issuer in managed CAs (by AKI→SKI first, then subject)
+                existing_ca = None
+                if top_cert.aki:
+                    existing_ca = CA.query.filter(CA.ski == top_cert.aki).first()
+                if not existing_ca:
+                    existing_ca = CA.query.filter(CA.subject == issuer).first()
+                
                 if existing_ca:
                     result.add_info(
                         f"Chain for '{self._get_cn(chain.leaf.subject)}' will be linked to existing CA '{existing_ca.common_name}'"
                     )
+                    chain.trust_source = 'managed_ca'
+                    chain.trust_anchor = existing_ca.common_name
                 else:
-                    result.add_warning(
-                        f"Chain for '{self._get_cn(chain.leaf.subject)}' is incomplete - issuing CA not found"
-                    )
+                    # 2. Look in Trust Store
+                    trusted = self._find_in_trust_store(top_cert)
+                    if trusted:
+                        result.add_info(
+                            f"Chain for '{self._get_cn(chain.leaf.subject)}' verified against Trust Store CA '{trusted['name']}'"
+                        )
+                        chain.is_complete = True
+                        chain.trust_source = 'trust_store'
+                        chain.trust_anchor = trusted['name']
+                    else:
+                        result.add_warning(
+                            f"Chain for '{self._get_cn(chain.leaf.subject)}' is incomplete - issuing CA not found in managed CAs or Trust Store"
+                        )
+                        chain.trust_source = None
+                        chain.trust_anchor = None
+        else:
+            chain.trust_source = 'self_contained'
+            chain.trust_anchor = self._get_cn(chain.root.subject) if chain.root else None
         
         if chain.errors:
             for error in chain.errors:
                 result.add_error(error)
+    
+    def _find_in_trust_store(self, cert) -> Optional[Dict]:
+        """Look for the issuer of a certificate in the Trust Store"""
+        import sqlite3
+        from flask import current_app
+        from cryptography import x509 as x509_mod
+        from cryptography.hazmat.backends import default_backend as dfb
+        
+        try:
+            db_path = current_app.config.get('DATABASE', '/opt/ucm/data/ucm.db')
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            
+            # Search by issuer subject match
+            rows = conn.execute(
+                "SELECT id, name, certificate_pem, subject, fingerprint_sha256 FROM trusted_certificates WHERE subject = ?",
+                (cert.issuer,)
+            ).fetchall()
+            
+            if not rows:
+                # Fallback: broader search
+                cn = self._get_cn(cert.issuer)
+                rows = conn.execute(
+                    "SELECT id, name, certificate_pem, subject, fingerprint_sha256 FROM trusted_certificates WHERE name LIKE ? OR subject LIKE ?",
+                    (f'%{cn}%', f'%{cn}%')
+                ).fetchall()
+            
+            # Verify AKI→SKI match if available
+            for row in rows:
+                try:
+                    trusted_cert = x509_mod.load_pem_x509_certificate(
+                        row['certificate_pem'].encode(), dfb()
+                    )
+                    # Check AKI→SKI
+                    if cert.aki:
+                        try:
+                            ski_ext = trusted_cert.extensions.get_extension_for_class(
+                                x509_mod.SubjectKeyIdentifier
+                            )
+                            trusted_ski = ski_ext.value.digest.hex()
+                            if trusted_ski == cert.aki:
+                                conn.close()
+                                return dict(row)
+                        except x509_mod.ExtensionNotFound:
+                            pass
+                    
+                    # Verify signature as fallback
+                    if cert.raw_pem:
+                        child_cert = x509_mod.load_pem_x509_certificate(
+                            cert.raw_pem.encode(), dfb()
+                        )
+                        from services.smart_import.chain_builder import ChainBuilder
+                        builder = ChainBuilder()
+                        builder._verify_signature(child_cert, trusted_cert.public_key())
+                        conn.close()
+                        return dict(row)
+                except Exception:
+                    continue
+            
+            conn.close()
+        except Exception:
+            pass
+        
+        return None
     
     def _check_duplicate_cert(self, obj: ParsedObject) -> Optional[int]:
         """Check if certificate already exists in database"""

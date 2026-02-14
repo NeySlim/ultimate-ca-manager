@@ -27,6 +27,8 @@ class ChainInfo:
     is_complete: bool = False
     is_valid: bool = False
     errors: List[str] = None
+    trust_source: Optional[str] = None  # 'self_contained', 'managed_ca', 'trust_store', None
+    trust_anchor: Optional[str] = None  # Name of the trust anchor (CA name)
     
     def __post_init__(self):
         if self.intermediates is None:
@@ -42,7 +44,9 @@ class ChainInfo:
             "is_complete": self.is_complete,
             "is_valid": self.is_valid,
             "errors": self.errors,
-            "chain_length": len(self.get_ordered_chain())
+            "chain_length": len(self.get_ordered_chain()),
+            "trust_source": self.trust_source,
+            "trust_anchor": self.trust_anchor,
         }
     
     def get_ordered_chain(self) -> List[ParsedObject]:

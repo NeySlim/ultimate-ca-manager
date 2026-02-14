@@ -52,7 +52,18 @@ export default function TrustStorePage() {
         truststoreService.getAll(),
         truststoreService.getStats()
       ])
-      setCertificates(certsRes.data || [])
+      const rawCerts = certsRes.data || []
+      // Add computed expiry status for filtering
+      const now = new Date()
+      const enrichedCerts = rawCerts.map(c => {
+        const date = c.not_after ? new Date(c.not_after) : null
+        const daysLeft = date ? Math.floor((date - now) / (1000 * 60 * 60 * 24)) : null
+        return {
+          ...c,
+          _expiry_status: daysLeft === null ? 'valid' : daysLeft <= 0 ? 'expired' : daysLeft <= 90 ? 'expiring' : 'valid'
+        }
+      })
+      setCertificates(enrichedCerts)
       setCertStats(statsRes.data || { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.TRUSTSTORE)
@@ -180,6 +191,22 @@ export default function TrustStorePage() {
     URL.revokeObjectURL(url)
   }
 
+  const handleExportBundle = async (format = 'pem') => {
+    try {
+      const response = await truststoreService.exportBundle(format, 'all')
+      const blob = response instanceof Blob ? response : response?.data instanceof Blob ? response.data : new Blob([response?.data || response], { type: 'application/x-pem-file' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `truststore-bundle.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+      showSuccess(t('trustStore.bundleExported'))
+    } catch (error) {
+      showError(error.message || t('trustStore.exportFailed'))
+    }
+  }
+
   // Stats - from backend API
   const stats = useMemo(() => [
     { icon: ShieldCheck, label: t('common.rootCA'), value: certStats.root_ca, variant: 'success' },
@@ -189,20 +216,30 @@ export default function TrustStorePage() {
   ], [certStats, t])
 
   // Toolbar actions - next to search bar
-  const toolbarActions = canWrite('truststore') && (
+  const toolbarActions = (
     <div className="flex gap-2">
-      <Button size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
-        <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
-        <span className="hidden sm:inline">{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</span>
-      </Button>
-      <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
-        <UploadSimple size={14} />
-        <span className="hidden sm:inline">{t('common.import')}</span>
-      </Button>
-      <Button size="sm" onClick={handleOpenAddModal}>
-        <Plus size={14} />
-        <span className="hidden sm:inline">{t('trustStore.add')}</span>
-      </Button>
+      {certificates.length > 0 && (
+        <Button size="sm" variant="ghost" onClick={() => handleExportBundle('pem')} title={t('trustStore.exportBundle')}>
+          <Download size={14} />
+          <span className="hidden sm:inline">{t('trustStore.exportBundle')}</span>
+        </Button>
+      )}
+      {canWrite('truststore') && (
+        <>
+          <Button size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
+            <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</span>
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+            <UploadSimple size={14} />
+            <span className="hidden sm:inline">{t('common.import')}</span>
+          </Button>
+          <Button size="sm" onClick={handleOpenAddModal}>
+            <Plus size={14} />
+            <span className="hidden sm:inline">{t('trustStore.add')}</span>
+          </Button>
+        </>
+      )}
     </div>
   )
 
@@ -503,6 +540,15 @@ export default function TrustStorePage() {
                 { value: 'code_signing', label: t('common.codeSigning') },
                 { value: 'system', label: t('common.system') },
                 { value: 'custom', label: t('common.custom') }
+              ]
+            },
+            {
+              key: '_expiry_status',
+              placeholder: t('trustStore.allStatuses'),
+              options: [
+                { value: 'valid', label: t('common.valid') },
+                { value: 'expiring', label: t('trustStore.expiringSoon') },
+                { value: 'expired', label: t('common.expired') }
               ]
             }
           ]}

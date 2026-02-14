@@ -19,7 +19,7 @@ import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import { Card, Button, Badge, LoadingSpinner, Modal, Logo } from '../components'
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
-import { dashboardService, certificatesService, acmeService } from '../services'
+import { dashboardService, certificatesService, acmeService, truststoreService } from '../services'
 import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
@@ -35,6 +35,7 @@ const DEFAULT_WIDGETS = [
   { id: 'certs', nameKey: 'dashboard.widgetRecentCertificates', visible: true },
   { id: 'cas', nameKey: 'dashboard.widgetCertificateAuthorities', visible: true },
   { id: 'acme', nameKey: 'dashboard.widgetAcmeAccounts', visible: true },
+  { id: 'trustExpiry', nameKey: 'dashboard.widgetTrustStoreExpiry', visible: true },
 ]
 
 // Default grid layouts per breakpoint (12-column grid)
@@ -47,8 +48,9 @@ const DEFAULT_LAYOUTS = {
     { i: 'certs',      x: 0,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
     { i: 'cas',        x: 4,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
     { i: 'activity',   x: 8,  y: 7, w: 4,  h: 4, minW: 3, minH: 3 },
-    { i: 'system',     x: 0,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
-    { i: 'acme',       x: 6,  y: 11, w: 6,  h: 4, minW: 3, minH: 3 },
+    { i: 'system',     x: 0,  y: 11, w: 4,  h: 4, minW: 3, minH: 3 },
+    { i: 'acme',       x: 4,  y: 11, w: 4,  h: 4, minW: 3, minH: 3 },
+    { i: 'trustExpiry',x: 8,  y: 11, w: 4,  h: 4, minW: 3, minH: 3 },
   ],
   md: [
     { i: 'stats',      x: 0, y: 0, w: 6, h: 3, static: true },
@@ -59,7 +61,8 @@ const DEFAULT_LAYOUTS = {
     { i: 'cas',        x: 3, y: 13, w: 3, h: 5, minW: 3, minH: 3 },
     { i: 'activity',   x: 0, y: 18, w: 6, h: 5, minW: 3, minH: 3 },
     { i: 'system',     x: 0, y: 23, w: 6, h: 6, minW: 3, minH: 4 },
-    { i: 'acme',       x: 0, y: 29, w: 6, h: 4, minW: 3, minH: 3 },
+    { i: 'acme',       x: 0, y: 29, w: 3, h: 4, minW: 3, minH: 3 },
+    { i: 'trustExpiry',x: 3, y: 29, w: 3, h: 4, minW: 3, minH: 3 },
   ],
   sm: [
     { i: 'stats',      x: 0, y: 0, w: 1, h: 3, static: true },
@@ -71,6 +74,7 @@ const DEFAULT_LAYOUTS = {
     { i: 'activity',   x: 0, y: 27, w: 1, h: 5 },
     { i: 'system',     x: 0, y: 32, w: 1, h: 6 },
     { i: 'acme',       x: 0, y: 38, w: 1, h: 4 },
+    { i: 'trustExpiry',x: 0, y: 42, w: 1, h: 4 },
   ]
 }
 
@@ -138,6 +142,7 @@ export default function DashboardPage() {
   const [recentCerts, setRecentCerts] = useState([])
   const [recentCAs, setRecentCAs] = useState([])
   const [recentAcme, setRecentAcme] = useState([])
+  const [trustStoreExpiring, setTrustStoreExpiring] = useState({ expiring: [], expired: [], expiring_count: 0, expired_count: 0 })
   const [activityLog, setActivityLog] = useState([])
   const [systemStatus, setSystemStatus] = useState(null)
   const [nextExpirations, setNextExpirations] = useState([])
@@ -237,6 +242,14 @@ export default function DashboardPage() {
         setRecentAcme(acmeData.data?.slice(0, 5) || [])
       } catch {
         setRecentAcme([])
+      }
+      
+      // Try to get trust store expiring certs
+      try {
+        const tsData = await truststoreService.getExpiring(90)
+        setTrustStoreExpiring(tsData.data || { expiring: [], expired: [], expiring_count: 0, expired_count: 0 })
+      } catch {
+        setTrustStoreExpiring({ expiring: [], expired: [], expiring_count: 0, expired_count: 0 })
       }
     } catch (error) {
       showError(error.message || t('dashboard.loadFailed'))
@@ -847,6 +860,56 @@ export default function DashboardPage() {
                               {account.email || account.contact}
                             </span>
                             <Badge variant="secondary" size="sm">{account.orders_count || 0} {t('dashboard.orders')}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </WidgetWrapper>
+          </div>
+          )}
+
+          {/* Trust Store Expiring Widget */}
+          {isVisible('trustExpiry') && (
+          <div key="trustExpiry">
+            <WidgetWrapper editMode={editMode}>
+              <Card variant="elevated" className="h-full flex flex-col p-0">
+                <Card.Header 
+                  icon={ShieldCheck}
+                  iconColor="orange"
+                  title={t('dashboard.trustStoreExpiry')}
+                  action={
+                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/trust-store')}>
+                      {t('common.viewAll')} <CaretRight size={12} />
+                    </Button>
+                  }
+                />
+                <Card.Body className="flex-1 overflow-y-auto !pt-0">
+                  {trustStoreExpiring.expiring_count === 0 && trustStoreExpiring.expired_count === 0 ? (
+                    <EmptyWidget icon={ShieldCheck} text={t('dashboard.noTrustStoreExpiring')} />
+                  ) : (
+                    <div className="space-y-0.5">
+                      {trustStoreExpiring.expired.slice(0, 2).map((cert) => (
+                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate('/trust-store')}>
+                          <div className="w-7 h-7 rounded-lg bg-status-danger/10 flex items-center justify-center shrink-0">
+                            <Warning size={14} weight="duotone" className="text-status-danger" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
+                            <span className="text-[10px] text-status-danger">{t('common.expired')}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {trustStoreExpiring.expiring.slice(0, 3).map((cert) => (
+                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate('/trust-store')}>
+                          <div className="w-7 h-7 rounded-lg bg-accent-warning/10 flex items-center justify-center shrink-0">
+                            <Clock size={14} weight="duotone" className="text-accent-warning" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
+                            <span className="text-[10px] text-accent-warning">{cert.days_remaining}d</span>
                           </div>
                         </div>
                       ))}
