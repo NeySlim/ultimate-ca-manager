@@ -686,24 +686,72 @@ export default function OperationsPage() {
         subtitle={t('operations.exportHeaderDesc')}
       />
       <DetailSection title={t('importExport.export.allCertsTitle')} icon={Certificate} iconClass="icon-bg-blue" description={t('importExport.export.allCertsDesc')}>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')}>
-            <DownloadSimple size={16} /> {t('importExport.export.pemBundle')}
-          </Button>
-          <Button onClick={() => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates')}>
-            <DownloadSimple size={16} /> {t('importExport.export.p7bBundle')}
-          </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')}
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+          >
+            <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
+              <FileText size={20} weight="fill" className="text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
+              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.pemDesc')}</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
+              <DownloadSimple size={14} /> {t('common.download')}
+            </span>
+          </button>
+          <button
+            onClick={() => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates')}
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+          >
+            <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
+              <Package size={20} weight="fill" className="text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
+              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.p7bDesc')}</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
+              <DownloadSimple size={14} /> {t('common.download')}
+            </span>
+          </button>
         </div>
       </DetailSection>
 
       <DetailSection title={t('importExport.export.allCAsTitle')} icon={ShieldCheck} iconClass="icon-bg-green" description={t('importExport.export.allCAsDesc', { count: cas.length })}>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}>
-            <DownloadSimple size={16} /> {t('importExport.export.pemBundle')}
-          </Button>
-          <Button onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')}>
-            <DownloadSimple size={16} /> {t('importExport.export.p7bBundle')}
-          </Button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+          >
+            <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
+              <FileText size={20} weight="fill" className="text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
+              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.pemDesc')}</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
+              <DownloadSimple size={14} /> {t('common.download')}
+            </span>
+          </button>
+          <button
+            onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')}
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+          >
+            <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
+              <Package size={20} weight="fill" className="text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
+              <p className="text-xs text-text-secondary mt-0.5">{t('importExport.export.p7bDesc')}</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-accent-primary group-hover:underline">
+              <DownloadSimple size={14} /> {t('common.download')}
+            </span>
+          </button>
         </div>
       </DetailSection>
     </DetailContent>

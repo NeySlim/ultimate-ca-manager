@@ -1141,7 +1141,9 @@
       "individualCAExportHint": "Utilisez l'export individuel d'AC pour DER, PKCS#12 ou PFX",
       "certificatesExported": "Certificats exportés",
       "caExported": "Certificats AC exportés",
-      "exportFailed": "Échec de l'export"
+      "exportFailed": "Échec de l'export",
+      "pemDesc": "Format PEM encodé en Base64, largement compatible",
+      "p7bDesc": "Format conteneur PKCS#7 encodé en DER"
     },
     "groups": {
       "import": "Importer",

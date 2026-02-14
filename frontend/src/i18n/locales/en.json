@@ -1058,7 +1058,9 @@
       "individualCAExportHint": "Use individual CA export for DER, PKCS#12, or PFX formats",
       "certificatesExported": "Certificates exported",
       "caExported": "CA certificates exported",
-      "exportFailed": "Export failed"
+      "exportFailed": "Export failed",
+      "pemDesc": "Base64-encoded PEM format, widely compatible",
+      "p7bDesc": "DER-encoded PKCS#7 container format"
     },
     "importCA": "Import CA",
     "importOPNsense": "Import from OPNsense",
