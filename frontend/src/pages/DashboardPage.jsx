@@ -361,7 +361,7 @@ export default function DashboardPage() {
   const isVisible = (id) => widgets.find(w => w.id === id)?.visible
 
   return (
-    <div className={`flex-1 flex flex-col bg-bg-primary ${isDesktopGrid ? 'h-full overflow-hidden' : ''}`}>
+    <div className={`flex flex-col bg-bg-primary ${isDesktopGrid ? 'flex-1 h-full overflow-hidden' : 'min-h-full'}`}>
       <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : 'pb-6'}`}>
         
         {/* Dashboard Header */}
@@ -941,42 +941,213 @@ export default function DashboardPage() {
               </div>
             </div>
             )}
-            {isVisible('nextExpiry') && nextExpirations.length > 0 && (
+
+            {isVisible('chartPie') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={Clock} iconColor="red" title={t('dashboard.nextExpirations')} subtitle={t('dashboard.expiringCertificates', { count: nextExpirations.length })} compact />
-              <Card.Body className="space-y-0.5 !pt-0 !pb-2">
-                {nextExpirations.slice(0, 5).map(cert => {
-                  const daysLeft = cert.valid_to 
-                    ? Math.max(0, Math.ceil((new Date(cert.valid_to) - new Date()) / (1000 * 60 * 60 * 24)))
-                    : null
-                  return (
-                  <div key={cert.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-bg-hover rounded-lg cursor-pointer" onClick={() => navigate(`/certificates/${cert.id}`)}>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-text-primary truncate">{cert.common_name}</p>
-                      <p className="text-[10px] text-text-tertiary">{cert.issuer_cn}</p>
-                    </div>
-                    {daysLeft !== null && <Badge variant={daysLeft <= 7 ? 'danger' : daysLeft <= 30 ? 'warning' : 'info'} size="sm">{daysLeft}d</Badge>}
-                  </div>
-                  )
-                })}
+              <Card.Header icon={Certificate} iconColor="violet" title={t('dashboard.statusDistribution')} compact />
+              <Card.Body className="!pt-0 !pb-0 !px-2" style={{ height: 180 }}>
+                <StatusPieChart data={{ valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: 0, revoked: stats?.revoked || 0 }} />
               </Card.Body>
             </Card>
             )}
-            {isVisible('activity') && activityLog.length > 0 && (
+
+            {isVisible('nextExpiry') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={ClockCounterClockwise} iconColor="blue" title={t('dashboard.recentActivity')} compact />
-              <Card.Body className="space-y-0.5 !pt-0 !pb-2">
-                {activityLog.slice(0, 5).map((a, i) => (
-                  <div key={i} className="flex items-center gap-2 px-3 py-1.5">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${a.action === 'create' ? 'bg-accent-success/15 text-accent-success' : a.action === 'delete' ? 'bg-status-danger/15 text-status-danger' : 'bg-accent-primary/15 text-accent-primary'}`}>
-                      {a.action === 'create' ? <Plus size={10} /> : a.action === 'delete' ? <Trash size={10} /> : <PencilSimple size={10} />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-text-primary truncate">{a.subject || a.details}</p>
-                      <p className="text-[10px] text-text-tertiary">{a.action} • {a.time_ago}</p>
-                    </div>
+              <Card.Header icon={Timer} iconColor="orange" title={t('dashboard.nextExpirations')} action={expiringCount > 0 ? <Badge variant="warning" size="sm" dot>{expiringCount}</Badge> : null} compact />
+              <Card.Body className="!pt-0 !pb-2">
+                {nextExpirations.length === 0 ? (
+                  <EmptyWidget icon={Timer} text={t('dashboard.noExpirations')} />
+                ) : (
+                  <div className="space-y-1">
+                    {nextExpirations.slice(0, 5).map((cert, i) => {
+                      const daysLeft = cert.valid_to ? Math.max(0, Math.ceil((new Date(cert.valid_to) - new Date()) / (1000 * 60 * 60 * 24))) : null
+                      const totalLifespan = (cert.valid_from && cert.valid_to) ? Math.max(1, Math.ceil((new Date(cert.valid_to) - new Date(cert.valid_from)) / (1000 * 60 * 60 * 24))) : 365
+                      const progress = daysLeft !== null ? Math.min(100, (daysLeft / totalLifespan) * 100) : 0
+                      const urgency = daysLeft === null ? 'gray' : daysLeft <= 7 ? 'danger' : daysLeft <= 15 ? 'warning' : daysLeft <= 30 ? 'yellow' : 'success'
+                      const barColor = { danger: 'var(--accent-danger)', warning: 'var(--accent-warning)', yellow: '#EAB308', success: 'var(--accent-success)', gray: 'var(--text-tertiary)' }[urgency]
+                      return (
+                        <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-xs font-medium text-text-primary truncate flex-1">{cert.common_name || cert.descr || cert.subject || '—'}</span>
+                            <span className={`text-[10px] font-semibold whitespace-nowrap ${urgency === 'danger' ? 'status-danger-text' : urgency === 'warning' ? 'status-warning-text' : 'text-text-secondary'}`}>
+                              {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(3, progress)}%`, backgroundColor: barColor }} />
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
+                )}
+              </Card.Body>
+            </Card>
+            )}
+
+            {isVisible('certs') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={Certificate} iconColor="blue" title={t('dashboard.recentCertificates')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/certificates')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Body className="space-y-0.5 !pt-0">
+                {recentCerts.length === 0 ? (
+                  <EmptyWidget icon={Certificate} text={t('dashboard.noCertificatesYet')} />
+                ) : (
+                  recentCerts.slice(0, 4).map((cert, i) => (
+                    <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0">
+                        <Certificate size={14} weight="duotone" className="text-text-tertiary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-text-primary truncate">{cert.common_name || cert.descr || cert.subject || t('common.certificate')}</span>
+                          <Badge variant={cert.revoked ? 'danger' : (cert.valid_to && new Date(cert.valid_to) < new Date()) ? 'warning' : 'success'} size="sm" dot>
+                            {cert.revoked ? t('common.revoked') : (cert.valid_to && new Date(cert.valid_to) < new Date()) ? t('common.expired') : t('common.valid')}
+                          </Badge>
+                        </div>
+                        <div className="text-[10px] text-text-tertiary mt-0.5">{formatRelativeTime(cert.created_at, t)}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </Card.Body>
+            </Card>
+            )}
+
+            {isVisible('cas') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={ShieldCheck} iconColor="emerald" title={t('dashboard.recentCAs')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Body className="space-y-0.5 !pt-0">
+                {recentCAs.length === 0 ? (
+                  <EmptyWidget icon={ShieldCheck} text={t('dashboard.noCAsYet')} />
+                ) : (
+                  recentCAs.slice(0, 4).map((ca, i) => (
+                    <div key={ca.id || i} onClick={() => navigate(`/cas/${ca.id}`)} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0">
+                        <ShieldCheck size={14} weight="duotone" className="text-text-tertiary" />
+                      </div>
+                      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-text-primary truncate">{ca.dn_commonname || ca.descr || ca.name}</span>
+                        <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">{ca.is_root ? t('common.root') : t('dashboard.sub')}</Badge>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </Card.Body>
+            </Card>
+            )}
+
+            {isVisible('activity') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={ClockCounterClockwise} iconColor="teal" title={t('dashboard.recentActivity')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/audit')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Body className="!pt-0">
+                {activityLog.length === 0 ? (
+                  <EmptyWidget icon={ClockCounterClockwise} text={t('dashboard.noRecentActivity')} />
+                ) : (
+                  <div className="space-y-0.5">
+                    {activityLog.slice(0, 5).map((activity, i) => {
+                      const Icon = actionIcons[activity.action] || actionIcons.default
+                      const isError = activity.action === 'login_failed' || activity.action === 'revoke'
+                      const isSuccess = activity.action === 'login_success' || activity.action === 'create'
+                      return (
+                        <div key={activity.id || i} className="p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors flex items-start gap-2.5">
+                          <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${isError ? 'status-danger-bg' : isSuccess ? 'status-success-bg' : 'bg-bg-tertiary'}`}>
+                            <Icon size={12} weight="bold" className={isError ? 'status-danger-text' : isSuccess ? 'status-success-text' : 'text-text-tertiary'} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-text-primary leading-tight truncate">{activity.message || activity.action}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-text-secondary font-medium">{activity.user || 'System'}</span>
+                              <span className="text-text-tertiary text-[10px]">•</span>
+                              <span className="text-[10px] text-text-tertiary">{formatRelativeTime(activity.timestamp, t)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+            )}
+
+            {isVisible('system') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={Heartbeat} iconColor="blue" title={t('dashboard.systemHealth')} compact />
+              <Card.Body className="!pt-0.5 !pb-1.5">
+                <div className="grid grid-cols-2 gap-1 mb-1.5">
+                  <SystemStat icon={WifiHigh} label={t('dashboard.websocket')} value={isConnected ? t('common.connected') : t('common.disconnected')} status={isConnected ? 'online' : 'offline'} />
+                  <SystemStat icon={Database} label={t('common.database')} value={t('dashboard.healthy')} status="online" />
+                  <SystemStat icon={Clock} label={t('common.lastUpdate')} value={formatRelativeTime(lastUpdate, t)} status="online" />
+                  <SystemStat icon={Lightning} label={t('dashboard.api')} value={t('common.online')} status="online" />
+                </div>
+                <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide mb-0.5">{t('dashboard.services')}</div>
+                <div className="grid grid-cols-4 gap-1">
+                  <ServiceBadge name="ACME" status={systemStatus?.acme} />
+                  <ServiceBadge name="SCEP" status={systemStatus?.scep} />
+                  <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
+                  <ServiceBadge name="CRL" status={systemStatus?.crl} />
+                </div>
+              </Card.Body>
+            </Card>
+            )}
+
+            {isVisible('acme') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={Globe} iconColor="violet" title={t('dashboard.acmeAccounts')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Body className="!pt-0">
+                {recentAcme.length === 0 ? (
+                  <EmptyWidget icon={Globe} text={t('dashboard.noAcmeAccounts')} />
+                ) : (
+                  <div className="space-y-0.5">
+                    {recentAcme.slice(0, 4).map((account, i) => (
+                      <div key={account.id || i} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate('/acme')}>
+                        <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0">
+                          <User size={14} weight="duotone" className="text-text-tertiary" />
+                        </div>
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-text-primary truncate">{account.email || account.contact}</span>
+                          <Badge variant="secondary" size="sm">{account.orders_count || 0} {t('dashboard.orders')}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
+            )}
+
+            {isVisible('trustExpiry') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={ShieldCheck} iconColor="orange" title={t('dashboard.trustStoreExpiry')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/truststore')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Body className="!pt-0">
+                {trustStoreExpiring.expiring_count === 0 && trustStoreExpiring.expired_count === 0 ? (
+                  <EmptyWidget icon={ShieldCheck} text={t('dashboard.noTrustStoreExpiring')} />
+                ) : (
+                  <div className="space-y-0.5">
+                    {trustStoreExpiring.expired.slice(0, 2).map((cert) => (
+                      <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
+                        <div className="w-7 h-7 rounded-lg bg-status-danger/10 flex items-center justify-center shrink-0">
+                          <Warning size={14} weight="duotone" className="text-status-danger" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
+                          <span className="text-[10px] text-status-danger">{t('common.expired')}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {trustStoreExpiring.expiring.slice(0, 3).map((cert) => (
+                      <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
+                        <div className="w-7 h-7 rounded-lg bg-accent-warning/10 flex items-center justify-center shrink-0">
+                          <Clock size={14} weight="duotone" className="text-accent-warning" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
+                          <span className="text-[10px] text-accent-warning">{cert.days_remaining}d</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Card.Body>
             </Card>
             )}
