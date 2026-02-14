@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Wrench, Globe, FileMagnifyingGlass, Key, ArrowsLeftRight,
   CheckCircle, XCircle, Warning, Certificate,
-  Copy, Download, ArrowRight, Spinner
+  Copy, Download, Spinner
 } from '@phosphor-icons/react'
 import {
   Button, Badge, Textarea, Input, Select, FileUpload,
@@ -546,11 +546,8 @@ export default function CertificateToolsPage() {
         />
       </div>
 
-      {/* Output format */}
-      <div className="flex gap-4 flex-wrap items-end">
-        <div className="flex items-center gap-2">
-          <ArrowRight size={20} className="text-text-secondary" />
-        </div>
+      {/* Output format and passwords */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
         <Select
           label={t('tools.outputFormat')}
           value={convertFormat}
@@ -561,8 +558,24 @@ export default function CertificateToolsPage() {
             { value: 'pkcs12', label: t('tools.pkcs12') },
             { value: 'pkcs7', label: t('tools.pkcs7') },
           ]}
-          className="w-48"
         />
+        <Input
+          label={t('tools.inputPassword')}
+          type="password"
+          placeholder={t('tools.forEncryptedFiles')}
+          value={convertPassword}
+          onChange={(e) => setConvertPassword(e.target.value)}
+        />
+        {convertFormat === 'pkcs12' && (
+          <Input
+            label={t('tools.outputPkcs12Password')}
+            type="password"
+            placeholder={t('tools.passwordForP12')}
+            value={pkcs12Password}
+            onChange={(e) => setPkcs12Password(e.target.value)}
+            showStrength
+          />
+        )}
       </div>
 
       {/* Additional inputs for PKCS12 output */}
@@ -614,28 +627,6 @@ export default function CertificateToolsPage() {
           className="font-mono text-xs"
         />
       )}
-
-      <div className="flex gap-3 flex-wrap items-end">
-        <Input
-          label={t('tools.inputPassword')}
-          type="password"
-          placeholder={t('tools.forEncryptedFiles')}
-          value={convertPassword}
-          onChange={(e) => setConvertPassword(e.target.value)}
-          className="w-48"
-        />
-        {convertFormat === 'pkcs12' && (
-          <Input
-            label={t('tools.outputPkcs12Password')}
-            type="password"
-            placeholder={t('tools.passwordForP12')}
-            value={pkcs12Password}
-            onChange={(e) => setPkcs12Password(e.target.value)}
-            className="w-48"
-            showStrength
-          />
-        )}
-      </div>
 
       <Button size="default" onClick={handleConvert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
