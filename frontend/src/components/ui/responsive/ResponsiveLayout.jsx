@@ -109,13 +109,6 @@ export function ResponsiveLayout({
   const useSidebar = tabLayout === 'sidebar' && tabs && tabs.length > 0
   const [mobileMenuOpen, setMobileMenuOpen] = useState(true)
   
-  // Mobile: when tab changes externally, show content (not menu)
-  useEffect(() => {
-    if (useSidebar && !showInlineHeader && activeTab) {
-      setMobileMenuOpen(false)
-    }
-  }, []) // Only on mount
-  
   // Local state for filter/help drawers (mobile only)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [helpDrawerOpen, setHelpDrawerOpen] = useState(false)
