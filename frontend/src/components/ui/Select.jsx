@@ -125,7 +125,7 @@ export function Select({
             align="start"
           >
             <SelectPrimitive.Viewport className="p-1 max-h-60 overflow-auto">
-              {options.map(option => (
+              {options.filter(opt => opt.value !== '').map(option => (
                 <SelectPrimitive.Item
                   key={option.value}
                   value={option.value}
