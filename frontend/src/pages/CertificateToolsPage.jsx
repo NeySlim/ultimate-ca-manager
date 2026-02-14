@@ -10,7 +10,7 @@ import {
   Copy, Download, ArrowRight, Spinner, UploadSimple
 } from '@phosphor-icons/react'
 import {
-  Button, Badge, Textarea, Input,
+  Button, Badge, Textarea, Input, Select,
   CompactSection, CompactGrid, CompactField,
   DetailHeader, DetailContent, DetailSection
 } from '../components'
@@ -293,7 +293,7 @@ export default function CertificateToolsPage() {
     showSuccess(t('common.copiedToClipboard'))
   }
 
-  // Reusable Textarea with file upload
+  // Reusable Textarea with file upload button
   const TextareaWithUpload = ({ label, placeholder, value, onChange, rows = 6, accept = '.pem,.crt,.cer,.der,.p12,.pfx,.p7b,.key,.csr' }) => {
     const fileInputId = `file-${label.replace(/\s/g, '-').toLowerCase()}`
     
@@ -307,7 +307,6 @@ export default function CertificateToolsPage() {
         if (typeof content === 'string') {
           onChange({ target: { value: content } })
         } else {
-          // Binary - convert to base64 with prefix
           const bytes = new Uint8Array(content)
           let binary = ''
           for (let i = 0; i < bytes.length; i++) {
@@ -317,7 +316,6 @@ export default function CertificateToolsPage() {
         }
       }
       
-      // PEM files as text, others as binary
       if (file.name.match(/\.(pem|crt|cer|key|csr)$/i)) {
         reader.readAsText(file)
       } else {
@@ -326,30 +324,24 @@ export default function CertificateToolsPage() {
     }
     
     return (
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-text-primary">{label}</label>
-          <label htmlFor={fileInputId} className="flex items-center gap-1 text-xs text-accent-primary hover:underline cursor-pointer">
-            <UploadSimple size={12} />
-            {t('tools.uploadFile')}
-          </label>
-          <input
-            id={fileInputId}
-            type="file"
-            accept={accept}
-            onChange={handleFile}
-            className="hidden"
-          />
-        </div>
-        <textarea
-          placeholder={placeholder}
-          value={value?.startsWith('BASE64:') ? `[Binary file loaded - ${Math.round(value.length / 1.37)} bytes]` : value}
-          onChange={onChange}
-          rows={rows}
-          className="w-full px-3 py-2 rounded-md border border-border bg-bg-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 font-mono text-xs resize-none"
-          readOnly={value?.startsWith('BASE64:')}
-        />
-      </div>
+      <Textarea
+        label={label}
+        placeholder={value?.startsWith('BASE64:') ? `[Binary file loaded - ${Math.round(value.length / 1.37)} bytes]` : placeholder}
+        value={value?.startsWith('BASE64:') ? `[Binary file loaded - ${Math.round(value.length / 1.37)} bytes]` : value}
+        onChange={onChange}
+        rows={rows}
+        className="font-mono text-xs"
+        readOnly={value?.startsWith('BASE64:')}
+        helperText={
+          <span className="inline-flex items-center gap-1">
+            <label htmlFor={fileInputId} className="inline-flex items-center gap-1 text-accent-primary hover:underline cursor-pointer">
+              <UploadSimple size={12} />
+              {t('tools.uploadFile')}
+            </label>
+            <input id={fileInputId} type="file" accept={accept} onChange={handleFile} className="hidden" />
+          </span>
+        }
+      />
     )
   }
 
@@ -393,7 +385,7 @@ export default function CertificateToolsPage() {
           />
         </div>
       </div>
-      <Button onClick={handleCheckSSL} disabled={loading}>
+      <Button size="default" onClick={handleCheckSSL} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Globe size={16} />}
         {t('tools.checkSSL')}
       </Button>
@@ -420,7 +412,7 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.csr,.der"
       />
-      <Button onClick={handleDecodeCSR} disabled={loading}>
+      <Button size="default" onClick={handleDecodeCSR} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
         {t('tools.decodeCsr')}
       </Button>
@@ -447,7 +439,7 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.crt,.cer,.der"
       />
-      <Button onClick={handleDecodeCert} disabled={loading}>
+      <Button size="default" onClick={handleDecodeCert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
         {t('tools.decodeCert')}
       </Button>
@@ -500,7 +492,7 @@ export default function CertificateToolsPage() {
         onChange={(e) => setMatchPassword(e.target.value)}
         className="max-w-xs"
       />
-      <Button onClick={handleMatchKeys} disabled={loading}>
+      <Button size="default" onClick={handleMatchKeys} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Key size={16} />}
         {t('tools.matchKeys')}
       </Button>
@@ -525,28 +517,26 @@ export default function CertificateToolsPage() {
         
         {/* File upload */}
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t('common.uploadFile')}</label>
-          <input
+          <Input
+            label={t('common.uploadFile')}
             type="file"
             accept=".pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr"
             onChange={(e) => handleConvertFileChange(e, setConvertFile, setConvertFileData)}
-            className="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded file:bg-accent-primary file:text-white file:cursor-pointer hover:file:bg-accent-primary/90"
+            helperText={t('tools.supportsFormats')}
           />
-          <p className="text-xs text-text-secondary mt-1">
-            {t('tools.supportsFormats')}
-          </p>
         </div>
         
         {convertFile && (
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle size={16} className="text-status-success" />
             <span className="text-text-primary">{convertFile.name}</span>
-            <button 
+            <Button 
+              variant="ghost"
+              size="xs"
               onClick={() => { setConvertFile(null); setConvertFileData(null) }}
-              className="text-text-secondary hover:text-status-danger"
             >
               <XCircle size={16} />
-            </button>
+            </Button>
           </div>
         )}
         
@@ -572,19 +562,18 @@ export default function CertificateToolsPage() {
         <div className="flex items-center gap-2">
           <ArrowRight size={20} className="text-text-secondary" />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t('tools.outputFormat')}</label>
-          <select
-            value={convertFormat}
-            onChange={(e) => setConvertFormat(e.target.value)}
-            className="px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
-          >
-            <option value="pem">{t('tools.pemText')}</option>
-            <option value="der">{t('tools.derBinary')}</option>
-            <option value="pkcs12">{t('tools.pkcs12')}</option>
-            <option value="pkcs7">{t('tools.pkcs7')}</option>
-          </select>
-        </div>
+        <Select
+          label={t('tools.outputFormat')}
+          value={convertFormat}
+          onChange={convertFormat => setConvertFormat(convertFormat)}
+          options={[
+            { value: 'pem', label: t('tools.pemText') },
+            { value: 'der', label: t('tools.derBinary') },
+            { value: 'pkcs12', label: t('tools.pkcs12') },
+            { value: 'pkcs7', label: t('tools.pkcs7') },
+          ]}
+          className="w-48"
+        />
       </div>
 
       {/* Additional inputs for PKCS12 output */}
@@ -592,15 +581,12 @@ export default function CertificateToolsPage() {
         <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
           <div className="text-sm font-medium text-text-primary">{t('tools.pkcs12RequiresKey')}</div>
           
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">{t('tools.privateKeyFile')}</label>
-            <input
-              type="file"
-              accept=".pem,.key,.der"
-              onChange={(e) => handleConvertFileChange(e, setConvertKeyFile, (data) => setConvertKey(data))}
-              className="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded file:bg-bg-tertiary file:text-text-primary file:cursor-pointer"
-            />
-          </div>
+          <Input
+            label={t('tools.privateKeyFile')}
+            type="file"
+            accept=".pem,.key,.der"
+            onChange={(e) => handleConvertFileChange(e, setConvertKeyFile, (data) => setConvertKey(data))}
+          />
           
           {!convertKeyFile && (
             <Textarea
@@ -657,7 +643,7 @@ export default function CertificateToolsPage() {
         )}
       </div>
 
-      <Button onClick={handleConvert} disabled={loading}>
+      <Button size="default" onClick={handleConvert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
         {t('tools.convert')}
       </Button>
@@ -973,16 +959,18 @@ export default function CertificateToolsPage() {
             <pre className="p-3 bg-bg-secondary rounded-lg text-xs font-mono overflow-x-auto max-h-64 text-text-primary">
               {data.data}
             </pre>
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => copyToClipboard(data.data)}
-              className="absolute top-2 right-2 p-1.5 rounded bg-bg-tertiary hover:bg-bg-secondary"
+              className="absolute top-2 right-2"
             >
-              <Copy size={14} className="text-text-secondary" />
-            </button>
+              <Copy size={14} />
+            </Button>
           </div>
         )}
 
-        <Button onClick={downloadConverted}>
+        <Button size="default" onClick={downloadConverted}>
           <Download size={16} />
           {t('tools.download', { filename: data.filename })}
         </Button>
