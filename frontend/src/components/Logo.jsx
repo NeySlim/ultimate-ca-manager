@@ -1,6 +1,6 @@
 /**
- * UCM Logo Component - U Orbit
- * Stylized U letter with protective orbital arcs
+ * UCM Logo Component - U Shield
+ * Stylized U letter inside a protective shield outline
  * Uses CSS variables for gradient colors
  */
 import { useId } from 'react'
@@ -18,13 +18,14 @@ function LogoIcon({ size = 32, className }) {
   const uid = useId()
   const g1 = `ucm-g1-${uid}`
   const g2 = `ucm-g2-${uid}`
+  const g3 = `ucm-g3-${uid}`
   return (
     <svg
-      viewBox="0 0 48 48"
+      viewBox="0 0 48 56"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       width={size}
-      height={size}
+      height={size * (56 / 48)}
       className={className}
     >
       <defs>
@@ -37,15 +38,29 @@ function LogoIcon({ size = 32, className }) {
           <stop offset="0%" stopColor="var(--logo-gradient-accent)" />
           <stop offset="100%" stopColor="var(--logo-gradient-start)" />
         </linearGradient>
+        <linearGradient id={g3} x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="var(--logo-gradient-accent)" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="var(--logo-gradient-end)" stopOpacity="0.05" />
+        </linearGradient>
       </defs>
-      {/* Left protective arc */}
-      <path d="M5 34 A22 22 0 0 1 5 14" fill="none" stroke={`url(#${g2})`} strokeWidth="4" strokeLinecap="round" />
-      {/* Right protective arc */}
-      <path d="M43 14 A22 22 0 0 1 43 34" fill="none" stroke={`url(#${g1})`} strokeWidth="4" strokeLinecap="round" />
+      {/* Shield outline — wider, curved sides, softer bottom */}
+      <path
+        d="M24 3 C16 3 6 9 5 13 C4 20 3 32 24 51 C45 32 44 20 43 13 C42 9 32 3 24 3Z"
+        fill={`url(#${g3})`}
+        stroke={`url(#${g1})`}
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
       {/* U letter */}
-      <path d="M16 13v13a8 8 0 0 0 16 0V13" fill="none" stroke={`url(#${g1})`} strokeWidth="5.5" strokeLinecap="round" />
-      {/* Accent dot */}
-      <circle cx="39" cy="10" r="3.5" fill={`url(#${g2})`} />
+      <path
+        d="M17 18v11a7 7 0 0 0 14 0V18"
+        fill="none"
+        stroke={`url(#${g1})`}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+      {/* Accent dot at shield top */}
+      <circle cx="24" cy="11" r="2.5" fill={`url(#${g2})`} />
     </svg>
   )
 }
