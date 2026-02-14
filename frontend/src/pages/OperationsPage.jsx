@@ -668,12 +668,12 @@ export default function OperationsPage() {
       )}
 
       <div className="flex gap-3 pt-2">
-        <Button variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret} size="lg">
+        <Button variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
           {processing ? t('common.testing') : t('common.testConnection')}
         </Button>
         {testResult?.success && testItems.some(i => i.selected) && (
-          <Button onClick={handleImportFromOpnsense} disabled={processing} size="lg">
-            <UploadSimple size={18} />
+          <Button onClick={handleImportFromOpnsense} disabled={processing}>
+            <UploadSimple size={16} />
             {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
           </Button>
         )}

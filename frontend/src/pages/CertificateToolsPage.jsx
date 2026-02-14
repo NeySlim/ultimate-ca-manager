@@ -372,7 +372,7 @@ export default function CertificateToolsPage() {
           />
         </div>
       </div>
-      <Button size="default" onClick={handleCheckSSL} disabled={loading}>
+      <Button onClick={handleCheckSSL} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Globe size={16} />}
         {t('tools.checkSSL')}
       </Button>
@@ -399,7 +399,7 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.csr,.der"
       />
-      <Button size="default" onClick={handleDecodeCSR} disabled={loading}>
+      <Button onClick={handleDecodeCSR} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
         {t('tools.decodeCsr')}
       </Button>
@@ -426,7 +426,7 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.crt,.cer,.der"
       />
-      <Button size="default" onClick={handleDecodeCert} disabled={loading}>
+      <Button onClick={handleDecodeCert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
         {t('tools.decodeCert')}
       </Button>
@@ -479,7 +479,7 @@ export default function CertificateToolsPage() {
         onChange={(e) => setMatchPassword(e.target.value)}
         className="max-w-xs"
       />
-      <Button size="default" onClick={handleMatchKeys} disabled={loading}>
+      <Button onClick={handleMatchKeys} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Key size={16} />}
         {t('tools.matchKeys')}
       </Button>
@@ -628,7 +628,7 @@ export default function CertificateToolsPage() {
         />
       )}
 
-      <Button size="default" onClick={handleConvert} disabled={loading}>
+      <Button onClick={handleConvert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
         {t('tools.convert')}
       </Button>
@@ -955,7 +955,7 @@ export default function CertificateToolsPage() {
           </div>
         )}
 
-        <Button size="default" onClick={downloadConverted}>
+        <Button onClick={downloadConverted}>
           <Download size={16} />
           {t('tools.download', { filename: data.filename })}
         </Button>
