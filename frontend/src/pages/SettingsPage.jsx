@@ -184,11 +184,10 @@ function AboutSection() {
       {/* Logo & branding */}
       <div className="flex flex-col items-center py-6 mb-4">
         <Logo variant="vertical" size="lg" />
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3">
           <Badge variant="accent" size="sm">
             {loading ? '...' : `v${info?.version || '2.1.0'}`}
           </Badge>
-          <Badge variant="outline" size="sm">Open Source</Badge>
         </div>
       </div>
 
