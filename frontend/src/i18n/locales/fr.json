@@ -947,7 +947,13 @@
     "addedBy": "Ajouté par",
     "sanDns": "SAN DNS",
     "daysLeft": "{{count}} jours restants",
-    "daysLeft_one": "{{count}} jour restant"
+    "daysLeft_one": "{{count}} jour restant",
+    "chainValidation": "Validation de chaîne",
+    "chainComplete": "Chaîne complète",
+    "chainIncomplete": "Chaîne incomplète",
+    "chainPartial": "Chaîne partielle",
+    "managedCA": "CA gérée",
+    "trustAnchor": "Ancre de confiance"
   },
   "groups": {
     "group": "Groupe",

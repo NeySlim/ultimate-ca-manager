@@ -37,7 +37,8 @@ import {
   Hash,
   Fingerprint,
   ArrowsClockwise,
-  UploadSimple
+  UploadSimple,
+  LinkSimple
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
@@ -297,6 +298,50 @@ export function CertificateDetails({
           <CompactField autoIcon="caReference" label={t('details.caReference')} value={cert.caref} mono copyable />
         </CompactGrid>
       </CompactSection>
+
+      {/* Chain Validation */}
+      {cert.chain_status && (
+        <CompactSection 
+          title={t('details.chainValidation')} 
+          icon={LinkSimple} 
+          iconClass={cert.chain_status.status === 'complete' ? 'icon-bg-emerald' : cert.chain_status.status === 'incomplete' ? 'icon-bg-orange' : 'icon-bg-teal'}
+        >
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {cert.chain_status.status === 'complete' ? (
+                <Badge variant="success" size="sm" dot>{t('details.chainComplete')}</Badge>
+              ) : cert.chain_status.status === 'incomplete' ? (
+                <Badge variant="warning" size="sm" dot>{t('details.chainIncomplete')}</Badge>
+              ) : (
+                <Badge variant="secondary" size="sm" dot>{t('details.chainPartial')}</Badge>
+              )}
+              {cert.chain_status.trust_source === 'trust_store' && (
+                <Badge variant="teal" size="sm">✓ Trust Store</Badge>
+              )}
+              {cert.chain_status.trust_source === 'managed_ca' && (
+                <Badge variant="primary" size="sm">✓ {t('details.managedCA')}</Badge>
+              )}
+            </div>
+            {cert.chain_status.trust_anchor && (
+              <CompactField autoIcon="ca" label={t('details.trustAnchor')} value={cert.chain_status.trust_anchor} />
+            )}
+            {cert.chain_status.chain?.length > 0 && (
+              <div className="flex items-center gap-1 text-xs flex-wrap mt-1">
+                <span className="px-2 py-0.5 rounded icon-bg-blue text-[10px]">{cert.common_name || 'Leaf'}</span>
+                {cert.chain_status.chain.map((link, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    <span className="text-text-tertiary">→</span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[10px]",
+                      link.type === 'trust_store' ? 'icon-bg-amber' : 'icon-bg-emerald'
+                    )}>{link.name}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </CompactSection>
+      )}
       
       {/* Thumbprints */}
       <CompactSection title={t('common.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
