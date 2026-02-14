@@ -814,7 +814,7 @@ export default function CertificatesPage() {
 MIIEvgIBADANBgkqhkiG9w0BAQE...
 -----END PRIVATE KEY-----"
             rows={8}
-            mono
+            className="font-mono text-xs"
           />
           <Input
             label={t('common.password')}

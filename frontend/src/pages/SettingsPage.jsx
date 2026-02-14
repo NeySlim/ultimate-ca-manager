@@ -519,7 +519,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               onChange={e => handleChange('saml_certificate', e.target.value)}
               rows={6}
               placeholder="-----BEGIN CERTIFICATE-----..."
-              mono
+              className="font-mono text-xs"
             />
           </>
         )}

@@ -528,7 +528,7 @@ export default function TrustStorePage() {
             value={addForm.certificate_pem}
             onChange={(e) => setAddForm(prev => ({ ...prev, certificate_pem: e.target.value }))}
             rows={8}
-            mono
+            className="font-mono text-xs"
             required
           />
           <Input

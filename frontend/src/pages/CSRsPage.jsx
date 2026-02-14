@@ -582,7 +582,7 @@ export default function CSRsPage() {
 MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
 -----END CERTIFICATE REQUEST-----"
                 rows={10}
-                mono
+                className="font-mono text-xs"
               />
               <div className="flex justify-end gap-2 pt-2 border-t border-border">
                 <Button variant="secondary" onClick={() => { closeModal('upload'); setPastedPEM('') }}>
@@ -652,7 +652,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
 MIIEvgIBADANBgkqhkiG9w0BAQE...
 -----END PRIVATE KEY-----"
             rows={8}
-            mono
+            className="font-mono text-xs"
           />
           <Input
             label={t('csrs.passphrase')}

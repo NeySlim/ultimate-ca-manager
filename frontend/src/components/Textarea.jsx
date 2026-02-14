@@ -9,7 +9,6 @@ export function Textarea({
   helperText,
   maxLength,
   showCount = false,
-  mono = false,
   className,
   inputClassName,
   value = '',
@@ -33,8 +32,7 @@ export function Textarea({
       
       <textarea
         className={cn(
-          "w-full px-3 py-2 bg-bg-tertiary/80 border rounded-md text-text-primary placeholder-text-secondary/60",
-          mono ? "font-mono text-2xs" : "text-sm",
+          "w-full px-3 py-2 bg-bg-tertiary/80 border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
           "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-tertiary",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "transition-all duration-200 resize-y",
