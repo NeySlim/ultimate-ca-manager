@@ -17,7 +17,7 @@ import {
 import { Responsive, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
-import { Card, Button, Badge, LoadingSpinner, Modal } from '../components'
+import { Card, Button, Badge, LoadingSpinner, Modal, Logo } from '../components'
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
 import { dashboardService, certificatesService, acmeService } from '../services'
 import { useNotification } from '../contexts'
@@ -333,13 +333,6 @@ export default function DashboardPage() {
     )
   }
 
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return t('dashboard.goodMorning')
-    if (hour < 18) return t('dashboard.goodAfternoon')
-    return t('dashboard.goodEvening')
-  }
-
   const totalCerts = stats?.total_certificates || 0
   const totalCAs = stats?.total_cas || 0
   const pendingCSRs = stats?.pending_csrs || 0
@@ -353,32 +346,26 @@ export default function DashboardPage() {
     <div className={`flex-1 flex flex-col bg-bg-primary ${isDesktopGrid ? 'h-full overflow-hidden' : 'min-h-full overflow-y-auto'}`}>
       <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : 'pb-6'}`}>
         
-        {/* Hero Header — compact bar */}
-        <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-3 py-1.5 mb-1.5">
-          <div className="relative flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
+        {/* Dashboard Header */}
+        <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-4 py-3 mb-1.5">
+          <div className="relative flex items-center justify-between gap-4">
+            {/* Branding */}
+            <div className="flex items-center gap-3">
+              <Logo variant="icon" size="sm" />
               <div>
-                <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-semibold text-text-primary">UCM</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-lg font-black tracking-tight logo-text-gradient">UCM</span>
                   <span className="text-xs text-text-tertiary">v{versionInfo.version}</span>
                   {versionInfo.update_available && (
                     <Badge variant="warning" size="sm" dot>{t('common.updateAvailable')}</Badge>
                   )}
-                  <div className="flex items-center gap-1 ml-2">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
-                    <span className={`text-xs ${isConnected ? 'status-success-text' : 'text-text-tertiary'}`}>
-                      {isConnected ? t('dashboard.liveUpdates') : t('common.offline')}
-                    </span>
-                  </div>
                 </div>
+                <p className="text-xs text-text-tertiary mt-0.5">Ultimate Certificate Manager</p>
               </div>
             </div>
-            
-            <div className="flex-1" />
-            
-            {/* Quick Actions + Layout Controls */}
-            <div className="flex flex-wrap items-center gap-2">
+
+            {/* Actions */}
+            <div className="flex items-center gap-2">
               {!editMode ? (
                 <>
                   <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
@@ -393,16 +380,17 @@ export default function DashboardPage() {
                     <ListChecks size={14} weight="bold" />
                     {t('common.csr')}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={loadDashboard} title={t('common.refresh')} className="hidden md:flex">
-                    <ArrowsClockwise size={14} />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title={t('dashboard.customizeDashboard')} className="hidden md:flex">
-                    <SlidersHorizontal size={14} />
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={() => setEditMode(true)} className="hidden md:flex">
-                    <PencilSimpleLine size={14} />
-                    {t('dashboard.editLayout')}
-                  </Button>
+                  <div className="hidden md:flex items-center gap-1 ml-1 border-l border-border/40 pl-2">
+                    <Button size="sm" variant="ghost" onClick={loadDashboard} title={t('common.refresh')}>
+                      <ArrowsClockwise size={14} />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title={t('dashboard.customizeDashboard')}>
+                      <SlidersHorizontal size={14} />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setEditMode(true)} title={t('dashboard.editLayout')}>
+                      <PencilSimpleLine size={14} />
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -418,15 +406,15 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          
-           {/* Edit mode indicator */}
-           {editMode && (
-             <div className="mt-1 flex items-center gap-2 text-xs text-accent-primary">
-               <DotsSixVertical size={14} />
-               {t('dashboard.dragToReorder')}
-             </div>
-           )}
-         </div>
+
+          {/* Edit mode indicator */}
+          {editMode && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-accent-primary">
+              <DotsSixVertical size={14} />
+              {t('dashboard.dragToReorder')}
+            </div>
+          )}
+        </div>
 
         {/* Grid Layout — flex-1 fills remaining space on desktop, natural flow on mobile */}
         <div ref={gridContainerRef} className={isDesktopGrid ? 'flex-1 min-h-0' : ''}>
