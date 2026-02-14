@@ -352,7 +352,7 @@ export default function CertificateToolsPage() {
         title={t('tools.sslChecker')}
         subtitle={t('tools.sslCheckerDesc')}
       />
-      <DetailSection>
+      <DetailSection title={t('tools.sectionConnection')} icon={Globe} iconClass="icon-bg-emerald">
       <div className="space-y-4">
       <div className="flex gap-3">
         <div className="flex-1">
@@ -389,7 +389,7 @@ export default function CertificateToolsPage() {
         title={t('tools.csrDecoder')}
         subtitle={t('tools.csrDecoderDesc')}
       />
-      <DetailSection>
+      <DetailSection title={t('tools.sectionPemInput')} icon={FileMagnifyingGlass} iconClass="icon-bg-blue">
     <div className="space-y-4">
       <TextareaWithUpload
         label={t('tools.csrPemLabel')}
@@ -416,7 +416,7 @@ export default function CertificateToolsPage() {
         title={t('tools.decoder')}
         subtitle={t('tools.certDecoderDesc')}
       />
-      <DetailSection>
+      <DetailSection title={t('tools.sectionCertificateInput')} icon={Certificate} iconClass="icon-bg-violet">
     <div className="space-y-4">
       <TextareaWithUpload
         label={t('tools.certPemLabel')}
@@ -443,7 +443,7 @@ export default function CertificateToolsPage() {
         title={t('tools.keyMatcher')}
         subtitle={t('tools.keyMatcherDesc')}
       />
-      <DetailSection>
+      <DetailSection title={t('tools.sectionKeyInput')} icon={Key} iconClass="icon-bg-orange">
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <TextareaWithUpload
@@ -496,7 +496,7 @@ export default function CertificateToolsPage() {
         title={t('tools.converter')}
         subtitle={t('tools.converterDesc')}
       />
-      <DetailSection>
+      <DetailSection title={t('tools.sectionConversion')} icon={ArrowsLeftRight} iconClass="icon-bg-teal">
     <div className="space-y-4">
       {/* Input section */}
       <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
