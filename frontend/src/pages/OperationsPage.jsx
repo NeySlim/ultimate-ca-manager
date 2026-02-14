@@ -596,7 +596,6 @@ export default function OperationsPage() {
         title={t('operations.importHeader')}
         subtitle={t('operations.importHeaderDesc')}
       />
-    <div className="max-w-3xl mx-auto space-y-6">
       <DetailSection 
         title={t('importExport.smartImport.title')}
         icon={UploadSimple} 
@@ -607,78 +606,75 @@ export default function OperationsPage() {
       </DetailSection>
 
       <DetailSection title={t('importExport.opnsense.title')} icon={CloudArrowUp} iconClass="icon-bg-orange" description={t('importExport.opnsense.description')}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
-          <Input label={t('common.portLabel')} value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
-          <Input label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} placeholder={t('importExport.opnsense.apiKeyLabel')} />
-          <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
+            <Input label={t('common.portLabel')} value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
+            <Input label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} placeholder={t('importExport.opnsense.apiKeyLabel')} />
+            <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
+          </div>
+
+          {testResult && (
+            <>
+              {testResult.success ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-status-success">
+                    <CheckCircle size={18} weight="fill" />
+                    <span className="text-sm font-medium">{t('importExport.opnsense.connectedSuccessfully')}</span>
+                  </div>
+                  {testResult.stats && (
+                    <div className="flex gap-4">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
+                        <ShieldCheck size={16} className="text-accent-primary" />
+                        <span className="text-sm font-medium">{testResult.stats.cas} CA{testResult.stats.cas > 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
+                        <Certificate size={16} className="text-accent-primary" />
+                        <span className="text-sm font-medium">{testResult.stats.certificates} {t('common.certificates')}</span>
+                      </div>
+                    </div>
+                  )}
+                  {testItems.length > 0 && (
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border">
+                        <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                          <input type="checkbox" checked={testItems.every(i => i.selected)} onChange={(e) => toggleAllItems(e.target.checked)} className="w-4 h-4 rounded border-border text-accent-primary" />
+                          {t('importExport.opnsense.selectAll')} ({testItems.filter(i => i.selected).length}/{testItems.length})
+                        </label>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto divide-y divide-border">
+                        {testItems.map(item => (
+                          <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
+                            <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} className="w-4 h-4 rounded border-border text-accent-primary shrink-0" />
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary/15 text-accent-primary' : 'bg-status-info/15 text-status-info'}`}>
+                              {item.type}
+                            </span>
+                            <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-status-danger">{testResult.error || t('importExport.opnsense.connectionFailed')}</div>
+              )}
+            </>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
+              {processing ? t('common.testing') : t('common.testConnection')}
+            </Button>
+            {testResult?.success && testItems.some(i => i.selected) && (
+              <Button onClick={handleImportFromOpnsense} disabled={processing}>
+                <UploadSimple size={16} />
+                {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
+              </Button>
+            )}
+          </div>
         </div>
       </DetailSection>
-
-      {testResult && (
-        <DetailSection 
-          title={t('importExport.opnsense.connectionResult')} 
-          icon={testResult.success ? CheckCircle : Key} 
-          iconClass={testResult.success ? 'icon-bg-emerald' : 'icon-bg-orange'}
-        >
-          {testResult.success ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-status-success">
-                <CheckCircle size={18} weight="fill" />
-                <span className="text-sm font-medium">{t('importExport.opnsense.connectedSuccessfully')}</span>
-              </div>
-              {testResult.stats && (
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-                    <ShieldCheck size={16} className="text-accent-primary" />
-                    <span className="text-sm font-medium">{testResult.stats.cas} CA{testResult.stats.cas > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-                    <Certificate size={16} className="text-accent-primary" />
-                    <span className="text-sm font-medium">{testResult.stats.certificates} {t('common.certificates')}</span>
-                  </div>
-                </div>
-              )}
-              {testItems.length > 0 && (
-                <div className="border border-border rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border">
-                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                      <input type="checkbox" checked={testItems.every(i => i.selected)} onChange={(e) => toggleAllItems(e.target.checked)} className="w-4 h-4 rounded border-border text-accent-primary" />
-                      {t('importExport.opnsense.selectAll')} ({testItems.filter(i => i.selected).length}/{testItems.length})
-                    </label>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto divide-y divide-border">
-                    {testItems.map(item => (
-                      <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
-                        <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} className="w-4 h-4 rounded border-border text-accent-primary shrink-0" />
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary/15 text-accent-primary' : 'bg-status-info/15 text-status-info'}`}>
-                          {item.type}
-                        </span>
-                        <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-sm text-status-danger">{testResult.error || t('importExport.opnsense.connectionFailed')}</div>
-          )}
-        </DetailSection>
-      )}
-
-      <div className="flex gap-3 pt-2">
-        <Button variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
-          {processing ? t('common.testing') : t('common.testConnection')}
-        </Button>
-        {testResult?.success && testItems.some(i => i.selected) && (
-          <Button onClick={handleImportFromOpnsense} disabled={processing}>
-            <UploadSimple size={16} />
-            {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
-          </Button>
-        )}
-      </div>
-    </div>
     </DetailContent>
   )
 
@@ -689,29 +685,27 @@ export default function OperationsPage() {
         title={t('operations.exportHeader')}
         subtitle={t('operations.exportHeaderDesc')}
       />
-    <div className="max-w-3xl mx-auto space-y-6">
       <DetailSection title={t('importExport.export.allCertsTitle')} icon={Certificate} iconClass="icon-bg-blue" description={t('importExport.export.allCertsDesc')}>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="secondary" onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')} className="justify-center">
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')}>
             <DownloadSimple size={16} /> {t('importExport.export.pemBundle')}
           </Button>
-          <Button onClick={() => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates')} className="justify-center">
+          <Button onClick={() => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates')}>
             <DownloadSimple size={16} /> {t('importExport.export.p7bBundle')}
           </Button>
         </div>
       </DetailSection>
 
       <DetailSection title={t('importExport.export.allCAsTitle')} icon={ShieldCheck} iconClass="icon-bg-green" description={t('importExport.export.allCAsDesc', { count: cas.length })}>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="secondary" onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')} className="justify-center">
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}>
             <DownloadSimple size={16} /> {t('importExport.export.pemBundle')}
           </Button>
-          <Button onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')} className="justify-center">
+          <Button onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')}>
             <DownloadSimple size={16} /> {t('importExport.export.p7bBundle')}
           </Button>
         </div>
       </DetailSection>
-    </div>
     </DetailContent>
   )
 
