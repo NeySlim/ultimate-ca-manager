@@ -178,9 +178,9 @@
    THEME: Light (legacy - most values now in ThemeContext)
    ============================================ */
 .theme-light {
-  --bg-primary: #FAFBFC;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F3F4F6;
+  --bg-primary: #F5F6F8;
+  --bg-secondary: #FAFBFC;
+  --bg-tertiary: #EDEEF2;
   --text-primary: #1F2937;
   --text-secondary: #6B7280;
   --text-tertiary: #9CA3AF;
@@ -189,9 +189,9 @@
   --accent-warning: #F59E0B;
   --accent-danger: #EF4444;
   --accent-purple: #8B5CF6;
-  --border: #E5E7EB;
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-strong: rgba(0, 0, 0, 0.12);
+  --border: #DDDFE4;
+  --border-subtle: rgba(0, 0, 0, 0.05);
+  --border-strong: rgba(0, 0, 0, 0.10);
   
   /* Icon colors removed - managed by ThemeContext */
   
