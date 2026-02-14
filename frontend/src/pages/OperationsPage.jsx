@@ -9,7 +9,7 @@ import {
   UploadSimple, DownloadSimple, CloudArrowUp, Lightning,
   CheckCircle, XCircle, Clock, X, Certificate, ShieldCheck, Key, Trash, 
   ArrowsClockwise, Prohibit, PencilSimple, FileText, Warning, User, Crown, Info,
-  Table, ShoppingCart, Package
+  Table, ShoppingCart, Package, CaretDown
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, ResponsiveDataTable, Button, Input, 
@@ -20,7 +20,7 @@ import {
   opnsenseService, casService, certificatesService, 
   csrsService, templatesService, usersService 
 } from '../services'
-import { useNotification } from '../contexts'
+import { useNotification, useMobile } from '../contexts'
 import { formatDate, extractCN, cn } from '../lib/utils'
 
 const STORAGE_KEY = 'opnsense_config'
@@ -254,6 +254,7 @@ function useResourceTypes(t) {
 export default function OperationsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
+  const { isMobile } = useMobile()
   const navigate = useNavigate()
   const RESOURCE_TYPES = useResourceTypes(t)
   
@@ -261,6 +262,9 @@ export default function OperationsPage() {
     { id: 'import', label: t('common.import'), icon: UploadSimple },
     { id: 'export', label: t('common.export'), icon: DownloadSimple },
     { id: 'bulk', label: t('operations.bulkActions', 'Bulk Actions'), icon: Lightning },
+  ]
+  const TAB_GROUPS = [
+    { labelKey: 'operations.groups.actions', tabs: ['import', 'export', 'bulk'], color: 'icon-bg-orange' }
   ]
   const [activeTab, setActiveTab] = useState('import')
 
@@ -852,71 +856,93 @@ export default function OperationsPage() {
         />
       </div>
 
-      {/* Resource type tabs */}
+      {/* Resource type selector */}
       <div className="shrink-0 px-4 md:px-6 pb-1">
-        <div className="flex items-center border-b border-border overflow-x-auto">
-          <div className="flex items-center gap-1 min-w-max">
-            {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-              const Icon = config.icon
-              const isActive = bulkResourceType === key
-              const count = resourceCounts[key]
-              return (
-                <button
-                  key={key}
-                  onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap",
-                    isActive
-                      ? "border-accent-primary text-accent-primary"
-                      : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
-                  )}
-                >
-                  <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary")}>
-                    <Icon size={12} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : ""} />
-                  </div>
-                  {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
-                  {count !== undefined && (
-                    <span className={cn(
-                      "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
-                      isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
-                    )}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+        {isMobile ? (
+          /* Mobile: dropdown select */
+          <div className="relative">
+            <select
+              value={bulkResourceType}
+              onChange={(e) => { setBulkResourceType(e.target.value); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+              className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-medium focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
+            >
+              {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
+                const count = resourceCounts[key]
+                return (
+                  <option key={key} value={key}>
+                    {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}{count !== undefined ? ` (${count})` : ''}
+                  </option>
+                )
+              })}
+            </select>
+            <CaretDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
           </div>
+        ) : (
+          /* Desktop: underline tabs */
+          <div className="flex items-center border-b border-border">
+            <div className="flex items-center gap-1">
+              {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
+                const Icon = config.icon
+                const isActive = bulkResourceType === key
+                const count = resourceCounts[key]
+                return (
+                  <button
+                    key={key}
+                    onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap",
+                      isActive
+                        ? "border-accent-primary text-accent-primary"
+                        : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
+                    )}
+                  >
+                    <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary")}>
+                      <Icon size={12} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : ""} />
+                    </div>
+                    {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                    {count !== undefined && (
+                      <span className={cn(
+                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
+                        isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
+                      )}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
 
-          {/* View mode toggle */}
-          <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border mb-1.5 shrink-0">
-            <button
-              onClick={() => setBulkViewMode('table')}
-              className={cn(
-                "p-1.5 rounded-md transition-all",
-                bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
-              )}
-              title={t('operations.tableView', 'Table View')}
-            >
-              <Table size={16} />
-            </button>
-            <button
-              onClick={() => setBulkViewMode('basket')}
-              className={cn(
-                "p-1.5 rounded-md transition-all",
-                bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
-              )}
-              title={t('operations.basketView', 'Basket View')}
-            >
-              <ShoppingCart size={16} />
-            </button>
+            {/* View mode toggle - desktop only */}
+            <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border mb-1.5 shrink-0">
+              <button
+                onClick={() => setBulkViewMode('table')}
+                className={cn(
+                  "p-1.5 rounded-md transition-all",
+                  bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                )}
+                title={t('operations.tableView', 'Table View')}
+              >
+                <Table size={16} />
+              </button>
+              <button
+                onClick={() => setBulkViewMode('basket')}
+                className={cn(
+                  "p-1.5 rounded-md transition-all",
+                  bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                )}
+                title={t('operations.basketView', 'Basket View')}
+              >
+                <ShoppingCart size={16} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Content area — table or basket */}
+      {/* Content area — table on mobile, table or basket on desktop */}
       <div className="flex-1 min-h-0">
-        {bulkViewMode === 'table' ? (
+        {(isMobile || bulkViewMode === 'table') ? (
           <ResponsiveDataTable
             data={filteredBulkData}
             columns={resourceConfig.columns}
@@ -975,6 +1001,7 @@ export default function OperationsPage() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       tabLayout="sidebar"
+      tabGroups={TAB_GROUPS}
       sidebarContentClass={activeTab === 'bulk' ? '' : undefined}
       helpPageKey="operations"
     >
