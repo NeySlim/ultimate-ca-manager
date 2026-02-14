@@ -51,19 +51,21 @@ test.describe('RBAC', () => {
     if (await rows.count() > 0) {
       await rows.first().click()
       await page.waitForTimeout(500)
-      const detail = page.locator('[class*="slide"], [class*="panel"], [class*="detail"]')
+      const detail = page.locator('aside, [role="complementary"]')
       expect(await detail.count()).toBeGreaterThan(0)
     }
   })
 
-  test('detail panel shows permissions', async ({ page }) => {
+  test('detail panel shows role info', async ({ page }) => {
     const rows = page.locator('table tbody tr')
     if (await rows.count() > 0) {
       await rows.first().click()
       await page.waitForTimeout(500)
-      // Look for permission-related elements
-      const perms = page.locator('text=/permission/i, text=/autorisation/i, input[type="checkbox"]')
-      expect(await perms.count()).toBeGreaterThan(0)
+      const checkboxes = page.locator('input[type="checkbox"]')
+      const permText = page.getByText(/permission/i)
+      const hasCheckboxes = await checkboxes.count() > 0
+      const hasPermText = await permText.count() > 0
+      expect(hasCheckboxes || hasPermText).toBeTruthy()
     }
   })
 

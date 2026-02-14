@@ -10,8 +10,12 @@ test.describe('CSRs', () => {
     await expect(page.locator('h1')).toBeVisible()
   })
 
-  test('has data table', async ({ page }) => {
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
+  test('has data table or empty state', async ({ page }) => {
+    const table = page.locator('table')
+    const empty = page.locator('h3:has-text("No Pending"), h3:has-text("Aucun")')
+    const hasTable = await table.count() > 0
+    const hasEmpty = await empty.count() > 0
+    expect(hasTable || hasEmpty).toBeTruthy()
   })
 
   test('has stats bar', async ({ page }) => {

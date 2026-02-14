@@ -17,7 +17,7 @@ test.describe('HSM', () => {
 
   test('has data table or empty state', async ({ page }) => {
     const table = page.locator('table')
-    const empty = page.locator('[class*="empty"], [class*="no-data"], text=/no provider/i')
+    const empty = page.locator('h3:has-text("No HSM"), h3:has-text("Aucun")')
     const hasTable = await table.count() > 0
     const hasEmpty = await empty.count() > 0
     expect(hasTable || hasEmpty).toBeTruthy()
