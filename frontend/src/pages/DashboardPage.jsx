@@ -144,7 +144,7 @@ export default function DashboardPage() {
   const [certificateTrend, setCertificateTrend] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
-  const [versionInfo, setVersionInfo] = useState({ version: '2.0.0', edition: 'community', update_available: false })
+  const [versionInfo, setVersionInfo] = useState({ version: '2.0.0', update_available: false })
   
   // Widget + layout customization
   const [widgets, setWidgets] = useState(loadWidgetPrefs)
@@ -256,7 +256,7 @@ export default function DashboardPage() {
         const response = await fetch('/api/v2/system/updates/version')
         if (response.ok) {
           const data = await response.json()
-          setVersionInfo(data.data || { version: '2.0.0', edition: 'community', update_available: false })
+          setVersionInfo(data.data || { version: '2.0.0', update_available: false })
         }
       } catch {}
     }
@@ -360,9 +360,6 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="primary" size="sm">
-                    {t('common.community')}
-                  </Badge>
                   <span className="text-xs text-text-tertiary">v{versionInfo.version}</span>
                   {versionInfo.update_available && (
                     <Badge variant="warning" size="sm" dot>{t('common.updateAvailable')}</Badge>

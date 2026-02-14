@@ -188,7 +188,7 @@ function AboutSection() {
           <Badge variant="accent" size="sm">
             {loading ? '...' : `v${info?.version || '2.1.0'}`}
           </Badge>
-          <Badge variant="outline" size="sm">Community Edition</Badge>
+          <Badge variant="outline" size="sm">Open Source</Badge>
         </div>
       </div>
 
@@ -196,7 +196,6 @@ function AboutSection() {
       <DetailSection title={t('settings.about.systemInfo')} icon={HardDrives} iconClass="icon-bg-blue">
         <DetailGrid>
           <DetailField label={t('settings.about.version')} value={info?.version || '—'} />
-          <DetailField label={t('settings.about.edition')} value="Community" />
           <DetailField label={t('settings.about.pythonVersion')} value={info?.python_version || '—'} />
           <DetailField label={t('settings.about.uptime')} value={formatUptime(info?.uptime_seconds)} />
           <DetailField label={t('settings.about.memory')} value={info?.memory_mb ? `${info.memory_mb} MB` : '—'} />

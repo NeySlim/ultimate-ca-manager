@@ -1,7 +1,5 @@
 """
 Update Service - Check and install updates from GitHub releases
-
-UCM is now fully open-source (Community edition).
 """
 import os
 import re
@@ -21,11 +19,6 @@ REPO = "NeySlim/ultimate-ca-manager"
 
 # Simple cache to avoid GitHub rate limits (5 min TTL)
 _releases_cache = {'data': None, 'ts': 0, 'ttl': 300}
-
-
-def get_edition():
-    """UCM is now fully open-source community edition"""
-    return 'community'
 
 
 def get_github_repo():
@@ -102,10 +95,8 @@ def check_for_updates(include_prereleases=False):
         - release_notes: str
         - download_url: str
         - published_at: str
-        - edition: str
     """
     repo = get_github_repo()
-    edition = get_edition()
     current = get_current_version()
     
     try:
@@ -135,7 +126,6 @@ def check_for_updates(include_prereleases=False):
                 'update_available': False,
                 'current_version': current,
                 'latest_version': current,
-                'edition': edition,
                 'message': 'No releases found'
             }
         
@@ -167,7 +157,6 @@ def check_for_updates(include_prereleases=False):
                 'update_available': False,
                 'current_version': current,
                 'latest_version': current,
-                'edition': edition,
                 'message': 'No applicable releases found'
             }
         
@@ -215,7 +204,6 @@ def check_for_updates(include_prereleases=False):
             'published_at': latest_release.get('published_at'),
             'html_url': latest_release.get('html_url'),
             'prerelease': latest_release.get('prerelease', False),
-            'edition': edition,
             'repo': repo
         }
         
@@ -223,7 +211,6 @@ def check_for_updates(include_prereleases=False):
         return {
             'update_available': False,
             'current_version': current,
-            'edition': edition,
             'error': f'Failed to check for updates: {str(e)}'
         }
 

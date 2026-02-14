@@ -1317,11 +1317,10 @@ def install_update():
 @bp.route('/api/v2/system/updates/version', methods=['GET'])
 def get_version():
     """Get current version info (public endpoint)"""
-    from services.updates import get_current_version, get_edition
+    from services.updates import get_current_version
     
     return success_response(data={
-        'version': get_current_version(),
-        'edition': get_edition()
+        'version': get_current_version()
     })
 
 

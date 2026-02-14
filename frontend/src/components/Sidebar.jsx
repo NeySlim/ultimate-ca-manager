@@ -1,6 +1,5 @@
 /**
  * Sidebar Component - 56px navigation sidebar
- * All features are now available (community edition)
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
