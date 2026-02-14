@@ -1766,6 +1766,7 @@
     "keyPasswordPlaceholder": "Mot de passe optionnel pour la clé chiffrée",
     "inputAnyFormat": "Entrée (n'importe quel format)",
     "supportsFormats": "Supporte : PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR",
+    "binaryFileLoaded": "Fichier binaire chargé",
     "outputFormat": "Format de sortie",
     "pemText": "PEM (Texte)",
     "derBinary": "DER (Binaire)",

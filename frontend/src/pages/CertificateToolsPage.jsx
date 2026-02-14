@@ -7,10 +7,10 @@ import { useTranslation } from 'react-i18next'
 import {
   Wrench, Globe, FileMagnifyingGlass, Key, ArrowsLeftRight,
   CheckCircle, XCircle, Warning, Certificate,
-  Copy, Download, ArrowRight, Spinner, UploadSimple
+  Copy, Download, ArrowRight, Spinner
 } from '@phosphor-icons/react'
 import {
-  Button, Badge, Textarea, Input, Select,
+  Button, Badge, Textarea, Input, Select, FileUpload,
   CompactSection, CompactGrid, CompactField,
   DetailHeader, DetailContent, DetailSection
 } from '../components'
@@ -99,38 +99,6 @@ export default function CertificateToolsPage() {
   const [convertChain, setConvertChain] = useState('')
   const [convertPassword, setConvertPassword] = useState('')
   const [pkcs12Password, setPkcs12Password] = useState('')
-
-  // Handle file upload for converter
-  const handleConvertFileChange = async (e, setter, dataSetter) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setter(file)
-    
-    // Read file content
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const content = event.target.result
-      // Check if it's text (PEM) or binary
-      if (typeof content === 'string') {
-        dataSetter(content)
-      } else {
-        // Binary - convert to base64
-        const bytes = new Uint8Array(content)
-        let binary = ''
-        for (let i = 0; i < bytes.length; i++) {
-          binary += String.fromCharCode(bytes[i])
-        }
-        dataSetter('BASE64:' + btoa(binary))
-      }
-    }
-    
-    // Try reading as text first for PEM files
-    if (file.name.match(/\.(pem|crt|cer|key|csr)$/i)) {
-      reader.readAsText(file)
-    } else {
-      reader.readAsArrayBuffer(file)
-    }
-  }
 
   const resetResult = () => setResult(null)
 
@@ -293,55 +261,74 @@ export default function CertificateToolsPage() {
     showSuccess(t('common.copiedToClipboard'))
   }
 
-  // Reusable Textarea with file upload button
-  const TextareaWithUpload = ({ label, placeholder, value, onChange, rows = 6, accept = '.pem,.crt,.cer,.der,.p12,.pfx,.p7b,.key,.csr' }) => {
-    const fileInputId = `file-${label.replace(/\s/g, '-').toLowerCase()}`
-    
-    const handleFile = async (e) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-      
+  // Read file content (PEM as text, binary as base64)
+  const readFileContent = (file) => {
+    return new Promise((resolve) => {
       const reader = new FileReader()
       reader.onload = (event) => {
         const content = event.target.result
         if (typeof content === 'string') {
-          onChange({ target: { value: content } })
+          resolve(content)
         } else {
           const bytes = new Uint8Array(content)
           let binary = ''
           for (let i = 0; i < bytes.length; i++) {
             binary += String.fromCharCode(bytes[i])
           }
-          onChange({ target: { value: 'BASE64:' + btoa(binary) } })
+          resolve('BASE64:' + btoa(binary))
         }
       }
-      
       if (file.name.match(/\.(pem|crt|cer|key|csr)$/i)) {
         reader.readAsText(file)
       } else {
         reader.readAsArrayBuffer(file)
       }
-    }
+    })
+  }
+
+  // Reusable drop zone + textarea for PEM/file input
+  const TextareaWithUpload = ({ label, placeholder, value, onChange, rows = 6, accept = '.pem,.crt,.cer,.der,.p12,.pfx,.p7b,.key,.csr' }) => {
+    const isBinary = value?.startsWith('BASE64:')
     
     return (
-      <Textarea
-        label={label}
-        placeholder={value?.startsWith('BASE64:') ? `[Binary file loaded - ${Math.round(value.length / 1.37)} bytes]` : placeholder}
-        value={value?.startsWith('BASE64:') ? `[Binary file loaded - ${Math.round(value.length / 1.37)} bytes]` : value}
-        onChange={onChange}
-        rows={rows}
-        className="font-mono text-xs"
-        readOnly={value?.startsWith('BASE64:')}
-        helperText={
-          <span className="inline-flex items-center gap-1">
-            <label htmlFor={fileInputId} className="inline-flex items-center gap-1 text-accent-primary hover:underline cursor-pointer">
-              <UploadSimple size={12} />
-              {t('tools.uploadFile')}
-            </label>
-            <input id={fileInputId} type="file" accept={accept} onChange={handleFile} className="hidden" />
-          </span>
-        }
-      />
+      <div className="space-y-3">
+        <FileUpload
+          compact
+          accept={accept}
+          maxSize={50 * 1024 * 1024}
+          onFileSelect={async (file) => {
+            const content = await readFileContent(file)
+            onChange({ target: { value: content } })
+          }}
+          helperText={accept}
+        />
+        {!isBinary && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-xs text-text-secondary">{t('common.orPastePem')}</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <Textarea
+              label={label}
+              placeholder={placeholder}
+              value={value}
+              onChange={onChange}
+              rows={rows}
+              className="font-mono text-xs"
+            />
+          </>
+        )}
+        {isBinary && (
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle size={16} className="text-status-success" />
+            <span className="text-text-primary">[{t('tools.binaryFileLoaded')} - {Math.round(value.length / 1.37)} bytes]</span>
+            <Button variant="ghost" size="xs" onClick={() => onChange({ target: { value: '' } })}>
+              <XCircle size={16} />
+            </Button>
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -515,16 +502,18 @@ export default function CertificateToolsPage() {
       <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
         <div className="text-sm font-medium text-text-primary">{t('tools.inputAnyFormat')}</div>
         
-        {/* File upload */}
-        <div>
-          <Input
-            label={t('common.uploadFile')}
-            type="file"
-            accept=".pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr"
-            onChange={(e) => handleConvertFileChange(e, setConvertFile, setConvertFileData)}
-            helperText={t('tools.supportsFormats')}
-          />
-        </div>
+        {/* File upload drop zone */}
+        <FileUpload
+          compact
+          accept=".pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr"
+          maxSize={50 * 1024 * 1024}
+          onFileSelect={async (file) => {
+            setConvertFile(file)
+            const content = await readFileContent(file)
+            setConvertFileData(content)
+          }}
+          helperText={t('tools.supportsFormats')}
+        />
         
         {convertFile && (
           <div className="flex items-center gap-2 text-sm">
@@ -581,11 +570,16 @@ export default function CertificateToolsPage() {
         <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
           <div className="text-sm font-medium text-text-primary">{t('tools.pkcs12RequiresKey')}</div>
           
-          <Input
+          <FileUpload
+            compact
             label={t('tools.privateKeyFile')}
-            type="file"
             accept=".pem,.key,.der"
-            onChange={(e) => handleConvertFileChange(e, setConvertKeyFile, (data) => setConvertKey(data))}
+            maxSize={50 * 1024 * 1024}
+            onFileSelect={async (file) => {
+              setConvertKeyFile(file)
+              const content = await readFileContent(file)
+              setConvertKey(content)
+            }}
           />
           
           {!convertKeyFile && (

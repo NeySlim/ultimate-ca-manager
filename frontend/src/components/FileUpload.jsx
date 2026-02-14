@@ -1,7 +1,7 @@
 /**
  * File Upload Component
  */
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { UploadSimple, FileText, X } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
@@ -13,10 +13,13 @@ export function FileUpload({
   onUpload,
   onFileSelect, // Called immediately when file is selected (no upload button)
   helperText,
+  label,
+  compact = false, // Compact mode: smaller drop zone
   maxSize = 10 * 1024 * 1024, // 10MB default
   className 
 }) {
   const { t } = useTranslation()
+  const inputId = useId()
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState([])
   const [error, setError] = useState(null)
@@ -91,12 +94,16 @@ export function FileUpload({
 
   return (
     <div className={cn("space-y-4", className)}>
+      {label && (
+        <label className="block text-sm font-medium text-text-primary">{label}</label>
+      )}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          "border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer",
+          "border-2 border-dashed rounded-xl text-center transition-all cursor-pointer",
+          compact ? "p-4" : "p-8",
           isDragging 
             ? "border-accent-primary bg-accent-primary/10" 
             : "border-border hover:border-accent-primary/50"
@@ -108,12 +115,12 @@ export function FileUpload({
           multiple={multiple}
           onChange={handleInputChange}
           className="hidden"
-          id="file-upload"
+          id={inputId}
         />
         
-        <label htmlFor="file-upload" className="cursor-pointer">
-          <UploadSimple size={48} className="mx-auto mb-4 text-text-secondary" weight="duotone" />
-          <p className="text-sm font-medium text-text-primary mb-1">
+        <label htmlFor={inputId} className="cursor-pointer">
+          <UploadSimple size={compact ? 28 : 48} className="mx-auto mb-2 text-text-secondary" weight="duotone" />
+          <p className={cn("font-medium text-text-primary mb-1", compact ? "text-xs" : "text-sm")}>
             {t('common.dropFilesOrBrowse')}
           </p>
           <p className="text-xs text-text-secondary">
