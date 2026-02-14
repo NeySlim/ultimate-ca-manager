@@ -116,7 +116,7 @@ export function NotificationProvider({ children }) {
         {toasts.map(toast => (
           <Toast.Root
             key={toast.id}
-            className={`fixed top-4 right-4 z-50 rounded-xl border p-4 shadow-2xl backdrop-blur-sm transition-all w-96 max-w-[calc(100vw-2rem)] ${getColors(toast.type)}`}
+            className={`rounded-xl border p-4 shadow-2xl backdrop-blur-sm transition-all ${getColors(toast.type)}`}
             open={true}
             onOpenChange={() => removeToast(toast.id)}
           >
@@ -136,7 +136,7 @@ export function NotificationProvider({ children }) {
           </Toast.Root>
         ))}
 
-        <Toast.Viewport className="fixed top-0 right-0 flex flex-col gap-2 p-4 w-96 max-w-full z-50" />
+        <Toast.Viewport className="fixed top-4 right-4 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-50 outline-none" />
       </Toast.Provider>
 
       {/* Confirm Dialog */}
