@@ -286,6 +286,7 @@ export default function OperationsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [caFilter, setCaFilter] = useState('')
   const [bulkViewMode, setBulkViewMode] = useState('table') // 'table' | 'basket'
+  const [resourceCounts, setResourceCounts] = useState({})
 
   // Load on mount
   useEffect(() => {
@@ -306,6 +307,27 @@ export default function OperationsPage() {
   useEffect(() => {
     if (activeTab === 'bulk') loadBulkData()
   }, [bulkResourceType, activeTab])
+
+  // Load resource counts when bulk tab becomes active
+  useEffect(() => {
+    if (activeTab === 'bulk') {
+      Promise.allSettled([
+        certificatesService.getAll(),
+        casService.getAll(),
+        csrsService.getAll(),
+        templatesService.getAll(),
+        usersService.getAll(),
+      ]).then(([certs, cas, csrs, templates, users]) => {
+        setResourceCounts({
+          certificates: certs.status === 'fulfilled' ? (certs.value.data?.length || 0) : 0,
+          cas: cas.status === 'fulfilled' ? (cas.value.data?.length || 0) : 0,
+          csrs: csrs.status === 'fulfilled' ? (csrs.value.data?.length || 0) : 0,
+          templates: templates.status === 'fulfilled' ? (templates.value.data?.length || 0) : 0,
+          users: users.status === 'fulfilled' ? (users.value.data?.length || 0) : 0,
+        })
+      })
+    }
+  }, [activeTab])
 
   const loadCAs = async () => {
     try {
@@ -822,56 +844,70 @@ export default function OperationsPage() {
 
   const renderBulkTab = () => (
     <div className="flex flex-col h-full min-h-0">
-      <div className="px-4 md:px-6 pt-4">
+      <div className="px-4 md:px-6 pt-4 pb-2">
         <DetailHeader
           icon={Lightning}
           title={t('operations.bulkHeader')}
           subtitle={t('operations.bulkHeaderDesc')}
+          compact
         />
       </div>
-      {/* Resource type selector + view toggle */}
-      <div className="flex items-center gap-2 flex-wrap shrink-0 px-4 md:px-6 pt-3 pb-2">
-        {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-          const Icon = config.icon
-          return (
-            <button
-              key={key}
-              onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                bulkResourceType === key 
-                  ? 'bg-accent-primary text-white shadow-sm' 
-                  : 'bg-bg-secondary text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-              }`}
-            >
-              <Icon size={16} />
-              {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
-              <Badge variant="secondary" size="sm">{key === bulkResourceType ? filteredBulkData.length : ''}</Badge>
-            </button>
-          )
-        })}
 
-        {/* View mode toggle */}
-        <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border">
-          <button
-            onClick={() => setBulkViewMode('table')}
-            className={cn(
-              "p-1.5 rounded-md transition-all",
-              bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
-            )}
-            title={t('operations.tableView', 'Table View')}
-          >
-            <Table size={16} />
-          </button>
-          <button
-            onClick={() => setBulkViewMode('basket')}
-            className={cn(
-              "p-1.5 rounded-md transition-all",
-              bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
-            )}
-            title={t('operations.basketView', 'Basket View')}
-          >
-            <ShoppingCart size={16} />
-          </button>
+      {/* Resource type tabs */}
+      <div className="shrink-0 px-4 md:px-6 pb-1">
+        <div className="flex items-center gap-1 border-b border-border">
+          {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
+            const Icon = config.icon
+            const isActive = bulkResourceType === key
+            const count = resourceCounts[key]
+            return (
+              <button
+                key={key}
+                onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px",
+                  isActive
+                    ? "border-accent-primary text-accent-primary"
+                    : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
+                )}
+              >
+                <Icon size={16} />
+                {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                {count !== undefined && (
+                  <span className={cn(
+                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
+                    isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
+                  )}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+
+          {/* View mode toggle */}
+          <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border mb-1.5">
+            <button
+              onClick={() => setBulkViewMode('table')}
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+              )}
+              title={t('operations.tableView', 'Table View')}
+            >
+              <Table size={16} />
+            </button>
+            <button
+              onClick={() => setBulkViewMode('basket')}
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+              )}
+              title={t('operations.basketView', 'Basket View')}
+            >
+              <ShoppingCart size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
