@@ -1885,7 +1885,14 @@
     "emailTrustDesc": "Approuvé pour S/MIME",
     "tlsTrust": "Confiance TLS",
     "tlsTrustDesc": "Approuvé pour les connexions TLS/SSL",
-    "subtitle": "Gérer les certificats de confiance"
+    "subtitle": "Gérer les certificats de confiance",
+    "addFromManagedCAs": "Ajouter depuis les CA gérées",
+    "selectCAsToAdd": "Sélectionnez les CA gérées par UCM à ajouter au trust store",
+    "noManagedCAs": "Aucune CA gérée disponible",
+    "alreadyInTruststore": "Déjà dans le trust store",
+    "addedFromManaged": "Ajouté depuis les CA gérées",
+    "addedCount": "{{count}} CA(s) ajoutée(s) au trust store",
+    "addSelected": "Ajouter {{count}} sélectionné(s)"
   },
   "users": {
     "createUser": "Créer un utilisateur",

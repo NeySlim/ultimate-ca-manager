@@ -16,7 +16,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { truststoreService } from '../services'
+import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -35,15 +35,11 @@ export default function TrustStorePage() {
   const [syncing, setSyncing] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   
-  // Add modal state
-  const [addForm, setAddForm] = useState({
-    name: '',
-    description: '',
-    certificate_pem: '',
-    purpose: 'custom',
-    notes: ''
-  })
+  // Add from managed CAs modal state
+  const [managedCAs, setManagedCAs] = useState([])
+  const [selectedCAIds, setSelectedCAIds] = useState([])
   const [adding, setAdding] = useState(false)
+  const [loadingCAs, setLoadingCAs] = useState(false)
 
   useEffect(() => {
     loadCertificates()
@@ -74,24 +70,60 @@ export default function TrustStorePage() {
     }
   }
 
-  const handleAdd = async () => {
-    if (!addForm.name || !addForm.certificate_pem) {
-      showError(ERRORS.VALIDATION.TRUSTSTORE_REQUIRED)
-      return
-    }
-    
-    setAdding(true)
+  const loadManagedCAs = async () => {
+    setLoadingCAs(true)
     try {
-      const response = await truststoreService.add(addForm)
-      showSuccess(SUCCESS.IMPORT.TRUSTSTORE)
-      closeModal('add')
-      setAddForm({ name: '', description: '', certificate_pem: '', purpose: 'custom', notes: '' })
-      loadCertificates()
-      if (response.data) {
-        setSelectedCert(response.data)
-      }
+      const res = await casService.getAll()
+      const cas = res.data || []
+      // Filter out CAs already in truststore (by fingerprint match via subject)
+      const existingSubjects = new Set(certificates.map(c => c.subject))
+      setManagedCAs(cas.map(ca => ({ ...ca, alreadyInTruststore: existingSubjects.has(ca.subject) })))
     } catch (error) {
-      showError(error.message || ERRORS.IMPORT_FAILED.TRUSTSTORE)
+      showError(error.message)
+    } finally {
+      setLoadingCAs(false)
+    }
+  }
+
+  const handleOpenAddModal = () => {
+    setSelectedCAIds([])
+    loadManagedCAs()
+    openModal('add')
+  }
+
+  const handleAddFromCAs = async () => {
+    if (selectedCAIds.length === 0) return
+    setAdding(true)
+    let added = 0
+    try {
+      for (const caId of selectedCAIds) {
+        try {
+          const exportRes = await casService.export(caId, 'pem')
+          const pemText = typeof exportRes === 'string' ? exportRes : 
+            exportRes instanceof Blob ? await exportRes.text() :
+            exportRes?.data instanceof Blob ? await exportRes.data.text() :
+            typeof exportRes?.data === 'string' ? exportRes.data : ''
+          const ca = managedCAs.find(c => c.id === caId)
+          await truststoreService.add({
+            name: ca?.descr || ca?.common_name || `CA-${caId}`,
+            description: ca?.organization || '',
+            certificate_pem: pemText,
+            purpose: ca?.is_root ? 'root_ca' : 'intermediate_ca',
+            notes: t('trustStore.addedFromManaged')
+          })
+          added++
+        } catch (err) {
+          // Skip duplicates (409)
+          if (!err.message?.includes('already')) {
+            showError(`${managedCAs.find(c => c.id === caId)?.descr}: ${err.message}`)
+          }
+        }
+      }
+      if (added > 0) {
+        showSuccess(t('trustStore.addedCount', { count: added }))
+        loadCertificates()
+      }
+      closeModal('add')
     } finally {
       setAdding(false)
     }
@@ -167,7 +199,7 @@ export default function TrustStorePage() {
         <UploadSimple size={14} />
         <span className="hidden sm:inline">{t('common.import')}</span>
       </Button>
-      <Button size="sm" onClick={() => openModal('add')}>
+      <Button size="sm" onClick={handleOpenAddModal}>
         <Plus size={14} />
         <span className="hidden sm:inline">{t('trustStore.add')}</span>
       </Button>
@@ -482,70 +514,83 @@ export default function TrustStorePage() {
           emptyTitle={t('trustStore.noCertificates')}
           emptyDescription={t('trustStore.addCertificatesForChain')}
           emptyAction={canWrite('truststore') && (
-            <Button onClick={() => openModal('add')}>
+            <Button onClick={handleOpenAddModal}>
               <Plus size={16} /> {t('trustStore.addCertificate')}
             </Button>
           )}
         />
       </ResponsiveLayout>
 
-      {/* Add Certificate Modal */}
+      {/* Add from Managed CAs Modal */}
       <Modal
         open={modals.add}
         onClose={() => closeModal('add')}
-        title={t('trustStore.addTrustedCertificate')}
+        title={t('trustStore.addFromManagedCAs')}
       >
-        <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleAdd() }}>
-          <Input
-            label={t('common.name')}
-            placeholder={t('trustStore.namePlaceholder')}
-            value={addForm.name}
-            onChange={(e) => setAddForm(prev => ({ ...prev, name: e.target.value }))}
-            required
-          />
-          <Input
-            label={t('common.description')}
-            placeholder={t('trustStore.descriptionPlaceholder')}
-            value={addForm.description}
-            onChange={(e) => setAddForm(prev => ({ ...prev, description: e.target.value }))}
-          />
-          <FormSelect
-            label={t('common.purpose')}
-            value={addForm.purpose}
-            onChange={(val) => setAddForm(prev => ({ ...prev, purpose: val }))}
-            options={[
-              { value: 'root_ca', label: t('common.rootCA') },
-              { value: 'intermediate_ca', label: t('common.intermediateCA') },
-              { value: 'client_auth', label: t('trustStore.clientAuth') },
-              { value: 'code_signing', label: t('common.codeSigning') },
-              { value: 'custom', label: t('common.custom') },
-            ]}
-            size="lg"
-          />
-          <Textarea
-            label={t('trustStore.certificatePEM')}
-            placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-            value={addForm.certificate_pem}
-            onChange={(e) => setAddForm(prev => ({ ...prev, certificate_pem: e.target.value }))}
-            rows={8}
-            className="font-mono text-xs"
-            required
-          />
-          <Input
-            label={t('common.notes')}
-            placeholder={t('trustStore.notesPlaceholder')}
-            value={addForm.notes}
-            onChange={(e) => setAddForm(prev => ({ ...prev, notes: e.target.value }))}
-          />
+        <div className="p-4 space-y-4">
+          {loadingCAs ? (
+            <div className="flex items-center justify-center py-8">
+              <ArrowsClockwise size={20} className="animate-spin text-text-tertiary" />
+            </div>
+          ) : managedCAs.length === 0 ? (
+            <p className="text-sm text-text-secondary text-center py-8">{t('trustStore.noManagedCAs')}</p>
+          ) : (
+            <>
+              <p className="text-sm text-text-secondary">{t('trustStore.selectCAsToAdd')}</p>
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-bg-secondary border-b border-border">
+                  <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedCAIds.length === managedCAs.filter(ca => !ca.alreadyInTruststore).length && selectedCAIds.length > 0}
+                      onChange={(e) => setSelectedCAIds(e.target.checked ? managedCAs.filter(ca => !ca.alreadyInTruststore).map(ca => ca.id) : [])}
+                      className="w-4 h-4 rounded border-border text-accent-primary"
+                    />
+                    {t('common.selectAll')} ({selectedCAIds.length}/{managedCAs.filter(ca => !ca.alreadyInTruststore).length})
+                  </label>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-border">
+                  {managedCAs.map(ca => (
+                    <label key={ca.id} className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 transition-colors",
+                      ca.alreadyInTruststore ? "opacity-50 cursor-not-allowed" : "hover:bg-bg-secondary cursor-pointer"
+                    )}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCAIds.includes(ca.id)}
+                        onChange={() => {
+                          if (ca.alreadyInTruststore) return
+                          setSelectedCAIds(prev => prev.includes(ca.id) ? prev.filter(id => id !== ca.id) : [...prev, ca.id])
+                        }}
+                        disabled={ca.alreadyInTruststore}
+                        className="w-4 h-4 rounded border-border text-accent-primary shrink-0"
+                      />
+                      <ShieldCheck size={16} className={ca.is_root ? 'text-accent-primary shrink-0' : 'text-status-info shrink-0'} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium truncate">{ca.descr || ca.common_name}</div>
+                        {ca.organization && <div className="text-xs text-text-tertiary truncate">{ca.organization}</div>}
+                      </div>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary/15 text-accent-primary' : 'bg-status-info/15 text-status-info'}`}>
+                        {ca.is_root ? 'Root' : 'Inter'}
+                      </span>
+                      {ca.alreadyInTruststore && (
+                        <CheckCircle size={16} weight="fill" className="text-status-success shrink-0" title={t('trustStore.alreadyInTruststore')} />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => closeModal('add')}>
+            <Button variant="secondary" onClick={() => closeModal('add')}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit" disabled={adding}>
-              {adding ? t('trustStore.adding') : t('trustStore.addCertificate')}
+            <Button onClick={handleAddFromCAs} disabled={adding || selectedCAIds.length === 0}>
+              {adding ? t('trustStore.adding') : t('trustStore.addSelected', { count: selectedCAIds.length })}
             </Button>
           </div>
-        </form>
+        </div>
       </Modal>
 
       {/* Smart Import Modal */}

@@ -1026,7 +1026,14 @@
     "syncConfirm": "This will import up to 50 certificates from the system. Continue?",
     "syncTitle": "Sync from system",
     "syncing": "Syncing...",
-    "subtitle": "Manage trusted certificates"
+    "subtitle": "Manage trusted certificates",
+    "addFromManagedCAs": "Add from Managed CAs",
+    "selectCAsToAdd": "Select CAs managed by UCM to add to the trust store",
+    "noManagedCAs": "No managed CAs available",
+    "alreadyInTruststore": "Already in trust store",
+    "addedFromManaged": "Added from managed CAs",
+    "addedCount": "{{count}} CA(s) added to trust store",
+    "addSelected": "Add {{count}} selected"
   },
   "importExport": {
     "subtitle": "Transfer certificates and CAs",
