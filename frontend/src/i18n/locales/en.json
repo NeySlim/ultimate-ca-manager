@@ -1858,7 +1858,13 @@
     "addedBy": "Added By",
     "sanDns": "SAN DNS",
     "daysLeft": "{{count}} days left",
-    "daysLeft_one": "{{count}} day left"
+    "daysLeft_one": "{{count}} day left",
+    "chainValidation": "Chain Validation",
+    "chainComplete": "Chain complete",
+    "chainIncomplete": "Chain incomplete",
+    "chainPartial": "Partial chain",
+    "managedCA": "Managed CA",
+    "trustAnchor": "Trust anchor"
   },
   "compare": {
     "title": "Compare Certificates",
