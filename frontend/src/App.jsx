@@ -87,7 +87,9 @@ function AppRoutes() {
           <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
+          <Route path="/certificates/:id" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
           <Route path="/cas" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
+          <Route path="/cas/:id" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
           <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />
           <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><UsersGroupsPage /></ProtectedRoute>} />
@@ -101,6 +103,7 @@ function AppRoutes() {
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
           <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
+          <Route path="/truststore/:id" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
           
           {/* Security & Administration */}
           <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />

@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useParams, useNavigate } from 'react-router-dom'
 import { 
   ShieldCheck, Plus, Trash, Download, Certificate, Clock,
   CheckCircle, Warning, UploadSimple, ArrowsClockwise, Calendar,
@@ -24,6 +25,8 @@ import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 
 export default function TrustStorePage() {
   const { t } = useTranslation()
+  const { id: urlCertId } = useParams()
+  const navigate = useNavigate()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { modals, open: openModal, close: closeModal } = useModals(['add'])
@@ -80,6 +83,17 @@ export default function TrustStorePage() {
       setSelectedCert(cert)
     }
   }
+
+  // Deep-link: auto-select cert from URL param /truststore/:id
+  useEffect(() => {
+    if (urlCertId && !loading && certificates.length > 0 && !selectedCert) {
+      const id = parseInt(urlCertId, 10)
+      if (!isNaN(id)) {
+        handleSelectCert({ id })
+        navigate('/truststore', { replace: true })
+      }
+    }
+  }, [urlCertId, loading, certificates.length])
 
   const loadManagedCAs = async () => {
     setLoadingCAs(true)
