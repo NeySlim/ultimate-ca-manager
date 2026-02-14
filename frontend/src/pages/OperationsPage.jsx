@@ -879,41 +879,37 @@ export default function OperationsPage() {
             <CaretDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
           </div>
         ) : (
-          /* Desktop: refined segmented tabs */
-          <div className="flex items-center gap-3">
-            <div className="flex-1 min-w-0 overflow-x-auto">
-              <div className="flex items-center gap-1.5 bg-bg-secondary/60 rounded-xl p-1 border border-border/50 w-fit">
-                {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-                  const Icon = config.icon
-                  const isActive = bulkResourceType === key
-                  const count = resourceCounts[key]
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
-                      className={cn(
-                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all whitespace-nowrap",
-                        isActive
-                          ? "bg-bg-primary text-text-primary shadow-sm border border-border/80"
-                          : "text-text-secondary hover:text-text-primary hover:bg-bg-primary/50"
-                      )}
-                    >
-                      <div className={cn("w-5.5 h-5.5 rounded-md flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary/80")}>
-                        <Icon size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : "text-text-tertiary"} />
-                      </div>
-                      {t(`common.${key}Short`, key)}
-                      {count !== undefined && (
-                        <span className={cn(
-                          "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
-                          isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
-                        )}>
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
+          /* Desktop: toolbar row — chips + search + view toggle */
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
+                const Icon = config.icon
+                const isActive = bulkResourceType === key
+                const count = resourceCounts[key]
+                return (
+                  <button
+                    key={key}
+                    onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all border",
+                      isActive
+                        ? "border-accent-primary/40 bg-accent-primary/10 text-accent-primary"
+                        : "border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover"
+                    )}
+                  >
+                    <Icon size={15} weight={isActive ? "fill" : "duotone"} />
+                    {t(`common.${key}Short`, key)}
+                    {count !== undefined && (
+                      <span className={cn(
+                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
+                        isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
+                      )}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
 
             {/* Inline search */}
@@ -924,12 +920,12 @@ export default function OperationsPage() {
                 value={bulkSearch}
                 onChange={(e) => setBulkSearch(e.target.value)}
                 placeholder={t('common.search')}
-                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border/50 bg-bg-secondary/40 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary transition-all"
+                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary transition-all"
               />
             </div>
 
-            {/* View mode toggle - desktop only */}
-            <div className="flex items-center bg-bg-secondary/60 rounded-lg p-0.5 border border-border/50 shrink-0">
+            {/* View mode toggle */}
+            <div className="flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border shrink-0 ml-auto">
               <button
                 onClick={() => setBulkViewMode('table')}
                 className={cn(
