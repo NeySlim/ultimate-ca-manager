@@ -878,43 +878,45 @@ export default function OperationsPage() {
             <CaretDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
           </div>
         ) : (
-          /* Desktop: underline tabs */
-          <div className="flex items-center border-b border-border">
-            <div className="flex items-center gap-1">
-              {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
-                const Icon = config.icon
-                const isActive = bulkResourceType === key
-                const count = resourceCounts[key]
-                return (
-                  <button
-                    key={key}
-                    onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap",
-                      isActive
-                        ? "border-accent-primary text-accent-primary"
-                        : "border-transparent text-text-secondary hover:text-text-primary hover:border-border"
-                    )}
-                  >
-                    <div className={cn("w-5 h-5 rounded flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary")}>
-                      <Icon size={12} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : ""} />
-                    </div>
-                    {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
-                    {count !== undefined && (
-                      <span className={cn(
-                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
-                        isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
-                      )}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
+          /* Desktop: refined segmented tabs */
+          <div className="flex items-center gap-3">
+            <div className="flex-1 min-w-0 overflow-x-auto">
+              <div className="flex items-center gap-1.5 bg-bg-secondary/60 rounded-xl p-1 border border-border/50 w-fit">
+                {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
+                  const Icon = config.icon
+                  const isActive = bulkResourceType === key
+                  const count = resourceCounts[key]
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()) }}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all whitespace-nowrap",
+                        isActive
+                          ? "bg-bg-primary text-text-primary shadow-sm border border-border/80"
+                          : "text-text-secondary hover:text-text-primary hover:bg-bg-primary/50"
+                      )}
+                    >
+                      <div className={cn("w-5.5 h-5.5 rounded-md flex items-center justify-center shrink-0", isActive ? config.color : "bg-bg-tertiary/80")}>
+                        <Icon size={13} weight={isActive ? "fill" : "regular"} className={isActive ? "text-white" : "text-text-tertiary"} />
+                      </div>
+                      {t(`common.${key}`, key.charAt(0).toUpperCase() + key.slice(1))}
+                      {count !== undefined && (
+                        <span className={cn(
+                          "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center",
+                          isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
+                        )}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* View mode toggle - desktop only */}
-            <div className="ml-auto flex items-center bg-bg-secondary rounded-lg p-0.5 border border-border mb-1.5 shrink-0">
+            <div className="flex items-center bg-bg-secondary/60 rounded-lg p-0.5 border border-border/50 shrink-0">
               <button
                 onClick={() => setBulkViewMode('table')}
                 className={cn(
