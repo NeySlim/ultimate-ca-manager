@@ -45,7 +45,7 @@ const ENTITY_CONFIG = {
 
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
-  const { closeWindow, focusWindow } = useWindowManager()
+  const { closeWindow, focusWindow, sameWindow } = useWindowManager()
   const [data, setData] = useState(windowInfo.data?.fullData || null)
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
   const [minimized, setMinimized] = useState(false)
@@ -80,8 +80,9 @@ export function FloatingDetailWindow({ windowInfo }) {
 
   return (
     <FloatingWindow
-      storageKey={`ucm-detail-${windowInfo.id}`}
+      storageKey={sameWindow ? 'ucm-detail-single' : `ucm-detail-${windowInfo.id}`}
       defaultPos={windowInfo.defaultPos}
+      forcePosition={!!windowInfo._tileKey}
       constraints={{ minW: 380, maxW: 900, minH: 300, defW: 520, defH: 500 }}
       minimized={minimized}
       onMinimizeToggle={() => setMinimized(!minimized)}
@@ -92,7 +93,6 @@ export function FloatingDetailWindow({ windowInfo }) {
       subtitle={subtitle}
       icon={config.icon}
       iconClass={config.iconClass}
-      key={windowInfo._tileKey || windowInfo.id}
     >
       {loading ? (
         <div className="flex-1 flex items-center justify-center">

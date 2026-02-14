@@ -2002,6 +2002,9 @@
   "windows": {
     "tile": "Mosaïque",
     "stack": "Cascade",
-    "closeAll": "Fermer tout"
+    "closeAll": "Fermer tout",
+    "sameWindow": "Même fenêtre",
+    "closeOnNav": "Fermer en naviguant",
+    "noWindows": "Aucune fenêtre ouverte"
   }
 }

@@ -14,6 +14,7 @@ import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
+import { StatusFooter } from './ui/StatusFooter'
 import LanguageSelector from './ui/LanguageSelector'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
@@ -344,9 +345,14 @@ export function AppShell() {
           </div>
         )}
 
-        {/* Main Content */}
-        <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
-          <Outlet />
+        {/* Main Content + Footer (flex column) */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+          <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
+            <Outlet />
+          </div>
+
+          {/* Status Footer — desktop only, not on dashboard */}
+          {!isMobile && activePage !== '' && <StatusFooter />}
         </div>
       </div>
 

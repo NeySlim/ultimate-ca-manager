@@ -60,6 +60,7 @@ function savePersist(storageKey, pos) {
 export function useFloatingWindow({
   storageKey,
   defaultPos,
+  forcePosition = false,
   constraints: userConstraints,
   panelRef,
   bodyRef,
@@ -68,12 +69,12 @@ export function useFloatingWindow({
   const constraints = { ...DEFAULT_CONSTRAINTS, ...userConstraints }
   const posRef = useRef(null)
   const isDragging = useRef(false)
-  const preMaximizeRef = useRef(null) // store pre-maximize position for restore
+  const preMaximizeRef = useRef(null)
   const [, forceUpdate] = useState(0)
 
-  // Init position
+  // Init position — forcePosition skips localStorage (used by tile/cascade)
   if (!posRef.current) {
-    const saved = loadSaved(storageKey)
+    const saved = forcePosition ? null : loadSaved(storageKey)
     posRef.current = saved || defaultPos || {
       x: window.innerWidth - constraints.defW - 24,
       y: window.innerHeight - constraints.defH - 24,
@@ -103,11 +104,6 @@ export function useFloatingWindow({
 
   // Apply on mount
   useEffect(() => { applyPos() }, [applyPos])
-
-  // Save on unmount
-  useEffect(() => {
-    return () => savePersist(storageKey, posRef.current)
-  }, [storageKey])
 
   // --- DRAG ---
   const onDragStart = useCallback((e) => {

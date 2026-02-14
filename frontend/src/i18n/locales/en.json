@@ -2002,6 +2002,9 @@
   "windows": {
     "tile": "Tile Windows",
     "stack": "Cascade Windows",
-    "closeAll": "Close All Windows"
+    "closeAll": "Close All Windows",
+    "sameWindow": "Same window",
+    "closeOnNav": "Close on navigate",
+    "noWindows": "No windows open"
   }
 }

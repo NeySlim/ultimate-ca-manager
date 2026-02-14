@@ -25,6 +25,7 @@ import {
 export function FloatingWindow({
   storageKey,
   defaultPos,
+  forcePosition = false,
   constraints,
   minimized = false,
   onMinimizeToggle,
@@ -51,6 +52,7 @@ export function FloatingWindow({
   } = useFloatingWindow({
     storageKey,
     defaultPos,
+    forcePosition,
     constraints,
     panelRef,
     bodyRef,

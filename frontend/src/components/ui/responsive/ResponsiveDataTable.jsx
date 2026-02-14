@@ -1562,7 +1562,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
     <div className={cn(
       'shrink-0 border-t border-border bg-bg-secondary/30',
       'flex items-center justify-between',
-      isMobile ? 'px-4 py-3' : 'px-4 py-2'
+      isMobile ? 'px-4 py-2' : 'px-4 py-1'
     )}>
       {/* Info */}
       <p className={cn(
