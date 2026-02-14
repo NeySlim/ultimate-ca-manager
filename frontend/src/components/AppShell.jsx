@@ -7,7 +7,7 @@ import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom'
 import { 
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
-  UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
+  Lightning, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock, Wrench,
   UserCircle, Palette, Question, SignOut, Globe
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
@@ -22,7 +22,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { useAuth } from '../contexts/AuthContext'
 import { certificatesService } from '../services'
 
-// Mobile navigation items (grid menu) - labels are i18n keys
+// Mobile navigation items — must match desktop sidebar (Sidebar.jsx)
 const mobileNavItems = [
   { id: '', icon: House, labelKey: 'common.dashboard', path: '/' },
   { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
@@ -33,16 +33,13 @@ const mobileNavItems = [
   { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
   { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
   { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
-  { id: 'import', icon: UploadSimple, labelKey: 'common.importExport', path: '/import' },
+  { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations' },
+  { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
   { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
-  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
-  { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
-]
-
-// Advanced features (formerly Pro) - labels are i18n keys
-const advancedNavItems = [
   { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
   { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
+  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
+  { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
 ]
 
 export function AppShell() {
@@ -67,7 +64,6 @@ export function AppShell() {
   const helpPageKeyMap = {
     '': 'dashboard',
     'scep-config': 'scep',
-    'import': 'importExport',
     'audit': 'auditLogs',
     'crl-ocsp': 'crlocsp',
     'users': 'usersGroups',
@@ -80,7 +76,7 @@ export function AppShell() {
     // Core pages
     'certificates', 'cas', 'csrs', 'users', 'templates', 
     'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
-    'import', 'tools', 'audit', 'account', 'operations',
+    'tools', 'audit', 'account', 'operations',
     // Pro pages
     'rbac', 'hsm'
   ]
@@ -141,8 +137,8 @@ export function AppShell() {
     onCommandPalette: () => setCommandPaletteOpen(true)
   })
 
-  // All nav items (including Pro if available)
-  const allNavItems = [...mobileNavItems, ...advancedNavItems]
+  // All nav items for mobile menu
+  const allNavItems = mobileNavItems
 
   return (
     <div className={cn(
@@ -168,13 +164,12 @@ export function AppShell() {
           {/* Spacer */}
           <div className="flex-1" />
           
-          {/* Page title - custom labels for some pages */}
+          {/* Page title - use nav item labels for consistency */}
           <span className="text-xs font-medium text-text-primary truncate max-w-[140px]">
-            {activePage === '' ? t('common.dashboard') : 
-             activePage === 'import' ? t('common.importExport') :
-             activePage === 'scep-config' ? t('common.scep') :
-             activePage === 'crl-ocsp' ? t('common.crlOcsp') :
-             activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            {(() => {
+              const navItem = mobileNavItems.find(item => item.id === activePage)
+              return navItem ? t(navItem.labelKey) : activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+            })()}
           </span>
           
           {/* Help button - only if page has help */}
