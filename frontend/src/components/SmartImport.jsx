@@ -483,10 +483,12 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
                   <div className="flex items-center gap-2 ml-6">
                     <LockSimple size={14} className="text-text-secondary shrink-0" />
                     <input
-                      type="password"
+                      type="text"
                       value={file.password || ''}
                       onChange={(e) => setFilePassword(i, e.target.value)}
                       placeholder={t('import.filePassword')}
+                      autoComplete="new-password"
+                      style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
                       className="flex-1 px-2 py-1 text-xs border border-border rounded bg-bg-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
                     />
                   </div>
@@ -517,10 +519,12 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
           <div className="flex-1">
             <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
             <input
-              type="password"
+              type="text"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t('common.enterPassword')}
+              autoComplete="new-password"
+              style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
               className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
             />
           </div>

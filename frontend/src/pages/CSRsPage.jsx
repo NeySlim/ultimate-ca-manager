@@ -656,6 +656,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           <Input
             label={t('csrs.passphrase')}
             type="password"
+            noAutofill
             value={keyPassphrase}
             onChange={(e) => setKeyPassphrase(e.target.value)}
             placeholder={t('csrs.passphraseHint')}

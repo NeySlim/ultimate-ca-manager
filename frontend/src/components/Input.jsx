@@ -42,6 +42,7 @@ export const Input = forwardRef(function Input({
   hasExistingValue,  // Shows "Set" badge and "enter new to change" hint
   placeholder,
   required,
+  noAutofill,  // Use text+CSS masking to prevent password manager detection
   ...props 
 }, ref) {
   const { t } = useTranslation()
@@ -49,7 +50,9 @@ export const Input = forwardRef(function Input({
   const [internalValue, setInternalValue] = useState('')
   
   const isPassword = type === 'password'
-  const inputType = isPassword && showPassword ? 'text' : type
+  // noAutofill: render as text with CSS masking to hide from password managers
+  const useTextMasking = isPassword && noAutofill && !showPassword
+  const inputType = isPassword && showPassword ? 'text' : (useTextMasking ? 'text' : type)
   
   // Track value for strength indicator
   const handleChange = (e) => {
@@ -104,7 +107,8 @@ export const Input = forwardRef(function Input({
             isPassword && "pr-10"
           )}
           style={{
-            '--focus-shadow': 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
+            '--focus-shadow': 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
+            ...(useTextMasking ? { WebkitTextSecurity: 'disc', textSecurity: 'disc' } : {})
           }}
           onFocus={(e) => {
             e.target.style.boxShadow = '0 0 0 3px var(--focus-shadow), 0 1px 2px color-mix(in srgb, var(--accent-primary) 10%, transparent)';
@@ -115,7 +119,7 @@ export const Input = forwardRef(function Input({
           onChange={handleChange}
           placeholder={effectivePlaceholder}
           required={required && !hasExistingValue}
-          autoComplete={isPassword ? 'off' : undefined}
+          autoComplete={noAutofill ? 'off' : undefined}
           {...props}
         />
         

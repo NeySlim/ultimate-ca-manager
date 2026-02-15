@@ -895,6 +895,7 @@ function UserForm({ user, onSubmit, onCancel }) {
       <Input
         label={user ? t('common.newPassword') : t('common.password')}
         type="password"
+        noAutofill
         value={formData.password}
         onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
         required={!user}

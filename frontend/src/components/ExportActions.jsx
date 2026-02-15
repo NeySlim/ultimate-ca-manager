@@ -72,12 +72,12 @@ export function ExportActions({
         <Lock size={14} className="text-text-tertiary shrink-0 ml-1" />
         <input
           ref={inputRef}
-          type="password"
+          type="text"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('common.password', 'Password')}
-          autoComplete="off"
+          style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
           className={cn(
             'w-24 sm:w-32 h-6 px-2 text-xs rounded-md border border-border bg-bg-primary text-text-primary',
             'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary/50 focus:border-accent-primary'

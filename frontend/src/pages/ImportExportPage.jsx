@@ -228,6 +228,7 @@ export default function ImportExportPage() {
                 <Input 
                   label={t('importExport.opnsense.apiSecretLabel')}
                   type="password"
+                  noAutofill
                   value={opnsenseApiSecret}
                   onChange={(e) => setOpnsenseApiSecret(e.target.value)}
                   placeholder={t('importExport.opnsense.apiSecretLabel')}

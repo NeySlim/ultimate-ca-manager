@@ -554,6 +554,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             <Input
               label={t('sso.bindPassword')}
               type="password"
+              noAutofill
               value={formData.ldap_bind_password}
               onChange={e => handleChange('ldap_bind_password', e.target.value)}
               hasExistingValue={!!provider?.ldap_bind_password}
@@ -583,6 +584,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             <Input
               label={t('common.clientSecret')}
               type="password"
+              noAutofill
               value={formData.oauth2_client_secret}
               onChange={e => handleChange('oauth2_client_secret', e.target.value)}
               hasExistingValue={!!provider?.oauth2_client_secret}
@@ -1550,6 +1552,7 @@ export default function SettingsPage() {
                 <Input
                   label={t('settings.smtpPassword')}
                   type="password"
+                  noAutofill
                   value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
                   onChange={(e) => updateSetting('smtp_password', e.target.value)}
                   hasExistingValue={settings.smtp_password === '********'}
@@ -1882,6 +1885,7 @@ export default function SettingsPage() {
                     <Input
                       label={t('settings.autoBackupPassword')}
                       type="password"
+                      noAutofill
                       value={settings.backup_password || ''}
                       onChange={(e) => updateSetting('backup_password', e.target.value)}
                       placeholder={t('settings.min12Characters')}
@@ -2461,6 +2465,7 @@ export default function SettingsPage() {
           <Input
             label={t('settings.encryptionPassword')}
             type="password"
+            noAutofill
             value={backupPassword}
             onChange={(e) => setBackupPassword(e.target.value)}
             placeholder={t('settings.min12Characters')}
@@ -2503,6 +2508,7 @@ export default function SettingsPage() {
           <Input
             label={t('settings.backupPassword')}
             type="password"
+            noAutofill
             value={restorePassword}
             onChange={(e) => setRestorePassword(e.target.value)}
             placeholder={t('settings.enterBackupPassword')}
