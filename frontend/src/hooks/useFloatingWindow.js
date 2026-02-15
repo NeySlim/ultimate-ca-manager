@@ -15,11 +15,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 
 const DEFAULT_CONSTRAINTS = {
-  minW: 380,
-  maxW: 1190,
+  minW: 420,
+  maxW: 800,
   minH: 280,
-  defW: 442,
-  defH: 408,
+  defW: 500,
+  defH: 460,
 }
 
 export const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']

@@ -53,7 +53,7 @@ export function WindowManagerProvider({ children }) {
 
   // Center position for new windows
   const getCenterPos = useCallback((index) => {
-    const w = 442, h = 425
+    const w = 500, h = 460
     const vw = window.innerWidth
     const vh = window.innerHeight
     const offset = index * CASCADE_OFFSET
@@ -139,8 +139,8 @@ export function WindowManagerProvider({ children }) {
       const gap = 12
       const sidebarW = 56
       const headerH = 48
-      const tileW = 442
-      const tileH = 425
+      const tileW = 500
+      const tileH = 460
       const availW = window.innerWidth - sidebarW
       const availH = window.innerHeight - headerH
       const maxCols = Math.max(1, Math.floor((availW - gap) / (tileW + gap)))
