@@ -636,12 +636,14 @@ export default function AccountPage() {
           label={t('common.currentPassword')}
           type="password"
           name="current_password"
+          autoComplete="current-password"
           required
         />
         <Input
           label={t('common.newPassword')}
           type="password"
           name="new_password"
+          autoComplete="new-password"
           showStrength
           required
         />
@@ -649,6 +651,7 @@ export default function AccountPage() {
           label={t('common.confirmNewPassword')}
           type="password"
           name="confirm_password"
+          autoComplete="new-password"
           required
         />
       </FormModal>

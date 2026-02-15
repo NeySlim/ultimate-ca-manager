@@ -115,6 +115,7 @@ export const Input = forwardRef(function Input({
           onChange={handleChange}
           placeholder={effectivePlaceholder}
           required={required && !hasExistingValue}
+          autoComplete={isPassword ? 'off' : undefined}
           {...props}
         />
         

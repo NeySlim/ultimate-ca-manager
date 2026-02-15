@@ -84,6 +84,7 @@ export function ForcePasswordChange({ onComplete }) {
           value={formData.new_password}
           onChange={(e) => setFormData(prev => ({ ...prev, new_password: e.target.value }))}
           error={errors.new_password}
+          autoComplete="new-password"
           showStrength
           required
         />
@@ -94,6 +95,7 @@ export function ForcePasswordChange({ onComplete }) {
           value={formData.confirm_password}
           onChange={(e) => setFormData(prev => ({ ...prev, confirm_password: e.target.value }))}
           error={errors.confirm_password}
+          autoComplete="new-password"
           required
         />
 

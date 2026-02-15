@@ -122,6 +122,7 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   icon={<Lock size={18} />}
                   placeholder={t('auth.minCharacters')}
+                  autoComplete="new-password"
                   showStrength
                   autoFocus
                   required
@@ -134,6 +135,7 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   icon={<Lock size={18} />}
                   placeholder={t('auth.reenterPassword')}
+                  autoComplete="new-password"
                   required
                 />
 

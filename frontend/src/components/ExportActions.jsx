@@ -77,6 +77,7 @@ export function ExportActions({
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('common.password', 'Password')}
+          autoComplete="off"
           className={cn(
             'w-24 sm:w-32 h-6 px-2 text-xs rounded-md border border-border bg-bg-primary text-text-primary',
             'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary/50 focus:border-accent-primary'
