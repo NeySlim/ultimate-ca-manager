@@ -1,5 +1,7 @@
 {
   "common": {
+    "saved": "设置已保存",
+    "saveFailed": "保存失败",
     "save": "保存",
     "cancel": "取消",
     "noDataAvailable": "无可用数据",
@@ -1482,6 +1484,7 @@
     "alertDays": "Alert Days Before Expiry",
     "alertDaysHelp": "Select how many days before expiry to send alerts",
     "alertRecipients": "Alert Recipients",
+    "tagsInputHelp": "输入地址后按Enter添加",
     "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
     "smtpRequiredForAlerts": "在启用邮件提醒之前，请先配置并测试上方的SMTP服务器。",
     "includeRevoked": "Include revoked certificates",

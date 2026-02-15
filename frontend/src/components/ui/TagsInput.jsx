@@ -6,7 +6,7 @@ import { X } from '@phosphor-icons/react'
  * Type a value and press Enter/Tab/comma to add it as a tag.
  * Click the × on a tag to remove it.
  */
-export default function TagsInput({ value = [], onChange, label, placeholder, validate, className = '' }) {
+export default function TagsInput({ value = [], onChange, label, placeholder, helperText, validate, className = '' }) {
   const [input, setInput] = useState('')
   const inputRef = useRef(null)
 
@@ -44,22 +44,22 @@ export default function TagsInput({ value = [], onChange, label, placeholder, va
   return (
     <div className={className}>
       {label && (
-        <label className="block text-sm font-medium text-text-primary mb-1.5">{label}</label>
+        <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
       )}
       <div
-        className="flex flex-wrap items-center gap-1.5 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-primary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary/30"
+        className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-tertiary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary/30"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-primary/15 text-accent-primary text-sm font-medium"
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md bg-accent-primary/15 text-accent-primary text-sm font-medium border border-accent-primary/20"
           >
             {tag}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeTag(i) }}
-              className="hover:text-status-danger transition-colors"
+              className="p-0.5 rounded hover:bg-status-danger/15 hover:text-status-danger transition-colors"
             >
               <X size={12} weight="bold" />
             </button>
@@ -77,6 +77,9 @@ export default function TagsInput({ value = [], onChange, label, placeholder, va
           className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-tertiary"
         />
       </div>
+      {helperText && (
+        <p className="text-xs text-text-tertiary mt-1">{helperText}</p>
+      )}
     </div>
   )
 }

@@ -422,6 +422,8 @@
     "subtitle": "{{count}} certificats"
   },
   "common": {
+    "saved": "Paramètres enregistrés",
+    "saveFailed": "Échec de l'enregistrement",
     "save": "Enregistrer",
     "cancel": "Annuler",
     "noDataAvailable": "Aucune donnée disponible",
@@ -1419,6 +1421,7 @@
     "alertDays": "Jours avant expiration",
     "alertDaysHelp": "Sélectionnez combien de jours avant l'expiration envoyer les alertes",
     "alertRecipients": "Destinataires des alertes",
+    "tagsInputHelp": "Saisissez une adresse et appuyez sur Entrée pour ajouter",
     "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
     "smtpRequiredForAlerts": "Configurez et testez un serveur SMTP ci-dessus avant d'activer les alertes email.",
     "includeRevoked": "Inclure les certificats révoqués",

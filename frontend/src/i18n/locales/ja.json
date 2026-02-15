@@ -1,5 +1,7 @@
 {
   "common": {
+    "saved": "設定を保存しました",
+    "saveFailed": "保存に失敗しました",
     "save": "保存",
     "cancel": "キャンセル",
     "noDataAvailable": "データがありません",
@@ -1482,6 +1484,7 @@
     "alertDays": "Alert Days Before Expiry",
     "alertDaysHelp": "Select how many days before expiry to send alerts",
     "alertRecipients": "Alert Recipients",
+    "tagsInputHelp": "アドレスを入力してEnterで追加",
     "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
     "smtpRequiredForAlerts": "メールアラートを有効にする前に、上記のSMTPサーバーを設定してテストしてください。",
     "includeRevoked": "Include revoked certificates",

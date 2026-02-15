@@ -1,5 +1,7 @@
 {
   "common": {
+    "saved": "Settings saved",
+    "saveFailed": "Failed to save",
     "save": "Save",
     "cancel": "Cancel",
     "noDataAvailable": "No data available",
@@ -1483,6 +1485,7 @@
     "alertDays": "Alert Days Before Expiry",
     "alertDaysHelp": "Select how many days before expiry to send alerts",
     "alertRecipients": "Alert Recipients",
+    "tagsInputHelp": "Type an address and press Enter to add",
     "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
     "smtpRequiredForAlerts": "Configure and test an SMTP server above before enabling email alerts.",
     "includeRevoked": "Include revoked certificates",
