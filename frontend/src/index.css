@@ -178,58 +178,83 @@
    THEME: Light (legacy - most values now in ThemeContext)
    ============================================ */
 .theme-light {
-  --bg-primary: #F5F6F8;
-  --bg-secondary: #FAFBFC;
-  --bg-tertiary: #EDEEF2;
-  --text-primary: #1F2937;
-  --text-secondary: #6B7280;
-  --text-tertiary: #9CA3AF;
-  --accent-primary: #3B82F6;
-  --accent-success: #10B981;
-  --accent-warning: #F59E0B;
-  --accent-danger: #EF4444;
-  --accent-purple: #8B5CF6;
-  --border: #DDDFE4;
-  --border-subtle: rgba(0, 0, 0, 0.05);
-  --border-strong: rgba(0, 0, 0, 0.10);
-  
-  /* Icon colors removed - managed by ThemeContext */
+  --bg-primary: #EFF2F7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E4E8EF;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-tertiary: #6B7280;
+  --accent-primary: #2563EB;
+  --accent-success: #059669;
+  --accent-warning: #D97706;
+  --accent-danger: #DC2626;
+  --accent-purple: #7C3AED;
+  --border: #CBD5E1;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.12);
   
   /* Logo gradient colors - light */
-  --logo-gradient-start: #f97316;
-  --logo-gradient-mid: #ea580c;
-  --logo-gradient-end: #c2410c;
-  --logo-gradient-accent: #f59e0b;
+  --logo-gradient-start: #ea580c;
+  --logo-gradient-mid: #c2410c;
+  --logo-gradient-end: #9a3412;
+  --logo-gradient-accent: #d97706;
   
-  /* Light theme shadow adjustments */
-  --shadow-color: 220deg 20% 50%;
+  /* Light theme shadow adjustments — stronger, colored */
+  --shadow-color: 220deg 30% 50%;
+  --shadow-xs: 
+    0 1px 2px hsl(var(--shadow-color) / 0.06),
+    0 1px 3px hsl(var(--shadow-color) / 0.08);
+  --shadow-sm: 
+    0 1px 2px hsl(var(--shadow-color) / 0.06),
+    0 2px 6px hsl(var(--shadow-color) / 0.10);
+  --shadow-md: 
+    0 2px 4px hsl(var(--shadow-color) / 0.05),
+    0 4px 12px hsl(var(--shadow-color) / 0.08),
+    0 8px 24px hsl(var(--shadow-color) / 0.06);
+  --shadow-lg: 
+    0 4px 8px hsl(var(--shadow-color) / 0.04),
+    0 8px 24px hsl(var(--shadow-color) / 0.08),
+    0 16px 48px hsl(var(--shadow-color) / 0.06);
+  --shadow-xl: 
+    0 4px 8px hsl(var(--shadow-color) / 0.03),
+    0 8px 24px hsl(var(--shadow-color) / 0.06),
+    0 24px 64px hsl(var(--shadow-color) / 0.08),
+    0 40px 96px hsl(var(--shadow-color) / 0.06);
+
+  /* Glow shadows — softer for light */
+  --shadow-glow-primary: 0 0 20px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  --shadow-glow-success: 0 0 20px color-mix(in srgb, var(--accent-success) 20%, transparent);
+  --shadow-glow-danger: 0 0 20px color-mix(in srgb, var(--accent-danger) 20%, transparent);
+  --shadow-glow-warning: 0 0 20px color-mix(in srgb, var(--accent-warning) 20%, transparent);
   
   /* Glass adjustments for light */
-  --glass-bg: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
-  --glass-border: rgba(0, 0, 0, 0.06);
-  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+  --glass-bg: color-mix(in srgb, #FFFFFF 80%, transparent);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.06);
   
   /* Inner highlight for light theme */
-  --shadow-inner-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+  --shadow-inner-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-inner-sm: inset 0 1px 3px hsl(var(--shadow-color) / 0.08);
   
   /* Gradient shine for light */
-  --gradient-shine: linear-gradient(135deg, rgba(255,255,255,0.5), transparent 50%);
+  --gradient-shine: linear-gradient(135deg, rgba(255,255,255,0.7), transparent 50%);
+  --gradient-surface: linear-gradient(180deg, #FFFFFF, #F8FAFC);
   
   /* DetailCard soft colors - light theme */
   --detail-header-bg: linear-gradient(135deg, 
-    color-mix(in srgb, var(--accent-primary) 6%, white),
-    color-mix(in srgb, var(--logo-gradient-end) 3%, white),
+    color-mix(in srgb, var(--accent-primary) 8%, white),
+    color-mix(in srgb, var(--logo-gradient-end) 4%, white),
     white
   );
-  --detail-header-border: rgba(0, 0, 0, 0.06);
-  --detail-header-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
-  --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 80%, #8B5CF6));
-  --detail-icon-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 20%, transparent);
-  --detail-stats-border: rgba(0, 0, 0, 0.06);
-  --detail-section-bg: rgba(0, 0, 0, 0.02);
+  --detail-header-border: rgba(0, 0, 0, 0.08);
+  --detail-header-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 80%, #4F46E5));
+  --detail-icon-shadow: 0 4px 14px color-mix(in srgb, var(--accent-primary) 30%, transparent);
+  --detail-stats-border: rgba(0, 0, 0, 0.08);
+  --detail-section-bg: rgba(241, 245, 249, 0.8);
   --detail-section-border: var(--border);
-  --detail-field-bg: rgba(0, 0, 0, 0.02);
-  --detail-field-border: rgba(0, 0, 0, 0.06);
+  --detail-field-bg: rgba(0, 0, 0, 0.025);
+  --detail-field-border: rgba(0, 0, 0, 0.07);
 }
 
 /* Custom scrollbar styling - thin and subtle */
