@@ -526,8 +526,10 @@ export default function DashboardPage() {
                   title={t('dashboard.certificateActivity')}
                   subtitle={t('dashboard.last7Days')}
                 />
-                <Card.Body className="flex-1 min-h-0 !pt-0 !pb-0 !px-2">
+                <Card.Body className="flex-1 min-h-0 relative !pt-0 !pb-0 !px-2">
+                  <div className="absolute inset-0 px-2">
                     <CertificateTrendChart data={certificateTrend} />
+                  </div>
                 </Card.Body>
               </Card>
             </WidgetWrapper>
@@ -545,7 +547,8 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 min-h-0 !pt-0 !pb-0 !px-2">
+                <Card.Body className="flex-1 min-h-0 relative !pt-0 !pb-0 !px-2">
+                  <div className="absolute inset-0 px-2 flex items-center">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
@@ -554,6 +557,7 @@ export default function DashboardPage() {
                         revoked: stats?.revoked || 0,
                       }}
                     />
+                  </div>
                 </Card.Body>
               </Card>
             </WidgetWrapper>
