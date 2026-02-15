@@ -17,22 +17,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Trust Store Chain Validation** - Visual chain status (complete/partial/incomplete), export bundle, add from managed CAs
 - **Service Reconnection** - 30s countdown, health + WebSocket readiness check, automatic redirect to login
 - **Health Endpoint** - Consolidated to `/api/v2/health` with WebSocket readiness status, backward-compatible aliases
+- **ACME Account Delete** - DELETE `/api/v2/acme/accounts/{id}` with cascade cleanup (challenges→authorizations→orders)
 - **Settings About** - Version, system info, uptime, memory, links to docs/wiki/issues
 - **Template Duplication** - Clone endpoint: POST /templates/{id}/duplicate
 
 ### UI/UX
 
-- **Dashboard** - Redesigned header with logo, diversified widget colors
+- **Dashboard** - Redesigned header with logo, diversified widget colors, donut chart with gradient/shadow effects
+- **Dashboard Mobile** - Compact header with watermark logo, no redundancy with navbar
 - **Logo** - Shield outline, larger on dashboard, smaller in sidebar
 - **Themes** - Simplified to 3 themes: Gray, Purple, Sunset (was 6)
 - **Tables** - Proportional column sizing, actions moved from table to detail windows
 - **Status Footer Bar** - Window management controls, theme-aware design
-- **Mobile** - All dashboard charts render correctly, scroll fixes
+- **Mobile Navbar** - User dropdown menu with account, settings, language selector, logout
+- **Mobile Nav Grid** - Short i18n labels for 5-column grid (all 9 languages)
 - **Reconnect Overlay** - Circular countdown ring, connection progress bar, redirect status
 
 ### i18n
 
-- **Full Coverage** - 1914+ keys across all 9 languages, 0 missing
+- **Full Coverage** - 1930+ keys across all 9 languages, 0 missing
+- **Short Mobile Labels** - 16 `*Short` keys per language for compact mobile navigation
 - **New Namespaces** - `reconnect.*`, `table.*`, `windows.*`, `details.daysShort`
 - **Hardcoded Strings** - 20+ user-facing strings replaced with `t()` calls
 
@@ -40,11 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Health Endpoint** - Removed duplicate route from app.py, consolidated in health_routes.py
 - **FloatingHelpPanel** - Defined missing SOFT_MAX_W constant (was causing runtime crash)
+- **Dashboard Charts** - Fixed width/height(-1) errors with absolute positioning wrapper
+- **Dashboard Donut** - Fixed gradient IDs using translated names (SVG invalid refs)
 - **Dashboard** - Fixed react-grid-layout v2.2.2 dragConfig/resizeConfig API
 - **Dashboard** - Fixed Card.Body ignoring style prop
 - **Toast Notifications** - Stack vertically instead of overlapping
 - **Radix Select** - Filter empty value options
 - **SCEP Nav** - Normalize URL for active state detection
+- **OPNsense** - Wrapped password inputs in form element (DOM warning)
 - **Tests** - Mock useWindowManager in PageRendering tests
 
 ---

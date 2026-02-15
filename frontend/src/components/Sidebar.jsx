@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Lock, FileX, Vault, Wrench
+  UsersThree, Shield, Lock, FileX, Vault, Wrench, Globe, CaretRight
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -17,10 +17,11 @@ import { Logo } from './Logo'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { useMobile } from '../contexts/MobileContext'
 import { certificatesService } from '../services'
+import { languages } from '../i18n'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes, isLight } = useTheme()
   const { user, logout } = useAuth()
   const { isLargeScreen } = useMobile()
@@ -256,6 +257,40 @@ export function Sidebar({ activePage }) {
                 )}
               </DropdownMenu.Item>
             ))}
+
+            <DropdownMenu.Separator className="h-px bg-border my-1" />
+
+            {/* Language sub-section */}
+            <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
+              {t('settings.language')}
+            </DropdownMenu.Label>
+            <DropdownMenu.Sub>
+              <DropdownMenu.SubTrigger className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors data-[state=open]:bg-bg-tertiary">
+                <Globe size={16} />
+                <span className="flex-1">{languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en'))?.flag} {languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en'))?.name || 'English'}</span>
+                <CaretRight size={12} className="text-text-tertiary" />
+              </DropdownMenu.SubTrigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.SubContent className="min-w-[180px] bg-bg-secondary border border-border rounded-sm shadow-lg p-1 z-50">
+                  {languages.map(lang => (
+                    <DropdownMenu.Item
+                      key={lang.code}
+                      onClick={() => {
+                        i18n.changeLanguage(lang.code)
+                        try { localStorage.setItem('i18nextLng', lang.code) } catch {}
+                      }}
+                      className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
+                    >
+                      <span>{lang.flag}</span>
+                      <span className="flex-1">{lang.name}</span>
+                      {(i18n.language?.split('-')[0] || 'en') === lang.code && (
+                        <Check size={16} weight="bold" className="text-accent-primary" />
+                      )}
+                    </DropdownMenu.Item>
+                  ))}
+                </DropdownMenu.SubContent>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Sub>
 
             <DropdownMenu.Separator className="h-px bg-border my-1" />
 

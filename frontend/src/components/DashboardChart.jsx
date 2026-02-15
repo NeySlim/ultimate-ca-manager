@@ -153,18 +153,32 @@ export function StatusPieChart({ data = {}, height = '100%' }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart>
+        <defs>
+          <filter id="donutShadow" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity="0.15" />
+          </filter>
+          {chartData.map((entry, i) => (
+            <linearGradient key={`grad-${i}`} id={`donut-grad-${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={entry.color} stopOpacity={1} />
+              <stop offset="100%" stopColor={entry.color} stopOpacity={0.7} />
+            </linearGradient>
+          ))}
+        </defs>
         <Pie
           data={chartData}
-          cx="50%"
+          cx="35%"
           cy="50%"
-          innerRadius="30%"
-          outerRadius="50%"
-          paddingAngle={2}
+          innerRadius="40%"
+          outerRadius="70%"
+          paddingAngle={3}
           dataKey="value"
-          strokeWidth={0}
+          stroke="rgba(255,255,255,0.15)"
+          strokeWidth={1}
+          style={{ filter: 'url(#donutShadow)' }}
+          cornerRadius={3}
         >
-          {chartData.map((entry, index) => (
-            <Cell key={entry.name} fill={entry.color} />
+          {chartData.map((entry, i) => (
+            <Cell key={i} fill={`url(#donut-grad-${i})`} />
           ))}
         </Pie>
         <Tooltip content={<CustomTooltip />} />
@@ -174,7 +188,7 @@ export function StatusPieChart({ data = {}, height = '100%' }) {
           layout="vertical"
           iconSize={8}
           iconType="circle"
-          wrapperStyle={{ fontSize: 11, paddingLeft: 10 }}
+          wrapperStyle={{ fontSize: 11, paddingLeft: 4 }}
           formatter={(value) => <span className="text-text-secondary">{value}</span>}
         />
       </PieChart>
