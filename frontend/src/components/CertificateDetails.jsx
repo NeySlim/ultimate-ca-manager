@@ -160,7 +160,7 @@ export function CertificateDetails({
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
-    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2", embedded && "space-y-2 p-0")}>
+    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2", embedded && "space-y-3 p-3")}>
       {!embedded && <>
       {/* Header */}
       <div className="flex items-start gap-2 sm:gap-3">
