@@ -1567,7 +1567,8 @@
     "templateVarContent": "Contenido de notificación",
     "templateVarDatetime": "Fecha/hora de envío",
     "templateVarInstanceUrl": "URL de la instancia",
-    "templatePlainText": "Texto plano"
+    "templatePlainText": "Texto plano",
+    "templateDesktopOnly": "El editor de plantillas requiere una pantalla de escritorio"
   },
   "account": {
     "profile": "Perfil",

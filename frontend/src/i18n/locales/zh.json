@@ -1567,7 +1567,8 @@
     "templateVarContent": "通知内容",
     "templateVarDatetime": "发送日期/时间",
     "templateVarInstanceUrl": "实例URL",
-    "templatePlainText": "纯文本"
+    "templatePlainText": "纯文本",
+    "templateDesktopOnly": "模板编辑器需要桌面屏幕"
   },
   "account": {
     "profile": "个人资料",

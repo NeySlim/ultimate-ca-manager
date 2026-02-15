@@ -1703,7 +1703,8 @@
     "templateVarContent": "Contenu de notification",
     "templateVarDatetime": "Date/heure d'envoi",
     "templateVarInstanceUrl": "URL de l'instance",
-    "templatePlainText": "Texte brut"
+    "templatePlainText": "Texte brut",
+    "templateDesktopOnly": "L'éditeur de modèle nécessite un écran large"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

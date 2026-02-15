@@ -1567,7 +1567,8 @@
     "templateVarContent": "Conteúdo da notificação",
     "templateVarDatetime": "Data/hora de envio",
     "templateVarInstanceUrl": "URL da instância",
-    "templatePlainText": "Texto simples"
+    "templatePlainText": "Texto simples",
+    "templateDesktopOnly": "O editor de modelos requer uma tela desktop"
   },
   "account": {
     "profile": "Perfil",

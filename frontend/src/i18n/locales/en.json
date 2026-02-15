@@ -1568,7 +1568,8 @@
     "templateVarContent": "Notification content",
     "templateVarDatetime": "Send date/time",
     "templateVarInstanceUrl": "Instance URL",
-    "templatePlainText": "Plain Text"
+    "templatePlainText": "Plain Text",
+    "templateDesktopOnly": "Template editor requires a desktop screen"
   },
   "account": {
     "profile": "Profile",
