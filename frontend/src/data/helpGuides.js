@@ -906,8 +906,26 @@ Configure SMTP for email notifications (expiry alerts, user invitations):
 - **Username** and **Password**
 - **Encryption** — None, STARTTLS, or SSL/TLS
 - **From Address** — Sender email address
+- **Content Type** — HTML, Plain Text, or Both
+- **Alert Recipients** — Add multiple recipients using the tag input
 
 Click **Test** to send a test email and verify the configuration.
+
+### Email Template Editor
+
+Click **Edit Template** to open the split-pane template editor in a floating window:
+- **HTML tab** — Edit the HTML email template with live preview on the right
+- **Plain Text tab** — Edit the plain text version for email clients that don't support HTML
+- Available variables: \`{{title}}\`, \`{{content}}\`, \`{{datetime}}\`, \`{{instance_url}}\`, \`{{logo}}\`, \`{{title_color}}\`
+- Click **Reset to Default** to restore the built-in UCM-branded template
+- The window is resizable and draggable for comfortable editing
+
+### Expiry Alerts
+
+When SMTP is configured, enable automatic certificate expiry alerts:
+- Toggle alerts on/off
+- Select warning thresholds (90d, 60d, 30d, 14d, 7d, 3d, 1d)
+- Run **Check Now** to trigger an immediate scan
 
 ## Security
 

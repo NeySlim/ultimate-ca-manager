@@ -472,7 +472,7 @@ export const helpContent = {
         items: [
           { label: 'General', text: 'Instance name, hostname, and system-wide defaults' },
           { label: 'Appearance', text: 'Theme selection (light/dark/system), accent color, desktop mode' },
-          { label: 'Email (SMTP)', text: 'SMTP server, port, credentials for email notifications' },
+          { label: 'Email (SMTP)', text: 'SMTP server, credentials, email template editor, and expiry alert notifications' },
           { label: 'Security', text: 'Password policies, session timeout, rate limiting, IP restrictions' },
           { label: 'SSO', text: 'SAML and OIDC single sign-on integration' },
           { label: 'Backup', text: 'Manual and scheduled database backups' },
@@ -487,6 +487,7 @@ export const helpContent = {
     tips: [
       'Use the System Status widget at the top to quickly check service health',
       'Test SMTP settings before relying on email notifications',
+      'Customize the email template with your branding using the built-in HTML/Text editor',
       'Schedule automatic backups for production environments',
     ],
     warnings: [

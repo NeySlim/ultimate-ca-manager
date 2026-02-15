@@ -99,6 +99,42 @@ Enable/disable in **Settings** > **Security**:
 
 ---
 
+## Email Notifications
+
+### SMTP Configuration
+
+Configure SMTP settings under **Settings → Email** to enable email notifications:
+
+- **SMTP Host/Port** — Mail server address and port
+- **Credentials** — Username and password (if required)
+- **Encryption** — None, STARTTLS, or SSL/TLS
+- **From Address** — Sender email for all notifications
+- **Content Type** — HTML, Plain Text, or Both
+- **Alert Recipients** — One or more email addresses for expiry alerts
+
+Use the **Test** button to send a test email and verify connectivity.
+
+### Email Template Editor
+
+Customize the notification email template via the built-in editor:
+
+1. Navigate to **Settings → Email → Email Template**
+2. Click **Edit Template** to open the floating editor window
+3. Switch between **HTML** and **Plain Text** tabs
+4. Edit the template source on the left, see the live preview on the right
+5. Available variables: `{{title}}`, `{{content}}`, `{{datetime}}`, `{{instance_url}}`, `{{logo}}`, `{{title_color}}`
+6. Click **Save** to apply, or **Reset to Default** to restore the UCM default template
+
+### Expiry Alerts
+
+When SMTP is configured, enable automatic certificate expiry alerts:
+
+- Toggle notifications on/off
+- Select warning thresholds (90, 60, 30, 14, 7, 3, 1 days before expiry)
+- **Check Now** triggers an immediate scan of all certificates
+
+---
+
 ## Backup & Restore
 
 ### Creating Backups
