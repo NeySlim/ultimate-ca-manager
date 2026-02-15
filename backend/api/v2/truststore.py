@@ -630,12 +630,12 @@ def add_ca_to_truststore(ca_refid):
     db.session.add(trusted)
     db.session.commit()
     
-    AuditService.log(
+    AuditService.log_action(
         action='truststore.add_from_ca',
-        target=f'CA:{ca_refid}',
-        details=f'Added managed CA "{ca.common_name or ca.descr}" to Trust Store',
-        user=g.current_user.username,
-        status='success'
+        resource_type='truststore',
+        resource_id=str(trusted.id),
+        resource_name=trusted.name,
+        details=f'Added managed CA "{ca.common_name or ca.descr}" to Trust Store'
     )
     
     return created_response(data={
