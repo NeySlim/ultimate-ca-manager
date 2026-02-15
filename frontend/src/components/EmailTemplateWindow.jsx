@@ -14,10 +14,11 @@ import { FloatingWindow } from './ui/FloatingWindow'
 import { Button } from './Button'
 import {
   EnvelopeSimple, ArrowCounterClockwise, FloppyDisk,
-  ArrowsClockwise, Info, Code, TextT
+  ArrowsClockwise, Info, Code, TextT, X, Eye, PencilSimple
 } from '@phosphor-icons/react'
 import { apiClient } from '../services/apiClient'
 import { useNotification } from '../contexts/NotificationContext'
+import { useMobile } from '../contexts/MobileContext'
 
 const HTML_VARS = [
   { var: '{{logo}}', desc: 'templateVarLogo' },
@@ -38,8 +39,10 @@ const TEXT_VARS = [
 export default function EmailTemplateWindow({ onClose }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
+  const { isMobile } = useMobile()
   
   const [tab, setTab] = useState('html') // html, text
+  const [mobileView, setMobileView] = useState('source') // source, preview (mobile only)
   const [htmlTemplate, setHtmlTemplate] = useState('')
   const [textTemplate, setTextTemplate] = useState('')
   const [defaultHtml, setDefaultHtml] = useState('')
@@ -143,6 +146,123 @@ export default function EmailTemplateWindow({ onClose }) {
   const isCustom = tab === 'html' ? isHtmlCustom : isTextCustom
   const vars = tab === 'html' ? HTML_VARS : TEXT_VARS
 
+  // --- Shared toolbar content ---
+  const tabSwitcher = (
+    <div className="flex items-center gap-1 bg-bg-tertiary rounded-md p-0.5">
+      <button type="button" onClick={() => setTab('html')}
+        className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
+          tab === 'html' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
+        <Code size={14} /> HTML
+      </button>
+      <button type="button" onClick={() => setTab('text')}
+        className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
+          tab === 'text' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
+        <TextT size={14} /> {t('settings.templatePlainText')}
+      </button>
+    </div>
+  )
+
+  const actionButtons = (
+    <div className="flex items-center gap-1.5 shrink-0">
+      {(isHtmlCustom || isTextCustom) && (
+        <Button variant="ghost" size="xs" onClick={handleReset}>
+          <ArrowCounterClockwise size={14} />
+          <span className="hidden sm:inline">{t('settings.templateResetDefault')}</span>
+        </Button>
+      )}
+      <Button variant="primary" size="xs" onClick={handleSave} disabled={saving || !dirty}>
+        {saving ? <ArrowsClockwise size={14} className="animate-spin" /> : <FloppyDisk size={14} />}
+        {t('common.save')}
+      </Button>
+    </div>
+  )
+
+  const sourceEditor = (type) => (
+    <textarea
+      value={type === 'html' ? htmlTemplate : textTemplate}
+      onChange={type === 'html' ? handleHtmlChange : handleTextChange}
+      className="flex-1 w-full p-3 bg-bg-primary text-text-primary font-mono text-[12px] leading-[1.6] resize-none focus:outline-none"
+      spellCheck={false}
+    />
+  )
+
+  const previewPane = (type) => type === 'html' ? (
+    <div className="flex-1 overflow-auto bg-[#f4f5f7]">
+      <iframe srcDoc={previewHtml} title="Email Preview"
+        className="w-full h-full border-0" sandbox="allow-same-origin" style={{ minHeight: '100%' }} />
+    </div>
+  ) : (
+    <div className="flex-1 overflow-auto bg-bg-primary p-4">
+      <pre className="text-text-primary text-xs font-mono whitespace-pre-wrap leading-[1.6]">{previewText}</pre>
+    </div>
+  )
+
+  // ==================== MOBILE ====================
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-[60] bg-bg-secondary flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+          <div className="flex items-center gap-2">
+            <div className="icon-bg-blue w-8 h-8 rounded-lg flex items-center justify-center">
+              <EnvelopeSimple size={16} weight="duotone" className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary">{t('settings.emailTemplate')}</h3>
+              <p className="text-[10px] text-text-tertiary">{isCustom ? t('settings.templateCustom') : t('settings.templateDefault')}</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Tabs + source/preview toggle + actions */}
+        <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border bg-bg-primary">
+          <div className="flex items-center gap-2">
+            {tabSwitcher}
+            {/* Source / Preview toggle (mobile) */}
+            <div className="flex items-center gap-1 bg-bg-tertiary rounded-md p-0.5">
+              <button type="button" onClick={() => setMobileView('source')}
+                className={`p-1 rounded transition-colors ${mobileView === 'source' ? 'bg-bg-secondary text-text-primary shadow-sm' : 'text-text-tertiary'}`}>
+                <PencilSimple size={14} />
+              </button>
+              <button type="button" onClick={() => setMobileView('preview')}
+                className={`p-1 rounded transition-colors ${mobileView === 'preview' ? 'bg-bg-secondary text-text-primary shadow-sm' : 'text-text-tertiary'}`}>
+                <Eye size={14} />
+              </button>
+            </div>
+          </div>
+          {actionButtons}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {loading ? (
+            <div className="flex items-center justify-center flex-1 text-text-tertiary">
+              <ArrowsClockwise size={20} className="animate-spin" />
+            </div>
+          ) : mobileView === 'source' ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="px-3 py-1 bg-bg-tertiary border-b border-border text-[10px] font-medium text-text-tertiary uppercase tracking-wider">
+                {tab === 'html' ? 'HTML Source' : t('settings.templatePlainText')}
+              </div>
+              {sourceEditor(tab)}
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="px-3 py-1 bg-bg-tertiary border-b border-border text-[10px] font-medium text-text-tertiary uppercase tracking-wider">
+                {t('settings.templatePreview')}
+              </div>
+              {previewPane(tab)}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ==================== DESKTOP ====================
   return (
     <FloatingWindow
       storageKey="email-template-editor"
@@ -159,27 +279,7 @@ export default function EmailTemplateWindow({ onClose }) {
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-bg-primary">
           <div className="flex items-center gap-3">
-            {/* Tab switcher */}
-            <div className="flex items-center gap-1 bg-bg-tertiary/50 rounded-md p-0.5">
-              <button
-                type="button"
-                onClick={() => setTab('html')}
-                className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  tab === 'html' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <Code size={14} /> HTML
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('text')}
-                className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  tab === 'text' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <TextT size={14} /> {t('settings.templatePlainText')}
-              </button>
-            </div>
+            {tabSwitcher}
             {/* Variables */}
             <div className="flex items-start gap-1.5 min-w-0">
               <Info size={12} className="shrink-0 mt-0.5 text-accent-primary" />
@@ -193,18 +293,7 @@ export default function EmailTemplateWindow({ onClose }) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {(isHtmlCustom || isTextCustom) && (
-              <Button variant="ghost" size="xs" onClick={handleReset}>
-                <ArrowCounterClockwise size={14} />
-                {t('settings.templateResetDefault')}
-              </Button>
-            )}
-            <Button variant="primary" size="xs" onClick={handleSave} disabled={saving || !dirty}>
-              {saving ? <ArrowsClockwise size={14} className="animate-spin" /> : <FloppyDisk size={14} />}
-              {t('common.save')}
-            </Button>
-          </div>
+          {actionButtons}
         </div>
 
         {/* Split pane */}
@@ -213,54 +302,19 @@ export default function EmailTemplateWindow({ onClose }) {
             <div className="flex items-center justify-center w-full text-text-tertiary">
               <ArrowsClockwise size={20} className="animate-spin" />
             </div>
-          ) : tab === 'html' ? (
-            <>
-              <div className="w-1/2 flex flex-col border-r border-border min-h-0">
-                <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
-                  HTML Source
-                </div>
-                <textarea
-                  value={htmlTemplate}
-                  onChange={handleHtmlChange}
-                  className="flex-1 w-full p-3 bg-bg-primary text-text-primary font-mono text-[12px] leading-[1.6] resize-none focus:outline-none"
-                  spellCheck={false}
-                />
-              </div>
-              <div className="w-1/2 flex flex-col min-h-0">
-                <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
-                  {t('settings.templatePreview')}
-                </div>
-                <div className="flex-1 overflow-auto bg-[#f4f5f7]">
-                  <iframe
-                    srcDoc={previewHtml}
-                    title="Email Preview"
-                    className="w-full h-full border-0"
-                    sandbox="allow-same-origin"
-                    style={{ minHeight: '100%' }}
-                  />
-                </div>
-              </div>
-            </>
           ) : (
             <>
               <div className="w-1/2 flex flex-col border-r border-border min-h-0">
-                <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
-                  {t('settings.templatePlainText')}
+                <div className="px-3 py-1.5 bg-bg-tertiary border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                  {tab === 'html' ? 'HTML Source' : t('settings.templatePlainText')}
                 </div>
-                <textarea
-                  value={textTemplate}
-                  onChange={handleTextChange}
-                  className="flex-1 w-full p-3 bg-bg-primary text-text-primary font-mono text-[12px] leading-[1.6] resize-none focus:outline-none"
-                  spellCheck={false}
-                />
+                {sourceEditor(tab)}
               </div>
               <div className="w-1/2 flex flex-col min-h-0">
-                <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                <div className="px-3 py-1.5 bg-bg-tertiary border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
                   {t('settings.templatePreview')}
                 </div>
-                <div className="flex-1 overflow-auto bg-bg-primary p-4">
-                  <pre className="text-text-primary text-xs font-mono whitespace-pre-wrap leading-[1.6]">{previewText}</pre>
-                </div>
+                {previewPane(tab)}
               </div>
             </>
           )}
