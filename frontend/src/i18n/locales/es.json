@@ -1566,7 +1566,8 @@
     "templateVarTitleColor": "Color de la barra de título",
     "templateVarContent": "Contenido de notificación",
     "templateVarDatetime": "Fecha/hora de envío",
-    "templateVarInstanceUrl": "URL de la instancia"
+    "templateVarInstanceUrl": "URL de la instancia",
+    "templatePlainText": "Texto plano"
   },
   "account": {
     "profile": "Perfil",

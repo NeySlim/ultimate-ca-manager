@@ -1566,7 +1566,8 @@
     "templateVarTitleColor": "Titelleistenfarbe",
     "templateVarContent": "Benachrichtigungsinhalt",
     "templateVarDatetime": "Sendedatum/-zeit",
-    "templateVarInstanceUrl": "Instanz-URL"
+    "templateVarInstanceUrl": "Instanz-URL",
+    "templatePlainText": "Klartext"
   },
   "account": {
     "profile": "Profil",

@@ -23,6 +23,7 @@ class SMTPConfig(db.Model):
     smtp_auth = db.Column(db.Boolean, default=True)
     smtp_content_type = db.Column(db.String(10), default='html')  # html, text, both
     email_template = db.Column(db.Text)  # Custom HTML template (null = use default)
+    email_text_template = db.Column(db.Text)  # Custom plain text template (null = use default)
     enabled = db.Column(db.Boolean, default=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(80))

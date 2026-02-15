@@ -398,34 +398,41 @@ def test_email():
 def get_email_template():
     """Get email template (custom or default)"""
     from models.email_notification import SMTPConfig
-    from services.email_templates import get_default_template
+    from services.email_templates import get_default_template, get_default_text_template
     
     smtp = SMTPConfig.query.first()
-    custom = smtp.email_template if smtp else None
+    custom_html = smtp.email_template if smtp else None
+    custom_text = smtp.email_text_template if smtp else None
     
     return success_response(data={
-        'template': custom or get_default_template(),
-        'is_custom': bool(custom),
-        'default_template': get_default_template()
+        'template': custom_html or get_default_template(),
+        'text_template': custom_text or get_default_text_template(),
+        'is_custom': bool(custom_html),
+        'is_text_custom': bool(custom_text),
+        'default_template': get_default_template(),
+        'default_text_template': get_default_text_template()
     })
 
 
 @bp.route('/api/v2/settings/email/template', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_email_template():
-    """Update email template"""
+    """Update email template (HTML and/or text)"""
     from models.email_notification import SMTPConfig
     
     data = request.json
-    if not data or 'template' not in data:
-        return error_response('Template HTML required', 400)
+    if not data:
+        return error_response('No data provided', 400)
     
     smtp = SMTPConfig.query.first()
     if not smtp:
         smtp = SMTPConfig()
         db.session.add(smtp)
     
-    smtp.email_template = data['template']
+    if 'template' in data:
+        smtp.email_template = data['template']
+    if 'text_template' in data:
+        smtp.email_text_template = data['text_template']
     db.session.commit()
     
     AuditService.log_action(
@@ -442,12 +449,13 @@ def update_email_template():
 @bp.route('/api/v2/settings/email/template/reset', methods=['POST'])
 @require_auth(['write:settings'])
 def reset_email_template():
-    """Reset email template to default"""
+    """Reset email template to default (HTML and text)"""
     from models.email_notification import SMTPConfig
     
     smtp = SMTPConfig.query.first()
     if smtp:
         smtp.email_template = None
+        smtp.email_text_template = None
         db.session.commit()
     
     AuditService.log_action(
@@ -465,10 +473,11 @@ def reset_email_template():
 @require_auth(['read:settings'])
 def preview_email_template():
     """Preview email template with sample data"""
-    from services.email_templates import render_template
+    from services.email_templates import render_template, render_text_template
     
     data = request.json
     template = data.get('template', '') if data else ''
+    template_type = data.get('type', 'html') if data else 'html'
     
     sample_content = """
     <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">This is a <strong>preview</strong> of your email template.</p>
@@ -478,9 +487,12 @@ def preview_email_template():
     </div>
     """
     
-    html = render_template(template, "Template Preview", "#3b82f6", sample_content)
-    
-    return success_response(data={'html': html})
+    if template_type == 'text':
+        text = render_text_template(template, "Template Preview", sample_content)
+        return success_response(data={'text': text})
+    else:
+        html = render_template(template, "Template Preview", "#3b82f6", sample_content)
+        return success_response(data={'html': html})
 
 
 # ============================================================================

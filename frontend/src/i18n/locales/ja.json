@@ -1566,7 +1566,8 @@
     "templateVarTitleColor": "タイトルバーの色",
     "templateVarContent": "通知内容",
     "templateVarDatetime": "送信日時",
-    "templateVarInstanceUrl": "インスタンスURL"
+    "templateVarInstanceUrl": "インスタンスURL",
+    "templatePlainText": "プレーンテキスト"
   },
   "account": {
     "profile": "プロフィール",

@@ -1702,7 +1702,8 @@
     "templateVarTitleColor": "Couleur de la barre titre",
     "templateVarContent": "Contenu de notification",
     "templateVarDatetime": "Date/heure d'envoi",
-    "templateVarInstanceUrl": "URL de l'instance"
+    "templateVarInstanceUrl": "URL de l'instance",
+    "templatePlainText": "Texte brut"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",
