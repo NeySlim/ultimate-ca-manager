@@ -187,11 +187,12 @@ class EmailService:
     @staticmethod
     def send_test_email(recipient: str) -> tuple[bool, str]:
         """Send a test email"""
-        from services.email_templates import render_template
+        from services.email_templates import render_template, render_text_template
         from models.email_notification import SMTPConfig
         
         smtp = SMTPConfig.query.first()
         custom_template = smtp.email_template if smtp else None
+        custom_text_template = smtp.email_text_template if smtp else None
         
         subject = "UCM Test Email"
         content = """
@@ -203,16 +204,8 @@ class EmailService:
         """
         
         body_html = render_template(custom_template, "Test Email", "#3b82f6", content)
-        
-        body_text = f"""
-Ultimate CA Manager - Test Email
-
-This is a test email from your UCM instance.
-If you received this email, your SMTP configuration is working correctly!
-
-Sent at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
-From: UCM Email Notification System
-        """
+        body_text = render_text_template(custom_text_template, "Test Email",
+            "This is a test email from your UCM instance.\nIf you received this email, your SMTP configuration is working correctly!")
         
         return EmailService.send_email(
             recipients=[recipient],

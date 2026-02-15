@@ -1566,7 +1566,8 @@
     "templateVarTitleColor": "标题栏颜色",
     "templateVarContent": "通知内容",
     "templateVarDatetime": "发送日期/时间",
-    "templateVarInstanceUrl": "实例URL"
+    "templateVarInstanceUrl": "实例URL",
+    "templatePlainText": "纯文本"
   },
   "account": {
     "profile": "个人资料",

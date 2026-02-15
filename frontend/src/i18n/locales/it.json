@@ -1566,7 +1566,8 @@
     "templateVarTitleColor": "Colore barra titolo",
     "templateVarContent": "Contenuto notifica",
     "templateVarDatetime": "Data/ora di invio",
-    "templateVarInstanceUrl": "URL dell'istanza"
+    "templateVarInstanceUrl": "URL dell'istanza",
+    "templatePlainText": "Testo semplice"
   },
   "account": {
     "profile": "Profilo",

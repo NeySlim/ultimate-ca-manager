@@ -1566,7 +1566,8 @@
     "templateVarTitleColor": "Колір панелі заголовка",
     "templateVarContent": "Вміст сповіщення",
     "templateVarDatetime": "Дата/час відправлення",
-    "templateVarInstanceUrl": "URL екземпляра"
+    "templateVarInstanceUrl": "URL екземпляра",
+    "templatePlainText": "Звичайний текст"
   },
   "account": {
     "profile": "Профіль",

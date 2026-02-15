@@ -76,6 +76,23 @@ def get_default_template():
     return DEFAULT_TEMPLATE
 
 
+DEFAULT_TEXT_TEMPLATE = """=== Ultimate CA Manager ===
+
+{{title}}
+
+{{content}}
+
+---
+Sent at {{datetime}}
+Ultimate CA Manager
+{{instance_url}}"""
+
+
+def get_default_text_template():
+    """Return the default plain text email template"""
+    return DEFAULT_TEXT_TEMPLATE
+
+
 def render_template(template_html: str, title: str, title_color: str, content: str,
                     instance_url: str = '') -> str:
     """
@@ -101,3 +118,22 @@ def render_template(template_html: str, title: str, title_color: str, content: s
     html = html.replace('{{instance_url}}', instance_url)
     
     return html
+
+
+def render_text_template(template_text: str, title: str, content: str,
+                         instance_url: str = '') -> str:
+    """Render a plain text email template with variable substitution."""
+    from datetime import datetime as dt
+    import re
+    
+    text = template_text or DEFAULT_TEXT_TEMPLATE
+    # Strip HTML tags from content if any
+    clean_content = re.sub(r'<[^>]+>', '', content).strip()
+    clean_content = re.sub(r'\n{3,}', '\n\n', clean_content)
+    
+    text = text.replace('{{title}}', title)
+    text = text.replace('{{content}}', clean_content)
+    text = text.replace('{{datetime}}', dt.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC'))
+    text = text.replace('{{instance_url}}', instance_url)
+    
+    return text

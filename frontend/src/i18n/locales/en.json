@@ -1567,7 +1567,8 @@
     "templateVarTitleColor": "Title bar color",
     "templateVarContent": "Notification content",
     "templateVarDatetime": "Send date/time",
-    "templateVarInstanceUrl": "Instance URL"
+    "templateVarInstanceUrl": "Instance URL",
+    "templatePlainText": "Plain Text"
   },
   "account": {
     "profile": "Profile",
