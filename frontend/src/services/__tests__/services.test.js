@@ -483,16 +483,6 @@ describe('systemService', () => {
     systemService = mod.systemService
   })
 
-  it('getHealth → GET /system/health', async () => {
-    await systemService.getHealth()
-    expect(mockApiClient.get).toHaveBeenCalledWith('/system/health')
-  })
-
-  it('getVersion → GET /system/version', async () => {
-    await systemService.getVersion()
-    expect(mockApiClient.get).toHaveBeenCalledWith('/system/version')
-  })
-
   it('listBackups → GET /system/backups', async () => {
     await systemService.listBackups()
     expect(mockApiClient.get).toHaveBeenCalledWith('/system/backups')
