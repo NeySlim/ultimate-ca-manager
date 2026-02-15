@@ -1549,7 +1549,24 @@
       "wikiGuides": "Wikiとユーザーガイド",
       "license": "ライセンス",
       "licenseDesc": "フリーでオープンソースなソフトウェアです。"
-    }
+    },
+    "emailTemplate": "メールテンプレート",
+    "templateDescription": "すべてのメール通知に使用されるHTMLテンプレートをカスタマイズします。",
+    "editTemplate": "テンプレートを編集",
+    "templateSaved": "メールテンプレートを保存しました",
+    "templateCustom": "カスタムテンプレート",
+    "templateDefault": "デフォルトテンプレート",
+    "templateResetDefault": "リセット",
+    "templateResetConfirm": "メールテンプレートをデフォルトにリセットしますか？カスタムテンプレートは失われます。",
+    "templateResetSuccess": "メールテンプレートをリセットしました",
+    "templateVisual": "ビジュアル",
+    "templatePreview": "プレビュー",
+    "templateVarLogo": "UCMロゴ",
+    "templateVarTitle": "メールタイトル",
+    "templateVarTitleColor": "タイトルバーの色",
+    "templateVarContent": "通知内容",
+    "templateVarDatetime": "送信日時",
+    "templateVarInstanceUrl": "インスタンスURL"
   },
   "account": {
     "profile": "プロフィール",
