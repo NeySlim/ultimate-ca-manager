@@ -1418,6 +1418,7 @@
     "alertDaysHelp": "Sélectionnez combien de jours avant l'expiration envoyer les alertes",
     "alertRecipients": "Destinataires des alertes",
     "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
+    "smtpRequiredForAlerts": "Configurez et testez un serveur SMTP ci-dessus avant d'activer les alertes email.",
     "includeRevoked": "Inclure les certificats révoqués",
     "checkNow": "Vérifier maintenant",
     "expiryCheckResult": "Vérification terminée : {{count}} alerte(s) envoyée(s)",

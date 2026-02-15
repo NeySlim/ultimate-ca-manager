@@ -1624,6 +1624,12 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
             <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-rose">
+              {!settings.smtp_host ? (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">
+                  <Warning size={20} className="text-status-warning shrink-0" />
+                  {t('settings.smtpRequiredForAlerts')}
+                </div>
+              ) : (
               <div className="space-y-4">
                 <ToggleSwitch
                   checked={expiryAlerts.enabled}
@@ -1688,6 +1694,7 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+              )}
             </DetailSection>
           </DetailContent>
         )
