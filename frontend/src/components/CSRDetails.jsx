@@ -101,17 +101,17 @@ export function CSRDetails({
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || 'N/A'}</div>
+          <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || t('common.na')}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Hash size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keySize')}</div>
-          <div className="text-xs font-medium text-text-primary">{csr.key_size || 'N/A'}</div>
+          <div className="text-xs font-medium text-text-primary">{csr.key_size || t('common.na')}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <FileText size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
-          <div className="text-xs font-medium text-text-primary">{csr.signature_algorithm || 'N/A'}</div>
+          <div className="text-xs font-medium text-text-primary">{csr.signature_algorithm || t('common.na')}</div>
         </div>
       </div>
       

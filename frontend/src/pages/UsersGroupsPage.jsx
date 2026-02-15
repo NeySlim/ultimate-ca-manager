@@ -411,7 +411,7 @@ export default function UsersGroupsPage() {
       sortable: true,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
-          {val ? formatDate(val) : 'Never'}
+          {val ? formatDate(val) : t('common.never')}
         </span>
       )
     }
@@ -536,14 +536,14 @@ export default function UsersGroupsPage() {
       <CompactSection title={t('common.lastLogin')} icon={Clock} iconClass="icon-bg-green">
         <CompactGrid columns={1}>
           <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedUser.created_at)} />
-          <CompactField autoIcon="lastLogin" label={t('common.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
+          <CompactField autoIcon="lastLogin" label={t('common.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : t('common.never')} />
         </CompactGrid>
       </CompactSection>
 
       <CompactSection title={t('common.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
         <CompactGrid columns={1}>
           <CompactField autoIcon="enable2FA" label={t('common.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
-          <CompactField autoIcon="totp" label="TOTP" value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
+          <CompactField autoIcon="totp" label={t('common.totp', 'TOTP')} value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
         </CompactGrid>
       </CompactSection>
     </div>
@@ -580,7 +580,7 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title={t('groups.members')}>
+      <CompactSection title={t('groups.members')} icon={Users} iconClass="icon-bg-blue">
         <div className="space-y-3">
           {/* Manage Members Button */}
           {canWrite('users') && (
@@ -594,7 +594,7 @@ export default function UsersGroupsPage() {
           {/* Members Preview */}
           {(selectedGroup.members?.length || 0) === 0 ? (
             <p className="text-sm text-text-tertiary text-center py-4">
-              {t('groups.noGroups').replace('groups', 'members')}
+              {t('groups.noMembers')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -623,7 +623,7 @@ export default function UsersGroupsPage() {
                   onClick={() => setShowMemberModal(true)}
                   className="w-full text-sm text-accent-primary hover:text-accent-primary/80 py-2"
                 >
-                  + {selectedGroup.members.length - 5} {t('groups.members').toLowerCase()}
+                  + {selectedGroup.members.length - 5} {t('groups.members')}
                 </button>
               )}
             </div>
