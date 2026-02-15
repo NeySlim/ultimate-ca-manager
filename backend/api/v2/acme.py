@@ -245,6 +245,40 @@ def get_acme_account(account_id):
     })
 
 
+@bp.route('/api/v2/acme/accounts/<int:account_id>', methods=['DELETE'])
+@require_auth(['write:acme'])
+def delete_acme_account(account_id):
+    """Delete an ACME account and its related orders/authorizations/challenges"""
+    acc = AcmeAccount.query.get(account_id)
+    if not acc:
+        return error_response('Account not found', 404)
+
+    account_name = acc.account_id
+    try:
+        # Delete related challenges, authorizations, orders first
+        for order in acc.orders:
+            for authz in order.authorizations:
+                AcmeChallenge.query.filter_by(authorization_id=authz.id).delete()
+            AcmeAuthorization.query.filter_by(order_id=order.id).delete()
+        AcmeOrder.query.filter_by(account_id=acc.id).delete()
+        db.session.delete(acc)
+        db.session.commit()
+
+        AuditService.log(
+            action='acme.account.delete',
+            resource_type='acme_account',
+            resource_id=str(account_id),
+            details={'account_id': account_name},
+            user_id=g.get('user_id')
+        )
+
+        return success_response(message=f'Account {account_name} deleted')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete ACME account {account_id}: {e}")
+        return error_response(f'Failed to delete account: {str(e)}', 500)
+
+
 @bp.route('/api/v2/acme/orders', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_orders():

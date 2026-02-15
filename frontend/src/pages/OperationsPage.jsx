@@ -638,7 +638,7 @@ export default function OperationsPage() {
       </DetailSection>
 
       <DetailSection title={t('importExport.opnsense.title')} icon={CloudArrowUp} iconClass="icon-bg-orange" description={t('importExport.opnsense.description')}>
-        <div className="space-y-4">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
             <Input label={t('common.portLabel')} value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
@@ -709,7 +709,7 @@ export default function OperationsPage() {
               </Button>
             )}
           </div>
-        </div>
+        </form>
       </DetailSection>
     </DetailContent>
   )

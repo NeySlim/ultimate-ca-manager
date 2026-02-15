@@ -60,7 +60,7 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 // Certificate trend chart (area chart)
-export function CertificateTrendChart({ data = [], height = '100%' }) {
+export function CertificateTrendChart({ data = [], height = 250 }) {
   const { t } = useTranslation()
   const { mode } = useTheme()
   const colors = useChartColors()
@@ -128,7 +128,7 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
 }
 
 // Status distribution pie chart
-export function StatusPieChart({ data = {}, height = '100%' }) {
+export function StatusPieChart({ data = {}, height = 250 }) {
   const { t } = useTranslation()
   const colors = useChartColors()
   
