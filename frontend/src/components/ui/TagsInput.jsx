@@ -47,7 +47,7 @@ export default function TagsInput({ value = [], onChange, label, placeholder, he
         <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
       )}
       <div
-        className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-tertiary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary"
+        className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-secondary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag, i) => (
