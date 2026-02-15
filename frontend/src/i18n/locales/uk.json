@@ -1567,7 +1567,8 @@
     "templateVarContent": "Вміст сповіщення",
     "templateVarDatetime": "Дата/час відправлення",
     "templateVarInstanceUrl": "URL екземпляра",
-    "templatePlainText": "Звичайний текст"
+    "templatePlainText": "Звичайний текст",
+    "templateDesktopOnly": "Редактор шаблонів потребує екран комп'ютера"
   },
   "account": {
     "profile": "Профіль",

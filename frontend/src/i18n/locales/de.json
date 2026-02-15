@@ -1567,7 +1567,8 @@
     "templateVarContent": "Benachrichtigungsinhalt",
     "templateVarDatetime": "Sendedatum/-zeit",
     "templateVarInstanceUrl": "Instanz-URL",
-    "templatePlainText": "Klartext"
+    "templatePlainText": "Klartext",
+    "templateDesktopOnly": "Der Vorlagen-Editor benötigt einen Desktop-Bildschirm"
   },
   "account": {
     "profile": "Profil",

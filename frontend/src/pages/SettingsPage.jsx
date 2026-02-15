@@ -262,7 +262,7 @@ function AboutSection() {
 function AppearanceSettings() {
   const { t } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
-  const { forceDesktop, setForceDesktop, screenWidth, breakpoints } = useMobile()
+  const { isMobile, forceDesktop, setForceDesktop, screenWidth, breakpoints } = useMobile()
   
   const modeOptions = [
     { id: 'system', label: t('settings.followSystem'), icon: Desktop, description: t('settings.followSystemDesc') },
@@ -809,6 +809,7 @@ export default function SettingsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, hasPermission } = usePermission()
+  const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [loading, setLoading] = useState(true)
@@ -1720,12 +1721,19 @@ export default function SettingsPage() {
 
             {/* Email Template */}
             <DetailSection title={t('settings.emailTemplate')} icon={EnvelopeSimple} iconClass="icon-bg-indigo">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-text-secondary">{t('settings.templateDescription')}</p>
-                <Button variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)}>
-                  <PencilSimple size={16} />
-                  {t('settings.editTemplate')}
-                </Button>
+                <div className="relative group shrink-0">
+                  <Button variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
+                    <PencilSimple size={16} />
+                    {t('settings.editTemplate')}
+                  </Button>
+                  {isMobile && (
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-[11px] text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+                      {t('settings.templateDesktopOnly')}
+                    </div>
+                  )}
+                </div>
               </div>
             </DetailSection>
 
