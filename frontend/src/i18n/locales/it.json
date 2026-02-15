@@ -1485,7 +1485,7 @@
     "alertDaysHelp": "Select how many days before expiry to send alerts",
     "alertRecipients": "Alert Recipients",
     "tagsInputHelp": "Digita un indirizzo e premi Invio per aggiungere",
-    "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
+    "alertRecipientsPlaceholder": "admin@example.com",
     "smtpRequiredForAlerts": "Configura e testa un server SMTP sopra prima di attivare gli avvisi email.",
     "includeRevoked": "Include revoked certificates",
     "checkNow": "Check Now",

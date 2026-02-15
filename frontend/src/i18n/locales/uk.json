@@ -1485,7 +1485,7 @@
     "alertDaysHelp": "Select how many days before expiry to send alerts",
     "alertRecipients": "Alert Recipients",
     "tagsInputHelp": "Введіть адресу та натисніть Enter для додавання",
-    "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
+    "alertRecipientsPlaceholder": "admin@example.com",
     "smtpRequiredForAlerts": "Налаштуйте та протестуйте SMTP-сервер вище, перш ніж вмикати сповіщення електронною поштою.",
     "includeRevoked": "Include revoked certificates",
     "checkNow": "Check Now",

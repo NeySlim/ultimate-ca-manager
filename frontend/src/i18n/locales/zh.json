@@ -1485,7 +1485,7 @@
     "alertDaysHelp": "Select how many days before expiry to send alerts",
     "alertRecipients": "Alert Recipients",
     "tagsInputHelp": "输入地址后按Enter添加",
-    "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
+    "alertRecipientsPlaceholder": "admin@example.com",
     "smtpRequiredForAlerts": "在启用邮件提醒之前，请先配置并测试上方的SMTP服务器。",
     "includeRevoked": "Include revoked certificates",
     "checkNow": "Check Now",

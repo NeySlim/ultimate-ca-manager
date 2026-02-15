@@ -1422,7 +1422,7 @@
     "alertDaysHelp": "Sélectionnez combien de jours avant l'expiration envoyer les alertes",
     "alertRecipients": "Destinataires des alertes",
     "tagsInputHelp": "Saisissez une adresse et appuyez sur Entrée pour ajouter",
-    "alertRecipientsPlaceholder": "admin@example.com, security@example.com",
+    "alertRecipientsPlaceholder": "admin@example.com",
     "smtpRequiredForAlerts": "Configurez et testez un serveur SMTP ci-dessus avant d'activer les alertes email.",
     "includeRevoked": "Inclure les certificats révoqués",
     "checkNow": "Vérifier maintenant",

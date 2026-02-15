@@ -47,19 +47,19 @@ export default function TagsInput({ value = [], onChange, label, placeholder, he
         <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
       )}
       <div
-        className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-tertiary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary/30"
+        className="flex flex-wrap items-center gap-2 min-h-[38px] px-2.5 py-1.5 rounded-lg border border-border bg-bg-tertiary cursor-text transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag, i) => (
           <span
             key={i}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md bg-accent-primary/15 text-accent-primary text-sm font-medium border border-accent-primary/20"
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md bg-bg-secondary text-accent-primary text-sm font-medium border border-border"
           >
             {tag}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); removeTag(i) }}
-              className="p-0.5 rounded hover:bg-status-danger/15 hover:text-status-danger transition-colors"
+              className="p-0.5 rounded hover:bg-bg-tertiary hover:text-status-danger transition-colors"
             >
               <X size={12} weight="bold" />
             </button>
