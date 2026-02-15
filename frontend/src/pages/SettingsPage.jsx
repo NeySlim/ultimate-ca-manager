@@ -927,7 +927,6 @@ export default function SettingsPage() {
       const data = await casService.getAll()
       setCas(data.data || [])
     } catch (error) {
-      console.error('Failed to load CAs:', error)
     }
   }
 
@@ -936,7 +935,6 @@ export default function SettingsPage() {
       const data = await systemService.listBackups()
       setBackups(data.data || [])
     } catch (error) {
-      console.error('Failed to load backups:', error)
     }
   }
 
@@ -945,7 +943,6 @@ export default function SettingsPage() {
       const data = await systemService.getHttpsCertInfo()
       setHttpsInfo(data.data || {})
     } catch (error) {
-      console.error('Failed to load HTTPS cert info:', error)
     }
   }
 
@@ -960,7 +957,6 @@ export default function SettingsPage() {
         last_optimized: stats.last_vacuum || 'Never'
       })
     } catch (error) {
-      console.error('Failed to load database stats:', error)
     }
   }
 
@@ -971,7 +967,6 @@ export default function SettingsPage() {
       const response = await apiClient.get('/sso/providers')
       setSsoProviders(response.data || [])
     } catch (error) {
-      console.error('Failed to load SSO providers:', error)
     } finally {
       setSsoLoading(false)
     }
@@ -1049,7 +1044,6 @@ export default function SettingsPage() {
       const response = await apiClient.get('/webhooks')
       setWebhooks(response.data || [])
     } catch (error) {
-      console.error('Failed to load webhooks:', error)
     } finally {
       setWebhooksLoading(false)
     }
@@ -1126,7 +1120,6 @@ export default function SettingsPage() {
       )
       setCertificates(validCerts)
     } catch (error) {
-      console.error('Failed to load certificates:', error)
     }
   }
 
@@ -1136,7 +1129,6 @@ export default function SettingsPage() {
       const response = await apiClient.get('/system/security/encryption-status')
       setEncryptionStatus(response.data)
     } catch (error) {
-      console.error('Failed to load encryption status:', error)
     }
   }
 
@@ -1177,7 +1169,6 @@ export default function SettingsPage() {
       const response = await apiClient.get('/system/security/anomalies')
       setAnomalies(response.data?.anomalies || response.anomalies || [])
     } catch (error) {
-      console.error('Failed to load anomalies:', error)
     } finally {
       setAnomaliesLoading(false)
     }
@@ -1189,7 +1180,6 @@ export default function SettingsPage() {
       const response = await apiClient.get('/system/audit/syslog')
       setSyslogConfig(response.data || response)
     } catch (error) {
-      console.error('Failed to load syslog config:', error)
     }
   }
 

@@ -68,7 +68,6 @@ export function FloatingDetailWindow({ windowInfo }) {
           setData(extractData(res) || res.data || res)
         }
       } catch (err) {
-        console.error(`Failed to load ${windowInfo.type} ${windowInfo.entityId}:`, err)
       } finally {
         if (!cancelled) setLoading(false)
       }

@@ -86,7 +86,6 @@ export default function HSMPage() {
       const response = await apiClient.get(`/hsm/keys?provider_id=${providerId}`)
       setKeys(response.data || [])
     } catch (error) {
-      console.error('Failed to load keys:', error)
     }
   }
 

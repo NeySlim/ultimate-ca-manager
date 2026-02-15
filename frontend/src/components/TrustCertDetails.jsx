@@ -56,7 +56,6 @@ async function copyToClipboard(text, onSuccess) {
     await navigator.clipboard.writeText(text)
     onSuccess?.()
   } catch (err) {
-    console.error('Failed to copy:', err)
   }
 }
 

@@ -150,7 +150,6 @@ export default function AuditLogsPage() {
       setStats(statsRes.data || null);
       setActions(actionsRes.data || { actions: [], categories: {} });
     } catch (err) {
-      console.error('Failed to load audit data:', err);
       showError(err.message || ERRORS.LOAD_FAILED.AUDIT_LOGS);
     } finally {
       setLoading(false);
@@ -174,7 +173,6 @@ export default function AuditLogsPage() {
       setLogs(res.data || []);
       setTotal(res.meta?.total || 0);
     } catch (err) {
-      console.error('Failed to load logs:', err);
     }
   };
 

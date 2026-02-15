@@ -95,7 +95,6 @@ export default function AccountPage() {
       const response = await accountService.getApiKeys()
       setApiKeys(response.data || response || [])
     } catch (error) {
-      console.error('Failed to load API keys:', error)
     }
   }
 
@@ -104,7 +103,6 @@ export default function AccountPage() {
       const response = await accountService.getWebAuthnCredentials()
       setWebauthnCredentials(response.data || [])
     } catch (error) {
-      console.error('Failed to load WebAuthn credentials:', error)
     }
   }
 
@@ -113,7 +111,6 @@ export default function AccountPage() {
       const response = await accountService.getMTLSCertificates()
       setMtlsCertificates(response.data || [])
     } catch (error) {
-      console.error('Failed to load mTLS certificates:', error)
     }
   }
 
