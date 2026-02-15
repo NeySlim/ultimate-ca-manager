@@ -60,7 +60,7 @@ export const csrsService = {
   },
 
   async download(id) {
-    return apiClient.get(`/csrs/${id}/download`, {
+    return apiClient.get(`/csrs/${id}/export`, {
       responseType: 'blob'
     })
   },

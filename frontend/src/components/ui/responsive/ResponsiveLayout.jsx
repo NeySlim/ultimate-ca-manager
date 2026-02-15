@@ -417,7 +417,10 @@ export function ResponsiveLayout({
           )
         )}
         
-        {/* Mobile slide-over (in split mode, mobile still uses overlay) */}
+        </>
+        )}
+
+        {/* Mobile slide-over (in split mode, mobile still uses overlay) — OUTSIDE useSidebar block */}
         {splitView && !isLargeScreen && slideOverOpen && (
           <MobileSlideOver
             title={slideOverTitle}
@@ -425,8 +428,6 @@ export function ResponsiveLayout({
           >
             {slideOverContent}
           </MobileSlideOver>
-        )}
-        </>
         )}
       </div>
       
