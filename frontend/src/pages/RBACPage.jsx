@@ -444,7 +444,6 @@ export default function RBACPage() {
             loading={loading}
             onRowClick={setSelectedRole}
             selectedId={selectedRole?.id}
-            rowActions={rowActions}
             searchable
             searchPlaceholder={t('rbac.searchRoles')}
             searchKeys={['name', 'description']}

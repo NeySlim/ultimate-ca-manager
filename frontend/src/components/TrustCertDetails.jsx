@@ -76,7 +76,8 @@ export function TrustCertDetails({
   canWrite = false,
   canDelete = false,
   showActions = true,
-  showPem = true
+  showPem = true,
+  embedded = false,
 }) {
   const { t } = useTranslation()
   const [showFullPem, setShowFullPem] = useState(false)
@@ -115,7 +116,8 @@ export function TrustCertDetails({
     : []
   
   return (
-    <div className="space-y-4 p-4">
+    <div className={cn("space-y-4", embedded ? "p-0" : "p-4")}>
+      {!embedded && <>
       {/* Header with badges */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -198,6 +200,22 @@ export function TrustCertDetails({
               <Trash size={14} /> {t('common.delete')}
             </Button>
           )}
+        </div>
+      )}
+      </>}
+
+      {/* Embedded: compact status bar */}
+      {embedded && (
+        <div className="flex items-center gap-2 flex-wrap px-1 pb-1">
+          <Badge variant={statusConfig[status].variant} size="sm">
+            {statusConfig[status].label}
+          </Badge>
+          {purposes.length > 0 && purposes.slice(0, 2).map((purpose, idx) => {
+            const config = purposeConfig[purpose.toLowerCase()] || { variant: 'default', label: purpose }
+            return <Badge key={idx} variant={config.variant} size="sm">{config.label}</Badge>
+          })}
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className="text-2xs text-text-secondary">{cert.key_type || 'N/A'}</span>
         </div>
       )}
       

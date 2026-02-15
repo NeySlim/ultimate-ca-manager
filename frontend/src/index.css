@@ -1201,6 +1201,19 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
+.dashboard-grid.edit-mode .react-grid-item {
+  pointer-events: auto;
+}
+
+.dashboard-grid.edit-mode .react-grid-item > *:not(.react-resizable-handle):not(.widget-drag-handle) {
+  pointer-events: none;
+}
+
+.dashboard-grid.edit-mode .widget-drag-handle,
+.dashboard-grid.edit-mode .react-resizable-handle {
+  pointer-events: auto;
+}
+
 .dashboard-grid .react-grid-item > .react-resizable-handle::after {
   border-color: var(--accent-primary);
   opacity: 0.5;

@@ -710,7 +710,6 @@ export default function UsersGroupsPage() {
           loading={loading}
           onRowClick={handleSelect}
           selectedId={currentSelected?.id}
-          rowActions={currentRowActions}
           searchable
           searchPlaceholder={`${t('common.search')} ${activeTab}...`}
           searchKeys={activeTab === 'users' ? ['username', 'email', 'full_name', 'role'] : ['name', 'description']}
