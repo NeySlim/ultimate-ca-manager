@@ -264,12 +264,11 @@ def delete_acme_account(account_id):
         db.session.delete(acc)
         db.session.commit()
 
-        AuditService.log(
+        AuditService.log_action(
             action='acme.account.delete',
             resource_type='acme_account',
             resource_id=str(account_id),
-            details={'account_id': account_name},
-            user_id=g.get('user_id')
+            details=f'Deleted ACME account: {account_name}'
         )
 
         return success_response(message=f'Account {account_name} deleted')

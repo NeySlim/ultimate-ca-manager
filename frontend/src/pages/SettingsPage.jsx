@@ -186,7 +186,7 @@ function AboutSection() {
         <Logo variant="vertical" size="lg" />
         <div className="mt-3">
           <Badge variant="accent" size="sm">
-            {loading ? '...' : `v${info?.version || '2.1.0'}`}
+            {loading ? '...' : `v${info?.version || __APP_VERSION__}`}
           </Badge>
         </div>
       </div>
