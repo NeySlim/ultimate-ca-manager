@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-beta3] - 2026-02-15
+
+### New Features
+
+- **Floating Detail Windows** - Click any table row to open draggable, resizable detail window with embedded content
+- **Detail Action Bar** - Export (multi-format dropdown: PEM, DER, PKCS#12, chain), Renew, Revoke, Delete actions in detail windows
+- **Window Manager** - Footer bar with stack/tile, same-window, close-on-navigate options
+- **Trust Store Chain Validation** - Visual chain status (complete/partial/incomplete), export bundle, add from managed CAs
+- **Service Reconnection** - 30s countdown, health + WebSocket readiness check, automatic redirect to login
+- **Health Endpoint** - Consolidated to `/api/v2/health` with WebSocket readiness status, backward-compatible aliases
+- **Settings About** - Version, system info, uptime, memory, links to docs/wiki/issues
+- **Template Duplication** - Clone endpoint: POST /templates/{id}/duplicate
+
+### UI/UX
+
+- **Dashboard** - Redesigned header with logo, diversified widget colors
+- **Logo** - Shield outline, larger on dashboard, smaller in sidebar
+- **Themes** - Simplified to 3 themes: Gray, Purple, Sunset (was 6)
+- **Tables** - Proportional column sizing, actions moved from table to detail windows
+- **Status Footer Bar** - Window management controls, theme-aware design
+- **Mobile** - All dashboard charts render correctly, scroll fixes
+- **Reconnect Overlay** - Circular countdown ring, connection progress bar, redirect status
+
+### i18n
+
+- **Full Coverage** - 1914+ keys across all 9 languages, 0 missing
+- **New Namespaces** - `reconnect.*`, `table.*`, `windows.*`, `details.daysShort`
+- **Hardcoded Strings** - 20+ user-facing strings replaced with `t()` calls
+
+### Bug Fixes
+
+- **Health Endpoint** - Removed duplicate route from app.py, consolidated in health_routes.py
+- **FloatingHelpPanel** - Defined missing SOFT_MAX_W constant (was causing runtime crash)
+- **Dashboard** - Fixed react-grid-layout v2.2.2 dragConfig/resizeConfig API
+- **Dashboard** - Fixed Card.Body ignoring style prop
+- **Toast Notifications** - Stack vertically instead of overlapping
+- **Radix Select** - Filter empty value options
+- **SCEP Nav** - Normalize URL for active state detection
+- **Tests** - Mock useWindowManager in PageRendering tests
+
+---
+
 ## [2.1.0-alpha3] - 2026-02-13
 
 ### Security

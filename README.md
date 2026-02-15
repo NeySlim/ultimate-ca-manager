@@ -26,7 +26,7 @@
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
-- **12 Themes** -- 6 color schemes (Gray, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink) x Light/Dark
+- **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) x Light/Dark
 - **i18n** -- 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
 - **Responsive UI** -- React 18 + Radix UI, mobile-friendly, command palette (Ctrl+K)
 - **Real-time** -- WebSocket live updates

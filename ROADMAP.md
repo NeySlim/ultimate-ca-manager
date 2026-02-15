@@ -93,6 +93,24 @@
 - [x] **Chain Repair Widget** - Visual progress on CAs page with manual run
 - [x] **Smart Import Dedup** - Prevent duplicate CAs via SKI matching
 
+### UI Overhaul
+- [x] **Floating Detail Windows** - Draggable, resizable detail views with embedded content and action bar
+- [x] **Window Manager** - Footer bar with stack/tile, same-window, close-on-navigate controls
+- [x] **Themes Simplified** - 3 themes (Gray, Purple, Sunset) replacing 6 color schemes
+- [x] **Dashboard Redesign** - New header with logo, diversified widget colors
+- [x] **Mobile Improvements** - All dashboard charts render, scroll fixes
+- [x] **Status Footer Bar** - Window management controls in bottom bar
+
+### Trust Store
+- [x] **Chain Validation** - Visual chain status (complete/partial/incomplete)
+- [x] **Export Bundle** - PEM bundle export
+- [x] **Add from Managed CAs** - Add CA certificates to trust store from managed CAs
+
+### Service Reconnection
+- [x] **Reconnect Overlay** - 30s countdown, health + WebSocket readiness check
+- [x] **Auto-Redirect** - Redirect to login after service restart with cache invalidation
+- [x] **Health API** - Consolidated `/api/v2/health` with WebSocket status
+
 ### Integrations (moved to v2.2.0)
 
 ### Microsoft AD CS Import
@@ -119,6 +137,8 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| v2.1.0-beta3 | 2026-02-15 | Floating detail windows, trust store chain validation, service reconnect, 3 themes |
+| v2.1.0-beta2 | 2026-02-14 | Dashboard redesign, mobile fixes, status footer bar |
 | v2.1.0-alpha | 2026-02-12 | AKI/SKI chain matching, chain repair, themed dialogs, auto-update fix |
 | v2.0.6 | 2026-02-12 | Auto-update sudo fix, cumulative fixes since v2.0.1 |
 | v2.0.1 | 2026-02-08 | SSO login, i18n sync, form fixes |
@@ -129,4 +149,4 @@
 
 ---
 
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-02-15

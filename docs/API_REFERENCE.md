@@ -2966,11 +2966,11 @@ GET /api/v2/websocket/events
 
 ## Health
 
-These endpoints are served at `/api/health` (not under `/api/v2/`). They do not require authentication and are intended for load balancers and monitoring systems.
+These endpoints are served at `/api/v2/health` (primary) with backward-compatible aliases at `/api/health` and `/health`. They do not require authentication and are intended for load balancers, monitoring systems, and frontend reconnection detection.
 
 ### Basic Health Check
 ```http
-GET /api/health
+GET /api/v2/health
 ```
 
 **Response:**
@@ -2978,13 +2978,23 @@ GET /api/health
 {
   "status": "ok",
   "service": "ucm",
-  "started_at": 1706400000.0
+  "version": "2.1.0",
+  "started_at": 1707123456.789,
+  "websocket": true
 }
 ```
 
+| Field | Description |
+|-------|-------------|
+| `status` | Always `"ok"` when the service is running |
+| `service` | Service identifier (`"ucm"`) |
+| `version` | Current application version |
+| `started_at` | Unix timestamp when the service started |
+| `websocket` | Indicates whether the WebSocket (Socket.IO) server is initialized and ready to accept connections |
+
 ### Readiness Check
 ```http
-GET /api/health/ready
+GET /api/v2/health/ready
 ```
 
 Verifies the application can serve traffic (database, filesystem). Returns 200 if ready, 503 if not.
@@ -3002,7 +3012,7 @@ Verifies the application can serve traffic (database, filesystem). Returns 200 i
 
 ### Liveness Check
 ```http
-GET /api/health/live
+GET /api/v2/health/live
 ```
 
 Returns 200 if the application process is alive, regardless of dependency status.
