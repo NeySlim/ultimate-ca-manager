@@ -819,6 +819,11 @@ export default function SettingsPage() {
   const [selectedHttpsCert, setSelectedHttpsCert] = useState('')
   const [cas, setCas] = useState([])
   
+  // Expiry alert settings
+  const [expiryAlerts, setExpiryAlerts] = useState({
+    enabled: true, alert_days: [30, 14, 7, 1], include_revoked: false, recipients: []
+  })
+  
   // Selected category - read from URL param or default to 'general'
   const [selectedCategory, setSelectedCategory] = useState(
     searchParams.get('tab') || 'general'
@@ -893,6 +898,7 @@ export default function SettingsPage() {
     loadWebhooks()
     loadEncryptionStatus()
     loadAnomalies()
+    loadExpiryAlerts()
     loadSyslogConfig()
   }, [])
 
@@ -921,6 +927,35 @@ export default function SettingsPage() {
       showError(error.message || ERRORS.LOAD_FAILED.SETTINGS)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadExpiryAlerts = async () => {
+    try {
+      const res = await apiClient.get('/system/alerts/expiry')
+      setExpiryAlerts(res.data || res)
+    } catch (e) {}
+  }
+
+  const saveExpiryAlerts = async () => {
+    setSaving(true)
+    try {
+      await apiClient.put('/system/alerts/expiry', expiryAlerts)
+      showSuccess(t('common.saved'))
+    } catch (e) {
+      showError(e.message || t('common.saveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const triggerExpiryCheck = async () => {
+    try {
+      const res = await apiClient.post('/system/alerts/expiry/check')
+      const data = res.data || res
+      showSuccess(t('settings.expiryCheckResult', { count: data.alerts_sent || 0 }))
+    } catch (e) {
+      showError(e.message || t('common.error'))
     }
   }
 
@@ -1581,6 +1616,72 @@ export default function SettingsPage() {
                       {t('settings.testEmail')}
                     </Button>
                     <Button onClick={() => handleSave('email')} disabled={saving}>
+                      <FloppyDisk size={16} />
+                      {t('common.saveChanges')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </DetailSection>
+            <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-rose">
+              <div className="space-y-4">
+                <ToggleSwitch
+                  checked={expiryAlerts.enabled}
+                  onChange={(val) => setExpiryAlerts(prev => ({ ...prev, enabled: val }))}
+                  label={t('settings.enableExpiryAlerts')}
+                  size="sm"
+                />
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-2">
+                    {t('settings.alertDays')}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[90, 60, 30, 14, 7, 3, 1].map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          setExpiryAlerts(prev => ({
+                            ...prev,
+                            alert_days: prev.alert_days.includes(d)
+                              ? prev.alert_days.filter(x => x !== d)
+                              : [...prev.alert_days, d].sort((a, b) => b - a)
+                          }))
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          expiryAlerts.alert_days.includes(d)
+                            ? 'bg-accent-primary text-white'
+                            : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
+                        }`}
+                      >
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-tertiary mt-1">{t('settings.alertDaysHelp')}</p>
+                </div>
+                <Input
+                  label={t('settings.alertRecipients')}
+                  value={(expiryAlerts.recipients || []).join(', ')}
+                  onChange={(e) => setExpiryAlerts(prev => ({
+                    ...prev,
+                    recipients: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : []
+                  }))}
+                  placeholder={t('settings.alertRecipientsPlaceholder')}
+                />
+                <ToggleSwitch
+                  checked={expiryAlerts.include_revoked}
+                  onChange={(val) => setExpiryAlerts(prev => ({ ...prev, include_revoked: val }))}
+                  label={t('settings.includeRevoked')}
+                  size="sm"
+                />
+                {canWrite('settings') && (
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="secondary" onClick={triggerExpiryCheck}>
+                      <Bell size={16} />
+                      {t('settings.checkNow')}
+                    </Button>
+                    <Button onClick={saveExpiryAlerts} disabled={saving}>
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
