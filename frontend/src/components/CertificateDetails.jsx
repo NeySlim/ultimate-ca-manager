@@ -240,7 +240,7 @@ export function CertificateDetails({
 
       {/* Embedded: compact status bar */}
       {embedded && (
-        <div className="flex items-center gap-2 flex-wrap px-1 pb-1">
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-bg-tertiary/30">
           <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
           {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
           {cert.days_remaining !== undefined && !cert.revoked && (
