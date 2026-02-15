@@ -96,21 +96,32 @@ class EmailService:
             return False, "No recipients specified"
         
         try:
-            # Create message
-            msg = MIMEMultipart('alternative')
+            # Determine content type from config
+            content_type = getattr(config, 'smtp_content_type', 'html') or 'html'
+            
+            if content_type == 'text':
+                # Plain text only
+                plain = body_text or body_html.replace('<br>', '\n').replace('</p>', '\n')
+                import re
+                plain = re.sub(r'<[^>]+>', '', plain)
+                msg = MIMEText(plain, 'plain', 'utf-8')
+            elif content_type == 'both':
+                # Multipart: text + HTML
+                msg = MIMEMultipart('alternative')
+                if body_text:
+                    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+                msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+            else:
+                # HTML only (default)
+                msg = MIMEMultipart('alternative')
+                if body_text:
+                    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
+                msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+            
             msg['Subject'] = subject
             msg['From'] = f"{config.smtp_from_name} <{config.smtp_from}>" if config.smtp_from_name else config.smtp_from
             msg['To'] = ", ".join(recipients)
             msg['Date'] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
-            
-            # Add plain text part
-            if body_text:
-                part1 = MIMEText(body_text, 'plain', 'utf-8')
-                msg.attach(part1)
-            
-            # Add HTML part
-            part2 = MIMEText(body_html, 'html', 'utf-8')
-            msg.attach(part2)
             
             # Connect and send
             if config.smtp_use_ssl:

@@ -812,6 +812,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState({})
+  const [emailTestResult, setEmailTestResult] = useState(null) // { success, message }
+  const [emailTesting, setEmailTesting] = useState(false)
   const [backups, setBackups] = useState([])
   const [dbStats, setDbStats] = useState(null)
   const [httpsInfo, setHttpsInfo] = useState(null)
@@ -922,6 +924,8 @@ export default function SettingsPage() {
         smtp_use_tls: emailSettings.smtp_tls,
         smtp_from_email: emailSettings.from_email,
         smtp_from_name: emailSettings.from_name,
+        smtp_auth: emailSettings.smtp_auth !== false,
+        smtp_content_type: emailSettings.smtp_content_type || 'html',
       })
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.SETTINGS)
@@ -1256,9 +1260,11 @@ export default function SettingsPage() {
         await settingsService.updateEmailSettings({
           smtp_host: settings.smtp_host,
           smtp_port: settings.smtp_port,
-          smtp_username: settings.smtp_username,
-          smtp_password: settings.smtp_password,
+          smtp_username: settings.smtp_auth !== false ? settings.smtp_username : '',
+          smtp_password: settings.smtp_auth !== false ? settings.smtp_password : '',
           smtp_tls: settings.smtp_use_tls,
+          smtp_auth: settings.smtp_auth !== false,
+          smtp_content_type: settings.smtp_content_type || 'html',
           from_email: settings.smtp_from_email,
           from_name: settings.smtp_from_name,
           enabled: true
@@ -1278,14 +1284,20 @@ export default function SettingsPage() {
   const handleTestEmail = async () => {
     const testEmail = settings.smtp_from_email || settings.admin_email
     if (!testEmail) {
-      showError(t('common.emailRequired'))
+      setEmailTestResult({ success: false, message: t('common.emailRequired') })
       return
     }
+    setEmailTesting(true)
+    setEmailTestResult(null)
     try {
       await settingsService.testEmail(testEmail)
+      setEmailTestResult({ success: true, message: t('settings.testEmailSuccess') })
       showSuccess(SUCCESS.EMAIL.TEST_SENT)
     } catch (error) {
-      showError(error.message || ERRORS.EMAIL.TEST_FAILED)
+      const msg = error?.response?.data?.error || error?.response?.data?.message || error.message || ERRORS.EMAIL.TEST_FAILED
+      setEmailTestResult({ success: false, message: msg })
+    } finally {
+      setEmailTesting(false)
     }
   }
 
@@ -1557,62 +1569,124 @@ export default function SettingsPage() {
               title={t('settings.emailTitle')}
               subtitle={t('settings.emailSubtitle')}
             />
-            <DetailSection title={t('settings.smtpHost')} icon={Envelope} iconClass="icon-bg-violet">
-              <DetailGrid>
-                <div className="col-span-full md:col-span-1">
-                  <Input
-                    label={t('settings.smtpHost')}
-                    value={settings.smtp_host || ''}
-                    onChange={(e) => updateSetting('smtp_host', e.target.value)}
-                    placeholder={t('settings.smtpHostPlaceholder')}
+            <DetailSection title={t('settings.smtpConfig')} icon={Envelope} iconClass="icon-bg-violet">
+              <div className="space-y-5">
+                {/* Server */}
+                <DetailGrid>
+                  <div className="col-span-full md:col-span-1">
+                    <Input
+                      label={t('settings.smtpHost')}
+                      value={settings.smtp_host || ''}
+                      onChange={(e) => updateSetting('smtp_host', e.target.value)}
+                      placeholder={t('settings.smtpHostPlaceholder')}
+                    />
+                  </div>
+                  <div className="col-span-full md:col-span-1">
+                    <Input
+                      label={t('settings.smtpPort')}
+                      type="number"
+                      value={settings.smtp_port || 587}
+                      onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
+                    />
+                  </div>
+                </DetailGrid>
+
+                {/* Authentication */}
+                <div className="border-t border-border pt-4 space-y-3">
+                  <ToggleSwitch
+                    checked={settings.smtp_auth !== false}
+                    onChange={(val) => {
+                      updateSetting('smtp_auth', val)
+                      if (!val) {
+                        updateSetting('smtp_username', '')
+                        updateSetting('smtp_password', '')
+                      }
+                    }}
+                    label={t('settings.smtpAuthRequired')}
+                    size="sm"
                   />
+                  {!settings.smtp_auth && settings.smtp_auth !== undefined && (
+                    <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
+                  )}
+                  {settings.smtp_auth !== false && (
+                    <DetailGrid>
+                      <div className="col-span-full md:col-span-1">
+                        <Input
+                          label={t('settings.smtpUsername')}
+                          value={settings.smtp_username || ''}
+                          onChange={(e) => updateSetting('smtp_username', e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-full md:col-span-1">
+                        <Input
+                          label={t('settings.smtpPassword')}
+                          type="password"
+                          noAutofill
+                          value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
+                          onChange={(e) => updateSetting('smtp_password', e.target.value)}
+                          hasExistingValue={settings.smtp_password === '********'}
+                        />
+                      </div>
+                    </DetailGrid>
+                  )}
                 </div>
-                <div className="col-span-full md:col-span-1">
+
+                {/* Options */}
+                <div className="border-t border-border pt-4 space-y-3">
                   <Input
-                    label={t('settings.smtpPort')}
-                    type="number"
-                    value={settings.smtp_port || 587}
-                    onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
+                    label={t('settings.fromEmail')}
+                    type="email"
+                    value={settings.smtp_from_email || ''}
+                    onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
+                    placeholder={t('settings.fromEmailPlaceholder')}
                   />
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <ToggleSwitch
+                      checked={settings.smtp_use_tls || false}
+                      onChange={(val) => updateSetting('smtp_use_tls', val)}
+                      label={t('settings.useTls')}
+                      size="sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-text-secondary">{t('settings.emailFormat')}:</span>
+                      {['html', 'text', 'both'].map(fmt => (
+                        <button
+                          key={fmt}
+                          type="button"
+                          onClick={() => updateSetting('smtp_content_type', fmt)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                            (settings.smtp_content_type || 'html') === fmt
+                              ? 'bg-accent-primary text-white'
+                              : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
+                          }`}
+                        >
+                          {t(`settings.emailFormat_${fmt}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </DetailGrid>
-            </DetailSection>
-            <DetailSection title={t('settings.authentication')} icon={Key} iconClass="icon-bg-amber">
-              <div className="space-y-4">
-                <Input
-                  label={t('settings.smtpUsername')}
-                  value={settings.smtp_username || ''}
-                  onChange={(e) => updateSetting('smtp_username', e.target.value)}
-                />
-                <Input
-                  label={t('settings.smtpPassword')}
-                  type="password"
-                  noAutofill
-                  value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
-                  onChange={(e) => updateSetting('smtp_password', e.target.value)}
-                  hasExistingValue={settings.smtp_password === '********'}
-                />
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.emailOptions')} icon={EnvelopeSimple} iconClass="icon-bg-teal">
-              <div className="space-y-4">
-                <Input
-                  label={t('settings.fromEmail')}
-                  type="email"
-                  value={settings.smtp_from_email || ''}
-                  onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-                  placeholder={t('settings.fromEmailPlaceholder')}
-                />
-                <ToggleSwitch
-                  checked={settings.smtp_use_tls || false}
-                  onChange={(val) => updateSetting('smtp_use_tls', val)}
-                  label={t('settings.useTls')}
-                  size="sm"
-                />
+
+                {/* Test result banner */}
+                {emailTestResult && (
+                  <div className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
+                    emailTestResult.success
+                      ? 'bg-status-success/10 text-status-success'
+                      : 'bg-status-danger/10 text-status-danger'
+                  }`}>
+                    {emailTestResult.success
+                      ? <CheckCircle size={18} className="shrink-0 mt-0.5" />
+                      : <WarningCircle size={18} className="shrink-0 mt-0.5" />
+                    }
+                    <span className="break-all">{emailTestResult.message}</span>
+                  </div>
+                )}
+
+                {/* Actions */}
                 {canWrite('settings') && (
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="secondary" onClick={handleTestEmail}>
-                      <Envelope size={16} />
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
+                      {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
                       {t('settings.testEmail')}
                     </Button>
                     <Button onClick={() => handleSave('email')} disabled={saving}>

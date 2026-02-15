@@ -20,6 +20,8 @@ class SMTPConfig(db.Model):
     smtp_from_name = db.Column(db.String(255), default="UCM Notifications")
     smtp_use_tls = db.Column(db.Boolean, default=True)
     smtp_use_ssl = db.Column(db.Boolean, default=False)
+    smtp_auth = db.Column(db.Boolean, default=True)
+    smtp_content_type = db.Column(db.String(10), default='html')  # html, text, both
     enabled = db.Column(db.Boolean, default=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(80))

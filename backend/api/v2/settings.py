@@ -293,8 +293,10 @@ def get_email_settings():
             'smtp_host': '',
             'smtp_port': 587,
             'smtp_username': '',
-            'smtp_password': '',  # Never return actual password
+            'smtp_password': '',
             'smtp_tls': True,
+            'smtp_auth': True,
+            'smtp_content_type': 'html',
             'from_name': 'UCM Certificate Manager',
             'from_email': ''
         })
@@ -307,6 +309,8 @@ def get_email_settings():
         'smtp_username': smtp.smtp_user or '',  # Model uses smtp_user
         'smtp_password': '********' if smtp._smtp_password else '',  # Masked
         'smtp_tls': smtp.smtp_use_tls,  # Model uses smtp_use_tls
+        'smtp_auth': smtp.smtp_auth if smtp.smtp_auth is not None else True,
+        'smtp_content_type': smtp.smtp_content_type or 'html',
         'from_name': smtp.smtp_from_name or 'UCM Certificate Manager',
         'from_email': smtp.smtp_from or ''
     })
@@ -340,6 +344,10 @@ def update_email_settings():
         smtp.smtp_password = data['smtp_password']  # Uses encrypted setter
     if 'smtp_tls' in data:
         smtp.smtp_use_tls = bool(data['smtp_tls'])  # Model uses smtp_use_tls
+    if 'smtp_auth' in data:
+        smtp.smtp_auth = bool(data['smtp_auth'])
+    if 'smtp_content_type' in data and data['smtp_content_type'] in ('html', 'text', 'both'):
+        smtp.smtp_content_type = data['smtp_content_type']
     if 'from_name' in data:
         smtp.smtp_from_name = data['from_name']  # Model uses smtp_from_name
     if 'from_email' in data:
@@ -374,7 +382,7 @@ def test_email():
         return error_response('Email address required', 400)
     
     # Try to send test email
-    success = NotificationService.send_test_email(email)
+    success, message = NotificationService.send_test_email_with_detail(email)
     
     if success:
         return success_response(
@@ -382,7 +390,7 @@ def test_email():
             message='Test email sent successfully'
         )
     else:
-        return error_response('Failed to send test email. Check SMTP settings.', 500)
+        return error_response(message or 'Failed to send test email', 500)
 
 
 # ============================================================================

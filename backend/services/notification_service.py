@@ -656,6 +656,11 @@ class NotificationService:
         return success
 
     @staticmethod
+    def send_test_email_with_detail(recipient: str) -> tuple:
+        """Send a test email and return (success, detail_message)"""
+        return EmailService.send_test_email(recipient)
+
+    @staticmethod
     def send_email(to: str, subject: str, template: str, context: dict) -> bool:
         """
         Send templated email
