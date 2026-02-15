@@ -235,7 +235,7 @@ export default function EmailTemplateWindow({ onClose }) {
                     srcDoc={previewHtml}
                     title="Email Preview"
                     className="w-full h-full border-0"
-                    sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-scripts"
                     style={{ minHeight: '100%' }}
                   />
                 </div>
