@@ -131,6 +131,12 @@ jobs:
           npm ci
           npm run build
       
+      - name: Update VERSION file
+        run: |
+          VERSION="${{ needs.build-deb.outputs.version }}"
+          echo "$VERSION" > VERSION
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
+
       - name: Build RPM in Fedora container
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
@@ -210,6 +216,12 @@ jobs:
           cd frontend
           npm ci
           npm run build
+      
+      - name: Update VERSION file
+        run: |
+          VERSION="${{ needs.build-deb.outputs.version }}"
+          echo "$VERSION" > VERSION
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
       
       - name: Set image name
         id: image
