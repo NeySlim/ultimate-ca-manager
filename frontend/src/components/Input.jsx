@@ -73,11 +73,11 @@ export const Input = forwardRef(function Input({
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
-        <label className="block text-xs font-medium text-text-secondary">
-          <span className="flex items-center gap-2">
+        <label className="block text-xs font-medium text-text-secondary leading-[20px]">
+          <span className="flex items-center gap-2 h-[20px]">
             {typeof label === 'string' ? label : label}
             {hasExistingValue && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-status-success/20 text-status-success rounded">
+              <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success/20 text-status-success rounded leading-[16px]">
                 <CheckCircle size={10} weight="fill" />
                 {t('common.set')}
               </span>
