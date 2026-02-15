@@ -40,6 +40,7 @@ const CONTRAST_MODES = [
   { key: 'high', label: 'High' },
   { key: 'sepia', label: 'Sepia' },
 ]
+const SOFT_MAX_W = 600
 
 export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   const { t } = useTranslation()
