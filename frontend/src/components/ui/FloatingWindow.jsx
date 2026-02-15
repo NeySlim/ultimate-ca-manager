@@ -88,7 +88,7 @@ export function FloatingWindow({
         height: minimized ? 48 : p.h,
         transition: minimized ? 'height 0.2s ease' : undefined,
         border: '1px solid var(--border-strong)',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.20), 0 2px 10px rgba(0,0,0,0.12)',
+        boxShadow: 'var(--floating-window-shadow)',
       }}
       onMouseDown={onFocus}
     >

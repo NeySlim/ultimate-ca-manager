@@ -159,6 +159,11 @@
   --detail-field-bg: rgba(255, 255, 255, 0.02);
   --detail-field-border: rgba(255, 255, 255, 0.05);
   
+  /* Floating window shadow */
+  --floating-window-shadow: 
+    0 10px 40px rgba(0,0,0,0.30),
+    0 2px 10px rgba(0,0,0,0.20);
+  
   /* Icon colors - defaults for dark theme, overridden by ThemeContext for colored themes */
   --icon-orange-bg: rgba(249, 115, 22, 0.15);
   --icon-orange-text: #FB923C;
@@ -251,10 +256,39 @@
   --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 80%, #4F46E5));
   --detail-icon-shadow: 0 4px 14px color-mix(in srgb, var(--accent-primary) 30%, transparent);
   --detail-stats-border: rgba(0, 0, 0, 0.08);
-  --detail-section-bg: rgba(241, 245, 249, 0.8);
+  --detail-section-bg: #F1F5F9;
   --detail-section-border: var(--border);
-  --detail-field-bg: rgba(0, 0, 0, 0.025);
-  --detail-field-border: rgba(0, 0, 0, 0.07);
+  --detail-field-bg: rgba(0, 0, 0, 0.035);
+  --detail-field-border: rgba(0, 0, 0, 0.08);
+  
+  /* Floating window shadow — stronger for light mode */
+  --floating-window-shadow: 
+    0 4px 16px rgba(0,0,0,0.10),
+    0 12px 48px rgba(0,0,0,0.12),
+    0 2px 6px rgba(0,0,0,0.06);
+}
+
+/* Light mode: stronger section header gradient */
+.theme-light .section-header-gradient {
+  background: linear-gradient(to right, 
+    color-mix(in srgb, var(--accent-primary) 8%, color-mix(in srgb, var(--bg-tertiary) 60%, transparent)), 
+    transparent
+  );
+}
+.theme-light .section-header-gradient:hover {
+  background: linear-gradient(to right, 
+    color-mix(in srgb, var(--accent-primary) 12%, color-mix(in srgb, var(--bg-tertiary) 80%, transparent)), 
+    transparent
+  );
+}
+
+/* Light mode: stronger card borders */
+.theme-light .card-soft {
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.theme-light .card-soft:hover {
+  box-shadow: var(--shadow-md);
 }
 
 /* Custom scrollbar styling - thin and subtle */

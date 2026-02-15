@@ -71,10 +71,10 @@ const themeFamilies = {
       'detail-icon-bg': 'linear-gradient(135deg, #2563EB, #4F46E5)',
       'detail-icon-shadow': '0 4px 14px rgba(37,99,235,0.30)',
       'detail-stats-border': 'rgba(0,0,0,0.08)',
-      'detail-section-bg': 'rgba(241,245,249,0.8)',
+      'detail-section-bg': '#F1F5F9',
       'detail-section-border': '#CBD5E1',
-      'detail-field-bg': 'rgba(0,0,0,0.025)',
-      'detail-field-border': 'rgba(0,0,0,0.07)',
+      'detail-field-bg': 'rgba(0,0,0,0.035)',
+      'detail-field-border': 'rgba(0,0,0,0.08)',
       // Icon colors - stronger/deeper for light mode
       'icon-orange-bg': 'rgba(234, 88, 12, 0.12)',
       'icon-orange-text': '#C2410C',
