@@ -48,7 +48,7 @@ const ENTITY_CONFIG = {
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
   const { closeWindow, focusWindow, sameWindow } = useWindowManager()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showPrompt } = useNotification()
   const [data, setData] = useState(windowInfo.data?.fullData || null)
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
   const [minimized, setMinimized] = useState(false)
@@ -83,12 +83,31 @@ export function FloatingDetailWindow({ windowInfo }) {
       const service = config.service()
       const id = windowInfo.entityId
       const name = data?.cn || data?.common_name || data?.name || windowInfo.type
-      const res = await service.export(id, format)
+      let options = {}
+      
+      // PKCS12/PFX need password
+      if (format === 'pkcs12' || format === 'pfx') {
+        const password = await showPrompt(t('certificates.enterP12Password', 'Enter password for PKCS#12 file:'), {
+          title: t('certificates.exportPKCS12', 'Export PKCS#12'),
+          type: 'password',
+          placeholder: t('common.password', 'Password'),
+          confirmText: t('common.export', 'Export')
+        })
+        if (!password) return
+        if (password.length < 4) {
+          showError(t('certificates.passwordTooShort', 'Password must be at least 4 characters'))
+          return
+        }
+        options.password = password
+      }
+      
+      const res = await service.export(id, format, options)
       const blob = res instanceof Blob ? res : new Blob([res.data || res], { type: 'application/octet-stream' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${name}.${format === 'pkcs12' ? 'p12' : format === 'pkcs7' ? 'p7b' : format}`
+      const ext = { pkcs12: 'p12', pfx: 'pfx', pkcs7: 'p7b' }[format] || format
+      a.download = `${name}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess(t('common.exported'))
