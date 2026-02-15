@@ -1,20 +1,18 @@
 /**
- * EmailTemplateWindow — Floating window with WYSIWYG email template editor
+ * EmailTemplateWindow — Floating window with split-pane email template editor
  * 
  * Features:
- * - TipTap WYSIWYG editor for HTML template editing
- * - Raw HTML source view toggle
- * - Live preview with rendered template
+ * - Split pane: HTML source editor (left) + live preview (right)
+ * - Debounced live preview that auto-refreshes as you type
  * - Reset to default template
- * - Save/cancel actions
+ * - Save action
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FloatingWindow } from './ui/FloatingWindow'
 import { Button } from './Button'
-import EmailTemplateEditor from './EmailTemplateEditor'
 import {
-  EnvelopeSimple, Eye, Code, ArrowCounterClockwise, FloppyDisk,
+  EnvelopeSimple, ArrowCounterClockwise, FloppyDisk,
   ArrowsClockwise, Info
 } from '@phosphor-icons/react'
 import { apiClient } from '../services/apiClient'
@@ -38,12 +36,11 @@ export default function EmailTemplateWindow({ onClose }) {
   const [isCustom, setIsCustom] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [mode, setMode] = useState('visual') // visual, source, preview
   const [previewHtml, setPreviewHtml] = useState('')
-  const [previewing, setPreviewing] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const previewTimer = useRef(null)
 
-  // Load template
+  // Load template + initial preview
   useEffect(() => {
     const load = async () => {
       try {
@@ -51,6 +48,9 @@ export default function EmailTemplateWindow({ onClose }) {
         setTemplate(res.data.template)
         setDefaultTemplate(res.data.default_template)
         setIsCustom(res.data.is_custom)
+        // Load initial preview
+        const prev = await apiClient.post('/settings/email/template/preview', { template: res.data.template })
+        setPreviewHtml(prev.data.html)
       } catch (err) {
         showError(err.message)
       } finally {
@@ -58,17 +58,28 @@ export default function EmailTemplateWindow({ onClose }) {
       }
     }
     load()
+    return () => { if (previewTimer.current) clearTimeout(previewTimer.current) }
   }, [])
 
-  const handleChange = useCallback((html) => {
-    setTemplate(html)
-    setDirty(true)
+  // Debounced preview refresh
+  const refreshPreview = useCallback((html) => {
+    if (previewTimer.current) clearTimeout(previewTimer.current)
+    previewTimer.current = setTimeout(async () => {
+      try {
+        const res = await apiClient.post('/settings/email/template/preview', { template: html })
+        setPreviewHtml(res.data.html)
+      } catch {
+        // Silently fail on preview errors during typing
+      }
+    }, 800)
   }, [])
 
   const handleSourceChange = useCallback((e) => {
-    setTemplate(e.target.value)
+    const val = e.target.value
+    setTemplate(val)
     setDirty(true)
-  }, [])
+    refreshPreview(val)
+  }, [refreshPreview])
 
   const handleSave = async () => {
     setSaving(true)
@@ -91,30 +102,18 @@ export default function EmailTemplateWindow({ onClose }) {
       setTemplate(defaultTemplate)
       setIsCustom(false)
       setDirty(false)
+      refreshPreview(defaultTemplate)
       showSuccess(t('settings.templateResetSuccess'))
     } catch (err) {
       showError(err.message)
     }
   }
 
-  const handlePreview = async () => {
-    setPreviewing(true)
-    try {
-      const res = await apiClient.post('/settings/email/template/preview', { template })
-      setPreviewHtml(res.data.html)
-      setMode('preview')
-    } catch (err) {
-      showError(err.message)
-    } finally {
-      setPreviewing(false)
-    }
-  }
-
   return (
     <FloatingWindow
       storageKey="email-template-editor"
-      defaultPos={{ x: 120, y: 60, w: 900, h: 680 }}
-      constraints={{ minW: 640, minH: 400 }}
+      defaultPos={{ x: 80, y: 40, w: 1100, h: 700 }}
+      constraints={{ minW: 700, minH: 400 }}
       onClose={onClose}
       title={t('settings.emailTemplate')}
       subtitle={isCustom ? t('settings.templateCustom') : t('settings.templateDefault')}
@@ -125,38 +124,18 @@ export default function EmailTemplateWindow({ onClose }) {
       <div className="flex flex-col h-full overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-bg-primary">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setMode('visual')}
-              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
-                mode === 'visual' ? 'bg-accent-primary text-white' : 'text-text-secondary hover:bg-bg-tertiary'
-              }`}
-            >
-              {t('settings.templateVisual')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('source')}
-              className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
-                mode === 'source' ? 'bg-accent-primary text-white' : 'text-text-secondary hover:bg-bg-tertiary'
-              }`}
-            >
-              <Code size={14} /> HTML
-            </button>
-            <button
-              type="button"
-              onClick={handlePreview}
-              disabled={previewing}
-              className={`px-2.5 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${
-                mode === 'preview' ? 'bg-accent-primary text-white' : 'text-text-secondary hover:bg-bg-tertiary'
-              }`}
-            >
-              {previewing ? <ArrowsClockwise size={14} className="animate-spin" /> : <Eye size={14} />}
-              {t('settings.templatePreview')}
-            </button>
+          <div className="flex items-start gap-2 min-w-0">
+            <Info size={14} className="shrink-0 mt-0.5 text-accent-primary" />
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-text-secondary">
+              {TEMPLATE_VARS.map(v => (
+                <span key={v.var}>
+                  <code className="text-accent-primary font-mono text-[11px]">{v.var}</code>
+                  <span className="ml-1">{t(`settings.${v.desc}`)}</span>
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isCustom && (
               <Button variant="ghost" size="xs" onClick={handleReset}>
                 <ArrowCounterClockwise size={14} />
@@ -170,43 +149,43 @@ export default function EmailTemplateWindow({ onClose }) {
           </div>
         </div>
 
-        {/* Variables hint */}
-        <div className="flex items-start gap-2 px-3 py-2 bg-bg-tertiary/50 border-b border-border text-xs text-text-secondary">
-          <Info size={14} className="shrink-0 mt-0.5 text-accent-primary" />
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {TEMPLATE_VARS.map(v => (
-              <span key={v.var}>
-                <code className="text-accent-primary font-mono text-[11px]">{v.var}</code>
-                <span className="ml-1">{t(`settings.${v.desc}`)}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 overflow-auto">
+        {/* Split pane: HTML source + Preview */}
+        <div className="flex-1 flex min-h-0">
           {loading ? (
-            <div className="flex items-center justify-center h-full text-text-tertiary">
+            <div className="flex items-center justify-center w-full text-text-tertiary">
               <ArrowsClockwise size={20} className="animate-spin" />
             </div>
-          ) : mode === 'visual' ? (
-            <EmailTemplateEditor content={template} onChange={handleChange} />
-          ) : mode === 'source' ? (
-            <textarea
-              value={template}
-              onChange={handleSourceChange}
-              className="w-full h-full p-4 bg-bg-primary text-text-primary font-mono text-xs resize-none focus:outline-none"
-              spellCheck={false}
-            />
           ) : (
-            <div className="h-full bg-white">
-              <iframe
-                srcDoc={previewHtml}
-                title="Email Preview"
-                className="w-full h-full border-0"
-                sandbox="allow-same-origin"
-              />
-            </div>
+            <>
+              {/* HTML Source Editor */}
+              <div className="w-1/2 flex flex-col border-r border-border min-h-0">
+                <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                  HTML Source
+                </div>
+                <textarea
+                  value={template}
+                  onChange={handleSourceChange}
+                  className="flex-1 w-full p-3 bg-bg-primary text-text-primary font-mono text-[12px] leading-[1.6] resize-none focus:outline-none"
+                  spellCheck={false}
+                />
+              </div>
+
+              {/* Live Preview */}
+              <div className="w-1/2 flex flex-col min-h-0">
+                <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border text-[11px] font-medium text-text-tertiary uppercase tracking-wider">
+                  {t('settings.templatePreview')}
+                </div>
+                <div className="flex-1 overflow-auto bg-[#f4f5f7]">
+                  <iframe
+                    srcDoc={previewHtml}
+                    title="Email Preview"
+                    className="w-full h-full border-0"
+                    sandbox="allow-same-origin"
+                    style={{ minHeight: '100%' }}
+                  />
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
