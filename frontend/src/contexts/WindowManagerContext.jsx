@@ -53,7 +53,7 @@ export function WindowManagerProvider({ children }) {
 
   // Center position for new windows
   const getCenterPos = useCallback((index) => {
-    const w = 520, h = 500
+    const w = 442, h = 425
     const vw = window.innerWidth
     const vh = window.innerHeight
     const offset = index * CASCADE_OFFSET
@@ -136,23 +136,18 @@ export function WindowManagerProvider({ children }) {
   const tileWindows = useCallback(() => {
     setWindows(prev => {
       if (prev.length === 0) return prev
-      const gap = 8
+      const gap = 12
       const sidebarW = 56
       const headerH = 48
       const footerH = 32
       const startX = sidebarW + gap
       const startY = headerH + gap
-      const vw = window.innerWidth - startX - gap
-      const vh = window.innerHeight - startY - footerH - gap
+      const tileW = 442
+      const tileH = 425
+      const maxCols = Math.max(1, Math.floor((window.innerWidth - startX - gap) / (tileW + gap)))
       const count = prev.length
-
-      let cols, rows
-      if (count <= 2) { cols = count; rows = 1 }
-      else if (count <= 4) { cols = 2; rows = Math.ceil(count / 2) }
-      else { cols = 3; rows = Math.ceil(count / 3) }
-
-      const tileW = Math.floor(vw / cols)
-      const tileH = Math.floor(vh / rows)
+      const cols = Math.min(count, maxCols)
+      const rows = Math.ceil(count / cols)
 
       return prev.map((w, i) => {
         const col = i % cols
@@ -160,10 +155,10 @@ export function WindowManagerProvider({ children }) {
         return {
           ...w,
           defaultPos: {
-            x: startX + col * tileW,
-            y: startY + row * tileH,
-            w: tileW - gap,
-            h: tileH - gap,
+            x: startX + col * (tileW + gap),
+            y: startY + row * (tileH + gap),
+            w: tileW,
+            h: tileH,
           },
           _tileKey: Date.now() + i,
         }
