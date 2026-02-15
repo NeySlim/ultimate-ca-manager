@@ -139,15 +139,20 @@ export function WindowManagerProvider({ children }) {
       const gap = 12
       const sidebarW = 56
       const headerH = 48
-      const footerH = 32
-      const startX = sidebarW + gap
-      const startY = headerH + gap
       const tileW = 442
       const tileH = 425
-      const maxCols = Math.max(1, Math.floor((window.innerWidth - startX - gap) / (tileW + gap)))
+      const availW = window.innerWidth - sidebarW
+      const availH = window.innerHeight - headerH
+      const maxCols = Math.max(1, Math.floor((availW - gap) / (tileW + gap)))
       const count = prev.length
       const cols = Math.min(count, maxCols)
       const rows = Math.ceil(count / cols)
+
+      // Center the grid in the available area
+      const gridW = cols * tileW + (cols - 1) * gap
+      const gridH = rows * tileH + (rows - 1) * gap
+      const offsetX = sidebarW + Math.max(gap, Math.round((availW - gridW) / 2))
+      const offsetY = headerH + Math.max(gap, Math.round((availH - gridH) / 2))
 
       return prev.map((w, i) => {
         const col = i % cols
@@ -155,8 +160,8 @@ export function WindowManagerProvider({ children }) {
         return {
           ...w,
           defaultPos: {
-            x: startX + col * (tileW + gap),
-            y: startY + row * (tileH + gap),
+            x: offsetX + col * (tileW + gap),
+            y: offsetY + row * (tileH + gap),
             w: tileW,
             h: tileH,
           },
