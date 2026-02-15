@@ -24,6 +24,7 @@
 - **OCSP** -- RFC 6960 real-time certificate status
 - **CRL/CDP** -- Certificate Revocation List distribution
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
+- **Email Notifications** -- SMTP, customizable HTML/text templates, certificate expiry alerts
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
 - **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) x Light/Dark

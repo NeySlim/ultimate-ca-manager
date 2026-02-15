@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-rc1] - 2026-02-15
+
+### Improvements
+- Template editor button disabled on mobile with tooltip (desktop-only feature)
+- Cleaned up unused mobile full-screen editor code
+
+### Bug Fixes
+- Fixed `isMobile` reference error in SettingsPage email tab
+
 ## [2.1.0-beta4] - 2026-02-15
 
 ### New Features
