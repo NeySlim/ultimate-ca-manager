@@ -30,6 +30,7 @@ import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
+import EmailTemplateWindow from '../components/EmailTemplateWindow'
 import { apiClient } from '../services/apiClient'
 
 // Settings categories with colors for visual distinction
@@ -815,6 +816,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({})
   const [emailTestResult, setEmailTestResult] = useState(null) // { success, message }
   const [emailTesting, setEmailTesting] = useState(false)
+  const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [backups, setBackups] = useState([])
   const [dbStats, setDbStats] = useState(null)
   const [httpsInfo, setHttpsInfo] = useState(null)
@@ -1715,6 +1717,22 @@ export default function SettingsPage() {
                 )}
               </div>
             </DetailSection>
+
+            {/* Email Template */}
+            <DetailSection title={t('settings.emailTemplate')} icon={EnvelopeSimple} iconClass="icon-bg-indigo">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-text-secondary">{t('settings.templateDescription')}</p>
+                <Button variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)}>
+                  <PencilSimple size={16} />
+                  {t('settings.editTemplate')}
+                </Button>
+              </div>
+            </DetailSection>
+
+            {showTemplateEditor && (
+              <EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} />
+            )}
+
             <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-rose">
               {!settings.smtp_host ? (
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">

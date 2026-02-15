@@ -1549,7 +1549,24 @@
       "wikiGuides": "Вікі та посібники користувача",
       "license": "Ліцензія",
       "licenseDesc": "Вільне програмне забезпечення з відкритим кодом."
-    }
+    },
+    "emailTemplate": "Шаблон email",
+    "templateDescription": "Налаштуйте HTML-шаблон для всіх email-сповіщень.",
+    "editTemplate": "Редагувати шаблон",
+    "templateSaved": "Шаблон email збережено",
+    "templateCustom": "Користувацький шаблон",
+    "templateDefault": "Шаблон за замовчуванням",
+    "templateResetDefault": "Скинути",
+    "templateResetConfirm": "Скинути шаблон email до стандартного? Ваш шаблон буде втрачено.",
+    "templateResetSuccess": "Шаблон email скинуто",
+    "templateVisual": "Візуально",
+    "templatePreview": "Попередній перегляд",
+    "templateVarLogo": "Логотип UCM",
+    "templateVarTitle": "Заголовок email",
+    "templateVarTitleColor": "Колір панелі заголовка",
+    "templateVarContent": "Вміст сповіщення",
+    "templateVarDatetime": "Дата/час відправлення",
+    "templateVarInstanceUrl": "URL екземпляра"
   },
   "account": {
     "profile": "Профіль",

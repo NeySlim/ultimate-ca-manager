@@ -1549,7 +1549,24 @@
       "wikiGuides": "Wiki y guías de usuario",
       "license": "Licencia",
       "licenseDesc": "Software libre y de código abierto."
-    }
+    },
+    "emailTemplate": "Plantilla de correo",
+    "templateDescription": "Personalice la plantilla HTML utilizada para todas las notificaciones por correo.",
+    "editTemplate": "Editar plantilla",
+    "templateSaved": "Plantilla de correo guardada",
+    "templateCustom": "Plantilla personalizada",
+    "templateDefault": "Plantilla predeterminada",
+    "templateResetDefault": "Restablecer",
+    "templateResetConfirm": "¿Restablecer la plantilla de correo predeterminada? Su plantilla personalizada se perderá.",
+    "templateResetSuccess": "Plantilla de correo restablecida",
+    "templateVisual": "Visual",
+    "templatePreview": "Vista previa",
+    "templateVarLogo": "Logo UCM",
+    "templateVarTitle": "Título del correo",
+    "templateVarTitleColor": "Color de la barra de título",
+    "templateVarContent": "Contenido de notificación",
+    "templateVarDatetime": "Fecha/hora de envío",
+    "templateVarInstanceUrl": "URL de la instancia"
   },
   "account": {
     "profile": "Perfil",

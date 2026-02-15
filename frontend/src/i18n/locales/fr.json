@@ -1685,7 +1685,24 @@
       "wikiGuides": "Wiki et guides utilisateur",
       "license": "Licence",
       "licenseDesc": "Logiciel libre et open-source."
-    }
+    },
+    "emailTemplate": "Modèle d'email",
+    "templateDescription": "Personnalisez le modèle HTML utilisé pour toutes les notifications email.",
+    "editTemplate": "Modifier le modèle",
+    "templateSaved": "Modèle d'email enregistré",
+    "templateCustom": "Modèle personnalisé",
+    "templateDefault": "Modèle par défaut",
+    "templateResetDefault": "Réinitialiser",
+    "templateResetConfirm": "Réinitialiser le modèle d'email par défaut ? Votre modèle personnalisé sera perdu.",
+    "templateResetSuccess": "Modèle d'email réinitialisé",
+    "templateVisual": "Visuel",
+    "templatePreview": "Aperçu",
+    "templateVarLogo": "Logo UCM",
+    "templateVarTitle": "Titre de l'email",
+    "templateVarTitleColor": "Couleur de la barre titre",
+    "templateVarContent": "Contenu de notification",
+    "templateVarDatetime": "Date/heure d'envoi",
+    "templateVarInstanceUrl": "URL de l'instance"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

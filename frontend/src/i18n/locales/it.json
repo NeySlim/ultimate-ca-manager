@@ -1549,7 +1549,24 @@
       "wikiGuides": "Wiki e guide utente",
       "license": "Licenza",
       "licenseDesc": "Software libero e open source."
-    }
+    },
+    "emailTemplate": "Modello email",
+    "templateDescription": "Personalizza il modello HTML utilizzato per tutte le notifiche email.",
+    "editTemplate": "Modifica modello",
+    "templateSaved": "Modello email salvato",
+    "templateCustom": "Modello personalizzato",
+    "templateDefault": "Modello predefinito",
+    "templateResetDefault": "Ripristina",
+    "templateResetConfirm": "Ripristinare il modello email predefinito? Il modello personalizzato verrà perso.",
+    "templateResetSuccess": "Modello email ripristinato",
+    "templateVisual": "Visuale",
+    "templatePreview": "Anteprima",
+    "templateVarLogo": "Logo UCM",
+    "templateVarTitle": "Titolo email",
+    "templateVarTitleColor": "Colore barra titolo",
+    "templateVarContent": "Contenuto notifica",
+    "templateVarDatetime": "Data/ora di invio",
+    "templateVarInstanceUrl": "URL dell'istanza"
   },
   "account": {
     "profile": "Profilo",

@@ -393,6 +393,96 @@ def test_email():
         return error_response(message or 'Failed to send test email', 500)
 
 
+@bp.route('/api/v2/settings/email/template', methods=['GET'])
+@require_auth(['read:settings'])
+def get_email_template():
+    """Get email template (custom or default)"""
+    from models.email_notification import SMTPConfig
+    from services.email_templates import get_default_template
+    
+    smtp = SMTPConfig.query.first()
+    custom = smtp.email_template if smtp else None
+    
+    return success_response(data={
+        'template': custom or get_default_template(),
+        'is_custom': bool(custom),
+        'default_template': get_default_template()
+    })
+
+
+@bp.route('/api/v2/settings/email/template', methods=['PATCH'])
+@require_auth(['write:settings'])
+def update_email_template():
+    """Update email template"""
+    from models.email_notification import SMTPConfig
+    
+    data = request.json
+    if not data or 'template' not in data:
+        return error_response('Template HTML required', 400)
+    
+    smtp = SMTPConfig.query.first()
+    if not smtp:
+        smtp = SMTPConfig()
+        db.session.add(smtp)
+    
+    smtp.email_template = data['template']
+    db.session.commit()
+    
+    AuditService.log_action(
+        action='settings_update',
+        resource_type='settings',
+        resource_name='Email Template',
+        details='Updated email template',
+        success=True
+    )
+    
+    return success_response(message='Email template updated')
+
+
+@bp.route('/api/v2/settings/email/template/reset', methods=['POST'])
+@require_auth(['write:settings'])
+def reset_email_template():
+    """Reset email template to default"""
+    from models.email_notification import SMTPConfig
+    
+    smtp = SMTPConfig.query.first()
+    if smtp:
+        smtp.email_template = None
+        db.session.commit()
+    
+    AuditService.log_action(
+        action='settings_update',
+        resource_type='settings',
+        resource_name='Email Template',
+        details='Reset email template to default',
+        success=True
+    )
+    
+    return success_response(message='Email template reset to default')
+
+
+@bp.route('/api/v2/settings/email/template/preview', methods=['POST'])
+@require_auth(['read:settings'])
+def preview_email_template():
+    """Preview email template with sample data"""
+    from services.email_templates import render_template
+    
+    data = request.json
+    template = data.get('template', '') if data else ''
+    
+    sample_content = """
+    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">This is a <strong>preview</strong> of your email template.</p>
+    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">Variables like <code>{{title}}</code>, <code>{{content}}</code>, and <code>{{logo}}</code> are replaced automatically.</p>
+    <div style="background-color:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin:20px 0;">
+        <p style="margin:0;font-size:14px;color:#0369a1;font-weight:500;">📋 Sample notification content would appear here.</p>
+    </div>
+    """
+    
+    html = render_template(template, "Template Preview", "#3b82f6", sample_content)
+    
+    return success_response(data={'html': html})
+
+
 # ============================================================================
 # Notification Settings
 # ============================================================================

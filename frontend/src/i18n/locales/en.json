@@ -1550,7 +1550,24 @@
       "wikiGuides": "Wiki and user guides",
       "license": "License",
       "licenseDesc": "Free and open-source software."
-    }
+    },
+    "emailTemplate": "Email Template",
+    "templateDescription": "Customize the HTML template used for all email notifications.",
+    "editTemplate": "Edit Template",
+    "templateSaved": "Email template saved",
+    "templateCustom": "Custom template",
+    "templateDefault": "Default template",
+    "templateResetDefault": "Reset to Default",
+    "templateResetConfirm": "Reset the email template to the default? Your custom template will be lost.",
+    "templateResetSuccess": "Email template reset to default",
+    "templateVisual": "Visual",
+    "templatePreview": "Preview",
+    "templateVarLogo": "UCM logo",
+    "templateVarTitle": "Email title",
+    "templateVarTitleColor": "Title bar color",
+    "templateVarContent": "Notification content",
+    "templateVarDatetime": "Send date/time",
+    "templateVarInstanceUrl": "Instance URL"
   },
   "account": {
     "profile": "Profile",

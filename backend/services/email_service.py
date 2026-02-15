@@ -187,24 +187,22 @@ class EmailService:
     @staticmethod
     def send_test_email(recipient: str) -> tuple[bool, str]:
         """Send a test email"""
+        from services.email_templates import render_template
+        from models.email_notification import SMTPConfig
+        
+        smtp = SMTPConfig.query.first()
+        custom_template = smtp.email_template if smtp else None
+        
         subject = "UCM Test Email"
-        body_html = """
-        <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
-                    <h2 style="color: #3b82f6; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">
-                        Ultimate CA Manager - Test Email
-                    </h2>
-                    <p>This is a test email from your UCM instance.</p>
-                    <p>If you received this email, your SMTP configuration is working correctly!</p>
-                    <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em;">
-                        Sent at: {datetime}<br>
-                        From: UCM Email Notification System
-                    </p>
-                </div>
-            </body>
-        </html>
-        """.format(datetime=datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC'))
+        content = """
+        <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">This is a test email from your UCM instance.</p>
+        <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 16px;">If you received this email, your SMTP configuration is working correctly! ✅</p>
+        <div style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:20px 0;">
+            <p style="margin:0;font-size:14px;color:#166534;font-weight:500;">🎉 Your email notifications are ready to use.</p>
+        </div>
+        """
+        
+        body_html = render_template(custom_template, "Test Email", "#3b82f6", content)
         
         body_text = f"""
 Ultimate CA Manager - Test Email

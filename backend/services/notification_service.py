@@ -384,25 +384,14 @@ class NotificationService:
     
     @staticmethod
     def _base_template(title: str, title_color: str, content: str) -> str:
-        """Base HTML template for all emails"""
-        return f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <div style="background-color: #f9f9f9; border-radius: 8px; padding: 20px;">
-                        <h2 style="color: {title_color}; border-bottom: 2px solid {title_color}; padding-bottom: 10px; margin-top: 0;">
-                            {title}
-                        </h2>
-                        {content}
-                        <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 0.9em;">
-                            Sent at: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}<br>
-                            From: UCM Notification System
-                        </p>
-                    </div>
-                </div>
-            </body>
-        </html>
-        """
+        """Base HTML template for all emails - uses custom template if configured"""
+        from services.email_templates import render_template
+        from models.email_notification import SMTPConfig
+        
+        smtp = SMTPConfig.query.first()
+        custom_template = smtp.email_template if smtp else None
+        
+        return render_template(custom_template, title, title_color, content)
     
     @staticmethod
     def _render_cert_issued_template(cert: Certificate, issued_by: str = None) -> str:
