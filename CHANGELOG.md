@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improvements
 - Template editor button disabled on mobile with tooltip (desktop-only feature)
 - Cleaned up unused mobile full-screen editor code
+- Comprehensive API smoke test: 96/97 endpoints verified
 
 ### Bug Fixes
 - Fixed `isMobile` reference error in SettingsPage email tab
+- Fixed 6 broken API endpoints (schema mismatches between models and database)
+- Migration 030: added missing columns to user_sessions, approval_requests, certificate_policies
+- Fixed `User.two_factor_enabled` → `User.totp_confirmed` attribute in account API
+- Fixed `AuditLog.created_at` → `AuditLog.timestamp` in audit log queries
 
 ## [2.1.0-beta4] - 2026-02-15
 
