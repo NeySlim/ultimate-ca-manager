@@ -126,7 +126,8 @@ export function CertificateDetails({
   canDelete = false,
   compact = false,
   showActions = true,
-  showPem = true
+  showPem = true,
+  embedded = false,
 }) {
   const { t } = useTranslation()
   const [pemCopied, setPemCopied] = useState(false)
@@ -158,7 +159,8 @@ export function CertificateDetails({
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
-    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2")}>
+    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2", embedded && "space-y-2 p-0")}>
+      {!embedded && <>
       {/* Header */}
       <div className="flex items-start gap-2 sm:gap-3">
         <div className={cn(
@@ -248,6 +250,30 @@ export function CertificateDetails({
               <Trash size={14} />
             </Button>
           )}
+        </div>
+      )}
+      </>}
+
+      {/* Embedded: compact status bar */}
+      {embedded && (
+        <div className="flex items-center gap-2 flex-wrap px-1 pb-1">
+          <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
+          {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
+          {cert.days_remaining !== undefined && !cert.revoked && (
+            <span className={cn(
+              "text-2xs font-medium",
+              cert.days_remaining <= 0 ? "text-status-danger" :
+              cert.days_remaining <= 30 ? "text-status-warning" : "text-text-tertiary"
+            )}>
+              {cert.days_remaining <= 0 ? t('common.expired') : t('details.daysShort', { count: cert.days_remaining })}
+            </span>
+          )}
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className="text-2xs text-text-secondary">{cert.key_algorithm || 'RSA'}{cert.key_size ? ` ${cert.key_size}` : ''}</span>
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className={cn("text-2xs", cert.has_private_key ? "text-status-success" : "text-text-tertiary")}>
+            {cert.has_private_key ? '🔑' : '—'} {t('common.privateKey')}
+          </span>
         </div>
       )}
       

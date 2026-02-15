@@ -58,7 +58,8 @@ export function CADetails({
   canWrite = false,
   canDelete = false,
   showActions = true,
-  showPem = true
+  showPem = true,
+  embedded = false,
 }) {
   const { t } = useTranslation()
   const [showFullPem, setShowFullPem] = useState(false)
@@ -81,7 +82,8 @@ export function CADetails({
   }
   
   return (
-    <div className="space-y-4 p-4">
+    <div className={cn("space-y-4", embedded ? "p-0" : "p-4")}>
+      {!embedded && <>
       {/* Header with badges and actions */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -160,6 +162,23 @@ export function CADetails({
               <Trash size={14} /> {t('common.delete')}
             </Button>
           )}
+        </div>
+      )}
+      </>}
+
+      {/* Embedded: compact status bar */}
+      {embedded && (
+        <div className="flex items-center gap-2 flex-wrap px-1 pb-1">
+          <Badge variant={ca.is_root ? 'warning' : 'info'} size="sm">
+            {ca.is_root ? t('common.rootCA') : t('common.intermediate')}
+          </Badge>
+          <Badge variant={statusConfig[status].variant} size="sm">
+            {statusConfig[status].label}
+          </Badge>
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className="text-2xs text-text-secondary">{ca.key_type || 'N/A'}</span>
+          <span className="text-2xs text-text-tertiary">•</span>
+          <span className="text-2xs text-text-secondary">{ca.certs || 0} {t('common.certificatesShort')}</span>
         </div>
       )}
       

@@ -13,6 +13,7 @@
  * - Focus management (onClick → onFocus callback)
  */
 import { useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, ArrowsOutSimple, ArrowsInSimple, CornersOut, CornersIn } from '@phosphor-icons/react'
 import { cn } from '../../lib/utils'
 import {
@@ -40,6 +41,7 @@ export function FloatingWindow({
   children,
   className,
 }) {
+  const { t } = useTranslation()
   const panelRef = useRef(null)
   const bodyRef = useRef(null)
 
@@ -118,7 +120,7 @@ export function FloatingWindow({
             </div>
           )}
           <div className="min-w-0">
-            <h3 className="text-xs font-semibold text-text-primary truncate">{title}</h3>
+            <h3 className="text-sm font-semibold text-text-primary truncate">{title}</h3>
             {!minimized && subtitle && (
               <p className="text-[10px] text-text-tertiary truncate leading-tight">{subtitle}</p>
             )}
@@ -130,7 +132,7 @@ export function FloatingWindow({
             <button
               onClick={(e) => { e.stopPropagation(); onMinimizeToggle() }}
               className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors"
-              title={minimized ? 'Expand' : 'Minimize'}
+              title={minimized ? t('windows.expand') : t('windows.minimize')}
             >
               {minimized ? <ArrowsOutSimple size={13} /> : <ArrowsInSimple size={13} />}
             </button>
@@ -138,7 +140,7 @@ export function FloatingWindow({
           <button
             onClick={(e) => { e.stopPropagation(); toggleMaximize() }}
             className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors"
-            title={isMaximized ? 'Restore' : 'Maximize'}
+            title={isMaximized ? t('windows.restore') : t('windows.maximize')}
           >
             {isMaximized ? <CornersIn size={13} /> : <CornersOut size={13} />}
           </button>

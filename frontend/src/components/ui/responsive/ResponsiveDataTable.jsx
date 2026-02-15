@@ -5,6 +5,7 @@
  * MOBILE: Card-style rows with primary/secondary info, large touch targets
  */
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
   CaretLeft, CaretRight, X, Columns, Check,
@@ -84,6 +85,7 @@ export function ResponsiveDataTable({
   className
 }) {
   const { isMobile, isDesktop, isTouch } = useMobile()
+  const { t } = useTranslation()
   
   // Support both individual props and emptyState object
   const EmptyIcon = emptyState?.icon || EmptyIconProp
@@ -527,11 +529,11 @@ export function ResponsiveDataTable({
             </div>
           )}
           <h3 className="text-lg font-medium text-text-primary mb-1">
-            {hasActiveFilters ? 'No matching results' : emptyTitle}
+            {hasActiveFilters ? t('table.noResults') : emptyTitle}
           </h3>
           <p className="text-sm text-text-secondary text-center max-w-sm mb-4">
             {hasActiveFilters 
-              ? 'Try adjusting your filters or search terms'
+              ? t('table.adjustFilters')
               : emptyDescription
             }
           </p>
@@ -550,7 +552,7 @@ export function ResponsiveDataTable({
               }}
               className="text-sm text-accent-primary hover:text-accent-primary/80 font-medium"
             >
-              Clear all filters
+              {t('table.clearFilters')}
             </button>
           ) : emptyAction}
         </div>
@@ -605,7 +607,7 @@ export function ResponsiveDataTable({
       {multiSelect && selectionCount > 0 && bulkActions && (
         <div className="flex items-center gap-3 px-4 py-2 bg-accent-primary/10 border border-accent-primary/20 rounded-lg mx-1 mb-1">
           <span className="text-sm font-medium text-accent-primary">
-            {selectionCount} selected
+            {selectionCount} {t('table.selected')}
           </span>
           <div className="flex items-center gap-2 ml-auto">
             {bulkActions}
@@ -613,7 +615,7 @@ export function ResponsiveDataTable({
               onClick={() => onSelectionChange(new Set())}
               className="text-xs text-text-secondary hover:text-text-primary transition-colors px-2 py-1"
             >
-              Clear
+              {t('common.clear')}
             </button>
           </div>
         </div>
@@ -714,6 +716,7 @@ function SearchBar({
   handleExportJSON,
   dataCount
 }) {
+  const { t } = useTranslation()
   return (
     <div className={cn(
       'shrink-0 border-b border-border/30',
@@ -783,7 +786,7 @@ function SearchBar({
                         '[color-scheme:dark]',
                         filter.from && 'border-accent-primary/50'
                       )}
-                      title={filter.fromPlaceholder || 'From date'}
+                      title={filter.fromPlaceholder || t('table.fromDate')}
                     />
                     <span className="text-text-tertiary text-xs">→</span>
                     <input
@@ -796,7 +799,7 @@ function SearchBar({
                         '[color-scheme:dark]',
                         filter.to && 'border-accent-primary/50'
                       )}
-                      title={filter.toPlaceholder || 'To date'}
+                      title={filter.toPlaceholder || t('table.toDate')}
                     />
                   </div>
                 )
@@ -807,7 +810,7 @@ function SearchBar({
                   key={filter.key}
                   value={filter.value || ''}
                   onChange={filter.onChange}
-                  placeholder={filter.placeholder || 'All'}
+                  placeholder={filter.placeholder || t('common.all')}
                   options={filter.options || []}
                   size="sm"
                 />
@@ -827,7 +830,7 @@ function SearchBar({
                   ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
                   : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
               )}
-              title="Customize columns"
+              title={t('table.customizeColumns')}
             >
               <Columns size={14} />
             </button>
@@ -836,7 +839,7 @@ function SearchBar({
             {showColumnMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
                 <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
-                  Show columns
+                  {t('table.showColumns')}
                 </div>
                 {columns.map(col => (
                   <button
@@ -872,7 +875,7 @@ function SearchBar({
                       }}
                       className="w-full px-3 py-1.5 text-xs text-accent-primary hover:bg-bg-hover transition-colors text-left"
                     >
-                      Show all columns
+                      {t('table.showAllColumns')}
                     </button>
                   </>
                 )}
@@ -892,7 +895,7 @@ function SearchBar({
                   ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
                   : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
               )}
-              title="Filter presets"
+              title={t('table.filterPresets')}
             >
               <BookmarkSimple size={14} />
               {filterPresets?.length > 0 && (
@@ -906,7 +909,7 @@ function SearchBar({
             {showPresetsMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
                 <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
-                  Filter Presets
+                  {t('table.filterPresets')}
                 </div>
                 
                 {/* Save current filter button */}
@@ -916,7 +919,7 @@ function SearchBar({
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors text-accent-primary"
                   >
                     <FloppyDisk size={14} />
-                    Save current filters
+                    {t('table.saveFilters')}
                   </button>
                 )}
                 
@@ -927,7 +930,7 @@ function SearchBar({
                       type="text"
                       value={presetName}
                       onChange={(e) => setPresetName?.(e.target.value)}
-                      placeholder="Preset name..."
+                      placeholder={t('table.presetName')}
                       className="w-full h-7 px-2 text-xs rounded border border-border bg-bg-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary"
                       autoFocus
                       onKeyDown={(e) => {
@@ -941,13 +944,13 @@ function SearchBar({
                         disabled={!presetName?.trim()}
                         className="flex-1 h-6 text-xs rounded bg-accent-primary text-white hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Save
+                        {t('common.save')}
                       </button>
                       <button
                         onClick={() => setShowSavePresetModal?.(false)}
                         className="h-6 px-2 text-xs rounded border border-border hover:bg-bg-hover"
                       >
-                        Cancel
+                        {t('common.cancel')}
                       </button>
                     </div>
                   </div>
@@ -984,8 +987,8 @@ function SearchBar({
                   </>
                 ) : !hasActiveFilters && (
                   <div className="px-3 py-4 text-xs text-text-tertiary text-center">
-                    No saved presets.<br/>
-                    Apply filters and save them here.
+                    {t('table.noPresets')}<br/>
+                    {t('table.applyAndSave')}
                   </div>
                 )}
               </div>
@@ -1004,7 +1007,7 @@ function SearchBar({
                   ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
                   : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
               )}
-              title="Export data"
+              title={t('table.exportData')}
             >
               <Export size={14} />
             </button>
@@ -1013,21 +1016,21 @@ function SearchBar({
             {showExportMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
                 <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
-                  Export {dataCount} items
+                  {t('table.exportItems', { count: dataCount })}
                 </div>
                 <button
                   onClick={handleExportCSV}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
                 >
                   <Export size={14} />
-                  Export as CSV
+                  {t('table.exportCSV')}
                 </button>
                 <button
                   onClick={handleExportJSON}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
                 >
                   <Export size={14} />
-                  Export as JSON
+                  {t('table.exportJSON')}
                 </button>
               </div>
             )}
@@ -1081,7 +1084,6 @@ function DesktopTable({
   const tableRef = useRef(null)
   
   // Check if any column has a custom width
-  const hasCustomWidths = Object.keys(columnWidths).length > 0
   
   // Density-based padding for rows
   const densityStyles = {
@@ -1091,21 +1093,42 @@ function DesktopTable({
   }
   const dStyle = densityStyles[density] || densityStyles.compact
   
-  // Calculate column styles, preferring stored width over column definition
-  // With tableLayout: fixed, we need explicit widths
+  // Column sizing: table-layout:fixed with proportional widths
+  // Each column gets a "size" weight. Total weights are summed and each column
+  // gets a percentage of the available space. This is how TanStack Table works.
+  // User-resized columns use exact px widths, remaining space is redistributed.
   const getColStyle = (col) => {
-    // If we have a stored width for this column, use it (in px)
+    // User-resized: use exact px width
     if (columnWidths[col.key]) {
-      return { width: `${columnWidths[col.key]}px`, minWidth: 50, maxWidth: columnWidths[col.key] }
+      return { width: `${columnWidths[col.key]}px` }
     }
-    // If column has fixed width defined
-    if (col.width) return { width: col.width, minWidth: col.minWidth || 50 }
-    // Default: use minWidth as the base width for tableLayout fixed
-    // This ensures columns don't shift when other columns are resized
-    return { 
-      width: col.minWidth || 120,
-      minWidth: col.minWidth || 80
+    // Column has explicit width (e.g. '120px', '80px')
+    if (col.width) return { width: col.width }
+    // Use proportional sizing based on column "size" hint or smart defaults
+    const size = col.size || getDefaultColumnSize(col)
+    const totalSize = columns.reduce((sum, c) => {
+      if (columnWidths[c.key] || c.width) return sum // fixed-width cols excluded from proportion
+      return sum + (c.size || getDefaultColumnSize(c))
+    }, 0)
+    if (totalSize > 0) {
+      return { width: `${((size / totalSize) * 100).toFixed(1)}%` }
     }
+    return {}
+  }
+  
+  // Smart default column sizes based on key name patterns
+  function getDefaultColumnSize(col) {
+    const k = col.key?.toLowerCase() || ''
+    // Name/subject/description columns get more space
+    if (k.includes('name') || k.includes('cn') || k.includes('subject') || k.includes('descr') || k.includes('description') || k.includes('email') || k.includes('domain')) return 3
+    // Medium columns
+    if (k.includes('issuer') || k.includes('organization')) return 2
+    // Narrow columns: status, dates, types, booleans
+    if (k.includes('status') || k.includes('type') || k.includes('role') || k.includes('active') || k.includes('enabled')) return 1
+    if (k.includes('date') || k.includes('valid') || k.includes('created') || k.includes('expires') || k.includes('login') || k.includes('timestamp')) return 1.5
+    if (k.includes('key') || k.includes('serial') || k.includes('id') || k.includes('count') || k.includes('days')) return 1
+    // Default
+    return 1.5
   }
   
   // Handle resize start
@@ -1209,7 +1232,7 @@ function DesktopTable({
                 </th>
               )
             })}
-            {rowActions && <th className="w-12 min-w-[48px]" />}
+            {rowActions && <th className="w-px whitespace-nowrap" />}
           </tr>
         </thead>
         
@@ -1230,7 +1253,7 @@ function DesktopTable({
                 key={row.id || idx}
                 onClick={() => multiSelect ? onToggleRow(row.id) : onRowClick?.(row)}
                 className={cn(
-                  'group transition-all duration-200 table-row-hover',
+                  'group group/row transition-all duration-200 table-row-hover',
                   (onRowClick || multiSelect) && 'cursor-pointer',
                   // Selected state - uses theme-aware CSS class
                   selectedId === row.id && 'row-selected',
@@ -1307,55 +1330,29 @@ function RowActionMenu({ row, idx, actions, isOpen, onToggle, menuRef }) {
   if (!actions || actions.length === 0) return null
   
   return (
-    <div className="relative" ref={menuRef}>
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggle()
-        }}
-        className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center',
-          'text-text-tertiary hover:text-text-primary',
-          'hover:bg-bg-tertiary',
-          'transition-all duration-150',
-          isOpen && 'bg-accent-primary/10 text-accent-primary'
-        )}
-      >
-        <DotsThreeVertical size={18} weight="bold" />
-      </button>
-      
-      {isOpen && (
-        <div className={cn(
-          'absolute right-0 top-full mt-1 z-20',
-          'min-w-[180px] py-1.5 rounded-xl border border-border bg-bg-primary',
-          'shadow-xl shadow-black/10',
-          'animate-fade-in'
-        )}>
-          {actions.map((action, i) => {
-            const Icon = action.icon
-            return (
-              <button
-                key={i}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  action.onClick?.()
-                  onToggle()
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2 text-sm',
-                  'transition-all duration-150',
-                  action.variant === 'danger'
-                    ? 'status-danger-text hover:status-danger-bg'
-                    : 'text-text-primary hover:bg-accent-primary/5 hover:text-accent-primary'
-                )}
-              >
-                {Icon && <Icon size={16} weight="duotone" />}
-                {action.label}
-              </button>
-            )
-          })}
-        </div>
-      )}
+    <div className="flex items-center justify-end gap-0.5">
+      {actions.map((action, i) => {
+        const Icon = action.icon
+        return (
+          <button
+            key={i}
+            onClick={(e) => {
+              e.stopPropagation()
+              action.onClick?.()
+            }}
+            title={action.label}
+            className={cn(
+              'w-7 h-7 rounded-lg flex items-center justify-center',
+              'transition-all duration-150',
+              action.variant === 'danger'
+                ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger/10'
+                : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary/10'
+            )}
+          >
+            {Icon && <Icon size={15} weight="duotone" />}
+          </button>
+        )
+      })}
     </div>
   )
 }

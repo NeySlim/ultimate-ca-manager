@@ -319,7 +319,8 @@
     "certificatesShort": "Certificates",
     "templatesShort": "Templates",
     "usersShort": "Users",
-    "cert": "Cert"
+    "cert": "Cert",
+    "clear": "Clear"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -481,7 +482,8 @@
     "chainRepairRunning": "Running...",
     "widgetTrustStoreExpiry": "Trust Store Expiry",
     "trustStoreExpiry": "Trust Store Expiry",
-    "noTrustStoreExpiring": "All trusted certificates are valid"
+    "noTrustStoreExpiring": "All trusted certificates are valid",
+    "loading": "Loading dashboard..."
   },
   "certificates": {
     "createCertificate": "Create Certificate",
@@ -1868,7 +1870,8 @@
     "chainIncompleteHint": "The issuing CA is not in the Trust Store or managed CAs. Import the issuer certificate in the Trust Store to complete the chain.",
     "addIssuerToTrustStore": "Add Issuer to Trust Store",
     "addedToTrustStore": "CA added to Trust Store successfully",
-    "addToTrustStoreFailed": "Failed to add CA to Trust Store"
+    "addToTrustStoreFailed": "Failed to add CA to Trust Store",
+    "daysShort": "{{count}}d"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -2005,6 +2008,30 @@
     "closeAll": "Close All Windows",
     "sameWindow": "Same window",
     "closeOnNav": "Close on navigate",
-    "noWindows": "No windows open"
+    "noWindows": "No windows open",
+    "expand": "Expand",
+    "minimize": "Minimize",
+    "restore": "Restore",
+    "maximize": "Maximize"
+  },
+  "table": {
+    "noResults": "No matching results",
+    "adjustFilters": "Try adjusting your filters or search terms",
+    "clearFilters": "Clear all filters",
+    "selected": "selected",
+    "fromDate": "From date",
+    "toDate": "To date",
+    "customizeColumns": "Customize columns",
+    "showColumns": "Show columns",
+    "showAllColumns": "Show all columns",
+    "filterPresets": "Filter Presets",
+    "saveFilters": "Save current filters",
+    "presetName": "Preset name...",
+    "noPresets": "No saved presets.",
+    "applyAndSave": "Apply filters and save them here.",
+    "exportData": "Export data",
+    "exportItems": "Export {{count}} items",
+    "exportCSV": "Export as CSV",
+    "exportJSON": "Export as JSON"
   }
 }
