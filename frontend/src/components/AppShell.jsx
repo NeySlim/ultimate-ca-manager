@@ -8,8 +8,9 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   Lightning, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock, Wrench,
-  UserCircle, Palette, Question, SignOut, Globe
+  UserCircle, Palette, Question, SignOut, Globe, Check, CaretRight
 } from '@phosphor-icons/react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
@@ -22,33 +23,34 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { useAuth } from '../contexts/AuthContext'
 import { certificatesService } from '../services'
+import { languages } from '../i18n'
 
 // Mobile navigation items — must match desktop sidebar (Sidebar.jsx)
 const mobileNavItems = [
-  { id: '', icon: House, labelKey: 'common.dashboard', path: '/' },
-  { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
-  { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
-  { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
-  { id: 'templates', icon: ListIcon, labelKey: 'common.templates', path: '/templates' },
-  { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme' },
-  { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
-  { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
-  { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
-  { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations' },
-  { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
-  { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
-  { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
-  { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
-  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
-  { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings' },
+  { id: '', icon: House, labelKey: 'common.dashboard', shortKey: 'common.dashboardShort', path: '/' },
+  { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', shortKey: 'common.certificatesShort', path: '/certificates' },
+  { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', shortKey: 'common.casShort', path: '/cas' },
+  { id: 'csrs', icon: FileText, labelKey: 'common.csrs', shortKey: 'common.csrsShort', path: '/csrs' },
+  { id: 'templates', icon: ListIcon, labelKey: 'common.templates', shortKey: 'common.templatesShort', path: '/templates' },
+  { id: 'acme', icon: Key, labelKey: 'common.acme', shortKey: 'common.acmeShort', path: '/acme' },
+  { id: 'scep', icon: Robot, labelKey: 'common.scep', shortKey: 'common.scepShort', path: '/scep-config' },
+  { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', shortKey: 'common.crlOcspShort', path: '/crl-ocsp' },
+  { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', shortKey: 'common.trustStoreShort', path: '/truststore' },
+  { id: 'operations', icon: Lightning, labelKey: 'common.operations', shortKey: 'common.operationsShort', path: '/operations' },
+  { id: 'tools', icon: Wrench, labelKey: 'common.tools', shortKey: 'common.toolsShort', path: '/tools' },
+  { id: 'users', icon: User, labelKey: 'common.users', shortKey: 'common.usersShort', path: '/users' },
+  { id: 'rbac', icon: Shield, labelKey: 'common.rbac', shortKey: 'common.rbacShort', path: '/rbac' },
+  { id: 'hsm', icon: Lock, labelKey: 'common.hsm', shortKey: 'common.hsmShort', path: '/hsm' },
+  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', shortKey: 'common.auditShort', path: '/audit' },
+  { id: 'settings', icon: Gear, labelKey: 'common.settings', shortKey: 'common.settingsShort', path: '/settings' },
 ]
 
 export function AppShell() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -204,13 +206,87 @@ export function AppShell() {
           {/* WebSocket indicator */}
           <WebSocketIndicator className="ml-0.5 scale-90" />
           
-          {/* Account button */}
-          <button
-            onClick={() => { setMobileMenuOpen(false); navigate('/account') }}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
-          >
-            <UserCircle size={16} />
-          </button>
+          {/* User dropdown menu */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary">
+                <UserCircle size={16} />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content 
+                className="min-w-[180px] bg-bg-secondary border border-border rounded-lg shadow-lg p-1 z-[60]"
+                sideOffset={5}
+                align="end"
+                collisionPadding={8}
+              >
+                {user?.username && (
+                  <DropdownMenu.Label className="px-2.5 py-1.5 text-xs text-text-tertiary border-b border-border mb-0.5">
+                    {user.username}
+                  </DropdownMenu.Label>
+                )}
+                <DropdownMenu.Item
+                  onClick={() => { setMobileMenuOpen(false); navigate('/account') }}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary"
+                >
+                  <UserCircle size={15} />
+                  <span>{t('common.account')}</span>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item
+                  onClick={() => { setMobileMenuOpen(false); navigate('/settings') }}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary"
+                >
+                  <Gear size={15} />
+                  <span>{t('common.settings')}</span>
+                </DropdownMenu.Item>
+
+                <DropdownMenu.Separator className="h-px bg-border my-0.5" />
+
+                {/* Language sub-menu */}
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary data-[state=open]:bg-bg-tertiary">
+                    <Globe size={15} />
+                    <span className="flex-1">{languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en'))?.flag} {languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en'))?.name || 'English'}</span>
+                    <CaretRight size={12} className="text-text-tertiary" />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.SubContent 
+                      className="min-w-[160px] max-h-[50vh] overflow-auto bg-bg-secondary border border-border rounded-lg shadow-lg p-1 z-[60]"
+                      sideOffset={4}
+                      collisionPadding={8}
+                    >
+                      {languages.map(lang => (
+                        <DropdownMenu.Item
+                          key={lang.code}
+                          onClick={() => {
+                            i18n.changeLanguage(lang.code)
+                            try { localStorage.setItem('i18nextLng', lang.code) } catch {}
+                          }}
+                          className="flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary"
+                        >
+                          <span>{lang.flag}</span>
+                          <span className="flex-1">{lang.name}</span>
+                          {(i18n.language?.split('-')[0] || 'en') === lang.code && (
+                            <Check size={14} weight="bold" className="text-accent-primary" />
+                          )}
+                        </DropdownMenu.Item>
+                      ))}
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Sub>
+
+                <DropdownMenu.Separator className="h-px bg-border my-0.5" />
+
+                <DropdownMenu.Item
+                  onClick={() => { setMobileMenuOpen(false); logout() }}
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-status-danger/10 text-status-danger"
+                >
+                  <SignOut size={15} />
+                  <span>{t('auth.logout')}</span>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
           
           {/* Hamburger menu */}
           <button
@@ -308,7 +384,7 @@ export function AppShell() {
                     >
                       <Icon size={20} weight={isActive ? "fill" : "regular"} />
                       <span className="text-3xs font-medium text-center leading-tight">
-                        {t(item.labelKey)}
+                        {t(item.shortKey)}
                       </span>
                       {item.pro && (
                         <span className="text-3xs px-0.5 py-0.5 status-warning-bg status-warning-text rounded">
@@ -320,9 +396,8 @@ export function AppShell() {
                 })}
               </div>
               
-              {/* Footer: Language selector + Logout */}
-              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
-                <LanguageSelector className="flex-1" />
+              {/* Footer: Logout only (language is in user dropdown) */}
+              <div className="mt-3 pt-3 border-t border-border flex items-center justify-end">
                 <button
                   onClick={() => { setMobileMenuOpen(false); logout(); }}
                   className="flex items-center gap-2 px-3 py-2 rounded-lg text-status-danger hover:bg-status-danger/10 transition-colors"

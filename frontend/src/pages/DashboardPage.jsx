@@ -390,18 +390,24 @@ export default function DashboardPage() {
         {/* Dashboard Header */}
         <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-4 py-3 mb-1.5">
           <div className="relative flex items-center justify-between gap-4">
-            {/* Branding */}
+            {/* Branding — compact on mobile */}
             <div className="flex items-center gap-3">
-              <Logo variant="icon" size="md" />
+              <div className="md:block hidden">
+                <Logo variant="icon" size="md" />
+              </div>
+              <div className="md:hidden opacity-40 scale-75 origin-left">
+                <Logo variant="icon" size="sm" />
+              </div>
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-black tracking-tight logo-text-gradient">UCM</span>
+                  <span className="hidden md:inline text-lg font-black tracking-tight logo-text-gradient">UCM</span>
+                  <span className="md:hidden text-sm font-black tracking-tight logo-text-gradient opacity-50">UCM</span>
                   <span className="text-xs text-text-tertiary">v{versionInfo.version}</span>
                   {versionInfo.update_available && (
                     <Badge variant="warning" size="sm" dot>{t('common.updateAvailable')}</Badge>
                   )}
                 </div>
-                <p className="text-xs text-text-tertiary mt-0.5">Ultimate Certificate Manager</p>
+                <p className="text-xs text-text-tertiary mt-0.5 hidden md:block">Ultimate Certificate Manager</p>
               </div>
             </div>
 
@@ -526,8 +532,8 @@ export default function DashboardPage() {
                   title={t('dashboard.certificateActivity')}
                   subtitle={t('dashboard.last7Days')}
                 />
-                <Card.Body className="flex-1 min-h-0 relative !pt-0 !pb-0 !px-2">
-                  <div className="absolute inset-0 px-2">
+                <Card.Body className="flex-1 min-h-0 relative !pb-0 !px-2">
+                  <div className="absolute inset-0 px-2 pb-2">
                     <CertificateTrendChart data={certificateTrend} />
                   </div>
                 </Card.Body>
@@ -547,8 +553,8 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 min-h-0 relative !pt-0 !pb-0 !px-2">
-                  <div className="absolute inset-0 px-2 flex items-center">
+                <Card.Body className="flex-1 min-h-0 relative !p-0">
+                  <div className="absolute inset-0 flex items-center">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
