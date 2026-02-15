@@ -147,6 +147,7 @@ export function useFloatingWindow({
     let raf = 0
 
     document.body.style.userSelect = 'none'
+    if (bodyRef?.current) bodyRef.current.style.pointerEvents = 'none'
     const onMove = (e) => {
       cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => {
@@ -163,6 +164,7 @@ export function useFloatingWindow({
     const onUp = () => {
       cancelAnimationFrame(raf)
       document.body.style.userSelect = ''
+      if (bodyRef?.current) bodyRef.current.style.pointerEvents = ''
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
       savePersist(storageKey, posRef.current)
@@ -170,7 +172,7 @@ export function useFloatingWindow({
     }
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
-  }, [clamp, applyPos, storageKey])
+  }, [clamp, applyPos, storageKey, bodyRef])
 
   // --- MAXIMIZE/RESTORE (double-click header) ---
   const toggleMaximize = useCallback(() => {
