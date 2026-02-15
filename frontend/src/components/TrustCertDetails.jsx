@@ -115,7 +115,7 @@ export function TrustCertDetails({
     : []
   
   return (
-    <div className={cn("space-y-4", embedded ? "p-0" : "p-4")}>
+    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", embedded && "space-y-3 p-3")}>
       {!embedded && <>
       {/* Header with badges */}
       <div className="flex items-start justify-between gap-4">
