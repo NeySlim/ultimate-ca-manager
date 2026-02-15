@@ -153,7 +153,7 @@ export function FloatingDetailWindow({ windowInfo }) {
       storageKey={sameWindow ? 'ucm-detail-single' : `ucm-detail-${windowInfo.id}`}
       defaultPos={windowInfo.defaultPos}
       forcePosition={!!windowInfo._tileKey}
-      constraints={{ minW: 380, maxW: 900, minH: 300, defW: 520, defH: 500 }}
+      constraints={{ minW: 380, maxW: 765, minH: 300, defW: 442, defH: 425 }}
       minimized={minimized}
       onMinimizeToggle={() => setMinimized(!minimized)}
       onClose={() => closeWindow(windowInfo.id)}
