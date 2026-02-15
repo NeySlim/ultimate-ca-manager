@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-beta4] - 2026-02-15
+
+### New Features
+- Email template editor with split-pane HTML source + live preview
+- Plain text template tab for non-HTML email clients
+- Customizable email templates with UCM branding and 6 template variables
+- TagsInput component for alert recipients (type + Enter, paste multiple)
+- Certificate expiry alert settings (thresholds, recipients, check now)
+- SMTP settings: content type selector (HTML/Text/Both), test email recipient field
+
+### Improvements
+- Floating window: resize from left/top edge keeps opposite edge fixed
+- Floating window: pointer-events disabled on body during resize (iframe fix)
+- Input field: "Set" badge no longer misaligns adjacent fields
+- Email settings: consistent field widths with DetailGrid layout
+- SMTP gate: real error messages displayed inline (not just "check settings")
+
+### Bug Fixes
+- TagsInput background color matches regular input fields (bg-secondary)
+- Removed broken Tailwind opacity syntax on CSS variables in TagsInput
+- Placeholder comma removed from alert recipients field
+
+### Documentation
+- In-app help: email template editor section with variables and instructions
+- Admin guide: new Email Notifications section (SMTP, template, alerts)
+- Wiki: Email & Notifications section in Configuration page
+
+### Cleanup
+- Removed dead EmailTemplateEditor.jsx (TipTap WYSIWYG, replaced by source editor)
+- Uninstalled 14 unused TipTap npm packages
+
 ## [2.1.0-beta3] - 2026-02-15
 
 ### New Features

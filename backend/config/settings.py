@@ -156,7 +156,7 @@ class Config:
                 return docker_version.read_text().strip()
         except Exception:
             pass
-        return os.getenv("APP_VERSION", "2.0.0")
+        return os.getenv("APP_VERSION", "2.1.0")
     
     APP_VERSION = _get_version.__func__()
     
