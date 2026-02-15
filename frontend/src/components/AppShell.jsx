@@ -352,7 +352,7 @@ export function AppShell() {
           </div>
 
           {/* Status Footer — desktop only, not on dashboard */}
-          {!isMobile && activePage !== '' && <StatusFooter />}
+          {!isMobile && activePage !== '' && activePage !== 'dashboard' && <StatusFooter />}
         </div>
       </div>
 

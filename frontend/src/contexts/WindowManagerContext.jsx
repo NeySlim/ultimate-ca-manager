@@ -30,8 +30,8 @@ export function WindowManagerProvider({ children }) {
   const zCounter = useRef(BASE_Z)
 
   // User preferences
-  const [sameWindow, setSameWindow] = useState(() => loadPrefs().sameWindow ?? false)
-  const [closeOnNav, setCloseOnNav] = useState(() => loadPrefs().closeOnNav ?? false)
+  const [sameWindow, setSameWindow] = useState(() => loadPrefs().sameWindow ?? true)
+  const [closeOnNav, setCloseOnNav] = useState(() => loadPrefs().closeOnNav ?? true)
 
   const toggleSameWindow = useCallback(() => {
     setSameWindow(prev => {

@@ -488,7 +488,6 @@ export default function CSRsPage() {
           loading={loading}
           selectedId={selectedCSR?.id}
           onRowClick={(item) => item ? loadCSRDetails(item) : setSelectedCSR(null)}
-          rowActions={activeTab === 'pending' ? pendingRowActions : historyRowActions}
           searchable
           searchPlaceholder={activeTab === 'pending' ? t('csrs.searchPending') : t('csrs.searchSigned')}
           searchKeys={['cn', 'common_name', 'subject', 'organization', 'signed_by']}

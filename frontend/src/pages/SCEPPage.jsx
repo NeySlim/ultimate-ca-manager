@@ -463,10 +463,6 @@ export default function SCEPPage() {
               title: t('scep.noRequests'),
               description: t('scep.noRequestsDesc')
             }}
-            rowActions={(row) => row.status === 'pending' && hasPermission('write:scep') ? [
-              { icon: CheckCircle, label: t('scep.approve'), onClick: () => handleApprove(row), variant: 'success' },
-              { icon: XCircle, label: t('scep.reject'), onClick: () => { setSelectedRequest(row); setShowRejectModal(true); }, variant: 'danger' }
-            ] : []}
           />
         )}
 

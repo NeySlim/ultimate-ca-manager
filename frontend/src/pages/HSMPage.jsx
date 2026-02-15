@@ -462,7 +462,6 @@ export default function HSMPage() {
             loading={loading}
             onRowClick={setSelectedProvider}
             selectedId={selectedProvider?.id}
-            rowActions={rowActions}
             searchable
             searchPlaceholder={t('common.searchProviders')}
             searchKeys={['name', 'provider_type']}

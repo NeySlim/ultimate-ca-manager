@@ -553,7 +553,6 @@ export default function TrustStorePage() {
           loading={loading}
           onRowClick={handleSelectCert}
           selectedId={selectedCert?.id}
-          rowActions={rowActions}
           searchable
           searchPlaceholder={t('common.searchCertificates')}
           searchKeys={['name', 'subject_cn', 'issuer_cn', 'purpose']}

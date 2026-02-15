@@ -445,7 +445,6 @@ export default function TemplatesPage() {
           loading={loading}
           onRowClick={setSelectedTemplate}
           selectedId={selectedTemplate?.id}
-          rowActions={rowActions}
           searchable
           searchPlaceholder={t('templates.searchPlaceholder')}
           searchKeys={['name', 'description', 'type']}

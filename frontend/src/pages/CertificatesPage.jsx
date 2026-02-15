@@ -730,7 +730,6 @@ export default function CertificatesPage() {
           loading={loading}
           onRowClick={handleSelectCert}
           selectedId={selectedCert?.id}
-          rowActions={rowActions}
           searchable
           searchPlaceholder={t('common.search') + ' ' + t('common.certificates').toLowerCase() + '...'}
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
