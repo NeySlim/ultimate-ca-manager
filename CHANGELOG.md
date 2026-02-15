@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ACME Account Delete** - DELETE `/api/v2/acme/accounts/{id}` with cascade cleanup (challenges→authorizations→orders)
 - **Settings About** - Version, system info, uptime, memory, links to docs/wiki/issues
 - **Template Duplication** - Clone endpoint: POST /templates/{id}/duplicate
+- **Unified Export Actions** - Reusable `ExportActions` component with inline contextual password field for P12
 
 ### UI/UX
 
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mobile Navbar** - User dropdown menu with account, settings, language selector, logout
 - **Mobile Nav Grid** - Short i18n labels for 5-column grid (all 9 languages)
 - **Reconnect Overlay** - Circular countdown ring, connection progress bar, redirect status
+- **Export Consistency** - Uniform PEM/DER/P7B/P12 formats across all detail panels, inline password field replaces modal
 
 ### i18n
 
@@ -53,6 +55,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SCEP Nav** - Normalize URL for active state detection
 - **OPNsense** - Wrapped password inputs in form element (DOM warning)
 - **Tests** - Mock useWindowManager in PageRendering tests
+- **Mobile Slide-Over** - Fixed detail panels not showing for sidebar pages (ACME, Users, CSRs)
+- **CSR Download** - Fixed endpoint mismatch (`/download` → `/export`)
+- **PFX/P12 Export** - Fixed missing password prompt in floating detail windows
+- **Password Autofill** - Prevent password managers from autofilling non-login fields (CSS text-security masking)
+
+### Code Quality
+
+- Removed dead system.service methods (getHealth, getVersion, getInfo)
+- Removed unused LanguageSelector import
+- Removed 23 console.error statements from production code
+- Removed P12 password modals (replaced by inline ExportActions)
 
 ---
 
