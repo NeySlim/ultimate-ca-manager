@@ -1610,35 +1610,41 @@ export default function SettingsPage() {
                     <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
                   )}
                   {settings.smtp_auth !== false && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
-                      <Input
-                        label={t('settings.smtpUsername')}
-                        value={settings.smtp_username || ''}
-                        onChange={(e) => updateSetting('smtp_username', e.target.value)}
-                      />
-                      <Input
-                        label={t('settings.smtpPassword')}
-                        type="password"
-                        noAutofill
-                        value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
-                        onChange={(e) => updateSetting('smtp_password', e.target.value)}
-                        hasExistingValue={settings.smtp_password === '********'}
-                      />
-                    </div>
+                    <DetailGrid>
+                      <div className="col-span-full md:col-span-1">
+                        <Input
+                          label={t('settings.smtpUsername')}
+                          value={settings.smtp_username || ''}
+                          onChange={(e) => updateSetting('smtp_username', e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-full md:col-span-1">
+                        <Input
+                          label={t('settings.smtpPassword')}
+                          type="password"
+                          noAutofill
+                          value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
+                          onChange={(e) => updateSetting('smtp_password', e.target.value)}
+                          hasExistingValue={settings.smtp_password === '********'}
+                        />
+                      </div>
+                    </DetailGrid>
                   )}
                 </div>
 
                 {/* Options */}
                 <div className="border-t border-border pt-4 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input
-                      label={t('settings.fromEmail')}
-                      type="email"
-                      value={settings.smtp_from_email || ''}
-                      onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-                      placeholder={t('settings.fromEmailPlaceholder')}
-                    />
-                  </div>
+                  <DetailGrid>
+                    <div className="col-span-full md:col-span-1">
+                      <Input
+                        label={t('settings.fromEmail')}
+                        type="email"
+                        value={settings.smtp_from_email || ''}
+                        onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
+                        placeholder={t('settings.fromEmailPlaceholder')}
+                      />
+                    </div>
+                  </DetailGrid>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                     <ToggleSwitch
                       checked={settings.smtp_use_tls || false}
@@ -1684,15 +1690,17 @@ export default function SettingsPage() {
                 {/* Actions */}
                 {canWrite('settings') && (
                   <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                      <Input
-                        label={t('settings.testRecipient')}
-                        type="email"
-                        value={settings._testRecipient || ''}
-                        onChange={(e) => updateSetting('_testRecipient', e.target.value)}
-                        placeholder={settings.smtp_from_email || 'admin@example.com'}
-                      />
-                      <div className="flex gap-2">
+                    <DetailGrid>
+                      <div className="col-span-full md:col-span-1">
+                        <Input
+                          label={t('settings.testRecipient')}
+                          type="email"
+                          value={settings._testRecipient || ''}
+                          onChange={(e) => updateSetting('_testRecipient', e.target.value)}
+                          placeholder={settings.smtp_from_email || 'admin@example.com'}
+                        />
+                      </div>
+                      <div className="col-span-full md:col-span-1 flex items-end gap-2">
                         <Button variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
                           {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
                           {t('settings.testEmail')}
@@ -1702,7 +1710,7 @@ export default function SettingsPage() {
                           {t('common.save')}
                         </Button>
                       </div>
-                    </div>
+                    </DetailGrid>
                   </div>
                 )}
               </div>
