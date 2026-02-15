@@ -2030,5 +2030,17 @@
     "exportItems": "{{count}} Einträge exportieren",
     "exportCSV": "Als CSV exportieren",
     "exportJSON": "Als JSON exportieren"
+  },
+  "reconnect": {
+    "countdown": "Dienst wird neu gestartet...",
+    "countdownSub": "Wiederverbindung startet in {{seconds}}s",
+    "connecting": "Verbindung wird hergestellt...",
+    "connectingSub": "Warte auf Rückkehr des Dienstes",
+    "redirecting": "Dienst ist zurück!",
+    "redirectingSub": "Weiterleitung zur Anmeldeseite...",
+    "timeout": "Verbindungszeitüberschreitung",
+    "timeoutSub": "Der Dienst benötigt möglicherweise mehr Zeit. Versuchen Sie, die Seite manuell zu aktualisieren.",
+    "attempt": "Versuch {{count}}",
+    "refresh": "Seite aktualisieren"
   }
 }

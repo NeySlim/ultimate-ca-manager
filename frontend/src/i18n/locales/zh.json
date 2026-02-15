@@ -2030,5 +2030,17 @@
     "exportItems": "导出{{count}}项",
     "exportCSV": "导出为CSV",
     "exportJSON": "导出为JSON"
+  },
+  "reconnect": {
+    "countdown": "服务正在重启...",
+    "countdownSub": "将在{{seconds}}秒后开始重新连接",
+    "connecting": "重新连接中...",
+    "connectingSub": "等待服务恢复在线",
+    "redirecting": "服务已恢复！",
+    "redirectingSub": "正在重定向到登录页面...",
+    "timeout": "连接超时",
+    "timeoutSub": "服务可能需要更多时间。请尝试手动刷新。",
+    "attempt": "尝试 {{count}}",
+    "refresh": "刷新页面"
   }
 }

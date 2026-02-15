@@ -2030,5 +2030,17 @@
     "exportItems": "{{count}}件をエクスポート",
     "exportCSV": "CSVでエクスポート",
     "exportJSON": "JSONでエクスポート"
+  },
+  "reconnect": {
+    "countdown": "サービスを再起動中...",
+    "countdownSub": "{{seconds}}秒後に再接続を開始します",
+    "connecting": "再接続中...",
+    "connectingSub": "サービスの復旧を待っています",
+    "redirecting": "サービスが復旧しました！",
+    "redirectingSub": "ログインページにリダイレクトしています...",
+    "timeout": "接続タイムアウト",
+    "timeoutSub": "サービスにはもう少し時間が必要かもしれません。手動で更新してください。",
+    "attempt": "試行 {{count}}",
+    "refresh": "ページを更新"
   }
 }

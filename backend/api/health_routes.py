@@ -12,19 +12,32 @@ health_bp = Blueprint('health', __name__)
 _started_at = time.time()
 
 
-@health_bp.route('/health')
+@health_bp.route('/api/v2/health')
 @health_bp.route('/api/health')
+@health_bp.route('/health')
 def health():
     """
     Basic health check - fast response for load balancers.
     Always returns 200 if the application is running.
     Includes started_at for restart detection by frontend.
     """
-    from flask import current_app
+    from config.settings import get_config
+    _config = get_config()
+
+    # Check WebSocket readiness
+    ws_ready = False
+    try:
+        from websocket import socketio
+        ws_ready = socketio.server is not None
+    except Exception:
+        pass
+
     result = {
         'status': 'ok',
         'service': 'ucm',
-        'started_at': _started_at
+        'version': _config.APP_VERSION,
+        'started_at': _started_at,
+        'websocket': ws_ready
     }
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
@@ -32,8 +45,9 @@ def health():
     return jsonify(result)
 
 
-@health_bp.route('/health/ready')
+@health_bp.route('/api/v2/health/ready')
 @health_bp.route('/api/health/ready')
+@health_bp.route('/health/ready')
 def readiness():
     """
     Readiness check - verifies the app can serve traffic.
@@ -58,8 +72,9 @@ def readiness():
     }), 200 if all_ok else 503
 
 
-@health_bp.route('/health/live')
+@health_bp.route('/api/v2/health/live')
 @health_bp.route('/api/health/live')
+@health_bp.route('/health/live')
 def liveness():
     """
     Liveness check - verifies the app is not deadlocked.

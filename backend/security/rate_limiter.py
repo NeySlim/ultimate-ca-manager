@@ -361,7 +361,7 @@ def init_rate_limiter(app=None) -> RateLimiter:
         @app.before_request
         def rate_limit_middleware():
             # Skip for certain paths
-            if request.path.startswith('/static') or request.path == '/health':
+            if request.path.startswith('/static') or request.path in ['/health', '/api/health', '/api/v2/health']:
                 return None
             
             ip = request.headers.get('X-Forwarded-For', request.remote_addr)

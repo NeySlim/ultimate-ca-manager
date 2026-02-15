@@ -497,7 +497,7 @@ def create_app(config_name=None):
     @app.before_request
     def redirect_to_fqdn():
         # Skip for health checks and static files
-        if request.path in ['/api/health', '/health', '/api/auth/verify', '/api/v2/auth/verify'] or request.path.startswith('/static/') or request.path.startswith('/assets/'):
+        if request.path in ['/api/v2/health', '/api/health', '/health', '/api/auth/verify', '/api/v2/auth/verify'] or request.path.startswith('/static/') or request.path.startswith('/assets/'):
             return None
         
         # Get configured FQDN - check both UCM_FQDN (Docker) and FQDN env vars
@@ -544,17 +544,6 @@ def create_app(config_name=None):
                 url = url.replace(f':{config.HTTPS_PORT}', f':{config.HTTPS_PORT}')
                 return redirect(url, code=301)
     
-    # Health check endpoint
-    _started_at = time.time()
-    
-    @app.route('/api/health')
-    def health():
-        result = {"status": "ok", "version": config.APP_VERSION, "started_at": _started_at}
-        if app.config.get('SAFE_MODE'):
-            result['safe_mode'] = True
-            result['safe_mode_reason'] = 'encryption_key_missing'
-        return result
-    
     # Safe mode middleware — block most API calls when key is missing
     @app.before_request
     def check_safe_mode():
@@ -563,7 +552,7 @@ def create_app(config_name=None):
         
         # Allow health, auth, static, and frontend routes
         allowed_prefixes = (
-            '/api/health', '/health',
+            '/api/v2/health', '/api/health', '/health',
             '/api/v2/auth/', '/api/auth/',
             '/api/v2/system/security/encryption-status',
             '/static/', '/assets/', '/favicon',

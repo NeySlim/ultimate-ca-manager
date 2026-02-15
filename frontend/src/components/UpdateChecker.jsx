@@ -19,7 +19,7 @@ export function UpdateChecker() {
   const [error, setError] = useState(null)
   const [includePrereleases, setIncludePrereleases] = useState(false)
   const { showSuccess, showError, showConfirm } = useNotification()
-  const { reconnecting, status, attempt, waitForRestart, cancel } = useServiceReconnect()
+  const { reconnecting, status, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
   const checkForUpdates = async (showNotification = false) => {
     setChecking(true)
@@ -61,9 +61,8 @@ export function UpdateChecker() {
       })
       showSuccess(`Update to v${updateInfo.latest_version} initiated...`)
       
-      // Show reconnect overlay and poll until service is back
+      // Show reconnect overlay — countdown then poll until service is back
       waitForRestart({
-        delay: 5000,
         expectedVersion: updateInfo.latest_version
       })
     } catch (err) {
@@ -90,7 +89,7 @@ export function UpdateChecker() {
   return (
     <>
       {reconnecting && (
-        <ServiceReconnectOverlay status={status} attempt={attempt} onCancel={cancel} />
+        <ServiceReconnectOverlay status={status} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
       <Card className="p-4">
       <div className="flex items-start justify-between gap-4">

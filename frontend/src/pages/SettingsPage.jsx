@@ -62,7 +62,7 @@ function ServiceStatusWidget() {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
-  const { reconnecting, status: reconnectStatus, attempt, waitForRestart, cancel } = useServiceReconnect()
+  const { reconnecting, status: reconnectStatus, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
   const fetchStatus = async () => {
     try {
@@ -102,7 +102,7 @@ function ServiceStatusWidget() {
     setRestarting(true)
     try {
       await systemService.restartService()
-      waitForRestart({ delay: 3000 })
+      waitForRestart()
     } catch {
       showError(t('settings.restartFailed'))
       setRestarting(false)
@@ -112,7 +112,7 @@ function ServiceStatusWidget() {
   return (
     <>
       {reconnecting && (
-        <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} onCancel={cancel} />
+        <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
       )}
       <DetailSection title={t('settings.serviceStatus')} icon={Power} iconClass="icon-bg-orange" className="mt-4">
       {loading ? (

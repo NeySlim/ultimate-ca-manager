@@ -2033,5 +2033,17 @@
     "exportItems": "Export {{count}} items",
     "exportCSV": "Export as CSV",
     "exportJSON": "Export as JSON"
+  },
+  "reconnect": {
+    "countdown": "Service is restarting...",
+    "countdownSub": "Reconnection will start in {{seconds}}s",
+    "connecting": "Reconnecting...",
+    "connectingSub": "Waiting for service to come back online",
+    "redirecting": "Service is back!",
+    "redirectingSub": "Redirecting to login page...",
+    "timeout": "Connection timeout",
+    "timeoutSub": "Service may need more time. Try refreshing manually.",
+    "attempt": "Attempt {{count}}",
+    "refresh": "Refresh Page"
   }
 }
