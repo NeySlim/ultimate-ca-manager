@@ -14,7 +14,7 @@ import {
   SlidersHorizontal, Eye, EyeSlash, X, DotsSixVertical,
   PencilSimpleLine, ArrowCounterClockwise, Timer, Check
 } from '@phosphor-icons/react'
-import { Responsive, verticalCompactor } from 'react-grid-layout'
+import { Responsive } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import { Card, Button, Badge, LoadingSpinner, Modal, Logo } from '../components'
@@ -99,6 +99,18 @@ const saveWidgetPrefs = (widgets) => {
 
 // Load grid layout from localStorage
 const LAYOUT_STORAGE_KEY = 'ucm-dashboard-layouts-v2'
+// Strip per-item isDraggable/isResizable to prevent layout items from overriding global props
+const cleanLayoutFlags = (layouts) => {
+  const clean = {}
+  for (const bp of Object.keys(layouts)) {
+    if (Array.isArray(layouts[bp])) {
+      clean[bp] = layouts[bp].map(({ isDraggable, isResizable, moved, ...rest }) => rest)
+    } else {
+      clean[bp] = layouts[bp]
+    }
+  }
+  return clean
+}
 const loadGridLayouts = () => {
   try {
     const saved = localStorage.getItem(LAYOUT_STORAGE_KEY)
@@ -108,14 +120,14 @@ const loadGridLayouts = () => {
       const defaultIds = new Set(DEFAULT_LAYOUTS.lg.map(l => l.i))
       const savedIds = new Set((parsed.lg || []).map(l => l.i))
       const allPresent = [...defaultIds].every(id => savedIds.has(id))
-      if (allPresent) return parsed
+      if (allPresent) return cleanLayoutFlags(parsed)
     }
   } catch {}
   return DEFAULT_LAYOUTS
 }
 
 const saveGridLayouts = (layouts) => {
-  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts))
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(cleanLayoutFlags(layouts)))
 }
 
 // Action icons mapping
@@ -175,6 +187,17 @@ export default function DashboardPage() {
   const gridObserverRef = useRef(null)
   
   const isDesktopGrid = currentBreakpoint === 'lg'
+
+  // Keep breakpoint in sync with window size (needed when RGL is not rendered)
+  useEffect(() => {
+    const onResize = () => {
+      const w = window.innerWidth
+      const bp = w >= 1024 ? 'lg' : w >= 640 ? 'md' : 'sm'
+      setCurrentBreakpoint(prev => prev !== bp ? bp : prev)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   
   const gridContainerRef = useCallback((el) => {
     // Clean up previous observer
@@ -346,7 +369,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingSpinner message="Loading dashboard..." />
+        <LoadingSpinner message={t('dashboard.loading')} />
       </div>
     )
   }
@@ -448,10 +471,9 @@ export default function DashboardPage() {
           margin={[GRID_MARGIN, GRID_MARGIN]}
           containerPadding={[0, 0]}
           onBreakpointChange={(bp) => setCurrentBreakpoint(bp)}
-          isDraggable={editMode}
-          isResizable={editMode}
-          draggableHandle={editMode ? '.widget-drag-handle' : undefined}
-          compactor={verticalCompactor}
+          dragConfig={{ enabled: editMode, handle: editMode ? '.widget-drag-handle' : undefined }}
+          resizeConfig={{ enabled: editMode }}
+          compactType="vertical"
           onLayoutChange={handleLayoutChange}
         >
           {/* Stats Widget */}
@@ -942,11 +964,24 @@ export default function DashboardPage() {
             </div>
             )}
 
+            {isVisible('chartTrend') && (
+            <Card variant="elevated" className="p-0">
+              <Card.Header icon={Lightning} iconColor="amber" title={t('dashboard.certificateActivity')} subtitle={t('dashboard.last7Days')} compact />
+              <Card.Body className="!pt-0 !pb-0 !px-2">
+                <div style={{ height: 200 }}>
+                  <CertificateTrendChart data={certificateTrend} />
+                </div>
+              </Card.Body>
+            </Card>
+            )}
+
             {isVisible('chartPie') && (
             <Card variant="elevated" className="p-0">
               <Card.Header icon={Certificate} iconColor="violet" title={t('dashboard.statusDistribution')} compact />
-              <Card.Body className="!pt-0 !pb-0 !px-2" style={{ height: 180 }}>
-                <StatusPieChart data={{ valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: 0, revoked: stats?.revoked || 0 }} />
+              <Card.Body className="!pt-0 !pb-0 !px-2">
+                <div style={{ height: 200 }}>
+                  <StatusPieChart data={{ valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: 0, revoked: stats?.revoked || 0 }} />
+                </div>
               </Card.Body>
             </Card>
             )}

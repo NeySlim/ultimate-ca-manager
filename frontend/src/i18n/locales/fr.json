@@ -741,7 +741,8 @@
     "certificatesShort": "Certificats",
     "templatesShort": "Modèles",
     "usersShort": "Utilisateurs",
-    "cert": "Cert"
+    "cert": "Cert",
+    "clear": "Effacer"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -856,7 +857,7 @@
     "certificateActivity": "Activité des certificats",
     "recentCertificates": "Certificats récents",
     "recentCAs": "AC récentes",
-    "statusDistribution": "Distribution des statuts",
+    "statusDistribution": "Répartition des statuts",
     "recentActivity": "Activité récente",
     "clickToRenew": "Cliquez pour voir et renouveler",
     "customizeDashboard": "Personnaliser le tableau de bord",
@@ -910,7 +911,8 @@
     "chainRepairRunning": "En cours...",
     "widgetTrustStoreExpiry": "Expiration Trust Store",
     "trustStoreExpiry": "Expiration Trust Store",
-    "noTrustStoreExpiring": "Tous les certificats de confiance sont valides"
+    "noTrustStoreExpiring": "Tous les certificats de confiance sont valides",
+    "loading": "Chargement du tableau de bord..."
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -957,7 +959,8 @@
     "chainIncompleteHint": "La CA émettrice n'est pas dans le Trust Store ni dans les CAs gérées. Importez le certificat de l'émetteur dans le Trust Store pour compléter la chaîne.",
     "addIssuerToTrustStore": "Ajouter l'émetteur au Trust Store",
     "addedToTrustStore": "CA ajoutée au Trust Store avec succès",
-    "addToTrustStoreFailed": "Échec de l'ajout de la CA au Trust Store"
+    "addToTrustStoreFailed": "Échec de l'ajout de la CA au Trust Store",
+    "daysShort": "{{count}}j"
   },
   "groups": {
     "group": "Groupe",
@@ -2005,6 +2008,30 @@
     "closeAll": "Fermer tout",
     "sameWindow": "Même fenêtre",
     "closeOnNav": "Fermer en naviguant",
-    "noWindows": "Aucune fenêtre ouverte"
+    "noWindows": "Aucune fenêtre ouverte",
+    "expand": "Agrandir",
+    "minimize": "Réduire",
+    "restore": "Restaurer",
+    "maximize": "Maximiser"
+  },
+  "table": {
+    "noResults": "Aucun résultat",
+    "adjustFilters": "Essayez de modifier vos filtres ou termes de recherche",
+    "clearFilters": "Effacer tous les filtres",
+    "selected": "sélectionné(s)",
+    "fromDate": "Date de début",
+    "toDate": "Date de fin",
+    "customizeColumns": "Personnaliser les colonnes",
+    "showColumns": "Afficher les colonnes",
+    "showAllColumns": "Afficher toutes les colonnes",
+    "filterPresets": "Filtres prédéfinis",
+    "saveFilters": "Enregistrer les filtres actuels",
+    "presetName": "Nom du filtre...",
+    "noPresets": "Aucun filtre enregistré.",
+    "applyAndSave": "Appliquez des filtres et enregistrez-les ici.",
+    "exportData": "Exporter les données",
+    "exportItems": "Exporter {{count}} éléments",
+    "exportCSV": "Exporter en CSV",
+    "exportJSON": "Exporter en JSON"
   }
 }
