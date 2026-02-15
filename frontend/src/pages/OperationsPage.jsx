@@ -643,7 +643,7 @@ export default function OperationsPage() {
             <Input label={t('importExport.opnsense.hostLabel')} value={opnsenseHost} onChange={(e) => setOpnsenseHost(e.target.value)} placeholder={t('importExport.opnsense.hostPlaceholder')} />
             <Input label={t('common.portLabel')} value={opnsensePort} onChange={(e) => setOpnsensePort(e.target.value)} placeholder={t('common.portPlaceholder')} />
             <Input label={t('importExport.opnsense.apiKeyLabel')} value={opnsenseApiKey} onChange={(e) => setOpnsenseApiKey(e.target.value)} placeholder={t('importExport.opnsense.apiKeyLabel')} />
-            <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
+            <Input label={t('importExport.opnsense.apiSecretLabel')} type="password" noAutofill value={opnsenseApiSecret} onChange={(e) => setOpnsenseApiSecret(e.target.value)} placeholder={t('importExport.opnsense.apiSecretLabel')} />
           </div>
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={!opnsenseVerifySsl} onChange={(e) => setOpnsenseVerifySsl(!e.target.checked)} className="w-4 h-4 rounded border-border text-accent-primary" />

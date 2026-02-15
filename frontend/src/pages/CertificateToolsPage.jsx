@@ -474,6 +474,7 @@ export default function CertificateToolsPage() {
       <Input
         label={t('tools.keyPassword')}
         type="password"
+        noAutofill
         placeholder={t('tools.keyPasswordPlaceholder')}
         value={matchPassword}
         onChange={(e) => setMatchPassword(e.target.value)}
@@ -562,6 +563,7 @@ export default function CertificateToolsPage() {
         <Input
           label={t('tools.inputPassword')}
           type="password"
+          noAutofill
           placeholder={t('tools.forEncryptedFiles')}
           value={convertPassword}
           onChange={(e) => setConvertPassword(e.target.value)}
@@ -570,6 +572,7 @@ export default function CertificateToolsPage() {
           <Input
             label={t('tools.outputPkcs12Password')}
             type="password"
+            noAutofill
             placeholder={t('tools.passwordForP12')}
             value={pkcs12Password}
             onChange={(e) => setPkcs12Password(e.target.value)}

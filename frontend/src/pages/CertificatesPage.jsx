@@ -824,6 +824,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           <Input
             label={t('common.password')}
             type="password"
+            noAutofill
             value={keyPassphrase}
             onChange={(e) => setKeyPassphrase(e.target.value)}
             placeholder={t('common.optional')}
