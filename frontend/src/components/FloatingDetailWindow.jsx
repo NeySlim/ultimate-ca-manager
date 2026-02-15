@@ -4,9 +4,9 @@
  * Wraps FloatingWindow + entity-specific content (CertificateDetails, CA details, etc.)
  * Fetches full entity data on mount, shows loading state.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Certificate, ShieldCheck, Fingerprint, Download, Trash, X, ArrowsClockwise, CaretDown } from '@phosphor-icons/react'
+import { Certificate, ShieldCheck, Fingerprint, Trash, X, ArrowsClockwise } from '@phosphor-icons/react'
 import { FloatingWindow } from './ui/FloatingWindow'
 import { CertificateDetails } from './CertificateDetails'
 import { CADetails } from './CADetails'
@@ -16,6 +16,7 @@ import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useNotification } from '../contexts'
 import { extractData } from '../lib/utils'
 import { LoadingSpinner } from './LoadingSpinner'
+import { ExportActions } from './ExportActions'
 import { cn } from '../lib/utils'
 
 const ENTITY_CONFIG = {
@@ -48,7 +49,7 @@ const ENTITY_CONFIG = {
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
   const { closeWindow, focusWindow, sameWindow } = useWindowManager()
-  const { showSuccess, showError, showPrompt } = useNotification()
+  const { showSuccess, showError } = useNotification()
   const [data, setData] = useState(windowInfo.data?.fullData || null)
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
   const [minimized, setMinimized] = useState(false)
@@ -78,35 +79,18 @@ export function FloatingDetailWindow({ windowInfo }) {
   }, [windowInfo.entityId, windowInfo.type])
 
   // Header action handlers
-  const handleExport = async (format = 'pem') => {
+  const handleExport = async (format = 'pem', options = {}) => {
     try {
       const service = config.service()
       const id = windowInfo.entityId
       const name = data?.cn || data?.common_name || data?.name || windowInfo.type
-      let options = {}
-      
-      // PKCS12/PFX need password
-      if (format === 'pkcs12' || format === 'pfx') {
-        const password = await showPrompt(t('certificates.enterP12Password', 'Enter password for PKCS#12 file:'), {
-          title: t('certificates.exportPKCS12', 'Export PKCS#12'),
-          type: 'password',
-          placeholder: t('common.password', 'Password'),
-          confirmText: t('common.export', 'Export')
-        })
-        if (!password) return
-        if (password.length < 4) {
-          showError(t('certificates.passwordTooShort', 'Password must be at least 4 characters'))
-          return
-        }
-        options.password = password
-      }
       
       const res = await service.export(id, format, options)
       const blob = res instanceof Blob ? res : new Blob([res.data || res], { type: 'application/octet-stream' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const ext = { pkcs12: 'p12', pfx: 'pfx', pkcs7: 'p7b' }[format] || format
+      const ext = { pkcs12: 'p12', pkcs7: 'p7b' }[format] || format
       a.download = `${name}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
@@ -152,29 +136,12 @@ export function FloatingDetailWindow({ windowInfo }) {
   const title = data ? config.getTitle(data) : t('common.loading')
   const subtitle = data ? (windowInfo.type === 'ca' ? t(config.getSubtitle(data)) : config.getSubtitle(data)) : ''
 
-  // Export formats per entity type
-  const exportFormats = windowInfo.type === 'certificate'
-    ? [
-        { label: 'PEM', format: 'pem' },
-        { label: 'DER', format: 'der' },
-        { label: 'P7B', format: 'pkcs7' },
-        ...(data?.has_private_key ? [
-          { label: 'P12', format: 'pkcs12' },
-          { label: 'PFX', format: 'pfx' },
-        ] : []),
-      ]
-    : windowInfo.type === 'ca'
-    ? [
-        { label: 'PEM', format: 'pem' },
-        { label: 'DER', format: 'der' },
-      ]
-    : [{ label: 'PEM', format: 'pem' }]
-
   // Build action bar props
   const isCert = windowInfo.type === 'certificate'
+  const hasPrivateKey = isCert ? !!data?.has_private_key : !!data?.has_private_key
   const actionBarProps = data ? {
-    exportFormats,
     onExport: handleExport,
+    hasPrivateKey,
     onRenew: isCert && !data.revoked && data.has_private_key ? handleRenew : null,
     onRevoke: isCert && !data.revoked ? handleRevoke : null,
     onDelete: handleDelete,
@@ -261,48 +228,17 @@ function DetailContent({ type, data }) {
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ exportFormats, onExport, onRenew, onRevoke, onDelete, t }) {
-  const [showExport, setShowExport] = useState(false)
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    if (!showExport) return
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setShowExport(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [showExport])
-
+function ActionBar({ onExport, hasPrivateKey, onRenew, onRevoke, onDelete, t }) {
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
   return (
     <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-border/40 bg-bg-tertiary/30">
-      {/* Export dropdown */}
-      <div className="relative" ref={menuRef}>
-        <button
-          onClick={() => setShowExport(!showExport)}
-          className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary/10', showExport && 'text-accent-primary bg-accent-primary/10')}
-        >
-          <Download size={14} weight="duotone" />
-          {t('common.export')}
-          <CaretDown size={10} className={cn('transition-transform', showExport && 'rotate-180')} />
-        </button>
-        {showExport && (
-          <div className="absolute left-0 top-full mt-1 z-50 min-w-[120px] py-1 rounded-lg border border-border bg-bg-primary shadow-xl shadow-black/15">
-            {exportFormats.map(({ label, format }) => (
-              <button
-                key={format}
-                onClick={() => { onExport(format); setShowExport(false) }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-text-primary hover:bg-accent-primary/5 hover:text-accent-primary transition-colors"
-              >
-                <Download size={12} />
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Export actions with inline password */}
+      <ExportActions 
+        onExport={onExport} 
+        hasPrivateKey={hasPrivateKey}
+        className="!p-0 !bg-transparent !rounded-none"
+      />
 
       {/* Renew */}
       {onRenew && (

@@ -13,7 +13,7 @@ import {
 import {
   Badge, Button, Modal, Input, Select, LoadingSpinner,
   CompactSection, CompactGrid, CompactField, CompactStats,
-  FilterSelect, CATypeIcon
+  FilterSelect, CATypeIcon, ExportActions
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
@@ -43,12 +43,6 @@ export default function CAsPage() {
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
   const [showImportModal, setShowImportModal] = useState(false)
   const [createFormType, setCreateFormType] = useState('root')
-  
-  // P12/PFX export modal
-  const [showP12Modal, setShowP12Modal] = useState(false)
-  const [p12Password, setP12Password] = useState('')
-  const [p12CA, setP12CA] = useState(null)
-  const [p12Format, setP12Format] = useState('pkcs12')
   
   // Filter state
   const [filterType, setFilterType] = useState('')
@@ -194,50 +188,17 @@ export default function CAsPage() {
     }
   }
 
-  const handleExport = async (ca, format = 'pem') => {
-    // PKCS12/PFX need password - show password modal
-    if (format === 'pkcs12' || format === 'pfx') {
-      setP12CA(ca)
-      setP12Format(format)
-      setShowP12Modal(true)
-      return
-    }
-    
+  const handleExport = async (ca, format = 'pem', options = {}) => {
     try {
-      const blob = await casService.export(ca.id, format, {})
+      const blob = await casService.export(ca.id, format, options)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', pfx: 'pfx' }[format] || format
+      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12' }[format] || format
       a.download = `${ca.name || ca.common_name || 'ca'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess(SUCCESS.EXPORT.CA)
-    } catch (error) {
-      showError(error.message || t('cas.exportFailed'))
-    }
-  }
-  
-  // Export P12/PFX with password
-  const handleExportP12 = async () => {
-    if (!p12Password || p12Password.length < 4) {
-      showError(t('cas.passwordTooShort'))
-      return
-    }
-    try {
-      const blob = await casService.export(p12CA.id, p12Format, { password: p12Password })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const ext = p12Format === 'pfx' ? 'pfx' : 'p12'
-      a.download = `${p12CA.name || p12CA.common_name || 'ca'}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
-      showSuccess(t('cas.exportedAs', { format: p12Format.toUpperCase() }))
-      setShowP12Modal(false)
-      setP12Password('')
-      setP12CA(null)
-      setP12Format('pkcs12')
     } catch (error) {
       showError(error.message || t('cas.exportFailed'))
     }
@@ -408,7 +369,7 @@ export default function CAsPage() {
             ca={selectedCA}
             canWrite={canWrite}
             canDelete={canDelete}
-            onExport={(format) => handleExport(selectedCA, format)}
+            onExport={(format, options) => handleExport(selectedCA, format, options)}
             onDelete={() => handleDelete(selectedCA.id)}
             t={t}
           />
@@ -674,35 +635,6 @@ export default function CAsPage() {
         }}
       />
       
-      {/* P12/PFX Export Password Modal */}
-      <Modal
-        open={showP12Modal}
-        onOpenChange={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}
-        title={t('cas.exportAs', { format: p12Format.toUpperCase() })}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('cas.p12PasswordDescription')}
-          </p>
-          <Input
-            label={t('cas.exportPassword')}
-            type="password"
-            placeholder={t('cas.enterPasswordPlaceholder')}
-            value={p12Password}
-            onChange={(e) => setP12Password(e.target.value)}
-            autoFocus
-            showStrength
-          />
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
-              <Download size={14} /> {t('common.export')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </>
   )
 }
@@ -1188,22 +1120,11 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
       ]} />
 
       {/* Export Actions */}
-      <div className="flex flex-wrap gap-1.5 sm:gap-2">
-        <Button size="xs" variant="secondary" onClick={() => onExport('pem')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PEM
-        </Button>
-        <Button size="xs" variant="secondary" onClick={() => onExport('der')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> DER
-        </Button>
-        <Button size="xs" variant="secondary" onClick={() => onExport('pkcs7')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P7B
-        </Button>
-        <Button size="xs" variant="secondary" onClick={() => onExport('pkcs12')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P12
-        </Button>
-        <Button size="xs" variant="secondary" onClick={() => onExport('pfx')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PFX
-        </Button>
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <ExportActions 
+          onExport={(format, options) => onExport(format, options)} 
+          hasPrivateKey={!!ca.has_private_key} 
+        />
         {canDelete('cas') && (
           <Button size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
             <Trash size={12} className="sm:w-3.5 sm:h-3.5" />

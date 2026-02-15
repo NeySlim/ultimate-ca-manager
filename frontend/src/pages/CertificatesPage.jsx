@@ -68,7 +68,7 @@ export default function CertificatesPage() {
     else setFilterCA('')
   }, [])
   
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
 
   // Load data - reload when filters or sort change
@@ -168,19 +168,11 @@ export default function CertificatesPage() {
   }, [urlCertId, loading, certificates.length])
 
   // Export certificate
-  const handleExport = async (format) => {
+  const handleExport = async (format, options = {}) => {
     if (!selectedCert) return
     
-    // PKCS12/PFX need password - show password modal
-    if ((format === 'pkcs12' || format === 'pfx') && selectedCert.has_private_key) {
-      setP12Cert(selectedCert)
-      setP12Format(format)
-      setShowP12Modal(true)
-      return
-    }
-    
     try {
-      const blob = await certificatesService.export(selectedCert.id, format)
+      const blob = await certificatesService.export(selectedCert.id, format, options)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -524,62 +516,31 @@ export default function CertificatesPage() {
     ] : [])
   ], [canWrite, canDelete, t])
 
-  // State for P12 password modal
-  const [showP12Modal, setShowP12Modal] = useState(false)
-  const [p12Password, setP12Password] = useState('')
-  const [p12Cert, setP12Cert] = useState(null)
-  const [p12Format, setP12Format] = useState('pkcs12')
-
-  // Export from row
-  const handleExportRow = async (cert, format) => {
-    // For P12, we need a password - show modal
-    if (format === 'p12' || format === 'pkcs12') {
-      if (!cert.has_private_key) {
-        showError(t('common.operationFailed'))
-        return
-      }
-      setP12Cert(cert)
-      setP12Password('')
-      setShowP12Modal(true)
-      return
+  // Export from row (uses showPrompt for P12 password since it's from a menu)
+  const handleExportRow = async (cert, format, options = {}) => {
+    if ((format === 'p12' || format === 'pkcs12') && cert.has_private_key) {
+      const password = await showPrompt(t('certificates.enterP12Password', 'Enter password for PKCS#12 file:'), {
+        title: t('certificates.exportPKCS12', 'Export PKCS#12'),
+        type: 'password',
+        placeholder: t('common.password', 'Password'),
+        confirmText: t('common.export', 'Export')
+      })
+      if (!password || password.length < 4) return
+      options = { ...options, password }
     }
     
     try {
-      const blob = await certificatesService.export(cert.id, format)
+      const blob = await certificatesService.export(cert.id, format, options)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${cert.common_name || cert.cn || 'certificate'}.${format}`
+      const ext = { pkcs12: 'p12', pkcs7: 'p7b' }[format] || format
+      a.download = `${cert.common_name || cert.cn || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess(SUCCESS.EXPORT.CERTIFICATE)
     } catch {
       showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
-    }
-  }
-
-  // Export P12/PFX with password
-  const handleExportP12 = async () => {
-    if (!p12Password || p12Password.length < 4) {
-      showError(t('validation.minLength', { count: 4 }))
-      return
-    }
-    try {
-      const blob = await certificatesService.export(p12Cert.id, p12Format, { password: p12Password })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const ext = p12Format === 'pfx' ? 'pfx' : 'p12'
-      a.download = `${p12Cert.common_name || p12Cert.cn || 'certificate'}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
-      showSuccess(t('common.operationSuccess'))
-      setShowP12Modal(false)
-      setP12Password('')
-      setP12Cert(null)
-      setP12Format('pkcs12')
-    } catch (error) {
-      showError(error.message || t('common.operationFailed'))
     }
   }
 
@@ -878,46 +839,6 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
         </div>
       </Modal>
 
-      {/* PKCS#12 Export Modal */}
-      <Modal
-        open={showP12Modal}
-        onClose={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}
-        title={t('certificates.exportPKCS12')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t('certificates.pkcs12Password')}
-          </p>
-          <Input
-            label={t('common.password')}
-            type="password"
-            value={p12Password}
-            onChange={(e) => setP12Password(e.target.value)}
-            placeholder={t('validation.minLength', { count: 4 })}
-            autoFocus
-            showStrength
-          />
-          <Input
-            label={t('common.confirmPassword')}
-            type="password"
-            placeholder={t('common.confirmPassword')}
-            onBlur={(e) => {
-              if (e.target.value && e.target.value !== p12Password) {
-                showError(t('common.passwordMismatch'))
-              }
-            }}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
-              <Download size={16} /> {t('certificates.exportPKCS12')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-      
       {/* Certificate Compare Modal */}
       <CertificateCompareModal
         open={showCompareModal}

@@ -42,6 +42,7 @@ import {
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
+import { ExportActions } from './ExportActions'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
@@ -212,27 +213,10 @@ export function CertificateDetails({
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {/* Export buttons grouped */}
           {onExport && (
-            <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-bg-tertiary/50">
-              <Button size="xs" variant="ghost" onClick={() => onExport('pem')} className="!px-2 hover:bg-bg-secondary">
-                <Download size={12} /> PEM
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => onExport('der')} className="!px-2 hover:bg-bg-secondary">
-                <Download size={12} /> DER
-              </Button>
-              <Button size="xs" variant="ghost" onClick={() => onExport('pkcs7')} className="!px-2 hover:bg-bg-secondary">
-                <Download size={12} /> P7B
-              </Button>
-              {cert.has_private_key && (
-                <>
-                  <Button size="xs" variant="ghost" onClick={() => onExport('pkcs12')} className="!px-2 hover:bg-bg-secondary">
-                    <Download size={12} /> P12
-                  </Button>
-                  <Button size="xs" variant="ghost" onClick={() => onExport('pfx')} className="!px-2 hover:bg-bg-secondary">
-                    <Download size={12} /> PFX
-                  </Button>
-                </>
-              )}
-            </div>
+            <ExportActions 
+              onExport={(format, options) => onExport(format, options)} 
+              hasPrivateKey={cert.has_private_key} 
+            />
           )}
           {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
