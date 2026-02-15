@@ -38,7 +38,7 @@ def get_profile():
             'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
             'last_login': user.last_login.isoformat() if hasattr(user, 'last_login') and user.last_login else None,
             'login_count': getattr(user, 'login_count', 0),
-            'two_factor_enabled': getattr(user, 'two_factor_enabled', False),
+            'two_factor_enabled': getattr(user, 'totp_confirmed', False),
             'password_changed_at': user.password_changed_at.isoformat() if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
         }
     )
@@ -462,7 +462,7 @@ def confirm_2fa():
     backup_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
     
     # Enable 2FA
-    user.two_factor_enabled = True
+    user.totp_confirmed = True
     user.backup_codes = ','.join(backup_codes)
     db.session.commit()
     
@@ -517,7 +517,7 @@ def disable_2fa():
             return error_response('Invalid backup code', 400)
     
     # Disable 2FA
-    user.two_factor_enabled = False
+    user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
     db.session.commit()
@@ -541,7 +541,7 @@ def get_recovery_codes():
     from models import User
     
     user = User.query.get(g.current_user.id)
-    if not user or not user.two_factor_enabled:
+    if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
     
     stored_codes = (user.backup_codes or '').split(',')
@@ -570,7 +570,7 @@ def regenerate_recovery_codes():
         return error_response('2FA code required', 400)
     
     user = User.query.get(g.current_user.id)
-    if not user or not user.two_factor_enabled:
+    if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
     
     # Verify code

@@ -637,17 +637,17 @@ def get_audit_logs():
     if start_date:
         try:
             start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-            query = query.filter(AuditLog.created_at >= start)
+            query = query.filter(AuditLog.timestamp >= start)
         except ValueError:
             pass
     if end_date:
         try:
             end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-            query = query.filter(AuditLog.created_at <= end)
+            query = query.filter(AuditLog.timestamp <= end)
         except ValueError:
             pass
     
-    query = query.order_by(AuditLog.created_at.desc())
+    query = query.order_by(AuditLog.timestamp.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
     return success_response(
