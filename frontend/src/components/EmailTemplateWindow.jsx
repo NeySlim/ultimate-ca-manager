@@ -147,7 +147,7 @@ export default function EmailTemplateWindow({ onClose }) {
     <FloatingWindow
       storageKey="email-template-editor"
       defaultPos={{ x: 60, y: 30, w: 1300, h: 720 }}
-      constraints={{ minW: 800, minH: 400 }}
+      constraints={{ minW: 800, maxW: 1800, minH: 400 }}
       onClose={onClose}
       title={t('settings.emailTemplate')}
       subtitle={isCustom ? t('settings.templateCustom') : t('settings.templateDefault')}
