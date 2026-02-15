@@ -258,7 +258,6 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         return { name: file.name, type: 'text', data: text, size: file.size, ext }
       }
     } catch (err) {
-      console.error(`Failed to read ${file.name}:`, err)
       return null
     }
   }

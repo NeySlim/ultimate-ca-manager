@@ -653,7 +653,6 @@ export default function UsersGroupsPage() {
         const res = await groupsService.getById(item.id)
         setSelectedGroup(res.data) // Update with members
       } catch (error) {
-        console.error('Failed to load group details:', error)
       }
     }
   }

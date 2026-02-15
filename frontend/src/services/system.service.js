@@ -4,18 +4,6 @@
 import { apiClient } from './apiClient'
 
 export const systemService = {
-  async getHealth() {
-    return apiClient.get('/system/health')
-  },
-
-  async getVersion() {
-    return apiClient.get('/system/version')
-  },
-
-  async getInfo() {
-    return apiClient.get('/system/info')
-  },
-
   // Backup Management
   async listBackups() {
     return apiClient.get('/system/backups')

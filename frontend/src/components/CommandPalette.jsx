@@ -93,7 +93,6 @@ export function CommandPalette({ open, onOpenChange }) {
       const results = await searchService.globalSearch(query, 5)
       setSearchResults(results)
     } catch (error) {
-      console.error('Search failed:', error)
       setSearchResults(null)
     } finally {
       setIsSearching(false)

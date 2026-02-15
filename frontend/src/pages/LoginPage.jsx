@@ -112,7 +112,6 @@ export default function LoginPage() {
           navigate('/dashboard')
         })
         .catch((err) => {
-          console.error('SSO session verification failed:', err)
           showError(t('auth.ssoError'))
           setLoading(false)
           setStatusMessage('')
@@ -198,7 +197,6 @@ export default function LoginPage() {
       setStatusMessage('')
       
     } catch (error) {
-      console.error('Auth detection failed:', error)
       // On error, go directly to password
       setStep('auth')
       setAuthMethod('password')
