@@ -157,7 +157,11 @@ export function useFloatingWindow({
         if (edge.includes('w')) { next.x = sp.x + dx; next.w = sp.w - dx }
         if (edge.includes('s')) next.h = sp.h + dy
         if (edge.includes('n')) { next.y = sp.y + dy; next.h = sp.h - dy }
-        posRef.current = clamp(next)
+        const clamped = clamp(next)
+        // Keep right/bottom edge fixed when resizing from left/top
+        if (edge.includes('w')) clamped.x = next.x + next.w - clamped.w
+        if (edge.includes('n')) clamped.y = next.y + next.h - clamped.h
+        posRef.current = clamped
         applyPos()
       })
     }
