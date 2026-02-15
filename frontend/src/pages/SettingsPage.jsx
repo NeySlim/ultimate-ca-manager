@@ -1294,7 +1294,7 @@ export default function SettingsPage() {
       setEmailTestResult({ success: true, message: t('settings.testEmailSuccess') })
       showSuccess(SUCCESS.EMAIL.TEST_SENT)
     } catch (error) {
-      const msg = error?.response?.data?.error || error?.response?.data?.message || error.message || ERRORS.EMAIL.TEST_FAILED
+      const msg = error?.data?.message || error?.data?.error || error.message || ERRORS.EMAIL.TEST_FAILED
       setEmailTestResult({ success: false, message: msg })
     } finally {
       setEmailTesting(false)
