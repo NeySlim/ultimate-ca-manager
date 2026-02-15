@@ -1474,6 +1474,8 @@
       "webhooks": "Webhooks",
       "about": "概要"
     },
+    "testRecipient": "テスト送信先",
+    "testRecipientRequired": "テスト用の送信先メールアドレスを入力してください",
     "testEmail": "テストメール",
     "expiryAlerts": "Expiry Alerts",
     "enableExpiryAlerts": "Enable certificate expiry email alerts",

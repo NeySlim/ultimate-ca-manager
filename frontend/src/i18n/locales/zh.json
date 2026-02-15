@@ -1474,6 +1474,8 @@
       "webhooks": "Webhooks",
       "about": "关于"
     },
+    "testRecipient": "测试收件人",
+    "testRecipientRequired": "请输入测试收件人电子邮件地址",
     "testEmail": "测试邮件",
     "expiryAlerts": "Expiry Alerts",
     "enableExpiryAlerts": "Enable certificate expiry email alerts",

@@ -1474,6 +1474,8 @@
       "webhooks": "Webhooks",
       "about": "Про програму"
     },
+    "testRecipient": "Одержувач тесту",
+    "testRecipientRequired": "Введіть адресу електронної пошти одержувача для тесту",
     "testEmail": "Тестовий email",
     "expiryAlerts": "Expiry Alerts",
     "enableExpiryAlerts": "Enable certificate expiry email alerts",

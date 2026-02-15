@@ -29,6 +29,7 @@ import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+import TagsInput from '../components/ui/TagsInput'
 import { apiClient } from '../services/apiClient'
 
 // Settings categories with colors for visual distinction
@@ -1282,16 +1283,16 @@ export default function SettingsPage() {
   }
 
   const handleTestEmail = async () => {
-    const testEmail = settings.smtp_from_email || settings.admin_email
+    const testEmail = settings._testRecipient || settings.smtp_from_email
     if (!testEmail) {
-      setEmailTestResult({ success: false, message: t('common.emailRequired') })
+      setEmailTestResult({ success: false, message: t('settings.testRecipientRequired') })
       return
     }
     setEmailTesting(true)
     setEmailTestResult(null)
     try {
       await settingsService.testEmail(testEmail)
-      setEmailTestResult({ success: true, message: t('settings.testEmailSuccess') })
+      setEmailTestResult({ success: true, message: `${t('settings.testEmailSuccess')} → ${testEmail}` })
       showSuccess(SUCCESS.EMAIL.TEST_SENT)
     } catch (error) {
       const msg = error?.data?.message || error?.data?.error || error.message || ERRORS.EMAIL.TEST_FAILED
@@ -1633,13 +1634,17 @@ export default function SettingsPage() {
 
                 {/* Options */}
                 <div className="border-t border-border pt-4 space-y-3">
-                  <Input
-                    label={t('settings.fromEmail')}
-                    type="email"
-                    value={settings.smtp_from_email || ''}
-                    onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-                    placeholder={t('settings.fromEmailPlaceholder')}
-                  />
+                  <DetailGrid>
+                    <div className="col-span-full md:col-span-1">
+                      <Input
+                        label={t('settings.fromEmail')}
+                        type="email"
+                        value={settings.smtp_from_email || ''}
+                        onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
+                        placeholder={t('settings.fromEmailPlaceholder')}
+                      />
+                    </div>
+                  </DetailGrid>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                     <ToggleSwitch
                       checked={settings.smtp_use_tls || false}
@@ -1684,12 +1689,21 @@ export default function SettingsPage() {
 
                 {/* Actions */}
                 {canWrite('settings') && (
-                  <div className="flex gap-2 pt-1">
-                    <Button variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
+                  <div className="flex flex-wrap items-end gap-2 pt-1">
+                    <div className="w-full max-w-xs">
+                      <Input
+                        label={t('settings.testRecipient')}
+                        type="email"
+                        value={settings._testRecipient || ''}
+                        onChange={(e) => updateSetting('_testRecipient', e.target.value)}
+                        placeholder={settings.smtp_from_email || 'admin@example.com'}
+                      />
+                    </div>
+                    <Button variant="secondary" onClick={handleTestEmail} disabled={emailTesting} className="shrink-0">
                       {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
                       {t('settings.testEmail')}
                     </Button>
-                    <Button onClick={() => handleSave('email')} disabled={saving}>
+                    <Button onClick={() => handleSave('email')} disabled={saving} className="shrink-0">
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
@@ -1740,14 +1754,12 @@ export default function SettingsPage() {
                   </div>
                   <p className="text-xs text-text-tertiary mt-1">{t('settings.alertDaysHelp')}</p>
                 </div>
-                <Input
+                <TagsInput
                   label={t('settings.alertRecipients')}
-                  value={(expiryAlerts.recipients || []).join(', ')}
-                  onChange={(e) => setExpiryAlerts(prev => ({
-                    ...prev,
-                    recipients: e.target.value ? e.target.value.split(',').map(s => s.trim()).filter(Boolean) : []
-                  }))}
+                  value={expiryAlerts.recipients || []}
+                  onChange={(tags) => setExpiryAlerts(prev => ({ ...prev, recipients: tags }))}
                   placeholder={t('settings.alertRecipientsPlaceholder')}
+                  validate={(v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)}
                 />
                 <ToggleSwitch
                   checked={expiryAlerts.include_revoked}

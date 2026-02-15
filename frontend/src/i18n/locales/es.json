@@ -1474,6 +1474,8 @@
       "webhooks": "Webhooks",
       "about": "Acerca de"
     },
+    "testRecipient": "Destinatario de prueba",
+    "testRecipientRequired": "Ingrese una dirección de correo destinataria para la prueba",
     "testEmail": "Email de prueba",
     "expiryAlerts": "Expiry Alerts",
     "enableExpiryAlerts": "Enable certificate expiry email alerts",

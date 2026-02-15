@@ -1411,6 +1411,8 @@
     "smtpPassword": "Mot de passe SMTP",
     "fromEmail": "Email expéditeur",
     "fromName": "Nom expéditeur",
+    "testRecipient": "Destinataire du test",
+    "testRecipientRequired": "Saisissez une adresse email destinataire pour le test",
     "testEmail": "Email de test",
     "expiryAlerts": "Alertes d'expiration",
     "enableExpiryAlerts": "Activer les alertes email d'expiration des certificats",
