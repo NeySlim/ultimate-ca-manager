@@ -168,7 +168,7 @@ export function CADetails({
 
       {/* Embedded: compact status bar */}
       {embedded && (
-        <div className="flex items-center gap-2 flex-wrap px-1 pb-1">
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-bg-tertiary/30">
           <Badge variant={ca.is_root ? 'warning' : 'info'} size="sm">
             {ca.is_root ? t('common.rootCA') : t('common.intermediate')}
           </Badge>
