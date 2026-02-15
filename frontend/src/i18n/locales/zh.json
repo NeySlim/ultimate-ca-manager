@@ -1549,7 +1549,24 @@
       "wikiGuides": "Wiki和用户指南",
       "license": "许可证",
       "licenseDesc": "自由开源软件。"
-    }
+    },
+    "emailTemplate": "邮件模板",
+    "templateDescription": "自定义所有邮件通知使用的HTML模板。",
+    "editTemplate": "编辑模板",
+    "templateSaved": "邮件模板已保存",
+    "templateCustom": "自定义模板",
+    "templateDefault": "默认模板",
+    "templateResetDefault": "重置",
+    "templateResetConfirm": "将邮件模板重置为默认值？您的自定义模板将丢失。",
+    "templateResetSuccess": "邮件模板已重置",
+    "templateVisual": "可视化",
+    "templatePreview": "预览",
+    "templateVarLogo": "UCM标志",
+    "templateVarTitle": "邮件标题",
+    "templateVarTitleColor": "标题栏颜色",
+    "templateVarContent": "通知内容",
+    "templateVarDatetime": "发送日期/时间",
+    "templateVarInstanceUrl": "实例URL"
   },
   "account": {
     "profile": "个人资料",

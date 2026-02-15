@@ -1549,7 +1549,24 @@
       "wikiGuides": "Wiki und Benutzerhandbücher",
       "license": "Lizenz",
       "licenseDesc": "Freie und quelloffene Software."
-    }
+    },
+    "emailTemplate": "E-Mail-Vorlage",
+    "templateDescription": "Passen Sie die HTML-Vorlage für alle E-Mail-Benachrichtigungen an.",
+    "editTemplate": "Vorlage bearbeiten",
+    "templateSaved": "E-Mail-Vorlage gespeichert",
+    "templateCustom": "Benutzerdefinierte Vorlage",
+    "templateDefault": "Standardvorlage",
+    "templateResetDefault": "Zurücksetzen",
+    "templateResetConfirm": "E-Mail-Vorlage auf Standard zurücksetzen? Ihre benutzerdefinierte Vorlage geht verloren.",
+    "templateResetSuccess": "E-Mail-Vorlage zurückgesetzt",
+    "templateVisual": "Visuell",
+    "templatePreview": "Vorschau",
+    "templateVarLogo": "UCM-Logo",
+    "templateVarTitle": "E-Mail-Titel",
+    "templateVarTitleColor": "Titelleistenfarbe",
+    "templateVarContent": "Benachrichtigungsinhalt",
+    "templateVarDatetime": "Sendedatum/-zeit",
+    "templateVarInstanceUrl": "Instanz-URL"
   },
   "account": {
     "profile": "Profil",
