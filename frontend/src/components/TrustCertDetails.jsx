@@ -154,12 +154,12 @@ export function TrustCertDetails({
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          <div className="text-xs font-medium text-text-primary">{cert.key_type || 'N/A'}</div>
+          <div className="text-xs font-medium text-text-primary">{cert.key_type || t('common.na')}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
-          <div className="text-xs font-medium text-text-primary">{cert.signature_algorithm || 'N/A'}</div>
+          <div className="text-xs font-medium text-text-primary">{cert.signature_algorithm || t('common.na')}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
@@ -214,7 +214,7 @@ export function TrustCertDetails({
             return <Badge key={idx} variant={config.variant} size="sm">{config.label}</Badge>
           })}
           <span className="text-2xs text-text-tertiary">•</span>
-          <span className="text-2xs text-text-secondary">{cert.key_type || 'N/A'}</span>
+          <span className="text-2xs text-text-secondary">{cert.key_type || t('common.na')}</span>
         </div>
       )}
       

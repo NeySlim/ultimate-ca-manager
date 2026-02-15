@@ -173,7 +173,7 @@ export function CertificateDetails({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">
-              {cert.cn || cert.common_name || cert.descr || 'Certificate'}
+              {cert.cn || cert.common_name || cert.descr || t('common.certificate')}
             </h3>
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
