@@ -5,7 +5,8 @@
 import {
   SiCloudflare, SiDigitalocean, SiOvh, SiHetzner, SiGandi, SiScaleway,
   SiVultr, SiGodaddy, SiNamecheap, SiVercel, SiPorkbun, SiBunnydotnet,
-  SiIonos, SiNetcup, SiInfomaniak, SiAlwaysdata, SiAkamai
+  SiIonos, SiNetcup, SiInfomaniak, SiAlwaysdata, SiAkamai,
+  SiNetlify, SiHostinger
 } from '@icons-pack/react-simple-icons'
 
 // Custom SVG icons for providers not in Simple Icons
@@ -81,6 +82,22 @@ const PROVIDER_ICONS = {
   domeneshop:   { text: 'DS',  color: '#CB2027' },
   corenetworks: { text: 'CN',  color: '#4B5563' },
   checkdomain:  { text: 'CD',  color: '#059669' },
+  // Tier 1 - Cloud & Enterprise
+  netlify:      { Icon: SiNetlify,    color: '#00C7B7' },
+  ns1:          { text: 'N1',  color: '#762FBF' },
+  constellix:   { text: 'CX',  color: '#E8442A' },
+  rackspace:    { text: 'RS',  color: '#C40022' },
+  powerdns:     { text: 'PD',  color: '#002B5C' },
+  // Tier 2 - Registrars & Regional
+  hostinger:    { Icon: SiHostinger,  color: '#673DE6' },
+  hover:        { text: 'Ho',  color: '#23B2D8' },
+  namecom:      { text: 'N',   color: '#1660B7' },
+  epik:         { text: 'EP',  color: '#1A1A2E' },
+  hurricane:    { text: 'HE',  color: '#C93B1E' },
+  mythicbeasts: { text: 'MB',  color: '#E42931' },
+  rcodezero:    { text: 'R0',  color: '#2D3748' },
+  // Self-hosted / Protocol-based
+  rfc2136:      { text: 'NS',  color: '#0F766E' },
 }
 
 /**
