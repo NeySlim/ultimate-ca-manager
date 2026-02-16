@@ -39,6 +39,9 @@ const TrustStorePage = lazyWithRetry(() => import('./pages/TrustStorePage'))
 const RBACPage = lazyWithRetry(() => import('./pages/RBACPage'))
 const HSMPage = lazyWithRetry(() => import('./pages/HSMPage'))
 const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
+const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'))
+const ApprovalsPage = lazyWithRetry(() => import('./pages/ApprovalsPage'))
+const ReportsPage = lazyWithRetry(() => import('./pages/ReportsPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -112,6 +115,10 @@ function AppRoutes() {
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
           <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
           <Route path="/security" element={<Navigate to="/settings?tab=security" replace />} />
+          {/* Governance */}
+          <Route path="/policies" element={<ProtectedRoute><PoliciesPage /></ProtectedRoute>} />
+          <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
           {/* Component showcase — accessible by URL only, not in sidebar */}
           <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />
         </Route>

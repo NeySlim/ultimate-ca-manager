@@ -22,6 +22,9 @@ export const ERRORS = {
     HSM_PROVIDERS: 'Failed to load HSM providers',
     ROLES: 'Failed to load roles',
     SSO_PROVIDERS: 'Failed to load SSO providers',
+    POLICIES: 'Failed to load policies',
+    APPROVALS: 'Failed to load approval requests',
+    REPORTS: 'Failed to load reports',
     GENERIC: 'Failed to load data',
   },
   CREATE_FAILED: {
@@ -33,6 +36,7 @@ export const ERRORS = {
     TEMPLATE: 'Failed to create template',
     ROLE: 'Failed to create role',
     PROVIDER: 'Failed to save provider',
+    POLICY: 'Failed to create policy',
     GENERIC: 'Failed to create',
   },
   UPDATE_FAILED: {
@@ -43,6 +47,7 @@ export const ERRORS = {
     TEMPLATE: 'Failed to update template',
     SETTINGS: 'Failed to save settings',
     ROLE: 'Failed to update role',
+    POLICY: 'Failed to update policy',
     GENERIC: 'Failed to update',
   },
   DELETE_FAILED: {
@@ -56,6 +61,7 @@ export const ERRORS = {
     TRUSTSTORE: 'Failed to remove certificate from trust store',
     PROVIDER: 'Failed to delete provider',
     ROLE: 'Failed to delete role',
+    POLICY: 'Failed to delete policy',
     KEY: 'Failed to destroy key',
     GENERIC: 'Failed to delete',
   },
@@ -126,6 +132,7 @@ export const SUCCESS = {
     GROUP: 'Group created successfully',
     TEMPLATE: 'Template created successfully',
     ROLE: 'Role created',
+    POLICY: 'Policy created',
     PROVIDER: 'Provider created',
     KEY: 'Key generated',
     GENERIC: 'Created successfully',
@@ -138,6 +145,7 @@ export const SUCCESS = {
     TEMPLATE: 'Template updated successfully',
     SETTINGS: 'Settings saved successfully',
     ROLE: 'Role updated',
+    POLICY: 'Policy updated',
     PROVIDER: 'Provider updated',
   },
   DELETE: {
@@ -150,6 +158,7 @@ export const SUCCESS = {
     TRUSTSTORE: 'Certificate removed from trust store',
     PROVIDER: 'Provider deleted',
     ROLE: 'Role deleted',
+    POLICY: 'Policy deleted',
     KEY: 'Key destroyed',
     GENERIC: 'Deleted successfully',
   },
@@ -375,6 +384,9 @@ export const CONFIRM = {
   SSO: {
     DELETE_PROVIDER: 'Delete SSO provider "{name}"?',
   },
+  POLICY: {
+    DELETE: 'Delete policy "{name}"? This cannot be undone.',
+  },
   RESET_PASSWORD: {
     TITLE: 'Reset Password',
     MESSAGE: 'Are you sure you want to reset this user\'s password?',
@@ -396,6 +408,9 @@ export const TITLES = {
   TRUSTSTORE: 'Trust Store',
   IMPORT_EXPORT: 'Import & Export',
   AUDIT_LOGS: 'Audit Logs',
+  POLICIES: 'Certificate Policies',
+  APPROVALS: 'Approval Requests',
+  REPORTS: 'Reports',
   SETTINGS: 'Settings',
   ACCOUNT: 'Account',
   LOGIN: 'Login',

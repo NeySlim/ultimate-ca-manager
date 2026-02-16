@@ -8,7 +8,7 @@ import {
   MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
   User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
   UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star,
-  Spinner, Database, Wrench, Lightning
+  Spinner, Database, Wrench, Lightning, Gavel, Stamp, ChartBar
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
@@ -36,6 +36,9 @@ const COMMANDS = [
   { id: 'rbac', label: 'Go to RBAC', icon: Shield, path: '/rbac', category: 'Pro', pro: true },
   { id: 'sso', label: 'Go to SSO', icon: Key, path: '/sso', category: 'Pro', pro: true },
   { id: 'hsm', label: 'Go to HSM', icon: Lock, path: '/hsm', category: 'Pro', pro: true },
+  { id: 'policies', label: 'Go to Policies', icon: Gavel, path: '/policies', category: 'Governance' },
+  { id: 'approvals', label: 'Go to Approvals', icon: Stamp, path: '/approvals', category: 'Governance' },
+  { id: 'reports', label: 'Go to Reports', icon: ChartBar, path: '/reports', category: 'Governance' },
   
   // Actions
   { id: 'new-cert', label: 'Issue New Certificate', icon: Certificate, path: '/certificates', action: 'new', category: 'Actions' },

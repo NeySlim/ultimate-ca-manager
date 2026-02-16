@@ -6,7 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Lock, FileX, Vault, Wrench, Globe, CaretRight
+  UsersThree, Shield, Lock, FileX, Vault, Wrench, Globe, CaretRight,
+  Gavel, Stamp, ChartBar
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -85,6 +86,11 @@ export function Sidebar({ activePage }) {
     { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
     { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations' },
     { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
+    'separator',
+    // Governance
+    { id: 'policies', icon: Gavel, labelKey: 'common.policies', path: '/policies' },
+    { id: 'approvals', icon: Stamp, labelKey: 'common.approvals', path: '/approvals' },
+    { id: 'reports', icon: ChartBar, labelKey: 'common.reports', path: '/reports' },
     'separator',
     // Admin
     { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },

@@ -9,7 +9,7 @@ import {
   TreeStructure, Certificate, FileText, ClockCounterClockwise,
   ShieldCheck, Key, Users, Gear, Database, Lock, Globe,
   ListChecks, CloudArrowUp, HardDrive, UsersFour, Fingerprint,
-  ArrowClockwise, Wrench, Stack, Robot
+  ArrowClockwise, Wrench, Stack, Robot, Gavel, CalendarBlank
 } from '@phosphor-icons/react'
 
 export const helpContent = {
@@ -769,6 +769,105 @@ export const helpContent = {
       'Always ensure at least one admin can access the system before enabling IP restrictions',
     ],
     related: ['Account', 'Users & Groups', 'Settings']
+  },
+
+  // ===== POLICIES =====
+  policies: {
+    title: 'Certificate Policies',
+    subtitle: 'Issuance rules and compliance enforcement',
+    overview: 'Define and manage certificate policies that control issuance rules, key requirements, validity limits, and approval workflows. Policies are evaluated in priority order when certificates are requested.',
+    sections: [
+      {
+        title: 'Policy Types',
+        icon: Gavel,
+        items: [
+          { label: 'Issuance', text: 'Rules applied when new certificates are created' },
+          { label: 'Renewal', text: 'Rules applied when certificates are renewed' },
+          { label: 'Revocation', text: 'Rules applied when certificates are revoked' },
+        ]
+      },
+      {
+        title: 'Rules',
+        icon: ShieldCheck,
+        items: [
+          { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
+          { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used' },
+          { label: 'SAN Restrictions', text: 'Limit the number of SANs and enforce DNS name patterns' },
+        ]
+      },
+      {
+        title: 'Approval Workflows',
+        icon: Users,
+        items: [
+          { label: 'Approval Groups', text: 'Assign a user group responsible for approving requests' },
+          { label: 'Min Approvers', text: 'Number of approvals required before issuance' },
+          { label: 'Notifications', text: 'Alert administrators when policies are violated' },
+        ]
+      },
+    ],
+    tips: [
+      'Lower priority number = higher precedence. Use 1–10 for critical policies.',
+      'Scope policies to specific CAs for granular control.',
+      'Enable notifications to catch policy violations early.',
+    ],
+    related: ['Approvals', 'Certificates', 'CAs']
+  },
+
+  // ===== APPROVALS =====
+  approvals: {
+    title: 'Approval Requests',
+    subtitle: 'Certificate approval workflow management',
+    overview: 'Review and manage certificate approval requests. When a policy requires approval, certificate issuance is paused until the required number of approvers have reviewed and approved the request.',
+    sections: [
+      {
+        title: 'Request Lifecycle',
+        icon: ClockCounterClockwise,
+        items: [
+          { label: 'Pending', text: 'Awaiting review — certificate cannot be issued yet' },
+          { label: 'Approved', text: 'All required approvals received — certificate can be issued' },
+          { label: 'Rejected', text: 'Any rejection immediately stops the request' },
+          { label: 'Expired', text: 'Request was not reviewed before the deadline' },
+        ]
+      },
+    ],
+    tips: [
+      'Any single rejection immediately stops the approval — this is intentional for security.',
+      'Approval comments are logged in the audit trail for compliance.',
+    ],
+    related: ['Policies', 'Certificates', 'Audit Logs']
+  },
+
+  // ===== REPORTS =====
+  reports: {
+    title: 'Reports',
+    subtitle: 'PKI compliance and inventory reports',
+    overview: 'Generate, download, and schedule reports for compliance auditing. Reports cover certificate inventory, expiring certificates, CA hierarchy, audit activity, and policy compliance status.',
+    sections: [
+      {
+        title: 'Report Types',
+        icon: FileText,
+        items: [
+          { label: 'Certificate Inventory', text: 'Complete list of all certificates with status' },
+          { label: 'Expiring Certificates', text: 'Certificates expiring within a specified time window' },
+          { label: 'CA Hierarchy', text: 'Certificate Authority structure and statistics' },
+          { label: 'Audit Summary', text: 'Security events and user activity summary' },
+          { label: 'Compliance Status', text: 'Policy compliance and violation summary' },
+        ]
+      },
+      {
+        title: 'Scheduling',
+        icon: CalendarBlank,
+        items: [
+          { label: 'Expiry Report', text: 'Daily email with certificates expiring soon' },
+          { label: 'Compliance Report', text: 'Weekly email with policy compliance status' },
+        ]
+      },
+    ],
+    tips: [
+      'Download reports as CSV for spreadsheet analysis or JSON for automation.',
+      'Use the test send feature to verify email delivery before enabling schedules.',
+    ],
+    related: ['Policies', 'Certificates', 'Audit Logs', 'Settings']
   },
 }
 
