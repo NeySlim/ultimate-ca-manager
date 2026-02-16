@@ -490,6 +490,8 @@ def create_app(config_name=None):
             response.headers['X-Frame-Options'] = 'DENY'
         if 'X-XSS-Protection' not in response.headers:
             response.headers['X-XSS-Protection'] = '1; mode=block'
+        if 'Referrer-Policy' not in response.headers:
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         
         return response
     
@@ -980,7 +982,7 @@ def init_database(app):
             # Get hostname
             try:
                 hostname = socket.gethostname()
-            except:
+            except Exception:
                 hostname = 'ucm.local'
             
             # Generate private key
@@ -1234,7 +1236,7 @@ def main():
                 import base64
                 try:
                     ca_pem = base64.b64decode(ca.crt).decode('utf-8')
-                except:
+                except Exception:
                     # If decode fails, assume it's already in PEM format
                     ca_pem = ca.crt
                 
@@ -1293,7 +1295,7 @@ def main():
         if ca_cert_path and os.path.exists(ca_cert_path):
             try:
                 os.unlink(ca_cert_path)
-            except:
+            except Exception:
                 pass
 
 
