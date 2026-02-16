@@ -3,7 +3,8 @@
  * Displays all UI components with their variants for design/theme testing.
  * Only available in development mode (import.meta.env.DEV).
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Palette, PaintBrush, Cube, Stack, Cards, ToggleLeft, TextT,
   CheckSquare, Warning, Info, ShieldCheck, Lightning, Gear,
@@ -22,12 +23,14 @@ import {
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent, DetailTabs,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactActions, CompactHeader,
   RichStatsBar, KeyIndicator, TreeView,
-  FilterSelect, ResponsiveLayout
+  FilterSelect, ResponsiveLayout,
+  MobileCard, ActionBar, FilterChips, BottomSheet, PermissionsDisplay
 } from '../components'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
 export default function DevShowcasePage() {
-  const [activeSection, setActiveSection] = useState('buttons')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeSection, setActiveSection] = useState(searchParams.get('s') || 'buttons')
   const [modalOpen, setModalOpen] = useState(false)
   const [formModalOpen, setFormModalOpen] = useState(false)
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
@@ -38,6 +41,11 @@ export default function DevShowcasePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [dateValue, setDateValue] = useState('')
   const [textareaValue, setTextareaValue] = useState('')
+
+  const handleSectionChange = (id) => {
+    setActiveSection(id)
+    setSearchParams({ s: id })
+  }
 
   const sections = [
     { id: 'buttons', label: 'Buttons', icon: Cube },
@@ -67,7 +75,7 @@ export default function DevShowcasePage() {
             key={s.id}
             variant={activeSection === s.id ? 'primary' : 'ghost'}
             size="sm"
-            onClick={() => setActiveSection(s.id)}
+            onClick={() => handleSectionChange(s.id)}
           >
             <s.icon size={14} />
             {s.label}
@@ -276,7 +284,7 @@ export default function DevShowcasePage() {
           <SectionTitle title="Input States" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl">
             <Input label="Default Input" placeholder="Type something..." value={inputValue} onChange={e => setInputValue(e.target.value)} />
-            <Input label="With Icon" placeholder="Search..." icon={MagnifyingGlass} value="" onChange={() => {}} />
+            <Input label="With Icon" placeholder="Search..." icon={<MagnifyingGlass size={16} />} value="" onChange={() => {}} />
             <Input label="With Error" placeholder="Invalid..." error="This field is required" value="" onChange={() => {}} />
             <Input label="With Helper" placeholder="Optional..." helperText="This field is optional" value="" onChange={() => {}} />
             <Input label="Disabled" placeholder="Cannot edit" disabled value="" onChange={() => {}} />
@@ -662,19 +670,19 @@ export default function DevShowcasePage() {
             <TreeView
               nodes={[
                 {
-                  id: 'root', label: 'Root CA', icon: <Lock size={16} />,
+                  id: 'root', name: 'Root CA', icon: <Lock size={16} />, badge: '5',
                   children: [
                     {
-                      id: 'inter1', label: 'Intermediate CA 1', icon: <Certificate size={16} />,
+                      id: 'inter1', name: 'Intermediate CA 1', icon: <Certificate size={16} />, badge: '3',
                       children: [
-                        { id: 'leaf1', label: 'server.example.com', icon: <Globe size={16} /> },
-                        { id: 'leaf2', label: 'api.example.com', icon: <Globe size={16} /> },
+                        { id: 'leaf1', name: 'server.example.com', icon: <Globe size={16} /> },
+                        { id: 'leaf2', name: 'api.example.com', icon: <Globe size={16} /> },
                       ]
                     },
                     {
-                      id: 'inter2', label: 'Intermediate CA 2', icon: <Certificate size={16} />,
+                      id: 'inter2', name: 'Intermediate CA 2', icon: <Certificate size={16} />,
                       children: [
-                        { id: 'leaf3', label: 'mail.example.com', icon: <Globe size={16} /> },
+                        { id: 'leaf3', name: 'mail.example.com', icon: <Globe size={16} /> },
                       ]
                     },
                   ]
@@ -689,6 +697,72 @@ export default function DevShowcasePage() {
       {/* ═══════════ MISC COMPONENTS ═══════════ */}
       {activeSection === 'misc' && (
         <div className="space-y-6">
+          <SectionTitle title="MobileCard" />
+          <div className="max-w-sm space-y-2">
+            <MobileCard
+              icon={Certificate}
+              iconColor="blue"
+              title="server.example.com"
+              badge={<Badge variant="success" size="sm" dot>Valid</Badge>}
+              subtitle="Issued by: Internal Root CA"
+              metadata={[
+                { label: 'Expires', value: '2026-12-31' },
+                { label: 'Type', value: 'RSA 2048' },
+              ]}
+            />
+            <MobileCard
+              icon={Lock}
+              iconColor="violet"
+              title="Internal Root CA"
+              titleExtra={<KeyIndicator hasKey={true} />}
+              badge={<Badge variant="warning" size="sm" dot>Expiring</Badge>}
+              subtitle="Self-signed • RSA 4096"
+              metadata={[
+                { label: 'Certs', value: '42' },
+                { label: 'Expires', value: '2027-01-15' },
+              ]}
+            />
+            <MobileCard
+              icon={User}
+              iconColor="emerald"
+              title="admin@example.com"
+              badge={<Badge variant="purple" size="sm">Admin</Badge>}
+              subtitle="Last login: 2 hours ago"
+            />
+          </div>
+
+          <SectionTitle title="ActionBar" />
+          <div className="border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-bg-primary)]">
+            <ActionBar
+              primary={<Button variant="primary" size="sm"><Plus size={14} /> New Certificate</Button>}
+              secondary={[
+                <Button key="r" variant="secondary" size="sm">Refresh</Button>,
+                <Button key="e" variant="secondary" size="sm"><Download size={14} /> Export</Button>,
+              ]}
+            />
+          </div>
+
+          <SectionTitle title="FilterChips" />
+          <div className="border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-bg-primary)]">
+            <FilterChips
+              filters={[
+                { key: 'status', label: 'Status', value: 'valid', options: [{ value: 'valid', label: 'Valid' }] },
+                { key: 'type', label: 'Type', value: 'rsa', options: [{ value: 'rsa', label: 'RSA' }] },
+                { key: 'ca', label: 'CA', value: 'root', options: [{ value: 'root', label: 'Root CA' }] },
+              ]}
+              onRemove={() => {}}
+            />
+          </div>
+
+          <SectionTitle title="PermissionsDisplay" />
+          <div className="border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-bg-primary)] max-w-md">
+            <PermissionsDisplay
+              role="admin"
+              permissions={['certificates.read', 'certificates.write', 'cas.read', 'cas.write', 'users.manage', 'settings.manage']}
+              description="Full access to all features"
+            />
+          </div>
+
           <SectionTitle title="Color Palette (CSS Variables)" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
@@ -711,8 +785,12 @@ export default function DevShowcasePage() {
             ].map(c => (
               <div key={c.name} className="flex items-center gap-2 p-2 rounded border border-[var(--color-border)]">
                 <div
-                  className="w-8 h-8 rounded border border-[var(--color-border)]"
-                  style={{ backgroundColor: `var(${c.name})` }}
+                  className="w-8 h-8 rounded shadow-inner"
+                  style={{
+                    backgroundColor: `var(${c.name})`,
+                    border: '2px solid var(--color-border)',
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)',
+                  }}
                 />
                 <span className="text-xs text-[var(--color-text-secondary)] font-mono">{c.label}</span>
               </div>
@@ -731,12 +809,17 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="Spacing & Layout Reference" />
-          <div className="flex gap-2 items-end">
+          <div className="flex gap-3 items-end">
             {[1, 2, 3, 4, 6, 8, 12, 16].map(s => (
               <div key={s} className="flex flex-col items-center gap-1">
                 <div
-                  className="bg-[var(--color-accent)] rounded"
-                  style={{ width: `${s * 4}px`, height: `${s * 4}px` }}
+                  className="rounded border border-[var(--color-border)]"
+                  style={{
+                    width: `${s * 4}px`,
+                    height: `${s * 4}px`,
+                    backgroundColor: 'var(--color-accent)',
+                    opacity: 0.7,
+                  }}
                 />
                 <span className="text-[10px] text-[var(--color-text-muted)]">{s * 4}px</span>
               </div>
