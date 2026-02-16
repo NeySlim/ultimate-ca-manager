@@ -90,15 +90,28 @@ class ReportService:
         }
     
     @classmethod
+    def _cert_status(cls, cert) -> str:
+        """Calculate certificate status from model fields"""
+        if cert.revoked:
+            return 'revoked'
+        if cert.valid_to:
+            now = datetime.utcnow()
+            if cert.valid_to < now:
+                return 'expired'
+            if cert.valid_to < now + timedelta(days=30):
+                return 'expiring'
+        return 'valid'
+
+    @classmethod
     def _generate_certificate_inventory(cls, params: dict) -> dict:
         """Generate certificate inventory report"""
         certs = Certificate.query.all()
         
         items = []
-        stats = {'total': 0, 'valid': 0, 'expired': 0, 'revoked': 0, 'pending': 0}
+        stats = {'total': 0, 'valid': 0, 'expired': 0, 'revoked': 0, 'expiring': 0}
         
         for cert in certs:
-            status = cert.status or 'unknown'
+            status = cls._cert_status(cert)
             stats['total'] += 1
             if status in stats:
                 stats[status] += 1
@@ -109,9 +122,9 @@ class ReportService:
                 'serial_number': cert.serial_number,
                 'status': status,
                 'issuer': cert.issuer,
-                'not_before': cert.not_before,
-                'not_after': cert.not_after,
-                'key_type': cert.get_key_type(),
+                'valid_from': cert.valid_from,
+                'valid_to': cert.valid_to,
+                'key_type': cert.key_type,
                 'source': cert.source,
                 'created_at': cert.created_at,
             })
@@ -119,7 +132,7 @@ class ReportService:
         return {
             'items': items,
             'columns': ['id', 'common_name', 'serial_number', 'status', 'issuer', 
-                       'not_before', 'not_after', 'key_type', 'source'],
+                       'valid_from', 'valid_to', 'key_type', 'source'],
             'summary': stats,
         }
     
@@ -127,23 +140,25 @@ class ReportService:
     def _generate_expiring_certificates(cls, params: dict) -> dict:
         """Generate expiring certificates report"""
         days = params.get('days', 30)
-        threshold = datetime.utcnow() + timedelta(days=days)
+        now = datetime.utcnow()
+        threshold = now + timedelta(days=days)
         
         certs = Certificate.query.filter(
-            Certificate.not_after != None,
-            Certificate.not_after <= threshold,
-            Certificate.status.in_(['valid', 'active'])
-        ).order_by(Certificate.not_after).all()
+            Certificate.valid_to != None,
+            Certificate.valid_to <= threshold,
+            Certificate.valid_to > now,
+            Certificate.revoked == False
+        ).order_by(Certificate.valid_to).all()
         
         items = []
         for cert in certs:
-            days_remaining = (cert.not_after - datetime.utcnow()).days if cert.not_after else None
+            days_remaining = (cert.valid_to - now).days if cert.valid_to else None
             items.append({
                 'id': cert.id,
                 'common_name': cert.common_name,
                 'serial_number': cert.serial_number,
                 'issuer': cert.issuer,
-                'not_after': cert.not_after,
+                'valid_to': cert.valid_to,
                 'days_remaining': days_remaining,
                 'source': cert.source,
             })
@@ -151,7 +166,7 @@ class ReportService:
         return {
             'items': items,
             'columns': ['id', 'common_name', 'serial_number', 'issuer', 
-                       'not_after', 'days_remaining', 'source'],
+                       'valid_to', 'days_remaining', 'source'],
             'summary': {
                 'total_expiring': len(items),
                 'threshold_days': days,
@@ -167,32 +182,31 @@ class ReportService:
         stats = {'total': 0, 'root': 0, 'intermediate': 0}
         
         for ca in cas:
-            is_root = ca.parent_refid is None
             stats['total'] += 1
-            if is_root:
+            if ca.is_root:
                 stats['root'] += 1
             else:
                 stats['intermediate'] += 1
             
-            cert_count = Certificate.query.filter_by(ca_id=ca.id).count()
+            cert_count = Certificate.query.filter_by(caref=ca.refid).count()
             
             items.append({
                 'id': ca.id,
                 'refid': ca.refid,
                 'common_name': ca.common_name,
-                'parent_refid': ca.parent_refid,
-                'is_root': is_root,
-                'not_before': ca.not_before,
-                'not_after': ca.not_after,
+                'parent_refid': ca.caref,
+                'is_root': ca.is_root,
+                'valid_from': ca.valid_from,
+                'valid_to': ca.valid_to,
                 'key_type': ca.key_type,
                 'issued_certificates': cert_count,
-                'crl_url': ca.crl_url,
+                'cdp_url': ca.cdp_url,
             })
         
         return {
             'items': items,
             'columns': ['id', 'refid', 'common_name', 'parent_refid', 'is_root',
-                       'not_before', 'not_after', 'key_type', 'issued_certificates'],
+                       'valid_from', 'valid_to', 'key_type', 'issued_certificates'],
             'summary': stats,
         }
     
@@ -248,17 +262,25 @@ class ReportService:
         issues = []
         
         # Check certificates without proper extensions
-        certs_no_key_usage = Certificate.query.filter(
-            Certificate.status.in_(['valid', 'active'])
-        ).count()  # Simplified - would need extension parsing
+        total_active = Certificate.query.filter(
+            Certificate.revoked == False,
+            Certificate.valid_to > datetime.utcnow()
+        ).count()
         
         # Check expired CAs
         expired_cas = CA.query.filter(
-            CA.not_after < datetime.utcnow()
+            CA.valid_to < datetime.utcnow()
         ).count()
         
         # Check weak keys (RSA < 2048)
         # This is simplified - would need actual key analysis
+        
+        items.append({
+            'check': 'Active Certificates',
+            'status': 'pass',
+            'count': total_active,
+            'severity': 'none',
+        })
         
         # Build compliance items
         items.append({
@@ -270,9 +292,12 @@ class ReportService:
         
         # Check for certificates expiring soon (< 30 days)
         threshold = datetime.utcnow() + timedelta(days=30)
+        now = datetime.utcnow()
         expiring_soon = Certificate.query.filter(
-            Certificate.not_after <= threshold,
-            Certificate.status.in_(['valid', 'active'])
+            Certificate.valid_to != None,
+            Certificate.valid_to <= threshold,
+            Certificate.valid_to > now,
+            Certificate.revoked == False
         ).count()
         
         items.append({

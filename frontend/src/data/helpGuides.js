@@ -1507,6 +1507,218 @@ Require all users to enable 2FA. Users who haven't set up 2FA will be prompted o
 > 💡 Enforce 2FA for admin accounts at minimum. Consider enforcing it for all users in security-sensitive environments.
 `
   },
+
+  // ===== GOVERNANCE =====
+
+  policies: {
+    title: 'Certificate Policies',
+    content: `
+## Overview
+
+Certificate policies define the rules and constraints enforced when certificates are issued, renewed, or revoked. Policies are evaluated in **priority order** (lower number = higher precedence) and can be scoped to specific CAs.
+
+## Policy Types
+
+### Issuance Policies
+Rules applied when new certificates are created. This is the most common type. Controls key types, validity periods, SAN restrictions, and whether approval is required.
+
+### Renewal Policies
+Rules applied when certificates are renewed. Can enforce shorter validity on renewal or require re-approval.
+
+### Revocation Policies
+Rules applied when certificates are revoked. Can require approval before revocation of critical certificates.
+
+## Rules Configuration
+
+### Max Validity
+Maximum certificate lifetime in days. Common values:
+- **90 days** — Short-lived automation (ACME-style)
+- **397 days** — CA/Browser Forum baseline for public TLS
+- **730 days** — Internal/private PKI
+- **365 days** — Code signing
+
+### Allowed Key Types
+Restrict which key algorithms and sizes can be used:
+- **RSA-2048** — Minimum for public trust
+- **RSA-4096** — Higher security, larger certificates
+- **EC-P256** — Modern, fast, recommended
+- **EC-P384** — Higher security elliptic curve
+- **EC-P521** — Maximum security (rarely needed)
+
+### SAN Restrictions
+- **Max DNS Names** — Limit the number of Subject Alternative Names
+- **DNS Pattern** — Restrict to specific domain patterns (e.g. \`*.company.com\`)
+
+## Approval Workflows
+
+When **Require Approval** is enabled, certificate issuance is paused until the required number of approvers from the assigned group have approved the request.
+
+### Configuration
+- **Approval Group** — Select a user group responsible for approvals
+- **Min Approvers** — Number of approvals required (e.g. 2 of 3 group members)
+- **Notifications** — Alert administrators when policies are violated
+
+> 💡 Use approval workflows for high-value certificates like code signing and wildcard certificates.
+
+## Priority System
+
+Policies are evaluated in priority order. Lower numbers have higher precedence:
+- **1–10** — Critical security policies (code signing, wildcard)
+- **10–20** — Standard compliance (public TLS, internal PKI)
+- **20+** — Permissive defaults
+
+When multiple policies match a certificate request, the highest-priority (lowest number) policy wins.
+
+## Scope
+
+### All CAs
+Policy applies to every CA in the system. Use for organization-wide rules.
+
+### Specific CA
+Policy applies only to certificates issued by the selected CA. Use for granular control.
+
+## Default Policies
+
+UCM ships with 5 built-in policies reflecting real-world PKI best practices:
+- **Code Signing** (priority 5) — Strong keys, approval required
+- **Wildcard Certificates** (priority 8) — Approval required, max 10 SANs
+- **Web Server TLS** (priority 10) — CA/B Forum compliant, 397-day max
+- **Short-Lived Automation** (priority 15) — 90-day ACME-style
+- **Internal PKI** (priority 20) — 730-day, relaxed rules
+
+> 💡 Customize or disable default policies to match your organization's requirements.
+`
+  },
+
+  approvals: {
+    title: 'Approval Requests',
+    content: `
+## Overview
+
+The Approvals page shows all certificate requests that require manual approval before issuance. Approval workflows are configured in **Policies** — when a policy has "Require Approval" enabled, any matching certificate request creates an approval request here.
+
+## Request Lifecycle
+
+### Pending
+The request is awaiting review. The certificate cannot be issued until the required number of approvers have approved it. Pending requests appear first by default.
+
+### Approved
+All required approvals have been received. The certificate will be issued automatically once approved.
+
+### Rejected
+Any single rejection immediately stops the request. The certificate will not be issued. A rejection comment is required to explain the reason.
+
+### Expired
+The request was not reviewed before the deadline. Expired requests must be re-submitted.
+
+## Approving a Request
+
+1. Click a pending request to view its details
+2. Review the certificate details, requester, and associated policy
+3. Click **Approve** and optionally add a comment
+4. The approval is recorded with your username and timestamp
+
+## Rejecting a Request
+
+1. Click a pending request to view its details
+2. Click **Reject**
+3. Enter a **rejection reason** (required) — this is logged for audit compliance
+4. The request is immediately stopped
+
+> ⚠ Any single rejection stops the entire request. This is intentional — if any reviewer identifies a problem, issuance should not proceed.
+
+## Approval History
+
+Each request maintains a complete approval timeline showing:
+- Who approved or rejected (username)
+- When the action was taken (timestamp)
+- Comment provided (if any)
+
+This history is immutable and part of the audit trail.
+
+## Filtering
+
+Use the status filter bar at the top to show:
+- **Pending** — Requests awaiting your review
+- **Approved** — Recently approved requests
+- **Rejected** — Rejected requests with reasons
+- **Total** — All requests regardless of status
+
+## Permissions
+
+- **read:approvals** — View approval requests
+- **write:approvals** — Approve or reject requests
+
+> 💡 Set up email notifications in policies so approvers are alerted when new requests arrive.
+`
+  },
+
+  reports: {
+    title: 'Reports',
+    content: `
+## Overview
+
+Generate, download, and schedule PKI compliance reports. Reports provide visibility into your certificate infrastructure for auditing, compliance, and operational planning.
+
+## Report Types
+
+### Certificate Inventory
+Complete list of all certificates managed by UCM. Includes subject, issuer, serial number, validity dates, key type, and current status. Use for compliance audits and infrastructure documentation.
+
+### Expiring Certificates
+Certificates expiring within a specified time window (default: 30 days). Critical for avoiding outages — review this report regularly or schedule it for daily delivery.
+
+### CA Hierarchy
+Certificate Authority structure showing parent-child relationships, certificate counts per CA, and CA status. Useful for understanding your PKI topology.
+
+### Audit Summary
+Security events and user activity summary. Includes login attempts, certificate operations, policy violations, and configuration changes. Essential for security audits.
+
+### Compliance Status
+Policy compliance and violation summary. Shows which certificates comply with your policies and which ones violate them. Required for regulatory compliance.
+
+## Generating Reports
+
+1. Find the report card you want to generate
+2. Click **▶ Generate** to create a preview
+3. The preview appears below the cards as formatted JSON
+4. Click **Close** to dismiss the preview
+
+## Downloading Reports
+
+Each report card has two download buttons:
+- **CSV** — Spreadsheet format for Excel, Google Sheets, or LibreOffice
+- **JSON** — Structured data for automation and integration
+
+> 💡 CSV reports are easier for non-technical stakeholders. JSON is better for scripts and API integrations.
+
+## Scheduling Reports
+
+### Expiry Report (Daily)
+Automatically sends a certificate expiry report every day to configured recipients. Enable this to catch expiring certificates before they cause outages.
+
+### Compliance Report (Weekly)
+Sends a policy compliance summary every week. Useful for ongoing compliance monitoring without manual effort.
+
+### Configuration
+1. Click **Schedule Reports** in the top-right
+2. Enable the reports you want to schedule
+3. Add recipient email addresses (press Enter or click Add)
+4. Click Save
+
+### Test Send
+Before enabling schedules, use the ✈️ button on any report card to send a test report to a specific email address. This verifies that SMTP is configured correctly and the report format meets your needs.
+
+> ⚠ Scheduled reports require SMTP to be configured in **Settings → Email**. Test send will fail if SMTP is not set up.
+
+## Permissions
+
+- **read:reports** — Generate and download reports
+- **write:settings** — Configure report schedules
+
+> 💡 Schedule the expiry report first — it's the most operationally valuable and helps prevent certificate-related outages.
+`
+  },
 }
 
 export default helpGuides

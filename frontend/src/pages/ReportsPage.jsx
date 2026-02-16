@@ -200,8 +200,8 @@ export default function ReportsPage() {
     }))
   }
 
-  // Recipient editor sub-component to avoid duplication
-  const RecipientEditor = ({ type, input, setInput }) => (
+  // Render recipient editor — function (not component) to avoid remount/focus loss
+  const renderRecipientEditor = (type, input, setInput) => (
     <div className="pl-8">
       <label className="text-sm text-text-secondary mb-1.5 block">{t('reports.recipients')}</label>
       <div className="flex gap-2 mb-2">
@@ -462,9 +462,7 @@ export default function ReportsPage() {
               </label>
               <Badge variant="default" size="sm">{t('reports.daily')}</Badge>
             </div>
-            {scheduleForm.expiry_report.enabled && (
-              <RecipientEditor type="expiry_report" input={expiryRecipientInput} setInput={setExpiryRecipientInput} />
-            )}
+            {scheduleForm.expiry_report.enabled && renderRecipientEditor('expiry_report', expiryRecipientInput, setExpiryRecipientInput)}
           </div>
 
           {/* Compliance Report */}
@@ -485,9 +483,7 @@ export default function ReportsPage() {
               </label>
               <Badge variant="default" size="sm">{t('reports.weekly')}</Badge>
             </div>
-            {scheduleForm.compliance_report.enabled && (
-              <RecipientEditor type="compliance_report" input={complianceRecipientInput} setInput={setComplianceRecipientInput} />
-            )}
+            {scheduleForm.compliance_report.enabled && renderRecipientEditor('compliance_report', complianceRecipientInput, setComplianceRecipientInput)}
           </div>
 
           {/* Footer */}
