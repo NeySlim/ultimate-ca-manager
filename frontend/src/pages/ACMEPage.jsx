@@ -2268,11 +2268,12 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
   // Group: Manual first, then Popular (sorted by rank), then Other alphabetical
   const popularOrder = ['cloudflare', 'route53', 'azure', 'gcloud', 'ovh', 'hetzner', 'digitalocean', 'gandi', 'porkbun']
   const manualProvider = filtered.find(p => p.type === 'manual')
+  const rfc2136Provider = filtered.find(p => p.type === 'rfc2136')
   const popularProviders = popularOrder
     .map(type => filtered.find(p => p.type === type))
     .filter(Boolean)
   const otherProviders = filtered
-    .filter(p => p.type !== 'manual' && !popularOrder.includes(p.type))
+    .filter(p => p.type !== 'manual' && p.type !== 'rfc2136' && !popularOrder.includes(p.type))
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const renderCard = (pt) => {
@@ -2324,10 +2325,11 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
 
       {/* Grid */}
       <div className="max-h-80 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-        {/* Manual — always visible on top when not searching */}
-        {search === '' && manualProvider && (
+        {/* Manual & RFC2136 — always visible on top when not searching */}
+        {search === '' && (manualProvider || rfc2136Provider) && (
           <div className="grid grid-cols-3 gap-2">
-            {renderCard(manualProvider)}
+            {manualProvider && renderCard(manualProvider)}
+            {rfc2136Provider && renderCard(rfc2136Provider)}
           </div>
         )}
         {search === '' && popularProviders.length > 0 && (
