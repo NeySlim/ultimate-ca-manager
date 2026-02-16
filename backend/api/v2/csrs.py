@@ -4,6 +4,7 @@ CSR Management Routes v2.0
 """
 
 import re
+import logging
 from flask import Blueprint, request, jsonify
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
@@ -15,6 +16,7 @@ import base64
 import uuid
 
 bp = Blueprint('csrs_v2', __name__)
+logger = logging.getLogger(__name__)
 
 # DN validation (shared pattern)
 DN_FIELD_PATTERNS = {
@@ -393,10 +395,8 @@ def import_csr():
         
     except Exception as e:
         db.session.rollback()
-        import traceback
-        print(f"CSR Import Error: {str(e)}")
-        print(traceback.format_exc())
-        return error_response(f'Import failed: {str(e)}', 500)
+        logger.error(f"CSR Import Error: {str(e)}", exc_info=True)
+        return error_response('Import failed', 500)
 
 @bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET'])
 @require_auth(['read:csrs'])
@@ -594,10 +594,8 @@ def sign_csr(csr_id):
             message='CSR signed successfully'
         )
     except Exception as e:
-        import traceback
-        print(f"CSR Sign Error: {str(e)}")
-        print(traceback.format_exc())
-        return error_response(f"Failed to sign CSR: {str(e)}", 500)
+        logger.error(f"CSR Sign Error: {str(e)}", exc_info=True)
+        return error_response("Failed to sign CSR", 500)
 
 
 # ============================================================

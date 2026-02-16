@@ -111,10 +111,19 @@ class PKIResetService:
                 'scep_requests',
             ]
             
+            # Whitelist validation for table names
+            allowed_tables = {
+                'certificates', 'certificate_authorities', 'certificate_requests',
+                'crl_metadata', 'crls', 'ocsp_responses', 'scep_requests',
+            }
             for table_name in pki_tables:
+                if table_name not in allowed_tables:
+                    logger.warning(f"Skipping unknown table: {table_name}")
+                    continue
                 try:
-                    # SQLite: DELETE FROM table
-                    result = db.session.execute(db.text(f"DELETE FROM {table_name}"))
+                    result = db.session.execute(
+                        db.text(f'DELETE FROM "{table_name}"')
+                    )
                     deleted = result.rowcount
                     
                     if table_name == 'certificates':
@@ -133,10 +142,13 @@ class PKIResetService:
             
             # 4. Reset auto-increment sequences (SQLite)
             for table_name in pki_tables:
+                if table_name not in allowed_tables:
+                    continue
                 try:
-                    db.session.execute(db.text(
-                        f"DELETE FROM sqlite_sequence WHERE name='{table_name}'"
-                    ))
+                    db.session.execute(
+                        db.text("DELETE FROM sqlite_sequence WHERE name = :tbl"),
+                        {"tbl": table_name}
+                    )
                 except Exception as e:
                     logger.warning(f"Could not reset sequence for {table_name}: {e}")
             
@@ -176,7 +188,7 @@ class PKIResetService:
         for table_name, label in ALLOWED_PKI_TABLES.items():
             try:
                 result = db.session.execute(
-                    db.text("SELECT COUNT(*) FROM " + table_name)
+                    db.text(f'SELECT COUNT(*) FROM "{table_name}"')
                 )
                 count = result.scalar()
                 stats[label.lower().replace(' ', '_')] = count
