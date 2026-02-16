@@ -2321,6 +2321,7 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
           label: pt.name
         }))}
         disabled={!!provider}
+        searchable
       />
       
       {/* Dynamic credential fields based on provider type schema */}
