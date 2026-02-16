@@ -16,6 +16,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtensionOID
 from OpenSSL import crypto
 
+from auth.unified import require_auth
+
 tools_bp = Blueprint('tools', __name__, url_prefix='/api/v2/tools')
 
 
@@ -188,7 +190,41 @@ def get_public_key_bytes(obj):
     )
 
 
+import ipaddress
+
+def is_safe_host(hostname):
+    """
+    Check if hostname is safe to connect to (SSRF protection)
+    Blocks loopback, link-local, and private networks unless explicitly allowed
+    """
+    # Allow whitelisted domains (e.g. for testing)
+    ALLOWED_DOMAINS = os.getenv('SSRF_ALLOWED_DOMAINS', '').split(',')
+    if hostname in ALLOWED_DOMAINS:
+        return True
+        
+    try:
+        # Check if it's an IP address
+        ip = ipaddress.ip_address(hostname)
+        # Block private/loopback/link-local/multicast
+        if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_private:
+            return False
+        return True
+    except ValueError:
+        # It's a hostname - resolve it
+        try:
+            # Resolve to IP
+            ip_str = socket.gethostbyname(hostname)
+            ip = ipaddress.ip_address(ip_str)
+            if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_private:
+                return False
+            return True
+        except (socket.gaierror, ValueError):
+            # Could not resolve - safe to block
+            return False
+
+
 @tools_bp.route('/check-ssl', methods=['POST'])
+@require_auth()
 def check_ssl():
     """Check SSL certificate of a remote server"""
     data = request.get_json() or {}
@@ -197,6 +233,10 @@ def check_ssl():
     
     if not hostname:
         return jsonify({'error': 'Hostname is required'}), 400
+        
+    # SSRF Protection
+    if not is_safe_host(hostname):
+        return jsonify({'error': 'Access to private/local network resources is blocked'}), 403
     
     try:
         port = int(port)
@@ -281,6 +321,7 @@ def check_ssl():
 
 
 @tools_bp.route('/decode-csr', methods=['POST'])
+@require_auth()
 def decode_csr():
     """Decode a CSR and return its contents"""
     data = request.get_json() or {}
@@ -310,6 +351,7 @@ def decode_csr():
 
 
 @tools_bp.route('/decode-cert', methods=['POST'])
+@require_auth()
 def decode_cert():
     """Decode a certificate and return its contents"""
     data = request.get_json() or {}
@@ -339,6 +381,7 @@ def decode_cert():
 
 
 @tools_bp.route('/match-keys', methods=['POST'])
+@require_auth()
 def match_keys():
     """Check if certificate, private key, and/or CSR match"""
     data = request.get_json() or {}
@@ -502,6 +545,7 @@ def match_keys():
 
 
 @tools_bp.route('/convert', methods=['POST'])
+@require_auth()
 def convert_certificate():
     """Convert certificate/key between formats
     

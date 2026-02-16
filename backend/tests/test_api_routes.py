@@ -167,6 +167,11 @@ class TestAuthRequired:
         ('/api/v2/groups', {'name': 'Test'}),
         ('/api/v2/system/database/optimize', {}),
         ('/api/v2/system/database/reset', {}),
+        ('/api/v2/tools/check-ssl', {'hostname': 'google.com'}),
+        ('/api/v2/tools/decode-csr', {'pem': 'test'}),
+        ('/api/v2/tools/decode-cert', {'pem': 'test'}),
+        ('/api/v2/tools/match-keys', {'certificate': 'test', 'private_key': 'test'}),
+        ('/api/v2/tools/convert', {'pem': 'test'}),
     ])
     def test_post_requires_auth(self, client, path, body):
         """POST endpoints require authentication"""

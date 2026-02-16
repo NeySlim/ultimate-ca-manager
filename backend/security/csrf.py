@@ -31,6 +31,7 @@ CSRF_EXEMPT_PATHS = [
     '/api/v2/auth/login',       # Login (all methods: password, mtls, webauthn)
     '/api/v2/auth/forgot',      # Forgot password (no session yet)
     '/api/v2/auth/reset',       # Reset password (token-based)
+    '/api/v2/auth/methods',     # Auth method detection (pre-login)
     '/api/v2/sso/',             # SSO callbacks (OAuth2/LDAP, external flow)
     '/acme/',                   # ACME protocol
     '/scep/',                   # SCEP protocol  
@@ -206,8 +207,8 @@ def init_csrf_middleware(app):
             return None
         
         # Skip for API key auth (external integrations)
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header.startswith('ApiKey '):
+        api_key_header = request.headers.get('X-API-Key', '')
+        if api_key_header:
             return None
         
         # Get user_id from session or g (set by auth middleware)

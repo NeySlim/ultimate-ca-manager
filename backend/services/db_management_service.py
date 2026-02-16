@@ -96,8 +96,10 @@ class DatabaseManagementService:
             tables = [row[0] for row in cursor.fetchall()]
             
             for table in tables:
-                if table in ALLOWED_TABLES:
+                # Double check against whitelist AND strict alphanumeric pattern
+                if table in ALLOWED_TABLES and table.isidentifier():
                     try:
+                        # Safe because table is strictly validated against whitelist
                         cursor.execute(f'SELECT COUNT(*) FROM "{table}"')
                         count = cursor.fetchone()[0]
                         stats['tables'][table] = count
@@ -106,7 +108,8 @@ class DatabaseManagementService:
                         stats['tables'][table] = 0
                 else:
                     # Skip unknown tables but log them
-                    logger.debug(f"Skipping unknown table: {table}")
+                    if table not in ALLOWED_TABLES:
+                        logger.debug(f"Skipping unknown table: {table}")
                     stats['tables'][table] = 0
             
             conn.close()
