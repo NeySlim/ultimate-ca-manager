@@ -1011,3 +1011,144 @@ describe('searchService', () => {
     expect(mockApiClient.get).not.toHaveBeenCalled()
   })
 })
+
+// ============================================================
+// Governance: Policies Service
+// ============================================================
+describe('policiesService', () => {
+  let policiesService
+
+  beforeEach(async () => {
+    const mod = await import('../policies.service')
+    policiesService = mod.policiesService
+  })
+
+  it('list → GET /policies', async () => {
+    await policiesService.list()
+    expect(mockApiClient.get).toHaveBeenCalledWith('/policies')
+  })
+
+  it('getById → GET /policies/:id', async () => {
+    await policiesService.getById(5)
+    expect(mockApiClient.get).toHaveBeenCalledWith('/policies/5')
+  })
+
+  it('create → POST /policies', async () => {
+    const data = { name: 'Test', type: 'key_requirements' }
+    await policiesService.create(data)
+    expect(mockApiClient.post).toHaveBeenCalledWith('/policies', data)
+  })
+
+  it('update → PUT /policies/:id', async () => {
+    const data = { name: 'Updated' }
+    await policiesService.update(3, data)
+    expect(mockApiClient.put).toHaveBeenCalledWith('/policies/3', data)
+  })
+
+  it('delete → DELETE /policies/:id', async () => {
+    await policiesService.delete(7)
+    expect(mockApiClient.delete).toHaveBeenCalledWith('/policies/7')
+  })
+
+  it('toggle → POST /policies/:id/toggle', async () => {
+    await policiesService.toggle(2)
+    expect(mockApiClient.post).toHaveBeenCalledWith('/policies/2/toggle')
+  })
+})
+
+// ============================================================
+// Governance: Approvals Service
+// ============================================================
+describe('approvalsService', () => {
+  let approvalsService
+
+  beforeEach(async () => {
+    const mod = await import('../approvals.service')
+    approvalsService = mod.approvalsService
+  })
+
+  it('list with default status → GET /approvals?status=pending', async () => {
+    await approvalsService.list()
+    expect(mockApiClient.get).toHaveBeenCalledWith('/approvals?status=pending')
+  })
+
+  it('list with all → GET /approvals?status=all', async () => {
+    await approvalsService.list('all')
+    expect(mockApiClient.get).toHaveBeenCalledWith('/approvals?status=all')
+  })
+
+  it('list with specific status → GET /approvals?status=approved', async () => {
+    await approvalsService.list('approved')
+    expect(mockApiClient.get).toHaveBeenCalledWith('/approvals?status=approved')
+  })
+
+  it('getById → GET /approvals/:id', async () => {
+    await approvalsService.getById(10)
+    expect(mockApiClient.get).toHaveBeenCalledWith('/approvals/10')
+  })
+
+  it('approve → POST /approvals/:id/approve', async () => {
+    await approvalsService.approve(5, 'Looks good')
+    expect(mockApiClient.post).toHaveBeenCalledWith('/approvals/5/approve', { comment: 'Looks good' })
+  })
+
+  it('reject → POST /approvals/:id/reject', async () => {
+    await approvalsService.reject(3, 'Does not meet policy')
+    expect(mockApiClient.post).toHaveBeenCalledWith('/approvals/3/reject', { comment: 'Does not meet policy' })
+  })
+
+  it('getStats → GET /approvals/stats', async () => {
+    await approvalsService.getStats()
+    expect(mockApiClient.get).toHaveBeenCalledWith('/approvals/stats')
+  })
+})
+
+// ============================================================
+// Governance: Reports Service
+// ============================================================
+describe('reportsService', () => {
+  let reportsService
+
+  beforeEach(async () => {
+    const mod = await import('../reports.service')
+    reportsService = mod.reportsService
+  })
+
+  it('getTypes → GET /reports/types', async () => {
+    await reportsService.getTypes()
+    expect(mockApiClient.get).toHaveBeenCalledWith('/reports/types')
+  })
+
+  it('generate → POST /reports/generate with type + params', async () => {
+    await reportsService.generate('certificate_inventory', { days: 30 })
+    expect(mockApiClient.post).toHaveBeenCalledWith('/reports/generate', {
+      report_type: 'certificate_inventory',
+      params: { days: 30 }
+    })
+  })
+
+  it('download → GET /reports/download/:type with format', async () => {
+    await reportsService.download('ca_hierarchy', 'json', 90)
+    const call = mockApiClient.get.mock.calls[0]
+    expect(call[0]).toBe('/reports/download/ca_hierarchy?format=json&days=90')
+  })
+
+  it('getSchedule → GET /reports/schedule', async () => {
+    await reportsService.getSchedule()
+    expect(mockApiClient.get).toHaveBeenCalledWith('/reports/schedule')
+  })
+
+  it('updateSchedule → PUT /reports/schedule', async () => {
+    const data = { enabled: true, frequency: 'weekly' }
+    await reportsService.updateSchedule(data)
+    expect(mockApiClient.put).toHaveBeenCalledWith('/reports/schedule', data)
+  })
+
+  it('sendTest → POST /reports/send-test', async () => {
+    await reportsService.sendTest('compliance_status', 'admin@test.com')
+    expect(mockApiClient.post).toHaveBeenCalledWith('/reports/send-test', {
+      report_type: 'compliance_status',
+      recipient: 'admin@test.com'
+    })
+  })
+})

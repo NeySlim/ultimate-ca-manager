@@ -352,6 +352,9 @@ import CertificateToolsPage from '../CertificateToolsPage'
 import AccountPage from '../AccountPage'
 import ForgotPasswordPage from '../ForgotPasswordPage'
 import ResetPasswordPage from '../ResetPasswordPage'
+import PoliciesPage from '../PoliciesPage'
+import ApprovalsPage from '../ApprovalsPage'
+import ReportsPage from '../ReportsPage'
 
 
 // ════════════════════════════════════════════════════════════════════
@@ -537,6 +540,36 @@ describe('Page Rendering — smoke tests', () => {
       const { container } = render(
         <TestWrapper route="/account">
           <AccountPage />
+        </TestWrapper>
+      )
+      expect(container.firstChild).toBeTruthy()
+    })
+  })
+
+  // ── Governance pages ─────────────────────────────────────────
+  describe('Governance pages', () => {
+    it('PoliciesPage renders without crashing', () => {
+      const { container } = render(
+        <TestWrapper route="/policies">
+          <PoliciesPage />
+        </TestWrapper>
+      )
+      expect(container.firstChild).toBeTruthy()
+    })
+
+    it('ApprovalsPage renders without crashing', () => {
+      const { container } = render(
+        <TestWrapper route="/approvals">
+          <ApprovalsPage />
+        </TestWrapper>
+      )
+      expect(container.firstChild).toBeTruthy()
+    })
+
+    it('ReportsPage renders without crashing', () => {
+      const { container } = render(
+        <TestWrapper route="/reports">
+          <ReportsPage />
         </TestWrapper>
       )
       expect(container.firstChild).toBeTruthy()
