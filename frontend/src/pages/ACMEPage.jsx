@@ -13,7 +13,7 @@ import {
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple
+  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple, MagnifyingGlass
 } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import {
@@ -2253,6 +2253,117 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
   )
 }
 
+// Provider icon/color mapping for the card grid
+const PROVIDER_META = {
+  manual:       { color: 'bg-gray-500',    icon: '⚙️' },
+  cloudflare:   { color: 'bg-orange-500',  icon: '☁️' },
+  route53:      { color: 'bg-amber-600',   icon: '🔶' },
+  digitalocean: { color: 'bg-blue-500',    icon: '🌊' },
+  ovh:          { color: 'bg-blue-700',    icon: '🇫🇷' },
+  hetzner:      { color: 'bg-red-600',     icon: '🔴' },
+  gandi:        { color: 'bg-emerald-600', icon: '🟢' },
+  infomaniak:   { color: 'bg-sky-500',     icon: '🇨🇭' },
+  scaleway:     { color: 'bg-purple-600',  icon: '🟣' },
+  ionos:        { color: 'bg-blue-600',    icon: '🔷' },
+  netcup:       { color: 'bg-gray-700',    icon: '🖥️' },
+  inwx:         { color: 'bg-teal-600',    icon: '🌐' },
+  bookmyname:   { color: 'bg-indigo-500',  icon: '📖' },
+  linode:       { color: 'bg-green-600',   icon: '🟩' },
+  vultr:        { color: 'bg-sky-600',     icon: '🔵' },
+  godaddy:      { color: 'bg-green-700',   icon: '🏢' },
+  namecheap:    { color: 'bg-orange-600',  icon: '🏷️' },
+  desec:        { color: 'bg-yellow-600',  icon: '🔒' },
+  duckdns:      { color: 'bg-yellow-500',  icon: '🦆' },
+  freedns:      { color: 'bg-lime-600',    icon: '🆓' },
+}
+
+function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
+  const [search, setSearch] = useState('')
+  const { t } = useTranslation()
+
+  const filtered = providers.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.description.toLowerCase().includes(search.toLowerCase())
+  )
+
+  // Group: Popular first, then alphabetical
+  const popular = ['cloudflare', 'route53', 'ovh', 'hetzner', 'digitalocean', 'gandi']
+  const popularProviders = filtered.filter(p => popular.includes(p.type))
+  const otherProviders = filtered.filter(p => !popular.includes(p.type)).sort((a, b) => a.name.localeCompare(b.name))
+
+  const renderCard = (pt) => {
+    const meta = PROVIDER_META[pt.type] || { color: 'bg-gray-500', icon: '🌐' }
+    const isSelected = value === pt.type
+    return (
+      <button
+        key={pt.type}
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && onChange(pt.type)}
+        className={cn(
+          "flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center transition-all duration-200",
+          "hover:scale-[1.03] hover:shadow-md",
+          disabled && "opacity-50 cursor-not-allowed",
+          isSelected
+            ? "border-accent-primary bg-accent-primary/10 ring-2 ring-accent-primary/40 shadow-sm"
+            : "border-border/50 bg-bg-tertiary/40 hover:border-text-secondary/40 hover:bg-bg-tertiary/70"
+        )}
+      >
+        <span className={cn("w-9 h-9 rounded-lg flex items-center justify-center text-lg", meta.color, "text-white shadow-sm")}>
+          {meta.icon}
+        </span>
+        <span className={cn("text-xs font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
+          {pt.name}
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {label && <label className="block text-sm font-medium text-text-primary">{label}</label>}
+
+      {/* Search */}
+      {providers.length > 6 && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-bg-tertiary/60 border border-border/50 rounded-md">
+          <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />
+          <input
+            type="text"
+            className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
+            placeholder={t('common.search') + '...'}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
+      {/* Grid */}
+      <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
+        {search === '' && popularProviders.length > 0 && otherProviders.length > 0 && (
+          <>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">{t('common.popular', 'Popular')}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {popularProviders.map(renderCard)}
+            </div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary pt-1">{t('common.other', 'Other')}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {otherProviders.map(renderCard)}
+            </div>
+          </>
+        )}
+        {(search !== '' || popularProviders.length === 0 || otherProviders.length === 0) && (
+          <div className="grid grid-cols-3 gap-2">
+            {filtered.map(renderCard)}
+          </div>
+        )}
+        {filtered.length === 0 && (
+          <p className="text-xs text-text-tertiary text-center py-4">{t('common.noResults', 'No results')}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // DNS Provider Form Component
 function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
   const { t } = useTranslation()
@@ -2312,16 +2423,12 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
         placeholder={t('acme.providerNamePlaceholder')}
       />
       
-      <Select
+      <ProviderTypeGrid
         label={t('common.providerType')}
+        providers={providerTypes}
         value={formData.provider_type}
         onChange={(val) => setFormData(prev => ({ ...prev, provider_type: val, credentials: {} }))}
-        options={providerTypes.map(pt => ({
-          value: pt.type,
-          label: pt.name
-        }))}
         disabled={!!provider}
-        searchable
       />
       
       {/* Dynamic credential fields based on provider type schema */}
