@@ -210,7 +210,7 @@ export default function ApprovalsPage() {
       setComment('')
       loadData()
     } catch (err) {
-      showError(err.message || t('approvals.actionFailed'))
+      showError(t('approvals.actionFailed'))
     } finally {
       setActionLoading(false)
     }

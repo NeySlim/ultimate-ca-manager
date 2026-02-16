@@ -9,7 +9,7 @@ Creates useful out-of-the-box policies that reflect real-world PKI best practice
 - Wildcard Certificates (approval required)
 """
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 DEFAULT_POLICIES = [
@@ -118,7 +118,7 @@ DEFAULT_POLICIES = [
 
 def upgrade(conn):
     cursor = conn.cursor()
-    now = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
 
     for policy in DEFAULT_POLICIES:
         # Skip if already exists (idempotent)

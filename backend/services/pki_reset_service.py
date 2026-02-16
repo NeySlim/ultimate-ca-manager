@@ -114,7 +114,7 @@ class PKIResetService:
             # Whitelist validation for table names
             allowed_tables = {
                 'certificates', 'certificate_authorities', 'certificate_requests',
-                'crl_metadata', 'crls', 'ocsp_responses', 'scep_requests',
+                'trust_stores', 'crl_metadata', 'crls', 'ocsp_responses', 'scep_requests',
             }
             for table_name in pki_tables:
                 if table_name not in allowed_tables:

@@ -93,7 +93,7 @@ export default function ReportsPage() {
       setGeneratedReport({ type: reportType, data: res.data })
       showSuccess(t('reports.generated'))
     } catch (err) {
-      showError(err.message || t('reports.generateFailed'))
+      showError(t('reports.generateFailed'))
     } finally {
       setGenerating(null)
     }
@@ -105,7 +105,14 @@ export default function ReportsPage() {
       const res = await reportsService.download(reportType, format, 30)
 
       // Create blob for download
-      const content = typeof res === 'string' ? res : (res.data ? (typeof res.data === 'string' ? res.data : JSON.stringify(res.data, null, 2)) : JSON.stringify(res, null, 2))
+      let content
+      if (typeof res === 'string') {
+        content = res
+      } else if (res.data && typeof res.data === 'string') {
+        content = res.data
+      } else {
+        content = JSON.stringify(res.data || res, null, 2)
+      }
       const mimeType = format === 'csv' ? 'text/csv' : 'application/json'
       const blob = new Blob([content], { type: mimeType })
       const url = URL.createObjectURL(blob)
@@ -119,7 +126,7 @@ export default function ReportsPage() {
 
       showSuccess(t('reports.downloaded'))
     } catch (err) {
-      showError(err.message || t('reports.downloadFailed'))
+      showError(t('reports.downloadFailed'))
     } finally {
       setGenerating(null)
     }
@@ -134,7 +141,7 @@ export default function ReportsPage() {
       setTestSendModal(null)
       setTestEmail('')
     } catch (err) {
-      showError(err.message || t('reports.testFailed'))
+      showError(t('reports.testFailed'))
     } finally {
       setTestSending(false)
     }
@@ -164,7 +171,7 @@ export default function ReportsPage() {
       setShowScheduleModal(false)
       loadData()
     } catch (err) {
-      showError(err.message || t('reports.scheduleFailed'))
+      showError(t('reports.scheduleFailed'))
     } finally {
       setScheduleSaving(false)
     }
@@ -172,7 +179,7 @@ export default function ReportsPage() {
 
   const addRecipient = (type, input, setInput) => {
     const email = input.trim()
-    if (!email || !email.includes('@')) return
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return
     setScheduleForm(prev => ({
       ...prev,
       [type]: {
@@ -192,6 +199,47 @@ export default function ReportsPage() {
       },
     }))
   }
+
+  // Recipient editor sub-component to avoid duplication
+  const RecipientEditor = ({ type, input, setInput }) => (
+    <div className="pl-8">
+      <label className="text-sm text-text-secondary mb-1.5 block">{t('reports.recipients')}</label>
+      <div className="flex gap-2 mb-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="email@example.com"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              addRecipient(type, input, setInput)
+            }
+          }}
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => addRecipient(type, input, setInput)}
+        >
+          {t('common.add')}
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {scheduleForm[type].recipients.map(email => (
+          <Badge key={email} variant="default" size="sm" className="pr-1">
+            {email}
+            <button
+              type="button"
+              onClick={() => removeRecipient(type, email)}
+              className="ml-1.5 text-text-muted hover:text-red-500"
+            >×</button>
+          </Badge>
+        ))}
+      </div>
+    </div>
+  )
 
   if (loading) {
     return (
@@ -415,43 +463,7 @@ export default function ReportsPage() {
               <Badge variant="default" size="sm">{t('reports.daily')}</Badge>
             </div>
             {scheduleForm.expiry_report.enabled && (
-              <div className="pl-8">
-                <label className="text-sm text-text-secondary mb-1.5 block">{t('reports.recipients')}</label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={expiryRecipientInput}
-                    onChange={(e) => setExpiryRecipientInput(e.target.value)}
-                    placeholder="email@example.com"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addRecipient('expiry_report', expiryRecipientInput, setExpiryRecipientInput)
-                      }
-                    }}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => addRecipient('expiry_report', expiryRecipientInput, setExpiryRecipientInput)}
-                  >
-                    {t('common.add')}
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {scheduleForm.expiry_report.recipients.map(email => (
-                    <Badge key={email} variant="default" size="sm" className="pr-1">
-                      {email}
-                      <button
-                        type="button"
-                        onClick={() => removeRecipient('expiry_report', email)}
-                        className="ml-1.5 text-text-muted hover:text-red-500"
-                      >×</button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <RecipientEditor type="expiry_report" input={expiryRecipientInput} setInput={setExpiryRecipientInput} />
             )}
           </div>
 
@@ -474,43 +486,7 @@ export default function ReportsPage() {
               <Badge variant="default" size="sm">{t('reports.weekly')}</Badge>
             </div>
             {scheduleForm.compliance_report.enabled && (
-              <div className="pl-8">
-                <label className="text-sm text-text-secondary mb-1.5 block">{t('reports.recipients')}</label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={complianceRecipientInput}
-                    onChange={(e) => setComplianceRecipientInput(e.target.value)}
-                    placeholder="email@example.com"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addRecipient('compliance_report', complianceRecipientInput, setComplianceRecipientInput)
-                      }
-                    }}
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => addRecipient('compliance_report', complianceRecipientInput, setComplianceRecipientInput)}
-                  >
-                    {t('common.add')}
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {scheduleForm.compliance_report.recipients.map(email => (
-                    <Badge key={email} variant="default" size="sm" className="pr-1">
-                      {email}
-                      <button
-                        type="button"
-                        onClick={() => removeRecipient('compliance_report', email)}
-                        className="ml-1.5 text-text-muted hover:text-red-500"
-                      >×</button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+              <RecipientEditor type="compliance_report" input={complianceRecipientInput} setInput={setComplianceRecipientInput} />
             )}
           </div>
 

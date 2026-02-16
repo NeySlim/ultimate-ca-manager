@@ -76,6 +76,7 @@ export default function PoliciesPage() {
   const [formData, setFormData] = useState({ ...DEFAULT_FORM })
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+  const [actionInProgress, setActionInProgress] = useState(false)
 
   // Detail state
   const [selectedPolicy, setSelectedPolicy] = useState(null)
@@ -296,30 +297,38 @@ export default function PoliciesPage() {
       setShowModal(false)
       loadData()
     } catch (err) {
-      showError(err.message || t('policies.saveFailed'))
+      showError(t('policies.saveFailed'))
     } finally {
       setSaving(false)
     }
   }
 
   const handleToggle = async (policy) => {
+    if (actionInProgress) return
     try {
+      setActionInProgress(true)
       await policiesService.toggle(policy.id)
       showSuccess(policy.is_active ? t('policies.disabled') : t('policies.enabled'))
       loadData()
     } catch (err) {
       showError(t('policies.toggleFailed'))
+    } finally {
+      setActionInProgress(false)
     }
   }
 
   const handleDelete = async (policy) => {
+    if (actionInProgress) return
     try {
+      setActionInProgress(true)
       await policiesService.delete(policy.id)
       showSuccess(t('policies.deleted'))
       setShowDeleteConfirm(null)
       loadData()
     } catch (err) {
-      showError(err.message || t('policies.deleteFailed'))
+      showError(t('policies.deleteFailed'))
+    } finally {
+      setActionInProgress(false)
     }
   }
 
@@ -728,8 +737,8 @@ export default function PoliciesPage() {
             <Button variant="secondary" onClick={() => setShowDeleteConfirm(null)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="danger" onClick={() => handleDelete(showDeleteConfirm)}>
-              {t('common.delete')}
+            <Button variant="danger" onClick={() => handleDelete(showDeleteConfirm)} disabled={actionInProgress}>
+              {actionInProgress ? <LoadingSpinner size="sm" /> : t('common.delete')}
             </Button>
           </div>
         </div>
