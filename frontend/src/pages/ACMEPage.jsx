@@ -27,6 +27,7 @@ import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
+import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
 
 export default function ACMEPage() {
   const { t } = useTranslation()
@@ -2253,44 +2254,7 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
   )
 }
 
-// Provider icon/color mapping for the card grid
-const PROVIDER_META = {
-  manual:       { color: 'bg-gray-500',    icon: '⚙️' },
-  cloudflare:   { color: 'bg-orange-500',  icon: '☁️' },
-  route53:      { color: 'bg-amber-600',   icon: '🔶' },
-  digitalocean: { color: 'bg-blue-500',    icon: '🌊' },
-  ovh:          { color: 'bg-blue-700',    icon: '🇫🇷' },
-  hetzner:      { color: 'bg-red-600',     icon: '🔴' },
-  gandi:        { color: 'bg-emerald-600', icon: '🟢' },
-  infomaniak:   { color: 'bg-sky-500',     icon: '🇨🇭' },
-  scaleway:     { color: 'bg-purple-600',  icon: '🟣' },
-  ionos:        { color: 'bg-blue-600',    icon: '🔷' },
-  netcup:       { color: 'bg-gray-700',    icon: '🖥️' },
-  inwx:         { color: 'bg-teal-600',    icon: '🌐' },
-  bookmyname:   { color: 'bg-indigo-500',  icon: '📖' },
-  linode:       { color: 'bg-green-600',   icon: '🟩' },
-  vultr:        { color: 'bg-sky-600',     icon: '🔵' },
-  godaddy:      { color: 'bg-green-700',   icon: '🏢' },
-  namecheap:    { color: 'bg-orange-600',  icon: '🏷️' },
-  desec:        { color: 'bg-yellow-600',  icon: '🔒' },
-  duckdns:      { color: 'bg-yellow-500',  icon: '🦆' },
-  freedns:      { color: 'bg-lime-600',    icon: '🆓' },
-  azure:        { color: 'bg-blue-500',    icon: '🔷' },
-  gcloud:       { color: 'bg-blue-400',    icon: '☁️' },
-  dynu:         { color: 'bg-cyan-600',    icon: '🔄' },
-  dnsimple:     { color: 'bg-teal-500',    icon: '✨' },
-  dnsmadeeasy:  { color: 'bg-green-500',   icon: '🧩' },
-  easydns:      { color: 'bg-rose-500',    icon: '🎯' },
-  dreamhost:    { color: 'bg-indigo-600',  icon: '💫' },
-  cloudns:      { color: 'bg-sky-700',     icon: '☁️' },
-  domeneshop:   { color: 'bg-red-700',     icon: '🇳🇴' },
-  porkbun:      { color: 'bg-pink-500',    icon: '🐷' },
-  vercel:       { color: 'bg-gray-800',    icon: '▲' },
-  bunny:        { color: 'bg-orange-400',  icon: '🐰' },
-  alwaysdata:   { color: 'bg-violet-600',  icon: '🇫🇷' },
-  corenetworks: { color: 'bg-slate-600',   icon: '🇩🇪' },
-  checkdomain:  { color: 'bg-emerald-700', icon: '✅' },
-}
+// Provider icon/color mapping is now in components/ProviderIcons.jsx
 
 function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
   const [search, setSearch] = useState('')
@@ -2312,7 +2276,7 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const renderCard = (pt) => {
-    const meta = PROVIDER_META[pt.type] || { color: 'bg-gray-500', icon: '🌐' }
+    const brandColor = getProviderColor(pt.type)
     const isSelected = value === pt.type
     return (
       <button
@@ -2329,8 +2293,9 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
             : "border-border/50 bg-bg-tertiary/40 hover:border-text-secondary/40 hover:bg-bg-tertiary/70"
         )}
       >
-        <span className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-base", meta.color, "text-white shadow-sm")}>
-          {meta.icon}
+        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
+          style={{ backgroundColor: brandColor }}>
+          <ProviderIcon type={pt.type} size={18} />
         </span>
         <span className={cn("text-[11px] font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
           {pt.name}
