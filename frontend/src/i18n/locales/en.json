@@ -2117,6 +2117,7 @@
     "maxSANs": "Max SANs",
     "dnsPattern": "DNS Pattern Restriction",
     "approvalWorkflow": "Approval Workflow",
+    "approval": "Approval",
     "requireApproval": "Require approval before issuance",
     "approvalGroup": "Approval Group",
     "selectGroup": "Select group...",
