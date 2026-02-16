@@ -2311,7 +2311,7 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
 
       {/* Search */}
       {providers.length > 6 && (
-        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-bg-tertiary/60 border border-border/50 rounded-md">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-transparent border border-border rounded-md focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary/30 transition-colors">
           <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />
           <input
             type="text"
