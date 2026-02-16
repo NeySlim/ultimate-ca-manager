@@ -2275,6 +2275,21 @@ const PROVIDER_META = {
   desec:        { color: 'bg-yellow-600',  icon: '🔒' },
   duckdns:      { color: 'bg-yellow-500',  icon: '🦆' },
   freedns:      { color: 'bg-lime-600',    icon: '🆓' },
+  azure:        { color: 'bg-blue-500',    icon: '🔷' },
+  gcloud:       { color: 'bg-blue-400',    icon: '☁️' },
+  dynu:         { color: 'bg-cyan-600',    icon: '🔄' },
+  dnsimple:     { color: 'bg-teal-500',    icon: '✨' },
+  dnsmadeeasy:  { color: 'bg-green-500',   icon: '🧩' },
+  easydns:      { color: 'bg-rose-500',    icon: '🎯' },
+  dreamhost:    { color: 'bg-indigo-600',  icon: '💫' },
+  cloudns:      { color: 'bg-sky-700',     icon: '☁️' },
+  domeneshop:   { color: 'bg-red-700',     icon: '🇳🇴' },
+  porkbun:      { color: 'bg-pink-500',    icon: '🐷' },
+  vercel:       { color: 'bg-gray-800',    icon: '▲' },
+  bunny:        { color: 'bg-orange-400',  icon: '🐰' },
+  alwaysdata:   { color: 'bg-violet-600',  icon: '🇫🇷' },
+  corenetworks: { color: 'bg-slate-600',   icon: '🇩🇪' },
+  checkdomain:  { color: 'bg-emerald-700', icon: '✅' },
 }
 
 function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
@@ -2286,10 +2301,15 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
     p.description.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Group: Popular first, then alphabetical
-  const popular = ['cloudflare', 'route53', 'ovh', 'hetzner', 'digitalocean', 'gandi']
-  const popularProviders = filtered.filter(p => popular.includes(p.type))
-  const otherProviders = filtered.filter(p => !popular.includes(p.type)).sort((a, b) => a.name.localeCompare(b.name))
+  // Group: Manual first, then Popular (sorted by rank), then Other alphabetical
+  const popularOrder = ['cloudflare', 'route53', 'azure', 'gcloud', 'ovh', 'hetzner', 'digitalocean', 'gandi', 'porkbun']
+  const manualProvider = filtered.find(p => p.type === 'manual')
+  const popularProviders = popularOrder
+    .map(type => filtered.find(p => p.type === type))
+    .filter(Boolean)
+  const otherProviders = filtered
+    .filter(p => p.type !== 'manual' && !popularOrder.includes(p.type))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   const renderCard = (pt) => {
     const meta = PROVIDER_META[pt.type] || { color: 'bg-gray-500', icon: '🌐' }
@@ -2301,7 +2321,7 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
         disabled={disabled}
         onClick={() => !disabled && onChange(pt.type)}
         className={cn(
-          "flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center transition-all duration-200",
+          "flex flex-col items-center gap-1.5 p-2.5 rounded-lg border text-center transition-all duration-200 min-h-[72px]",
           "hover:scale-[1.03] hover:shadow-md",
           disabled && "opacity-50 cursor-not-allowed",
           isSelected
@@ -2309,10 +2329,10 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
             : "border-border/50 bg-bg-tertiary/40 hover:border-text-secondary/40 hover:bg-bg-tertiary/70"
         )}
       >
-        <span className={cn("w-9 h-9 rounded-lg flex items-center justify-center text-lg", meta.color, "text-white shadow-sm")}>
+        <span className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-base", meta.color, "text-white shadow-sm")}>
           {meta.icon}
         </span>
-        <span className={cn("text-xs font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
+        <span className={cn("text-[11px] font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
           {pt.name}
         </span>
       </button>
@@ -2338,20 +2358,30 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
       )}
 
       {/* Grid */}
-      <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
-        {search === '' && popularProviders.length > 0 && otherProviders.length > 0 && (
+      <div className="max-h-80 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+        {/* Manual — always visible on top when not searching */}
+        {search === '' && manualProvider && (
+          <div className="grid grid-cols-3 gap-2">
+            {renderCard(manualProvider)}
+          </div>
+        )}
+        {search === '' && popularProviders.length > 0 && (
           <>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">{t('common.popular', 'Popular')}</p>
             <div className="grid grid-cols-3 gap-2">
               {popularProviders.map(renderCard)}
             </div>
+          </>
+        )}
+        {search === '' && otherProviders.length > 0 && (
+          <>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary pt-1">{t('common.other', 'Other')}</p>
             <div className="grid grid-cols-3 gap-2">
               {otherProviders.map(renderCard)}
             </div>
           </>
         )}
-        {(search !== '' || popularProviders.length === 0 || otherProviders.length === 0) && (
+        {search !== '' && (
           <div className="grid grid-cols-3 gap-2">
             {filtered.map(renderCard)}
           </div>

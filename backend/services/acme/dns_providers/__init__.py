@@ -20,6 +20,7 @@ from .gandi import GandiDnsProvider
 from .digitalocean import DigitalOceanDnsProvider
 from .infomaniak import InfomaniakDnsProvider
 from .route53 import Route53DnsProvider
+from .azure import AzureDnsProvider
 from .scaleway import ScalewayDnsProvider
 from .ionos import IonosDnsProvider
 from .desec import DesecDnsProvider
@@ -32,6 +33,20 @@ from .netcup import NetcupDnsProvider
 from .inwx import InwxDnsProvider
 from .freedns import FreeDnsDnsProvider
 from .duckdns import DuckDnsDnsProvider
+from .gcloud import GoogleCloudDnsProvider
+from .dynu import DynuDnsProvider
+from .dnsimple import DnsimpleDnsProvider
+from .dnsmadeeasy import DnsMadeEasyDnsProvider
+from .easydns import EasyDnsDnsProvider
+from .dreamhost import DreamhostDnsProvider
+from .cloudns import ClouDnsDnsProvider
+from .domeneshop import DomeneshopDnsProvider
+from .porkbun import PorkbunDnsProvider
+from .vercel import VercelDnsProvider
+from .bunny import BunnyDnsProvider
+from .alwaysdata import AlwaysdataDnsProvider
+from .corenetworks import CoreNetworksDnsProvider
+from .checkdomain import CheckdomainDnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +71,8 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'cloudflare': CloudflareDnsProvider,
     'digitalocean': DigitalOceanDnsProvider,
     'route53': Route53DnsProvider,
+    'gcloud': GoogleCloudDnsProvider,
+    'azure': AzureDnsProvider,
     'linode': LinodeDnsProvider,
     'vultr': VultrDnsProvider,
     'godaddy': GoDaddyDnsProvider,
@@ -64,6 +81,20 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     # Free DNS services
     'duckdns': DuckDnsDnsProvider,
     'freedns': FreeDnsDnsProvider,
+    'dynu': DynuDnsProvider,
+    # Additional providers
+    'dnsimple': DnsimpleDnsProvider,
+    'dnsmadeeasy': DnsMadeEasyDnsProvider,
+    'easydns': EasyDnsDnsProvider,
+    'dreamhost': DreamhostDnsProvider,
+    'cloudns': ClouDnsDnsProvider,
+    'domeneshop': DomeneshopDnsProvider,
+    'porkbun': PorkbunDnsProvider,
+    'vercel': VercelDnsProvider,
+    'bunny': BunnyDnsProvider,
+    'alwaysdata': AlwaysdataDnsProvider,
+    'corenetworks': CoreNetworksDnsProvider,
+    'checkdomain': CheckdomainDnsProvider,
 }
 
 
