@@ -47,6 +47,19 @@ from .bunny import BunnyDnsProvider
 from .alwaysdata import AlwaysdataDnsProvider
 from .corenetworks import CoreNetworksDnsProvider
 from .checkdomain import CheckdomainDnsProvider
+from .netlify import NetlifyDnsProvider
+from .rackspace import RackspaceDnsProvider
+from .powerdns import PowerDnsDnsProvider
+from .ns1 import Ns1DnsProvider
+from .constellix import ConstellixDnsProvider
+from .hostinger import HostingerDnsProvider
+from .hover import HoverDnsProvider
+from .namecom import NamecomDnsProvider
+from .epik import EpikDnsProvider
+from .hurricane import HurricaneDnsProvider
+from .mythicbeasts import MythicBeastsDnsProvider
+from .rcodezero import RcodeZeroDnsProvider
+from .rfc2136 import Rfc2136DnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +108,22 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'alwaysdata': AlwaysdataDnsProvider,
     'corenetworks': CoreNetworksDnsProvider,
     'checkdomain': CheckdomainDnsProvider,
+    # Tier 1 - Cloud & Enterprise
+    'netlify': NetlifyDnsProvider,
+    'ns1': Ns1DnsProvider,
+    'constellix': ConstellixDnsProvider,
+    'rackspace': RackspaceDnsProvider,
+    'powerdns': PowerDnsDnsProvider,
+    # Tier 2 - Registrars & Regional
+    'hostinger': HostingerDnsProvider,
+    'hover': HoverDnsProvider,
+    'namecom': NamecomDnsProvider,
+    'epik': EpikDnsProvider,
+    'hurricane': HurricaneDnsProvider,
+    'mythicbeasts': MythicBeastsDnsProvider,
+    'rcodezero': RcodeZeroDnsProvider,
+    # Self-hosted / Protocol-based
+    'rfc2136': Rfc2136DnsProvider,
 }
 
 
