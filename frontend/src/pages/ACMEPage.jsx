@@ -2311,11 +2311,11 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
 
       {/* Search */}
       {providers.length > 6 && (
-        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-bg-tertiary border border-border rounded-lg focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary/30 transition-colors">
-          <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />
+        <div className="relative">
+          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
           <input
             type="text"
-            className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
+            className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent-primary transition-colors"
             placeholder={t('common.search') + '...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
