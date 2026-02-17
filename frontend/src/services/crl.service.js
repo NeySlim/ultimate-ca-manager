@@ -26,11 +26,19 @@ export const crlService = {
     })
   },
 
-  async getDistributionPoints(caId) {
-    return apiClient.get(`/crl/distribution-points/${caId}`)
+  async regenerate(caId) {
+    return apiClient.post(`/crl/${caId}/regenerate`)
   },
 
-  async updateDistributionPoint(caId, url) {
-    return apiClient.put(`/crl/distribution-points/${caId}`, { url })
+  async toggleAutoRegen(caId, enabled) {
+    return apiClient.post(`/crl/${caId}/auto-regen`, { enabled })
+  },
+
+  async getOcspStatus() {
+    return apiClient.get('/ocsp/status')
+  },
+
+  async getOcspStats() {
+    return apiClient.get('/ocsp/stats')
   }
 }

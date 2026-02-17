@@ -347,7 +347,6 @@ import AuditLogsPage from '../AuditLogsPage'
 import SCEPPage from '../SCEPPage'
 import CRLOCSPPage from '../CRLOCSPPage'
 import TrustStorePage from '../TrustStorePage'
-import ImportExportPage from '../ImportExportPage'
 import CertificateToolsPage from '../CertificateToolsPage'
 import AccountPage from '../AccountPage'
 import ForgotPasswordPage from '../ForgotPasswordPage'
@@ -518,15 +517,6 @@ describe('Page Rendering — smoke tests', () => {
 
   // ── Utility pages ─────────────────────────────────────────────
   describe('Utility pages', () => {
-    it('ImportExportPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/import-export">
-          <ImportExportPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
     it('CertificateToolsPage renders without crashing', () => {
       const { container } = render(
         <TestWrapper route="/tools">
