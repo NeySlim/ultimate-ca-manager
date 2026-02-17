@@ -2204,6 +2204,7 @@
     "weekly": "Hebdomadaire",
     "recipients": "Destinataires",
     "generatedPreview": "Aperçu du rapport",
+    "generatedAt": "Généré le",
     "loadFailed": "Échec du chargement des rapports",
     "generated": "Rapport généré",
     "generateFailed": "Échec de la génération du rapport",

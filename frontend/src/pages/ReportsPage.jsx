@@ -251,6 +251,132 @@ export default function ReportsPage() {
     )
   }
 
+  // Parse report content and render a proper table + summary
+  const renderReportPreview = (report) => {
+    let parsed = report.data
+    // Parse content if it's a nested JSON string
+    if (parsed?.content && typeof parsed.content === 'string') {
+      try { parsed = JSON.parse(parsed.content) } catch { /* keep original */ }
+    }
+
+    const items = parsed?.items || []
+    const columns = parsed?.columns || []
+    const summary = parsed?.summary || report.data?.summary || {}
+
+    // Summary badges
+    const summaryBadges = Object.entries(summary).map(([key, val]) => {
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      let variant = 'default'
+      if (key === 'valid' || key === 'passed' || key === 'root') variant = 'success'
+      else if (key === 'overall_score' && val === 'healthy') variant = 'success'
+      else if (key === 'expired' || key === 'failed' || key === 'revoked') variant = 'danger'
+      else if (key === 'overall_score' && val === 'critical') variant = 'danger'
+      else if (key === 'expiring' || key === 'warnings') variant = 'warning'
+      else if (key === 'overall_score' && val === 'warning') variant = 'warning'
+      else if (key === 'total' || key === 'total_events' || key === 'total_checks') variant = 'info'
+      return (
+        <Badge key={key} variant={variant} size="sm" className="text-xs">
+          {label}: {typeof val === 'number' ? val.toLocaleString() : String(val)}
+        </Badge>
+      )
+    })
+
+    // Column display names
+    const colLabel = (col) => col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+    // Format cell value
+    const formatCell = (val, col) => {
+      if (val === null || val === undefined) return '—'
+      if (col === 'status') {
+        const v = { valid: 'success', expired: 'danger', revoked: 'danger', expiring: 'warning', pass: 'success', fail: 'danger', warning: 'warning' }
+        return <Badge variant={v[val] || 'default'} size="sm">{val}</Badge>
+      }
+      if (col === 'is_root') return val ? '✓ Root' : 'Intermediate'
+      if (col === 'severity') {
+        const v = { high: 'danger', medium: 'warning', none: 'default' }
+        return <Badge variant={v[val] || 'default'} size="sm">{val}</Badge>
+      }
+      if (typeof val === 'boolean') return val ? '✓' : '✗'
+      if (typeof val === 'object') return JSON.stringify(val)
+      const str = String(val)
+      return str.length > 60 ? str.slice(0, 57) + '…' : str
+    }
+
+    // For audit_summary which has a different structure (categories with data objects)
+    if (report.type === 'audit_summary' && items.length > 0 && items[0]?.category) {
+      return (
+        <div className="space-y-3">
+          {summaryBadges.length > 0 && (
+            <div className="flex flex-wrap gap-2">{summaryBadges}</div>
+          )}
+          {items.map((item) => (
+            <div key={item.category}>
+              <h4 className="text-xs font-semibold text-text-primary mb-1 capitalize">{item.category}</h4>
+              <div className="bg-bg-tertiary rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border-primary">
+                      <th className="text-left px-3 py-1.5 text-text-secondary font-medium">{item.category === 'actions' ? 'Action' : item.category === 'users' ? 'User' : 'Resource'}</th>
+                      <th className="text-right px-3 py-1.5 text-text-secondary font-medium">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(item.data || {}).map(([k, v]) => (
+                      <tr key={k} className="border-b border-border-primary/50 last:border-0">
+                        <td className="px-3 py-1.5 text-text-primary font-mono">{k}</td>
+                        <td className="px-3 py-1.5 text-text-primary text-right font-semibold">{v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // Standard table with items
+    return (
+      <div className="space-y-3">
+        {summaryBadges.length > 0 && (
+          <div className="flex flex-wrap gap-2">{summaryBadges}</div>
+        )}
+        {items.length > 0 && columns.length > 0 ? (
+          <div className="bg-bg-tertiary rounded-lg overflow-auto max-h-96">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-bg-tertiary">
+                <tr className="border-b border-border-primary">
+                  {columns.map((col) => (
+                    <th key={col} className="text-left px-3 py-2 text-text-secondary font-medium whitespace-nowrap">
+                      {colLabel(col)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={item.id || i} className="border-b border-border-primary/50 last:border-0 hover:bg-bg-secondary/50">
+                    {columns.map((col) => (
+                      <td key={col} className="px-3 py-1.5 text-text-primary whitespace-nowrap">
+                        {formatCell(item[col], col)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : items.length === 0 ? (
+          <p className="text-xs text-text-tertiary italic py-2">{t('common.noData')}</p>
+        ) : null}
+        <p className="text-xs text-text-tertiary">
+          {items.length} {items.length === 1 ? 'record' : 'records'} • {t('reports.generatedAt')} {new Date().toLocaleString()}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
       <ResponsiveLayout
@@ -387,18 +513,19 @@ export default function ReportsPage() {
                   <CheckCircle size={16} className="text-green-500" weight="fill" />
                   {t('reports.generatedPreview')} — {reportTypes[generatedReport.type]?.name}
                 </h3>
-                <Button size="sm" variant="secondary" onClick={() => setGeneratedReport(null)}>
-                  {t('common.close')}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="primary" onClick={() => handleDownload(generatedReport.type, 'csv')}>
+                    <FileCsv size={14} className="mr-1" /> CSV
+                  </Button>
+                  <Button size="sm" variant="primary" onClick={() => handleDownload(generatedReport.type, 'json')}>
+                    <FileJs size={14} className="mr-1" /> JSON
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => setGeneratedReport(null)}>
+                    {t('common.close')}
+                  </Button>
+                </div>
               </div>
-              <div className="bg-bg-tertiary rounded-lg p-4 max-h-80 overflow-auto">
-                <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap">
-                  {typeof generatedReport.data === 'string'
-                    ? generatedReport.data
-                    : JSON.stringify(generatedReport.data, null, 2)
-                  }
-                </pre>
-              </div>
+              {renderReportPreview(generatedReport)}
             </div>
           </Card>
         )}

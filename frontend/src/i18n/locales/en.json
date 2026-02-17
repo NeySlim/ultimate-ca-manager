@@ -2192,6 +2192,7 @@
     "weekly": "Weekly",
     "recipients": "Recipients",
     "generatedPreview": "Report Preview",
+    "generatedAt": "Generated",
     "loadFailed": "Failed to load reports",
     "generated": "Report generated",
     "generateFailed": "Failed to generate report",
