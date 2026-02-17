@@ -585,8 +585,9 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
   // SP metadata URLs for SAML/OAuth2 IdP configuration
   const baseUrl = window.location.origin
   const spEntityId = `${baseUrl}/api/v2/sso`
-  const acsUrl = provider ? `${baseUrl}/api/v2/sso/callback/${provider.id}` : null
-  const oauthCallbackUrl = provider ? `${baseUrl}/api/v2/sso/callback/${provider.id}` : null
+  const samlAcsUrl = `${baseUrl}/api/v2/sso/callback/saml`
+  const samlSloUrl = `${baseUrl}/api/v2/sso/callback/saml`
+  const oauthCallbackUrl = `${baseUrl}/api/v2/sso/callback/oauth2`
 
   const roleOptions = [
     { value: 'admin', label: t('common.admin') },
@@ -650,8 +651,8 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             {t('sso.spMetadataHelp')}
           </HelpCard>
           <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
-          <CopyableUrl label={t('sso.acsUrl')} value={`${baseUrl}/api/v2/sso/callback/${provider ? provider.id : '{id}'}`} description={!provider ? t('sso.urlsAfterSave') : t('sso.acsUrlDesc')} />
-          <CopyableUrl label={t('sso.spSloUrl')} value={`${baseUrl}/api/v2/sso/callback/${provider ? provider.id : '{id}'}`} />
+          <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
+          <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />
         </div>
       )}
 
@@ -664,7 +665,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           <HelpCard variant="info" className="text-xs">
             {t('sso.callbackUrlsHelp')}
           </HelpCard>
-          <CopyableUrl label={t('sso.redirectUri')} value={`${baseUrl}/api/v2/sso/callback/${provider ? provider.id : '{id}'}`} description={!provider ? t('sso.urlsAfterSave') : ''} />
+          <CopyableUrl label={t('sso.redirectUri')} value={oauthCallbackUrl} />
         </div>
       )}
 
