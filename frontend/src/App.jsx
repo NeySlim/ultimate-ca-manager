@@ -72,6 +72,17 @@ function AdminRoute({ children }) {
   return children
 }
 
+function PermissionRoute({ children, permission }) {
+  const { isAuthenticated, loading, permissions } = useAuth()
+  
+  if (loading) return <PageLoader />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (permissions?.includes('*')) return children
+  if (permission && !permissions?.includes(permission)) return <Navigate to="/" replace />
+  
+  return children
+}
+
 function AppRoutes() {
   const { isAuthenticated, forcePasswordChange, clearForcePasswordChange, logout } = useAuth()
   
@@ -107,28 +118,28 @@ function AppRoutes() {
           <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />
           <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
           <Route path="/users" element={<AdminRoute><UsersGroupsPage /></AdminRoute>} />
-          <Route path="/acme" element={<ProtectedRoute><ACMEPage /></ProtectedRoute>} />
-          <Route path="/scep-config" element={<ProtectedRoute><SCEPPage /></ProtectedRoute>} />
+          <Route path="/acme" element={<PermissionRoute permission="read:acme"><ACMEPage /></PermissionRoute>} />
+          <Route path="/scep-config" element={<PermissionRoute permission="read:scep"><SCEPPage /></PermissionRoute>} />
           <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
-          <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
+          <Route path="/audit" element={<PermissionRoute permission="read:audit"><AuditLogsPage /></PermissionRoute>} />
           <Route path="/operations" element={<AdminRoute><OperationsPage /></AdminRoute>} />
           <Route path="/import" element={<Navigate to="/operations" replace />} />
           <Route path="/tools" element={<ProtectedRoute><CertificateToolsPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-          <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
-          <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
-          <Route path="/truststore/:id" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
+          <Route path="/crl-ocsp" element={<PermissionRoute permission="read:crl"><CRLOCSPPage /></PermissionRoute>} />
+          <Route path="/truststore" element={<PermissionRoute permission="read:truststore"><TrustStorePage /></PermissionRoute>} />
+          <Route path="/truststore/:id" element={<PermissionRoute permission="read:truststore"><TrustStorePage /></PermissionRoute>} />
           
           {/* Security & Administration */}
           <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />
           <Route path="/rbac" element={<AdminRoute><RBACPage /></AdminRoute>} />
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
-          <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
+          <Route path="/hsm" element={<PermissionRoute permission="read:hsm"><HSMPage /></PermissionRoute>} />
           <Route path="/security" element={<Navigate to="/settings?tab=security" replace />} />
           {/* Governance */}
-          <Route path="/policies" element={<ProtectedRoute><PoliciesPage /></ProtectedRoute>} />
-          <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+          <Route path="/policies" element={<PermissionRoute permission="read:policies"><PoliciesPage /></PermissionRoute>} />
+          <Route path="/approvals" element={<PermissionRoute permission="read:approvals"><ApprovalsPage /></PermissionRoute>} />
+          <Route path="/reports" element={<PermissionRoute permission="read:audit"><ReportsPage /></PermissionRoute>} />
           {/* Component showcase — accessible by URL only, not in sidebar */}
           <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />
         </Route>

@@ -21,6 +21,7 @@ import { Logo } from './Logo'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermission } from '../hooks'
 import { certificatesService } from '../services'
 import { languages } from '../i18n'
 
@@ -31,17 +32,20 @@ const mobileNavItems = [
   { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', shortKey: 'common.casShort', path: '/cas' },
   { id: 'csrs', icon: FileText, labelKey: 'common.csrs', shortKey: 'common.csrsShort', path: '/csrs' },
   { id: 'templates', icon: ListIcon, labelKey: 'common.templates', shortKey: 'common.templatesShort', path: '/templates' },
-  { id: 'acme', icon: Key, labelKey: 'common.acme', shortKey: 'common.acmeShort', path: '/acme' },
-  { id: 'scep', icon: Robot, labelKey: 'common.scep', shortKey: 'common.scepShort', path: '/scep-config' },
-  { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', shortKey: 'common.crlOcspShort', path: '/crl-ocsp' },
-  { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', shortKey: 'common.trustStoreShort', path: '/truststore' },
-  { id: 'operations', icon: Lightning, labelKey: 'common.operations', shortKey: 'common.operationsShort', path: '/operations' },
+  { id: 'acme', icon: Key, labelKey: 'common.acme', shortKey: 'common.acmeShort', path: '/acme', permission: 'read:acme' },
+  { id: 'scep', icon: Robot, labelKey: 'common.scep', shortKey: 'common.scepShort', path: '/scep-config', permission: 'read:scep' },
+  { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', shortKey: 'common.crlOcspShort', path: '/crl-ocsp', permission: 'read:crl' },
+  { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', shortKey: 'common.trustStoreShort', path: '/truststore', permission: 'read:truststore' },
+  { id: 'operations', icon: Lightning, labelKey: 'common.operations', shortKey: 'common.operationsShort', path: '/operations', adminOnly: true },
   { id: 'tools', icon: Wrench, labelKey: 'common.tools', shortKey: 'common.toolsShort', path: '/tools' },
-  { id: 'users', icon: User, labelKey: 'common.users', shortKey: 'common.usersShort', path: '/users' },
-  { id: 'rbac', icon: Shield, labelKey: 'common.rbac', shortKey: 'common.rbacShort', path: '/rbac' },
-  { id: 'hsm', icon: Lock, labelKey: 'common.hsm', shortKey: 'common.hsmShort', path: '/hsm' },
-  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', shortKey: 'common.auditShort', path: '/audit' },
-  { id: 'settings', icon: Gear, labelKey: 'common.settings', shortKey: 'common.settingsShort', path: '/settings' },
+  { id: 'policies', icon: undefined, labelKey: 'common.policies', shortKey: 'common.policiesShort', path: '/policies', permission: 'read:policies' },
+  { id: 'approvals', icon: undefined, labelKey: 'common.approvals', shortKey: 'common.approvalsShort', path: '/approvals', permission: 'read:approvals' },
+  { id: 'reports', icon: undefined, labelKey: 'common.reports', shortKey: 'common.reportsShort', path: '/reports', permission: 'read:audit' },
+  { id: 'users', icon: User, labelKey: 'common.users', shortKey: 'common.usersShort', path: '/users', adminOnly: true },
+  { id: 'rbac', icon: Shield, labelKey: 'common.rbac', shortKey: 'common.rbacShort', path: '/rbac', adminOnly: true },
+  { id: 'hsm', icon: Lock, labelKey: 'common.hsm', shortKey: 'common.hsmShort', path: '/hsm', permission: 'read:hsm' },
+  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', shortKey: 'common.auditShort', path: '/audit', permission: 'read:audit' },
+  { id: 'settings', icon: Gear, labelKey: 'common.settings', shortKey: 'common.settingsShort', path: '/settings', adminOnly: true },
 ]
 
 export function AppShell() {
@@ -50,6 +54,7 @@ export function AppShell() {
   const navigate = useNavigate()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const { user, logout } = useAuth()
+  const { isAdmin, hasPermission } = usePermission()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -141,8 +146,12 @@ export function AppShell() {
     onCommandPalette: () => setCommandPaletteOpen(true)
   })
 
-  // All nav items for mobile menu
-  const allNavItems = mobileNavItems
+  // All nav items for mobile menu — filtered by permission
+  const allNavItems = mobileNavItems.filter(item => {
+    if (item.adminOnly && !isAdmin()) return false
+    if (item.permission && !isAdmin() && !hasPermission(item.permission)) return false
+    return true
+  })
 
   return (
     <div className={cn(
@@ -231,6 +240,7 @@ export function AppShell() {
                   <UserCircle size={15} />
                   <span>{t('common.account')}</span>
                 </DropdownMenu.Item>
+                {isAdmin() && (
                 <DropdownMenu.Item
                   onClick={() => { setMobileMenuOpen(false); navigate('/settings') }}
                   className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary"
@@ -238,6 +248,7 @@ export function AppShell() {
                   <Gear size={15} />
                   <span>{t('common.settings')}</span>
                 </DropdownMenu.Item>
+                )}
 
                 <DropdownMenu.Separator className="h-px bg-border my-0.5" />
 
