@@ -89,6 +89,6 @@ export const certificatesService = {
     return apiClient.post('/certificates/bulk/delete', { ids })
   },
   async bulkExport(ids, format = 'pem') {
-    return apiClient.post('/certificates/bulk/export', { ids, format })
+    return apiClient.post('/certificates/bulk/export', { ids, format }, { responseType: 'blob' })
   }
 }

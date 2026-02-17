@@ -13,7 +13,7 @@ import os
 import traceback
 import uuid
 from datetime import datetime
-from auth.unified import require_auth
+from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
@@ -641,8 +641,31 @@ def export_ca(ca_id):
     include_chain = request.args.get('include_chain', 'false').lower() == 'true'
     password = request.args.get('password')
     
+    # Private key export requires write permission (operator+)
+    if include_key or export_format in ('pkcs12', 'pfx', 'key'):
+        if not has_permission('write:cas', g.permissions):
+            return error_response('Private key export requires write:cas permission', 403)
+    
     try:
         cert_pem = base64.b64decode(ca.crt)
+        
+        # Private key only export
+        if export_format == 'key':
+            if not ca.prv:
+                return error_response('CA has no private key', 400)
+            key_pem = base64.b64decode(ca.prv)
+            if password:
+                private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+                key_pem = private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+                )
+            return Response(
+                key_pem,
+                mimetype='application/x-pem-file',
+                headers={'Content-Disposition': f'attachment; filename="{ca.descr or ca.refid}.key"'}
+            )
         
         if export_format == 'pem':
             result = cert_pem

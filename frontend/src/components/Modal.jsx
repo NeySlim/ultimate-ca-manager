@@ -27,11 +27,11 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="modal-backdrop fixed inset-0 z-40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="modal-backdrop fixed inset-0 z-[200] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content 
           className={cn(
             // Mobile: full screen
-            "fixed inset-0 z-50",
+            "fixed inset-0 z-[201]",
             "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
             "w-full h-full sm:h-auto sm:mx-4",
             sizes[size],

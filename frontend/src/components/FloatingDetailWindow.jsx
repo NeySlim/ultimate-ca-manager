@@ -17,7 +17,7 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { extractData } from '../lib/utils'
 import { LoadingSpinner } from './LoadingSpinner'
-import { ExportActions } from './ExportActions'
+import { ExportModal } from './ExportModal'
 import { cn } from '../lib/utils'
 
 const ENTITY_CONFIG = {
@@ -156,13 +156,18 @@ export function FloatingDetailWindow({ windowInfo }) {
 
   // Build action bar props
   const isCert = windowInfo.type === 'certificate'
-  const hasPrivateKey = isCert ? !!data?.has_private_key : !!data?.has_private_key
+  const isCA = windowInfo.type === 'ca'
+  const hasPrivateKey = !!data?.has_private_key
+  const resource = isCA ? 'cas' : 'certificates'
   const actionBarProps = data ? {
     onExport: handleExport,
     hasPrivateKey,
+    canExportKey: canWrite(resource),
+    entityType: isCA ? 'ca' : 'certificate',
+    entityName: title,
     onRenew: isCert && canWrite('certificates') && !data.revoked && data.has_private_key ? handleRenew : null,
     onRevoke: isCert && canWrite('certificates') && !data.revoked ? handleRevoke : null,
-    onDelete: canDelete('certificates') ? handleDelete : null,
+    onDelete: canDelete(resource) ? handleDelete : null,
     t,
   } : null
 
@@ -246,17 +251,18 @@ function DetailContent({ type, data }) {
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ onExport, hasPrivateKey, onRenew, onRevoke, onDelete, t }) {
+function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityName, onRenew, onRevoke, onDelete, t }) {
+  const [showExportModal, setShowExportModal] = useState(false)
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
   return (
+    <>
     <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-border/40 bg-bg-tertiary/30">
-      {/* Export actions with inline password */}
-      <ExportActions 
-        onExport={onExport} 
-        hasPrivateKey={hasPrivateKey}
-        className="!p-0 !bg-transparent !rounded-none"
-      />
+      {/* Export button → modal */}
+      <button onClick={() => setShowExportModal(true)} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary/10')}>
+        <Certificate size={14} weight="duotone" />
+        {t('export.title', 'Export')}
+      </button>
 
       {/* Renew */}
       {onRenew && (
@@ -278,9 +284,22 @@ function ActionBar({ onExport, hasPrivateKey, onRenew, onRevoke, onDelete, t }) 
       <div className="flex-1" />
 
       {/* Delete — right-aligned */}
-      <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger/10')}>
-        <Trash size={14} weight="duotone" />
-      </button>
+      {onDelete && (
+        <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger/10')}>
+          <Trash size={14} weight="duotone" />
+        </button>
+      )}
     </div>
+
+    <ExportModal
+      open={showExportModal}
+      onClose={() => setShowExportModal(false)}
+      entityType={entityType}
+      entityName={entityName}
+      hasPrivateKey={hasPrivateKey}
+      canExportKey={canExportKey}
+      onExport={onExport}
+    />
+    </>
   )
 }

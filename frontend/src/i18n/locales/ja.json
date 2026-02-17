@@ -339,7 +339,9 @@
     "allRoles": "すべてのロール",
     "approvals": "承認",
     "policies": "ポリシー",
-    "reports": "レポート"
+    "reports": "レポート",
+    "exporting": "エクスポート中...",
+    "exported": "エクスポート完了"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -2475,5 +2477,24 @@
     "testSent": "テストレポートが送信されました",
     "title": "レポート",
     "weekly": "毎週"
+  },
+  "export": {
+    "title": "エクスポート",
+    "format": "フォーマット",
+    "options": "オプション",
+    "password": "パスワード",
+    "passwordPlaceholder": "最小4文字",
+    "download": "ダウンロード",
+    "includeChain": "CA チェーンを含める",
+    "includeChainDesc": "発行元のCA証明書を含める",
+    "includeKey": "秘密鍵を含める",
+    "includeKeyDesc": "エクスポートに秘密鍵を添付する",
+    "pkcs12Note": "PKCS#12は常に秘密鍵を含みます",
+    "noKeyPermission": "秘密鍵のエクスポートには上位権限が必要です",
+    "formatPemDesc": "Base64エンコード、広く対応",
+    "formatDerDesc": "バイナリ形式、コンパクト",
+    "formatP7bDesc": "証明書チェーンバンドル",
+    "formatP12Desc": "証明書+鍵を暗号化コンテナに格納",
+    "formatKeyDesc": "PEM形式の秘密鍵のみ"
   }
 }

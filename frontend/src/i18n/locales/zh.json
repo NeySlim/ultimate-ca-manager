@@ -339,7 +339,9 @@
     "allRoles": "所有角色",
     "approvals": "审批",
     "policies": "策略",
-    "reports": "报告"
+    "reports": "报告",
+    "exporting": "导出中...",
+    "exported": "已导出"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -2475,5 +2477,24 @@
     "testSent": "测试报告已发送",
     "title": "报告",
     "weekly": "每周"
+  },
+  "export": {
+    "title": "导出",
+    "format": "格式",
+    "options": "选项",
+    "password": "密码",
+    "passwordPlaceholder": "最少4个字符",
+    "download": "下载",
+    "includeChain": "包含CA链",
+    "includeChainDesc": "包含签发CA证书",
+    "includeKey": "包含私钥",
+    "includeKeyDesc": "将私钥附加到导出",
+    "pkcs12Note": "PKCS#12始终包含私钥",
+    "noKeyPermission": "导出私钥需要更高权限",
+    "formatPemDesc": "Base64编码，广泛支持",
+    "formatDerDesc": "二进制格式，紧凑",
+    "formatP7bDesc": "证书链捆绑包",
+    "formatP12Desc": "证书+密钥加密容器",
+    "formatKeyDesc": "仅PEM编码的私钥"
   }
 }

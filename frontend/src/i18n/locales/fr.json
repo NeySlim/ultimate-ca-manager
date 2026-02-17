@@ -764,7 +764,9 @@
     "hsmShort": "HSM",
     "auditShort": "Audit",
     "settingsShort": "Config",
-    "allRoles": "Tous les rôles"
+    "allRoles": "Tous les rôles",
+    "exporting": "Export en cours...",
+    "exported": "Exporté"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -2478,5 +2480,24 @@
         "delete": "Supprimer la politique \"{{name}}\" ? Cette action ne peut pas être annulée."
       }
     }
+  },
+  "export": {
+    "title": "Exporter",
+    "format": "Format",
+    "options": "Options",
+    "password": "Mot de passe",
+    "passwordPlaceholder": "Min. 4 caractères",
+    "download": "Télécharger",
+    "includeChain": "Inclure la chaîne CA",
+    "includeChainDesc": "Inclure les certificats CA émetteurs",
+    "includeKey": "Inclure la clé privée",
+    "includeKeyDesc": "Joindre la clé privée à l'export",
+    "pkcs12Note": "PKCS#12 inclut toujours la clé privée",
+    "noKeyPermission": "L'export de la clé privée nécessite des permissions élevées",
+    "formatPemDesc": "Encodage Base64, largement supporté",
+    "formatDerDesc": "Format binaire, compact",
+    "formatP7bDesc": "Bundle de chaîne de certificats",
+    "formatP12Desc": "Certificat + clé dans un conteneur chiffré",
+    "formatKeyDesc": "Clé privée seule au format PEM"
   }
 }

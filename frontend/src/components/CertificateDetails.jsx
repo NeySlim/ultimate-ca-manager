@@ -42,7 +42,7 @@ import {
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
-import { ExportActions } from './ExportActions'
+import { ExportModal } from './ExportModal'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
@@ -133,6 +133,7 @@ export function CertificateDetails({
   const { t } = useTranslation()
   const [pemCopied, setPemCopied] = useState(false)
   const [showFullPem, setShowFullPem] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
   
   if (!certificate) return null
   
@@ -160,6 +161,7 @@ export function CertificateDetails({
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
+    <>
     <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2", embedded && "space-y-3 p-3")}>
       {!embedded && <>
       {/* Header */}
@@ -211,12 +213,11 @@ export function CertificateDetails({
       {/* Actions - compact on mobile */}
       {showActions && (
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          {/* Export buttons grouped */}
+          {/* Export button → modal */}
           {onExport && (
-            <ExportActions 
-              onExport={(format, options) => onExport(format, options)} 
-              hasPrivateKey={cert.has_private_key} 
-            />
+            <Button size="xs" variant="secondary" onClick={() => setShowExportModal(true)} title={t('export.title')}>
+              <Download size={14} /> {t('export.title')}
+            </Button>
           )}
           {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
@@ -451,6 +452,18 @@ export function CertificateDetails({
         </CompactGrid>
       </CompactSection>
     </div>
+
+    {/* Export Modal */}
+    <ExportModal
+      open={showExportModal}
+      onClose={() => setShowExportModal(false)}
+      entityType="certificate"
+      entityName={cert.common_name || cert.subject}
+      hasPrivateKey={!!cert.has_private_key}
+      canExportKey={canWrite}
+      onExport={onExport}
+    />
+    </>
   )
 }
 

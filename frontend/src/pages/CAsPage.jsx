@@ -13,8 +13,9 @@ import {
 import {
   Badge, Button, Modal, Input, Select, LoadingSpinner,
   CompactSection, CompactGrid, CompactField, CompactStats,
-  FilterSelect, CATypeIcon, ExportActions
+  FilterSelect, CATypeIcon
 } from '../components'
+import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
@@ -169,6 +170,7 @@ export default function CAsPage() {
       loadCAs() // Refresh CAs after repair
     } catch { /* ignore */ }
     finally { setChainRepairRunning(false) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleDelete = async (id) => {
@@ -1093,7 +1095,9 @@ function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
 // =============================================================================
 
 function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
+  const [showExportModal, setShowExportModal] = useState(false)
   return (
+    <>
     <div className="p-3 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
@@ -1120,12 +1124,11 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
         { badge: ca.status, badgeVariant: ca.status === 'Active' ? 'success' : 'danger' }
       ]} />
 
-      {/* Export Actions */}
+      {/* Export + Delete Actions */}
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-        <ExportActions 
-          onExport={(format, options) => onExport(format, options)} 
-          hasPrivateKey={!!ca.has_private_key} 
-        />
+        <Button size="xs" variant="secondary" onClick={() => setShowExportModal(true)}>
+          <Download size={14} /> {t('export.title')}
+        </Button>
         {canDelete('cas') && (
           <Button size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
             <Trash size={12} className="sm:w-3.5 sm:h-3.5" />
@@ -1176,6 +1179,17 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
         </CompactSection>
       )}
     </div>
+
+    <ExportModal
+      open={showExportModal}
+      onClose={() => setShowExportModal(false)}
+      entityType="ca"
+      entityName={ca.name || ca.common_name || ''}
+      hasPrivateKey={!!ca.has_private_key}
+      canExportKey={canWrite('cas')}
+      onExport={onExport}
+    />
+    </>
   )
 }
 

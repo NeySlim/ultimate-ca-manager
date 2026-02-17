@@ -591,13 +591,22 @@ export default function OperationsPage() {
         {resourceConfig.actions.includes('export') && (
           <Button size="sm" variant="secondary" onClick={async () => {
             const ids = Array.from(selectedIds)
+            if (!ids.length) return
             try {
-              if (bulkResourceType === 'certificates') await certificatesService.bulkExport(ids)
-              else if (bulkResourceType === 'cas') await casService.bulkExport(ids)
+              const service = bulkResourceType === 'certificates' ? certificatesService : casService
+              const blob = await service.bulkExport(ids, 'pem')
+              if (blob) {
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `${bulkResourceType}_export.pem`
+                a.click()
+                URL.revokeObjectURL(url)
+              }
               showSuccess(t('operations.bulkSuccess', { action: 'export', count: ids.length, defaultValue: `Exported ${ids.length} items` }))
             } catch (e) { showError(e.message || 'Export failed') }
           }}>
-            <DownloadSimple size={14} /> {t('common.export', 'Export')}
+            <DownloadSimple size={14} /> {t('export.title', 'Export')} PEM
           </Button>
         )}
         {resourceConfig.actions.includes('delete') && (
@@ -607,7 +616,7 @@ export default function OperationsPage() {
         )}
       </div>
     )
-  }, [resourceConfig, t])
+  }, [resourceConfig, selectedIds, bulkResourceType, t])
 
   // Confirm modal content
   const getConfirmMessage = () => {

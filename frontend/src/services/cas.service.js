@@ -70,6 +70,6 @@ export const casService = {
     return apiClient.post('/cas/bulk/delete', { ids })
   },
   async bulkExport(ids, format = 'pem') {
-    return apiClient.post('/cas/bulk/export', { ids, format })
+    return apiClient.post('/cas/bulk/export', { ids, format }, { responseType: 'blob' })
   }
 }

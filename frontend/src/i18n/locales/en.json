@@ -339,7 +339,9 @@
     "hsmShort": "HSM",
     "auditShort": "Audit",
     "settingsShort": "Settings",
-    "allRoles": "All Roles"
+    "allRoles": "All Roles",
+    "exporting": "Exporting...",
+    "exported": "Exported"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -2478,5 +2480,24 @@
         "delete": "Delete policy \"{{name}}\"? This cannot be undone."
       }
     }
+  },
+  "export": {
+    "title": "Export",
+    "format": "Format",
+    "options": "Options",
+    "password": "Password",
+    "passwordPlaceholder": "Min. 4 characters",
+    "download": "Download",
+    "includeChain": "Include CA chain",
+    "includeChainDesc": "Include issuing CA certificates",
+    "includeKey": "Include private key",
+    "includeKeyDesc": "Attach the private key to the export",
+    "pkcs12Note": "PKCS#12 always includes the private key",
+    "noKeyPermission": "Private key export requires elevated permissions",
+    "formatPemDesc": "Base64 encoded, widely supported",
+    "formatDerDesc": "Binary format, compact",
+    "formatP7bDesc": "Certificate chain bundle",
+    "formatP12Desc": "Certificate + key in encrypted container",
+    "formatKeyDesc": "PEM-encoded private key only"
   }
 }

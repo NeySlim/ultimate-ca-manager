@@ -15,6 +15,7 @@ import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
   CertificateDetails, CertificateCompareModal, KeyIndicator
 } from '../components'
+import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
@@ -42,6 +43,7 @@ export default function CertificatesPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
+  const [exportRowCert, setExportRowCert] = useState(null)
   const [keyPem, setKeyPem] = useState('')
   const [keyPassphrase, setKeyPassphrase] = useState('')
   
@@ -505,8 +507,7 @@ export default function CertificatesPage() {
   // Row actions
   const rowActions = useCallback((row) => [
     { label: t('common.details'), icon: Info, onClick: () => handleSelectCert(row) },
-    { label: t('certificates.exportPEM'), icon: Download, onClick: () => handleExportRow(row, 'pem') },
-    { label: t('certificates.exportPKCS12'), icon: Download, onClick: () => handleExportRow(row, 'p12') },
+    { label: t('export.title'), icon: Download, onClick: () => setExportRowCert(row) },
     ...(canWrite('certificates') && !row.revoked && row.has_private_key ? [
       { label: t('certificates.renewCertificate').split(' ')[0], icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
     ] : []),
@@ -518,19 +519,10 @@ export default function CertificatesPage() {
     ] : [])
   ], [canWrite, canDelete, t])
 
-  // Export from row (uses showPrompt for P12 password since it's from a menu)
-  const handleExportRow = async (cert, format, options = {}) => {
-    if ((format === 'p12' || format === 'pkcs12') && cert.has_private_key) {
-      const password = await showPrompt(t('certificates.enterP12Password', 'Enter password for PKCS#12 file:'), {
-        title: t('certificates.exportPKCS12', 'Export PKCS#12'),
-        type: 'password',
-        placeholder: t('common.password', 'Password'),
-        confirmText: t('common.export', 'Export')
-      })
-      if (!password || password.length < 4) return
-      options = { ...options, password }
-    }
-    
+  // Export from row via ExportModal
+  const handleExportRow = async (format, options = {}) => {
+    if (!exportRowCert) return
+    const cert = exportRowCert
     try {
       const blob = await certificatesService.export(cert.id, format, options)
       const url = URL.createObjectURL(blob)
@@ -858,6 +850,17 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           setShowImportModal(false)
           loadData()
         }}
+      />
+
+      {/* Row Export Modal */}
+      <ExportModal
+        open={!!exportRowCert}
+        onClose={() => setExportRowCert(null)}
+        entityType="certificate"
+        entityName={exportRowCert?.common_name || exportRowCert?.subject || ''}
+        hasPrivateKey={!!exportRowCert?.has_private_key}
+        canExportKey={canWrite('certificates')}
+        onExport={handleExportRow}
       />
     </>
   )

@@ -339,7 +339,9 @@
     "allRoles": "Alle Rollen",
     "approvals": "Genehmigungen",
     "policies": "Richtlinien",
-    "reports": "Berichte"
+    "reports": "Berichte",
+    "exporting": "Exportieren...",
+    "exported": "Exportiert"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -2475,5 +2477,24 @@
     "testSent": "Testbericht gesendet",
     "title": "Berichte",
     "weekly": "Wöchentlich"
+  },
+  "export": {
+    "title": "Exportieren",
+    "format": "Format",
+    "options": "Optionen",
+    "password": "Passwort",
+    "passwordPlaceholder": "Min. 4 Zeichen",
+    "download": "Herunterladen",
+    "includeChain": "CA-Kette einschließen",
+    "includeChainDesc": "Ausstellende CA-Zertifikate einbeziehen",
+    "includeKey": "Privaten Schlüssel einschließen",
+    "includeKeyDesc": "Privaten Schlüssel dem Export beifügen",
+    "pkcs12Note": "PKCS#12 enthält immer den privaten Schlüssel",
+    "noKeyPermission": "Export des privaten Schlüssels erfordert erweiterte Berechtigungen",
+    "formatPemDesc": "Base64-kodiert, weit verbreitet",
+    "formatDerDesc": "Binärformat, kompakt",
+    "formatP7bDesc": "Zertifikatsketten-Bundle",
+    "formatP12Desc": "Zertifikat + Schlüssel in verschlüsseltem Container",
+    "formatKeyDesc": "Nur der private Schlüssel im PEM-Format"
   }
 }
