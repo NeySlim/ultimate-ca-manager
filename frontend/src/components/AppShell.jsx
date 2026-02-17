@@ -22,7 +22,6 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../hooks'
-import { useWindowManager } from '../contexts/WindowManagerContext'
 import { certificatesService } from '../services'
 import { languages } from '../i18n'
 
@@ -54,9 +53,8 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
-  const { user, logout, isAuthenticated } = useAuth()
+  const { user, logout } = useAuth()
   const { isAdmin, hasPermission } = usePermission()
-  const { closeAll: closeAllWindows } = useWindowManager()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -92,16 +90,6 @@ export function AppShell() {
     'rbac', 'hsm'
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
-
-  // Close all floating panels/modals on logout
-  useEffect(() => {
-    if (!isAuthenticated) {
-      closeAllWindows()
-      setHelpModalOpen(false)
-      setCommandPaletteOpen(false)
-      setMobileMenuOpen(false)
-    }
-  }, [isAuthenticated, closeAllWindows])
 
   // Check for mobile viewport
   useEffect(() => {

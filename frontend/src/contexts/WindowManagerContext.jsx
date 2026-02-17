@@ -9,7 +9,8 @@
  * - Tile/stack/close-all actions
  * - Options: sameWindow (reuse existing), closeOnNav (auto-close on page change)
  */
-import { createContext, useContext, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
+import { useAuth } from './AuthContext'
 
 const WindowManagerContext = createContext(null)
 
@@ -28,6 +29,7 @@ function savePrefs(prefs) {
 export function WindowManagerProvider({ children }) {
   const [windows, setWindows] = useState([])
   const zCounter = useRef(BASE_Z)
+  const { isAuthenticated } = useAuth()
 
   // User preferences
   const [sameWindow, setSameWindow] = useState(() => loadPrefs().sameWindow ?? true)
@@ -125,6 +127,11 @@ export function WindowManagerProvider({ children }) {
       return []
     })
   }, [])
+
+  // Close all windows on logout
+  useEffect(() => {
+    if (!isAuthenticated) closeAll()
+  }, [isAuthenticated, closeAll])
 
   const focusWindow = useCallback((id) => {
     zCounter.current += 1
