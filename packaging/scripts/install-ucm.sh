@@ -150,26 +150,26 @@ install_dependencies() {
         apt)
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
-            apt-get install -y -qq python3 python3-pip python3-venv systemd openssl adduser curl
+            apt-get install -y -qq python3 python3-venv systemd openssl adduser curl
             ;;
         dnf)
-            dnf install -y python3 python3-pip systemd openssl curl
+            dnf install -y python3 systemd openssl curl
             ;;
         yum)
-            yum install -y python3 python3-pip systemd openssl curl
+            yum install -y python3 systemd openssl curl
             ;;
         zypper)
-            zypper install -y python3 python3-pip systemd openssl curl
+            zypper install -y python3 systemd openssl curl
             ;;
         pacman)
-            pacman -Sy --noconfirm python python-pip systemd openssl curl
+            pacman -Sy --noconfirm python systemd openssl curl
             ;;
         apk)
-            apk add --no-cache python3 py3-pip openrc openssl curl
+            apk add --no-cache python3 openrc openssl curl
             ;;
         *)
             log_error "Cannot install dependencies automatically"
-            log_info "Please install manually: python3, pip, systemd, openssl, curl"
+            log_info "Please install manually: python3, systemd, openssl, curl"
             exit 1
             ;;
     esac
