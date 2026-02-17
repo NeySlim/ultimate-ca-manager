@@ -4,12 +4,11 @@
 # Stage 1: Builder - Install dependencies and build environment
 FROM python:3.13-slim-bookworm AS builder
 
-# Install build dependencies
+# Install build dependencies (fallback for packages without prebuilt wheels)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libssl-dev \
     libffi-dev \
-    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment

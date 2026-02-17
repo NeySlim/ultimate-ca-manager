@@ -11,12 +11,10 @@ BuildArch:      noarch
 # Disable auto-detection of requires (we manage deps via venv)
 AutoReqProv:    no
 Requires:       python3 >= 3.9
-Requires:       python3-devel
 Requires:       systemd
 Requires:       openssl >= 1.1.1
-Requires:       gcc-c++
-Requires:       swig
-Requires:       softhsm
+Recommends:     softhsm
+Suggests:       openldap-clients
 
 # Use /opt/ucm like DEB package for consistency
 %define ucm_home /opt/ucm
