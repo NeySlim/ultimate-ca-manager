@@ -5,37 +5,24 @@ CSR Management Routes v2.0
 
 import re
 import logging
-from flask import Blueprint, request, jsonify
-from auth.unified import require_auth
-from utils.response import success_response, error_response, created_response, no_content_response
-from models import db, Certificate
-from services.cert_service import CertificateService
-from services.audit_service import AuditService
 import datetime
 import base64
 import uuid
+from flask import Blueprint, request, jsonify, g, Response
+from auth.unified import require_auth
+from utils.response import success_response, error_response, created_response, no_content_response
+from utils.dn_validation import validate_dn_field
+from utils.file_validation import validate_upload, CERT_EXTENSIONS
+from models import db, Certificate, CA
+from services.cert_service import CertificateService
+from services.audit_service import AuditService
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from security.encryption import encrypt_private_key
 
 bp = Blueprint('csrs_v2', __name__)
 logger = logging.getLogger(__name__)
-
-# DN validation (shared pattern)
-DN_FIELD_PATTERNS = {
-    'CN': re.compile(r'^[\w\s\-\.\,\'\@\(\)]+$', re.UNICODE),
-    'O': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
-    'OU': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
-    'C': re.compile(r'^[A-Z]{2}$'),
-}
-
-def _validate_dn_field(field_name, value):
-    if not value:
-        return True, None
-    value = str(value).strip()
-    if len(value) > 64:
-        return False, f"{field_name} must be 64 characters or less"
-    if field_name in DN_FIELD_PATTERNS:
-        if not DN_FIELD_PATTERNS[field_name].match(value):
-            return False, f"Invalid characters in {field_name}"
-    return True, None
 
 @bp.route('/api/v2/csrs', methods=['GET'])
 @require_auth(['read:csrs'])
@@ -79,7 +66,6 @@ def list_csrs():
 @require_auth(['read:csrs'])
 def list_csrs_history():
     """List all signed CSRs (Certificates that had a CSR and now have crt)"""
-    from models import CA
     
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -165,7 +151,7 @@ def create_csr():
         
         # Validate DN fields
         for field, value in dn.items():
-            is_valid, error = _validate_dn_field(field, value)
+            is_valid, error = validate_dn_field(field, value)
             if not is_valid:
                 return error_response(error, 400)
             
@@ -214,9 +200,6 @@ def upload_csr():
         pem: PEM-encoded CSR content
         name: Optional display name
     """
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
-    from flask import g
     
     data = request.get_json()
     if not data or not data.get('pem'):
@@ -270,7 +253,6 @@ def upload_csr():
         db.session.commit()
         
         # Audit log
-        from services.audit_service import AuditService
         AuditService.log_action('csr', 'upload', new_cert.id, {'subject': subject_str})
         
         # Return CSR-friendly format
@@ -299,15 +281,12 @@ def import_csr():
         pem_content: Pasted PEM content (optional if file provided)
         name: Optional display name
     """
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
     
     # Get CSR data from file or pasted content
     csr_pem = None
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        from utils.file_validation import validate_upload, CERT_EXTENSIONS
         try:
             csr_pem, _ = validate_upload(file, CERT_EXTENSIONS)
         except ValueError as e:
@@ -378,7 +357,6 @@ def import_csr():
         db.session.commit()
         
         # Audit log
-        from services.audit_service import AuditService
         AuditService.log_action(
             action='csr_imported',
             resource_type='csr',
@@ -402,7 +380,6 @@ def import_csr():
 @require_auth(['read:csrs'])
 def export_csr(csr_id):
     """Export CSR as PEM file"""
-    from flask import Response
     
     cert = Certificate.query.get(csr_id)
     if not cert or not cert.csr:
@@ -449,11 +426,6 @@ def upload_csr_private_key(csr_id):
     - key: Private key in PEM format (raw or base64 encoded)
     - passphrase: Optional passphrase if key is encrypted
     """
-    from flask import g
-    from services.audit_service import AuditService
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.backends import default_backend
-    from security.encryption import encrypt_private_key
     
     csr = Certificate.query.get(csr_id)
     if not csr:
@@ -544,9 +516,6 @@ def sign_csr(csr_id):
         ca_id: ID of the CA to sign with
         validity_days: Number of days the certificate should be valid (default: 365)
     """
-    from flask import g
-    from services.audit_service import AuditService
-    from models import CA
     
     cert = Certificate.query.get(csr_id)
     if not cert:
@@ -606,7 +575,6 @@ def sign_csr(csr_id):
 @require_auth(['write:csrs', 'write:certificates'])
 def bulk_sign_csrs():
     """Bulk sign CSRs with a CA"""
-    from models import CA
 
     data = request.get_json()
     if not data or not data.get('ids'):

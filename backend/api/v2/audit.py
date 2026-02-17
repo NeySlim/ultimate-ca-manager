@@ -2,7 +2,7 @@
 Audit Logs API v2.0
 View and manage audit logs
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, Response
 from auth.unified import require_auth
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
@@ -169,14 +169,12 @@ def export_logs():
     )
     
     if format == 'csv':
-        from flask import Response
         return Response(
             data,
             mimetype='text/csv',
             headers={'Content-Disposition': 'attachment; filename=audit_logs.csv'}
         )
     else:
-        from flask import Response
         return Response(
             data,
             mimetype='application/json',

@@ -6,8 +6,12 @@ Dashboard & Stats Routes v2.0
 
 from flask import Blueprint, request, g
 import logging
+import os
+from datetime import datetime, timedelta
 from auth.unified import require_auth
 from utils.response import success_response
+from models import db, CA, Certificate
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +22,6 @@ bp = Blueprint('dashboard_v2', __name__)
 def get_public_stats():
     """Get public overview statistics (no auth required - for login page)"""
     try:
-        from models import db
-        from sqlalchemy import text
         
         # Query counts directly with SQL to avoid import issues
         total_cas = db.session.execute(text("SELECT COUNT(*) FROM certificate_authorities")).scalar() or 0
@@ -59,10 +61,6 @@ def get_public_stats():
 @require_auth()
 def get_dashboard_stats():
     """Get dashboard statistics"""
-    from models import CA, Certificate
-    from datetime import datetime, timedelta
-    from models import db
-    from sqlalchemy import text
     
     # Count CAs
     total_cas = CA.query.count()
@@ -114,7 +112,6 @@ def get_dashboard_stats():
 @require_auth(['read:cas'])
 def get_recent_cas():
     """Get recently created CAs"""
-    from models import CA
     
     limit = request.args.get('limit', 5, type=int)
     
@@ -135,8 +132,6 @@ def get_recent_cas():
 @require_auth(['read:certificates'])
 def get_expiring_certificates():
     """Get next certificates to expire (soonest first, not yet expired)"""
-    from models import Certificate
-    from datetime import datetime
     
     limit = request.args.get('limit', 10, type=int)
     
@@ -162,8 +157,6 @@ def get_expiring_certificates():
 @require_auth()
 def get_activity_log():
     """Get recent activity"""
-    from models import db
-    from sqlalchemy import text
     
     limit = request.args.get('limit', 20, type=int)
     
@@ -231,9 +224,6 @@ def get_activity_log():
 @require_auth()
 def get_certificate_trend():
     """Get certificate activity for the last 7 days"""
-    from models import db
-    from sqlalchemy import text
-    from datetime import datetime, timedelta
     
     days = request.args.get('days', 7, type=int)
     
@@ -285,9 +275,6 @@ def get_certificate_trend():
 @bp.route('/api/v2/dashboard/system-status', methods=['GET'])
 def get_system_status():
     """Get system services status (no auth required - for login page)"""
-    from models import db
-    from sqlalchemy import text
-    import os
     
     status = {
         'database': {'status': 'online', 'message': 'Connected'},

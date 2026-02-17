@@ -3,59 +3,52 @@ Certificates Management Routes v2.0
 /api/certificates/* - Certificate CRUD
 """
 
-from flask import Blueprint, request, g
+from flask import Blueprint, request, g, Response
 import re
 import logging
+import base64
+import uuid
+import json
+import subprocess
+import tempfile
+import os
+import traceback
+from datetime import datetime, timedelta
+from ipaddress import ip_address
+from sqlalchemy import or_, case
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.dn_validation import validate_dn_field
+from utils.file_validation import validate_upload, CERT_EXTENSIONS
+from models import Certificate, CA, db
+from models.truststore import TrustedCertificate
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.backends import default_backend
+from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
+from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509 import load_pem_x509_certificate
+from services.cert_service import CertificateService
+from services.audit_service import AuditService
+from services.notification_service import NotificationService
+from services.import_service import (
+    parse_certificate_file, is_ca_certificate, extract_cert_info,
+    find_existing_ca, find_existing_certificate,
+    serialize_cert_to_pem, serialize_key_to_pem
+)
+from security.encryption import encrypt_private_key
+from websocket.emitters import on_certificate_issued, on_certificate_revoked
 
 bp = Blueprint('certificates_v2', __name__)
 
 logger = logging.getLogger(__name__)
 
 
-# SECURITY: DN field validation patterns (reused from cas.py)
-DN_FIELD_PATTERNS = {
-    'CN': re.compile(r'^[\w\s\-\.\,\'\@\(\)\*]+$', re.UNICODE),  # CN allows wildcards
-    'O': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
-    'OU': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
-    'C': re.compile(r'^[A-Z]{2}$'),
-    'ST': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),
-    'L': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),
-}
-
-MAX_DN_FIELD_LENGTH = 64
-
-
-def validate_dn_field(field_name, value):
-    """Validate DN field for security"""
-    if not value:
-        return True, None
-    
-    value = str(value).strip()
-    
-    if len(value) > MAX_DN_FIELD_LENGTH:
-        return False, f"{field_name} must be {MAX_DN_FIELD_LENGTH} characters or less"
-    
-    if field_name in DN_FIELD_PATTERNS:
-        if not DN_FIELD_PATTERNS[field_name].match(value):
-            return False, f"Invalid characters in {field_name}"
-    
-    dangerous_patterns = [';', '|', '`', '$', '\\n', '\\r', '\x00', '\n', '\r']
-    for pattern in dangerous_patterns:
-        if pattern in value:
-            return False, f"Invalid character in {field_name}"
-    
-    return True, None
-
-
 @bp.route('/api/v2/certificates', methods=['GET'])
 @require_auth(['read:certificates'])
 def list_certificates():
     """List certificates"""
-    from models import Certificate
-    from datetime import datetime, timedelta
-    from sqlalchemy import or_
     
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
@@ -118,7 +111,6 @@ def list_certificates():
     if sort_by == 'status':
         # Special handling: sort by computed status (revoked > expired > expiring > valid)
         # Then alphabetically by subject within each group
-        from sqlalchemy import case
         now = datetime.utcnow()
         expiry_threshold = now + timedelta(days=30)
         
@@ -155,8 +147,6 @@ def list_certificates():
 @require_auth(['read:certificates'])
 def get_certificate_stats():
     """Get certificate statistics"""
-    from models import Certificate
-    from datetime import datetime, timedelta
     
     now = datetime.utcnow()
     expiry_threshold = now + timedelta(days=30)
@@ -190,16 +180,6 @@ def get_certificate_stats():
 @require_auth(['write:certificates'])
 def create_certificate():
     """Create certificate - Real implementation"""
-    from models import Certificate, CA, db
-    from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
-    from datetime import datetime, timedelta
-    import base64
-    import uuid
-    import json
     
     data = request.json
     
@@ -344,7 +324,6 @@ def create_certificate():
             for dns in data['san_dns']:
                 san_list.append(x509.DNSName(dns))
         if data.get('san_ip'):
-            from ipaddress import ip_address
             for ip in data['san_ip']:
                 san_list.append(x509.IPAddress(ip_address(ip)))
         if data.get('san_email'):
@@ -386,7 +365,6 @@ def create_certificate():
         
         # Save to database
         # Extract SKI/AKI from issued cert
-        from cryptography.x509.oid import ExtensionOID
         cert_ski = None
         cert_aki = None
         try:
@@ -426,7 +404,6 @@ def create_certificate():
         
         # Audit log
         try:
-            from services.audit_service import AuditService
             AuditService.log_action(
                 action='certificate_created',
                 resource_type='certificate',
@@ -440,7 +417,6 @@ def create_certificate():
         
         # Send notification
         try:
-            from services.notification_service import NotificationService
             username = g.current_user.username if hasattr(g, 'current_user') else 'system'
             NotificationService.on_certificate_issued(db_cert, username)
         except Exception:
@@ -448,7 +424,6 @@ def create_certificate():
         
         # WebSocket event
         try:
-            from websocket.emitters import on_certificate_issued
             on_certificate_issued(
                 cert_id=db_cert.id,
                 cn=data['cn'],
@@ -473,8 +448,6 @@ def create_certificate():
 @require_auth(['read:certificates'])
 def get_certificate(cert_id):
     """Get certificate details with chain validation status"""
-    from models import Certificate, CA
-    from models.truststore import TrustedCertificate
     
     cert = Certificate.query.get(cert_id)
     if not cert:
@@ -491,8 +464,6 @@ def get_certificate(cert_id):
 
 def _validate_cert_chain(cert):
     """Validate certificate chain and return status info"""
-    from models import CA
-    from models.truststore import TrustedCertificate
     
     chain = []
     status = 'unknown'
@@ -581,7 +552,6 @@ def _validate_cert_chain(cert):
 @require_auth(['delete:certificates'])
 def delete_certificate(cert_id):
     """Delete certificate"""
-    from models import Certificate, db
     
     cert = Certificate.query.get(cert_id)
     if not cert:
@@ -594,7 +564,6 @@ def delete_certificate(cert_id):
     db.session.commit()
     
     # Audit log
-    from services.audit_service import AuditService
     AuditService.log_action(
         action='certificate_deleted',
         resource_type='certificate',
@@ -611,12 +580,6 @@ def delete_certificate(cert_id):
 @require_auth(['read:certificates'])
 def export_all_certificates():
     """Export all certificates in various formats"""
-    from flask import Response
-    from models import Certificate, CA
-    import base64
-    import subprocess
-    import tempfile
-    import os
     
     export_format = request.args.get('format', 'pem').lower()
     include_chain = request.args.get('include_chain', 'false').lower() == 'true'
@@ -684,9 +647,6 @@ def export_certificate(cert_id):
         include_chain: bool - Include CA chain (PEM only)
         password: string - Required for PKCS12
     """
-    from flask import Response
-    from models import Certificate, CA
-    import base64
     
     certificate = Certificate.query.get(cert_id)
     if not certificate:
@@ -742,8 +702,6 @@ def export_certificate(cert_id):
             )
         
         elif export_format == 'der':
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             der_bytes = cert.public_bytes(serialization.Encoding.DER)
@@ -759,11 +717,6 @@ def export_certificate(cert_id):
                 return error_response('Password required for PKCS12 export', 400)
             if not certificate.prv:
                 return error_response('Certificate has no private key for PKCS12 export', 400)
-            
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import serialization
-            from cryptography.hazmat.primitives.serialization import pkcs12
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem = base64.b64decode(certificate.prv)
@@ -799,11 +752,6 @@ def export_certificate(cert_id):
             )
         
         elif export_format == 'pkcs7' or export_format == 'p7b':
-            import subprocess
-            import tempfile
-            import os
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
             
             # Create temporary PEM file
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
@@ -843,11 +791,6 @@ def export_certificate(cert_id):
                 return error_response('Password required for PFX export', 400)
             if not certificate.prv:
                 return error_response('Certificate has no private key for PFX export', 400)
-            
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import serialization
-            from cryptography.hazmat.primitives.serialization import pkcs12
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem = base64.b64decode(certificate.prv)
@@ -893,9 +836,6 @@ def export_certificate(cert_id):
 @require_auth(['write:certificates'])
 def revoke_certificate(cert_id):
     """Revoke certificate"""
-    from models import Certificate, db
-    from services.cert_service import CertificateService
-    from services.audit_service import AuditService
     
     data = request.json
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
@@ -919,14 +859,12 @@ def revoke_certificate(cert_id):
         
         # Send notification
         try:
-            from services.notification_service import NotificationService
             NotificationService.on_certificate_revoked(cert, reason, username)
         except Exception:
             pass  # Non-blocking
         
         # WebSocket event
         try:
-            from websocket.emitters import on_certificate_revoked
             on_certificate_revoked(
                 cert_id=cert.id,
                 cn=cert.descr or cert.refid,
@@ -956,12 +894,6 @@ def upload_private_key(cert_id):
     - key: Private key in PEM format (raw or base64 encoded)
     - passphrase: Optional passphrase if key is encrypted
     """
-    from models import Certificate, db
-    from services.audit_service import AuditService
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.x509 import load_pem_x509_certificate
-    import base64
     
     cert = Certificate.query.get(cert_id)
     if not cert:
@@ -1035,7 +967,6 @@ def upload_private_key(cert_id):
         )
         
         # Encrypt with our key encryption if configured
-        from security.encryption import encrypt_private_key
         key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
         cert.prv = encrypt_private_key(key_encoded)
         
@@ -1068,17 +999,6 @@ def renew_certificate(cert_id):
     """
     Renew certificate - Creates a new certificate with same subject/SANs but new validity
     """
-    from models import Certificate, CA, db
-    from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.x509.oid import NameOID, ExtensionOID
-    from datetime import datetime, timedelta
-    import base64
-    import uuid
-    from flask import g
-    from services.audit_service import AuditService
     
     # Get original certificate
     cert = Certificate.query.get(cert_id)
@@ -1252,14 +1172,6 @@ def import_certificate():
         import_key: Whether to import private key (default: true)
         update_existing: Whether to update if duplicate found (default: true)
     """
-    from models import Certificate, CA, db
-    from services.import_service import (
-        parse_certificate_file, is_ca_certificate, extract_cert_info,
-        find_existing_ca, find_existing_certificate,
-        serialize_cert_to_pem, serialize_key_to_pem
-    )
-    import base64
-    import uuid
     
     # Get file data from either file upload or pasted PEM content
     file_data = None
@@ -1267,7 +1179,6 @@ def import_certificate():
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        from utils.file_validation import validate_upload, CERT_EXTENSIONS
         try:
             file_data, filename = validate_upload(file, CERT_EXTENSIONS)
         except ValueError as e:
@@ -1321,8 +1232,6 @@ def import_certificate():
                 existing_ca.ski = cert_info.get('ski')
                 
                 db.session.commit()
-                
-                from services.audit_service import AuditService
                 AuditService.log_action(
                     action='ca_updated',
                     resource_type='ca',
@@ -1355,8 +1264,6 @@ def import_certificate():
             
             db.session.add(ca)
             db.session.commit()
-            
-            from services.audit_service import AuditService
             AuditService.log_action(
                 action='ca_imported',
                 resource_type='ca',
@@ -1398,8 +1305,6 @@ def import_certificate():
                     existing_cert.caref = ca.refid
             
             db.session.commit()
-            
-            from services.audit_service import AuditService
             AuditService.log_action(
                 action='certificate_updated',
                 resource_type='certificate',
@@ -1451,8 +1356,6 @@ def import_certificate():
         
         db.session.add(certificate)
         db.session.commit()
-        
-        from services.audit_service import AuditService
         AuditService.log_action(
             action='certificate_imported',
             resource_type='certificate',
@@ -1472,7 +1375,6 @@ def import_certificate():
         return error_response(str(e), 400)
     except Exception as e:
         db.session.rollback()
-        import traceback
         logger.error(f"Certificate Import Error: {str(e)}")
         logger.error(traceback.format_exc())
         return error_response(f'Import failed: {str(e)}', 500)
@@ -1486,9 +1388,6 @@ def import_certificate():
 @require_auth(['write:certificates'])
 def bulk_revoke_certificates():
     """Bulk revoke certificates"""
-    from models import Certificate, db
-    from services.cert_service import CertificateService
-    from services.audit_service import AuditService
 
     data = request.get_json()
     if not data or not data.get('ids'):
@@ -1529,15 +1428,6 @@ def bulk_revoke_certificates():
 @require_auth(['write:certificates'])
 def bulk_renew_certificates():
     """Bulk renew certificates"""
-    from models import Certificate, CA, db
-    from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.x509.oid import ExtensionOID
-    from datetime import datetime, timedelta
-    from services.audit_service import AuditService
-    import base64
 
     data = request.get_json()
     if not data or not data.get('ids'):
@@ -1633,8 +1523,6 @@ def bulk_renew_certificates():
 @require_auth(['delete:certificates'])
 def bulk_delete_certificates():
     """Bulk delete certificates"""
-    from models import Certificate, db
-    from services.audit_service import AuditService
 
     data = request.get_json()
     if not data or not data.get('ids'):
@@ -1672,9 +1560,6 @@ def bulk_delete_certificates():
 @require_auth(['read:certificates'])
 def bulk_export_certificates():
     """Export selected certificates"""
-    from flask import Response
-    from models import Certificate
-    import base64
 
     data = request.get_json()
     if not data or not data.get('ids'):
@@ -1696,7 +1581,6 @@ def bulk_export_certificates():
             return Response(pem_data, mimetype='application/x-pem-file',
                 headers={'Content-Disposition': 'attachment; filename="certificates.pem"'})
         elif export_format in ('pkcs7', 'p7b'):
-            import subprocess, tempfile, os
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
                 for cert in certs:
                     f.write(base64.b64decode(cert.crt))

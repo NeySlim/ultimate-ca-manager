@@ -3,70 +3,38 @@ CAs Management Routes v2.0
 /api/cas/* - Certificate Authorities CRUD
 """
 
-from flask import Blueprint, request, g, jsonify
+from flask import Blueprint, request, g, jsonify, Response
 import base64
 import re
 import logging
+import subprocess
+import tempfile
+import os
+import traceback
+import uuid
+from datetime import datetime
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
+from utils.dn_validation import validate_dn_field, validate_dn
 from services.ca_service import CAService
+from services.audit_service import AuditService
+from services.notification_service import NotificationService
+from services.import_service import (
+    parse_certificate_file, extract_cert_info, find_existing_ca,
+    serialize_cert_to_pem, serialize_key_to_pem
+)
+from utils.file_validation import validate_upload, CERT_EXTENSIONS
+from models import Certificate, CA, db
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import pkcs12
+from websocket.emitters import on_ca_created
 
 logger = logging.getLogger(__name__)
-from models import Certificate
 
 bp = Blueprint('cas_v2', __name__)
-
-
-# SECURITY: DN field validation regex patterns
-DN_FIELD_PATTERNS = {
-    'CN': re.compile(r'^[\w\s\-\.\,\'\@\(\)]+$', re.UNICODE),  # Common Name - most permissive
-    'O': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),  # Organization
-    'OU': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),  # Organizational Unit
-    'C': re.compile(r'^[A-Z]{2}$'),  # Country - exactly 2 uppercase letters
-    'ST': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),  # State
-    'L': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),  # Locality
-}
-
-MAX_DN_FIELD_LENGTH = 64
-
-
-def validate_dn_field(field_name, value):
-    """
-    SECURITY: Validate DN field to prevent injection attacks
-    Returns (is_valid, error_message)
-    """
-    if not value:
-        return True, None  # Empty is OK
-    
-    value = str(value).strip()
-    
-    # Check length
-    if len(value) > MAX_DN_FIELD_LENGTH:
-        return False, f"{field_name} must be {MAX_DN_FIELD_LENGTH} characters or less"
-    
-    # Check pattern if defined
-    if field_name in DN_FIELD_PATTERNS:
-        if not DN_FIELD_PATTERNS[field_name].match(value):
-            return False, f"Invalid characters in {field_name}"
-    
-    # Block common injection patterns
-    dangerous_patterns = [';', '|', '`', '$', '\\n', '\\r', '\x00', '\n', '\r']
-    for pattern in dangerous_patterns:
-        if pattern in value:
-            return False, f"Invalid character in {field_name}"
-    
-    return True, None
-
-
-def validate_dn(dn_dict):
-    """Validate all DN fields"""
-    for field, value in dn_dict.items():
-        if value:
-            is_valid, error = validate_dn_field(field, value)
-            if not is_valid:
-                return False, error
-    return True, None
 
 
 @bp.route('/api/v2/cas', methods=['GET'])
@@ -157,7 +125,6 @@ def list_cas_tree():
         ca['type'] = 'Root CA' if ca['is_root'] else 'Intermediate'
         # Check expiry status
         if ca['valid_to']:
-            from datetime import datetime
             try:
                 valid_to = datetime.fromisoformat(ca['valid_to'].replace('Z', '+00:00'))
                 if valid_to < datetime.now(valid_to.tzinfo):
@@ -232,7 +199,6 @@ def list_cas_tree():
                             ca_obj.caref = potential_parent.refid
                             if ca_obj.is_root:
                                 ca_obj.is_root = False
-                            from models import db
                             db.session.commit()
                     except Exception:
                         db.session.rollback()
@@ -300,14 +266,12 @@ def create_ca():
         
         # Send notification for CA creation
         try:
-            from services.notification_service import NotificationService
             NotificationService.on_ca_created(ca, username)
         except Exception:
             pass  # Non-blocking
         
         # WebSocket event
         try:
-            from websocket.emitters import on_ca_created
             on_ca_created(
                 ca_id=ca.id,
                 name=ca.name,
@@ -341,21 +305,12 @@ def import_ca():
         import_key: Whether to import private key (default: true)
         update_existing: Whether to update if duplicate found (default: true)
     """
-    from models import CA, db
-    from services.import_service import (
-        parse_certificate_file, extract_cert_info, find_existing_ca,
-        serialize_cert_to_pem, serialize_key_to_pem
-    )
-    import base64
-    import uuid
-    
     # Get file data from either file upload or pasted PEM content
     file_data = None
     filename = 'pasted.pem'
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        from utils.file_validation import validate_upload, CERT_EXTENSIONS
         try:
             file_data, filename = validate_upload(file, CERT_EXTENSIONS)
         except ValueError as e:
@@ -405,8 +360,6 @@ def import_ca():
             existing_ca.valid_to = cert_info['valid_to']
             
             db.session.commit()
-            
-            from services.audit_service import AuditService
             AuditService.log_action(
                 action='ca_updated',
                 resource_type='ca',
@@ -439,8 +392,6 @@ def import_ca():
         
         db.session.add(ca)
         db.session.commit()
-        
-        from services.audit_service import AuditService
         AuditService.log_action(
             action='ca_imported',
             resource_type='ca',
@@ -452,7 +403,6 @@ def import_ca():
         
         # Send notification for CA creation
         try:
-            from services.notification_service import NotificationService
             username = g.current_user.username if hasattr(g, 'current_user') else 'system'
             NotificationService.on_ca_created(ca, username)
         except Exception:
@@ -468,7 +418,6 @@ def import_ca():
         return error_response(str(e), 400)
     except Exception as e:
         db.session.rollback()
-        import traceback
         logger.error(f"CA Import Error: {str(e)}")
         logger.error(traceback.format_exc())
         return error_response(f'Import failed: {str(e)}', 500)
@@ -543,7 +492,6 @@ def update_ca(ca_id):
         cdp_url: string - CRL Distribution Point URL
         is_active: bool - Active status
     """
-    from models import CA, db
     
     ca = CA.query.get(ca_id)
     if not ca:
@@ -569,7 +517,6 @@ def update_ca(ca_id):
         db.session.commit()
         
         # Audit log
-        from services.audit_service import AuditService
         AuditService.log_action(
             action='ca_updated',
             resource_type='ca',
@@ -589,7 +536,6 @@ def update_ca(ca_id):
 @require_auth(['delete:cas'])
 def delete_ca(ca_id):
     """Delete CA"""
-    from models import CA, db
     
     ca = CA.query.get(ca_id)
     if not ca:
@@ -602,7 +548,6 @@ def delete_ca(ca_id):
     db.session.commit()
     
     # Audit log
-    from services.audit_service import AuditService
     AuditService.log_action(
         action='ca_deleted',
         resource_type='ca',
@@ -619,12 +564,6 @@ def delete_ca(ca_id):
 @require_auth(['read:cas'])
 def export_all_cas():
     """Export all CA certificates in various formats"""
-    from flask import Response
-    from models import CA
-    import base64
-    import subprocess
-    import tempfile
-    import os
     
     export_format = request.args.get('format', 'pem').lower()
     
@@ -689,9 +628,6 @@ def export_ca(ca_id):
         include_chain: bool - Include parent CA chain
         password: string - Required for PKCS12
     """
-    from flask import Response
-    from models import CA
-    import base64
     
     ca = CA.query.get(ca_id)
     if not ca:
@@ -746,9 +682,6 @@ def export_ca(ca_id):
             )
         
         elif export_format == 'der':
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import serialization
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             der_bytes = cert.public_bytes(serialization.Encoding.DER)
@@ -764,11 +697,6 @@ def export_ca(ca_id):
                 return error_response('Password required for PKCS12 export', 400)
             if not ca.prv:
                 return error_response('CA has no private key for PKCS12 export', 400)
-            
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import serialization
-            from cryptography.hazmat.primitives.serialization import pkcs12
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem = base64.b64decode(ca.prv)
@@ -804,9 +732,6 @@ def export_ca(ca_id):
             )
         
         elif export_format == 'pkcs7' or export_format == 'p7b':
-            import subprocess
-            import tempfile
-            import os
             
             # Create temporary PEM file with CA chain
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
@@ -902,8 +827,6 @@ def list_ca_certificates(ca_id):
 @require_auth(['delete:cas'])
 def bulk_delete_cas():
     """Bulk delete CAs"""
-    from models import CA, db
-    from services.audit_service import AuditService
 
     data = request.get_json()
     if not data or not data.get('ids'):
@@ -942,9 +865,6 @@ def bulk_delete_cas():
 @require_auth(['read:cas'])
 def bulk_export_cas():
     """Export selected CAs"""
-    from flask import Response
-    from models import CA
-    import base64
 
     data = request.get_json()
     if not data or not data.get('ids'):
@@ -966,7 +886,6 @@ def bulk_export_cas():
             return Response(pem_data, mimetype='application/x-pem-file',
                 headers={'Content-Disposition': 'attachment; filename="ca-certificates.pem"'})
         elif export_format in ('pkcs7', 'p7b'):
-            import subprocess, tempfile, os
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
                 for ca in cas:
                     f.write(base64.b64decode(ca.crt))

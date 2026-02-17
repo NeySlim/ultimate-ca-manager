@@ -3,14 +3,16 @@ Certificate Templates Management Routes v2.0
 /api/v2/templates/* - Manage certificate templates
 """
 
-from flask import Blueprint, request, g
+from flask import Blueprint, request, g, Response
 import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.file_validation import validate_upload, JSON_EXTENSIONS
 from models import db
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from datetime import datetime
+import traceback
 
 logger = logging.getLogger(__name__)
 import json
@@ -406,8 +408,6 @@ def export_template(template_id):
     
     GET /api/v2/templates/{template_id}/export
     """
-    from flask import Response
-    import json
     
     template = CertificateTemplate.query.get(template_id)
     if not template:
@@ -441,8 +441,6 @@ def export_all_templates():
     
     GET /api/v2/templates/export
     """
-    from flask import Response
-    import json
     
     templates = CertificateTemplate.query.filter_by(is_system=False).all()
     
@@ -479,14 +477,12 @@ def import_template():
         json_content: Pasted JSON content (optional if file provided)
         update_existing: Whether to update if name exists (default: false)
     """
-    import json
     
     # Get JSON data from file or pasted content
     json_data = None
     
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
-        from utils.file_validation import validate_upload, JSON_EXTENSIONS
         try:
             raw, _ = validate_upload(file, JSON_EXTENSIONS)
             json_data = raw.decode('utf-8')
@@ -586,7 +582,6 @@ def import_template():
         return error_response(f'Invalid JSON: {str(e)}', 400)
     except Exception as e:
         db.session.rollback()
-        import traceback
         logger.error(f"Template Import Error: {str(e)}")
         logger.error(traceback.format_exc())
         logger.error(f'Import failed: {e}')
