@@ -57,10 +57,15 @@ def create_provider():
         display_name=data.get('display_name'),
         icon=data.get('icon'),
         enabled=data.get('enabled', False),
+        is_default=data.get('is_default', False),
         default_role=data.get('default_role', 'viewer'),
         auto_create_users=data.get('auto_create_users', True),
         auto_update_users=data.get('auto_update_users', True),
     )
+    
+    # If setting as default, clear other providers
+    if provider.is_default:
+        SSOProvider.query.filter(SSOProvider.id != provider.id).update({'is_default': False})
     
     # Type-specific fields
     if data['provider_type'] == 'saml':
@@ -135,6 +140,10 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider.icon = data['icon']
     if 'enabled' in data:
         provider.enabled = data['enabled']
+    if 'is_default' in data:
+        provider.is_default = data['is_default']
+        if provider.is_default:
+            SSOProvider.query.filter(SSOProvider.id != provider.id).update({'is_default': False})
     if 'default_role' in data:
         provider.default_role = data['default_role']
     if 'auto_create_users' in data:
@@ -149,20 +158,26 @@ def update_provider(provider_id=None, provider_type_name=None):
                 setattr(provider, field, data[field])
     
     elif provider.provider_type == 'oauth2':
-        for field in ['oauth2_client_id', 'oauth2_client_secret', 'oauth2_auth_url', 
+        for field in ['oauth2_client_id', 'oauth2_auth_url', 
                       'oauth2_token_url', 'oauth2_userinfo_url']:
             if field in data:
                 setattr(provider, field, data[field])
+        # Only update secret if non-empty (empty = keep existing)
+        if data.get('oauth2_client_secret'):
+            provider.oauth2_client_secret = data['oauth2_client_secret']
         if 'oauth2_scopes' in data:
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
     
     elif provider.provider_type == 'ldap':
         for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn', 
-                      'ldap_bind_password', 'ldap_base_dn', 'ldap_user_filter',
+                      'ldap_base_dn', 'ldap_user_filter',
                       'ldap_group_filter', 'ldap_username_attr', 'ldap_email_attr', 
                       'ldap_fullname_attr']:
             if field in data:
                 setattr(provider, field, data[field])
+        # Only update password if non-empty (empty = keep existing)
+        if data.get('ldap_bind_password'):
+            provider.ldap_bind_password = data['ldap_bind_password']
     
     # JSON fields
     if 'attribute_mapping' in data:

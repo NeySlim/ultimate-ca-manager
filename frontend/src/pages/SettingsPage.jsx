@@ -435,6 +435,88 @@ function AppearanceSettings() {
   )
 }
 
+// Copyable URL field for SSO SP metadata
+function CopyableUrl({ label, value, description }) {
+  const { showInfo } = useNotification()
+  const { t } = useTranslation()
+  const copy = () => {
+    navigator.clipboard.writeText(value)
+    showInfo(t('common.copiedToClipboard'))
+  }
+  return (
+    <div className="p-3 bg-bg-tertiary rounded-lg">
+      <p className="text-xs text-text-secondary mb-1">{label}</p>
+      {description && <p className="text-xs text-text-muted mb-1.5">{description}</p>}
+      <div className="flex items-center gap-2">
+        <code className="text-sm font-mono text-text-primary flex-1 break-all select-all">{value}</code>
+        <Button size="sm" variant="ghost" onClick={copy} title={t('common.copy')}>
+          <Copy size={14} />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Key-value pair editor for attribute/role mapping
+function MappingEditor({ value, onChange, keyLabel, valueLabel, keyPlaceholder, valuePlaceholder, valueOptions }) {
+  const { t } = useTranslation()
+  const entries = Object.entries(value || {})
+
+  const updateEntry = (oldKey, newKey, newVal) => {
+    const updated = { ...value }
+    if (oldKey !== newKey) delete updated[oldKey]
+    updated[newKey] = newVal
+    onChange(updated)
+  }
+  const removeEntry = (key) => {
+    const updated = { ...value }
+    delete updated[key]
+    onChange(updated)
+  }
+  const addEntry = () => {
+    onChange({ ...value, '': '' })
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 text-xs text-text-secondary">
+        <span>{keyLabel}</span><span>{valueLabel}</span><span />
+      </div>
+      {entries.map(([k, v], idx) => (
+        <div key={idx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+          <Input
+            value={k}
+            onChange={e => updateEntry(k, e.target.value, v)}
+            placeholder={keyPlaceholder}
+            size="sm"
+          />
+          {valueOptions ? (
+            <Select
+              value={v}
+              onChange={val => updateEntry(k, k, val)}
+              options={valueOptions}
+              size="sm"
+            />
+          ) : (
+            <Input
+              value={v}
+              onChange={e => updateEntry(k, k, e.target.value)}
+              placeholder={valuePlaceholder}
+              size="sm"
+            />
+          )}
+          <Button size="sm" variant="ghost" onClick={() => removeEntry(k)}>
+            <Trash size={14} className="text-status-danger" />
+          </Button>
+        </div>
+      ))}
+      <Button size="sm" variant="secondary" onClick={addEntry} type="button">
+        <Plus size={14} /> {t('common.add')}
+      </Button>
+    </div>
+  )
+}
+
 // SSO Provider Form Component
 function SsoProviderForm({ provider, onSave, onCancel }) {
   const { t } = useTranslation()
@@ -443,9 +525,12 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     display_name: provider?.display_name || '',
     provider_type: provider?.provider_type || 'ldap',
     enabled: provider?.enabled ?? false,
+    is_default: provider?.is_default ?? false,
     default_role: provider?.default_role || 'viewer',
     auto_create_users: provider?.auto_create_users ?? true,
     auto_update_users: provider?.auto_update_users ?? true,
+    attribute_mapping: provider?.attribute_mapping || {},
+    role_mapping: provider?.role_mapping || {},
     // LDAP
     ldap_server: provider?.ldap_server || '',
     ldap_port: provider?.ldap_port || 389,
@@ -454,6 +539,10 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     ldap_bind_password: '',
     ldap_base_dn: provider?.ldap_base_dn || '',
     ldap_user_filter: provider?.ldap_user_filter || '(uid={username})',
+    ldap_group_filter: provider?.ldap_group_filter || '',
+    ldap_username_attr: provider?.ldap_username_attr || 'uid',
+    ldap_email_attr: provider?.ldap_email_attr || 'mail',
+    ldap_fullname_attr: provider?.ldap_fullname_attr || 'cn',
     // OAuth2
     oauth2_client_id: provider?.oauth2_client_id || '',
     oauth2_client_secret: '',
@@ -466,6 +555,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     saml_sso_url: provider?.saml_sso_url || '',
     saml_slo_url: provider?.saml_slo_url || '',
     saml_certificate: provider?.saml_certificate || '',
+    saml_sign_requests: provider?.saml_sign_requests ?? true,
   })
 
   const handleChange = (field, value) => {
@@ -478,11 +568,34 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     if (data.provider_type === 'oauth2') {
       data.oauth2_scopes = data.oauth2_scopes.split(/\s+/).filter(Boolean)
     }
+    // Clean empty mapping entries
+    if (data.attribute_mapping) {
+      data.attribute_mapping = Object.fromEntries(
+        Object.entries(data.attribute_mapping).filter(([k, v]) => k && v)
+      )
+    }
+    if (data.role_mapping) {
+      data.role_mapping = Object.fromEntries(
+        Object.entries(data.role_mapping).filter(([k, v]) => k && v)
+      )
+    }
     onSave(data)
   }
 
+  // SP metadata URLs for SAML/OAuth2 IdP configuration
+  const baseUrl = window.location.origin
+  const spEntityId = `${baseUrl}/api/v2/sso`
+  const acsUrl = provider ? `${baseUrl}/api/v2/sso/callback/${provider.id}` : null
+  const oauthCallbackUrl = provider ? `${baseUrl}/api/v2/sso/callback/${provider.id}` : null
+
+  const roleOptions = [
+    { value: 'admin', label: t('common.admin') },
+    { value: 'operator', label: t('common.operator') },
+    { value: 'viewer', label: t('common.viewer') },
+  ]
+
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-6">
+    <form onSubmit={handleSubmit} className="p-4 space-y-6 max-h-[70vh] overflow-y-auto">
       {/* General Settings */}
       <div className="space-y-4">
         <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">{t('common.general')}</h4>
@@ -513,12 +626,47 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             ]}
           />
         )}
-        <ToggleSwitch
-          checked={formData.enabled}
-          onChange={(val) => handleChange('enabled', val)}
-          label={t('common.enableProvider')}
-        />
+        <div className="flex gap-6">
+          <ToggleSwitch
+            checked={formData.enabled}
+            onChange={(val) => handleChange('enabled', val)}
+            label={t('common.enableProvider')}
+          />
+          <ToggleSwitch
+            checked={formData.is_default}
+            onChange={(val) => handleChange('is_default', val)}
+            label={t('sso.isDefault')}
+          />
+        </div>
       </div>
+
+      {/* SP Metadata — SAML (show when editing existing provider) */}
+      {formData.provider_type === 'saml' && provider && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+            {t('sso.spMetadata')}
+          </h4>
+          <HelpCard variant="info" className="text-xs">
+            {t('sso.spMetadataHelp')}
+          </HelpCard>
+          <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
+          <CopyableUrl label={t('sso.acsUrl')} value={acsUrl} description={t('sso.acsUrlDesc')} />
+          <CopyableUrl label={t('sso.spSloUrl')} value={`${baseUrl}/api/v2/sso/callback/${provider.id}`} />
+        </div>
+      )}
+
+      {/* OAuth2 Callback URL (show when editing existing provider) */}
+      {formData.provider_type === 'oauth2' && provider && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+            {t('sso.callbackUrls')}
+          </h4>
+          <HelpCard variant="info" className="text-xs">
+            {t('sso.callbackUrlsHelp')}
+          </HelpCard>
+          <CopyableUrl label={t('sso.redirectUri')} value={oauthCallbackUrl} />
+        </div>
+      )}
 
       {/* Connection Settings */}
       <div className="space-y-4">
@@ -573,6 +721,37 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               onChange={e => handleChange('ldap_user_filter', e.target.value)}
               placeholder={t('sso.userFilterPlaceholder')}
             />
+            <Input
+              label={t('sso.groupFilter')}
+              value={formData.ldap_group_filter}
+              onChange={e => handleChange('ldap_group_filter', e.target.value)}
+              placeholder={t('sso.groupFilterPlaceholder')}
+            />
+
+            {/* LDAP Attribute Mapping */}
+            <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2 pt-2">
+              {t('sso.attributeMapping')}
+            </h4>
+            <div className="grid grid-cols-3 gap-4">
+              <Input
+                label={t('sso.usernameAttr')}
+                value={formData.ldap_username_attr}
+                onChange={e => handleChange('ldap_username_attr', e.target.value)}
+                placeholder="uid"
+              />
+              <Input
+                label={t('sso.emailAttr')}
+                value={formData.ldap_email_attr}
+                onChange={e => handleChange('ldap_email_attr', e.target.value)}
+                placeholder="mail"
+              />
+              <Input
+                label={t('sso.fullnameAttr')}
+                value={formData.ldap_fullname_attr}
+                onChange={e => handleChange('ldap_fullname_attr', e.target.value)}
+                placeholder="cn"
+              />
+            </div>
           </>
         )}
 
@@ -602,6 +781,12 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               value={formData.oauth2_token_url}
               onChange={e => handleChange('oauth2_token_url', e.target.value)}
               placeholder={t('sso.tokenUrlPlaceholder')}
+            />
+            <Input
+              label={t('sso.userinfoUrl')}
+              value={formData.oauth2_userinfo_url}
+              onChange={e => handleChange('oauth2_userinfo_url', e.target.value)}
+              placeholder={t('sso.userinfoUrlPlaceholder')}
             />
             <Input
               label={t('sso.scopes')}
@@ -640,6 +825,11 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               placeholder="-----BEGIN CERTIFICATE-----..."
               className="font-mono text-xs"
             />
+            <ToggleSwitch
+              checked={formData.saml_sign_requests}
+              onChange={(val) => handleChange('saml_sign_requests', val)}
+              label={t('sso.signRequests')}
+            />
           </>
         )}
       </div>
@@ -651,11 +841,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           label={t('sso.defaultRole')}
           value={formData.default_role}
           onChange={value => handleChange('default_role', value)}
-          options={[
-            { value: 'admin', label: t('common.admin') },
-            { value: 'operator', label: t('common.operator') },
-            { value: 'viewer', label: t('common.viewer') },
-          ]}
+          options={roleOptions}
         />
         <div className="space-y-2">
           <ToggleSwitch
@@ -671,8 +857,42 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
         </div>
       </div>
 
+      {/* Attribute Mapping (OAuth2/SAML) */}
+      {formData.provider_type !== 'ldap' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+            {t('sso.attributeMapping')}
+          </h4>
+          <p className="text-xs text-text-muted">{t('sso.attributeMappingHelp')}</p>
+          <MappingEditor
+            value={formData.attribute_mapping}
+            onChange={val => handleChange('attribute_mapping', val)}
+            keyLabel={t('sso.ssoAttribute')}
+            valueLabel={t('sso.ucmField')}
+            keyPlaceholder="e.g., preferred_username"
+            valuePlaceholder="e.g., username"
+          />
+        </div>
+      )}
+
+      {/* Role Mapping */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+          {t('sso.roleMapping')}
+        </h4>
+        <p className="text-xs text-text-muted">{t('sso.roleMappingHelp')}</p>
+        <MappingEditor
+          value={formData.role_mapping}
+          onChange={val => handleChange('role_mapping', val)}
+          keyLabel={t('sso.externalGroup')}
+          valueLabel={t('sso.ucmRole')}
+          keyPlaceholder="e.g., pki-admins"
+          valueOptions={roleOptions}
+        />
+      </div>
+
       {/* Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-border">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
@@ -2024,7 +2244,7 @@ export default function SettingsPage() {
                 icon={Key}
                 title={t('sso.noProviders')}
                 description={t('sso.noProvidersDescription')}
-                action={{ label: t('common.addDnsProvider'), onClick: handleSsoCreate }}
+                action={{ label: t('sso.addProvider'), onClick: handleSsoCreate }}
               />
             ) : (
               <DetailSection title={t('sso.configuredProviders')} icon={Key} iconClass="icon-bg-purple">
@@ -2043,21 +2263,29 @@ export default function SettingsPage() {
                               <Badge variant={provider.enabled ? 'success' : 'secondary'} size="sm">
                                 {provider.enabled ? t('common.enabled') : t('common.disabled')}
                               </Badge>
+                              {provider.is_default && (
+                                <Badge variant="primary" size="sm">{t('sso.default')}</Badge>
+                              )}
                             </div>
-                            <p className="text-xs text-text-secondary">{provider.provider_type?.toUpperCase()}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-text-secondary">{provider.provider_type?.toUpperCase()}</p>
+                              {provider.last_used_at && (
+                                <span className="text-xs text-text-muted">· {t('sso.lastUsed')} {formatDate(provider.last_used_at)}</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting}>
+                          <Button size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting} title={t('common.testConnection')}>
                             {ssoTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)}>
-                            <Lightning size={14} />
+                          <Button size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)} title={provider.enabled ? t('sso.disable') : t('sso.enable')}>
+                            <Power size={14} />
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)}>
+                          <Button size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)} title={t('common.edit')}>
                             <PencilSimple size={14} />
                           </Button>
-                          <Button size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)}>
+                          <Button size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)} title={t('common.delete')}>
                             <Trash size={14} />
                           </Button>
                         </div>
@@ -2068,7 +2296,7 @@ export default function SettingsPage() {
                     <div className="pt-2">
                       <Button onClick={handleSsoCreate}>
                         <Plus size={16} />
-                        {t('common.addDnsProvider')}
+                        {t('sso.addProvider')}
                       </Button>
                     </div>
                   )}
@@ -2758,7 +2986,7 @@ export default function SettingsPage() {
       <Modal
         open={showSsoModal}
         onClose={() => { setShowSsoModal(false); setEditingSsoProvider(null) }}
-        title={editingSsoProvider ? t('sso.editProvider') : t('common.addDnsProvider')}
+        title={editingSsoProvider ? t('sso.editProvider') : t('sso.newProvider')}
         size="lg"
       >
         <SsoProviderForm
