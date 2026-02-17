@@ -416,12 +416,13 @@ def get_available_providers():
         'display_name': p.display_name or p.name,
         'provider_type': p.provider_type,
         'icon': p.icon,
-        'is_default': p.is_default
+        'is_default': p.is_default,
+        'login_url': f'/api/v2/sso/login/{p.provider_type}' if p.provider_type != 'ldap' else None
     } for p in providers])
 
 
-@bp.route('/api/v2/sso/login/<int:provider_id>', methods=['GET'])
-def initiate_sso_login(provider_id):
+@bp.route('/api/v2/sso/login/<provider_type>', methods=['GET'])
+def initiate_sso_login(provider_type):
     """
     Initiate SSO login flow.
     For OAuth2: redirects to authorization URL
@@ -431,25 +432,23 @@ def initiate_sso_login(provider_id):
     import secrets as py_secrets
     import urllib.parse
     
-    provider = SSOProvider.query.get_or_404(provider_id)
+    if provider_type not in ('saml', 'oauth2'):
+        return error_response("Use /api/v2/sso/ldap/login for LDAP authentication", 400)
     
-    if not provider.enabled:
-        return error_response("SSO provider is disabled", 400)
-    
-    if provider.provider_type == 'ldap':
-        return error_response("LDAP uses direct authentication. Use /api/v2/sso/ldap/login instead.", 400)
+    provider = SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
+    if not provider:
+        return error_response(f"No enabled {provider_type.upper()} provider found", 404)
     
     # Generate state token for CSRF protection
     state = py_secrets.token_urlsafe(32)
     session['sso_state'] = state
-    session['sso_provider_id'] = provider_id
+    session['sso_provider_id'] = provider.id
     
     if provider.provider_type == 'oauth2':
         # Build OAuth2 authorization URL
         scopes = json.loads(provider.oauth2_scopes) if provider.oauth2_scopes else ['openid', 'profile', 'email']
         
-        # Get callback URL from request
-        callback_url = request.url_root.rstrip('/') + f'/api/v2/sso/callback/{provider_id}'
+        callback_url = request.url_root.rstrip('/') + '/api/v2/sso/callback/oauth2'
         
         params = {
             'client_id': provider.oauth2_client_id,
@@ -474,18 +473,20 @@ def initiate_sso_login(provider_id):
     return error_response("Unknown provider type", 400)
 
 
-@bp.route('/api/v2/sso/callback/<int:provider_id>', methods=['GET', 'POST'])
-def sso_callback(provider_id):
+@bp.route('/api/v2/sso/callback/<provider_type>', methods=['GET', 'POST'])
+def sso_callback(provider_type):
     """
     Handle SSO callback from OAuth2/SAML providers.
     Creates or updates user and establishes session.
     """
     import requests
     
-    provider = SSOProvider.query.get_or_404(provider_id)
+    if provider_type not in ('saml', 'oauth2'):
+        return redirect('/login?error=invalid_provider_type')
     
-    if not provider.enabled:
-        return redirect('/login?error=provider_disabled')
+    provider = SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
+    if not provider:
+        return redirect('/login?error=provider_not_found')
     
     # Verify state for CSRF protection
     state = request.args.get('state')
@@ -500,7 +501,7 @@ def sso_callback(provider_id):
         
         try:
             # Exchange code for token
-            callback_url = request.url_root.rstrip('/') + f'/api/v2/sso/callback/{provider_id}'
+            callback_url = request.url_root.rstrip('/') + '/api/v2/sso/callback/oauth2'
             
             token_response = requests.post(
                 provider.oauth2_token_url,
