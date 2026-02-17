@@ -532,7 +532,7 @@ export default function DashboardPage() {
                   title={t('dashboard.certificateActivity')}
                   subtitle={t('dashboard.last7Days')}
                 />
-                <Card.Body className="flex-1 min-h-0 relative !pb-0 !px-2">
+                <Card.Body className="flex-1 min-h-[200px] relative !pb-0 !px-2">
                   <div className="absolute inset-0 px-2 pb-2">
                     <CertificateTrendChart data={certificateTrend} />
                   </div>
@@ -553,7 +553,7 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 min-h-0 relative !p-0">
+                <Card.Body className="flex-1 min-h-[200px] relative !p-0">
                   <div className="absolute inset-0 flex items-center">
                     <StatusPieChart 
                       data={{

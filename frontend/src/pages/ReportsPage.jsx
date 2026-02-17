@@ -73,7 +73,7 @@ export default function ReportsPage() {
       setLoading(true)
       const [typesRes, scheduleRes] = await Promise.all([
         reportsService.getTypes(),
-        reportsService.getSchedule().catch(() => ({ data: null })),
+        canWrite('settings') ? reportsService.getSchedule().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       ])
       setReportTypes(typesRes.data || {})
       if (scheduleRes.data) setSchedule(scheduleRes.data)
@@ -82,7 +82,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showError, t])
+  }, [showError, t, canWrite])
 
   useEffect(() => { loadData() }, [loadData])
 

@@ -126,10 +126,12 @@ export default function CAsPage() {
       setLoading(false)
     }
 
-    // Load chain repair status (non-blocking)
-    apiClient.get('/system/chain-repair')
-      .then(res => setChainRepair(res.data || null))
-      .catch(() => {})
+    // Load chain repair status (non-blocking, admin/operator only)
+    if (canWrite('cas')) {
+      apiClient.get('/system/chain-repair')
+        .then(res => setChainRepair(res.data || null))
+        .catch(() => {})
+    }
   }
 
   const loadCADetails = async (ca) => {
