@@ -292,14 +292,18 @@ export function ThemeProvider({ children }) {
 
   // Load saved preferences
   useEffect(() => {
-    const savedFamily = localStorage.getItem('ucm-theme-family')
-    const savedMode = localStorage.getItem('ucm-theme-mode')
-    
-    if (savedFamily && themeFamilies[savedFamily]) {
-      setThemeFamily(savedFamily)
-    }
-    if (savedMode && ['system', 'dark', 'light'].includes(savedMode)) {
-      setMode(savedMode)
+    try {
+      const savedFamily = localStorage.getItem('ucm-theme-family')
+      const savedMode = localStorage.getItem('ucm-theme-mode')
+      
+      if (savedFamily && themeFamilies[savedFamily]) {
+        setThemeFamily(savedFamily)
+      }
+      if (savedMode && ['system', 'dark', 'light'].includes(savedMode)) {
+        setMode(savedMode)
+      }
+    } catch {
+      // localStorage unavailable (private browsing)
     }
   }, [])
 
@@ -311,8 +315,12 @@ export function ThemeProvider({ children }) {
       Object.entries(colors).forEach(([key, value]) => {
         document.documentElement.style.setProperty(`--${key}`, value)
       })
-      localStorage.setItem('ucm-theme-family', themeFamily)
-      localStorage.setItem('ucm-theme-mode', mode)
+      try {
+        localStorage.setItem('ucm-theme-family', themeFamily)
+        localStorage.setItem('ucm-theme-mode', mode)
+      } catch {
+        // localStorage unavailable
+      }
     }
   }, [themeFamily, resolvedMode, mode])
 

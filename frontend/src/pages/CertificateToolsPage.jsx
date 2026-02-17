@@ -15,7 +15,7 @@ import {
   DetailHeader, DetailContent, DetailSection
 } from '../components'
 import { ResponsiveLayout } from '../components/ui/responsive'
-import { apiClient } from '../services'
+import { toolsService } from '../services'
 import { useNotification } from '../contexts'
 import { cn } from '../lib/utils'
 
@@ -110,7 +110,7 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/tools/check-ssl', {
+      const response = await toolsService.checkSsl({
         hostname: sslHostname.trim(),
         port: parseInt(sslPort) || 443
       })
@@ -131,7 +131,7 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/tools/decode-csr', {
+      const response = await toolsService.decodeCsr({
         pem: csrPem.trim()
       })
       setResult({ type: 'csr', data: response.data })
@@ -151,7 +151,7 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/tools/decode-cert', {
+      const response = await toolsService.decodeCert({
         pem: certPem.trim()
       })
       setResult({ type: 'cert', data: response.data })
@@ -171,7 +171,7 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/tools/match-keys', {
+      const response = await toolsService.matchKeys({
         certificate: matchCert.trim(),
         private_key: matchKey.trim(),
         csr: matchCsr.trim(),
@@ -202,7 +202,7 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/tools/convert', {
+      const response = await toolsService.convert({
         pem: content,
         input_type: convertType,
         output_format: convertFormat,

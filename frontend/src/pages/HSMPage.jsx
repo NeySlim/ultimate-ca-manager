@@ -17,7 +17,7 @@ import {
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { apiClient } from '../services/apiClient'
+import { hsmService } from '../services'
 import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
@@ -65,7 +65,7 @@ export default function HSMPage() {
 
   const loadData = async () => {
     try {
-      const response = await apiClient.get('/hsm/providers')
+      const response = await hsmService.getProviders()
       setProviders(response.data || [])
     } catch (error) {
       showError(ERRORS.LOAD_FAILED.HSM_PROVIDERS)
@@ -76,7 +76,7 @@ export default function HSMPage() {
 
   const loadHsmStatus = async () => {
     try {
-      const response = await apiClient.get('/system/hsm-status')
+      const response = await hsmService.getStatus()
       setHsmStatus(response.data)
     } catch {
       // Non-critical — ignore
@@ -85,7 +85,7 @@ export default function HSMPage() {
 
   const loadKeys = async (providerId) => {
     try {
-      const response = await apiClient.get(`/hsm/keys?provider_id=${providerId}`)
+      const response = await hsmService.getKeys(providerId)
       setKeys(response.data || [])
     } catch (error) {
     }
@@ -107,7 +107,7 @@ export default function HSMPage() {
     const confirmed = await showConfirm(CONFIRM.HSM.DELETE_PROVIDER.replace('{name}', provider.name), { variant: 'danger', confirmText: t('common.delete') })
     if (!confirmed) return
     try {
-      await apiClient.delete(`/hsm/providers/${provider.id}`)
+      await hsmService.deleteProvider(provider.id)
       showSuccess(SUCCESS.DELETE.PROVIDER)
       loadData()
       setSelectedProvider(null)
@@ -119,7 +119,7 @@ export default function HSMPage() {
   const handleTest = async (provider) => {
     setTesting(true)
     try {
-      const response = await apiClient.post(`/hsm/providers/${provider.id}/test`)
+      const response = await hsmService.testProvider(provider.id)
       if (response.data?.success) {
         showSuccess(response.data.message || SUCCESS.HSM.CONNECTION_OK)
         loadData()
@@ -136,10 +136,10 @@ export default function HSMPage() {
   const handleSave = async (formData) => {
     try {
       if (modalMode === 'create') {
-        await apiClient.post('/hsm/providers', formData)
+        await hsmService.createProvider(formData)
         showSuccess(SUCCESS.CREATE.PROVIDER)
       } else {
-        await apiClient.put(`/hsm/providers/${selectedProvider.id}`, formData)
+        await hsmService.updateProvider(selectedProvider.id, formData)
         showSuccess(SUCCESS.UPDATE.PROVIDER)
       }
       setShowModal(false)
@@ -151,7 +151,7 @@ export default function HSMPage() {
 
   const handleGenerateKey = async (keyData) => {
     try {
-      await apiClient.post(`/hsm/providers/${selectedProvider.id}/keys`, keyData)
+      await hsmService.addKey(selectedProvider.id, keyData)
       showSuccess(SUCCESS.CREATE.KEY)
       setShowKeyModal(false)
       loadKeys(selectedProvider.id)
@@ -164,7 +164,7 @@ export default function HSMPage() {
     const confirmed = await showConfirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.label), { variant: 'danger', confirmText: t('common.delete') })
     if (!confirmed) return
     try {
-      await apiClient.delete(`/hsm/keys/${key.id}`)
+      await hsmService.deleteKey(key.id)
       showSuccess(SUCCESS.DELETE.KEY)
       loadKeys(selectedProvider.id)
     } catch (error) {
