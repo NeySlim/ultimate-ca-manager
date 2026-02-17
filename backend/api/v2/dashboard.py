@@ -5,8 +5,11 @@ Dashboard & Stats Routes v2.0
 """
 
 from flask import Blueprint, request, g
+import logging
 from auth.unified import require_auth
 from utils.response import success_response
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('dashboard_v2', __name__)
 
@@ -26,13 +29,15 @@ def get_public_stats():
         try:
             acme_accounts = db.session.execute(text("SELECT COUNT(*) FROM acme_accounts")).scalar() or 0
         except Exception:
+            logger.debug("ACME accounts table not available")
             acme_accounts = 0
         
         # Active users
         try:
             active_users = db.session.execute(text("SELECT COUNT(*) FROM users WHERE is_active = 1")).scalar() or 0
         except Exception:
-            active_users = 1  # At least one user should exist
+            logger.debug("Users table query failed")
+            active_users = 1
         
         return success_response(data={
             'total_cas': total_cas,
@@ -82,7 +87,7 @@ def get_dashboard_stats():
             text("SELECT COUNT(*) FROM certificate_requests WHERE status = 'pending'")
         ).scalar() or 0
     except Exception:
-        pass
+        logger.debug("Pending CSRs query failed")
     
     # Count ACME renewals (last 30 days)
     acme_renewals = 0
@@ -93,7 +98,7 @@ def get_dashboard_stats():
             {'date': thirty_days_ago}
         ).scalar() or 0
     except Exception:
-        pass
+        logger.debug("Pending CSRs query failed")
     
     return success_response(data={
         'total_cas': total_cas,
@@ -218,8 +223,7 @@ def get_activity_log():
         
         return success_response(data={'activity': activity})
     except Exception as e:
-        import logging
-        logging.error(f"Activity log error: {e}")
+        logger.error(f"Activity log error: {e}")
         return success_response(data={'activity': []})
 
 
@@ -273,8 +277,7 @@ def get_certificate_trend():
         
         return success_response(data={'trend': trend_data})
     except Exception as e:
-        import logging
-        logging.error(f"Certificate trend error: {e}")
+        logger.error(f"Certificate trend error: {e}")
         # Return empty but valid data
         return success_response(data={'trend': []})
 
@@ -298,6 +301,7 @@ def get_system_status():
         db.session.execute(text('SELECT 1'))
         status['database'] = {'status': 'online', 'message': 'Connected'}
     except Exception:
+        logger.debug('Database status check failed')
         status['database'] = {'status': 'offline', 'message': 'Connection failed'}
     
     # Check ACME service - check config first, then accounts
@@ -316,6 +320,7 @@ def get_system_status():
         else:
             status['acme'] = {'status': 'offline', 'message': 'Disabled'}
     except Exception:
+        logger.debug('ACME status check failed')
         status['acme'] = {'status': 'offline', 'message': 'Not configured'}
     
     # SCEP is always available if UCM is running
