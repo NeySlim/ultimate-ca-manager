@@ -6,10 +6,13 @@ CAs Management Routes v2.0
 from flask import Blueprint, request, g, jsonify
 import base64
 import re
+import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from services.ca_service import CAService
+
+logger = logging.getLogger(__name__)
 from models import Certificate
 
 bp = Blueprint('cas_v2', __name__)
@@ -466,8 +469,8 @@ def import_ca():
     except Exception as e:
         db.session.rollback()
         import traceback
-        print(f"CA Import Error: {str(e)}")
-        print(traceback.format_exc())
+        logger.error(f"CA Import Error: {str(e)}")
+        logger.error(traceback.format_exc())
         return error_response(f'Import failed: {str(e)}', 500)
 
 

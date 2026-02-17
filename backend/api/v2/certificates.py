@@ -5,10 +5,13 @@ Certificates Management Routes v2.0
 
 from flask import Blueprint, request, g
 import re
+import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 
 bp = Blueprint('certificates_v2', __name__)
+
+logger = logging.getLogger(__name__)
 
 
 # SECURITY: DN field validation patterns (reused from cas.py)
@@ -1470,8 +1473,8 @@ def import_certificate():
     except Exception as e:
         db.session.rollback()
         import traceback
-        print(f"Certificate Import Error: {str(e)}")
-        print(traceback.format_exc())
+        logger.error(f"Certificate Import Error: {str(e)}")
+        logger.error(traceback.format_exc())
         return error_response(f'Import failed: {str(e)}', 500)
 
 

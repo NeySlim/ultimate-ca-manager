@@ -16,7 +16,12 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtensionOID
 from OpenSSL import crypto
 
+import logging
+
 from auth.unified import require_auth
+from utils.response import success_response, error_response
+
+logger = logging.getLogger(__name__)
 
 tools_bp = Blueprint('tools', __name__, url_prefix='/api/v2/tools')
 
@@ -232,11 +237,11 @@ def check_ssl():
     port = data.get('port', 443)
     
     if not hostname:
-        return jsonify({'error': 'Hostname is required'}), 400
+        return error_response('Hostname is required', 400)
         
     # SSRF Protection
     if not is_safe_host(hostname):
-        return jsonify({'error': 'Access to private/local network resources is blocked'}), 403
+        return error_response('Access to private/local network resources is blocked', 403)
     
     try:
         port = int(port)
@@ -308,16 +313,17 @@ def check_ssl():
                 cert_info['issues'] = issues
                 cert_info['has_issues'] = len(issues) > 0
                 
-                return jsonify({'success': True, 'data': cert_info})
+                return success_response(data=cert_info)
     
     except socket.timeout:
-        return jsonify({'error': f'Connection timeout to {hostname}:{port}'}), 400
+        return error_response(f'Connection timeout to {hostname}:{port}', 400)
     except socket.gaierror:
-        return jsonify({'error': f'Could not resolve hostname: {hostname}'}), 400
+        return error_response(f'Could not resolve hostname: {hostname}', 400)
     except ConnectionRefusedError:
-        return jsonify({'error': f'Connection refused by {hostname}:{port}'}), 400
+        return error_response(f'Connection refused by {hostname}:{port}', 400)
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        logger.error(f'SSL check failed: {e}')
+        return error_response('SSL check failed', 400)
 
 
 @tools_bp.route('/decode-csr', methods=['POST'])
@@ -328,7 +334,7 @@ def decode_csr():
     pem_data = data.get('pem', '').strip()
     
     if not pem_data:
-        return jsonify({'error': 'CSR data is required'}), 400
+        return error_response('CSR data is required', 400)
     
     try:
         csr = None
@@ -344,10 +350,11 @@ def decode_csr():
             csr = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
         
         result = csr_to_dict(csr)
-        return jsonify({'success': True, 'data': result})
+        return success_response(data=result)
     
     except Exception as e:
-        return jsonify({'error': f'Failed to decode CSR: {str(e)}'}), 400
+        logger.error(f'Failed to decode CSR: {e}')
+        return error_response('Failed to decode CSR', 400)
 
 
 @tools_bp.route('/decode-cert', methods=['POST'])
@@ -358,7 +365,7 @@ def decode_cert():
     pem_data = data.get('pem', '').strip()
     
     if not pem_data:
-        return jsonify({'error': 'Certificate data is required'}), 400
+        return error_response('Certificate data is required', 400)
     
     try:
         cert = None
@@ -374,10 +381,11 @@ def decode_cert():
             cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
         
         result = cert_to_dict(cert)
-        return jsonify({'success': True, 'data': result})
+        return success_response(data=result)
     
     except Exception as e:
-        return jsonify({'error': f'Failed to decode certificate: {str(e)}'}), 400
+        logger.error(f'Failed to decode certificate: {e}')
+        return error_response('Failed to decode certificate', 400)
 
 
 @tools_bp.route('/match-keys', methods=['POST'])
@@ -391,7 +399,7 @@ def match_keys():
     password = data.get('password', '')
     
     if not any([cert_pem, key_pem, csr_pem]):
-        return jsonify({'error': 'At least one of certificate, private_key, or csr is required'}), 400
+        return error_response('At least one of certificate, private_key, or csr is required', 400)
     
     results = {
         'items': [],
@@ -538,10 +546,11 @@ def match_keys():
         # Overall status
         results['all_match'] = len(results['mismatches']) == 0 and len(results['matches']) > 0
         
-        return jsonify({'success': True, 'data': results})
+        return success_response(data=results)
     
     except Exception as e:
-        return jsonify({'error': f'Failed to match keys: {str(e)}'}), 400
+        logger.error(f'Failed to match keys: {e}')
+        return error_response('Failed to match keys', 400)
 
 
 @tools_bp.route('/convert', methods=['POST'])
@@ -566,7 +575,7 @@ def convert_certificate():
     key_pem = data.get('private_key', '').strip()
     
     if not input_data:
-        return jsonify({'error': 'Input data is required'}), 400
+        return error_response('Input data is required', 400)
     
     try:
         import subprocess
@@ -710,7 +719,7 @@ def convert_certificate():
         
         # Validate we have something to convert
         if not certs and not keys and not csrs:
-            return jsonify({'error': 'Could not parse input data. Supported formats: PEM, DER, PKCS12, PKCS7'}), 400
+            return error_response('Could not parse input data. Supported formats: PEM, DER, PKCS12, PKCS7', 400)
         
         result = {}
         
@@ -757,7 +766,7 @@ def convert_certificate():
                 der_data = csrs[0].public_bytes(serialization.Encoding.DER)
                 filename = 'request.der'
             else:
-                return jsonify({'error': 'No data to convert to DER'}), 400
+                return error_response('No data to convert to DER', 400)
             
             result = {
                 'format': 'der',
@@ -768,9 +777,9 @@ def convert_certificate():
         
         elif output_format == 'pkcs12':
             if not certs:
-                return jsonify({'error': 'Certificate is required for PKCS12'}), 400
+                return error_response('Certificate is required for PKCS12', 400)
             if not keys:
-                return jsonify({'error': 'Private key is required for PKCS12'}), 400
+                return error_response('Private key is required for PKCS12', 400)
             
             # Use first cert and key
             cert = certs[0]
@@ -797,7 +806,7 @@ def convert_certificate():
         
         elif output_format == 'pkcs7':
             if not certs:
-                return jsonify({'error': 'At least one certificate is required for PKCS7'}), 400
+                return error_response('At least one certificate is required for PKCS7', 400)
             
             # Build PEM with all certs
             all_certs_pem = ''
@@ -823,9 +832,10 @@ def convert_certificate():
                 os.unlink(temp_pem)
         
         else:
-            return jsonify({'error': f'Unknown output format: {output_format}'}), 400
+            return error_response(f'Unknown output format: {output_format}', 400)
         
-        return jsonify({'success': True, 'data': result})
+        return success_response(data=result)
     
     except Exception as e:
-        return jsonify({'error': f'Conversion failed: {str(e)}'}), 400
+        logger.error(f'Conversion failed: {e}')
+        return error_response('Conversion failed', 400)
