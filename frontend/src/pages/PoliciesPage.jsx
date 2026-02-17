@@ -382,7 +382,7 @@ export default function PoliciesPage() {
         <div className="border-t border-border pt-3">
           <h4 className="text-sm font-semibold text-text-primary mb-2">{t('policies.rules')}</h4>
           <div className="space-y-2 text-sm">
-            {selectedPolicy.rules.max_validity_days && (
+            {selectedPolicy.rules.max_validity_days > 0 && (
               <div className="flex justify-between">
                 <span className="text-text-muted">{t('policies.maxValidity')}</span>
                 <span className="text-text-primary">{selectedPolicy.rules.max_validity_days} {t('common.days')}</span>
@@ -398,7 +398,7 @@ export default function PoliciesPage() {
                 </div>
               </div>
             )}
-            {selectedPolicy.rules.san_restrictions?.max_dns_names && (
+            {selectedPolicy.rules.san_restrictions?.max_dns_names != null && selectedPolicy.rules.san_restrictions.max_dns_names > 0 && (
               <div className="flex justify-between">
                 <span className="text-text-muted">{t('policies.maxSANs')}</span>
                 <span className="text-text-primary">{selectedPolicy.rules.san_restrictions.max_dns_names}</span>
