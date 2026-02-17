@@ -334,7 +334,12 @@
     "rbacShort": "RBAC",
     "hsmShort": "HSM",
     "auditShort": "Аудит",
-    "settingsShort": "Налашт."
+    "settingsShort": "Налашт.",
+    "add": "Додати",
+    "allRoles": "Усі ролі",
+    "approvals": "Затвердження",
+    "policies": "Політики",
+    "reports": "Звіти"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -431,7 +436,9 @@
     "ssoUserCreationFailed": "Невдало to create user account",
     "ssoAutoCreateDisabled": "Користувач not found. Automatic account creation is вимкнено. Зверніться до адміністратора.",
     "ssoCallbackError": "SSO authentication помилка",
-    "ssoError": "SSO authentication невдало"
+    "ssoError": "SSO authentication невдало",
+    "passwordRequired": "Будь ласка, введіть пароль",
+    "usernameRequired": "Будь ласка, введіть ім'я користувача"
   },
   "dashboard": {
     "goodMorning": "Доброго ранку",
@@ -525,7 +532,8 @@
     "pkcs12Password": "Пароль PKCS#12",
     "includeChain": "Включити ланцюжок сертифікатів",
     "sanPlaceholder": "DNS:example.com\\nDNS:www.example.com\\nIP:192.168.1.1",
-    "subtitle": "{{count}} сертифікатів"
+    "subtitle": "{{count}} сертифікатів",
+    "revokeWarning": "Відкликання сертифіката є остаточним і не може бути скасовано. Сертифікат буде додано до CRL і він більше не буде вважатися довіреним жодним клієнтом, який перевіряє статус відкликання. Продовжуйте лише якщо ви впевнені, що цей сертифікат має бути остаточно анульовано."
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
@@ -837,12 +845,12 @@
     "revokeOnRenewal": "Відкликати старий сертифікат після оновлення",
     "revokeOnRenewalDesc": "Автоматично відкликати попередній сертифікат з причиною 'superseded' при видачі нового",
     "renewalPolicy": "Політика оновлення",
-    "revokeExistingSuperseded": "Відкликати існуючі сертифікати",
+    "revokeExistingSuperseded": "Відкликати існуючі сертифікати {{count}}",
     "revokeExistingSupersededDesc": "Відкликати вже видані сертифікати для цих доменів з причиною 'superseded'",
     "revokeSupersededConfirmTitle": "Відкликати існуючі сертифікати?",
-    "revokeSupersededConfirmDesc": "Це відкличе всі існуючі сертифікати для налаштованих доменів. Цю дію не можна скасувати.",
-    "revokeSupersededConfirmAction": "Відкликати",
-    "supersededRevoked": "Сертифікат відкликано як замінений",
+    "revokeSupersededConfirmDesc": "Це відкличе всі існуючі сертифікати для налаштованих доменів. Цю дію не можна скасувати {{count}}",
+    "revokeSupersededConfirmAction": "Відкликати {{count}}",
+    "supersededRevoked": "Сертифікат відкликано як замінений {{count}}",
     "domains": "Домени",
     "domainsHelper": "Один домен на рядок. Використовуйте *.domain.com для wildcard.",
     "atLeastOneDomainRequired": "Потрібен принаймні один домен",
@@ -1022,7 +1030,7 @@
     "emailTrustDesc": "Довірений для S/MIME",
     "clientAuth": "Автентифікація клієнта",
     "clientAuthDesc": "Довірений для автентифікації клієнта",
-    "syncedCerts": "Synced {{coat}} certificatees",
+    "syncedCerts": "Synced {{count}} certificatees",
     "syncFailed": "Faithed to sync from system",
     "aboutTrustStoreDesc": "The Trust Store contains certificates that are explicitly trusted for validating certificate chains. Add Root and Intermediate CAs here for chain verification.",
     "add": "Add",
@@ -1267,7 +1275,7 @@
     "lightDesc": "Завжди використовувати світлу тему",
     "darkMode": "Темний режим",
     "lightMode": "Світлий режим",
-    "updateAvailable": "Доступне оновлення",
+    "updateAvailable": "Доступне оновлення {{version}}",
     "upToDate": "Актуально",
     "updateAvailableTitle": "Оновити Available",
     "upToDateTitle": "Оновлено",
@@ -1278,11 +1286,11 @@
     "current": "Поточний",
     "edition": "Редагуватиion",
     "passwordMinLength": "Password must be at theast 12 characters",
-    "confirmDeleteBackup": "Dandhande backup \"{{fithename}}\"?",
+    "confirmDeleteBackup": "Dandhande backup \"{{filename}}\"?",
     "deleteBackup": "Dandhande Backup",
     "selectBackupFile": "Виберіть файл резервної копії (зашифрований .ucmbkp)",
     "backupRestored": "Backup risored successfully: {{users}} users, {{cas}} CAs, {{certs}} certificatees",
-    "integrityErrors": "Integrity check foad {{coat}} errors",
+    "integrityErrors": "Integrity check foad {{count}} errors",
     "resetDbWarning": "⚠️ WARNING: This will DELETE ALL DATA and resand the database to initial state. Are yor absolutely one?",
     "resetDatabase": "Скинути БД",
     "typeYesToConfirm": "Type YES to confirm database resand:",
@@ -1816,7 +1824,36 @@
     "updateSuccess": "Провайдера оновлено",
     "saveFailed": "Не вдалося зберегти провайдера",
     "keepExisting": "••••••• (залиште порожнім для збереження)",
-    "configuredProviders": "Налаштовані провайдери"
+    "configuredProviders": "Налаштовані провайдери",
+    "acsUrl": "URL служби споживання тверджень (ACS)",
+    "acsUrlDesc": "Куди IdP надсилає SAML-твердження після автентифікації",
+    "addProvider": "Додати SSO-провайдер",
+    "attributeMapping": "Зіставлення атрибутів",
+    "attributeMappingHelp": "Зіставте атрибути SSO-провайдера з полями користувача UCM (username, email, fullname).",
+    "callbackUrls": "URL-адреси зворотного виклику",
+    "callbackUrlsHelp": "Скопіюйте цей URI перенаправлення в конфігурацію вашого OAuth2/OIDC-додатку.",
+    "default": "За замовчуванням",
+    "emailAttr": "Атрибут email",
+    "externalGroup": "Зовнішня група",
+    "fullnameAttr": "Атрибут повного імені",
+    "groupFilter": "Фільтр груп",
+    "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "isDefault": "Провайдер входу за замовчуванням",
+    "lastUsed": "Останнє використання",
+    "redirectUri": "URI перенаправлення",
+    "roleMapping": "Зіставлення ролей",
+    "roleMappingHelp": "Зіставте зовнішні групи або ролі з ролями UCM. Користувачам у відповідних групах буде призначено відповідну роль UCM.",
+    "signRequests": "Підписувати запити автентифікації",
+    "spEntityId": "ID сутності SP",
+    "spMetadata": "Метадані постачальника послуг (SP)",
+    "spMetadataHelp": "Скопіюйте ці URL-адреси в конфігурацію вашого постачальника ідентифікації (IdP) для встановлення довіри SAML.",
+    "spSloUrl": "URL єдиного виходу SP",
+    "ssoAttribute": "Атрибут SSO",
+    "ucmField": "Поле UCM",
+    "ucmRole": "Роль UCM",
+    "urlsAfterSave": "Точна URL-адреса міститиме ID провайдера після збереження.",
+    "userinfoUrlPlaceholder": "https://provider.com/oauth/userinfo",
+    "usernameAttr": "Атрибут імені користувача"
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",
@@ -2097,5 +2134,346 @@
     "timeoutSub": "Сервісу може знадобитися більше часу. Спробуйте оновити сторінку вручну.",
     "attempt": "Спроба {{count}}",
     "refresh": "Оновити сторінку"
+  },
+  "approvals": {
+    "actionFailed": "Не вдалося виконати дію",
+    "approvalHistory": "Історія затверджень",
+    "approve": "Затвердити",
+    "approveConfirm": "Затвердити запит #{{id}}?",
+    "approveRequest": "Затвердити запит",
+    "approved": "Затверджені",
+    "approvedSuccess": "Запит затверджено",
+    "certificateId": "ID сертифіката",
+    "comment": "Коментар",
+    "commentPlaceholder": "Необов'язковий коментар...",
+    "commentRequired": "Причина відхилення є обов'язковою",
+    "expiresAt": "Дійсний до",
+    "loadFailed": "Не вдалося завантажити запити на затвердження",
+    "noRequests": "Немає запитів на затвердження",
+    "noRequestsDesc": "Запити на затвердження з'являться тут, коли сертифікати потребуватимуть затвердження відповідно до політик.",
+    "pending": "Очікують",
+    "policy": "Політика",
+    "reject": "Відхилити",
+    "rejectConfirm": "Відхилити запит #{{id}}?",
+    "rejectReasonPlaceholder": "Причина відхилення (обов'язково)",
+    "rejectRequest": "Відхилити запит",
+    "rejected": "Відхилені",
+    "rejectedSuccess": "Запит відхилено",
+    "requestDetails": "Деталі запиту",
+    "requester": "Заявник",
+    "requesterComment": "Коментар заявника",
+    "resolvedAt": "Вирішено",
+    "searchPlaceholder": "Пошук запитів...",
+    "subtitle": "Перегляд та керування процесами затвердження сертифікатів",
+    "title": "Запити на затвердження",
+    "total": "Усього"
+  },
+  "messages": {
+    "confirm": {
+      "delete": {
+        "ca": "Ви впевнені, що хочете видалити цей CA?",
+        "certificate": "Ви впевнені, що хочете видалити цей сертифікат?",
+        "csr": "Ви впевнені, що хочете видалити цей CSR?",
+        "generic": "Ви впевнені, що хочете видалити цей елемент?",
+        "group": "Ви впевнені, що хочете видалити цю групу?",
+        "template": "Ви впевнені, що хочете видалити цей шаблон?",
+        "truststore": "Видалити цей сертифікат зі сховища довіри?",
+        "user": "Ви впевнені, що хочете видалити цього користувача?"
+      },
+      "hsm": {
+        "deleteKey": "Знищити ключ \"{{name}}\"? Цю дію неможливо скасувати.",
+        "deleteProvider": "Видалити HSM-провайдер \"{{name}}\"?"
+      },
+      "policy": {
+        "delete": "Видалити політику \"{{name}}\"? Цю дію неможливо скасувати."
+      },
+      "rbac": {
+        "deleteRole": "Видалити роль \"{{name}}\"? Користувачам з цією роллю буде призначено роль 'viewer'.",
+        "systemRole": "Неможливо видалити системну роль"
+      },
+      "sso": {
+        "deleteProvider": "Видалити SSO-провайдер \"{{name}}\"?"
+      }
+    },
+    "errors": {
+      "backup": {
+        "createFailed": "Не вдалося створити резервну копію",
+        "downloadFailed": "Не вдалося завантажити резервну копію",
+        "restoreFailed": "Не вдалося відновити резервну копію"
+      },
+      "createFailed": {
+        "ca": "Не вдалося створити CA",
+        "certificate": "Не вдалося створити сертифікат",
+        "csr": "Не вдалося створити CSR",
+        "generic": "Не вдалося створити",
+        "group": "Не вдалося створити групу",
+        "policy": "Не вдалося створити політику",
+        "provider": "Не вдалося зберегти провайдер",
+        "role": "Не вдалося створити роль",
+        "template": "Не вдалося створити шаблон",
+        "user": "Не вдалося створити користувача"
+      },
+      "database": {
+        "exportFailed": "Не вдалося експортувати базу даних",
+        "integrityFailed": "Не вдалося перевірити цілісність бази даних",
+        "optimizeFailed": "Не вдалося оптимізувати базу даних",
+        "resetFailed": "Не вдалося скинути базу даних"
+      },
+      "deleteFailed": {
+        "backup": "Не вдалося видалити резервну копію",
+        "ca": "Не вдалося видалити CA",
+        "certificate": "Не вдалося видалити сертифікат",
+        "csr": "Не вдалося видалити CSR",
+        "generic": "Не вдалося видалити",
+        "group": "Не вдалося видалити групу",
+        "key": "Не вдалося знищити ключ",
+        "policy": "Не вдалося видалити політику",
+        "provider": "Не вдалося видалити провайдер",
+        "role": "Не вдалося видалити роль",
+        "template": "Не вдалося видалити шаблон",
+        "truststore": "Не вдалося видалити сертифікат зі сховища довіри",
+        "user": "Не вдалося видалити користувача"
+      },
+      "duplicateFailed": {
+        "generic": "Не вдалося дублювати",
+        "template": "Не вдалося дублювати шаблон"
+      },
+      "email": {
+        "testFailed": "Не вдалося надіслати тестовий лист"
+      },
+      "exportFailed": {
+        "certificate": "Не вдалося експортувати сертифікат",
+        "generic": "Не вдалося експортувати",
+        "template": "Не вдалося експортувати шаблон"
+      },
+      "hsm": {
+        "testFailed": "Тест з'єднання не пройдено"
+      },
+      "https": {
+        "applyFailed": "Не вдалося застосувати сертифікат",
+        "regenerateFailed": "Не вдалося перегенерувати HTTPS-сертифікат"
+      },
+      "importFailed": {
+        "generic": "Не вдалося імпортувати",
+        "template": "Не вдалося імпортувати шаблон",
+        "truststore": "Не вдалося додати сертифікат до сховища довіри"
+      },
+      "loadFailed": {
+        "acme": "Не вдалося завантажити дані ACME",
+        "approvals": "Не вдалося завантажити запити на затвердження",
+        "auditLogs": "Не вдалося завантажити журнали аудиту",
+        "cas": "Не вдалося завантажити CA",
+        "certificates": "Не вдалося завантажити сертифікати",
+        "crl": "Не вдалося завантажити дані CRL",
+        "csrs": "Не вдалося завантажити CSR",
+        "dashboard": "Не вдалося завантажити дані панелі моніторингу",
+        "generic": "Не вдалося завантажити дані",
+        "groups": "Не вдалося завантажити групи",
+        "hsmProviders": "Не вдалося завантажити HSM-провайдери",
+        "policies": "Не вдалося завантажити політики",
+        "reports": "Не вдалося завантажити звіти",
+        "roles": "Не вдалося завантажити ролі",
+        "scep": "Не вдалося завантажити дані SCEP",
+        "settings": "Не вдалося завантажити налаштування",
+        "ssoProviders": "Не вдалося завантажити SSO-провайдери",
+        "templates": "Не вдалося завантажити шаблони",
+        "truststore": "Не вдалося завантажити сховище довіри",
+        "users": "Не вдалося завантажити користувачів"
+      },
+      "revokeFailed": {
+        "certificate": "Не вдалося відкликати сертифікат"
+      },
+      "saveFailed": {
+        "generic": "Не вдалося зберегти"
+      },
+      "sso": {
+        "testFailed": "Тест з'єднання не пройдено",
+        "toggleFailed": "Не вдалося змінити стан провайдера"
+      },
+      "updateFailed": {
+        "ca": "Не вдалося оновити CA",
+        "certificate": "Не вдалося оновити сертифікат",
+        "generic": "Не вдалося оновити",
+        "group": "Не вдалося оновити групу",
+        "policy": "Не вдалося оновити політику",
+        "role": "Не вдалося оновити роль",
+        "settings": "Не вдалося зберегти налаштування",
+        "template": "Не вдалося оновити шаблон",
+        "user": "Не вдалося оновити користувача"
+      },
+      "validation": {
+        "requiredField": "Це поле є обов'язковим"
+      }
+    },
+    "success": {
+      "backup": {
+        "created": "Резервну копію створено та завантажено",
+        "deleted": "Резервну копію видалено",
+        "downloaded": "Резервну копію завантажено",
+        "restored": "Резервну копію відновлено"
+      },
+      "create": {
+        "ca": "CA створено успішно",
+        "certificate": "Сертифікат створено успішно",
+        "csr": "CSR створено успішно",
+        "generic": "Створено успішно",
+        "group": "Групу створено успішно",
+        "key": "Ключ згенеровано",
+        "policy": "Політику створено",
+        "provider": "Провайдер створено",
+        "role": "Роль створено",
+        "template": "Шаблон створено успішно",
+        "user": "Користувача створено успішно"
+      },
+      "crl": {
+        "generated": "CRL перегенеровано успішно"
+      },
+      "database": {
+        "integrityPassed": "Перевірку цілісності бази даних пройдено",
+        "optimized": "Базу даних оптимізовано успішно",
+        "reset": "Базу даних скинуто успішно. Сторінка перезавантажиться."
+      },
+      "delete": {
+        "ca": "CA видалено успішно",
+        "certificate": "Сертифікат видалено успішно",
+        "csr": "CSR видалено успішно",
+        "generic": "Видалено успішно",
+        "group": "Групу видалено успішно",
+        "key": "Ключ знищено",
+        "policy": "Політику видалено",
+        "provider": "Провайдер видалено",
+        "role": "Роль видалено",
+        "template": "Шаблон видалено успішно",
+        "truststore": "Сертифікат видалено зі сховища довіри",
+        "user": "Користувача видалено успішно"
+      },
+      "duplicate": {
+        "template": "Шаблон дубльовано успішно"
+      },
+      "email": {
+        "testSent": "Тестовий лист надіслано успішно"
+      },
+      "export": {
+        "backup": "Резервну копію експортовано успішно",
+        "ca": "CA експортовано успішно",
+        "certificate": "Сертифікат експортовано успішно",
+        "database": "Базу даних експортовано успішно",
+        "template": "Шаблон експортовано успішно"
+      },
+      "hsm": {
+        "connectionOk": "З'єднання успішне"
+      },
+      "https": {
+        "applied": "HTTPS-сертифікат застосовано. Сервер перезапуститься.",
+        "regenerated": "HTTPS-сертифікат перегенеровано. Сервер перезапуститься."
+      },
+      "import": {
+        "backup": "Резервну копію відновлено успішно",
+        "ca": "CA імпортовано успішно",
+        "certificate": "Сертифікат імпортовано успішно",
+        "template": "Шаблон імпортовано успішно",
+        "truststore": "Сертифікат додано до сховища довіри"
+      },
+      "other": {
+        "keyUploaded": "Приватний ключ завантажено успішно",
+        "passwordChanged": "Пароль змінено успішно",
+        "passwordReset": "Пароль скинуто успішно",
+        "revoked": "Сертифікат відкликано успішно",
+        "signed": "CSR підписано успішно",
+        "twoFactorDisabled": "Двофакторну автентифікацію вимкнено",
+        "twoFactorEnabled": "2FA увімкнено успішно! Збережіть резервні коди."
+      },
+      "sso": {
+        "connectionOk": "З'єднання успішне"
+      },
+      "update": {
+        "ca": "CA оновлено успішно",
+        "certificate": "Сертифікат оновлено успішно",
+        "group": "Групу оновлено успішно",
+        "policy": "Політику оновлено",
+        "provider": "Провайдер оновлено",
+        "role": "Роль оновлено",
+        "settings": "Налаштування збережено успішно",
+        "template": "Шаблон оновлено успішно",
+        "user": "Користувача оновлено успішно"
+      }
+    }
+  },
+  "policies": {
+    "active": "Активні",
+    "allCAs": "Усі CA",
+    "allStatuses": "Усі статуси",
+    "allTypes": "Усі типи",
+    "allowedKeyTypes": "Дозволені типи ключів",
+    "approval": "Затвердження",
+    "approvalGroup": "Група затвердження",
+    "approvalWorkflow": "Процес затвердження",
+    "createPolicy": "Створити політику",
+    "created": "Політику створено",
+    "deleteConfirm": "Ви впевнені, що хочете видалити політику \"{{name}}\"? Цю дію неможливо скасувати.",
+    "deleteFailed": "Не вдалося видалити політику",
+    "deletePolicy": "Видалити політику",
+    "deleted": "Політику видалено",
+    "descriptionPlaceholder": "Опишіть призначення цієї політики",
+    "disable": "Вимкнути",
+    "disabled": "Політику вимкнено",
+    "dnsPattern": "Обмеження DNS-шаблону",
+    "editPolicy": "Редагувати політику",
+    "enable": "Увімкнути",
+    "enabled": "Політику увімкнено",
+    "inactive": "Неактивні",
+    "loadFailed": "Не вдалося завантажити політики",
+    "maxSANs": "Макс. SANs",
+    "maxValidity": "Макс. термін дії (днів)",
+    "minApprovers": "Мін. затверджувачів",
+    "noPolicies": "Політики не визначено",
+    "noPoliciesDesc": "Створюйте політики сертифікатів для застосування правил видачі, вимог до ключів та процесів затвердження.",
+    "notifyOnViolation": "Сповіщати при порушенні політики",
+    "policyName": "Назва політики",
+    "policyNamePlaceholder": "напр. Політика TLS для продакшн",
+    "priority": "Пріоритет",
+    "requireApproval": "Вимагати затвердження перед видачею",
+    "rules": "Правила",
+    "saveFailed": "Не вдалося зберегти політику",
+    "scope": "Область дії",
+    "searchPlaceholder": "Пошук політик...",
+    "selectGroup": "Оберіть групу...",
+    "subtitle": "Керування правилами видачі, вимогами до ключів та процесами затвердження",
+    "targetCA": "Цільовий CA",
+    "title": "Політики сертифікатів",
+    "toggleFailed": "Не вдалося змінити стан політики",
+    "total": "Усього",
+    "updated": "Політику оновлено",
+    "withApproval": "З затвердженням"
+  },
+  "reports": {
+    "complianceReport": "Звіт відповідності",
+    "daily": "Щоденно",
+    "download": "Завантажити",
+    "downloadCSV": "Завантажити CSV",
+    "downloadFailed": "Не вдалося завантажити звіт",
+    "downloadJSON": "Завантажити JSON",
+    "downloaded": "Звіт завантажено",
+    "expiryReport": "Звіт про закінчення терміну дії",
+    "generate": "Згенерувати",
+    "generateFailed": "Не вдалося згенерувати звіт",
+    "generated": "Звіт згенеровано",
+    "generatedAt": "Згенеровано",
+    "generatedPreview": "Попередній перегляд звіту",
+    "loadFailed": "Не вдалося завантажити звіти",
+    "recipientEmail": "Email отримувача",
+    "recipients": "Отримувачі",
+    "scheduleFailed": "Не вдалося оновити розклад",
+    "scheduleReports": "Запланувати звіти",
+    "scheduleUpdated": "Розклад оновлено",
+    "scheduledReports": "Заплановані звіти",
+    "send": "Надіслати",
+    "subtitle": "Генерація, завантаження та планування звітів відповідності",
+    "testFailed": "Не вдалося надіслати тестовий звіт",
+    "testSend": "Надіслати тестовий звіт",
+    "testSendDesc": "Надіслати тестовий звіт \"{{type}}\" для перевірки доставки email.",
+    "testSent": "Тестовий звіт надіслано",
+    "title": "Звіти",
+    "weekly": "Щотижнево"
   }
 }
