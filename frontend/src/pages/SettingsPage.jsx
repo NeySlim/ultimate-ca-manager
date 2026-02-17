@@ -640,8 +640,8 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* SP Metadata — SAML (show when editing existing provider) */}
-      {formData.provider_type === 'saml' && provider && (
+      {/* SP Metadata — SAML */}
+      {formData.provider_type === 'saml' && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">
             {t('sso.spMetadata')}
@@ -650,13 +650,13 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             {t('sso.spMetadataHelp')}
           </HelpCard>
           <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
-          <CopyableUrl label={t('sso.acsUrl')} value={acsUrl} description={t('sso.acsUrlDesc')} />
-          <CopyableUrl label={t('sso.spSloUrl')} value={`${baseUrl}/api/v2/sso/callback/${provider.id}`} />
+          <CopyableUrl label={t('sso.acsUrl')} value={`${baseUrl}/api/v2/sso/callback/${provider ? provider.id : '{id}'}`} description={!provider ? t('sso.urlsAfterSave') : t('sso.acsUrlDesc')} />
+          <CopyableUrl label={t('sso.spSloUrl')} value={`${baseUrl}/api/v2/sso/callback/${provider ? provider.id : '{id}'}`} />
         </div>
       )}
 
-      {/* OAuth2 Callback URL (show when editing existing provider) */}
-      {formData.provider_type === 'oauth2' && provider && (
+      {/* OAuth2 Callback URL */}
+      {formData.provider_type === 'oauth2' && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2">
             {t('sso.callbackUrls')}
@@ -664,7 +664,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           <HelpCard variant="info" className="text-xs">
             {t('sso.callbackUrlsHelp')}
           </HelpCard>
-          <CopyableUrl label={t('sso.redirectUri')} value={oauthCallbackUrl} />
+          <CopyableUrl label={t('sso.redirectUri')} value={`${baseUrl}/api/v2/sso/callback/${provider ? provider.id : '{id}'}`} description={!provider ? t('sso.urlsAfterSave') : ''} />
         </div>
       )}
 

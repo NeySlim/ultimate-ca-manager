@@ -1847,6 +1847,7 @@
     "spEntityId": "SP Entity ID",
     "acsUrl": "Assertion Consumer Service (ACS) URL",
     "acsUrlDesc": "Where the IdP sends SAML assertions after authentication",
+    "urlsAfterSave": "The exact URL will include the provider ID after saving.",
     "spSloUrl": "SP Single Logout URL",
     "callbackUrls": "Callback URLs",
     "callbackUrlsHelp": "Copy this redirect URI into your OAuth2/OIDC application configuration.",
