@@ -188,11 +188,14 @@ export default function CertificatesPage() {
 
   // Revoke certificate
   const handleRevoke = async (id) => {
-    const confirmed = await showConfirm(CONFIRM.REVOKE.MESSAGE, {
-      title: t('certificates.revokeCertificate'),
-      confirmText: t('certificates.revokeCertificate').split(' ')[0],
-      variant: 'danger'
-    })
+    const confirmed = await showConfirm(
+      t('certificates.revokeWarning', 'Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.'),
+      {
+        title: t('certificates.revokeCertificate'),
+        confirmText: t('certificates.revokeCertificate').split(' ')[0],
+        variant: 'danger'
+      }
+    )
     if (!confirmed) return
     try {
       await certificatesService.revoke(id)

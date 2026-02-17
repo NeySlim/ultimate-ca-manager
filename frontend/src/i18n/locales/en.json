@@ -517,6 +517,7 @@
     "orphanDescription": "CA not found",
     "noCertificates": "No certificates found",
     "confirmRevoke": "Are you sure you want to revoke this certificate?",
+    "revokeWarning": "Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.",
     "confirmRenew": "Are you sure you want to renew this certificate?",
     "revokeReason": "Revocation reason",
     "selectCA": "Select issuing CA",

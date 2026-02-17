@@ -37,7 +37,7 @@ const TEXT_VARS = [
 
 export default function EmailTemplateWindow({ onClose }) {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   
   const [tab, setTab] = useState('html') // html, text
   const [htmlTemplate, setHtmlTemplate] = useState('')
@@ -124,7 +124,12 @@ export default function EmailTemplateWindow({ onClose }) {
   }
 
   const handleReset = async () => {
-    if (!window.confirm(t('settings.templateResetConfirm'))) return
+    const confirmed = await showConfirm(t('settings.templateResetConfirm'), {
+      title: t('common.reset', 'Reset'),
+      confirmText: t('common.reset', 'Reset'),
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       await apiClient.post('/settings/email/template/reset')
       setHtmlTemplate(defaultHtml)

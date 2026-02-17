@@ -14,6 +14,7 @@ import { TrustCertDetails } from './TrustCertDetails'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks'
 import { extractData } from '../lib/utils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { ExportActions } from './ExportActions'
@@ -49,7 +50,8 @@ const ENTITY_CONFIG = {
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
   const { closeWindow, focusWindow, sameWindow } = useWindowManager()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   const [data, setData] = useState(windowInfo.data?.fullData || null)
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
   const [minimized, setMinimized] = useState(false)
@@ -101,13 +103,21 @@ export function FloatingDetailWindow({ windowInfo }) {
   }
 
   const handleRevoke = async () => {
-    if (!confirm(t('certificates.confirmRevoke', 'Revoke this certificate?'))) return
+    const confirmed = await showConfirm(
+      t('certificates.revokeWarning', 'Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.'),
+      {
+        title: t('certificates.revokeCertificate', 'Revoke Certificate'),
+        confirmText: t('certificates.revokeCertificate', 'Revoke'),
+        variant: 'danger'
+      }
+    )
+    if (!confirmed) return
     try {
       await certificatesService.revoke(windowInfo.entityId)
       showSuccess(t('certificates.revoked', 'Certificate revoked'))
       closeWindow(windowInfo.id)
     } catch (err) {
-      showError(t('certificates.revokeFailed', 'Revoke failed'))
+      showError(err.message || t('certificates.revokeFailed', 'Revoke failed'))
     }
   }
 
@@ -122,14 +132,22 @@ export function FloatingDetailWindow({ windowInfo }) {
   }
 
   const handleDelete = async () => {
-    if (!confirm(t('common.confirmDelete'))) return
+    const confirmed = await showConfirm(
+      t('common.confirmDeleteMessage', 'Are you sure you want to delete this item? This action cannot be undone.'),
+      {
+        title: t('common.confirmDelete', 'Confirm Delete'),
+        confirmText: t('common.delete', 'Delete'),
+        variant: 'danger'
+      }
+    )
+    if (!confirmed) return
     try {
       const service = config.service()
       await service.delete(windowInfo.entityId)
       showSuccess(t('common.deleted'))
       closeWindow(windowInfo.id)
     } catch (err) {
-      showError(t('common.deleteFailed'))
+      showError(err.message || t('common.deleteFailed'))
     }
   }
 
@@ -142,9 +160,9 @@ export function FloatingDetailWindow({ windowInfo }) {
   const actionBarProps = data ? {
     onExport: handleExport,
     hasPrivateKey,
-    onRenew: isCert && !data.revoked && data.has_private_key ? handleRenew : null,
-    onRevoke: isCert && !data.revoked ? handleRevoke : null,
-    onDelete: handleDelete,
+    onRenew: isCert && canWrite('certificates') && !data.revoked && data.has_private_key ? handleRenew : null,
+    onRevoke: isCert && canWrite('certificates') && !data.revoked ? handleRevoke : null,
+    onDelete: canDelete('certificates') ? handleDelete : null,
     t,
   } : null
 

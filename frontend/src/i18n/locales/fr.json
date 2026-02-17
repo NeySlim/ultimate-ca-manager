@@ -407,6 +407,7 @@
     "orphanDescription": "AC non trouvée",
     "noCertificates": "Aucun certificat trouvé",
     "confirmRevoke": "Êtes-vous sûr de vouloir révoquer ce certificat ?",
+    "revokeWarning": "La révocation d'un certificat est permanente et irréversible. Le certificat sera ajouté à la CRL et ne sera plus approuvé par aucun client vérifiant le statut de révocation. Ne procédez que si vous êtes certain que ce certificat doit être définitivement invalidé.",
     "confirmRenew": "Êtes-vous sûr de vouloir renouveler ce certificat ?",
     "revokeReason": "Motif de révocation",
     "selectCA": "Sélectionner l'AC émettrice",
