@@ -10,6 +10,7 @@ from models import db, User
 from models.sso import SSOProvider, SSOSession
 from datetime import datetime, timedelta
 import json
+import urllib.parse
 
 bp = Blueprint('sso_pro', __name__)
 
@@ -96,11 +97,17 @@ def create_provider():
         provider.ldap_email_attr = data.get('ldap_email_attr', 'mail')
         provider.ldap_fullname_attr = data.get('ldap_fullname_attr', 'cn')
     
-    # JSON fields
+    # JSON fields - normalize to ensure clean JSON string storage
     if data.get('attribute_mapping'):
-        provider.attribute_mapping = json.dumps(data['attribute_mapping'])
+        val = data['attribute_mapping']
+        if isinstance(val, str):
+            val = json.loads(val)
+        provider.attribute_mapping = json.dumps(val)
     if data.get('role_mapping'):
-        provider.role_mapping = json.dumps(data['role_mapping'])
+        val = data['role_mapping']
+        if isinstance(val, str):
+            val = json.loads(val)
+        provider.role_mapping = json.dumps(val)
     
     db.session.add(provider)
     db.session.commit()
@@ -181,9 +188,15 @@ def update_provider(provider_id=None, provider_type_name=None):
     
     # JSON fields
     if 'attribute_mapping' in data:
-        provider.attribute_mapping = json.dumps(data['attribute_mapping'])
+        val = data['attribute_mapping']
+        if isinstance(val, str):
+            val = json.loads(val)
+        provider.attribute_mapping = json.dumps(val)
     if 'role_mapping' in data:
-        provider.role_mapping = json.dumps(data['role_mapping'])
+        val = data['role_mapping']
+        if isinstance(val, str):
+            val = json.loads(val)
+        provider.role_mapping = json.dumps(val)
     
     db.session.commit()
     return success_response(data=provider.to_dict(), message="SSO provider updated")
@@ -462,13 +475,17 @@ def initiate_sso_login(provider_type):
         return redirect(auth_url)
     
     elif provider.provider_type == 'saml':
-        # For SAML, we'd need to generate a SAML AuthnRequest
-        # This is a simplified redirect - full SAML requires python3-saml library
+        # For SAML, generate proper AuthnRequest
         if not provider.saml_sso_url:
             return error_response("SAML SSO URL not configured", 400)
         
-        # Simple redirect (real SAML needs signed request)
-        return redirect(provider.saml_sso_url)
+        try:
+            saml_auth = _get_saml_auth(request, provider, state)
+            redirect_url = saml_auth.login()
+            return redirect(redirect_url)
+        except Exception as e:
+            current_app.logger.error(f"SAML login initiation error: {e}")
+            return error_response(f"SAML login failed: {str(e)}", 500)
     
     return error_response("Unknown provider type", 400)
 
@@ -488,10 +505,11 @@ def sso_callback(provider_type):
     if not provider:
         return redirect('/login?error=provider_not_found')
     
-    # Verify state for CSRF protection
-    state = request.args.get('state')
-    if state != session.get('sso_state'):
-        return redirect('/login?error=invalid_state')
+    # Verify state for CSRF protection (OAuth2 only — SAML uses its own mechanisms)
+    if provider_type == 'oauth2':
+        state = request.args.get('state')
+        if state != session.get('sso_state'):
+            return redirect('/login?error=invalid_state')
     
     if provider.provider_type == 'oauth2':
         code = request.args.get('code')
@@ -538,7 +556,16 @@ def sso_callback(provider_type):
             userinfo = userinfo_response.json()
             
             # Map attributes
-            attr_mapping = json.loads(provider.attribute_mapping) if provider.attribute_mapping else {}
+            attr_mapping = provider.attribute_mapping
+            if isinstance(attr_mapping, str):
+                try:
+                    attr_mapping = json.loads(attr_mapping)
+                    if isinstance(attr_mapping, str):
+                        attr_mapping = json.loads(attr_mapping)
+                except (json.JSONDecodeError, TypeError):
+                    attr_mapping = {}
+            if not isinstance(attr_mapping, dict):
+                attr_mapping = {}
             username = userinfo.get(attr_mapping.get('username', 'preferred_username')) or userinfo.get('email', '').split('@')[0]
             email = userinfo.get(attr_mapping.get('email', 'email'), '')
             fullname = userinfo.get(attr_mapping.get('fullname', 'name'), '')
@@ -579,18 +606,103 @@ def sso_callback(provider_type):
             return redirect('/login/sso-complete')
             
         except Exception as e:
-            current_app.logger.error(f"OAuth2 callback error: {e}")
+            import traceback
+            current_app.logger.error(f"OAuth2 callback error: {e}\n{traceback.format_exc()}")
             return redirect('/login?error=callback_error')
     
     elif provider.provider_type == 'saml':
-        # Handle SAML response
-        # This is simplified - real SAML needs signature verification
-        saml_response = request.form.get('SAMLResponse')
-        if not saml_response:
-            return redirect('/login?error=no_saml_response')
-        
-        # TODO: Parse and verify SAML response
-        return redirect('/login?error=saml_not_implemented')
+        try:
+            saml_auth = _get_saml_auth(request, provider)
+            attrs = {}
+            name_id = ''
+            
+            try:
+                saml_auth.process_response()
+                errors = saml_auth.get_errors()
+                if errors:
+                    current_app.logger.error(f"SAML errors: {errors}, reason: {saml_auth.get_last_error_reason()}")
+                    return redirect('/login?error=saml_validation_failed')
+                attrs = saml_auth.get_attributes()
+                name_id = saml_auth.get_nameid()
+            except Exception as saml_err:
+                # Some IdPs (e.g. Keycloak) send duplicate attribute names
+                # which python3-saml rejects; parse manually as fallback
+                current_app.logger.warning(f"SAML standard parsing failed, using fallback: {saml_err}")
+                import base64
+                from lxml import etree
+                saml_response_b64 = request.form.get('SAMLResponse', '')
+                saml_xml = base64.b64decode(saml_response_b64)
+                root = etree.fromstring(saml_xml)
+                ns = {'saml': 'urn:oasis:names:tc:SAML:2.0:assertion'}
+                name_id_el = root.find('.//saml:NameID', ns)
+                name_id = name_id_el.text if name_id_el is not None else ''
+                for attr_el in root.findall('.//saml:Attribute', ns):
+                    attr_name = attr_el.get('Name', '')
+                    if attr_name and attr_name not in attrs:
+                        values = [v.text or '' for v in attr_el.findall('saml:AttributeValue', ns)]
+                        attrs[attr_name] = values
+            
+            # Map attributes
+            attr_mapping = provider.attribute_mapping
+            if isinstance(attr_mapping, str):
+                try:
+                    attr_mapping = json.loads(attr_mapping)
+                    if isinstance(attr_mapping, str):
+                        attr_mapping = json.loads(attr_mapping)
+                except (json.JSONDecodeError, TypeError):
+                    attr_mapping = {}
+            if not isinstance(attr_mapping, dict):
+                attr_mapping = {}
+            
+            username_key = attr_mapping.get('username', 'username')
+            email_key = attr_mapping.get('email', 'email')
+            fullname_key = attr_mapping.get('fullname', 'name')
+            
+            # SAML attributes are lists
+            username = (attrs.get(username_key, [None])[0] or name_id or '').strip()
+            email = (attrs.get(email_key, [None])[0] or '').strip()
+            fullname = (attrs.get(fullname_key, [None])[0] or '').strip()
+            
+            if not username:
+                return redirect('/login?error=no_username')
+            
+            # Create or update user
+            user, error_code = _get_or_create_sso_user(
+                provider, username, email, fullname,
+                {'name_id': name_id, 'attributes': {k: v for k, v in attrs.items()}}
+            )
+            
+            if not user:
+                return redirect(f'/login?error={error_code or "user_creation_failed"}')
+            
+            # Track SSO session
+            sso_session = SSOSession.query.filter_by(session_id=name_id).first()
+            if sso_session:
+                sso_session.expires_at = datetime.utcnow() + timedelta(hours=8)
+            else:
+                sso_session = SSOSession(
+                    user_id=user.id,
+                    provider_id=provider.id,
+                    session_id=name_id,
+                    sso_name_id=name_id,
+                    expires_at=datetime.utcnow() + timedelta(hours=8)
+                )
+                db.session.add(sso_session)
+            db.session.commit()
+            
+            # Establish Flask session
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['role'] = user.role
+            session['auth_method'] = 'sso'
+            session.permanent = True
+            
+            return redirect('/login/sso-complete')
+            
+        except Exception as e:
+            import traceback
+            current_app.logger.error(f"SAML callback error: {e}\n{traceback.format_exc()}")
+            return redirect('/login?error=callback_error')
     
     return redirect('/login?error=unknown_provider_type')
 
@@ -669,6 +781,66 @@ def ldap_login():
     )
 
 
+def _get_saml_auth(flask_request, provider, relay_state=None):
+    """Build a OneLogin_Saml2_Auth from Flask request and SSO provider config."""
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    
+    # Build request dict for python3-saml
+    url_data = urllib.parse.urlparse(flask_request.url)
+    req = {
+        'https': 'on' if url_data.scheme == 'https' else 'off',
+        'http_host': flask_request.host,
+        'script_name': flask_request.path,
+        'get_data': flask_request.args.copy(),
+        'post_data': flask_request.form.copy(),
+        'server_port': url_data.port or (443 if url_data.scheme == 'https' else 80),
+    }
+    
+    sp_base = flask_request.url_root.rstrip('/')
+    
+    saml_settings = {
+        'strict': False,
+        'debug': True,
+        'sp': {
+            'entityId': f'{sp_base}/api/v2/sso',
+            'assertionConsumerService': {
+                'url': f'{sp_base}/api/v2/sso/callback/saml',
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+            },
+            'singleLogoutService': {
+                'url': f'{sp_base}/api/v2/sso/callback/saml',
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+            },
+            'NameIDFormat': getattr(provider, 'saml_name_id_format', None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified',
+        },
+        'idp': {
+            'entityId': provider.saml_entity_id,
+            'singleSignOnService': {
+                'url': provider.saml_sso_url,
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+            },
+            'x509cert': provider.saml_certificate or '',
+        },
+        'security': {
+            'wantAssertionsSigned': False,
+            'wantMessagesSigned': False,
+            'authnRequestsSigned': False,
+            'wantNameIdEncrypted': False,
+            'wantAssertionsEncrypted': False,
+            'requestedAuthnContext': False,
+            'allowSingleLabelDomains': True,
+        },
+    }
+    
+    if provider.saml_slo_url:
+        saml_settings['idp']['singleLogoutService'] = {
+            'url': provider.saml_slo_url,
+            'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+        }
+    
+    return OneLogin_Saml2_Auth(req, saml_settings)
+
+
 def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     """Create or update a user from SSO authentication
     
@@ -696,7 +868,16 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         return None, 'auto_create_disabled'
     
     # Map role from provider config
-    role_mapping = json.loads(provider.role_mapping) if provider.role_mapping else {}
+    role_mapping = provider.role_mapping
+    if isinstance(role_mapping, str):
+        try:
+            role_mapping = json.loads(role_mapping)
+            if isinstance(role_mapping, str):
+                role_mapping = json.loads(role_mapping)
+        except (json.JSONDecodeError, TypeError):
+            role_mapping = {}
+    if not isinstance(role_mapping, dict):
+        role_mapping = {}
     role = provider.default_role or 'viewer'
     
     # Check if external data contains role info
