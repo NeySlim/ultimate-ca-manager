@@ -21,6 +21,7 @@ import {
   csrsService, templatesService, usersService 
 } from '../services'
 import { useNotification, useMobile } from '../contexts'
+import { usePermission } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
 
 const STORAGE_KEY = 'opnsense_config'
@@ -255,6 +256,7 @@ export default function OperationsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const { isMobile } = useMobile()
+  const { isAdmin } = usePermission()
   const navigate = useNavigate()
   const RESOURCE_TYPES = useResourceTypes(t)
   

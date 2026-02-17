@@ -26,7 +26,7 @@ import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 export default function SCEPPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showInfo } = useNotification()
-  const { hasPermission } = usePermission()
+  const { hasPermission, canWrite } = usePermission()
   
   const [loading, setLoading] = useState(true)
   const [config, setConfig] = useState({})
@@ -85,6 +85,7 @@ export default function SCEPPage() {
   }
 
   const handleSaveConfig = async () => {
+    if (!canWrite('scep')) return
     setSaving(true)
     try {
       await scepService.updateConfig(config)
