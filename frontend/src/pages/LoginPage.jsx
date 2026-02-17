@@ -307,7 +307,7 @@ export default function LoginPage() {
       setStep('ldap')
     } else {
       // OAuth2/SAML - redirect to backend
-      window.location.href = `/api/v2/sso/login/${provider.id}`
+      window.location.href = `/api/v2/sso/login/${provider.provider_type}`
     }
   }
 
