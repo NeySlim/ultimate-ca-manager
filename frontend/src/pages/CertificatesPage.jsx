@@ -254,7 +254,7 @@ export default function CertificatesPage() {
       const res = await certificatesService.getById(selectedCert.id)
       setSelectedCert(res.data)
     } catch (error) {
-      showError(error.response?.data?.error || error.message || t('details.addToTrustStoreFailed'))
+      showError(error.message || t('details.addToTrustStoreFailed'))
     }
   }
 

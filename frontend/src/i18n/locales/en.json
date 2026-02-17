@@ -404,6 +404,8 @@
     "useBackupCode": "Use backup code",
     "enterUsername": "Enter your username",
     "enterPassword": "Enter your password",
+    "usernameRequired": "Please enter your username",
+    "passwordRequired": "Please enter your password",
     "minCharacters": "Minimum 8 characters",
     "reenterPassword": "Re-enter password",
     "emailPlaceholder": "you@example.com",

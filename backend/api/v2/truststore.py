@@ -203,7 +203,7 @@ def list_trusted_certificates():
 
 
 @bp.route('/api/v2/truststore', methods=['POST'])
-@require_auth(['read:truststore'])
+@require_auth(['write:truststore'])
 def add_trusted_certificate():
     """
     Add certificate to trust store
@@ -290,7 +290,7 @@ def get_trusted_certificate(cert_id):
 
 
 @bp.route('/api/v2/truststore/<int:cert_id>', methods=['DELETE'])
-@require_auth(['read:truststore'])
+@require_auth(['delete:truststore'])
 def remove_trusted_certificate(cert_id):
     """
     Remove certificate from trust store

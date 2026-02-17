@@ -254,7 +254,7 @@ def update_template(template_id):
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['DELETE'])
-@require_auth(["read:templates"])
+@require_auth(["delete:templates"])
 def delete_template(template_id):
     """
     Delete certificate template
@@ -284,9 +284,7 @@ def delete_template(template_id):
             success=True
         )
         
-        return no_content_response(
-            message=f'Template {template_name} deleted successfully'
-        )
+        return no_content_response()
     except Exception as e:
         db.session.rollback()
         return error_response(f'Failed to delete template: {str(e)}', 500)
@@ -297,7 +295,7 @@ def delete_template(template_id):
 # ============================================================
 
 @bp.route('/api/v2/templates/bulk/delete', methods=['POST'])
-@require_auth(['read:templates'])
+@require_auth(['delete:templates'])
 def bulk_delete_templates():
     """Bulk delete templates"""
 

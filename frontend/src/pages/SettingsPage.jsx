@@ -1408,7 +1408,7 @@ export default function SettingsPage() {
       setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
       await loadEncryptionStatus()
     } catch (error) {
-      showError(error.response?.data?.message || t('settings.encryptionEnableFailed'))
+      showError(error.message || t('settings.encryptionEnableFailed'))
     } finally {
       setEncryptionLoading(false)
     }
@@ -1422,7 +1422,7 @@ export default function SettingsPage() {
       setShowDisableEncryptionModal(false)
       await loadEncryptionStatus()
     } catch (error) {
-      showError(error.response?.data?.message || t('settings.encryptionDisableFailed'))
+      showError(error.message || t('settings.encryptionDisableFailed'))
     } finally {
       setEncryptionLoading(false)
     }
@@ -1455,7 +1455,7 @@ export default function SettingsPage() {
       await apiClient.put('/system/audit/syslog', syslogConfig)
       showSuccess(t('settings.syslogSaved'))
     } catch (error) {
-      showError(error.response?.data?.message || t('settings.syslogSaveFailed'))
+      showError(error.message || t('settings.syslogSaveFailed'))
     } finally {
       setSyslogSaving(false)
     }
@@ -1467,7 +1467,7 @@ export default function SettingsPage() {
       const response = await apiClient.post('/system/audit/syslog/test')
       showSuccess(response.message || t('settings.syslogTestSuccess'))
     } catch (error) {
-      showError(error.response?.data?.message || error.message || t('settings.syslogTestFailed'))
+      showError(error.message || t('settings.syslogTestFailed'))
     } finally {
       setSyslogTesting(false)
     }

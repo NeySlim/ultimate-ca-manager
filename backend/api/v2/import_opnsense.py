@@ -3,9 +3,9 @@ OPNsense Import API
 Handles testing connection and importing CAs/Certs from OPNsense
 """
 from flask import Blueprint, request, jsonify, g
-from functools import wraps
 import requests
 import logging
+from auth.unified import require_auth
 from utils.safe_requests import create_session
 from services.audit_service import AuditService
 
@@ -15,17 +15,8 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('import_opnsense', __name__)
 
 
-def auth_required(f):
-    """Decorator for routes that require authentication"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # TODO: Add proper auth check
-        return f(*args, **kwargs)
-    return decorated_function
-
-
 @bp.route('/api/v2/import/opnsense/test', methods=['POST'])
-@auth_required
+@require_auth(['write:certificates'])
 def test_connection():
     """
     Test connection to OPNsense and fetch available CAs/Certificates
@@ -173,7 +164,7 @@ def test_connection():
 
 
 @bp.route('/api/v2/import/opnsense/import', methods=['POST'])
-@auth_required
+@require_auth(['write:certificates'])
 def import_items():
     """
     Import selected CAs and Certificates from OPNsense

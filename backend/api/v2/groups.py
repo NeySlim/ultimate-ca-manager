@@ -201,7 +201,7 @@ def delete_group(group_id):
             details=f'Deleted group: {group_name}',
             success=True
         )
-        return no_content_response(message="Group deleted")
+        return no_content_response()
     except Exception as e:
         db.session.rollback()
         return error_response('Failed to delete group', 500)
@@ -288,7 +288,7 @@ def remove_group_member(group_id, user_id):
             details=f'Removed user {user_id} from group {group_id}',
             success=True
         )
-        return no_content_response(message="Member removed")
+        return no_content_response()
     except Exception as e:
         db.session.rollback()
         return error_response('Failed to remove member', 500)

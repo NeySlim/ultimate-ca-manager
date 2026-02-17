@@ -493,7 +493,7 @@ export default function OperationsPage() {
           result = await casService.bulkDelete(ids)
           break
         case 'csrs:sign':
-          if (!bulkSignCaId) { showError('Select a CA'); setBulkProcessing(false); return }
+          if (!bulkSignCaId) { showError(t('operations.selectCA')); setBulkProcessing(false); return }
           result = await csrsService.bulkSign(ids, parseInt(bulkSignCaId), parseInt(bulkSignDays))
           break
         case 'csrs:delete':

@@ -313,6 +313,8 @@
     "useBackupCode": "Utiliser un code de secours",
     "enterUsername": "Entrez votre nom d'utilisateur",
     "enterPassword": "Entrez votre mot de passe",
+    "usernameRequired": "Veuillez entrer votre nom d'utilisateur",
+    "passwordRequired": "Veuillez entrer votre mot de passe",
     "minCharacters": "Minimum 8 caractères",
     "reenterPassword": "Ressaisir le mot de passe",
     "emailPlaceholder": "vous@exemple.com",

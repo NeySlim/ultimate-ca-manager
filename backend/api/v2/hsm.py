@@ -623,7 +623,7 @@ def get_dependencies_status():
 
 
 @bp.route('/api/v2/hsm/dependencies/install', methods=['POST'])
-@require_auth(['admin'])
+@require_auth(['admin:system'])
 def install_dependencies():
     """
     Install HSM dependencies (requires admin)

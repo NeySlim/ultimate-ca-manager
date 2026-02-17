@@ -156,7 +156,7 @@ export default function LoginPage() {
     e?.preventDefault()
     
     if (!username.trim()) {
-      showError('Please enter your username')
+      showError(t('auth.usernameRequired'))
       return
     }
 
@@ -261,7 +261,7 @@ export default function LoginPage() {
     e.preventDefault()
     
     if (!password) {
-      showError('Please enter your password')
+      showError(t('auth.passwordRequired'))
       return
     }
 
