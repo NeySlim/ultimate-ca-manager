@@ -36,10 +36,6 @@ export const authService = {
     return response
   },
 
-  async refreshToken() {
-    return apiClient.post('/auth/refresh')
-  },
-
   async verifySession() {
     const response = await apiClient.get('/auth/verify')
     

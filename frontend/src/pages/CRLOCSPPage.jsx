@@ -17,20 +17,11 @@ import {
   CompactSection, CompactGrid, CompactField
 } from '../components'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { casService, crlService, apiClient } from '../services'
+import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
-
-// Extended CRL service methods
-const crlApi = {
-  ...crlService,
-  regenerate: (caId) => apiClient.post(`/crl/${caId}/regenerate`),
-  toggleAutoRegen: (caId, enabled) => apiClient.post(`/crl/${caId}/auto-regen`, { enabled }),
-  getOcspStatus: () => apiClient.get('/ocsp/status'),
-  getOcspStats: () => apiClient.get('/ocsp/stats'),
-}
 
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
@@ -60,9 +51,9 @@ export default function CRLOCSPPage() {
     try {
       const [casRes, crlsRes, ocspStatusRes, ocspStatsRes] = await Promise.all([
         casService.getAll(),
-        crlApi.getAll(),
-        crlApi.getOcspStatus(),
-        crlApi.getOcspStats()
+        crlService.getAll(),
+        crlService.getOcspStatus(),
+        crlService.getOcspStats()
       ])
       
       setCas(casRes.data || [])
@@ -78,7 +69,7 @@ export default function CRLOCSPPage() {
 
   const loadCRLForCA = async (caId) => {
     try {
-      const response = await crlApi.getForCA(caId)
+      const response = await crlService.getForCA(caId)
       setSelectedCRL(response.data || null)
     } catch (error) {
       setSelectedCRL(null)
@@ -95,7 +86,7 @@ export default function CRLOCSPPage() {
     
     setRegenerating(true)
     try {
-      await crlApi.regenerate(selectedCA.id)
+      await crlService.regenerate(selectedCA.id)
       showSuccess(SUCCESS.CRL.GENERATED)
       loadCRLForCA(selectedCA.id)
       loadData()
@@ -109,7 +100,7 @@ export default function CRLOCSPPage() {
   const handleToggleAutoRegen = async (ca) => {
     if (!canWrite('crl')) return
     try {
-      const result = await crlApi.toggleAutoRegen(ca.id, !ca.cdp_enabled)
+      const result = await crlService.toggleAutoRegen(ca.id, !ca.cdp_enabled)
       showSuccess(t(result.data.cdp_enabled ? 'crlOcsp.autoRegenEnabled' : 'crlOcsp.autoRegenDisabled', { name: ca.descr }))
       // Update local state
       setCas(prev => prev.map(c => c.id === ca.id ? { ...c, cdp_enabled: result.data.cdp_enabled } : c))

@@ -9,14 +9,6 @@ export const settingsService = {
     return apiClient.get('/settings/general')
   },
 
-  async get(key) {
-    return apiClient.get(`/settings/${key}`)
-  },
-
-  async update(key, value) {
-    return apiClient.patch(`/settings/${key}`, { value })
-  },
-
   async updateBulk(settings) {
     return apiClient.patch('/settings/general', settings)
   },

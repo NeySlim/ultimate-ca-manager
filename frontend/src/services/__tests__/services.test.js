@@ -439,16 +439,6 @@ describe('settingsService', () => {
     expect(mockApiClient.get).toHaveBeenCalledWith('/settings/general')
   })
 
-  it('get → GET /settings/:key', async () => {
-    await settingsService.get('timezone')
-    expect(mockApiClient.get).toHaveBeenCalledWith('/settings/timezone')
-  })
-
-  it('update → PATCH /settings/:key with value', async () => {
-    await settingsService.update('timezone', 'UTC')
-    expect(mockApiClient.patch).toHaveBeenCalledWith('/settings/timezone', { value: 'UTC' })
-  })
-
   it('updateBulk → PATCH /settings/general', async () => {
     const settings = { timezone: 'UTC', session_timeout: 30 }
     await settingsService.updateBulk(settings)
@@ -648,11 +638,6 @@ describe('authService', () => {
   it('getCurrentUser → GET /auth/verify', async () => {
     await authService.getCurrentUser()
     expect(mockApiClient.get).toHaveBeenCalledWith('/auth/verify')
-  })
-
-  it('refreshToken → POST /auth/refresh', async () => {
-    await authService.refreshToken()
-    expect(mockApiClient.post).toHaveBeenCalledWith('/auth/refresh')
   })
 })
 
