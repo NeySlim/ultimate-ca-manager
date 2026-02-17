@@ -334,7 +334,12 @@
     "rbacShort": "RBAC",
     "hsmShort": "HSM",
     "auditShort": "Audit",
-    "settingsShort": "Impost."
+    "settingsShort": "Impost.",
+    "add": "Aggiungi",
+    "allRoles": "Tutti i ruoli",
+    "approvals": "Approvazioni",
+    "policies": "Policy",
+    "reports": "Report"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -431,7 +436,9 @@
     "ssoUserCreationFailed": "Creazione account utente fallita",
     "ssoAutoCreateDisabled": "Utente non trovato. La creazione automatica dell'account è disabilitata. Contatta il tuo amministratore.",
     "ssoCallbackError": "Errore autenticazione SSO",
-    "ssoError": "Autenticazione SSO fallita"
+    "ssoError": "Autenticazione SSO fallita",
+    "passwordRequired": "Inserire la password",
+    "usernameRequired": "Inserire il nome utente"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
@@ -525,7 +532,8 @@
     "pkcs12Password": "Password PKCS#12",
     "includeChain": "Includi catena certificati",
     "sanPlaceholder": "DNS:esempio.com\nDNS:www.esempio.com\nIP:192.168.1.1",
-    "subtitle": "{{count}} certificati"
+    "subtitle": "{{count}} certificati",
+    "revokeWarning": "La revoca di un certificato è permanente e irreversibile. Il certificato verrà aggiunto alla CRL e non sarà più considerato attendibile da nessun client che verifichi lo stato di revoca. Procedere solo se si è certi che questo certificato debba essere invalidato definitivamente."
   },
   "cas": {
     "parentCA": "CA padre",
@@ -837,12 +845,12 @@
     "revokeOnRenewal": "Revoca vecchio certificato dopo il rinnovo",
     "revokeOnRenewalDesc": "Revoca automaticamente il certificato precedente con il motivo 'superseded' quando ne viene emesso uno nuovo",
     "renewalPolicy": "Politica di rinnovo",
-    "revokeExistingSuperseded": "Revoca certificati esistenti",
+    "revokeExistingSuperseded": "Revoca certificati esistenti {{count}}",
     "revokeExistingSupersededDesc": "Revoca i certificati già emessi per questi domini con il motivo 'superseded'",
     "revokeSupersededConfirmTitle": "Revocare i certificati esistenti?",
-    "revokeSupersededConfirmDesc": "Questo revocherà tutti i certificati esistenti per i domini configurati. Questa azione non può essere annullata.",
-    "revokeSupersededConfirmAction": "Revoca",
-    "supersededRevoked": "Certificato revocato come sostituito",
+    "revokeSupersededConfirmDesc": "Questo revocherà tutti i certificati esistenti per i domini configurati. Questa azione non può essere annullata {{count}}",
+    "revokeSupersededConfirmAction": "Revoca {{count}}",
+    "supersededRevoked": "Certificato revocato come sostituito {{count}}",
     "domains": "Domini",
     "domainsHelper": "Un dominio per riga. Usa *.dominio.com per wildcard.",
     "atLeastOneDomainRequired": "È richiesto almeno un dominio",
@@ -1022,7 +1030,7 @@
     "emailTrustDesc": "Fidato per S/MIME",
     "clientAuth": "Autenticazione client",
     "clientAuthDesc": "Fidato per autenticazione client",
-    "syncedCerts": "Synced {{coat}} certificatees",
+    "syncedCerts": "Synced {{count}} certificatees",
     "syncFailed": "Faithed to sync from system",
     "aboutTrustStoreDesc": "The Trust Store contains certificates that are explicitly trusted for validating certificate chains. Add Root and Intermediate CAs here for chain verification.",
     "add": "Add",
@@ -1267,7 +1275,7 @@
     "lightDesc": "Usa sempre il tema chiaro",
     "darkMode": "Modalità scura",
     "lightMode": "Modalità chiara",
-    "updateAvailable": "Aggiornamento disponibile",
+    "updateAvailable": "Aggiornamento disponibile {{version}}",
     "upToDate": "Aggiornato",
     "updateAvailableTitle": "Aggiornamento Disponibile",
     "upToDateTitle": "Aggiornato",
@@ -1278,11 +1286,11 @@
     "current": "Corrente",
     "edition": "Edizione",
     "passwordMinLength": "Password must be at theast 12 characters",
-    "confirmDeleteBackup": "Dandhande backup \"{{fithename}}\"?",
+    "confirmDeleteBackup": "Dandhande backup \"{{filename}}\"?",
     "deleteBackup": "Dandhande Backup",
     "selectBackupFile": "Seleziona il file di backup (.ucmbkp crittografato)",
     "backupRestored": "Backup risored successfully: {{users}} users, {{cas}} CAs, {{certs}} certificatees",
-    "integrityErrors": "Integrity check foad {{coat}} errors",
+    "integrityErrors": "Integrity check foad {{count}} errors",
     "resetDbWarning": "⚠️ WARNING: This will DELETE ALL DATA and resand the database to initial state. Are yor absolutely one?",
     "resetDatabase": "Reimposta database",
     "typeYesToConfirm": "Type YES to confirm database resand:",
@@ -1816,7 +1824,36 @@
     "updateSuccess": "Provider aggiornato",
     "saveFailed": "Salvataggio provider fallito",
     "keepExisting": "••••••• (lascia vuoto per mantenere)",
-    "configuredProviders": "Provider configurati"
+    "configuredProviders": "Provider configurati",
+    "acsUrl": "URL Assertion Consumer Service (ACS)",
+    "acsUrlDesc": "Dove l'IdP invia le asserzioni SAML dopo l'autenticazione",
+    "addProvider": "Aggiungi provider SSO",
+    "attributeMapping": "Mappatura attributi",
+    "attributeMappingHelp": "Mappa gli attributi del provider SSO ai campi utente UCM (username, email, nome completo).",
+    "callbackUrls": "URL di callback",
+    "callbackUrlsHelp": "Copiare questo URI di reindirizzamento nella configurazione dell'applicazione OAuth2/OIDC.",
+    "default": "Predefinito",
+    "emailAttr": "Attributo email",
+    "externalGroup": "Gruppo esterno",
+    "fullnameAttr": "Attributo nome completo",
+    "groupFilter": "Filtro gruppo",
+    "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "isDefault": "Provider di accesso predefinito",
+    "lastUsed": "Ultimo utilizzo",
+    "redirectUri": "URI di reindirizzamento",
+    "roleMapping": "Mappatura ruoli",
+    "roleMappingHelp": "Mappa gruppi o ruoli esterni ai ruoli UCM. Gli utenti nei gruppi corrispondenti riceveranno il ruolo UCM associato.",
+    "signRequests": "Firma le richieste di autenticazione",
+    "spEntityId": "SP Entity ID",
+    "spMetadata": "Metadati Service Provider (SP)",
+    "spMetadataHelp": "Copiare questi URL nella configurazione dell'Identity Provider (IdP) per configurare il trust SAML.",
+    "spSloUrl": "URL Single Logout SP",
+    "ssoAttribute": "Attributo SSO",
+    "ucmField": "Campo UCM",
+    "ucmRole": "Ruolo UCM",
+    "urlsAfterSave": "L'URL esatto includerà l'ID del provider dopo il salvataggio.",
+    "userinfoUrlPlaceholder": "https://provider.com/oauth/userinfo",
+    "usernameAttr": "Attributo username"
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",
@@ -2097,5 +2134,346 @@
     "timeoutSub": "Il servizio potrebbe richiedere più tempo. Prova ad aggiornare manualmente.",
     "attempt": "Tentativo {{count}}",
     "refresh": "Aggiorna pagina"
+  },
+  "approvals": {
+    "actionFailed": "Azione fallita",
+    "approvalHistory": "Cronologia approvazioni",
+    "approve": "Approva",
+    "approveConfirm": "Approvare la richiesta #{{id}}?",
+    "approveRequest": "Approva richiesta",
+    "approved": "Approvate",
+    "approvedSuccess": "Richiesta approvata",
+    "certificateId": "ID certificato",
+    "comment": "Commento",
+    "commentPlaceholder": "Commento facoltativo...",
+    "commentRequired": "È necessario indicare il motivo del rifiuto",
+    "expiresAt": "Scadenza",
+    "loadFailed": "Impossibile caricare le richieste di approvazione",
+    "noRequests": "Nessuna richiesta di approvazione",
+    "noRequestsDesc": "Le richieste di approvazione appariranno qui quando i certificati richiederanno un'approvazione basata sulle policy.",
+    "pending": "In attesa",
+    "policy": "Policy",
+    "reject": "Rifiuta",
+    "rejectConfirm": "Rifiutare la richiesta #{{id}}?",
+    "rejectReasonPlaceholder": "Motivo del rifiuto (obbligatorio)",
+    "rejectRequest": "Rifiuta richiesta",
+    "rejected": "Rifiutate",
+    "rejectedSuccess": "Richiesta rifiutata",
+    "requestDetails": "Dettagli richiesta",
+    "requester": "Richiedente",
+    "requesterComment": "Commento del richiedente",
+    "resolvedAt": "Risolta il",
+    "searchPlaceholder": "Cerca richieste...",
+    "subtitle": "Revisiona e gestisci i flussi di approvazione dei certificati",
+    "title": "Richieste di approvazione",
+    "total": "Totale"
+  },
+  "messages": {
+    "confirm": {
+      "delete": {
+        "ca": "Eliminare questa CA?",
+        "certificate": "Eliminare questo certificato?",
+        "csr": "Eliminare questa CSR?",
+        "generic": "Eliminare questo elemento?",
+        "group": "Eliminare questo gruppo?",
+        "template": "Eliminare questo modello?",
+        "truststore": "Rimuovere questo certificato dal trust store?",
+        "user": "Eliminare questo utente?"
+      },
+      "hsm": {
+        "deleteKey": "Distruggere la chiave \"{{name}}\"? L'operazione è irreversibile.",
+        "deleteProvider": "Eliminare il provider HSM \"{{name}}\"?"
+      },
+      "policy": {
+        "delete": "Eliminare la policy \"{{name}}\"? L'operazione è irreversibile."
+      },
+      "rbac": {
+        "deleteRole": "Eliminare il ruolo \"{{name}}\"? Gli utenti con questo ruolo saranno impostati come 'viewer'.",
+        "systemRole": "Impossibile eliminare un ruolo di sistema"
+      },
+      "sso": {
+        "deleteProvider": "Eliminare il provider SSO \"{{name}}\"?"
+      }
+    },
+    "errors": {
+      "backup": {
+        "createFailed": "Impossibile creare il backup",
+        "downloadFailed": "Impossibile scaricare il backup",
+        "restoreFailed": "Impossibile ripristinare il backup"
+      },
+      "createFailed": {
+        "ca": "Impossibile creare la CA",
+        "certificate": "Impossibile creare il certificato",
+        "csr": "Impossibile creare la CSR",
+        "generic": "Impossibile creare",
+        "group": "Impossibile creare il gruppo",
+        "policy": "Impossibile creare la policy",
+        "provider": "Impossibile salvare il provider",
+        "role": "Impossibile creare il ruolo",
+        "template": "Impossibile creare il modello",
+        "user": "Impossibile creare l'utente"
+      },
+      "database": {
+        "exportFailed": "Impossibile esportare il database",
+        "integrityFailed": "Impossibile verificare l'integrità del database",
+        "optimizeFailed": "Impossibile ottimizzare il database",
+        "resetFailed": "Impossibile reimpostare il database"
+      },
+      "deleteFailed": {
+        "backup": "Impossibile eliminare il backup",
+        "ca": "Impossibile eliminare la CA",
+        "certificate": "Impossibile eliminare il certificato",
+        "csr": "Impossibile eliminare la CSR",
+        "generic": "Impossibile eliminare",
+        "group": "Impossibile eliminare il gruppo",
+        "key": "Impossibile distruggere la chiave",
+        "policy": "Impossibile eliminare la policy",
+        "provider": "Impossibile eliminare il provider",
+        "role": "Impossibile eliminare il ruolo",
+        "template": "Impossibile eliminare il modello",
+        "truststore": "Impossibile rimuovere il certificato dal trust store",
+        "user": "Impossibile eliminare l'utente"
+      },
+      "duplicateFailed": {
+        "generic": "Impossibile duplicare",
+        "template": "Impossibile duplicare il modello"
+      },
+      "email": {
+        "testFailed": "Impossibile inviare l'email di test"
+      },
+      "exportFailed": {
+        "certificate": "Impossibile esportare il certificato",
+        "generic": "Impossibile esportare",
+        "template": "Impossibile esportare il modello"
+      },
+      "hsm": {
+        "testFailed": "Test di connessione fallito"
+      },
+      "https": {
+        "applyFailed": "Impossibile applicare il certificato",
+        "regenerateFailed": "Impossibile rigenerare il certificato HTTPS"
+      },
+      "importFailed": {
+        "generic": "Impossibile importare",
+        "template": "Impossibile importare il modello",
+        "truststore": "Impossibile aggiungere il certificato al trust store"
+      },
+      "loadFailed": {
+        "acme": "Impossibile caricare i dati ACME",
+        "approvals": "Impossibile caricare le richieste di approvazione",
+        "auditLogs": "Impossibile caricare i log di audit",
+        "cas": "Impossibile caricare le CA",
+        "certificates": "Impossibile caricare i certificati",
+        "crl": "Impossibile caricare i dati CRL",
+        "csrs": "Impossibile caricare le CSR",
+        "dashboard": "Impossibile caricare i dati della dashboard",
+        "generic": "Impossibile caricare i dati",
+        "groups": "Impossibile caricare i gruppi",
+        "hsmProviders": "Impossibile caricare i provider HSM",
+        "policies": "Impossibile caricare le policy",
+        "reports": "Impossibile caricare i report",
+        "roles": "Impossibile caricare i ruoli",
+        "scep": "Impossibile caricare i dati SCEP",
+        "settings": "Impossibile caricare le impostazioni",
+        "ssoProviders": "Impossibile caricare i provider SSO",
+        "templates": "Impossibile caricare i modelli",
+        "truststore": "Impossibile caricare il trust store",
+        "users": "Impossibile caricare gli utenti"
+      },
+      "revokeFailed": {
+        "certificate": "Impossibile revocare il certificato"
+      },
+      "saveFailed": {
+        "generic": "Impossibile salvare"
+      },
+      "sso": {
+        "testFailed": "Test di connessione fallito",
+        "toggleFailed": "Impossibile attivare/disattivare il provider"
+      },
+      "updateFailed": {
+        "ca": "Impossibile aggiornare la CA",
+        "certificate": "Impossibile aggiornare il certificato",
+        "generic": "Impossibile aggiornare",
+        "group": "Impossibile aggiornare il gruppo",
+        "policy": "Impossibile aggiornare la policy",
+        "role": "Impossibile aggiornare il ruolo",
+        "settings": "Impossibile salvare le impostazioni",
+        "template": "Impossibile aggiornare il modello",
+        "user": "Impossibile aggiornare l'utente"
+      },
+      "validation": {
+        "requiredField": "Questo campo è obbligatorio"
+      }
+    },
+    "success": {
+      "backup": {
+        "created": "Backup creato e scaricato con successo",
+        "deleted": "Backup eliminato con successo",
+        "downloaded": "Backup scaricato con successo",
+        "restored": "Backup ripristinato con successo"
+      },
+      "create": {
+        "ca": "CA creata con successo",
+        "certificate": "Certificato creato con successo",
+        "csr": "CSR creata con successo",
+        "generic": "Creazione completata",
+        "group": "Gruppo creato con successo",
+        "key": "Chiave generata",
+        "policy": "Policy creata",
+        "provider": "Provider creato",
+        "role": "Ruolo creato",
+        "template": "Modello creato con successo",
+        "user": "Utente creato con successo"
+      },
+      "crl": {
+        "generated": "CRL rigenerata con successo"
+      },
+      "database": {
+        "integrityPassed": "Verifica integrità database superata",
+        "optimized": "Database ottimizzato con successo",
+        "reset": "Database reimpostato con successo. La pagina verrà ricaricata."
+      },
+      "delete": {
+        "ca": "CA eliminata con successo",
+        "certificate": "Certificato eliminato con successo",
+        "csr": "CSR eliminata con successo",
+        "generic": "Eliminazione completata",
+        "group": "Gruppo eliminato con successo",
+        "key": "Chiave distrutta",
+        "policy": "Policy eliminata",
+        "provider": "Provider eliminato",
+        "role": "Ruolo eliminato",
+        "template": "Modello eliminato con successo",
+        "truststore": "Certificato rimosso dal trust store",
+        "user": "Utente eliminato con successo"
+      },
+      "duplicate": {
+        "template": "Modello duplicato con successo"
+      },
+      "email": {
+        "testSent": "Email di test inviata con successo"
+      },
+      "export": {
+        "backup": "Backup esportato con successo",
+        "ca": "CA esportata con successo",
+        "certificate": "Certificato esportato con successo",
+        "database": "Database esportato con successo",
+        "template": "Modello esportato con successo"
+      },
+      "hsm": {
+        "connectionOk": "Connessione riuscita"
+      },
+      "https": {
+        "applied": "Certificato HTTPS applicato. Il server verrà riavviato.",
+        "regenerated": "Certificato HTTPS rigenerato. Il server verrà riavviato."
+      },
+      "import": {
+        "backup": "Backup ripristinato con successo",
+        "ca": "CA importata con successo",
+        "certificate": "Certificato importato con successo",
+        "template": "Modello importato con successo",
+        "truststore": "Certificato aggiunto al trust store"
+      },
+      "other": {
+        "keyUploaded": "Chiave privata caricata con successo",
+        "passwordChanged": "Password modificata con successo",
+        "passwordReset": "Password reimpostata con successo",
+        "revoked": "Certificato revocato con successo",
+        "signed": "CSR firmata con successo",
+        "twoFactorDisabled": "Autenticazione a due fattori disabilitata",
+        "twoFactorEnabled": "2FA abilitata con successo! Salvare i codici di recupero."
+      },
+      "sso": {
+        "connectionOk": "Connessione riuscita"
+      },
+      "update": {
+        "ca": "CA aggiornata con successo",
+        "certificate": "Certificato aggiornato con successo",
+        "group": "Gruppo aggiornato con successo",
+        "policy": "Policy aggiornata",
+        "provider": "Provider aggiornato",
+        "role": "Ruolo aggiornato",
+        "settings": "Impostazioni salvate con successo",
+        "template": "Modello aggiornato con successo",
+        "user": "Utente aggiornato con successo"
+      }
+    }
+  },
+  "policies": {
+    "active": "Attiva",
+    "allCAs": "Tutte le CA",
+    "allStatuses": "Tutti gli stati",
+    "allTypes": "Tutti i tipi",
+    "allowedKeyTypes": "Tipi di chiave consentiti",
+    "approval": "Approvazione",
+    "approvalGroup": "Gruppo approvazione",
+    "approvalWorkflow": "Flusso di approvazione",
+    "createPolicy": "Crea policy",
+    "created": "Policy creata",
+    "deleteConfirm": "Eliminare la policy \"{{name}}\"? L'operazione è irreversibile.",
+    "deleteFailed": "Impossibile eliminare la policy",
+    "deletePolicy": "Elimina policy",
+    "deleted": "Policy eliminata",
+    "descriptionPlaceholder": "Descrivere lo scopo di questa policy",
+    "disable": "Disabilita",
+    "disabled": "Policy disabilitata",
+    "dnsPattern": "Restrizione pattern DNS",
+    "editPolicy": "Modifica policy",
+    "enable": "Abilita",
+    "enabled": "Policy abilitata",
+    "inactive": "Inattiva",
+    "loadFailed": "Impossibile caricare le policy",
+    "maxSANs": "SAN massimi",
+    "maxValidity": "Validità massima (giorni)",
+    "minApprovers": "Approvatori minimi",
+    "noPolicies": "Nessuna policy definita",
+    "noPoliciesDesc": "Creare policy per i certificati per applicare regole di emissione, requisiti delle chiavi e flussi di approvazione.",
+    "notifyOnViolation": "Notifica in caso di violazione della policy",
+    "policyName": "Nome policy",
+    "policyNamePlaceholder": "es. Policy TLS produzione",
+    "priority": "Priorità",
+    "requireApproval": "Richiedi approvazione prima dell'emissione",
+    "rules": "Regole",
+    "saveFailed": "Impossibile salvare la policy",
+    "scope": "Ambito",
+    "searchPlaceholder": "Cerca policy...",
+    "selectGroup": "Seleziona gruppo...",
+    "subtitle": "Gestisci regole di emissione, requisiti delle chiavi e flussi di approvazione",
+    "targetCA": "CA di destinazione",
+    "title": "Policy certificati",
+    "toggleFailed": "Impossibile attivare/disattivare la policy",
+    "total": "Totale",
+    "updated": "Policy aggiornata",
+    "withApproval": "Con approvazione"
+  },
+  "reports": {
+    "complianceReport": "Report di conformità",
+    "daily": "Giornaliero",
+    "download": "Scarica",
+    "downloadCSV": "Scarica CSV",
+    "downloadFailed": "Impossibile scaricare il report",
+    "downloadJSON": "Scarica JSON",
+    "downloaded": "Report scaricato",
+    "expiryReport": "Report scadenze",
+    "generate": "Genera",
+    "generateFailed": "Impossibile generare il report",
+    "generated": "Report generato",
+    "generatedAt": "Generato il",
+    "generatedPreview": "Anteprima report",
+    "loadFailed": "Impossibile caricare i report",
+    "recipientEmail": "Email destinatario",
+    "recipients": "Destinatari",
+    "scheduleFailed": "Impossibile aggiornare la pianificazione",
+    "scheduleReports": "Pianifica report",
+    "scheduleUpdated": "Pianificazione aggiornata",
+    "scheduledReports": "Report pianificati",
+    "send": "Invia",
+    "subtitle": "Genera, scarica e pianifica report di conformità",
+    "testFailed": "Impossibile inviare il report di test",
+    "testSend": "Invia report di test",
+    "testSendDesc": "Invia un report di test \"{{type}}\" per verificare la consegna email.",
+    "testSent": "Report di test inviato",
+    "title": "Report",
+    "weekly": "Settimanale"
   }
 }

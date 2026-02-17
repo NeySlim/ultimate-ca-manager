@@ -334,7 +334,12 @@
     "rbacShort": "RBAC",
     "hsmShort": "HSM",
     "auditShort": "Audit",
-    "settingsShort": "Config"
+    "settingsShort": "Config",
+    "add": "Hinzufügen",
+    "allRoles": "Alle Rollen",
+    "approvals": "Genehmigungen",
+    "policies": "Richtlinien",
+    "reports": "Berichte"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -431,7 +436,9 @@
     "ssoUserCreationFailed": "Fehler beim Erstellen des Benutzerkontos",
     "ssoAutoCreateDisabled": "Benutzer nicht gefunden. Automatische Kontoerstellung ist deaktiviert. Wenden Sie sich an Ihren Administrator.",
     "ssoCallbackError": "SSO-Authentifizierungsfehler",
-    "ssoError": "SSO-Authentifizierung fehlgeschlagen"
+    "ssoError": "SSO-Authentifizierung fehlgeschlagen",
+    "passwordRequired": "Bitte geben Sie Ihr Passwort ein",
+    "usernameRequired": "Bitte geben Sie Ihren Benutzernamen ein"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
@@ -525,7 +532,8 @@
     "pkcs12Password": "PKCS#12-Passwort",
     "includeChain": "Zertifikatskette einschließen",
     "sanPlaceholder": "DNS:beispiel.com\nDNS:www.beispiel.com\nIP:192.168.1.1",
-    "subtitle": "{{count}} Zertifikate"
+    "subtitle": "{{count}} Zertifikate",
+    "revokeWarning": "Das Widerrufen eines Zertifikats ist dauerhaft und kann nicht rückgängig gemacht werden. Das Zertifikat wird zur CRL hinzugefügt und von keinem Client mehr als vertrauenswürdig eingestuft, der den Widerrufsstatus prüft. Fahren Sie nur fort, wenn Sie sicher sind, dass dieses Zertifikat dauerhaft ungültig gemacht werden soll."
   },
   "cas": {
     "parentCA": "Übergeordnete CA",
@@ -837,12 +845,12 @@
     "revokeOnRenewal": "Altes Zertifikat nach Erneuerung widerrufen",
     "revokeOnRenewalDesc": "Das vorherige Zertifikat automatisch mit dem Grund 'superseded' widerrufen, wenn ein neues ausgestellt wird",
     "renewalPolicy": "Erneuerungsrichtlinie",
-    "revokeExistingSuperseded": "Bestehende Zertifikate widerrufen",
+    "revokeExistingSuperseded": "Bestehende Zertifikate widerrufen {{count}}",
     "revokeExistingSupersededDesc": "Bereits ausgestellte Zertifikate für diese Domains mit dem Grund 'superseded' widerrufen",
     "revokeSupersededConfirmTitle": "Bestehende Zertifikate widerrufen?",
-    "revokeSupersededConfirmDesc": "Dies widerruft alle bestehenden Zertifikate für die konfigurierten Domains. Diese Aktion kann nicht rückgängig gemacht werden.",
-    "revokeSupersededConfirmAction": "Widerrufen",
-    "supersededRevoked": "Zertifikat als ersetzt widerrufen",
+    "revokeSupersededConfirmDesc": "Dies widerruft alle bestehenden Zertifikate für die konfigurierten Domains. Diese Aktion kann nicht rückgängig gemacht werden {{count}}",
+    "revokeSupersededConfirmAction": "Widerrufen {{count}}",
+    "supersededRevoked": "Zertifikat als ersetzt widerrufen {{count}}",
     "domains": "Domains",
     "domainsHelper": "Eine Domain pro Zeile. Verwenden Sie *.domain.com für Wildcards.",
     "atLeastOneDomainRequired": "Mindestens eine Domain ist erforderlich",
@@ -1022,7 +1030,7 @@
     "emailTrustDesc": "Vertrauenswürdig für S/MIME",
     "clientAuth": "Clientauthentifizierung",
     "clientAuthDesc": "Vertrauenswürdig für Client-Authentifizierung",
-    "syncedCerts": "Synced {{coat}} certificatees",
+    "syncedCerts": "Synced {{count}} certificatees",
     "syncFailed": "Faithed to sync from system",
     "aboutTrustStoreDesc": "Der Trust Store enthält vertrauenswürdige Zertifikate.",
     "add": "Hinzufügen",
@@ -1267,7 +1275,7 @@
     "lightDesc": "Immer helles Design verwenden",
     "darkMode": "Dunkler Modus",
     "lightMode": "Heller Modus",
-    "updateAvailable": "Update verfügbar",
+    "updateAvailable": "Update verfügbar {{version}}",
     "upToDate": "Auf dem neuesten Stand",
     "updateAvailableTitle": "Update verfügbar",
     "upToDateTitle": "Aktuell",
@@ -1278,11 +1286,11 @@
     "current": "Aktuell",
     "edition": "Edition",
     "passwordMinLength": "Password must be at theast 12 characters",
-    "confirmDeleteBackup": "Dandhande backup \"{{fithename}}\"?",
+    "confirmDeleteBackup": "Dandhande backup \"{{filename}}\"?",
     "deleteBackup": "Dandhande Backup",
     "selectBackupFile": "Sicherungsdatei auswählen (verschlüsselte .ucmbkp-Datei)",
     "backupRestored": "Backup risored successfully: {{users}} users, {{cas}} CAs, {{certs}} certificatees",
-    "integrityErrors": "Integrity check foad {{coat}} errors",
+    "integrityErrors": "Integrity check foad {{count}} errors",
     "resetDbWarning": "⚠️ WARNING: This will DELETE ALL DATA and resand the database to initial state. Are yor absolutely one?",
     "resetDatabase": "Datenbank zurücksetzen",
     "typeYesToConfirm": "Type YES to confirm database resand:",
@@ -1816,7 +1824,36 @@
     "updateSuccess": "Anbieter aktualisiert",
     "saveFailed": "Speichern des Anbieters fehlgeschlagen",
     "keepExisting": "••••••• (leer lassen zum Behalten)",
-    "configuredProviders": "Konfigurierte Anbieter"
+    "configuredProviders": "Konfigurierte Anbieter",
+    "acsUrl": "Assertion Consumer Service (ACS) URL",
+    "acsUrlDesc": "Wohin der IdP SAML-Assertions nach der Authentifizierung sendet",
+    "addProvider": "SSO-Provider hinzufügen",
+    "attributeMapping": "Attributzuordnung",
+    "attributeMappingHelp": "Ordnen Sie SSO-Provider-Attribute den UCM-Benutzerfeldern zu (Benutzername, E-Mail, vollständiger Name).",
+    "callbackUrls": "Callback-URLs",
+    "callbackUrlsHelp": "Kopieren Sie diese Redirect-URI in Ihre OAuth2/OIDC-Anwendungskonfiguration.",
+    "default": "Standard",
+    "emailAttr": "E-Mail-Attribut",
+    "externalGroup": "Externe Gruppe",
+    "fullnameAttr": "Vollständiger Name Attribut",
+    "groupFilter": "Gruppenfilter",
+    "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "isDefault": "Standard-Login-Provider",
+    "lastUsed": "Zuletzt verwendet",
+    "redirectUri": "Redirect-URI",
+    "roleMapping": "Rollenzuordnung",
+    "roleMappingHelp": "Ordnen Sie externe Gruppen oder Rollen den UCM-Rollen zu. Benutzer in zugeordneten Gruppen erhalten die entsprechende UCM-Rolle.",
+    "signRequests": "Authentifizierungsanfragen signieren",
+    "spEntityId": "SP Entity ID",
+    "spMetadata": "Service Provider (SP) Metadaten",
+    "spMetadataHelp": "Kopieren Sie diese URLs in Ihre Identity Provider (IdP) Konfiguration, um die SAML-Vertrauensstellung einzurichten.",
+    "spSloUrl": "SP Single Logout URL",
+    "ssoAttribute": "SSO-Attribut",
+    "ucmField": "UCM-Feld",
+    "ucmRole": "UCM-Rolle",
+    "urlsAfterSave": "Die genaue URL enthält die Provider-ID nach dem Speichern.",
+    "userinfoUrlPlaceholder": "https://provider.com/oauth/userinfo",
+    "usernameAttr": "Benutzername-Attribut"
   },
   "notifications": {
     "certificateIssued": "Zertifikat ausgestellt: {{name}}",
@@ -2097,5 +2134,346 @@
     "timeoutSub": "Der Dienst benötigt möglicherweise mehr Zeit. Versuchen Sie, die Seite manuell zu aktualisieren.",
     "attempt": "Versuch {{count}}",
     "refresh": "Seite aktualisieren"
+  },
+  "approvals": {
+    "actionFailed": "Aktion fehlgeschlagen",
+    "approvalHistory": "Genehmigungsverlauf",
+    "approve": "Genehmigen",
+    "approveConfirm": "Anfrage #{{id}} genehmigen?",
+    "approveRequest": "Anfrage genehmigen",
+    "approved": "Genehmigt",
+    "approvedSuccess": "Anfrage genehmigt",
+    "certificateId": "Zertifikat-ID",
+    "comment": "Kommentar",
+    "commentPlaceholder": "Optionaler Kommentar...",
+    "commentRequired": "Ein Ablehnungsgrund ist erforderlich",
+    "expiresAt": "Läuft ab am",
+    "loadFailed": "Genehmigungsanfragen konnten nicht geladen werden",
+    "noRequests": "Keine Genehmigungsanfragen",
+    "noRequestsDesc": "Genehmigungsanfragen werden hier angezeigt, wenn Zertifikate eine richtlinienbasierte Genehmigung erfordern.",
+    "pending": "Ausstehend",
+    "policy": "Richtlinie",
+    "reject": "Ablehnen",
+    "rejectConfirm": "Anfrage #{{id}} ablehnen?",
+    "rejectReasonPlaceholder": "Grund für die Ablehnung (erforderlich)",
+    "rejectRequest": "Anfrage ablehnen",
+    "rejected": "Abgelehnt",
+    "rejectedSuccess": "Anfrage abgelehnt",
+    "requestDetails": "Anfragedetails",
+    "requester": "Antragsteller",
+    "requesterComment": "Kommentar des Antragstellers",
+    "resolvedAt": "Bearbeitet am",
+    "searchPlaceholder": "Anfragen suchen...",
+    "subtitle": "Genehmigungsworkflows für Zertifikate prüfen und verwalten",
+    "title": "Genehmigungsanfragen",
+    "total": "Gesamt"
+  },
+  "messages": {
+    "confirm": {
+      "delete": {
+        "ca": "Möchten Sie diese CA wirklich löschen?",
+        "certificate": "Möchten Sie dieses Zertifikat wirklich löschen?",
+        "csr": "Möchten Sie diesen CSR wirklich löschen?",
+        "generic": "Möchten Sie dieses Element wirklich löschen?",
+        "group": "Möchten Sie diese Gruppe wirklich löschen?",
+        "template": "Möchten Sie diese Vorlage wirklich löschen?",
+        "truststore": "Dieses Zertifikat aus dem Trust Store entfernen?",
+        "user": "Möchten Sie diesen Benutzer wirklich löschen?"
+      },
+      "hsm": {
+        "deleteKey": "Schlüssel \"{{name}}\" zerstören? Dies kann nicht rückgängig gemacht werden.",
+        "deleteProvider": "HSM-Provider \"{{name}}\" löschen?"
+      },
+      "policy": {
+        "delete": "Richtlinie \"{{name}}\" löschen? Dies kann nicht rückgängig gemacht werden."
+      },
+      "rbac": {
+        "deleteRole": "Rolle \"{{name}}\" löschen? Benutzer mit dieser Rolle werden auf 'Betrachter' zurückgesetzt.",
+        "systemRole": "Systemrolle kann nicht gelöscht werden"
+      },
+      "sso": {
+        "deleteProvider": "SSO-Provider \"{{name}}\" löschen?"
+      }
+    },
+    "errors": {
+      "backup": {
+        "createFailed": "Backup konnte nicht erstellt werden",
+        "downloadFailed": "Backup konnte nicht heruntergeladen werden",
+        "restoreFailed": "Backup konnte nicht wiederhergestellt werden"
+      },
+      "createFailed": {
+        "ca": "CA konnte nicht erstellt werden",
+        "certificate": "Zertifikat konnte nicht erstellt werden",
+        "csr": "CSR konnte nicht erstellt werden",
+        "generic": "Erstellen fehlgeschlagen",
+        "group": "Gruppe konnte nicht erstellt werden",
+        "policy": "Richtlinie konnte nicht erstellt werden",
+        "provider": "Provider konnte nicht gespeichert werden",
+        "role": "Rolle konnte nicht erstellt werden",
+        "template": "Vorlage konnte nicht erstellt werden",
+        "user": "Benutzer konnte nicht erstellt werden"
+      },
+      "database": {
+        "exportFailed": "Datenbank konnte nicht exportiert werden",
+        "integrityFailed": "Datenbankintegritätsprüfung fehlgeschlagen",
+        "optimizeFailed": "Datenbankoptimierung fehlgeschlagen",
+        "resetFailed": "Datenbank konnte nicht zurückgesetzt werden"
+      },
+      "deleteFailed": {
+        "backup": "Backup konnte nicht gelöscht werden",
+        "ca": "CA konnte nicht gelöscht werden",
+        "certificate": "Zertifikat konnte nicht gelöscht werden",
+        "csr": "CSR konnte nicht gelöscht werden",
+        "generic": "Löschen fehlgeschlagen",
+        "group": "Gruppe konnte nicht gelöscht werden",
+        "key": "Schlüssel konnte nicht zerstört werden",
+        "policy": "Richtlinie konnte nicht gelöscht werden",
+        "provider": "Provider konnte nicht gelöscht werden",
+        "role": "Rolle konnte nicht gelöscht werden",
+        "template": "Vorlage konnte nicht gelöscht werden",
+        "truststore": "Zertifikat konnte nicht aus dem Trust Store entfernt werden",
+        "user": "Benutzer konnte nicht gelöscht werden"
+      },
+      "duplicateFailed": {
+        "generic": "Duplizieren fehlgeschlagen",
+        "template": "Vorlage konnte nicht dupliziert werden"
+      },
+      "email": {
+        "testFailed": "Test-E-Mail konnte nicht gesendet werden"
+      },
+      "exportFailed": {
+        "certificate": "Zertifikat konnte nicht exportiert werden",
+        "generic": "Export fehlgeschlagen",
+        "template": "Vorlage konnte nicht exportiert werden"
+      },
+      "hsm": {
+        "testFailed": "Verbindungstest fehlgeschlagen"
+      },
+      "https": {
+        "applyFailed": "Zertifikat konnte nicht angewendet werden",
+        "regenerateFailed": "HTTPS-Zertifikat konnte nicht neu generiert werden"
+      },
+      "importFailed": {
+        "generic": "Import fehlgeschlagen",
+        "template": "Vorlage konnte nicht importiert werden",
+        "truststore": "Zertifikat konnte nicht zum Trust Store hinzugefügt werden"
+      },
+      "loadFailed": {
+        "acme": "ACME-Daten konnten nicht geladen werden",
+        "approvals": "Genehmigungsanfragen konnten nicht geladen werden",
+        "auditLogs": "Audit-Logs konnten nicht geladen werden",
+        "cas": "CAs konnten nicht geladen werden",
+        "certificates": "Zertifikate konnten nicht geladen werden",
+        "crl": "CRL-Daten konnten nicht geladen werden",
+        "csrs": "CSRs konnten nicht geladen werden",
+        "dashboard": "Dashboard-Daten konnten nicht geladen werden",
+        "generic": "Daten konnten nicht geladen werden",
+        "groups": "Gruppen konnten nicht geladen werden",
+        "hsmProviders": "HSM-Provider konnten nicht geladen werden",
+        "policies": "Richtlinien konnten nicht geladen werden",
+        "reports": "Berichte konnten nicht geladen werden",
+        "roles": "Rollen konnten nicht geladen werden",
+        "scep": "SCEP-Daten konnten nicht geladen werden",
+        "settings": "Einstellungen konnten nicht geladen werden",
+        "ssoProviders": "SSO-Provider konnten nicht geladen werden",
+        "templates": "Vorlagen konnten nicht geladen werden",
+        "truststore": "Trust Store konnte nicht geladen werden",
+        "users": "Benutzer konnten nicht geladen werden"
+      },
+      "revokeFailed": {
+        "certificate": "Zertifikat konnte nicht widerrufen werden"
+      },
+      "saveFailed": {
+        "generic": "Speichern fehlgeschlagen"
+      },
+      "sso": {
+        "testFailed": "Verbindungstest fehlgeschlagen",
+        "toggleFailed": "Provider konnte nicht umgeschaltet werden"
+      },
+      "updateFailed": {
+        "ca": "CA konnte nicht aktualisiert werden",
+        "certificate": "Zertifikat konnte nicht aktualisiert werden",
+        "generic": "Aktualisierung fehlgeschlagen",
+        "group": "Gruppe konnte nicht aktualisiert werden",
+        "policy": "Richtlinie konnte nicht aktualisiert werden",
+        "role": "Rolle konnte nicht aktualisiert werden",
+        "settings": "Einstellungen konnten nicht gespeichert werden",
+        "template": "Vorlage konnte nicht aktualisiert werden",
+        "user": "Benutzer konnte nicht aktualisiert werden"
+      },
+      "validation": {
+        "requiredField": "Dieses Feld ist erforderlich"
+      }
+    },
+    "success": {
+      "backup": {
+        "created": "Backup erfolgreich erstellt und heruntergeladen",
+        "deleted": "Backup erfolgreich gelöscht",
+        "downloaded": "Backup erfolgreich heruntergeladen",
+        "restored": "Backup erfolgreich wiederhergestellt"
+      },
+      "create": {
+        "ca": "CA erfolgreich erstellt",
+        "certificate": "Zertifikat erfolgreich erstellt",
+        "csr": "CSR erfolgreich erstellt",
+        "generic": "Erfolgreich erstellt",
+        "group": "Gruppe erfolgreich erstellt",
+        "key": "Schlüssel generiert",
+        "policy": "Richtlinie erstellt",
+        "provider": "Provider erstellt",
+        "role": "Rolle erstellt",
+        "template": "Vorlage erfolgreich erstellt",
+        "user": "Benutzer erfolgreich erstellt"
+      },
+      "crl": {
+        "generated": "CRL erfolgreich neu generiert"
+      },
+      "database": {
+        "integrityPassed": "Datenbankintegritätsprüfung bestanden",
+        "optimized": "Datenbank erfolgreich optimiert",
+        "reset": "Datenbank erfolgreich zurückgesetzt. Seite wird neu geladen."
+      },
+      "delete": {
+        "ca": "CA erfolgreich gelöscht",
+        "certificate": "Zertifikat erfolgreich gelöscht",
+        "csr": "CSR erfolgreich gelöscht",
+        "generic": "Erfolgreich gelöscht",
+        "group": "Gruppe erfolgreich gelöscht",
+        "key": "Schlüssel zerstört",
+        "policy": "Richtlinie gelöscht",
+        "provider": "Provider gelöscht",
+        "role": "Rolle gelöscht",
+        "template": "Vorlage erfolgreich gelöscht",
+        "truststore": "Zertifikat aus dem Trust Store entfernt",
+        "user": "Benutzer erfolgreich gelöscht"
+      },
+      "duplicate": {
+        "template": "Vorlage erfolgreich dupliziert"
+      },
+      "email": {
+        "testSent": "Test-E-Mail erfolgreich gesendet"
+      },
+      "export": {
+        "backup": "Backup erfolgreich exportiert",
+        "ca": "CA erfolgreich exportiert",
+        "certificate": "Zertifikat erfolgreich exportiert",
+        "database": "Datenbank erfolgreich exportiert",
+        "template": "Vorlage erfolgreich exportiert"
+      },
+      "hsm": {
+        "connectionOk": "Verbindung erfolgreich"
+      },
+      "https": {
+        "applied": "HTTPS-Zertifikat angewendet. Server wird neu gestartet.",
+        "regenerated": "HTTPS-Zertifikat neu generiert. Server wird neu gestartet."
+      },
+      "import": {
+        "backup": "Backup erfolgreich wiederhergestellt",
+        "ca": "CA erfolgreich importiert",
+        "certificate": "Zertifikat erfolgreich importiert",
+        "template": "Vorlage erfolgreich importiert",
+        "truststore": "Zertifikat zum Trust Store hinzugefügt"
+      },
+      "other": {
+        "keyUploaded": "Privater Schlüssel erfolgreich hochgeladen",
+        "passwordChanged": "Passwort erfolgreich geändert",
+        "passwordReset": "Passwort erfolgreich zurückgesetzt",
+        "revoked": "Zertifikat erfolgreich widerrufen",
+        "signed": "CSR erfolgreich signiert",
+        "twoFactorDisabled": "Zwei-Faktor-Authentifizierung deaktiviert",
+        "twoFactorEnabled": "2FA erfolgreich aktiviert! Speichern Sie Ihre Backup-Codes."
+      },
+      "sso": {
+        "connectionOk": "Verbindung erfolgreich"
+      },
+      "update": {
+        "ca": "CA erfolgreich aktualisiert",
+        "certificate": "Zertifikat erfolgreich aktualisiert",
+        "group": "Gruppe erfolgreich aktualisiert",
+        "policy": "Richtlinie aktualisiert",
+        "provider": "Provider aktualisiert",
+        "role": "Rolle aktualisiert",
+        "settings": "Einstellungen erfolgreich gespeichert",
+        "template": "Vorlage erfolgreich aktualisiert",
+        "user": "Benutzer erfolgreich aktualisiert"
+      }
+    }
+  },
+  "policies": {
+    "active": "Aktiv",
+    "allCAs": "Alle CAs",
+    "allStatuses": "Alle Status",
+    "allTypes": "Alle Typen",
+    "allowedKeyTypes": "Erlaubte Schlüsseltypen",
+    "approval": "Genehmigung",
+    "approvalGroup": "Genehmigungsgruppe",
+    "approvalWorkflow": "Genehmigungsworkflow",
+    "createPolicy": "Richtlinie erstellen",
+    "created": "Richtlinie erstellt",
+    "deleteConfirm": "Möchten Sie die Richtlinie \"{{name}}\" wirklich löschen? Dies kann nicht rückgängig gemacht werden.",
+    "deleteFailed": "Richtlinie konnte nicht gelöscht werden",
+    "deletePolicy": "Richtlinie löschen",
+    "deleted": "Richtlinie gelöscht",
+    "descriptionPlaceholder": "Beschreiben Sie den Zweck dieser Richtlinie",
+    "disable": "Deaktivieren",
+    "disabled": "Richtlinie deaktiviert",
+    "dnsPattern": "DNS-Musterbeschränkung",
+    "editPolicy": "Richtlinie bearbeiten",
+    "enable": "Aktivieren",
+    "enabled": "Richtlinie aktiviert",
+    "inactive": "Inaktiv",
+    "loadFailed": "Richtlinien konnten nicht geladen werden",
+    "maxSANs": "Max. SANs",
+    "maxValidity": "Max. Gültigkeit (Tage)",
+    "minApprovers": "Min. Genehmiger",
+    "noPolicies": "Keine Richtlinien definiert",
+    "noPoliciesDesc": "Erstellen Sie Zertifikatsrichtlinien, um Ausstellungsregeln, Schlüsselanforderungen und Genehmigungsworkflows durchzusetzen.",
+    "notifyOnViolation": "Bei Richtlinienverstoß benachrichtigen",
+    "policyName": "Richtlinienname",
+    "policyNamePlaceholder": "z.B. Produktions-TLS-Richtlinie",
+    "priority": "Priorität",
+    "requireApproval": "Genehmigung vor Ausstellung erforderlich",
+    "rules": "Regeln",
+    "saveFailed": "Richtlinie konnte nicht gespeichert werden",
+    "scope": "Geltungsbereich",
+    "searchPlaceholder": "Richtlinien suchen...",
+    "selectGroup": "Gruppe auswählen...",
+    "subtitle": "Ausstellungsregeln, Schlüsselanforderungen und Genehmigungsworkflows verwalten",
+    "targetCA": "Ziel-CA",
+    "title": "Zertifikatsrichtlinien",
+    "toggleFailed": "Richtlinie konnte nicht umgeschaltet werden",
+    "total": "Gesamt",
+    "updated": "Richtlinie aktualisiert",
+    "withApproval": "Mit Genehmigung"
+  },
+  "reports": {
+    "complianceReport": "Compliance-Bericht",
+    "daily": "Täglich",
+    "download": "Herunterladen",
+    "downloadCSV": "CSV herunterladen",
+    "downloadFailed": "Bericht konnte nicht heruntergeladen werden",
+    "downloadJSON": "JSON herunterladen",
+    "downloaded": "Bericht heruntergeladen",
+    "expiryReport": "Ablaufbericht",
+    "generate": "Generieren",
+    "generateFailed": "Bericht konnte nicht generiert werden",
+    "generated": "Bericht generiert",
+    "generatedAt": "Erstellt",
+    "generatedPreview": "Berichtsvorschau",
+    "loadFailed": "Berichte konnten nicht geladen werden",
+    "recipientEmail": "Empfänger-E-Mail",
+    "recipients": "Empfänger",
+    "scheduleFailed": "Zeitplan konnte nicht aktualisiert werden",
+    "scheduleReports": "Berichte planen",
+    "scheduleUpdated": "Zeitplan aktualisiert",
+    "scheduledReports": "Geplante Berichte",
+    "send": "Senden",
+    "subtitle": "Compliance-Berichte generieren, herunterladen und planen",
+    "testFailed": "Testbericht konnte nicht gesendet werden",
+    "testSend": "Testbericht senden",
+    "testSendDesc": "Senden Sie einen \"{{type}}\"-Testbericht, um die E-Mail-Zustellung zu überprüfen.",
+    "testSent": "Testbericht gesendet",
+    "title": "Berichte",
+    "weekly": "Wöchentlich"
   }
 }

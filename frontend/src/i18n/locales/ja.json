@@ -334,7 +334,12 @@
     "rbacShort": "RBAC",
     "hsmShort": "HSM",
     "auditShort": "監査",
-    "settingsShort": "設定"
+    "settingsShort": "設定",
+    "add": "追加",
+    "allRoles": "すべてのロール",
+    "approvals": "承認",
+    "policies": "ポリシー",
+    "reports": "レポート"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -431,7 +436,9 @@
     "ssoUserCreationFailed": "ユーザーアカウントの作成に失敗しました",
     "ssoAutoCreateDisabled": "ユーザーが見つかりません。自動アカウント作成は無効になっています。管理者に連絡してください。",
     "ssoCallbackError": "SSO認証エラー",
-    "ssoError": "SSO認証に失敗しました"
+    "ssoError": "SSO認証に失敗しました",
+    "passwordRequired": "パスワードを入力してください",
+    "usernameRequired": "ユーザー名を入力してください"
   },
   "dashboard": {
     "goodMorning": "おはようございます",
@@ -525,7 +532,8 @@
     "pkcs12Password": "PKCS#12パスワード",
     "includeChain": "証明書チェーンを含める",
     "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
-    "subtitle": "{{count}} 件の証明書"
+    "subtitle": "{{count}} 件の証明書",
+    "revokeWarning": "証明書の失効は永久的であり、元に戻すことはできません。証明書はCRLに追加され、失効ステータスを確認するすべてのクライアントから信頼されなくなります。この証明書を永久に無効化する必要がある場合のみ続行してください。"
   },
   "cas": {
     "parentCA": "親CA",
@@ -837,12 +845,12 @@
     "revokeOnRenewal": "更新後に古い証明書を失効させる",
     "revokeOnRenewalDesc": "新しい証明書の発行時に前の証明書を'superseded'の理由で自動的に失効させます",
     "renewalPolicy": "更新ポリシー",
-    "revokeExistingSuperseded": "既存の証明書を失効させる",
+    "revokeExistingSuperseded": "既存の証明書を失効させる {{count}}",
     "revokeExistingSupersededDesc": "これらのドメインの既発行証明書を'superseded'の理由で失効させます",
     "revokeSupersededConfirmTitle": "既存の証明書を失効させますか？",
-    "revokeSupersededConfirmDesc": "設定されたドメインの既存の証明書がすべて失効されます。この操作は元に戻せません。",
-    "revokeSupersededConfirmAction": "失効させる",
-    "supersededRevoked": "証明書が置き換えとして失効しました",
+    "revokeSupersededConfirmDesc": "設定されたドメインの既存の証明書がすべて失効されます。この操作は元に戻せません {{count}}",
+    "revokeSupersededConfirmAction": "失効させる {{count}}",
+    "supersededRevoked": "証明書が置き換えとして失効しました {{count}}",
     "domains": "ドメイン",
     "domainsHelper": "1行に1ドメイン。ワイルドカードには*.domain.comを使用。",
     "atLeastOneDomainRequired": "少なくとも1つのドメインが必要です",
@@ -1022,7 +1030,7 @@
     "emailTrustDesc": "S/MIMEで信頼済み",
     "clientAuth": "クライアント認証",
     "clientAuthDesc": "クライアント認証で信頼済み",
-    "syncedCerts": "Synced {{coat}} certificatees",
+    "syncedCerts": "Synced {{count}} certificatees",
     "syncFailed": "Faithed to sync from system",
     "aboutTrustStoreDesc": "The Trust Store contains certificates that are explicitly trusted for validating certificate chains. Add Root and Intermediate CAs here for chain verification.",
     "add": "Add",
@@ -1267,7 +1275,7 @@
     "lightDesc": "常にライトテーマを使用",
     "darkMode": "ダークモード",
     "lightMode": "ライトモード",
-    "updateAvailable": "アップデート利用可能",
+    "updateAvailable": "アップデート利用可能 {{version}}",
     "upToDate": "最新です",
     "updateAvailableTitle": "アップデートが利用可能です",
     "upToDateTitle": "最新です",
@@ -1278,11 +1286,11 @@
     "current": "現在",
     "edition": "エディション",
     "passwordMinLength": "Password must be at theast 12 characters",
-    "confirmDeleteBackup": "Dandhande backup \"{{fithename}}\"?",
+    "confirmDeleteBackup": "Dandhande backup \"{{filename}}\"?",
     "deleteBackup": "Dandhande Backup",
     "selectBackupFile": "バックアップファイルを選択（暗号化された .ucmbkp）",
     "backupRestored": "Backup risored successfully: {{users}} users, {{cas}} CAs, {{certs}} certificatees",
-    "integrityErrors": "Integrity check foad {{coat}} errors",
+    "integrityErrors": "Integrity check foad {{count}} errors",
     "resetDbWarning": "⚠️ WARNING: This will DELETE ALL DATA and resand the database to initial state. Are yor absolutely one?",
     "resetDatabase": "データベースをリセット",
     "typeYesToConfirm": "Type YES to confirm database resand:",
@@ -1816,7 +1824,36 @@
     "updateSuccess": "プロバイダーを更新しました",
     "saveFailed": "プロバイダーの保存に失敗しました",
     "keepExisting": "••••••• （空白で維持）",
-    "configuredProviders": "設定済みプロバイダー"
+    "configuredProviders": "設定済みプロバイダー",
+    "acsUrl": "アサーションコンシューマーサービス（ACS）URL",
+    "acsUrlDesc": "認証後にIdPがSAMLアサーションを送信する先",
+    "addProvider": "SSOプロバイダーを追加",
+    "attributeMapping": "属性マッピング",
+    "attributeMappingHelp": "SSOプロバイダーの属性をUCMユーザーフィールド（username、email、fullname）にマッピングします。",
+    "callbackUrls": "コールバックURL",
+    "callbackUrlsHelp": "このリダイレクトURIをOAuth2/OIDCアプリケーション設定にコピーしてください。",
+    "default": "デフォルト",
+    "emailAttr": "メール属性",
+    "externalGroup": "外部グループ",
+    "fullnameAttr": "氏名属性",
+    "groupFilter": "グループフィルター",
+    "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "isDefault": "デフォルトログインプロバイダー",
+    "lastUsed": "最終使用日時",
+    "redirectUri": "リダイレクトURI",
+    "roleMapping": "ロールマッピング",
+    "roleMappingHelp": "外部グループまたはロールをUCMロールにマッピングします。一致するグループのユーザーには対応するUCMロールが割り当てられます。",
+    "signRequests": "認証リクエストに署名",
+    "spEntityId": "SPエンティティID",
+    "spMetadata": "サービスプロバイダー（SP）メタデータ",
+    "spMetadataHelp": "SAML信頼を設定するために、これらのURLをIDプロバイダー（IdP）設定にコピーしてください。",
+    "spSloUrl": "SPシングルログアウトURL",
+    "ssoAttribute": "SSO属性",
+    "ucmField": "UCMフィールド",
+    "ucmRole": "UCMロール",
+    "urlsAfterSave": "正確なURLは保存後にプロバイダーIDを含みます。",
+    "userinfoUrlPlaceholder": "https://provider.com/oauth/userinfo",
+    "usernameAttr": "ユーザー名属性"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",
@@ -2097,5 +2134,346 @@
     "timeoutSub": "サービスにはもう少し時間が必要かもしれません。手動で更新してください。",
     "attempt": "試行 {{count}}",
     "refresh": "ページを更新"
+  },
+  "approvals": {
+    "actionFailed": "アクションに失敗しました",
+    "approvalHistory": "承認履歴",
+    "approve": "承認",
+    "approveConfirm": "リクエスト #{{id}} を承認しますか？",
+    "approveRequest": "リクエストを承認",
+    "approved": "承認済み",
+    "approvedSuccess": "リクエストが承認されました",
+    "certificateId": "証明書ID",
+    "comment": "コメント",
+    "commentPlaceholder": "任意のコメント...",
+    "commentRequired": "却下理由は必須です",
+    "expiresAt": "有効期限",
+    "loadFailed": "承認リクエストの読み込みに失敗しました",
+    "noRequests": "承認リクエストはありません",
+    "noRequestsDesc": "ポリシーベースの承認が必要な証明書がある場合、承認リクエストがここに表示されます。",
+    "pending": "保留中",
+    "policy": "ポリシー",
+    "reject": "却下",
+    "rejectConfirm": "リクエスト #{{id}} を却下しますか？",
+    "rejectReasonPlaceholder": "却下理由（必須）",
+    "rejectRequest": "リクエストを却下",
+    "rejected": "却下済み",
+    "rejectedSuccess": "リクエストが却下されました",
+    "requestDetails": "リクエスト詳細",
+    "requester": "申請者",
+    "requesterComment": "申請者コメント",
+    "resolvedAt": "解決日時",
+    "searchPlaceholder": "リクエストを検索...",
+    "subtitle": "証明書の承認ワークフローを確認・管理します",
+    "title": "承認リクエスト",
+    "total": "合計"
+  },
+  "messages": {
+    "confirm": {
+      "delete": {
+        "ca": "このCAを削除してもよろしいですか？",
+        "certificate": "この証明書を削除してもよろしいですか？",
+        "csr": "このCSRを削除してもよろしいですか？",
+        "generic": "この項目を削除してもよろしいですか？",
+        "group": "このグループを削除してもよろしいですか？",
+        "template": "このテンプレートを削除してもよろしいですか？",
+        "truststore": "この証明書をトラストストアから削除しますか？",
+        "user": "このユーザーを削除してもよろしいですか？"
+      },
+      "hsm": {
+        "deleteKey": "鍵「{{name}}」を破棄しますか？この操作は元に戻せません。",
+        "deleteProvider": "HSMプロバイダー「{{name}}」を削除しますか？"
+      },
+      "policy": {
+        "delete": "ポリシー「{{name}}」を削除しますか？この操作は元に戻せません。"
+      },
+      "rbac": {
+        "deleteRole": "ロール「{{name}}」を削除しますか？このロールのユーザーは「viewer」に設定されます。",
+        "systemRole": "システムロールは削除できません"
+      },
+      "sso": {
+        "deleteProvider": "SSOプロバイダー「{{name}}」を削除しますか？"
+      }
+    },
+    "errors": {
+      "backup": {
+        "createFailed": "バックアップの作成に失敗しました",
+        "downloadFailed": "バックアップのダウンロードに失敗しました",
+        "restoreFailed": "バックアップの復元に失敗しました"
+      },
+      "createFailed": {
+        "ca": "CAの作成に失敗しました",
+        "certificate": "証明書の作成に失敗しました",
+        "csr": "CSRの作成に失敗しました",
+        "generic": "作成に失敗しました",
+        "group": "グループの作成に失敗しました",
+        "policy": "ポリシーの作成に失敗しました",
+        "provider": "プロバイダーの保存に失敗しました",
+        "role": "ロールの作成に失敗しました",
+        "template": "テンプレートの作成に失敗しました",
+        "user": "ユーザーの作成に失敗しました"
+      },
+      "database": {
+        "exportFailed": "データベースのエクスポートに失敗しました",
+        "integrityFailed": "データベースの整合性チェックに失敗しました",
+        "optimizeFailed": "データベースの最適化に失敗しました",
+        "resetFailed": "データベースのリセットに失敗しました"
+      },
+      "deleteFailed": {
+        "backup": "バックアップの削除に失敗しました",
+        "ca": "CAの削除に失敗しました",
+        "certificate": "証明書の削除に失敗しました",
+        "csr": "CSRの削除に失敗しました",
+        "generic": "削除に失敗しました",
+        "group": "グループの削除に失敗しました",
+        "key": "鍵の破棄に失敗しました",
+        "policy": "ポリシーの削除に失敗しました",
+        "provider": "プロバイダーの削除に失敗しました",
+        "role": "ロールの削除に失敗しました",
+        "template": "テンプレートの削除に失敗しました",
+        "truststore": "トラストストアからの証明書の削除に失敗しました",
+        "user": "ユーザーの削除に失敗しました"
+      },
+      "duplicateFailed": {
+        "generic": "複製に失敗しました",
+        "template": "テンプレートの複製に失敗しました"
+      },
+      "email": {
+        "testFailed": "テストメールの送信に失敗しました"
+      },
+      "exportFailed": {
+        "certificate": "証明書のエクスポートに失敗しました",
+        "generic": "エクスポートに失敗しました",
+        "template": "テンプレートのエクスポートに失敗しました"
+      },
+      "hsm": {
+        "testFailed": "接続テストに失敗しました"
+      },
+      "https": {
+        "applyFailed": "証明書の適用に失敗しました",
+        "regenerateFailed": "HTTPS証明書の再生成に失敗しました"
+      },
+      "importFailed": {
+        "generic": "インポートに失敗しました",
+        "template": "テンプレートのインポートに失敗しました",
+        "truststore": "トラストストアへの証明書の追加に失敗しました"
+      },
+      "loadFailed": {
+        "acme": "ACMEデータの読み込みに失敗しました",
+        "approvals": "承認リクエストの読み込みに失敗しました",
+        "auditLogs": "監査ログの読み込みに失敗しました",
+        "cas": "CAの読み込みに失敗しました",
+        "certificates": "証明書の読み込みに失敗しました",
+        "crl": "CRLデータの読み込みに失敗しました",
+        "csrs": "CSRの読み込みに失敗しました",
+        "dashboard": "ダッシュボードデータの読み込みに失敗しました",
+        "generic": "データの読み込みに失敗しました",
+        "groups": "グループの読み込みに失敗しました",
+        "hsmProviders": "HSMプロバイダーの読み込みに失敗しました",
+        "policies": "ポリシーの読み込みに失敗しました",
+        "reports": "レポートの読み込みに失敗しました",
+        "roles": "ロールの読み込みに失敗しました",
+        "scep": "SCEPデータの読み込みに失敗しました",
+        "settings": "設定の読み込みに失敗しました",
+        "ssoProviders": "SSOプロバイダーの読み込みに失敗しました",
+        "templates": "テンプレートの読み込みに失敗しました",
+        "truststore": "トラストストアの読み込みに失敗しました",
+        "users": "ユーザーの読み込みに失敗しました"
+      },
+      "revokeFailed": {
+        "certificate": "証明書の失効に失敗しました"
+      },
+      "saveFailed": {
+        "generic": "保存に失敗しました"
+      },
+      "sso": {
+        "testFailed": "接続テストに失敗しました",
+        "toggleFailed": "プロバイダーの切り替えに失敗しました"
+      },
+      "updateFailed": {
+        "ca": "CAの更新に失敗しました",
+        "certificate": "証明書の更新に失敗しました",
+        "generic": "更新に失敗しました",
+        "group": "グループの更新に失敗しました",
+        "policy": "ポリシーの更新に失敗しました",
+        "role": "ロールの更新に失敗しました",
+        "settings": "設定の保存に失敗しました",
+        "template": "テンプレートの更新に失敗しました",
+        "user": "ユーザーの更新に失敗しました"
+      },
+      "validation": {
+        "requiredField": "この項目は必須です"
+      }
+    },
+    "success": {
+      "backup": {
+        "created": "バックアップが作成され、ダウンロードされました",
+        "deleted": "バックアップが削除されました",
+        "downloaded": "バックアップがダウンロードされました",
+        "restored": "バックアップが復元されました"
+      },
+      "create": {
+        "ca": "CAが作成されました",
+        "certificate": "証明書が作成されました",
+        "csr": "CSRが作成されました",
+        "generic": "作成されました",
+        "group": "グループが作成されました",
+        "key": "鍵が生成されました",
+        "policy": "ポリシーが作成されました",
+        "provider": "プロバイダーが作成されました",
+        "role": "ロールが作成されました",
+        "template": "テンプレートが作成されました",
+        "user": "ユーザーが作成されました"
+      },
+      "crl": {
+        "generated": "CRLが再生成されました"
+      },
+      "database": {
+        "integrityPassed": "データベースの整合性チェックに合格しました",
+        "optimized": "データベースが最適化されました",
+        "reset": "データベースがリセットされました。ページが再読み込みされます。"
+      },
+      "delete": {
+        "ca": "CAが削除されました",
+        "certificate": "証明書が削除されました",
+        "csr": "CSRが削除されました",
+        "generic": "削除されました",
+        "group": "グループが削除されました",
+        "key": "鍵が破棄されました",
+        "policy": "ポリシーが削除されました",
+        "provider": "プロバイダーが削除されました",
+        "role": "ロールが削除されました",
+        "template": "テンプレートが削除されました",
+        "truststore": "証明書がトラストストアから削除されました",
+        "user": "ユーザーが削除されました"
+      },
+      "duplicate": {
+        "template": "テンプレートが複製されました"
+      },
+      "email": {
+        "testSent": "テストメールが送信されました"
+      },
+      "export": {
+        "backup": "バックアップがエクスポートされました",
+        "ca": "CAがエクスポートされました",
+        "certificate": "証明書がエクスポートされました",
+        "database": "データベースがエクスポートされました",
+        "template": "テンプレートがエクスポートされました"
+      },
+      "hsm": {
+        "connectionOk": "接続に成功しました"
+      },
+      "https": {
+        "applied": "HTTPS証明書が適用されました。サーバーが再起動します。",
+        "regenerated": "HTTPS証明書が再生成されました。サーバーが再起動します。"
+      },
+      "import": {
+        "backup": "バックアップが復元されました",
+        "ca": "CAがインポートされました",
+        "certificate": "証明書がインポートされました",
+        "template": "テンプレートがインポートされました",
+        "truststore": "証明書がトラストストアに追加されました"
+      },
+      "other": {
+        "keyUploaded": "秘密鍵がアップロードされました",
+        "passwordChanged": "パスワードが変更されました",
+        "passwordReset": "パスワードがリセットされました",
+        "revoked": "証明書が失効されました",
+        "signed": "CSRが署名されました",
+        "twoFactorDisabled": "二要素認証が無効化されました",
+        "twoFactorEnabled": "2FAが有効化されました！バックアップコードを保存してください。"
+      },
+      "sso": {
+        "connectionOk": "接続に成功しました"
+      },
+      "update": {
+        "ca": "CAが更新されました",
+        "certificate": "証明書が更新されました",
+        "group": "グループが更新されました",
+        "policy": "ポリシーが更新されました",
+        "provider": "プロバイダーが更新されました",
+        "role": "ロールが更新されました",
+        "settings": "設定が保存されました",
+        "template": "テンプレートが更新されました",
+        "user": "ユーザーが更新されました"
+      }
+    }
+  },
+  "policies": {
+    "active": "有効",
+    "allCAs": "すべてのCA",
+    "allStatuses": "すべてのステータス",
+    "allTypes": "すべてのタイプ",
+    "allowedKeyTypes": "許可された鍵タイプ",
+    "approval": "承認",
+    "approvalGroup": "承認グループ",
+    "approvalWorkflow": "承認ワークフロー",
+    "createPolicy": "ポリシーを作成",
+    "created": "ポリシーが作成されました",
+    "deleteConfirm": "ポリシー「{{name}}」を削除してもよろしいですか？この操作は元に戻せません。",
+    "deleteFailed": "ポリシーの削除に失敗しました",
+    "deletePolicy": "ポリシーを削除",
+    "deleted": "ポリシーが削除されました",
+    "descriptionPlaceholder": "このポリシーの目的を記述してください",
+    "disable": "無効化",
+    "disabled": "ポリシーが無効化されました",
+    "dnsPattern": "DNSパターン制限",
+    "editPolicy": "ポリシーを編集",
+    "enable": "有効化",
+    "enabled": "ポリシーが有効化されました",
+    "inactive": "無効",
+    "loadFailed": "ポリシーの読み込みに失敗しました",
+    "maxSANs": "最大SAN数",
+    "maxValidity": "最大有効期間（日）",
+    "minApprovers": "最小承認者数",
+    "noPolicies": "ポリシーが定義されていません",
+    "noPoliciesDesc": "証明書ポリシーを作成して、発行ルール、鍵要件、承認ワークフローを適用します。",
+    "notifyOnViolation": "ポリシー違反時に通知",
+    "policyName": "ポリシー名",
+    "policyNamePlaceholder": "例：本番用TLSポリシー",
+    "priority": "優先度",
+    "requireApproval": "発行前に承認を要求",
+    "rules": "ルール",
+    "saveFailed": "ポリシーの保存に失敗しました",
+    "scope": "スコープ",
+    "searchPlaceholder": "ポリシーを検索...",
+    "selectGroup": "グループを選択...",
+    "subtitle": "発行ルール、鍵要件、承認ワークフローを管理します",
+    "targetCA": "対象CA",
+    "title": "証明書ポリシー",
+    "toggleFailed": "ポリシーの切り替えに失敗しました",
+    "total": "合計",
+    "updated": "ポリシーが更新されました",
+    "withApproval": "承認あり"
+  },
+  "reports": {
+    "complianceReport": "コンプライアンスレポート",
+    "daily": "毎日",
+    "download": "ダウンロード",
+    "downloadCSV": "CSVをダウンロード",
+    "downloadFailed": "レポートのダウンロードに失敗しました",
+    "downloadJSON": "JSONをダウンロード",
+    "downloaded": "レポートがダウンロードされました",
+    "expiryReport": "有効期限レポート",
+    "generate": "生成",
+    "generateFailed": "レポートの生成に失敗しました",
+    "generated": "レポートが生成されました",
+    "generatedAt": "生成日時",
+    "generatedPreview": "レポートプレビュー",
+    "loadFailed": "レポートの読み込みに失敗しました",
+    "recipientEmail": "受信者メールアドレス",
+    "recipients": "受信者",
+    "scheduleFailed": "スケジュールの更新に失敗しました",
+    "scheduleReports": "レポートをスケジュール",
+    "scheduleUpdated": "スケジュールが更新されました",
+    "scheduledReports": "スケジュール済みレポート",
+    "send": "送信",
+    "subtitle": "コンプライアンスレポートの生成、ダウンロード、スケジュール設定",
+    "testFailed": "テストレポートの送信に失敗しました",
+    "testSend": "テストレポートを送信",
+    "testSendDesc": "メール配信を確認するためにテスト「{{type}}」レポートを送信します。",
+    "testSent": "テストレポートが送信されました",
+    "title": "レポート",
+    "weekly": "毎週"
   }
 }

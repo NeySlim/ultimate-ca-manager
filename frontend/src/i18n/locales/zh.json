@@ -334,7 +334,12 @@
     "rbacShort": "RBAC",
     "hsmShort": "HSM",
     "auditShort": "审计",
-    "settingsShort": "设置"
+    "settingsShort": "设置",
+    "add": "添加",
+    "allRoles": "所有角色",
+    "approvals": "审批",
+    "policies": "策略",
+    "reports": "报告"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -431,7 +436,9 @@
     "ssoUserCreationFailed": "创建用户账户失败",
     "ssoAutoCreateDisabled": "用户未找到。自动创建账户已禁用。请联系管理员。",
     "ssoCallbackError": "SSO 认证错误",
-    "ssoError": "SSO 认证失败"
+    "ssoError": "SSO 认证失败",
+    "passwordRequired": "请输入密码",
+    "usernameRequired": "请输入用户名"
   },
   "dashboard": {
     "goodMorning": "早上好",
@@ -525,7 +532,8 @@
     "pkcs12Password": "PKCS#12密码",
     "includeChain": "包含证书链",
     "sanPlaceholder": "DNS:example.com",
-    "subtitle": "{{count}} 个证书"
+    "subtitle": "{{count}} 个证书",
+    "revokeWarning": "吊销证书是永久性操作，不可撤销。该证书将被添加到 CRL 中，任何检查吊销状态的客户端都将不再信任该证书。请确认此证书确实需要被永久作废后再继续操作。"
   },
   "cas": {
     "parentCA": "父CA",
@@ -837,12 +845,12 @@
     "revokeOnRenewal": "续期后吊销旧证书",
     "revokeOnRenewalDesc": "签发新证书时自动以'superseded'为由吊销前一个证书",
     "renewalPolicy": "续期策略",
-    "revokeExistingSuperseded": "吊销现有证书",
+    "revokeExistingSuperseded": "吊销现有证书 {{count}}",
     "revokeExistingSupersededDesc": "以'superseded'为由吊销这些域名的已签发证书",
     "revokeSupersededConfirmTitle": "吊销现有证书？",
-    "revokeSupersededConfirmDesc": "这将吊销已配置域名的所有现有证书。此操作无法撤消。",
-    "revokeSupersededConfirmAction": "吊销",
-    "supersededRevoked": "证书已被标记为已替代并吊销",
+    "revokeSupersededConfirmDesc": "这将吊销已配置域名的所有现有证书。此操作无法撤消 {{count}}",
+    "revokeSupersededConfirmAction": "吊销 {{count}}",
+    "supersededRevoked": "证书已被标记为已替代并吊销 {{count}}",
     "domains": "域名",
     "domainsHelper": "每行一个域名。使用*.domain.com表示通配符。",
     "atLeastOneDomainRequired": "至少需要一个域名",
@@ -1022,7 +1030,7 @@
     "emailTrustDesc": "受信任用于 S/MIME",
     "clientAuth": "客户端认证",
     "clientAuthDesc": "受信任用于客户端认证",
-    "syncedCerts": "Synced {{coat}} certificatees",
+    "syncedCerts": "Synced {{count}} certificatees",
     "syncFailed": "Faithed to sync from system",
     "aboutTrustStoreDesc": "The Trust Store contains certificates that are explicitly trusted for validating certificate chains. Add Root and Intermediate CAs here for chain verification.",
     "add": "Add",
@@ -1267,7 +1275,7 @@
     "lightDesc": "始终使用浅色主题",
     "darkMode": "深色模式",
     "lightMode": "浅色模式",
-    "updateAvailable": "有可用更新",
+    "updateAvailable": "有可用更新 {{version}}",
     "upToDate": "已是最新",
     "updateAvailableTitle": "有可用更新",
     "upToDateTitle": "已是最新",
@@ -1278,11 +1286,11 @@
     "current": "当前",
     "edition": "版本",
     "passwordMinLength": "Password must be at theast 12 characters",
-    "confirmDeleteBackup": "Dandhande backup \"{{fithename}}\"?",
+    "confirmDeleteBackup": "Dandhande backup \"{{filename}}\"?",
     "deleteBackup": "Dandhande Backup",
     "selectBackupFile": "选择备份文件（加密的 .ucmbkp 文件）",
     "backupRestored": "Backup risored successfully: {{users}} users, {{cas}} CAs, {{certs}} certificatees",
-    "integrityErrors": "Integrity check foad {{coat}} errors",
+    "integrityErrors": "Integrity check foad {{count}} errors",
     "resetDbWarning": "⚠️ WARNING: This will DELETE ALL DATA and resand the database to initial state. Are yor absolutely one?",
     "resetDatabase": "重置数据库",
     "typeYesToConfirm": "Type YES to confirm database resand:",
@@ -1816,7 +1824,36 @@
     "updateSuccess": "提供商已更新",
     "saveFailed": "保存提供商失败",
     "keepExisting": "•••••••（留空保持）",
-    "configuredProviders": "已配置的提供商"
+    "configuredProviders": "已配置的提供商",
+    "acsUrl": "断言消费服务 (ACS) URL",
+    "acsUrlDesc": "IdP 在认证后发送 SAML 断言的地址",
+    "addProvider": "添加 SSO 提供者",
+    "attributeMapping": "属性映射",
+    "attributeMappingHelp": "将 SSO 提供者的属性映射到 UCM 用户字段（用户名、邮箱、全名）。",
+    "callbackUrls": "回调 URL",
+    "callbackUrlsHelp": "将此重定向 URI 复制到您的 OAuth2/OIDC 应用配置中。",
+    "default": "默认",
+    "emailAttr": "邮箱属性",
+    "externalGroup": "外部组",
+    "fullnameAttr": "全名属性",
+    "groupFilter": "组过滤器",
+    "groupFilterPlaceholder": "(objectClass=groupOfNames)",
+    "isDefault": "默认登录提供者",
+    "lastUsed": "最近使用",
+    "redirectUri": "重定向 URI",
+    "roleMapping": "角色映射",
+    "roleMappingHelp": "将外部组或角色映射到 UCM 角色。匹配组中的用户将被分配相应的 UCM 角色。",
+    "signRequests": "签名认证请求",
+    "spEntityId": "SP 实体 ID",
+    "spMetadata": "服务提供者 (SP) 元数据",
+    "spMetadataHelp": "将这些 URL 复制到您的身份提供者 (IdP) 配置中以建立 SAML 信任关系。",
+    "spSloUrl": "SP 单点登出 URL",
+    "ssoAttribute": "SSO 属性",
+    "ucmField": "UCM 字段",
+    "ucmRole": "UCM 角色",
+    "urlsAfterSave": "保存后，确切的 URL 将包含提供者 ID。",
+    "userinfoUrlPlaceholder": "https://provider.com/oauth/userinfo",
+    "usernameAttr": "用户名属性"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",
@@ -2097,5 +2134,346 @@
     "timeoutSub": "服务可能需要更多时间。请尝试手动刷新。",
     "attempt": "尝试 {{count}}",
     "refresh": "刷新页面"
+  },
+  "approvals": {
+    "actionFailed": "操作失败",
+    "approvalHistory": "审批历史",
+    "approve": "批准",
+    "approveConfirm": "批准请求 #{{id}}？",
+    "approveRequest": "批准请求",
+    "approved": "已批准",
+    "approvedSuccess": "请求已批准",
+    "certificateId": "证书 ID",
+    "comment": "备注",
+    "commentPlaceholder": "可选备注...",
+    "commentRequired": "必须提供拒绝原因",
+    "expiresAt": "过期时间",
+    "loadFailed": "加载审批请求失败",
+    "noRequests": "暂无审批请求",
+    "noRequestsDesc": "当证书需要基于策略的审批时，审批请求将显示在此处。",
+    "pending": "待处理",
+    "policy": "策略",
+    "reject": "拒绝",
+    "rejectConfirm": "拒绝请求 #{{id}}？",
+    "rejectReasonPlaceholder": "拒绝原因（必填）",
+    "rejectRequest": "拒绝请求",
+    "rejected": "已拒绝",
+    "rejectedSuccess": "请求已拒绝",
+    "requestDetails": "请求详情",
+    "requester": "请求人",
+    "requesterComment": "请求人备注",
+    "resolvedAt": "处理时间",
+    "searchPlaceholder": "搜索请求...",
+    "subtitle": "审查和管理证书审批工作流",
+    "title": "审批请求",
+    "total": "总计"
+  },
+  "messages": {
+    "confirm": {
+      "delete": {
+        "ca": "确定要删除此 CA 吗？",
+        "certificate": "确定要删除此证书吗？",
+        "csr": "确定要删除此 CSR 吗？",
+        "generic": "确定要删除此项目吗？",
+        "group": "确定要删除此用户组吗？",
+        "template": "确定要删除此模板吗？",
+        "truststore": "确定要从信任库中移除此证书吗？",
+        "user": "确定要删除此用户吗？"
+      },
+      "hsm": {
+        "deleteKey": "销毁密钥「{{name}}」？此操作不可撤销。",
+        "deleteProvider": "删除 HSM 提供者「{{name}}」？"
+      },
+      "policy": {
+        "delete": "删除策略「{{name}}」？此操作不可撤销。"
+      },
+      "rbac": {
+        "deleteRole": "删除角色「{{name}}」？拥有此角色的用户将被设为「查看者」。",
+        "systemRole": "无法删除系统角色"
+      },
+      "sso": {
+        "deleteProvider": "删除 SSO 提供者「{{name}}」？"
+      }
+    },
+    "errors": {
+      "backup": {
+        "createFailed": "创建备份失败",
+        "downloadFailed": "下载备份失败",
+        "restoreFailed": "恢复备份失败"
+      },
+      "createFailed": {
+        "ca": "创建 CA 失败",
+        "certificate": "创建证书失败",
+        "csr": "创建 CSR 失败",
+        "generic": "创建失败",
+        "group": "创建用户组失败",
+        "policy": "创建策略失败",
+        "provider": "保存提供者失败",
+        "role": "创建角色失败",
+        "template": "创建模板失败",
+        "user": "创建用户失败"
+      },
+      "database": {
+        "exportFailed": "导出数据库失败",
+        "integrityFailed": "数据库完整性检查失败",
+        "optimizeFailed": "优化数据库失败",
+        "resetFailed": "重置数据库失败"
+      },
+      "deleteFailed": {
+        "backup": "删除备份失败",
+        "ca": "删除 CA 失败",
+        "certificate": "删除证书失败",
+        "csr": "删除 CSR 失败",
+        "generic": "删除失败",
+        "group": "删除用户组失败",
+        "key": "销毁密钥失败",
+        "policy": "删除策略失败",
+        "provider": "删除提供者失败",
+        "role": "删除角色失败",
+        "template": "删除模板失败",
+        "truststore": "从信任库移除证书失败",
+        "user": "删除用户失败"
+      },
+      "duplicateFailed": {
+        "generic": "复制失败",
+        "template": "复制模板失败"
+      },
+      "email": {
+        "testFailed": "发送测试邮件失败"
+      },
+      "exportFailed": {
+        "certificate": "导出证书失败",
+        "generic": "导出失败",
+        "template": "导出模板失败"
+      },
+      "hsm": {
+        "testFailed": "连接测试失败"
+      },
+      "https": {
+        "applyFailed": "应用证书失败",
+        "regenerateFailed": "重新生成 HTTPS 证书失败"
+      },
+      "importFailed": {
+        "generic": "导入失败",
+        "template": "导入模板失败",
+        "truststore": "添加证书到信任库失败"
+      },
+      "loadFailed": {
+        "acme": "加载 ACME 数据失败",
+        "approvals": "加载审批请求失败",
+        "auditLogs": "加载审计日志失败",
+        "cas": "加载 CA 列表失败",
+        "certificates": "加载证书失败",
+        "crl": "加载 CRL 数据失败",
+        "csrs": "加载 CSR 列表失败",
+        "dashboard": "加载仪表盘数据失败",
+        "generic": "加载数据失败",
+        "groups": "加载用户组失败",
+        "hsmProviders": "加载 HSM 提供者失败",
+        "policies": "加载策略失败",
+        "reports": "加载报告失败",
+        "roles": "加载角色失败",
+        "scep": "加载 SCEP 数据失败",
+        "settings": "加载设置失败",
+        "ssoProviders": "加载 SSO 提供者失败",
+        "templates": "加载模板失败",
+        "truststore": "加载信任库失败",
+        "users": "加载用户失败"
+      },
+      "revokeFailed": {
+        "certificate": "吊销证书失败"
+      },
+      "saveFailed": {
+        "generic": "保存失败"
+      },
+      "sso": {
+        "testFailed": "连接测试失败",
+        "toggleFailed": "切换提供者失败"
+      },
+      "updateFailed": {
+        "ca": "更新 CA 失败",
+        "certificate": "更新证书失败",
+        "generic": "更新失败",
+        "group": "更新用户组失败",
+        "policy": "更新策略失败",
+        "role": "更新角色失败",
+        "settings": "保存设置失败",
+        "template": "更新模板失败",
+        "user": "更新用户失败"
+      },
+      "validation": {
+        "requiredField": "此字段为必填项"
+      }
+    },
+    "success": {
+      "backup": {
+        "created": "备份已创建并下载成功",
+        "deleted": "备份已删除",
+        "downloaded": "备份下载成功",
+        "restored": "备份恢复成功"
+      },
+      "create": {
+        "ca": "CA 创建成功",
+        "certificate": "证书创建成功",
+        "csr": "CSR 创建成功",
+        "generic": "创建成功",
+        "group": "用户组创建成功",
+        "key": "密钥已生成",
+        "policy": "策略已创建",
+        "provider": "提供者已创建",
+        "role": "角色已创建",
+        "template": "模板创建成功",
+        "user": "用户创建成功"
+      },
+      "crl": {
+        "generated": "CRL 重新生成成功"
+      },
+      "database": {
+        "integrityPassed": "数据库完整性检查通过",
+        "optimized": "数据库优化成功",
+        "reset": "数据库重置成功，页面将重新加载。"
+      },
+      "delete": {
+        "ca": "CA 删除成功",
+        "certificate": "证书删除成功",
+        "csr": "CSR 删除成功",
+        "generic": "删除成功",
+        "group": "用户组删除成功",
+        "key": "密钥已销毁",
+        "policy": "策略已删除",
+        "provider": "提供者已删除",
+        "role": "角色已删除",
+        "template": "模板删除成功",
+        "truststore": "证书已从信任库中移除",
+        "user": "用户删除成功"
+      },
+      "duplicate": {
+        "template": "模板复制成功"
+      },
+      "email": {
+        "testSent": "测试邮件发送成功"
+      },
+      "export": {
+        "backup": "备份导出成功",
+        "ca": "CA 导出成功",
+        "certificate": "证书导出成功",
+        "database": "数据库导出成功",
+        "template": "模板导出成功"
+      },
+      "hsm": {
+        "connectionOk": "连接成功"
+      },
+      "https": {
+        "applied": "HTTPS 证书已应用，服务器将重启。",
+        "regenerated": "HTTPS 证书已重新生成，服务器将重启。"
+      },
+      "import": {
+        "backup": "备份恢复成功",
+        "ca": "CA 导入成功",
+        "certificate": "证书导入成功",
+        "template": "模板导入成功",
+        "truststore": "证书已添加到信任库"
+      },
+      "other": {
+        "keyUploaded": "私钥上传成功",
+        "passwordChanged": "密码修改成功",
+        "passwordReset": "密码重置成功",
+        "revoked": "证书吊销成功",
+        "signed": "CSR 签署成功",
+        "twoFactorDisabled": "双因素认证已禁用",
+        "twoFactorEnabled": "2FA 启用成功！请保存您的备用码。"
+      },
+      "sso": {
+        "connectionOk": "连接成功"
+      },
+      "update": {
+        "ca": "CA 更新成功",
+        "certificate": "证书更新成功",
+        "group": "用户组更新成功",
+        "policy": "策略已更新",
+        "provider": "提供者已更新",
+        "role": "角色已更新",
+        "settings": "设置保存成功",
+        "template": "模板更新成功",
+        "user": "用户更新成功"
+      }
+    }
+  },
+  "policies": {
+    "active": "启用",
+    "allCAs": "所有 CA",
+    "allStatuses": "所有状态",
+    "allTypes": "所有类型",
+    "allowedKeyTypes": "允许的密钥类型",
+    "approval": "审批",
+    "approvalGroup": "审批组",
+    "approvalWorkflow": "审批工作流",
+    "createPolicy": "创建策略",
+    "created": "策略已创建",
+    "deleteConfirm": "确定要删除策略「{{name}}」吗？此操作不可撤销。",
+    "deleteFailed": "删除策略失败",
+    "deletePolicy": "删除策略",
+    "deleted": "策略已删除",
+    "descriptionPlaceholder": "描述此策略的用途",
+    "disable": "禁用",
+    "disabled": "策略已禁用",
+    "dnsPattern": "DNS 模式限制",
+    "editPolicy": "编辑策略",
+    "enable": "启用",
+    "enabled": "策略已启用",
+    "inactive": "未启用",
+    "loadFailed": "加载策略失败",
+    "maxSANs": "最大 SAN 数量",
+    "maxValidity": "最大有效期（天）",
+    "minApprovers": "最少审批人数",
+    "noPolicies": "暂无策略",
+    "noPoliciesDesc": "创建证书策略以强制执行签发规则、密钥要求和审批工作流。",
+    "notifyOnViolation": "策略违规时发送通知",
+    "policyName": "策略名称",
+    "policyNamePlaceholder": "例如：生产环境 TLS 策略",
+    "priority": "优先级",
+    "requireApproval": "签发前需要审批",
+    "rules": "规则",
+    "saveFailed": "保存策略失败",
+    "scope": "范围",
+    "searchPlaceholder": "搜索策略...",
+    "selectGroup": "选择用户组...",
+    "subtitle": "管理签发规则、密钥要求和审批工作流",
+    "targetCA": "目标 CA",
+    "title": "证书策略",
+    "toggleFailed": "切换策略失败",
+    "total": "总计",
+    "updated": "策略已更新",
+    "withApproval": "需审批"
+  },
+  "reports": {
+    "complianceReport": "合规报告",
+    "daily": "每日",
+    "download": "下载",
+    "downloadCSV": "下载 CSV",
+    "downloadFailed": "下载报告失败",
+    "downloadJSON": "下载 JSON",
+    "downloaded": "报告已下载",
+    "expiryReport": "到期报告",
+    "generate": "生成",
+    "generateFailed": "生成报告失败",
+    "generated": "报告已生成",
+    "generatedAt": "生成时间",
+    "generatedPreview": "报告预览",
+    "loadFailed": "加载报告失败",
+    "recipientEmail": "收件人邮箱",
+    "recipients": "收件人",
+    "scheduleFailed": "更新定时计划失败",
+    "scheduleReports": "定时报告",
+    "scheduleUpdated": "定时计划已更新",
+    "scheduledReports": "已计划的报告",
+    "send": "发送",
+    "subtitle": "生成、下载和定时发送合规报告",
+    "testFailed": "发送测试报告失败",
+    "testSend": "发送测试报告",
+    "testSendDesc": "发送「{{type}}」测试报告以验证邮件投递。",
+    "testSent": "测试报告已发送",
+    "title": "报告",
+    "weekly": "每周"
   }
 }
