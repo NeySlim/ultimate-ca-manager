@@ -21,8 +21,6 @@ import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
-import { ERRORS, SUCCESS } from '../lib/messages'
-
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showInfo } = useNotification()
@@ -61,7 +59,7 @@ export default function CRLOCSPPage() {
       setOcspStatus(ocspStatusRes.data || { enabled: false, running: false })
       setOcspStats(ocspStatsRes.data || { total_requests: 0, cache_hits: 0 })
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.CRL)
+      showError(error.message || t('messages.errors.loadFailed.crl'))
     } finally {
       setLoading(false)
     }
@@ -87,11 +85,11 @@ export default function CRLOCSPPage() {
     setRegenerating(true)
     try {
       await crlService.regenerate(selectedCA.id)
-      showSuccess(SUCCESS.CRL.GENERATED)
+      showSuccess(t('messages.success.crl.generated'))
       loadCRLForCA(selectedCA.id)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.CRL)
+      showError(error.message || t('messages.errors.loadFailed.crl'))
     } finally {
       setRegenerating(false)
     }

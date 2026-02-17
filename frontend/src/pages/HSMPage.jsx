@@ -18,7 +18,6 @@ import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsi
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { hsmService } from '../services'
-import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
 const PROVIDER_TYPES = [
@@ -68,7 +67,7 @@ export default function HSMPage() {
       const response = await hsmService.getProviders()
       setProviders(response.data || [])
     } catch (error) {
-      showError(ERRORS.LOAD_FAILED.HSM_PROVIDERS)
+      showError(t('messages.errors.loadFailed.hsmProviders'))
     } finally {
       setLoading(false)
     }
@@ -104,15 +103,15 @@ export default function HSMPage() {
   }
 
   const handleDelete = async (provider) => {
-    const confirmed = await showConfirm(CONFIRM.HSM.DELETE_PROVIDER.replace('{name}', provider.name), { variant: 'danger', confirmText: t('common.delete') })
+    const confirmed = await showConfirm(t('messages.confirm.hsm.deleteProvider', { name: provider.name }), { variant: 'danger', confirmText: t('common.delete') })
     if (!confirmed) return
     try {
       await hsmService.deleteProvider(provider.id)
-      showSuccess(SUCCESS.DELETE.PROVIDER)
+      showSuccess(t('messages.success.delete.provider'))
       loadData()
       setSelectedProvider(null)
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.PROVIDER)
+      showError(error.message || t('messages.errors.deleteFailed.provider'))
     }
   }
 
@@ -121,13 +120,13 @@ export default function HSMPage() {
     try {
       const response = await hsmService.testProvider(provider.id)
       if (response.data?.success) {
-        showSuccess(response.data.message || SUCCESS.HSM.CONNECTION_OK)
+        showSuccess(response.data.message || t('messages.success.hsm.connectionOk'))
         loadData()
       } else {
-        showError(response.data?.message || ERRORS.HSM.TEST_FAILED)
+        showError(response.data?.message || t('messages.errors.hsm.testFailed'))
       }
     } catch (error) {
-      showError(error.message || ERRORS.HSM.TEST_FAILED)
+      showError(error.message || t('messages.errors.hsm.testFailed'))
     } finally {
       setTesting(false)
     }
@@ -137,38 +136,38 @@ export default function HSMPage() {
     try {
       if (modalMode === 'create') {
         await hsmService.createProvider(formData)
-        showSuccess(SUCCESS.CREATE.PROVIDER)
+        showSuccess(t('messages.success.create.provider'))
       } else {
         await hsmService.updateProvider(selectedProvider.id, formData)
-        showSuccess(SUCCESS.UPDATE.PROVIDER)
+        showSuccess(t('messages.success.update.provider'))
       }
       setShowModal(false)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.CREATE_FAILED.PROVIDER)
+      showError(error.message || t('messages.errors.createFailed.provider'))
     }
   }
 
   const handleGenerateKey = async (keyData) => {
     try {
       await hsmService.addKey(selectedProvider.id, keyData)
-      showSuccess(SUCCESS.CREATE.KEY)
+      showSuccess(t('messages.success.create.key'))
       setShowKeyModal(false)
       loadKeys(selectedProvider.id)
     } catch (error) {
-      showError(error.message || ERRORS.CREATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.createFailed.generic'))
     }
   }
 
   const handleDeleteKey = async (key) => {
-    const confirmed = await showConfirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.label), { variant: 'danger', confirmText: t('common.delete') })
+    const confirmed = await showConfirm(t('messages.confirm.hsm.deleteKey', { name: key.label }), { variant: 'danger', confirmText: t('common.delete') })
     if (!confirmed) return
     try {
       await hsmService.deleteKey(key.id)
-      showSuccess(SUCCESS.DELETE.KEY)
+      showSuccess(t('messages.success.delete.key'))
       loadKeys(selectedProvider.id)
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.KEY)
+      showError(error.message || t('messages.errors.deleteFailed.key'))
     }
   }
 

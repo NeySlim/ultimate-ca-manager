@@ -12,7 +12,7 @@ import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
 import { languages } from '../i18n'
 import { useAuth, useNotification } from '../contexts'
 import { useTheme } from '../contexts/ThemeContext'
-import { authMethodsService } from '../services/authMethods.service'
+import { authMethodsService } from '../services/auth-methods.service'
 import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'ucm_last_username'

@@ -27,7 +27,6 @@ import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
-import { ERRORS, SUCCESS } from '../lib/messages'
 import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
 
 export default function ACMEPage() {
@@ -111,7 +110,7 @@ export default function ACMEPage() {
       setAcmeDomains(domainsRes.data || [])
       setLocalDomains(localDomainsRes.data || [])
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.ACME)
+      showError(error.message || t('messages.errors.loadFailed.acme'))
     } finally {
       setLoading(false)
     }
@@ -130,7 +129,7 @@ export default function ACMEPage() {
       setChallenges(challengesRes.data?.challenges || challengesRes.challenges || [])
       setActiveDetailTab('account')
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.loadFailed.generic'))
     }
   }, [showError])
 
@@ -139,9 +138,9 @@ export default function ACMEPage() {
     setSaving(true)
     try {
       await acmeService.updateSettings(acmeSettings)
-      showSuccess(SUCCESS.UPDATE.SETTINGS)
+      showSuccess(t('messages.success.update.settings'))
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
+      showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
       setSaving(false)
     }
@@ -157,7 +156,7 @@ export default function ACMEPage() {
 
   const handleRegisterProxy = async () => {
     if (!proxyEmail) {
-      showError(ERRORS.VALIDATION.REQUIRED_FIELD)
+      showError(t('messages.errors.validation.requiredField'))
       return
     }
     try {
@@ -192,7 +191,7 @@ export default function ACMEPage() {
       setClientSettings(updated)
       await acmeService.updateClientSettings({ [key]: value })
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
+      showError(error.message || t('messages.errors.updateFailed.settings'))
       loadData() // Revert on error
     }
   }
@@ -215,7 +214,7 @@ export default function ACMEPage() {
       setRevokeSuperseded(false)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
+      showError(error.message || t('messages.errors.updateFailed.settings'))
       loadData()
     }
   }
@@ -341,7 +340,7 @@ export default function ACMEPage() {
       setSelectedDnsProvider(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.SAVE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.saveFailed.generic'))
     }
   }
   
@@ -366,7 +365,7 @@ export default function ACMEPage() {
       showSuccess(t('acme.dnsProviderDeleted'))
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.deleteFailed.generic'))
     }
   }
 
@@ -413,7 +412,7 @@ export default function ACMEPage() {
       setSelectedAccount(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.deleteFailed.generic'))
     }
   }
 
@@ -461,7 +460,7 @@ export default function ACMEPage() {
       showSuccess(t('acme.domainDeletedSuccess'))
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.deleteFailed.generic'))
     }
   }
 
@@ -515,7 +514,7 @@ export default function ACMEPage() {
       showSuccess(t('acme.domainDeletedSuccess'))
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.deleteFailed.generic'))
     }
   }
 

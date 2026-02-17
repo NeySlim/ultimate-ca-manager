@@ -763,7 +763,8 @@
     "rbacShort": "RBAC",
     "hsmShort": "HSM",
     "auditShort": "Audit",
-    "settingsShort": "Config"
+    "settingsShort": "Config",
+    "allRoles": "Tous les rôles"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -2246,5 +2247,236 @@
     "testFailed": "Échec de l'envoi du rapport test",
     "scheduleUpdated": "Planification mise à jour",
     "scheduleFailed": "Échec de la mise à jour de la planification"
+  },
+  "messages": {
+    "errors": {
+      "loadFailed": {
+        "certificates": "Échec du chargement des certificats",
+        "cas": "Échec du chargement des AC",
+        "csrs": "Échec du chargement des CSR",
+        "users": "Échec du chargement des utilisateurs",
+        "groups": "Échec du chargement des groupes",
+        "templates": "Échec du chargement des modèles",
+        "auditLogs": "Échec du chargement des journaux d'audit",
+        "settings": "Échec du chargement des paramètres",
+        "acme": "Échec du chargement des données ACME",
+        "scep": "Échec du chargement des données SCEP",
+        "crl": "Échec du chargement des données CRL",
+        "truststore": "Échec du chargement du magasin de confiance",
+        "dashboard": "Échec du chargement du tableau de bord",
+        "hsmProviders": "Échec du chargement des fournisseurs HSM",
+        "roles": "Échec du chargement des rôles",
+        "ssoProviders": "Échec du chargement des fournisseurs SSO",
+        "policies": "Échec du chargement des politiques",
+        "approvals": "Échec du chargement des demandes d'approbation",
+        "reports": "Échec du chargement des rapports",
+        "generic": "Échec du chargement des données"
+      },
+      "createFailed": {
+        "certificate": "Échec de la création du certificat",
+        "ca": "Échec de la création de l'AC",
+        "csr": "Échec de la création du CSR",
+        "user": "Échec de la création de l'utilisateur",
+        "group": "Échec de la création du groupe",
+        "template": "Échec de la création du modèle",
+        "role": "Échec de la création du rôle",
+        "provider": "Échec de l'enregistrement du fournisseur",
+        "policy": "Échec de la création de la politique",
+        "generic": "Échec de la création"
+      },
+      "updateFailed": {
+        "certificate": "Échec de la mise à jour du certificat",
+        "ca": "Échec de la mise à jour de l'AC",
+        "user": "Échec de la mise à jour de l'utilisateur",
+        "group": "Échec de la mise à jour du groupe",
+        "template": "Échec de la mise à jour du modèle",
+        "settings": "Échec de l'enregistrement des paramètres",
+        "role": "Échec de la mise à jour du rôle",
+        "policy": "Échec de la mise à jour de la politique",
+        "generic": "Échec de la mise à jour"
+      },
+      "deleteFailed": {
+        "certificate": "Échec de la suppression du certificat",
+        "ca": "Échec de la suppression de l'AC",
+        "csr": "Échec de la suppression du CSR",
+        "user": "Échec de la suppression de l'utilisateur",
+        "group": "Échec de la suppression du groupe",
+        "template": "Échec de la suppression du modèle",
+        "backup": "Échec de la suppression de la sauvegarde",
+        "truststore": "Échec de la suppression du certificat du magasin de confiance",
+        "provider": "Échec de la suppression du fournisseur",
+        "role": "Échec de la suppression du rôle",
+        "policy": "Échec de la suppression de la politique",
+        "key": "Échec de la destruction de la clé",
+        "generic": "Échec de la suppression"
+      },
+      "exportFailed": {
+        "certificate": "Échec de l'exportation du certificat",
+        "template": "Échec de l'exportation du modèle",
+        "generic": "Échec de l'exportation"
+      },
+      "importFailed": {
+        "template": "Échec de l'importation du modèle",
+        "truststore": "Échec de l'ajout du certificat au magasin de confiance",
+        "generic": "Échec de l'importation"
+      },
+      "duplicateFailed": {
+        "template": "Échec de la duplication du modèle",
+        "generic": "Échec de la duplication"
+      },
+      "saveFailed": {
+        "generic": "Échec de l'enregistrement"
+      },
+      "revokeFailed": {
+        "certificate": "Échec de la révocation du certificat"
+      },
+      "backup": {
+        "createFailed": "Échec de la création de la sauvegarde",
+        "downloadFailed": "Échec du téléchargement de la sauvegarde",
+        "restoreFailed": "Échec de la restauration de la sauvegarde"
+      },
+      "database": {
+        "optimizeFailed": "Échec de l'optimisation de la base de données",
+        "integrityFailed": "Échec de la vérification d'intégrité de la base de données",
+        "exportFailed": "Échec de l'exportation de la base de données",
+        "resetFailed": "Échec de la réinitialisation de la base de données"
+      },
+      "https": {
+        "applyFailed": "Échec de l'application du certificat",
+        "regenerateFailed": "Échec de la régénération du certificat HTTPS"
+      },
+      "email": {
+        "testFailed": "Échec de l'envoi de l'e-mail test"
+      },
+      "hsm": {
+        "testFailed": "Échec du test de connexion"
+      },
+      "sso": {
+        "toggleFailed": "Échec de l'activation/désactivation du fournisseur",
+        "testFailed": "Échec du test de connexion"
+      },
+      "validation": {
+        "requiredField": "Ce champ est obligatoire"
+      }
+    },
+    "success": {
+      "create": {
+        "certificate": "Certificat créé avec succès",
+        "ca": "AC créée avec succès",
+        "csr": "CSR créé avec succès",
+        "user": "Utilisateur créé avec succès",
+        "group": "Groupe créé avec succès",
+        "template": "Modèle créé avec succès",
+        "role": "Rôle créé",
+        "policy": "Politique créée",
+        "provider": "Fournisseur créé",
+        "key": "Clé générée",
+        "generic": "Créé avec succès"
+      },
+      "update": {
+        "certificate": "Certificat mis à jour avec succès",
+        "ca": "AC mise à jour avec succès",
+        "user": "Utilisateur mis à jour avec succès",
+        "group": "Groupe mis à jour avec succès",
+        "template": "Modèle mis à jour avec succès",
+        "settings": "Paramètres enregistrés avec succès",
+        "role": "Rôle mis à jour",
+        "policy": "Politique mise à jour",
+        "provider": "Fournisseur mis à jour"
+      },
+      "delete": {
+        "certificate": "Certificat supprimé avec succès",
+        "ca": "AC supprimée avec succès",
+        "csr": "CSR supprimé avec succès",
+        "user": "Utilisateur supprimé avec succès",
+        "group": "Groupe supprimé avec succès",
+        "template": "Modèle supprimé avec succès",
+        "truststore": "Certificat retiré du magasin de confiance",
+        "provider": "Fournisseur supprimé",
+        "role": "Rôle supprimé",
+        "policy": "Politique supprimée",
+        "key": "Clé détruite",
+        "generic": "Supprimé avec succès"
+      },
+      "export": {
+        "certificate": "Certificat exporté avec succès",
+        "ca": "AC exportée avec succès",
+        "backup": "Sauvegarde exportée avec succès",
+        "database": "Base de données exportée avec succès",
+        "template": "Modèle exporté avec succès"
+      },
+      "import": {
+        "certificate": "Certificat importé avec succès",
+        "ca": "AC importée avec succès",
+        "backup": "Sauvegarde restaurée avec succès",
+        "template": "Modèle importé avec succès",
+        "truststore": "Certificat ajouté au magasin de confiance"
+      },
+      "duplicate": {
+        "template": "Modèle dupliqué avec succès"
+      },
+      "other": {
+        "passwordReset": "Mot de passe réinitialisé avec succès",
+        "passwordChanged": "Mot de passe modifié avec succès",
+        "keyUploaded": "Clé privée téléversée avec succès",
+        "revoked": "Certificat révoqué avec succès",
+        "signed": "CSR signé avec succès",
+        "twoFactorEnabled": "2FA activé avec succès ! Sauvegardez vos codes de secours.",
+        "twoFactorDisabled": "Authentification à deux facteurs désactivée"
+      },
+      "backup": {
+        "created": "Sauvegarde créée et téléchargée avec succès",
+        "downloaded": "Sauvegarde téléchargée avec succès",
+        "deleted": "Sauvegarde supprimée avec succès",
+        "restored": "Sauvegarde restaurée avec succès"
+      },
+      "database": {
+        "optimized": "Base de données optimisée avec succès",
+        "integrityPassed": "Vérification d'intégrité de la base de données réussie",
+        "reset": "Base de données réinitialisée avec succès. La page va se recharger."
+      },
+      "https": {
+        "applied": "Certificat HTTPS appliqué. Le serveur va redémarrer.",
+        "regenerated": "Certificat HTTPS régénéré. Le serveur va redémarrer."
+      },
+      "email": {
+        "testSent": "E-mail test envoyé avec succès"
+      },
+      "crl": {
+        "generated": "CRL régénérée avec succès"
+      },
+      "hsm": {
+        "connectionOk": "Connexion réussie"
+      },
+      "sso": {
+        "connectionOk": "Connexion réussie"
+      }
+    },
+    "confirm": {
+      "delete": {
+        "ca": "Êtes-vous sûr de vouloir supprimer cette AC ?",
+        "certificate": "Êtes-vous sûr de vouloir supprimer ce certificat ?",
+        "csr": "Êtes-vous sûr de vouloir supprimer ce CSR ?",
+        "user": "Êtes-vous sûr de vouloir supprimer cet utilisateur ?",
+        "group": "Êtes-vous sûr de vouloir supprimer ce groupe ?",
+        "template": "Êtes-vous sûr de vouloir supprimer ce modèle ?",
+        "truststore": "Retirer ce certificat du magasin de confiance ?",
+        "generic": "Êtes-vous sûr de vouloir supprimer cet élément ?"
+      },
+      "rbac": {
+        "deleteRole": "Supprimer le rôle \"{{name}}\" ? Les utilisateurs avec ce rôle seront définis sur 'viewer'.",
+        "systemRole": "Impossible de supprimer un rôle système"
+      },
+      "hsm": {
+        "deleteProvider": "Supprimer le fournisseur HSM \"{{name}}\" ?",
+        "deleteKey": "Détruire la clé \"{{name}}\" ? Cette action ne peut pas être annulée."
+      },
+      "sso": {
+        "deleteProvider": "Supprimer le fournisseur SSO \"{{name}}\" ?"
+      },
+      "policy": {
+        "delete": "Supprimer la politique \"{{name}}\" ? Cette action ne peut pas être annulée."
+      }
+    }
   }
 }

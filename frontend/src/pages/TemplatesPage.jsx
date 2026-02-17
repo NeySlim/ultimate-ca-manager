@@ -20,8 +20,6 @@ import { templatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
-
 export default function TemplatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -65,7 +63,7 @@ export default function TemplatesPage() {
       const res = await templatesService.getAll()
       setTemplates(res.data || [])
     } catch (error) {
-      showError(ERRORS.LOAD_FAILED.TEMPLATES)
+      showError(t('messages.errors.loadFailed.templates'))
     } finally {
       setLoading(false)
     }
@@ -86,20 +84,20 @@ export default function TemplatesPage() {
   const handleCreateTemplate = async (data) => {
     try {
       const created = await templatesService.create(data)
-      showSuccess(SUCCESS.CREATE.TEMPLATE)
+      showSuccess(t('messages.success.create.template'))
       setShowTemplateModal(false)
       setEditingTemplate(null)
       loadData()
       setSelectedTemplate(created)
     } catch (error) {
-      showError(error.message || ERRORS.CREATE_FAILED.TEMPLATE)
+      showError(error.message || t('messages.errors.createFailed.template'))
     }
   }
 
   const handleUpdateTemplate = async (data) => {
     try {
       await templatesService.update(editingTemplate.id, data)
-      showSuccess(SUCCESS.UPDATE.TEMPLATE)
+      showSuccess(t('messages.success.update.template'))
       setShowTemplateModal(false)
       setEditingTemplate(null)
       loadData()
@@ -107,12 +105,12 @@ export default function TemplatesPage() {
         setSelectedTemplate({ ...selectedTemplate, ...data })
       }
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.TEMPLATE)
+      showError(error.message || t('messages.errors.updateFailed.template'))
     }
   }
 
   const handleDeleteTemplate = async (template) => {
-    const confirmed = await showConfirm(CONFIRM.DELETE.TEMPLATE, {
+    const confirmed = await showConfirm(t('messages.confirm.delete.template'), {
       title: t('templates.deleteTemplate'),
       confirmText: t('common.delete'),
       variant: 'danger'
@@ -120,22 +118,22 @@ export default function TemplatesPage() {
     if (!confirmed) return
     try {
       await templatesService.delete(template.id)
-      showSuccess(SUCCESS.DELETE.TEMPLATE)
+      showSuccess(t('messages.success.delete.template'))
       if (selectedTemplate?.id === template.id) setSelectedTemplate(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.TEMPLATE)
+      showError(error.message || t('messages.errors.deleteFailed.template'))
     }
   }
 
   const handleDuplicateTemplate = async (template) => {
     try {
       const duplicated = await templatesService.duplicate(template.id)
-      showSuccess(SUCCESS.DUPLICATE.TEMPLATE)
+      showSuccess(t('messages.success.duplicate.template'))
       loadData()
       setSelectedTemplate(duplicated)
     } catch (error) {
-      showError(error.message || ERRORS.DUPLICATE_FAILED.TEMPLATE)
+      showError(error.message || t('messages.errors.duplicateFailed.template'))
     }
   }
 
@@ -149,9 +147,9 @@ export default function TemplatesPage() {
       a.download = `${template.name || 'template'}.json`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(SUCCESS.EXPORT.TEMPLATE)
+      showSuccess(t('messages.success.export.template'))
     } catch (error) {
-      showError(error.message || ERRORS.EXPORT_FAILED.TEMPLATE)
+      showError(error.message || t('messages.errors.exportFailed.template'))
     }
   }
 
@@ -167,13 +165,13 @@ export default function TemplatesPage() {
         templateData = JSON.parse(importJson)
       }
       await templatesService.create(templateData)
-      showSuccess(SUCCESS.IMPORT.TEMPLATE)
+      showSuccess(t('messages.success.import.template'))
       setShowImportModal(false)
       setImportFile(null)
       setImportJson('')
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.IMPORT_FAILED.TEMPLATE)
+      showError(error.message || t('messages.errors.importFailed.template'))
     } finally {
       setImporting(false)
     }

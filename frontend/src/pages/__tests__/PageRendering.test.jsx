@@ -199,7 +199,7 @@ vi.mock('../../services/auth.service', () => ({
     verify: vi.fn().mockResolvedValue({ data: { authenticated: true, user: { username: 'admin' } } }),
   }
 }))
-vi.mock('../../services/authMethods.service', () => ({
+vi.mock('../../services/auth-methods.service', () => ({
   authMethodsService: {
     getAvailableMethods: vi.fn().mockResolvedValue({ data: { methods: ['password'] } }),
     checkUsername: vi.fn().mockResolvedValue({ data: { methods: ['password'] } }),

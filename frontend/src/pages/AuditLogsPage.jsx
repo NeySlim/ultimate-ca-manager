@@ -48,8 +48,6 @@ import { useNotification } from '../contexts';
 import { usePermission } from '../hooks';
 import auditService from '../services/audit.service';
 import { apiClient } from '../services/apiClient';
-import { ERRORS } from '../lib/messages';
-
 // Action icons mapping
 const actionIcons = {
   login_success: SignIn,
@@ -152,7 +150,7 @@ export default function AuditLogsPage() {
       setStats(statsRes.data || null);
       setActions(actionsRes.data || { actions: [], categories: {} });
     } catch (err) {
-      showError(err.message || ERRORS.LOAD_FAILED.AUDIT_LOGS);
+      showError(err.message || t('messages.errors.loadFailed.auditLogs'));
     } finally {
       setLoading(false);
     }
