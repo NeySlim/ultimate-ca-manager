@@ -4,12 +4,15 @@ Certificate Templates Management Routes v2.0
 """
 
 from flask import Blueprint, request, g
+import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 import json
 
 bp = Blueprint('templates_v2', __name__)
@@ -156,7 +159,8 @@ def create_template():
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to create template: {str(e)}', 500)
+        logger.error(f'Failed to create template: {e}')
+        return error_response('Failed to create template', 500)
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['GET'])
@@ -250,7 +254,8 @@ def update_template(template_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to update template: {str(e)}', 500)
+        logger.error(f'Failed to update template: {e}')
+        return error_response('Failed to update template', 500)
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['DELETE'])
@@ -287,7 +292,8 @@ def delete_template(template_id):
         return no_content_response()
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to delete template: {str(e)}', 500)
+        logger.error(f'Failed to delete template: {e}')
+        return error_response('Failed to delete template', 500)
 
 
 # ============================================================
@@ -388,7 +394,8 @@ def duplicate_template(template_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to duplicate template: {str(e)}', 500)
+        logger.error(f'Failed to duplicate template: {e}')
+        return error_response('Failed to duplicate template', 500)
 
 
 @bp.route('/api/v2/templates/<int:template_id>/export', methods=['GET'])
@@ -580,6 +587,7 @@ def import_template():
     except Exception as e:
         db.session.rollback()
         import traceback
-        print(f"Template Import Error: {str(e)}")
-        print(traceback.format_exc())
-        return error_response(f'Import failed: {str(e)}', 500)
+        logger.error(f"Template Import Error: {str(e)}")
+        logger.error(traceback.format_exc())
+        logger.error(f'Import failed: {e}')
+        return error_response('Import failed', 500)

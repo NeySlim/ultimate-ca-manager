@@ -6,10 +6,11 @@ Endpoints:
 - POST /api/v2/import/execute - Execute the import
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from auth.unified import require_auth
 from services.smart_import import SmartImporter
 from services.audit_service import AuditService
+from utils.response import success_response, error_response
 
 bp = Blueprint('smart_import', __name__)
 
@@ -41,11 +42,11 @@ def analyze_import():
     data = request.get_json()
     
     if not data:
-        return jsonify({"error": "No data provided"}), 400
+        return error_response("No data provided", 400)
     
     content = data.get('content')
     if not content:
-        return jsonify({"error": "No content to analyze"}), 400
+        return error_response("No content to analyze", 400)
     
     password = data.get('password')
     
@@ -53,16 +54,10 @@ def analyze_import():
         importer = SmartImporter()
         result = importer.analyze(content, password)
         
-        return jsonify({
-            "success": True,
-            "data": result.to_dict()
-        })
+        return success_response(data=result.to_dict())
         
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response(str(e), 500)
 
 
 @bp.route('/api/v2/import/execute', methods=['POST'])
@@ -103,11 +98,11 @@ def execute_import():
     data = request.get_json()
     
     if not data:
-        return jsonify({"error": "No data provided"}), 400
+        return error_response("No data provided", 400)
     
     content = data.get('content')
     if not content:
-        return jsonify({"error": "No content to import"}), 400
+        return error_response("No content to import", 400)
     
     password = data.get('password')
     options = data.get('options', {})
@@ -125,16 +120,10 @@ def execute_import():
             success=result.success
         )
         
-        return jsonify({
-            "success": result.success,
-            "data": result.to_dict()
-        })
+        return success_response(data=result.to_dict())
         
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response(str(e), 500)
 
 
 @bp.route('/api/v2/import/formats', methods=['GET'])
@@ -143,44 +132,41 @@ def get_supported_formats():
     """
     Get list of supported import formats.
     """
-    return jsonify({
-        "success": True,
-        "data": {
-            "formats": [
-                {
-                    "name": "PEM",
-                    "extensions": [".pem", ".crt", ".cer", ".key"],
-                    "description": "Base64 encoded with header/footer markers"
-                },
-                {
-                    "name": "DER",
-                    "extensions": [".der", ".cer"],
-                    "description": "Binary ASN.1 format"
-                },
-                {
-                    "name": "PKCS#12/PFX",
-                    "extensions": [".p12", ".pfx"],
-                    "description": "Password-protected bundle (cert + key + chain)"
-                },
-                {
-                    "name": "PKCS#7",
-                    "extensions": [".p7b", ".p7c"],
-                    "description": "Certificate chain without private key"
-                }
-            ],
-            "object_types": [
-                {"type": "certificate", "description": "X.509 Certificate"},
-                {"type": "private_key", "description": "RSA, EC, or Ed25519 private key"},
-                {"type": "csr", "description": "Certificate Signing Request"},
-                {"type": "ca", "description": "Certificate Authority (CA certificate)"}
-            ],
-            "features": [
-                "Automatic format detection",
-                "Multi-object parsing (cert + key + chain)",
-                "Chain reconstruction",
-                "Key-to-certificate matching",
-                "Duplicate detection",
-                "Validation (signatures, dates, chains)"
-            ]
-        }
+    return success_response(data={
+        "formats": [
+            {
+                "name": "PEM",
+                "extensions": [".pem", ".crt", ".cer", ".key"],
+                "description": "Base64 encoded with header/footer markers"
+            },
+            {
+                "name": "DER",
+                "extensions": [".der", ".cer"],
+                "description": "Binary ASN.1 format"
+            },
+            {
+                "name": "PKCS#12/PFX",
+                "extensions": [".p12", ".pfx"],
+                "description": "Password-protected bundle (cert + key + chain)"
+            },
+            {
+                "name": "PKCS#7",
+                "extensions": [".p7b", ".p7c"],
+                "description": "Certificate chain without private key"
+            }
+        ],
+        "object_types": [
+            {"type": "certificate", "description": "X.509 Certificate"},
+            {"type": "private_key", "description": "RSA, EC, or Ed25519 private key"},
+            {"type": "csr", "description": "Certificate Signing Request"},
+            {"type": "ca", "description": "Certificate Authority (CA certificate)"}
+        ],
+        "features": [
+            "Automatic format detection",
+            "Multi-object parsing (cert + key + chain)",
+            "Chain reconstruction",
+            "Key-to-certificate matching",
+            "Duplicate detection",
+            "Validation (signatures, dates, chains)"
+        ]
     })

@@ -3,7 +3,10 @@ API v2 - Unified API
 All routes use @require_auth() decorator
 """
 
+import logging
 from flask import Blueprint
+
+logger = logging.getLogger(__name__)
 
 # Import all route blueprints
 from api.v2.auth import bp as auth_bp
@@ -85,4 +88,4 @@ def register_api_v2(app):
     for blueprint in API_V2_BLUEPRINTS:
         app.register_blueprint(blueprint)
     
-    print(f"✅ Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")
+    logger.info(f"Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")

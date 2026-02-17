@@ -2,10 +2,11 @@
 OPNsense Import API
 Handles testing connection and importing CAs/Certs from OPNsense
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, g
 import requests
 import logging
 from auth.unified import require_auth
+from utils.response import success_response, error_response
 from utils.safe_requests import create_session
 from services.audit_service import AuditService
 
@@ -63,10 +64,7 @@ def test_connection():
     
     if not all([host, api_key, api_secret]):
         logger.warning(f"OpnSense test failed: missing required fields")
-        return jsonify({
-            "success": False,
-            "error": "Missing required fields: host, api_key, api_secret"
-        }), 400
+        return error_response("Missing required fields: host, api_key, api_secret", 400)
     
     base_url = f"https://{host}:{port}"
     
@@ -83,10 +81,7 @@ def test_connection():
         )
         
         if response.status_code != 200:
-            return jsonify({
-                "success": False,
-                "error": f"API returned status {response.status_code}"
-            }), 400
+            return error_response(f"API returned status {response.status_code}", 400)
         
         # Parse CAs
         ca_data = response.json()
@@ -132,8 +127,7 @@ def test_connection():
                     certs_count += 1
         
         logger.info(f"OpnSense test successful: {cas_count} CAs, {certs_count} certificates")
-        return jsonify({
-            "success": True,
+        return success_response(data={
             "items": items,
             "stats": {
                 "cas": cas_count,
@@ -143,24 +137,15 @@ def test_connection():
     
     except requests.exceptions.Timeout:
         logger.error(f"OpnSense connection timeout: {host}:{port}")
-        return jsonify({
-            "success": False,
-            "error": "Connection timeout. Check host and port."
-        }), 408
+        return error_response("Connection timeout. Check host and port.", 408)
     
     except requests.exceptions.ConnectionError:
         logger.error(f"OpnSense connection failed: {host}:{port}")
-        return jsonify({
-            "success": False,
-            "error": "Connection failed. Check host and port."
-        }), 503
+        return error_response("Connection failed. Check host and port.", 503)
     
     except Exception as e:
         logger.exception(f"OpnSense test error: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": f"Error: {str(e)}"
-        }), 500
+        return error_response("Internal error during connection test", 500)
 
 
 @bp.route('/api/v2/import/opnsense/import', methods=['POST'])
@@ -203,18 +188,12 @@ def import_items():
     
     if not all([host, api_key, api_secret]):
         logger.warning("OpnSense import failed: missing required fields")
-        return jsonify({
-            "success": False,
-            "error": "Missing required fields"
-        }), 400
+        return error_response("Missing required fields", 400)
     
     # Allow empty items array to import all
     if items is None:
         logger.warning("OpnSense import failed: no items specified")
-        return jsonify({
-            "success": False,
-            "error": "No items selected for import"
-        }), 400
+        return error_response("No items selected for import", 400)
     
     # Import logic
     from models import db, CA, Certificate
@@ -420,8 +399,7 @@ def import_items():
         
         logger.info(f"OpnSense import complete: {stats['cas_imported']} CAs, {stats['certs_imported']} certificates imported, {stats['cas_skipped'] + stats['certs_skipped']} skipped")
         
-        return jsonify({
-            "success": True,
+        return success_response(data={
             "imported": {
                 "cas": stats['cas_imported'],
                 "certificates": stats['certs_imported']
@@ -433,7 +411,4 @@ def import_items():
     except Exception as e:
         db.session.rollback()
         logger.exception(f"OpnSense import failed: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return error_response("Import failed", 500)

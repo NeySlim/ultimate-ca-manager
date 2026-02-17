@@ -3,12 +3,16 @@ mTLS API
 Manage client certificates for mutual TLS authentication
 """
 
-from flask import Blueprint, jsonify, request, current_app, g, Response
-from api.v2.auth import require_auth
+import logging
+from flask import Blueprint, request, g, Response
+from auth.unified import require_auth
 from models import User, Certificate, CA, db
 from services.audit_service import AuditService
+from utils.response import success_response, error_response
 import json
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
 
@@ -37,7 +41,7 @@ def list_mtls_certificates():
             'ca_id': cert.ca_id
         })
     
-    return jsonify({'data': result})
+    return success_response(data=result)
 
 
 @bp.route('/certificates', methods=['POST'])
@@ -53,12 +57,12 @@ def create_mtls_certificate():
         # Use first available CA
         ca = CA.query.first()
         if not ca:
-            return jsonify({'error': True, 'message': 'No CA available'}), 400
+            return error_response('No CA available', 400)
         ca_id = ca.id
     
     ca = CA.query.get(ca_id)
     if not ca:
-        return jsonify({'error': True, 'message': 'CA not found'}), 404
+        return error_response('CA not found', 404)
     
     # Create client certificate
     from services.certificate_service import CertificateService
@@ -94,8 +98,7 @@ def create_mtls_certificate():
             success=True
         )
         
-        return jsonify({
-            'data': {
+        return success_response(data={
                 'id': cert_data['id'],
                 'serial': cert_data.get('serial', ''),
                 'certificate': cert_data.get('pem', ''),
@@ -103,12 +106,11 @@ def create_mtls_certificate():
                 'created_at': datetime.now(timezone.utc).isoformat(),
                 'expires_at': cert_data.get('not_after', ''),
                 'status': 'valid'
-            },
-            'message': 'mTLS certificate created'
-        }), 201
+            }, message='mTLS certificate created'), 201
         
     except Exception as e:
-        return jsonify({'error': True, 'message': str(e)}), 500
+        logger.error(f'mTLS error: {e}')
+        return error_response('Internal error', 500)
 
 
 @bp.route('/certificates/<int:cert_id>', methods=['DELETE'])
@@ -120,11 +122,11 @@ def revoke_mtls_certificate(cert_id):
     # Find certificate and verify ownership
     cert = Certificate.query.get(cert_id)
     if not cert:
-        return jsonify({'error': True, 'message': 'Certificate not found'}), 404
+        return error_response('Certificate not found', 404)
     
     # Verify ownership (CN should contain username@mtls)
     if f'{user.username}@mtls' not in (cert.subject or ''):
-        return jsonify({'error': True, 'message': 'Not authorized to revoke this certificate'}), 403
+        return error_response('Not authorized to revoke this certificate', 403)
     
     # Revoke the certificate
     cert.status = 'revoked'
@@ -141,7 +143,7 @@ def revoke_mtls_certificate(cert_id):
         success=True
     )
     
-    return jsonify({'message': 'Certificate revoked'})
+    return success_response(message='Certificate revoked')
 
 
 @bp.route('/certificates/<int:cert_id>/download', methods=['GET'])
@@ -153,15 +155,15 @@ def download_mtls_certificate(cert_id):
     # Find certificate
     cert = Certificate.query.get(cert_id)
     if not cert:
-        return jsonify({'error': True, 'message': 'Certificate not found'}), 404
+        return error_response('Certificate not found', 404)
     
     # Verify ownership
     if f'{user.username}@mtls' not in (cert.subject or ''):
-        return jsonify({'error': True, 'message': 'Not authorized'}), 403
+        return error_response('Not authorized', 403)
     
     # Check if we have the certificate PEM
     if not cert.certificate_pem:
-        return jsonify({'error': True, 'message': 'Certificate data not available'}), 404
+        return error_response('Certificate data not available', 404)
     
     # For now, just return PEM format
     # TODO: Implement PKCS12 conversion if private key is stored
@@ -183,31 +185,28 @@ def authenticate():
     client_cert_verify = request.headers.get('X-Client-Cert-Verify')
     
     if not client_cert or client_cert_verify != 'SUCCESS':
-        return jsonify({'error': True, 'message': 'No valid client certificate'}), 401
+        return error_response('No valid client certificate', 401)
     
     # Parse certificate to get username
     # The CN should be in format: username@mtls
     import re
     match = re.search(r'CN=([^@,]+)@mtls', client_cert)
     if not match:
-        return jsonify({'error': True, 'message': 'Invalid certificate subject'}), 401
+        return error_response('Invalid certificate subject', 401)
     
     username = match.group(1)
     
     # Find user
     user = User.query.filter_by(username=username).first()
     if not user:
-        return jsonify({'error': True, 'message': 'User not found'}), 401
+        return error_response('User not found', 401)
     
     if not user.active:
-        return jsonify({'error': True, 'message': 'Account disabled'}), 401
+        return error_response('Account disabled', 401)
     
     # Create session
     from flask import session
     session['user_id'] = user.id
     session.permanent = True
     
-    return jsonify({
-        'data': user.to_dict(),
-        'message': 'mTLS authentication successful'
-    })
+    return success_response(data=user.to_dict(), message='mTLS authentication successful')
