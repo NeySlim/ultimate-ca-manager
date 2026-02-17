@@ -901,10 +901,12 @@ export default function ACMEPage() {
       
       {/* Request Certificate Button */}
       <div className="flex flex-wrap items-center gap-2">
+        {canWrite('acme') && (
         <Button onClick={() => setShowRequestModal(true)}>
           <Plus size={14} />
           {t('acme.requestCertificate')}
         </Button>
+        )}
         <Button variant="secondary" onClick={loadData}>
           <ArrowsClockwise size={14} />
           {t('common.refresh')}
@@ -926,6 +928,7 @@ export default function ACMEPage() {
             label={t('acme.defaultEnvironment')}
             value={clientSettings.default_environment || 'staging'}
             onChange={(val) => handleUpdateClientSetting('default_environment', val)}
+            disabled={!canWrite('acme')}
             options={[
               { value: 'staging', label: t('acme.staging') + ' (Test)' },
               { value: 'production', label: t('acme.production') + ' (Live)' }
@@ -938,12 +941,14 @@ export default function ACMEPage() {
             type="email"
             value={clientSettings.contact_email || ''}
             onChange={(e) => handleUpdateClientSetting('contact_email', e.target.value)}
+            disabled={!canWrite('acme')}
             helperText={t('acme.contactEmailHelper')}
           />
           
           <ToggleSwitch
             checked={clientSettings.auto_renewal ?? true}
             onChange={(val) => handleUpdateClientSetting('auto_renewal', val)}
+            disabled={!canWrite('acme')}
             label={t('acme.autoRenewal')}
             description={t('acme.autoRenewalDesc')}
           />
@@ -956,6 +961,7 @@ export default function ACMEPage() {
           <ToggleSwitch
             checked={clientSettings.proxy_enabled || false}
             onChange={(val) => handleUpdateClientSetting('proxy_enabled', val)}
+            disabled={!canWrite('acme')}
             label={t('acme.enableLetsEncryptProxy')}
             description={t('acme.enableLetsEncryptProxyDesc')}
           />
@@ -1042,10 +1048,12 @@ export default function ACMEPage() {
       </HelpCard>
       
       <div className="flex flex-wrap items-center gap-2">
+        {canWrite('acme') && (
         <Button onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
           <Plus size={14} />
           {t('common.addDnsProvider')}
         </Button>
+        )}
       </div>
       
       {dnsProviders.length === 0 ? (
@@ -1085,6 +1093,7 @@ export default function ACMEPage() {
                   <Play size={12} />
                   {t('common.test')}
                 </Button>
+                {canWrite('acme') && (
                 <Button 
                   size="sm" 
                   variant="secondary"
@@ -1093,6 +1102,8 @@ export default function ACMEPage() {
                   <Gear size={12} />
                   {t('common.edit')}
                 </Button>
+                )}
+                {canDelete('acme') && (
                 <Button 
                   size="sm" 
                   variant="danger"
@@ -1100,6 +1111,7 @@ export default function ACMEPage() {
                 >
                   <Trash size={12} />
                 </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -1124,10 +1136,12 @@ export default function ACMEPage() {
           <p className="text-sm text-text-secondary mb-4">
             {t('acme.noDomainsDesc')}
           </p>
+          {canWrite('acme') && (
           <Button onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
             <Plus size={14} />
             {t('acme.addDomain')}
           </Button>
+          )}
         </Card>
       ) : (
         <ResponsiveDataTable
@@ -1193,6 +1207,7 @@ export default function ACMEPage() {
                   >
                     <Play size={14} />
                   </Button>
+                  {canWrite('acme') && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1201,6 +1216,8 @@ export default function ACMEPage() {
                   >
                     <Gear size={14} />
                   </Button>
+                  )}
+                  {canDelete('acme') && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1210,6 +1227,7 @@ export default function ACMEPage() {
                   >
                     <Trash size={14} />
                   </Button>
+                  )}
                 </div>
               )
             }
@@ -1234,6 +1252,7 @@ export default function ACMEPage() {
           <ToggleSwitch
             checked={acmeSettings.enabled || false}
             onChange={(val) => updateSetting('enabled', val)}
+            disabled={!canWrite('acme')}
             label={t('acme.enableAcmeServer')}
             description={t('acme.enableAcmeServerDesc')}
           />
@@ -1242,7 +1261,7 @@ export default function ACMEPage() {
             label={t('acme.defaultIssuingCA')}
             value={acmeSettings.issuing_ca_id?.toString() || ''}
             onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
-            disabled={!acmeSettings.enabled}
+            disabled={!acmeSettings.enabled || !canWrite('acme')}
             placeholder={t('common.acmeSelectCA')}
             options={cas.map(ca => ({ 
               value: ca.id.toString(), 
@@ -1258,6 +1277,7 @@ export default function ACMEPage() {
           <ToggleSwitch
             checked={acmeSettings.revoke_on_renewal || false}
             onChange={handleToggleRevokeOnRenewal}
+            disabled={!canWrite('acme')}
             label={t('acme.revokeOnRenewal')}
             description={t('acme.revokeOnRenewalDesc')}
           />
@@ -1298,12 +1318,14 @@ export default function ACMEPage() {
       </CompactSection>
 
       {/* Save Button */}
+      {canWrite('acme') && (
       <div className="flex gap-2 pt-3 border-t border-border">
         <Button onClick={handleSaveConfig} disabled={saving}>
           <FloppyDisk size={14} />
           {saving ? t('common.saving') : t('common.saveConfiguration')}
         </Button>
       </div>
+      )}
     </div>
   )
 
@@ -1342,6 +1364,7 @@ export default function ACMEPage() {
           label: '',
           render: (_, row) => (
             <div className="flex items-center gap-1">
+              {canWrite('acme') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1350,6 +1373,8 @@ export default function ACMEPage() {
               >
                 <PencilSimple size={14} />
               </Button>
+              )}
+              {canDelete('acme') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -1359,6 +1384,7 @@ export default function ACMEPage() {
               >
                 <Trash size={14} />
               </Button>
+              )}
             </div>
           )
         }
@@ -1367,12 +1393,12 @@ export default function ACMEPage() {
         icon: GlobeHemisphereWest,
         title: t('acme.noLocalDomains'),
         description: t('acme.noLocalDomainsDesc'),
-        action: (
+        action: canWrite('acme') ? (
           <Button onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
             <Plus size={14} />
             {t('acme.addDomain')}
           </Button>
-        )
+        ) : null
       }}
       onRowClick={(row) => { setSelectedLocalDomain(row); setShowLocalDomainModal(true) }}
     />

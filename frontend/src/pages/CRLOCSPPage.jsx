@@ -107,6 +107,7 @@ export default function CRLOCSPPage() {
   }
 
   const handleToggleAutoRegen = async (ca) => {
+    if (!canWrite('crl')) return
     try {
       const result = await crlApi.toggleAutoRegen(ca.id, !ca.cdp_enabled)
       showSuccess(t(result.data.cdp_enabled ? 'crlOcsp.autoRegenEnabled' : 'crlOcsp.autoRegenDisabled', { name: ca.descr }))
@@ -371,7 +372,7 @@ export default function CRLOCSPPage() {
 
       {/* Actions */}
       <div className="flex gap-2">
-        {canWrite('certificates') && selectedCA.has_private_key !== false && (
+        {canWrite('crl') && selectedCA.has_private_key !== false && (
           <Button 
             size="sm" 
             variant="primary" 
