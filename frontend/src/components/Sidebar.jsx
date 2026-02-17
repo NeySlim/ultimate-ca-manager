@@ -26,7 +26,7 @@ export function Sidebar({ activePage }) {
   const { t, i18n } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes, isLight } = useTheme()
   const { user, logout } = useAuth()
-  const { isAdmin, canRead, canWrite } = usePermission()
+  const { isAdmin, canRead, canWrite, hasPermission } = usePermission()
   const { isLargeScreen } = useMobile()
   
   // Expiring certificates badge
@@ -80,25 +80,25 @@ export function Sidebar({ activePage }) {
     { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },
     'separator',
     // Protocols
-    { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme' },
-    { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config' },
-    { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp' },
+    { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme', permission: 'read:acme' },
+    { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config', permission: 'read:scep' },
+    { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp', permission: 'read:crl' },
     'separator',
     // Data
-    { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
+    { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore', permission: 'read:truststore' },
     { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations', adminOnly: true },
     { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
     'separator',
     // Governance
-    { id: 'policies', icon: Gavel, labelKey: 'common.policies', path: '/policies' },
-    { id: 'approvals', icon: Stamp, labelKey: 'common.approvals', path: '/approvals' },
-    { id: 'reports', icon: ChartBar, labelKey: 'common.reports', path: '/reports' },
+    { id: 'policies', icon: Gavel, labelKey: 'common.policies', path: '/policies', permission: 'read:policies' },
+    { id: 'approvals', icon: Stamp, labelKey: 'common.approvals', path: '/approvals', permission: 'read:approvals' },
+    { id: 'reports', icon: ChartBar, labelKey: 'common.reports', path: '/reports', permission: 'read:audit' },
     'separator',
     // Admin
     { id: 'users', icon: User, labelKey: 'common.users', path: '/users', adminOnly: true },
     { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac', adminOnly: true },
-    { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
-    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
+    { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm', permission: 'read:hsm' },
+    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit', permission: 'read:audit' },
   ]
 
   const handleLogout = async () => {
@@ -114,12 +114,22 @@ export function Sidebar({ activePage }) {
       </Link>
 
       {/* Page Icons */}
-      {pages.map((page, idx) => {
+      {/* Filter visible pages and remove consecutive/trailing separators */}
+      {pages.filter((page, idx) => {
+        if (page !== 'separator') {
+          if (page.adminOnly && !isAdmin()) return false
+          if (page.permission && !isAdmin() && !hasPermission(page.permission)) return false
+        }
+        return true
+      }).filter((page, idx, arr) => {
+        // Remove consecutive separators and leading/trailing separators
+        if (page !== 'separator') return true
+        if (idx === 0 || idx === arr.length - 1) return false
+        return arr[idx - 1] !== 'separator'
+      }).map((page, idx) => {
         if (page === 'separator') {
           return <div key={`sep-${idx}`} className="w-6 h-px bg-border/40 my-2" />
         }
-        // Hide admin-only items for non-admins
-        if (page.adminOnly && !isAdmin()) return null
         const Icon = page.icon
         const isActive = activePage === page.id
         const showBadge = page.id === 'certificates' && expiringCount > 0 && !isBadgeDismissed
