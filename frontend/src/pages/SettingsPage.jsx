@@ -26,7 +26,6 @@ import { useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
-import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
@@ -1153,7 +1152,7 @@ export default function SettingsPage() {
         smtp_content_type: emailSettings.smtp_content_type || 'html',
       })
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.SETTINGS)
+      showError(error.message || t('messages.errors.loadFailed.settings'))
     } finally {
       setLoading(false)
     }
@@ -1497,10 +1496,10 @@ export default function SettingsPage() {
       } else {
         await settingsService.updateBulk(settings)
       }
-      showSuccess(SUCCESS.UPDATE.SETTINGS)
+      showSuccess(t('messages.success.update.settings'))
       await loadSettings()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
+      showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
       setSaving(false)
     }
@@ -1517,9 +1516,9 @@ export default function SettingsPage() {
     try {
       await settingsService.testEmail(testEmail)
       setEmailTestResult({ success: true, message: `${t('settings.testEmailSuccess')} → ${testEmail}` })
-      showSuccess(SUCCESS.EMAIL.TEST_SENT)
+      showSuccess(t('messages.success.email.testSent'))
     } catch (error) {
-      const msg = error?.data?.message || error?.data?.error || error.message || ERRORS.EMAIL.TEST_FAILED
+      const msg = error?.data?.message || error?.data?.error || error.message || t('messages.errors.email.testFailed')
       setEmailTestResult({ success: false, message: msg })
     } finally {
       setEmailTesting(false)
@@ -1543,13 +1542,13 @@ export default function SettingsPage() {
         a.download = response.data.filename
         a.click()
         URL.revokeObjectURL(url)
-        showSuccess(SUCCESS.BACKUP.CREATED)
+        showSuccess(t('messages.success.backup.created'))
         setShowBackupModal(false)
         setBackupPassword('')
         loadBackups()
       }
     } catch (error) {
-      showError(error.message || ERRORS.BACKUP.CREATE_FAILED)
+      showError(error.message || t('messages.errors.backup.createFailed'))
     } finally {
       setBackupLoading(false)
     }
@@ -1564,9 +1563,9 @@ export default function SettingsPage() {
       a.download = filename
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(SUCCESS.BACKUP.DOWNLOADED)
+      showSuccess(t('messages.success.backup.downloaded'))
     } catch (error) {
-      showError(error.message || ERRORS.BACKUP.DOWNLOAD_FAILED)
+      showError(error.message || t('messages.errors.backup.downloadFailed'))
     }
   }
 
@@ -1580,10 +1579,10 @@ export default function SettingsPage() {
     
     try {
       await systemService.deleteBackup(filename)
-      showSuccess(SUCCESS.BACKUP.DELETED)
+      showSuccess(t('messages.success.backup.deleted'))
       loadBackups()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.BACKUP)
+      showError(error.message || t('messages.errors.deleteFailed.backup'))
     }
   }
 
@@ -1606,7 +1605,7 @@ export default function SettingsPage() {
       setRestoreFile(null)
       setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
-      showError(error.message || ERRORS.BACKUP.RESTORE_FAILED)
+      showError(error.message || t('messages.errors.backup.restoreFailed'))
     } finally {
       setBackupLoading(false)
     }
@@ -1615,9 +1614,9 @@ export default function SettingsPage() {
   const handleOptimizeDb = async () => {
     try {
       await systemService.optimizeDatabase()
-      showSuccess(SUCCESS.DATABASE.OPTIMIZED)
+      showSuccess(t('messages.success.database.optimized'))
     } catch (error) {
-      showError(error.message || ERRORS.DATABASE.OPTIMIZE_FAILED)
+      showError(error.message || t('messages.errors.database.optimizeFailed'))
     }
   }
 
@@ -1625,12 +1624,12 @@ export default function SettingsPage() {
     try {
       const result = await systemService.integrityCheck()
       if (result.passed) {
-        showSuccess(SUCCESS.DATABASE.INTEGRITY_PASSED)
+        showSuccess(t('messages.success.database.integrityPassed'))
       } else {
         showError(t('settings.integrityErrors', { count: result.errors }))
       }
     } catch (error) {
-      showError(error.message || ERRORS.DATABASE.INTEGRITY_FAILED)
+      showError(error.message || t('messages.errors.database.integrityFailed'))
     }
   }
 
@@ -1642,9 +1641,9 @@ export default function SettingsPage() {
       a.href = url
       a.download = `ucm-database-${new Date().toISOString().split('T')[0]}.sql`
       a.click()
-      showSuccess(SUCCESS.EXPORT.DATABASE)
+      showSuccess(t('messages.success.export.database'))
     } catch (error) {
-      showError(error.message || ERRORS.DATABASE.EXPORT_FAILED)
+      showError(error.message || t('messages.errors.database.exportFailed'))
     }
   }
 
@@ -1667,10 +1666,10 @@ export default function SettingsPage() {
 
     try {
       await systemService.resetDatabase()
-      showSuccess(SUCCESS.DATABASE.RESET)
+      showSuccess(t('messages.success.database.reset'))
       setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
-      showError(error.message || ERRORS.DATABASE.RESET_FAILED)
+      showError(error.message || t('messages.errors.database.resetFailed'))
     }
   }
 
@@ -1690,10 +1689,10 @@ export default function SettingsPage() {
       await systemService.applyHttpsCert({
         cert_id: selectedHttpsCert
       })
-      showSuccess(SUCCESS.HTTPS.APPLIED)
+      showSuccess(t('messages.success.https.applied'))
       setTimeout(() => window.location.reload(), 3000)
     } catch (error) {
-      showError(error.message || ERRORS.HTTPS.APPLY_FAILED)
+      showError(error.message || t('messages.errors.https.applyFailed'))
     }
   }
 
@@ -1709,10 +1708,10 @@ export default function SettingsPage() {
         common_name: window.location.hostname,
         validity_days: 365
       })
-      showSuccess(SUCCESS.HTTPS.REGENERATED)
+      showSuccess(t('messages.success.https.regenerated'))
       setTimeout(() => window.location.reload(), 3000)
     } catch (error) {
-      showError(error.message || ERRORS.HTTPS.REGENERATE_FAILED)
+      showError(error.message || t('messages.errors.https.regenerateFailed'))
     }
   }
 
@@ -3149,10 +3148,10 @@ export default function SettingsPage() {
             if (apply) {
               try {
                 await systemService.applyHttpsCert({ cert_id: imported.id })
-                showSuccess(SUCCESS.HTTPS.APPLIED)
+                showSuccess(t('messages.success.https.applied'))
                 setTimeout(() => window.location.reload(), 3000)
               } catch (error) {
-                showError(error.message || ERRORS.HTTPS.APPLY_FAILED)
+                showError(error.message || t('messages.errors.https.applyFailed'))
               }
             }
           } else {

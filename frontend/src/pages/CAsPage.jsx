@@ -21,7 +21,6 @@ import { casService } from '../services'
 import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useModals, useRecentHistory } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
@@ -122,7 +121,7 @@ export default function CAsPage() {
       const casList = casData.data || []
       setCAs(casList)
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.CAS)
+      showError(error.message || t('messages.errors.loadFailed.cas'))
     } finally {
       setLoading(false)
     }
@@ -171,7 +170,7 @@ export default function CAsPage() {
   }, [])
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm(CONFIRM.DELETE.CA, {
+    const confirmed = await showConfirm(t('messages.confirm.delete.ca'), {
       title: t('cas.deleteCA'),
       confirmText: t('cas.deleteCAButton'),
       variant: 'danger'
@@ -180,7 +179,7 @@ export default function CAsPage() {
     
     try {
       await casService.delete(id)
-      showSuccess(SUCCESS.DELETE.CA)
+      showSuccess(t('messages.success.delete.ca'))
       loadCAs()
       setSelectedCA(null)
     } catch (error) {
@@ -198,7 +197,7 @@ export default function CAsPage() {
       a.download = `${ca.name || ca.common_name || 'ca'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(SUCCESS.EXPORT.CA)
+      showSuccess(t('messages.success.export.ca'))
     } catch (error) {
       showError(error.message || t('cas.exportFailed'))
     }
@@ -222,7 +221,7 @@ export default function CAsPage() {
     
     try {
       await casService.create(data)
-      showSuccess(SUCCESS.CREATE.CA)
+      showSuccess(t('messages.success.create.ca'))
       closeModal('create')
       loadCAs()
     } catch (error) {
@@ -318,7 +317,7 @@ export default function CAsPage() {
       type: 'select',
       value: filterType,
       onChange: setFilterType,
-      placeholder: LABELS.FILTERS.ALL_TYPES,
+      placeholder: t('common.allTypes'),
       options: [
         { value: 'root', label: t('common.rootCA') },
         { value: 'intermediate', label: t('common.intermediateCA') }
@@ -424,7 +423,7 @@ export default function CAsPage() {
                   <FilterSelect
                     value={filterType}
                     onChange={setFilterType}
-                    placeholder={LABELS.FILTERS.ALL_TYPES}
+                    placeholder={t('common.allTypes')}
                     options={[
                       { value: 'root', label: t('common.rootCA') },
                       { value: 'intermediate', label: t('common.intermediateCA') },
@@ -434,7 +433,7 @@ export default function CAsPage() {
                   <FilterSelect
                     value={filterStatus}
                     onChange={setFilterStatus}
-                    placeholder={LABELS.FILTERS.ALL_STATUS}
+                    placeholder={t('common.allStatus')}
                     options={[
                       { value: 'valid', label: t('common.valid') },
                       { value: 'expiring', label: t('common.expiring') },

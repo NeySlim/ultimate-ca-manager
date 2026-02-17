@@ -18,7 +18,6 @@ import {
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { ERRORS, SUCCESS } from '../lib/messages'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
@@ -78,7 +77,7 @@ export default function SCEPPage() {
       )
       setCas(casWithChallenges)
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.SCEP)
+      showError(error.message || t('messages.errors.loadFailed.scep'))
     } finally {
       setLoading(false)
     }
@@ -89,9 +88,9 @@ export default function SCEPPage() {
     setSaving(true)
     try {
       await scepService.updateConfig(config)
-      showSuccess(SUCCESS.UPDATE.SETTINGS)
+      showSuccess(t('messages.success.update.settings'))
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
+      showError(error.message || t('messages.errors.updateFailed.settings'))
     } finally {
       setSaving(false)
     }
@@ -103,7 +102,7 @@ export default function SCEPPage() {
       showSuccess(t('scep.requestApproved'))
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.updateFailed.generic'))
     }
   }
 
@@ -117,7 +116,7 @@ export default function SCEPPage() {
       setSelectedRequest(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.updateFailed.generic'))
     }
   }
 
@@ -127,7 +126,7 @@ export default function SCEPPage() {
       showSuccess(t('scep.challengeRegenerated'))
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.updateFailed.generic'))
     }
   }
 

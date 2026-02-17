@@ -22,8 +22,6 @@ import { apiClient } from '../services/apiClient'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
-
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -86,7 +84,7 @@ export default function UsersGroupsPage() {
       setGroups(groupsRes.data || [])
       setRoles(rolesRes.data || [])
     } catch (error) {
-      showError(ERRORS.LOAD_FAILED.GENERIC)
+      showError(t('messages.errors.loadFailed.generic'))
     } finally {
       setLoading(false)
     }
@@ -97,19 +95,19 @@ export default function UsersGroupsPage() {
   const handleCreateUser = async (data) => {
     try {
       await usersService.create(data)
-      showSuccess(SUCCESS.CREATE.USER)
+      showSuccess(t('messages.success.create.user'))
       setShowUserModal(false)
       setEditingUser(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.CREATE_FAILED.USER)
+      showError(error.message || t('messages.errors.createFailed.user'))
     }
   }
 
   const handleUpdateUser = async (data) => {
     try {
       await usersService.update(editingUser.id, data)
-      showSuccess(SUCCESS.UPDATE.USER)
+      showSuccess(t('messages.success.update.user'))
       setShowUserModal(false)
       setEditingUser(null)
       loadData()
@@ -117,7 +115,7 @@ export default function UsersGroupsPage() {
         setSelectedUser({ ...selectedUser, ...data })
       }
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.USER)
+      showError(error.message || t('messages.errors.updateFailed.user'))
     }
   }
 
@@ -130,11 +128,11 @@ export default function UsersGroupsPage() {
     if (!confirmed) return
     try {
       await usersService.delete(user.id)
-      showSuccess(SUCCESS.DELETE.USER)
+      showSuccess(t('messages.success.delete.user'))
       if (selectedUser?.id === user.id) setSelectedUser(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.USER)
+      showError(error.message || t('messages.errors.deleteFailed.user'))
     }
   }
 
@@ -147,7 +145,7 @@ export default function UsersGroupsPage() {
         setSelectedUser({ ...selectedUser, active: !user.active })
       }
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.USER)
+      showError(error.message || t('messages.errors.updateFailed.user'))
     }
   }
 
@@ -170,24 +168,24 @@ export default function UsersGroupsPage() {
   const handleCreateGroup = async (data) => {
     try {
       await groupsService.create(data)
-      showSuccess(SUCCESS.CREATE.GROUP)
+      showSuccess(t('messages.success.create.group'))
       setShowGroupModal(false)
       setEditingGroup(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.CREATE_FAILED.GROUP)
+      showError(error.message || t('messages.errors.createFailed.group'))
     }
   }
 
   const handleUpdateGroup = async (data) => {
     try {
       await groupsService.update(editingGroup.id, data)
-      showSuccess(SUCCESS.UPDATE.GROUP)
+      showSuccess(t('messages.success.update.group'))
       setShowGroupModal(false)
       setEditingGroup(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GROUP)
+      showError(error.message || t('messages.errors.updateFailed.group'))
     }
   }
 
@@ -200,11 +198,11 @@ export default function UsersGroupsPage() {
     if (!confirmed) return
     try {
       await groupsService.delete(group.id)
-      showSuccess(SUCCESS.DELETE.GROUP)
+      showSuccess(t('messages.success.delete.group'))
       if (selectedGroup?.id === group.id) setSelectedGroup(null)
       loadData()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.GROUP)
+      showError(error.message || t('messages.errors.deleteFailed.group'))
     }
   }
 
@@ -236,7 +234,7 @@ export default function UsersGroupsPage() {
       const updated = await groupsService.getById(selectedGroup.id)
       setSelectedGroup(updated.data)
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GROUP)
+      showError(error.message || t('messages.errors.updateFailed.group'))
     } finally {
       setSavingMembers(false)
     }
@@ -717,7 +715,7 @@ export default function UsersGroupsPage() {
               key: 'role',
               value: filterRole,
               onChange: setFilterRole,
-              placeholder: LABELS.FILTERS.ALL_ROLES,
+              placeholder: t('common.allRoles'),
               options: [
                 { value: 'admin', label: t('users.admin') },
                 { value: 'operator', label: t('common.operator') },
@@ -728,7 +726,7 @@ export default function UsersGroupsPage() {
               key: 'status',
               value: filterStatus,
               onChange: setFilterStatus,
-              placeholder: LABELS.FILTERS.ALL_STATUS,
+              placeholder: t('common.allStatus'),
               options: [
                 { value: 'active', label: t('common.active') },
                 { value: 'disabled', label: t('common.disabled') }

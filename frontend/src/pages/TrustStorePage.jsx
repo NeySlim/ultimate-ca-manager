@@ -23,8 +23,6 @@ import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
-import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
-
 export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -73,7 +71,7 @@ export default function TrustStorePage() {
       setCertificates(enrichedCerts)
       setCertStats(statsRes.data || { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.TRUSTSTORE)
+      showError(error.message || t('messages.errors.loadFailed.truststore'))
     } finally {
       setLoading(false)
     }
@@ -188,7 +186,7 @@ export default function TrustStorePage() {
   }
 
   const handleDelete = async (cert) => {
-    const confirmed = await showConfirm(CONFIRM.DELETE.TRUSTSTORE, {
+    const confirmed = await showConfirm(t('messages.confirm.delete.truststore'), {
       title: t('trustStore.confirmRemove'),
       confirmText: t('common.delete'),
       variant: 'danger'
@@ -197,13 +195,13 @@ export default function TrustStorePage() {
     
     try {
       await truststoreService.delete(cert.id)
-      showSuccess(SUCCESS.DELETE.TRUSTSTORE)
+      showSuccess(t('messages.success.delete.truststore'))
       loadCertificates()
       if (selectedCert?.id === cert.id) {
         setSelectedCert(null)
       }
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.TRUSTSTORE)
+      showError(error.message || t('messages.errors.deleteFailed.truststore'))
     }
   }
 

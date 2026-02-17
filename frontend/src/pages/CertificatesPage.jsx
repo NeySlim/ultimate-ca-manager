@@ -18,7 +18,6 @@ import {
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useRecentHistory, useFavorites } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
 
@@ -112,7 +111,7 @@ export default function CertificatesPage() {
       setCas(casRes.data || [])
       setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 })
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.CERTIFICATES)
+      showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
       setLoading(false)
     }
@@ -180,9 +179,9 @@ export default function CertificatesPage() {
       a.download = `${selectedCert.common_name || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(SUCCESS.EXPORT.CERTIFICATE)
+      showSuccess(t('messages.success.export.certificate'))
     } catch {
-      showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
+      showError(t('messages.errors.exportFailed.certificate'))
     }
   }
 
@@ -199,11 +198,11 @@ export default function CertificatesPage() {
     if (!confirmed) return
     try {
       await certificatesService.revoke(id)
-      showSuccess(SUCCESS.OTHER.REVOKED)
+      showSuccess(t('messages.success.other.revoked'))
       loadData()
       setSelectedCert(null)
     } catch {
-      showError(ERRORS.REVOKE_FAILED.CERTIFICATE)
+      showError(t('messages.errors.revokeFailed.certificate'))
     }
   }
 
@@ -230,7 +229,7 @@ export default function CertificatesPage() {
 
   // Delete certificate
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm(CONFIRM.DELETE.CERTIFICATE, {
+    const confirmed = await showConfirm(t('messages.confirm.delete.certificate'), {
       title: t('common.deleteCertificate'),
       confirmText: t('common.delete'),
       variant: 'danger'
@@ -238,11 +237,11 @@ export default function CertificatesPage() {
     if (!confirmed) return
     try {
       await certificatesService.delete(id)
-      showSuccess(SUCCESS.DELETE.CERTIFICATE)
+      showSuccess(t('messages.success.delete.certificate'))
       loadData()
       setSelectedCert(null)
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.CERTIFICATE)
+      showError(error.message || t('messages.errors.deleteFailed.certificate'))
     }
   }
 
@@ -269,7 +268,7 @@ export default function CertificatesPage() {
     }
     try {
       await certificatesService.uploadKey(selectedCert.id, keyPem.trim(), keyPassphrase || null)
-      showSuccess(SUCCESS.OTHER.KEY_UPLOADED)
+      showSuccess(t('messages.success.other.keyUploaded'))
       setShowKeyModal(false)
       setKeyPem('')
       setKeyPassphrase('')
@@ -541,9 +540,9 @@ export default function CertificatesPage() {
       a.download = `${cert.common_name || cert.cn || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(SUCCESS.EXPORT.CERTIFICATE)
+      showSuccess(t('messages.success.export.certificate'))
     } catch {
-      showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
+      showError(t('messages.errors.exportFailed.certificate'))
     }
   }
 
@@ -555,7 +554,7 @@ export default function CertificatesPage() {
       type: 'select',
       value: filterStatus,
       onChange: setFilterStatus,
-      placeholder: LABELS.FILTERS.ALL_STATUS,
+      placeholder: t('common.allStatus'),
       options: [
         { value: 'valid', label: t('common.valid') },
         { value: 'expiring', label: t('common.expiring') },
@@ -569,7 +568,7 @@ export default function CertificatesPage() {
       type: 'select',
       value: filterCA,
       onChange: setFilterCA,
-      placeholder: LABELS.FILTERS.ALL_CAS,
+      placeholder: t('common.allCAs'),
       options: cas.map(ca => ({ 
         value: String(ca.id), 
         label: ca.descr || ca.common_name 
@@ -707,7 +706,7 @@ export default function CertificatesPage() {
               key: 'status',
               value: filterStatus,
               onChange: setFilterStatus,
-              placeholder: LABELS.FILTERS.ALL_STATUS,
+              placeholder: t('common.allStatus'),
               options: [
                 { value: 'valid', label: t('common.valid') },
                 { value: 'expiring', label: t('common.expiring') },
@@ -719,7 +718,7 @@ export default function CertificatesPage() {
               key: 'ca',
               value: filterCA,
               onChange: setFilterCA,
-              placeholder: LABELS.FILTERS.ALL_CAS,
+              placeholder: t('common.allCAs'),
               options: cas.map(ca => ({ 
                 value: String(ca.id), 
                 label: ca.descr || ca.common_name 
@@ -792,7 +791,7 @@ export default function CertificatesPage() {
           onSubmit={async (data) => {
             try {
               await certificatesService.create(data)
-              showSuccess(SUCCESS.CREATE.CERTIFICATE)
+              showSuccess(t('messages.success.create.certificate'))
               setShowIssueModal(false)
               loadData()
             } catch (error) {

@@ -648,7 +648,7 @@ describe('authMethodsService', () => {
   let authMethodsService
 
   beforeEach(async () => {
-    const mod = await import('../authMethods.service')
+    const mod = await import('../auth-methods.service')
     authMethodsService = mod.authMethodsService
   })
 
@@ -903,7 +903,7 @@ describe('groupsService', () => {
   let groupsService
 
   beforeEach(async () => {
-    const mod = await import('../groupsService')
+    const mod = await import('../groups.service')
     groupsService = mod.groupsService
   })
 

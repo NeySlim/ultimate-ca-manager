@@ -16,7 +16,6 @@ import {
 } from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
-import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 import { formatDate } from '../lib/utils'
 
 export default function AccountPage() {
@@ -86,7 +85,7 @@ export default function AccountPage() {
       setAccountData(data)
       setFormData({ full_name: data.full_name || '', email: data.email || '' })
     } catch (error) {
-      showError(error.message || ERRORS.LOAD_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.loadFailed.generic'))
     }
   }
 
@@ -119,11 +118,11 @@ export default function AccountPage() {
     setSaving(true)
     try {
       await accountService.updateProfile(formData)
-      showSuccess(SUCCESS.UPDATE.USER)
+      showSuccess(t('messages.success.update.user'))
       setEditMode(false)
       await loadAccount()
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.USER)
+      showError(error.message || t('messages.errors.updateFailed.user'))
     } finally {
       setSaving(false)
     }
@@ -133,10 +132,10 @@ export default function AccountPage() {
   const handleChangePassword = async (passwordData) => {
     try {
       await accountService.changePassword(passwordData)
-      showSuccess(SUCCESS.OTHER.PASSWORD_CHANGED)
+      showSuccess(t('messages.success.other.passwordChanged'))
       setShowPasswordModal(false)
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.updateFailed.generic'))
     }
   }
 
@@ -151,7 +150,7 @@ export default function AccountPage() {
         })
         if (!code) return
         await accountService.disable2FA(code)
-        showSuccess(SUCCESS.OTHER.TWO_FACTOR_DISABLED)
+        showSuccess(t('messages.success.other.twoFactorDisabled'))
         await loadAccount()
       } else {
         const response = await accountService.enable2FA()
@@ -159,27 +158,27 @@ export default function AccountPage() {
         setShow2FAModal(true)
       }
     } catch (error) {
-      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.updateFailed.generic'))
     }
   }
 
   const handleConfirm2FA = async () => {
     try {
       await accountService.confirm2FA(confirmCode)
-      showSuccess(SUCCESS.OTHER.TWO_FACTOR_ENABLED)
+      showSuccess(t('messages.success.other.twoFactorEnabled'))
       setShow2FAModal(false)
       setQrData(null)
       setConfirmCode('')
       await loadAccount()
     } catch (error) {
-      showError(error.message || ERRORS.VALIDATION.REQUIRED_FIELD)
+      showError(error.message || t('messages.errors.validation.requiredField'))
     }
   }
 
   // WebAuthn handlers
   const handleRegisterWebAuthn = async () => {
     if (!webauthnName.trim()) {
-      showError(ERRORS.VALIDATION.REQUIRED_FIELD)
+      showError(t('messages.errors.validation.requiredField'))
       return
     }
     
@@ -280,7 +279,7 @@ export default function AccountPage() {
       setShowApiKeyModal(false)
       await loadApiKeys()
     } catch (error) {
-      showError(error.message || ERRORS.CREATE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.createFailed.generic'))
     }
   }
 
@@ -294,10 +293,10 @@ export default function AccountPage() {
     
     try {
       await accountService.deleteApiKey(keyId)
-      showSuccess(SUCCESS.DELETE.GENERIC)
+      showSuccess(t('messages.success.delete.generic'))
       await loadApiKeys()
     } catch (error) {
-      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
+      showError(error.message || t('messages.errors.deleteFailed.generic'))
     }
   }
 
