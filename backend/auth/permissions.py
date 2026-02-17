@@ -2,23 +2,37 @@
 Role-based permissions for UCM
 """
 
-# Role permissions mapping
+# Role permissions mapping — format: action:resource (matches @require_auth decorators)
 ROLE_PERMISSIONS = {
     'admin': ['*'],  # Full access
     'operator': [
-        'certificates:read', 'certificates:write', 'certificates:delete',
-        'csrs:read', 'csrs:write', 'csrs:delete',
-        'templates:read',
-        'cas:read',
-        'dashboard:read',
-        'settings:read',
+        'read:certificates', 'write:certificates', 'delete:certificates',
+        'read:cas', 'write:cas',
+        'read:csrs', 'write:csrs', 'delete:csrs',
+        'read:templates',
+        'read:truststore', 'write:truststore',
+        'read:crl', 'write:crl',
+        'read:acme', 'write:acme',
+        'read:scep',
+        'read:hsm',
+        'read:policies', 'read:approvals', 'write:approvals',
+        'read:audit',
+        'read:settings',
+        'read:groups',
     ],
     'viewer': [
-        'certificates:read',
-        'csrs:read',
-        'templates:read',
-        'cas:read',
-        'dashboard:read',
+        'read:certificates',
+        'read:cas',
+        'read:csrs',
+        'read:templates',
+        'read:truststore',
+        'read:crl',
+        'read:acme',
+        'read:scep',
+        'read:hsm',
+        'read:policies', 'read:approvals',
+        'read:audit',
+        'read:groups',
     ]
 }
 
@@ -40,13 +54,14 @@ def has_permission(user_role: str, required_permission: str) -> bool:
     if required_permission in permissions:
         return True
     
-    # Check wildcard patterns (e.g., 'certificates:*')
-    resource, action = required_permission.split(':') if ':' in required_permission else (required_permission, '*')
+    # Check wildcard patterns (e.g., 'read:*' or 'write:*')
+    parts = required_permission.split(':') if ':' in required_permission else [required_permission, '*']
+    action, resource = parts[0], parts[1] if len(parts) > 1 else '*'
     
     for perm in permissions:
-        if perm == f'{resource}:*':
+        if perm == f'{action}:*':
             return True
-        if perm == '*:read' and action == 'read':
+        if perm == f'*:{resource}':
             return True
     
     return False

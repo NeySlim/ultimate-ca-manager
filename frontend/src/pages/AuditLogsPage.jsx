@@ -45,6 +45,7 @@ import {
   CompactStats
 } from '../components';
 import { useNotification } from '../contexts';
+import { usePermission } from '../hooks';
 import auditService from '../services/audit.service';
 import { apiClient } from '../services/apiClient';
 import { ERRORS } from '../lib/messages';
@@ -95,6 +96,7 @@ const getActionCategory = (action) => {
 export default function AuditLogsPage() {
   const { t } = useTranslation();
   const { showError, showSuccess } = useNotification();
+  const { canDelete } = usePermission();
   
   // State
   const [logs, setLogs] = useState([]);
@@ -692,10 +694,12 @@ export default function AuditLogsPage() {
       <Button variant="secondary" size="sm" onClick={loadLogs} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
       </Button>
+      {canDelete('audit') && (
       <Button variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
         <Trash size={14} className="text-status-danger" />
         <span className="hidden md:inline">{t('audit.cleanupLogs')}</span>
       </Button>
+      )}
       <Button variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity} className="hidden md:inline-flex">
         <ShieldCheck size={14} />
         <span>{t('audit.verifyIntegrity')}</span>

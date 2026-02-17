@@ -122,11 +122,14 @@ class AuthManager:
         if not user or not user.active:
             return None
         
+        from auth.permissions import get_role_permissions
+        permissions = get_role_permissions(user.role)
+        
         return {
             'user_id': user.id,
             'user': user,
             'auth_method': 'session',
-            'permissions': ['*'],  # Session = full access
+            'permissions': permissions,
             'session_expires': session.get('expires_at')
         }
     

@@ -77,7 +77,7 @@ def download_report(report_type):
 
 
 @bp.route('/api/v2/reports/schedule', methods=['GET'])
-@require_auth(['read:settings'])
+@require_auth(['read:audit'])
 def get_schedule_settings():
     """Get report schedule settings"""
     settings = {

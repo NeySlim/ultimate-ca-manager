@@ -62,6 +62,16 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
+function AdminRoute({ children }) {
+  const { isAuthenticated, loading, permissions } = useAuth()
+  
+  if (loading) return <PageLoader />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!permissions?.includes('*')) return <Navigate to="/" replace />
+  
+  return children
+}
+
 function AppRoutes() {
   const { isAuthenticated, forcePasswordChange, clearForcePasswordChange, logout } = useAuth()
   
@@ -96,12 +106,12 @@ function AppRoutes() {
           <Route path="/cas/:id" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
           <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />
           <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><UsersGroupsPage /></ProtectedRoute>} />
+          <Route path="/users" element={<AdminRoute><UsersGroupsPage /></AdminRoute>} />
           <Route path="/acme" element={<ProtectedRoute><ACMEPage /></ProtectedRoute>} />
           <Route path="/scep-config" element={<ProtectedRoute><SCEPPage /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
-          <Route path="/operations" element={<ProtectedRoute><OperationsPage /></ProtectedRoute>} />
+          <Route path="/operations" element={<AdminRoute><OperationsPage /></AdminRoute>} />
           <Route path="/import" element={<Navigate to="/operations" replace />} />
           <Route path="/tools" element={<ProtectedRoute><CertificateToolsPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
@@ -111,7 +121,7 @@ function AppRoutes() {
           
           {/* Security & Administration */}
           <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />
-          <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
+          <Route path="/rbac" element={<AdminRoute><RBACPage /></AdminRoute>} />
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
           <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
           <Route path="/security" element={<Navigate to="/settings?tab=security" replace />} />

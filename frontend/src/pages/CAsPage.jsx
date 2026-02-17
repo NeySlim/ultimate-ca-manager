@@ -348,7 +348,7 @@ export default function CAsPage() {
         subtitle={t('cas.subtitle', { count: cas.length })}
         icon={ShieldCheck}
         stats={stats}
-        afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} t={t} />}
+        afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} canRunRepair={canWrite('cas')} t={t} />}
         helpPageKey="cas"
         // Split view on xl+ screens - panel always visible
         splitView={isMobile}
@@ -1179,7 +1179,7 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
 }
 
 // Compact chain repair bar — sits under stats
-function ChainRepairBar({ data, running, onRun, t }) {
+function ChainRepairBar({ data, running, onRun, canRunRepair, t }) {
   const task = data?.task || {}
   const crStats = data?.stats || {}
   const [countdown, setCountdown] = useState('')
@@ -1238,6 +1238,7 @@ function ChainRepairBar({ data, running, onRun, t }) {
             {countdown}
           </span>
         ) : null}
+        {canRunRepair && (
         <button
           onClick={onRun}
           disabled={running}
@@ -1249,6 +1250,7 @@ function ChainRepairBar({ data, running, onRun, t }) {
             : <ArrowClockwise size={12} />
           }
         </button>
+        )}
       </div>
     </div>
   )

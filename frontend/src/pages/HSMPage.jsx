@@ -16,6 +16,7 @@ import {
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { useNotification, useMobile } from '../contexts'
+import { usePermission } from '../hooks'
 import { apiClient } from '../services/apiClient'
 import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
@@ -36,6 +37,7 @@ const PROVIDER_ICONS = {
 
 export default function HSMPage() {
   const { t } = useTranslation()
+  const { canWrite, canDelete } = usePermission()
   const [providers, setProviders] = useState([])
   const [keys, setKeys] = useState([])
   const [selectedProvider, setSelectedProvider] = useState(null)
@@ -262,8 +264,8 @@ export default function HSMPage() {
 
   const rowActions = (row) => [
     { label: t('common.test'), icon: TestTube, onClick: () => handleTest(row) },
-    { label: t('common.edit'), icon: PencilSimple, onClick: () => handleEdit(row) },
-    { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
+    ...(canWrite('hsm') ? [{ label: t('common.edit'), icon: PencilSimple, onClick: () => handleEdit(row) }] : []),
+    ...(canDelete('hsm') ? [{ label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }] : [])
   ]
 
   const stats = useMemo(() => {
@@ -312,12 +314,16 @@ export default function HSMPage() {
             {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
             {testing ? t('common.testing') : t('common.test')}
           </Button>
+          {canWrite('hsm') && (
           <Button size="sm" variant="secondary" onClick={() => handleEdit(provider)}>
             <PencilSimple size={14} />
           </Button>
+          )}
+          {canDelete('hsm') && (
           <Button size="sm" variant="danger" onClick={() => handleDelete(provider)}>
             <Trash size={14} />
           </Button>
+          )}
         </div>
 
         {provider.last_error && (
@@ -378,9 +384,11 @@ export default function HSMPage() {
         <CompactSection title={t('hsm.hsmKeys')}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-text-tertiary">{t('hsm.keysInHsm', { count: keys.length })}</span>
+            {canWrite('hsm') && (
             <Button size="sm" variant="secondary" onClick={() => setShowKeyModal(true)}>
               <Plus size={12} /> {t('common.generate')}
             </Button>
+            )}
           </div>
           {keys.length === 0 ? (
             <p className="text-xs text-text-tertiary text-center py-4">{t('hsm.noKeysInHsm')}</p>
@@ -399,9 +407,11 @@ export default function HSMPage() {
                     <Badge variant={key.status === 'active' ? 'success' : 'danger'} size="sm">
                       {key.status}
                     </Badge>
+                    {canDelete('hsm') && (
                     <Button size="sm" variant="ghost" onClick={() => handleDeleteKey(key)}>
                       <Trash size={12} className="text-status-danger" />
                     </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -483,7 +493,7 @@ export default function HSMPage() {
                 options: PROVIDER_TYPES.map(t => ({ value: t.value, label: t.label.split(' ')[0] }))
               }
             ]}
-            toolbarActions={
+            toolbarActions={canWrite('hsm') ? (
               isMobile ? (
                 <Button size="lg" onClick={handleCreate} className="w-11 h-11 p-0">
                   <Plus size={22} weight="bold" />
@@ -493,15 +503,15 @@ export default function HSMPage() {
                   <Plus size={16} /> {t('hsm.newProvider')}
                 </Button>
               )
-            }
+            ) : null}
             emptyIcon={Lock}
             emptyTitle={t('hsm.noHSM')}
             emptyDescription={t('hsm.noHSMDescription')}
-            emptyAction={
+            emptyAction={canWrite('hsm') ?
               <Button onClick={handleCreate}>
                 <Plus size={16} /> {t('hsm.newProvider')}
               </Button>
-            }
+            : null}
           />
         </div>
       </ResponsiveLayout>

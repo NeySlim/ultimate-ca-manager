@@ -258,9 +258,11 @@ def verify():
             'user_id': g.user_id,
             'auth_method': g.auth_method,
             'permissions': g.permissions,
+            'role': g.current_user.role,
             'user': {
                 'id': g.current_user.id,
-                'username': g.current_user.username
+                'username': g.current_user.username,
+                'role': g.current_user.role
             },
             'csrf_token': csrf_token
         }

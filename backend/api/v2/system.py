@@ -1337,7 +1337,7 @@ def get_hsm_status():
 
 
 @bp.route('/api/v2/system/chain-repair', methods=['GET'])
-@require_auth(['read:settings'])
+@require_auth(['read:cas'])
 def get_chain_repair_status():
     """Get chain repair task status and last run stats"""
     try:
@@ -1354,7 +1354,7 @@ def get_chain_repair_status():
 
 
 @bp.route('/api/v2/system/chain-repair/run', methods=['POST'])
-@require_auth(['write:settings'])
+@require_auth(['write:cas'])
 def run_chain_repair():
     """Trigger immediate chain repair"""
     try:

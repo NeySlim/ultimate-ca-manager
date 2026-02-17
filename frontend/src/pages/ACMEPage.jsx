@@ -25,6 +25,7 @@ import {
 } from '../components'
 import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
@@ -32,6 +33,7 @@ import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
 export default function ACMEPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
@@ -618,19 +620,19 @@ export default function ACMEPage() {
         <ArrowsClockwise size={14} />
         {t('common.refresh')}
       </Button>
-      {activeTab === 'accounts' && (
+      {activeTab === 'accounts' && canWrite('acme') && (
         <Button size="sm" onClick={() => setShowCreateModal(true)}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.newAccount')}</span>
         </Button>
       )}
-      {activeTab === 'domains' && (
+      {activeTab === 'domains' && canWrite('acme') && (
         <Button size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.addDomain')}</span>
         </Button>
       )}
-      {activeTab === 'localdomains' && (
+      {activeTab === 'localdomains' && canWrite('acme') && (
         <Button size="sm" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.addDomain')}</span>

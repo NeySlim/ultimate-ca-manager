@@ -13,6 +13,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermission } from '../hooks'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 import { WebSocketIndicator } from './WebSocketIndicator'
@@ -25,6 +26,7 @@ export function Sidebar({ activePage }) {
   const { t, i18n } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes, isLight } = useTheme()
   const { user, logout } = useAuth()
+  const { isAdmin, canRead, canWrite } = usePermission()
   const { isLargeScreen } = useMobile()
   
   // Expiring certificates badge
@@ -84,7 +86,7 @@ export function Sidebar({ activePage }) {
     'separator',
     // Data
     { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore' },
-    { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations' },
+    { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations', adminOnly: true },
     { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
     'separator',
     // Governance
@@ -93,8 +95,8 @@ export function Sidebar({ activePage }) {
     { id: 'reports', icon: ChartBar, labelKey: 'common.reports', path: '/reports' },
     'separator',
     // Admin
-    { id: 'users', icon: User, labelKey: 'common.users', path: '/users' },
-    { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac' },
+    { id: 'users', icon: User, labelKey: 'common.users', path: '/users', adminOnly: true },
+    { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac', adminOnly: true },
     { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm' },
     { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit' },
   ]
@@ -116,6 +118,8 @@ export function Sidebar({ activePage }) {
         if (page === 'separator') {
           return <div key={`sep-${idx}`} className="w-6 h-px bg-border/40 my-2" />
         }
+        // Hide admin-only items for non-admins
+        if (page.adminOnly && !isAdmin()) return null
         const Icon = page.icon
         const isActive = activePage === page.id
         const showBadge = page.id === 'certificates' && expiringCount > 0 && !isBadgeDismissed
@@ -162,7 +166,8 @@ export function Sidebar({ activePage }) {
 
       <div className="flex-1" />
 
-      {/* Settings */}
+      {/* Settings - admin/operator only */}
+      {(isAdmin() || canRead('settings')) && (
       <Link
         to="/settings"
         className={cn(
@@ -182,6 +187,7 @@ export function Sidebar({ activePage }) {
           {t('common.settings')}
         </div>
       </Link>
+      )}
 
       {/* WebSocket Indicator */}
       <WebSocketIndicator className="mx-auto" />
@@ -211,6 +217,7 @@ export function Sidebar({ activePage }) {
               <span>{t('common.account')}</span>
             </DropdownMenu.Item>
 
+            {(isAdmin() || canRead('settings')) && (
             <DropdownMenu.Item
               onClick={() => navigate('/settings')}
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
@@ -218,6 +225,7 @@ export function Sidebar({ activePage }) {
               <Gear size={16} />
               <span>{t('common.settings')}</span>
             </DropdownMenu.Item>
+            )}
 
             <DropdownMenu.Separator className="h-px bg-border my-1" />
 
