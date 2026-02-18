@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-rc2] - 2026-02-18
+
+### New Features
+- ***SSO authentication: full SAML/OAuth2 support with Keycloak tested***
+- ***Governance module: certificate policies, approval workflows, scheduled reports***
+- ***ACME DNS providers: 48 providers with card grid selector and official SVG logos***
+- ***Unified ExportModal with RBAC permission guards***
+- ***Dashboard charts: day selector, expired series, optimized queries***
+- ***Complete i18n: all 9 languages with 2273 keys each***
+
+### Security
+- RBAC permission enforcement across all frontend pages and floating windows
+- SQL injection fixes and debug leak prevention
+- Referrer-Policy security header added
+- Hide sidebar pages based on user permissions
+
+### Improvements
+- WebSocket/CORS: auto-detect short hostname and dynamic port for reliable connections
+- Close all floating panels and detail windows on logout
+- Table refresh after floating window actions (revoke/renew/delete)
+- Rich table preview for reports instead of raw JSON
+- Searchable Select component
+
+### Bug Fixes
+- Fixed CORS origin rejection breaking WebSocket on Docker and fresh installs
+- Fixed force_password_change not set on fresh admin creation
+- Fixed infinite loop in reports from canWrite in useCallback deps
+- Fixed 403 console errors and chart sizing issues
+- Fixed z-index conflicts between confirm dialogs, toasts, and floating windows
+
+### Packaging
+- Removed unnecessary gcc/build-essential from DEB/RPM dependencies
+- Fixed backend/VERSION not updated during CI builds
+- Default password is now always `changeme123` (not random)
+
 ## [2.1.0-rc1] - 2026-02-15
 
 ### Improvements
