@@ -384,10 +384,10 @@ jobs:
           sed -i 's/^          //' notes.md
           
           # Replace placeholders (specific first, then generic)
-          DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
-          RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
-          sed -i "s|DEB_VERSION|$DEB_VERSION|g" notes.md
-          sed -i "s|RPM_VERSION|$RPM_VERSION|g" notes.md
+          # File names use dots (2.1.0.rc2), not tildes (2.1.0~rc2)
+          FILE_VERSION=$(echo "$VERSION" | sed 's/-/./g')
+          sed -i "s|DEB_VERSION|${FILE_VERSION}|g" notes.md
+          sed -i "s|RPM_VERSION|${FILE_VERSION}|g" notes.md
           sed -i "s|IMAGE|$IMAGE|g" notes.md
           sed -i "s|REPO|$REPO|g" notes.md
           sed -i "s|VERSION|$VERSION|g" notes.md
