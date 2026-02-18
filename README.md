@@ -67,7 +67,7 @@ sudo systemctl enable --now ucm
 ```
 
 **Access:** `https://localhost:8443`
-**Default credentials:** `admin` / shown during install (see `/etc/ucm/ucm.env`). You will be prompted to change the password on first login.
+**Default credentials:** `admin` / `changeme123` — you will be prompted to change on first login.
 
 See [Installation Guide](docs/installation/README.md) for all methods including Docker Compose and source install.
 
