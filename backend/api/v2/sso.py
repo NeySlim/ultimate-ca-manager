@@ -483,8 +483,10 @@ def get_sp_metadata():
     
     Uses python3-saml's metadata builder to ensure compliance with
     the SAML 2.0 Metadata XSD (correct element ordering, validUntil, etc.).
+    Includes SP signing certificate (HTTPS cert) in KeyDescriptor.
     Works with strict IDPs like Omnissa Workspace ONE Access, ADFS, Shibboleth.
     """
+    import os
     from onelogin.saml2.settings import OneLogin_Saml2_Settings
     
     sp_base = request.url_root.rstrip('/')
@@ -496,6 +498,28 @@ def get_sp_metadata():
     provider = SSOProvider.query.filter_by(provider_type='saml').first()
     name_id_format = (getattr(provider, 'saml_name_id_format', None) 
                       if provider else None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
+    
+    # Load SP certificate (HTTPS cert) for KeyDescriptor
+    sp_cert = ''
+    data_path = os.environ.get('DATA_PATH', '/opt/ucm/data')
+    cert_path = os.path.join(data_path, 'https_cert.pem')
+    try:
+        with open(cert_path, 'r') as f:
+            cert_content = f.read()
+        # Extract only the first certificate (leaf, not CA chain)
+        in_cert = False
+        cert_lines = []
+        for line in cert_content.splitlines():
+            if '-----BEGIN CERTIFICATE-----' in line:
+                in_cert = True
+                continue
+            if '-----END CERTIFICATE-----' in line:
+                break
+            if in_cert:
+                cert_lines.append(line.strip())
+        sp_cert = ''.join(cert_lines)
+    except Exception as e:
+        logger.warning(f"Could not load SP certificate from {cert_path}: {e}")
     
     settings_data = {
         'strict': False,
@@ -520,6 +544,10 @@ def get_sp_metadata():
         },
     }
     
+    # Include SP cert if available — generates KeyDescriptor in metadata
+    if sp_cert:
+        settings_data['sp']['x509cert'] = sp_cert
+    
     try:
         settings = OneLogin_Saml2_Settings(settings_data, custom_base_path='/tmp')
         metadata = settings.get_sp_metadata()
@@ -535,13 +563,23 @@ def get_sp_metadata():
     except Exception as e:
         logger.error(f"Failed to generate SP metadata via python3-saml: {e}")
         # Fallback: hand-crafted but schema-compliant (correct element order per XSD)
+        key_descriptor = ''
+        if sp_cert:
+            key_descriptor = f'''    <md:KeyDescriptor use="signing">
+      <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+        <ds:X509Data>
+          <ds:X509Certificate>{sp_cert}</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+'''
         metadata_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
                      entityID="{entity_id}">
   <md:SPSSODescriptor AuthnRequestsSigned="false"
-                      WantAssertionsSigned="false"
+                      WantAssertionsSigned="true"
                       protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+{key_descriptor}    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
                             Location="{slo_url}"/>
     <md:NameIDFormat>{name_id_format}</md:NameIDFormat>
     <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
