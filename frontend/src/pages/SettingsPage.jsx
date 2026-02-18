@@ -1138,6 +1138,7 @@ export default function SettingsPage() {
   const { canWrite, hasPermission } = usePermission()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { waitForRestart } = useServiceReconnect()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

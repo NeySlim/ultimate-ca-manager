@@ -643,7 +643,7 @@ export default function CAsPage() {
         onClose={() => setShowImportModal(false)}
         onImportComplete={() => {
           setShowImportModal(false)
-          loadData()
+          loadCAs()
         }}
       />
       

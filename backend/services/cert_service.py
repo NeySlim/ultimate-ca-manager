@@ -6,6 +6,7 @@ import base64
 import uuid
 import re
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
@@ -19,6 +20,8 @@ from services.trust_store import TrustStoreService
 from services.template_service import TemplateService
 from config.settings import Config
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
+
+logger = logging.getLogger(__name__)
 
 # Import key decryption (optional - fallback if not available)
 try:

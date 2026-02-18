@@ -18,3 +18,46 @@ exclude_lines = [
 ]
 fail_under = 0
 show_missing = true
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes (unused imports, undefined names, etc.)
+    "B",      # bugbear (common bugs)
+    "S",      # bandit security checks
+]
+ignore = [
+    "E501",   # line too long (let formatter handle)
+    "E402",   # module-level import not at top (some conditional imports needed)
+    "E711",   # none comparison (SQLAlchemy uses == None)
+    "E712",   # true/false comparison (SQLAlchemy uses == True)
+    "E721",   # type comparison
+    "E722",   # bare except (too many to fix now, existing pattern)
+    "E701",   # multiple statements on one line
+    "B008",   # function call in default arg (Flask patterns)
+    "B904",   # raise without from (too many to fix now)
+    "S101",   # assert used (ok in tests)
+    "S105",   # hardcoded password (false positives on field names)
+    "S106",   # hardcoded password arg
+    "S108",   # hardcoded temp file
+    "S110",   # try-except-pass (too many to fix now)
+    "S112",   # try-except-continue
+    "S113",   # request without timeout
+    "S303",   # insecure hash (we use MD5/SHA1 for cert fingerprints, not crypto)
+    "S304",   # insecure cipher (controlled usage)
+    "S603",   # subprocess call (we validate inputs)
+    "S607",   # partial path for subprocess (controlled)
+    "S608",   # SQL injection (false positives on parameterized queries)
+    "F401",   # unused imports (too many to fix now, low risk)
+    "F541",   # f-string missing placeholders (many are intentional empty f-strings)
+    "F811",   # redefined while unused (Flask route patterns)
+    "F841",   # unused variable (low priority)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S106", "B011"]
+"migrations/*" = ["E501"]

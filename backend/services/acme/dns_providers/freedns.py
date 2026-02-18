@@ -8,6 +8,7 @@ Based on: https://gist.github.com/AnthonyWharton/a0e8faae7195a5c1dea210466eda1c9
 import re
 from typing import Tuple, Dict, Any, Optional
 import logging
+import requests
 
 from .base import BaseDnsProvider
 from utils.safe_requests import create_session

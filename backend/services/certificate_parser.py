@@ -5,9 +5,12 @@ Parse X.509 certificates and extract information
 from typing import Dict, Optional
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 import re
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 
 class CertificateParser:

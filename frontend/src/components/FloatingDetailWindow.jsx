@@ -57,10 +57,9 @@ export function FloatingDetailWindow({ windowInfo }) {
   const [minimized, setMinimized] = useState(false)
 
   const config = ENTITY_CONFIG[windowInfo.type]
-  if (!config) return null
 
   useEffect(() => {
-    if (data) return
+    if (!config || data) return
     let cancelled = false
 
     const fetchData = async () => {
@@ -79,6 +78,8 @@ export function FloatingDetailWindow({ windowInfo }) {
     fetchData()
     return () => { cancelled = true }
   }, [windowInfo.entityId, windowInfo.type])
+
+  if (!config) return null
 
   // Header action handlers
   const handleExport = async (format = 'pem', options = {}) => {
