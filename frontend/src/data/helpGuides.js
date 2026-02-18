@@ -954,15 +954,22 @@ Require all users to enable two-factor authentication.
 ## SSO (Single Sign-On)
 
 ### SAML 2.0
-- Upload or link to IDP metadata XML
-- Configure Entity ID and ACS URL
+- Provide your IDP with the **SP Metadata URL**: \`/api/v2/sso/saml/metadata\`
+- Or manually configure: upload/link IDP metadata XML, configure Entity ID and ACS URL
 - Map IDP attributes to UCM user fields (username, email, role)
 
-### OpenID Connect (OIDC)
-- Discovery URL (/.well-known/openid-configuration)
+### OAuth2 / OIDC
+- Authorization URL and Token URL
 - Client ID and Client Secret
+- User Info URL (for attribute retrieval)
 - Scopes (openid, profile, email)
 - Auto-create users on first SSO login
+
+### LDAP
+- Server hostname, port (389/636), SSL toggle
+- Bind DN and password (service account)
+- Base DN and user filter
+- Attribute mapping (username, email, full name)
 
 > 💡 Always keep a local admin account as fallback in case SSO breaks.
 
@@ -1009,6 +1016,8 @@ Manage the TLS certificate used by the UCM web interface:
 - Check for new UCM versions from GitHub releases
 - View the changelog for available updates
 - Current version and build information
+- **Auto-update**: on supported installations (DEB/RPM), click **Update Now** to download and install the latest version automatically
+- **Include pre-releases**: toggle to also check for release candidates (rc)
 
 ## Webhooks
 
@@ -1399,50 +1408,91 @@ When creating a CA, select an HSM provider and key instead of generating a softw
     content: `
 ## Overview
 
-SSO allows users to authenticate using their organization's Identity Provider (IDP), eliminating the need for separate UCM credentials.
+SSO allows users to authenticate using their organization's Identity Provider (IDP), eliminating the need for separate UCM credentials. UCM supports **SAML 2.0**, **OAuth2/OIDC**, and **LDAP**.
 
 ## SAML 2.0
+
+### SP Metadata URL
+
+UCM provides a **Service Provider (SP) Metadata URL** that you can give to your IDP for automatic configuration:
+
+\`\`\`
+https://your-ucm-host:8443/api/v2/sso/saml/metadata
+\`\`\`
+
+This URL returns a SAML 2.0 compliant XML document containing:
+- **Entity ID** — UCM's service provider identifier
+- **ACS URL** — Assertion Consumer Service endpoint (HTTP-POST)
+- **SLO URL** — Single Logout Service endpoint
+- **NameID Format** — Requested name identifier format
+
+Copy this URL into your IDP's "Add Service Provider" or "SAML Application" configuration.
 
 ### Configuration
 1. Obtain the IDP metadata URL or XML file from your identity provider
 2. In UCM, go to **Settings → SSO**
 3. Click **Add Provider** → SAML
-4. Enter the **IDP Metadata URL** or upload the XML
-5. UCM auto-populates Entity ID and ACS URL
+4. Enter the **IDP Metadata URL** — UCM auto-populates Entity ID, SSO/SLO URLs, and certificate
+5. Or paste the IDP metadata XML directly
 6. Configure **attribute mapping** (username, email, groups)
 7. Click **Save** and **Enable**
 
 ### Attribute Mapping
 Map IDP SAML attributes to UCM user fields:
-- \`username\` → UCM username
-- \`email\` → UCM email
+- \`username\` → UCM username (required)
+- \`email\` → UCM email (required)
 - \`groups\` → UCM group membership (optional)
 
-## OpenID Connect
+## OAuth2 / OIDC
 
 ### Configuration
-1. Register UCM as a client in your OIDC provider
-2. Copy the **Client ID** and **Client Secret**
-3. In UCM, go to **Settings → SSO**
-4. Click **Add Provider** → OIDC
-5. Enter the **Discovery URL** (e.g., \`https://idp.example.com/.well-known/openid-configuration\`)
-6. Enter Client ID and Secret
-7. Configure scopes (openid, profile, email)
-8. Click **Save** and **Enable**
+1. Register UCM as a client in your OAuth2/OIDC provider
+2. Set the **Redirect URI** to: \`https://your-ucm-host:8443/api/v2/sso/callback/oauth2\`
+3. Copy the **Client ID** and **Client Secret**
+4. In UCM, go to **Settings → SSO**
+5. Click **Add Provider** → OAuth2
+6. Enter the **Authorization URL** and **Token URL**
+7. Enter the **User Info URL** (for fetching user attributes after login)
+8. Enter Client ID and Secret
+9. Configure scopes (openid, profile, email)
+10. Click **Save** and **Enable**
 
 ### Auto-Create Users
 When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes. The default role is assigned.
 
+## LDAP
+
+### Configuration
+1. In UCM, go to **Settings → SSO**
+2. Click **Add Provider** → LDAP
+3. Enter the **LDAP Server** hostname and **Port** (389 for LDAP, 636 for LDAPS)
+4. Enable **Use SSL** for encrypted connections
+5. Enter the **Bind DN** and **Bind Password** (service account credentials)
+6. Enter the **Base DN** (search base for user lookups)
+7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
+8. Map LDAP attributes: **username**, **email**, **full name**
+9. Click **Test Connection** to verify, then **Save** and **Enable**
+
+### Active Directory
+For Microsoft Active Directory, use:
+- Port: **389** (or 636 with SSL)
+- User Filter: \`(sAMAccountName={username})\`
+- Username attr: \`sAMAccountName\`
+- Email attr: \`mail\`
+- Full name attr: \`displayName\`
+
 ## Login Flow
-1. User clicks **Login with SSO** on the UCM login page
-2. User is redirected to the IDP
-3. After authentication, IDP redirects back to UCM
+1. User clicks **Login with SSO** on the UCM login page (or enters LDAP credentials)
+2. For SAML/OAuth2: user is redirected to the IDP, authenticates, then redirected back
+3. For LDAP: credentials are verified directly against the LDAP server
 4. UCM creates or updates the user account
 5. User is logged in
 
 > ⚠ Always keep at least one local admin account as fallback in case SSO misconfiguration locks everyone out.
 
 > 💡 Test SSO with a non-admin account first before making it the primary authentication method.
+
+> 💡 Use the **Test Connection** button to verify your configuration before enabling a provider.
 `
   },
 

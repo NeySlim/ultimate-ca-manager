@@ -474,12 +474,12 @@ export const helpContent = {
           { label: 'Appearance', text: 'Theme selection (light/dark/system), accent color, desktop mode' },
           { label: 'Email (SMTP)', text: 'SMTP server, credentials, email template editor, and expiry alert notifications' },
           { label: 'Security', text: 'Password policies, session timeout, rate limiting, IP restrictions' },
-          { label: 'SSO', text: 'SAML and OIDC single sign-on integration' },
+          { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC, and LDAP single sign-on integration' },
           { label: 'Backup', text: 'Manual and scheduled database backups' },
           { label: 'Audit', text: 'Log retention, syslog forwarding, integrity verification' },
           { label: 'Database', text: 'Database path, size, and migration status' },
           { label: 'HTTPS', text: 'TLS certificate for the UCM web interface' },
-          { label: 'Updates', text: 'Check for new versions and view changelog' },
+          { label: 'Updates', text: 'Check for new versions, view changelog, auto-update (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP webhooks for certificate events (issue, revoke, expire)' },
         ]
       },
@@ -698,27 +698,40 @@ export const helpContent = {
   // ===== SSO (sub-page of Settings, kept for reference) =====
   sso: {
     title: 'Single Sign-On',
-    subtitle: 'SAML and OIDC integration',
-    overview: 'Configure Single Sign-On to allow users to authenticate via their organization identity provider. Supports both SAML 2.0 and OpenID Connect (OIDC) protocols.',
+    subtitle: 'SAML, OAuth2, and LDAP integration',
+    overview: 'Configure Single Sign-On to allow users to authenticate via their organization identity provider. Supports SAML 2.0, OAuth2/OIDC, and LDAP protocols.',
     sections: [
       {
         title: 'SAML 2.0',
         icon: Lock,
         items: [
           { label: 'Identity Provider', text: 'Configure IDP metadata URL or upload XML' },
+          { label: 'SP Metadata URL', text: 'Provide this URL to your IDP to auto-configure UCM as a service provider' },
           { label: 'Entity ID', text: 'UCM service provider entity identifier' },
           { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
           { label: 'Attribute Mapping', text: 'Map IDP attributes to UCM user fields' },
         ]
       },
       {
-        title: 'OpenID Connect',
+        title: 'OAuth2 / OIDC',
         icon: Globe,
         items: [
-          { label: 'Discovery URL', text: 'OIDC provider .well-known/openid-configuration URL' },
+          { label: 'Authorization URL', text: 'OAuth2 authorization endpoint' },
+          { label: 'Token URL', text: 'OAuth2 token endpoint' },
           { label: 'Client ID/Secret', text: 'OAuth2 client credentials from your IDP' },
-          { label: 'Scopes', text: 'OpenID scopes to request (openid, profile, email)' },
+          { label: 'Scopes', text: 'OAuth2 scopes to request (openid, profile, email)' },
           { label: 'Auto-Create Users', text: 'Automatically create UCM accounts on first SSO login' },
+        ]
+      },
+      {
+        title: 'LDAP',
+        icon: Database,
+        items: [
+          { label: 'Server', text: 'LDAP server hostname and port (389 or 636 for SSL)' },
+          { label: 'Bind DN', text: 'Distinguished name for LDAP bind authentication' },
+          { label: 'Base DN', text: 'Search base for user lookups' },
+          { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
+          { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
         ]
       },
     ],
@@ -726,6 +739,7 @@ export const helpContent = {
       'Test SSO with a non-admin account first to avoid lockouts',
       'Keep local admin login available as a fallback',
       'Map the IDP email attribute to ensure unique user identification',
+      'Use the SP Metadata URL to auto-configure your IDP (SAML)',
     ],
     warnings: [
       'Misconfigured SSO can lock all users out — always keep a local admin',
