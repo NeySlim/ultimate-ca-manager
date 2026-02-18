@@ -77,6 +77,15 @@ export default function CertificatesPage() {
     loadData()
   }, [page, perPage, filterStatus, filterCA, sortBy, sortOrder])
 
+  // Reload when floating window actions change data
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.type === 'certificate') loadData()
+    }
+    window.addEventListener('ucm:data-changed', handler)
+    return () => window.removeEventListener('ucm:data-changed', handler)
+  }, [])
+
   const loadData = async () => {
     try {
       setLoading(true)

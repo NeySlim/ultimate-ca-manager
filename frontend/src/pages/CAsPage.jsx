@@ -79,6 +79,15 @@ export default function CAsPage() {
     }
   }, [])
 
+  // Reload when floating window actions change data
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.type === 'ca') loadCAs()
+    }
+    window.addEventListener('ucm:data-changed', handler)
+    return () => window.removeEventListener('ucm:data-changed', handler)
+  }, [])
+
   // Handle selected param from navigation
   useEffect(() => {
     const selectedId = searchParams.get('selected')

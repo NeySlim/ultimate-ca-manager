@@ -115,6 +115,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     try {
       await certificatesService.revoke(windowInfo.entityId)
       showSuccess(t('certificates.revoked', 'Certificate revoked'))
+      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
     } catch (err) {
       showError(err.message || t('certificates.revokeFailed', 'Revoke failed'))
@@ -125,6 +126,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     try {
       await certificatesService.renew(windowInfo.entityId)
       showSuccess(t('certificates.renewed', 'Certificate renewed'))
+      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
     } catch (err) {
       showError(t('certificates.renewFailed', 'Renew failed'))
@@ -145,6 +147,7 @@ export function FloatingDetailWindow({ windowInfo }) {
       const service = config.service()
       await service.delete(windowInfo.entityId)
       showSuccess(t('common.deleted'))
+      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
     } catch (err) {
       showError(err.message || t('common.deleteFailed'))
