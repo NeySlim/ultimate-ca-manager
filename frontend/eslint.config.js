@@ -49,11 +49,11 @@ export default [
       // React hooks — catches stale closures & missing deps
       ...reactHooks.configs.recommended.rules,
 
-      // React 19 strict rules — disable for React 18 codebase
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/refs': 'off',
-      'react-hooks/purity': 'off',
-      'react-hooks/immutability': 'off',
+      // React 19 strict rules — disable (only in react-hooks v7+)
+      // 'react-hooks/set-state-in-effect': 'off',
+      // 'react-hooks/refs': 'off',
+      // 'react-hooks/purity': 'off',
+      // 'react-hooks/immutability': 'off',
 
       // React refresh — warns on non-component exports
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
@@ -61,6 +61,7 @@ export default [
       // React JSX runtime (no need to import React)
       'react/react-in-jsx-scope': 'off',
       'react/jsx-uses-react': 'off',
+      'react/jsx-uses-vars': 'error',
 
       // Catch real bugs
       'no-undef': 'error',
