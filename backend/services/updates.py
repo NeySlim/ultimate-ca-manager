@@ -129,8 +129,8 @@ def check_for_updates(include_prereleases=False):
                 'message': 'No releases found'
             }
         
-        # Find latest applicable release
-        latest_release = None
+        # Find latest applicable release by version (don't trust API order)
+        candidates = []
         for release in releases:
             if release.get('draft'):
                 continue
@@ -142,15 +142,11 @@ def check_for_updates(include_prereleases=False):
                 suffix = tag.split('-', 1)[1] if '-' in tag else ''
                 if not any(suffix.startswith(p) for p in ('alpha', 'beta', 'rc')):
                     continue
-            latest_release = release
-            break
+            candidates.append(release)
         
-        if not latest_release:
-            # If no stable release, use latest prerelease
-            for release in releases:
-                if not release.get('draft'):
-                    latest_release = release
-                    break
+        # Sort by parsed version, highest first
+        candidates.sort(key=lambda r: parse_version(r.get('tag_name', '')), reverse=True)
+        latest_release = candidates[0] if candidates else None
         
         if not latest_release:
             return {
