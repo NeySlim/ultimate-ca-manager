@@ -104,6 +104,7 @@ def ensure_admin_user(app):
             active=True
         )
         admin.set_password(app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123"))
+        admin.force_password_change = True
         db.session.add(admin)
         db.session.commit()
         logger.info(f"✓ Admin user created: {admin.username}")
