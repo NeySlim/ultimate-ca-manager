@@ -890,6 +890,7 @@
     "lastUpdated": "Dernière mise à jour",
     "liveUpdates": "Mises à jour en direct",
     "last7Days": "7 derniers jours",
+    "lastNDays": "{{count}} derniers jours",
     "currentCertificates": "Certificats actuels",
     "noCertificatesYet": "Aucun certificat pour le moment",
     "noCAsYet": "Aucune AC pour le moment",

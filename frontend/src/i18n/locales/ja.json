@@ -460,6 +460,7 @@
     "lastUpdated": "最終更新",
     "liveUpdates": "リアルタイム更新",
     "last7Days": "過去7日間",
+    "lastNDays": "過去{{count}}日間",
     "currentCertificates": "現在の証明書",
     "noCertificatesYet": "証明書はまだありません",
     "noCAsYet": "CAはまだありません",

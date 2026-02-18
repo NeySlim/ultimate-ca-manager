@@ -460,6 +460,7 @@
     "lastUpdated": "Zuletzt aktualisiert",
     "liveUpdates": "Live-Updates",
     "last7Days": "Letzte 7 Tage",
+    "lastNDays": "Letzte {{count}} Tage",
     "currentCertificates": "Aktuelle Zertifikate",
     "noCertificatesYet": "Noch keine Zertifikate",
     "noCAsYet": "Noch keine Zertifizierungsstellen",

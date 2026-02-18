@@ -460,6 +460,7 @@
     "lastUpdated": "Останнє оновлення",
     "liveUpdates": "Оновлення в реальному часі",
     "last7Days": "Останні 7 днів",
+    "lastNDays": "Останні {{count}} днів",
     "currentCertificates": "Поточні сертифікати",
     "noCertificatesYet": "Сертифікатів ще немає",
     "noCAsYet": "ЦС ще немає",
