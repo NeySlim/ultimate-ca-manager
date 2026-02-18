@@ -1424,9 +1424,12 @@ This URL returns a SAML 2.0 compliant XML document containing:
 - **Entity ID** — UCM's service provider identifier
 - **ACS URL** — Assertion Consumer Service endpoint (HTTP-POST)
 - **SLO URL** — Single Logout Service endpoint
+- **Signing Certificate** — UCM's HTTPS certificate for signing verification
 - **NameID Format** — Requested name identifier format
 
 Copy this URL into your IDP's "Add Service Provider" or "SAML Application" configuration.
+
+> ⚠️ **Important:** UCM's HTTPS certificate must be **trusted by the IDP**. If the IDP cannot validate the certificate (e.g., self-signed or issued by a private CA), it will reject the metadata as invalid. Import UCM's CA certificate into the IDP's trust store, or use a certificate signed by a publicly trusted CA.
 
 ### Configuration
 1. Obtain the IDP metadata URL or XML file from your identity provider
