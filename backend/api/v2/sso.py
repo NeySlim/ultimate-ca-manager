@@ -6,7 +6,7 @@ SAML, OAuth2, LDAP authentication providers
 from flask import Blueprint, request, redirect, session, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import db, User
+from models import db, User, Certificate
 from models.sso import SSOProvider, SSOSession
 from datetime import datetime, timedelta
 import json
@@ -101,6 +101,7 @@ def create_provider():
         provider.saml_slo_url = data.get('saml_slo_url')
         provider.saml_certificate = data.get('saml_certificate')
         provider.saml_sign_requests = data.get('saml_sign_requests', True)
+        provider.saml_sp_cert_source = data.get('saml_sp_cert_source', 'https')
     
     elif data['provider_type'] == 'oauth2':
         provider.oauth2_client_id = data.get('oauth2_client_id')
@@ -186,7 +187,7 @@ def update_provider(provider_id=None, provider_type_name=None):
     
     # Type-specific fields
     if provider.provider_type == 'saml':
-        for field in ['saml_metadata_url', 'saml_entity_id', 'saml_sso_url', 'saml_slo_url', 'saml_certificate', 'saml_sign_requests']:
+        for field in ['saml_metadata_url', 'saml_entity_id', 'saml_sso_url', 'saml_slo_url', 'saml_certificate', 'saml_sign_requests', 'saml_sp_cert_source']:
             if field in data:
                 setattr(provider, field, data[field])
     
@@ -477,6 +478,66 @@ def fetch_idp_metadata():
         return error_response("Failed to parse metadata XML. Ensure the URL returns valid SAML metadata.", 400)
 
 
+@bp.route('/api/v2/sso/saml/certificates', methods=['GET'])
+@require_auth(['read:sso'])
+def list_saml_certificates():
+    """List valid certificates available for SAML SP metadata.
+    Returns HTTPS cert + all valid certs from the database."""
+    import os
+    from datetime import datetime
+    
+    certs = []
+    
+    # Option 1: HTTPS certificate (default)
+    data_path = os.environ.get('DATA_PATH', '/opt/ucm/data')
+    cert_path = os.path.join(data_path, 'https_cert.pem')
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        with open(cert_path, 'rb') as f:
+            pem_data = f.read()
+        cert = x509.load_pem_x509_certificate(pem_data)
+        certs.append({
+            'id': 'https',
+            'label': f'HTTPS Certificate ({cert.subject.rfc4514_string()})',
+            'subject': cert.subject.rfc4514_string(),
+            'not_after': cert.not_valid_after_utc.isoformat() if hasattr(cert, 'not_valid_after_utc') else cert.not_valid_after.isoformat(),
+            'is_default': True,
+        })
+    except Exception as e:
+        logger.warning(f"Could not load HTTPS cert: {e}")
+        certs.append({
+            'id': 'https',
+            'label': 'HTTPS Certificate',
+            'subject': 'Unknown',
+            'not_after': None,
+            'is_default': True,
+        })
+    
+    # Option 2+: Valid certificates from database
+    try:
+        db_certs = Certificate.query.filter(
+            Certificate.revoked == False,
+            Certificate.valid_to > datetime.utcnow(),
+            Certificate.crt.isnot(None)
+        ).order_by(Certificate.subject_cn).all()
+        
+        for c in db_certs:
+            certs.append({
+                'id': str(c.id),
+                'label': c.subject_cn or c.descr or f'Certificate #{c.id}',
+                'subject': c.subject,
+                'issuer': c.issuer,
+                'not_after': c.valid_to.isoformat() if c.valid_to else None,
+                'key_type': c.key_algo,
+                'is_default': False,
+            })
+    except Exception as e:
+        logger.warning(f"Could not list certificates: {e}")
+    
+    return success_response(data=certs)
+
+
 @bp.route('/api/v2/sso/saml/metadata', methods=['GET'])
 def get_sp_metadata():
     """Generate schema-valid SAML 2.0 SP metadata XML for configuring the IDP.
@@ -494,32 +555,69 @@ def get_sp_metadata():
     acs_url = f'{sp_base}/api/v2/sso/callback/saml'
     slo_url = f'{sp_base}/api/v2/sso/callback/saml'
     
-    # Load SAML provider config if available (for NameIDFormat override)
+    # Load SAML provider config if available (for NameIDFormat override + cert source)
     provider = SSOProvider.query.filter_by(provider_type='saml').first()
     name_id_format = (getattr(provider, 'saml_name_id_format', None) 
                       if provider else None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
     
-    # Load SP certificate (HTTPS cert) for KeyDescriptor
+    # Determine certificate source
+    cert_source = (getattr(provider, 'saml_sp_cert_source', None)
+                   if provider else None) or 'https'
+    
+    # Load SP certificate for KeyDescriptor
     sp_cert = ''
     data_path = os.environ.get('DATA_PATH', '/opt/ucm/data')
-    cert_path = os.path.join(data_path, 'https_cert.pem')
-    try:
-        with open(cert_path, 'r') as f:
-            cert_content = f.read()
-        # Extract only the first certificate (leaf, not CA chain)
-        in_cert = False
-        cert_lines = []
-        for line in cert_content.splitlines():
-            if '-----BEGIN CERTIFICATE-----' in line:
-                in_cert = True
-                continue
-            if '-----END CERTIFICATE-----' in line:
-                break
-            if in_cert:
-                cert_lines.append(line.strip())
-        sp_cert = ''.join(cert_lines)
-    except Exception as e:
-        logger.warning(f"Could not load SP certificate from {cert_path}: {e}")
+    
+    if cert_source != 'https':
+        # Load certificate from database by ID (must be valid and not revoked)
+        try:
+            from datetime import datetime as dt
+            db_cert = Certificate.query.filter(
+                Certificate.id == int(cert_source),
+                Certificate.revoked == False,
+                Certificate.valid_to > dt.utcnow(),
+                Certificate.crt.isnot(None)
+            ).first()
+            if db_cert:
+                cert_content = base64.b64decode(db_cert.crt).decode('utf-8')
+                in_cert = False
+                cert_lines = []
+                for line in cert_content.splitlines():
+                    if '-----BEGIN CERTIFICATE-----' in line:
+                        in_cert = True
+                        continue
+                    if '-----END CERTIFICATE-----' in line:
+                        break
+                    if in_cert:
+                        cert_lines.append(line.strip())
+                sp_cert = ''.join(cert_lines)
+                logger.info(f"Using database certificate #{cert_source} for SP metadata")
+            else:
+                logger.warning(f"Certificate #{cert_source} not found, falling back to HTTPS cert")
+                cert_source = 'https'
+        except Exception as e:
+            logger.warning(f"Could not load certificate #{cert_source}: {e}, falling back to HTTPS cert")
+            cert_source = 'https'
+    
+    if cert_source == 'https':
+        # Default: use HTTPS certificate
+        cert_path = os.path.join(data_path, 'https_cert.pem')
+        try:
+            with open(cert_path, 'r') as f:
+                cert_content = f.read()
+            in_cert = False
+            cert_lines = []
+            for line in cert_content.splitlines():
+                if '-----BEGIN CERTIFICATE-----' in line:
+                    in_cert = True
+                    continue
+                if '-----END CERTIFICATE-----' in line:
+                    break
+                if in_cert:
+                    cert_lines.append(line.strip())
+            sp_cert = ''.join(cert_lines)
+        except Exception as e:
+            logger.warning(f"Could not load SP certificate from {cert_path}: {e}")
     
     settings_data = {
         'strict': False,

@@ -557,8 +557,22 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     saml_slo_url: provider?.saml_slo_url || '',
     saml_certificate: provider?.saml_certificate || '',
     saml_sign_requests: provider?.saml_sign_requests ?? true,
+    saml_sp_cert_source: provider?.saml_sp_cert_source || 'https',
   })
   const [fetchingMetadata, setFetchingMetadata] = useState(false)
+  const [availableCerts, setAvailableCerts] = useState([])
+
+  // Load available certificates when SAML is selected
+  useEffect(() => {
+    if (formData.provider_type === 'saml') {
+      ssoService.getSamlCertificates()
+        .then(res => {
+          const certs = res.data || res
+          setAvailableCerts(Array.isArray(certs) ? certs : [])
+        })
+        .catch(() => setAvailableCerts([]))
+    }
+  }, [formData.provider_type])
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -883,6 +897,23 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               onChange={(val) => handleChange('saml_sign_requests', val)}
               label={t('sso.signRequests')}
             />
+            <Select
+              label={t('sso.spCertificate')}
+              value={formData.saml_sp_cert_source}
+              onChange={value => handleChange('saml_sp_cert_source', value)}
+              options={availableCerts.length > 0
+                ? availableCerts.map(c => ({
+                    value: c.id,
+                    label: c.not_after
+                      ? `${c.label} (${new Date(c.not_after).toLocaleDateString()})`
+                      : c.label
+                  }))
+                : [{ value: 'https', label: t('sso.httpsDefault') }]
+              }
+            />
+            <HelpCard variant="info" className="text-xs">
+              {t('sso.spCertificateHelp')}
+            </HelpCard>
           </>
         )}
       </div>

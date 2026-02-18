@@ -30,6 +30,7 @@ class SSOProvider(db.Model):
     saml_slo_url = db.Column(db.String(500))
     saml_certificate = db.Column(db.Text)  # Public cert, not secret
     saml_sign_requests = db.Column(db.Boolean, default=True)
+    saml_sp_cert_source = db.Column(db.String(50), default='https')  # 'https' or cert ID
     
     # OAuth2 settings
     oauth2_client_id = db.Column(db.String(500))
@@ -141,6 +142,7 @@ class SSOProvider(db.Model):
                 'saml_sso_url': self.saml_sso_url,
                 'saml_slo_url': self.saml_slo_url,
                 'saml_sign_requests': self.saml_sign_requests,
+                'saml_sp_cert_source': self.saml_sp_cert_source or 'https',
                 'saml_certificate': self.saml_certificate if include_secrets else bool(self.saml_certificate),
             })
         elif self.provider_type == 'oauth2':

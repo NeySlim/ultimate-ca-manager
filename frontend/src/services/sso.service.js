@@ -27,6 +27,9 @@ const ssoService = {
 
   getSessions: () =>
     apiClient.get('/sso/sessions'),
+
+  getSamlCertificates: () =>
+    apiClient.get('/sso/saml/certificates'),
 }
 
 export { ssoService }
