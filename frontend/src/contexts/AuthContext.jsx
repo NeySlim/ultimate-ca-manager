@@ -3,6 +3,7 @@
  */
 import { createContext, useContext, useState, useEffect } from 'react'
 import { authService } from '../services/auth.service'
+import { apiClient } from '../services/apiClient'
 
 const AuthContext = createContext()
 
@@ -64,6 +65,11 @@ export function AuthProvider({ children }) {
       if (preAuthData) {
         // Already authenticated via multi-method (mTLS, WebAuthn, etc.)
         response = { data: preAuthData }
+        // Store CSRF token from pre-auth response
+        const csrfToken = preAuthData.csrf_token
+        if (csrfToken) {
+          apiClient.setCsrfToken(csrfToken)
+        }
       } else {
         // Legacy password auth
         debug('🔐 Attempting password login for:', username)
