@@ -448,7 +448,7 @@ function CopyableUrl({ label, value, description }) {
       {description && <p className="text-xs text-text-muted mb-1.5">{description}</p>}
       <div className="flex items-center gap-2">
         <code className="text-sm font-mono text-text-primary flex-1 break-all select-all">{value}</code>
-        <Button size="sm" variant="ghost" onClick={copy} title={t('common.copy')}>
+        <Button size="sm" variant="ghost" onClick={copy} type="button" title={t('common.copy')}>
           <Copy size={14} />
         </Button>
       </div>
