@@ -707,6 +707,7 @@ export const helpContent = {
         items: [
           { label: 'Identity Provider', text: 'Configure IDP metadata URL or upload XML' },
           { label: 'SP Metadata URL', text: 'Provide this URL to your IDP to auto-configure UCM as a service provider' },
+          { label: 'SP Certificate', text: 'UCM HTTPS certificate included in metadata — must be trusted by the IDP or metadata will be rejected' },
           { label: 'Entity ID', text: 'UCM service provider entity identifier' },
           { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
           { label: 'Attribute Mapping', text: 'Map IDP attributes to UCM user fields' },
@@ -740,6 +741,7 @@ export const helpContent = {
       'Keep local admin login available as a fallback',
       'Map the IDP email attribute to ensure unique user identification',
       'Use the SP Metadata URL to auto-configure your IDP (SAML)',
+      'UCM HTTPS certificate must be trusted by the IDP for SAML metadata to be accepted',
     ],
     warnings: [
       'Misconfigured SSO can lock all users out — always keep a local admin',
