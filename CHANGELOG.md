@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-rc3] - 2026-02-18
+
+### New Features
+- ***SAML IDP metadata URL: auto-fetch and populate Entity ID, SSO/SLO URLs, certificate***
+- ***SP metadata XML endpoint for easy IDP configuration***
+
+### Bug Fixes
+- Fixed release notes using glob patterns instead of exact filenames for install commands
+- Mark rc/beta/alpha releases as prerelease on GitHub
+
 ## [2.1.0-rc2] - 2026-02-18
 
 ### New Features
