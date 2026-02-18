@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-rc6] - 2026-02-18
+
+### Added
+- **SAML SP certificate selector** — choose which certificate to include in SP metadata KeyDescriptor (HTTPS cert or any valid cert from DB)
+- New API endpoint `GET /sso/saml/certificates` to list available certificates
+- Certificate validity check in SP metadata generation (revoked/expired certs fall back to HTTPS)
+
+### Fixed
+- **CSRF token not stored** on multi-method login (password/mTLS/WebAuthn) — caused 403 errors on all POST/PUT/DELETE requests after login
+- **Select dropdown hidden behind modals** — Radix portal z-index override from 50 to 300
+- **Copy button closing SSO modal** — added `type="button"` to prevent form submission
+- **SP metadata missing certificate** — includes HTTPS cert in KeyDescriptor for IDP trust
+
+### Docs
+- In-app help: HTTPS certificate must be trusted by IDP for SAML metadata acceptance
+- In-app help: SP certificate field documentation
+
 ## [2.1.0-rc5] - 2026-02-18
 
 ### Fixed
