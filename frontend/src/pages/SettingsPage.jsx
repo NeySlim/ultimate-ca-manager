@@ -602,6 +602,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     const data = { ...formData }
+    delete data._directoryType
     if (data.provider_type === 'oauth2') {
       data.oauth2_scopes = data.oauth2_scopes.split(/\s+/).filter(Boolean)
     }
@@ -717,12 +718,29 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
         
         {formData.provider_type === 'ldap' && (
           <>
+            <Select
+              label={t('sso.directoryType')}
+              value={formData._directoryType || 'custom'}
+              onChange={value => {
+                handleChange('_directoryType', value)
+                if (value === 'openldap') {
+                  setFormData(prev => ({ ...prev, _directoryType: value, ldap_port: prev.ldap_port || 389, ldap_user_filter: '(uid={username})', ldap_username_attr: 'uid', ldap_email_attr: 'mail', ldap_fullname_attr: 'cn', ldap_group_filter: '(objectClass=groupOfNames)' }))
+                } else if (value === 'ad') {
+                  setFormData(prev => ({ ...prev, _directoryType: value, ldap_port: prev.ldap_use_ssl ? 636 : 389, ldap_user_filter: '(sAMAccountName={username})', ldap_username_attr: 'sAMAccountName', ldap_email_attr: 'mail', ldap_fullname_attr: 'displayName', ldap_group_filter: '(objectClass=group)' }))
+                }
+              }}
+              options={[
+                { value: 'openldap', label: 'OpenLDAP' },
+                { value: 'ad', label: 'Active Directory' },
+                { value: 'custom', label: t('common.custom') },
+              ]}
+            />
             <div className="grid grid-cols-3 gap-4">
               <Input
                 label={t('sso.ldapServer')}
                 value={formData.ldap_server}
                 onChange={e => handleChange('ldap_server', e.target.value)}
-                placeholder="ldap.example.com"
+                placeholder={formData._directoryType === 'ad' ? 'dc.example.com' : 'ldap.example.com'}
                 className="col-span-2"
               />
               <Input
@@ -734,7 +752,12 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             </div>
             <ToggleSwitch
               checked={formData.ldap_use_ssl}
-              onChange={(val) => handleChange('ldap_use_ssl', val)}
+              onChange={(val) => {
+                handleChange('ldap_use_ssl', val)
+                if (formData._directoryType === 'ad') {
+                  handleChange('ldap_port', val ? 636 : 389)
+                }
+              }}
               label={t('sso.ldapUseSsl')}
               size="sm"
             />
@@ -742,7 +765,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               label={t('sso.bindDn')}
               value={formData.ldap_bind_dn}
               onChange={e => handleChange('ldap_bind_dn', e.target.value)}
-              placeholder={t('sso.bindDnPlaceholder')}
+              placeholder={formData._directoryType === 'ad' ? 'CN=svc-ldap,OU=Service Accounts,DC=example,DC=com' : t('sso.bindDnPlaceholder')}
             />
             <Input
               label={t('sso.bindPassword')}
@@ -756,31 +779,31 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
               label={t('sso.baseDn')}
               value={formData.ldap_base_dn}
               onChange={e => handleChange('ldap_base_dn', e.target.value)}
-              placeholder={t('sso.baseDnPlaceholder')}
+              placeholder={formData._directoryType === 'ad' ? 'DC=example,DC=com' : t('sso.baseDnPlaceholder')}
             />
             <Input
               label={t('sso.userFilter')}
               value={formData.ldap_user_filter}
               onChange={e => handleChange('ldap_user_filter', e.target.value)}
-              placeholder={t('sso.userFilterPlaceholder')}
+              placeholder={formData._directoryType === 'ad' ? '(sAMAccountName={username})' : t('sso.userFilterPlaceholder')}
             />
             <Input
               label={t('sso.groupFilter')}
               value={formData.ldap_group_filter}
               onChange={e => handleChange('ldap_group_filter', e.target.value)}
-              placeholder={t('sso.groupFilterPlaceholder')}
+              placeholder={formData._directoryType === 'ad' ? '(objectClass=group)' : t('sso.groupFilterPlaceholder')}
             />
 
-            {/* LDAP Attribute Mapping */}
+            {/* LDAP Attributes */}
             <h4 className="text-sm font-medium text-text-primary border-b border-border pb-2 pt-2">
-              {t('sso.attributeMapping')}
+              {t('sso.ldapAttributes')}
             </h4>
             <div className="grid grid-cols-3 gap-4">
               <Input
                 label={t('sso.usernameAttr')}
                 value={formData.ldap_username_attr}
                 onChange={e => handleChange('ldap_username_attr', e.target.value)}
-                placeholder="uid"
+                placeholder={formData._directoryType === 'ad' ? 'sAMAccountName' : 'uid'}
               />
               <Input
                 label={t('sso.emailAttr')}
@@ -792,7 +815,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
                 label={t('sso.fullnameAttr')}
                 value={formData.ldap_fullname_attr}
                 onChange={e => handleChange('ldap_fullname_attr', e.target.value)}
-                placeholder="cn"
+                placeholder={formData._directoryType === 'ad' ? 'displayName' : 'cn'}
               />
             </div>
           </>

@@ -1790,6 +1790,8 @@
     "emailAttr": "Attribut email",
     "fullnameAttr": "Attribut nom complet",
     "attributeMapping": "Mappage d'attributs",
+    "ldapAttributes": "Attributs LDAP",
+    "directoryType": "Type d'annuaire",
     "attributeMappingHelp": "Mappez les attributs du fournisseur SSO vers les champs utilisateur UCM (username, email, fullname).",
     "roleMapping": "Mappage des rôles",
     "roleMappingHelp": "Mappez les groupes ou rôles externes vers les rôles UCM. Les utilisateurs dans les groupes correspondants se verront attribuer le rôle UCM associé.",
