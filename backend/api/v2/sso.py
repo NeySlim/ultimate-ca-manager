@@ -3,16 +3,41 @@ SSO API - UCM
 SAML, OAuth2, LDAP authentication providers
 """
 
-from flask import Blueprint, request, current_app, redirect, url_for, session
+from flask import Blueprint, request, redirect, session, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from datetime import datetime, timedelta
 import json
+import base64
+import secrets as py_secrets
+import traceback
 import urllib.parse
+import requests as http_requests
+from lxml import etree
+
+import logging
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('sso_pro', __name__)
+
+
+def _parse_json_field(value):
+    """Parse a JSON field that may be a string, double-encoded string, or dict/list."""
+    if not value:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(parsed, str):
+                parsed = json.loads(parsed)
+            return parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+    return {}
 
 
 # ============ Provider Management ============
@@ -285,7 +310,8 @@ def _test_ldap_connection(provider):
     except ImportError:
         return error_response("LDAP library not installed. Run: pip install ldap3", 500)
     except Exception as e:
-        return error_response(f"LDAP connection failed: {str(e)}", 400)
+        logger.error(f"LDAP connection test failed: {e}")
+        return error_response("LDAP connection failed. Check server address, port, and credentials.", 400)
 
 
 def _ldap_authenticate_user(provider, username, password):
@@ -358,16 +384,15 @@ def _ldap_authenticate_user(provider, username, password):
     except ImportError:
         return None, "LDAP library not installed"
     except Exception as e:
-        return None, str(e)
+        logger.error(f"LDAP authentication error: {e}")
+        return None, "LDAP authentication failed"
 
 
 def _test_oauth2_connection(provider):
     """Test OAuth2 configuration (checks URLs are reachable)"""
     try:
-        import requests
-        
         # Test auth URL
-        response = requests.head(provider.oauth2_auth_url, timeout=5, allow_redirects=True)
+        response = http_requests.head(provider.oauth2_auth_url, timeout=5, allow_redirects=True)
         
         return success_response(data={
             'status': 'success',
@@ -375,7 +400,8 @@ def _test_oauth2_connection(provider):
             'auth_url_status': response.status_code
         })
     except Exception as e:
-        return error_response(f"OAuth2 test failed: {str(e)}", 400)
+        logger.error(f"OAuth2 connection test failed: {e}")
+        return error_response("OAuth2 test failed. Check authorization URL is reachable.", 400)
 
 
 def _test_saml_connection(provider):
@@ -402,7 +428,8 @@ def _test_saml_connection(provider):
             'cert_expires': cert.not_valid_after_utc.isoformat()
         })
     except Exception as e:
-        return error_response(f"SAML certificate invalid: {str(e)}", 400)
+        logger.error(f"SAML certificate validation failed: {e}")
+        return error_response("SAML certificate is invalid or malformed", 400)
 
 
 # ============ SSO Sessions ============
@@ -423,8 +450,6 @@ def list_sessions():
 @require_auth(['write:sso'])
 def fetch_idp_metadata():
     """Fetch and parse IDP metadata XML from a URL"""
-    import requests as http_requests
-    
     data = request.get_json()
     metadata_url = data.get('metadata_url')
     if not metadata_url:
@@ -438,15 +463,18 @@ def fetch_idp_metadata():
             resp = http_requests.get(metadata_url, timeout=10, verify=False)
             resp.raise_for_status()
         except Exception as e:
-            return error_response(f"Failed to fetch metadata: {str(e)}", 400)
+            logger.error(f"Failed to fetch IDP metadata (SSL fallback): {e}")
+            return error_response("Failed to fetch metadata. Check the URL is reachable.", 400)
     except Exception as e:
-        return error_response(f"Failed to fetch metadata: {str(e)}", 400)
+        logger.error(f"Failed to fetch IDP metadata: {e}")
+        return error_response("Failed to fetch metadata. Check the URL is reachable.", 400)
     
     try:
         parsed = _parse_saml_metadata(resp.text)
         return success_response(data=parsed, message="IDP metadata parsed successfully")
     except Exception as e:
-        return error_response(f"Failed to parse metadata XML: {str(e)}", 400)
+        logger.error(f"Failed to parse IDP metadata XML: {e}")
+        return error_response("Failed to parse metadata XML. Ensure the URL returns valid SAML metadata.", 400)
 
 
 @bp.route('/api/v2/sso/saml/metadata', methods=['GET'])
@@ -473,15 +501,12 @@ def get_sp_metadata():
   </md:SPSSODescriptor>
 </md:EntityDescriptor>'''
     
-    from flask import Response
     return Response(metadata_xml, mimetype='application/xml',
                     headers={'Content-Disposition': 'inline; filename="ucm-sp-metadata.xml"'})
 
 
 def _parse_saml_metadata(xml_text):
     """Parse SAML IDP metadata XML and extract key fields"""
-    from lxml import etree
-    
     NS = {
         'md': 'urn:oasis:names:tc:SAML:2.0:metadata',
         'ds': 'http://www.w3.org/2000/09/xmldsig#',
@@ -569,9 +594,6 @@ def initiate_sso_login(provider_type):
     For SAML: redirects to IdP SSO URL
     For LDAP: returns error (LDAP uses direct auth via /api/v2/sso/ldap/login)
     """
-    import secrets as py_secrets
-    import urllib.parse
-    
     if provider_type not in ('saml', 'oauth2'):
         return error_response("Use /api/v2/sso/ldap/login for LDAP authentication", 400)
     
@@ -611,8 +633,8 @@ def initiate_sso_login(provider_type):
             redirect_url = saml_auth.login()
             return redirect(redirect_url)
         except Exception as e:
-            current_app.logger.error(f"SAML login initiation error: {e}")
-            return error_response(f"SAML login failed: {str(e)}", 500)
+            logger.error(f"SAML login initiation error: {e}")
+            return error_response("SAML login failed. Check SAML configuration.", 500)
     
     return error_response("Unknown provider type", 400)
 
@@ -623,8 +645,6 @@ def sso_callback(provider_type):
     Handle SSO callback from OAuth2/SAML providers.
     Creates or updates user and establishes session.
     """
-    import requests
-    
     if provider_type not in ('saml', 'oauth2'):
         return redirect('/login?error=invalid_provider_type')
     
@@ -648,7 +668,7 @@ def sso_callback(provider_type):
             # Exchange code for token
             callback_url = request.url_root.rstrip('/') + '/api/v2/sso/callback/oauth2'
             
-            token_response = requests.post(
+            token_response = http_requests.post(
                 provider.oauth2_token_url,
                 data={
                     'grant_type': 'authorization_code',
@@ -661,7 +681,7 @@ def sso_callback(provider_type):
             )
             
             if not token_response.ok:
-                current_app.logger.error(f"OAuth2 token exchange failed: {token_response.text}")
+                logger.error(f"OAuth2 token exchange failed: {token_response.text}")
                 return redirect('/login?error=token_exchange_failed')
             
             tokens = token_response.json()
@@ -671,7 +691,7 @@ def sso_callback(provider_type):
                 return redirect('/login?error=no_access_token')
             
             # Get user info
-            userinfo_response = requests.get(
+            userinfo_response = http_requests.get(
                 provider.oauth2_userinfo_url,
                 headers={'Authorization': f'Bearer {access_token}'},
                 timeout=10
@@ -683,16 +703,7 @@ def sso_callback(provider_type):
             userinfo = userinfo_response.json()
             
             # Map attributes
-            attr_mapping = provider.attribute_mapping
-            if isinstance(attr_mapping, str):
-                try:
-                    attr_mapping = json.loads(attr_mapping)
-                    if isinstance(attr_mapping, str):
-                        attr_mapping = json.loads(attr_mapping)
-                except (json.JSONDecodeError, TypeError):
-                    attr_mapping = {}
-            if not isinstance(attr_mapping, dict):
-                attr_mapping = {}
+            attr_mapping = _parse_json_field(provider.attribute_mapping)
             username = userinfo.get(attr_mapping.get('username', 'preferred_username')) or userinfo.get('email', '').split('@')[0]
             email = userinfo.get(attr_mapping.get('email', 'email'), '')
             fullname = userinfo.get(attr_mapping.get('fullname', 'name'), '')
@@ -733,8 +744,7 @@ def sso_callback(provider_type):
             return redirect('/login/sso-complete')
             
         except Exception as e:
-            import traceback
-            current_app.logger.error(f"OAuth2 callback error: {e}\n{traceback.format_exc()}")
+            logger.error(f"OAuth2 callback error: {e}\n{traceback.format_exc()}")
             return redirect('/login?error=callback_error')
     
     elif provider.provider_type == 'saml':
@@ -747,16 +757,14 @@ def sso_callback(provider_type):
                 saml_auth.process_response()
                 errors = saml_auth.get_errors()
                 if errors:
-                    current_app.logger.error(f"SAML errors: {errors}, reason: {saml_auth.get_last_error_reason()}")
+                    logger.error(f"SAML errors: {errors}, reason: {saml_auth.get_last_error_reason()}")
                     return redirect('/login?error=saml_validation_failed')
                 attrs = saml_auth.get_attributes()
                 name_id = saml_auth.get_nameid()
             except Exception as saml_err:
                 # Some IdPs (e.g. Keycloak) send duplicate attribute names
                 # which python3-saml rejects; parse manually as fallback
-                current_app.logger.warning(f"SAML standard parsing failed, using fallback: {saml_err}")
-                import base64
-                from lxml import etree
+                logger.warning(f"SAML standard parsing failed, using fallback: {saml_err}")
                 saml_response_b64 = request.form.get('SAMLResponse', '')
                 saml_xml = base64.b64decode(saml_response_b64)
                 root = etree.fromstring(saml_xml)
@@ -770,16 +778,7 @@ def sso_callback(provider_type):
                         attrs[attr_name] = values
             
             # Map attributes
-            attr_mapping = provider.attribute_mapping
-            if isinstance(attr_mapping, str):
-                try:
-                    attr_mapping = json.loads(attr_mapping)
-                    if isinstance(attr_mapping, str):
-                        attr_mapping = json.loads(attr_mapping)
-                except (json.JSONDecodeError, TypeError):
-                    attr_mapping = {}
-            if not isinstance(attr_mapping, dict):
-                attr_mapping = {}
+            attr_mapping = _parse_json_field(provider.attribute_mapping)
             
             username_key = attr_mapping.get('username', 'username')
             email_key = attr_mapping.get('email', 'email')
@@ -827,8 +826,7 @@ def sso_callback(provider_type):
             return redirect('/login/sso-complete')
             
         except Exception as e:
-            import traceback
-            current_app.logger.error(f"SAML callback error: {e}\n{traceback.format_exc()}")
+            logger.error(f"SAML callback error: {e}\n{traceback.format_exc()}")
             return redirect('/login?error=callback_error')
     
     return redirect('/login?error=unknown_provider_type')
@@ -882,15 +880,20 @@ def ldap_login():
             return error_response("User not found and automatic account creation is disabled. Contact your administrator.", 403)
         return error_response("Failed to create user account", 500)
     
-    # Create session
-    sso_session = SSOSession(
-        user_id=user.id,
-        provider_id=provider.id,
-        session_id=user_info['dn'],
-        sso_name_id=user_info.get('uid', user_info['dn']),
-        expires_at=datetime.utcnow() + timedelta(hours=8)
-    )
-    db.session.add(sso_session)
+    # Create or update session (deduplicate like OAuth2/SAML)
+    session_id = user_info['dn']
+    sso_session = SSOSession.query.filter_by(session_id=session_id).first()
+    if sso_session:
+        sso_session.expires_at = datetime.utcnow() + timedelta(hours=8)
+    else:
+        sso_session = SSOSession(
+            user_id=user.id,
+            provider_id=provider.id,
+            session_id=session_id,
+            sso_name_id=user_info.get('uid', session_id),
+            expires_at=datetime.utcnow() + timedelta(hours=8)
+        )
+        db.session.add(sso_session)
     db.session.commit()
     
     # Establish Flask session
@@ -974,8 +977,6 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     Returns:
         tuple: (user, error_code) - user object or None, and error code if failed
     """
-    from datetime import timedelta
-    
     user = User.query.filter_by(username=username).first()
     
     if user:
@@ -991,20 +992,11 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     
     # Create new user if auto_create is enabled
     if not provider.auto_create_users:
-        current_app.logger.warning(f"SSO user {username} not found and auto_create disabled")
+        logger.warning(f"SSO user {username} not found and auto_create disabled")
         return None, 'auto_create_disabled'
     
     # Map role from provider config
-    role_mapping = provider.role_mapping
-    if isinstance(role_mapping, str):
-        try:
-            role_mapping = json.loads(role_mapping)
-            if isinstance(role_mapping, str):
-                role_mapping = json.loads(role_mapping)
-        except (json.JSONDecodeError, TypeError):
-            role_mapping = {}
-    if not isinstance(role_mapping, dict):
-        role_mapping = {}
+    role_mapping = _parse_json_field(provider.role_mapping)
     role = provider.default_role or 'viewer'
     
     # Check if external data contains role info
@@ -1033,5 +1025,5 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     db.session.add(user)
     db.session.commit()
     
-    current_app.logger.info(f"Created SSO user: {username} with role {role}")
+    logger.info(f"Created SSO user: {username} with role {role}")
     return user, None
