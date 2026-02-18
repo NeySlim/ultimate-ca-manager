@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-rc4] - 2026-02-18
+
+### Improvements
+- ***SSO code review: consistent URL structure, security hardening, service layer***
+
+### Security
+- Stop leaking internal error details to API clients in SSO endpoints (LDAP, OAuth2, SAML)
+
+### Refactoring
+- Consistent SAML metadata URLs (`/sso/saml/metadata`, `/sso/saml/metadata/fetch`) — no provider ID needed
+- Extract `_parse_json_field()` helper for attribute/role mapping (was duplicated 3×)
+- Deduplicate LDAP SSO sessions (was creating new session every login)
+- Move all SSO imports to top-level (requests, traceback, base64, lxml)
+- Create `sso.service.js` frontend service layer
+
 ## [2.1.0-rc3] - 2026-02-18
 
 ### New Features
