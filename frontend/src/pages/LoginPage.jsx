@@ -107,8 +107,9 @@ export default function LoginPage() {
       })
         .then(res => res.ok ? res.json() : Promise.reject('Session not established'))
         .then(async (data) => {
-          await login(data.data?.user?.username || data.data?.username || 'sso_user', null, { user: data.data?.user || data.data })
-          showSuccess(t('auth.welcomeBackUser', { username: data.data?.user?.username || data.data?.username || 'User' }))
+          const verifyData = data.data || data
+          await login(verifyData?.user?.username || verifyData?.username || 'sso_user', null, verifyData)
+          showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || verifyData?.username || 'User' }))
           navigate('/dashboard')
         })
         .catch((err) => {

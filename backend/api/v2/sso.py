@@ -1180,9 +1180,15 @@ def ldap_login():
     except ImportError:
         pass
     
+    # Get role permissions
+    from auth.permissions import get_role_permissions
+    permissions = get_role_permissions(user.role)
+    
     return success_response(
         data={
             'user': user.to_dict(),
+            'role': user.role,
+            'permissions': permissions,
             'csrf_token': csrf_token
         },
         message='LDAP authentication successful'
