@@ -563,10 +563,8 @@ export default function DashboardPage() {
                     </div>
                   }
                 />
-                <Card.Body className="!p-2 !pr-3 !pt-2">
-                  <div className="h-[220px]">
-                    <CertificateTrendChart data={certificateTrend} />
-                  </div>
+                <Card.Body className="flex-1 min-h-0 !p-2 !pr-3 !pt-2">
+                  <CertificateTrendChart data={certificateTrend} />
                 </Card.Body>
               </Card>
             </WidgetWrapper>
@@ -584,8 +582,7 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="!p-2">
-                  <div className="h-[220px] flex items-center">
+                <Card.Body className="flex-1 min-h-0 !p-2">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
@@ -594,7 +591,6 @@ export default function DashboardPage() {
                         revoked: stats?.revoked || 0,
                       }}
                     />
-                  </div>
                 </Card.Body>
               </Card>
             </WidgetWrapper>
