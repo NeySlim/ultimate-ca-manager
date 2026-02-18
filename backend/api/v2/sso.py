@@ -70,6 +70,7 @@ def create_provider():
     
     # Type-specific fields
     if data['provider_type'] == 'saml':
+        provider.saml_metadata_url = data.get('saml_metadata_url')
         provider.saml_entity_id = data.get('saml_entity_id')
         provider.saml_sso_url = data.get('saml_sso_url')
         provider.saml_slo_url = data.get('saml_slo_url')
@@ -160,7 +161,7 @@ def update_provider(provider_id=None, provider_type_name=None):
     
     # Type-specific fields
     if provider.provider_type == 'saml':
-        for field in ['saml_entity_id', 'saml_sso_url', 'saml_slo_url', 'saml_certificate', 'saml_sign_requests']:
+        for field in ['saml_metadata_url', 'saml_entity_id', 'saml_sso_url', 'saml_slo_url', 'saml_certificate', 'saml_sign_requests']:
             if field in data:
                 setattr(provider, field, data[field])
     
@@ -414,6 +415,136 @@ def list_sessions():
         SSOSession.expires_at > datetime.utcnow()
     ).all()
     return success_response(data=[s.to_dict() for s in sessions])
+
+
+# ============ SAML Metadata ============
+
+@bp.route('/api/v2/sso/metadata/fetch', methods=['POST'])
+@require_auth(['write:sso'])
+def fetch_idp_metadata():
+    """Fetch and parse IDP metadata XML from a URL"""
+    import requests as http_requests
+    
+    data = request.get_json()
+    metadata_url = data.get('metadata_url')
+    if not metadata_url:
+        return error_response("metadata_url is required", 400)
+    
+    try:
+        resp = http_requests.get(metadata_url, timeout=10, verify=True)
+        resp.raise_for_status()
+    except http_requests.exceptions.SSLError:
+        try:
+            resp = http_requests.get(metadata_url, timeout=10, verify=False)
+            resp.raise_for_status()
+        except Exception as e:
+            return error_response(f"Failed to fetch metadata: {str(e)}", 400)
+    except Exception as e:
+        return error_response(f"Failed to fetch metadata: {str(e)}", 400)
+    
+    try:
+        parsed = _parse_saml_metadata(resp.text)
+        return success_response(data=parsed, message="IDP metadata parsed successfully")
+    except Exception as e:
+        return error_response(f"Failed to parse metadata XML: {str(e)}", 400)
+
+
+@bp.route('/api/v2/sso/providers/<int:provider_id>/metadata', methods=['GET'])
+def get_sp_metadata(provider_id):
+    """Generate SP metadata XML for configuring the IDP"""
+    provider = SSOProvider.query.get_or_404(provider_id)
+    if provider.provider_type != 'saml':
+        return error_response("SP metadata is only available for SAML providers", 400)
+    
+    sp_base = request.url_root.rstrip('/')
+    entity_id = f'{sp_base}/api/v2/sso'
+    acs_url = f'{sp_base}/api/v2/sso/callback/saml'
+    slo_url = f'{sp_base}/api/v2/sso/callback/saml'
+    
+    metadata_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
+                     entityID="{entity_id}">
+  <md:SPSSODescriptor AuthnRequestsSigned="false"
+                      WantAssertionsSigned="false"
+                      protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
+    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                Location="{acs_url}"
+                                index="1"
+                                isDefault="true"/>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                            Location="{slo_url}"/>
+  </md:SPSSODescriptor>
+</md:EntityDescriptor>'''
+    
+    from flask import Response
+    return Response(metadata_xml, mimetype='application/xml',
+                    headers={'Content-Disposition': f'inline; filename="ucm-sp-metadata-{provider_id}.xml"'})
+
+
+def _parse_saml_metadata(xml_text):
+    """Parse SAML IDP metadata XML and extract key fields"""
+    from lxml import etree
+    
+    NS = {
+        'md': 'urn:oasis:names:tc:SAML:2.0:metadata',
+        'ds': 'http://www.w3.org/2000/09/xmldsig#',
+    }
+    
+    root = etree.fromstring(xml_text.encode('utf-8'))
+    
+    result = {
+        'entity_id': None,
+        'sso_url': None,
+        'slo_url': None,
+        'certificate': None,
+    }
+    
+    # Entity ID from root or IDPSSODescriptor
+    result['entity_id'] = root.get('entityID')
+    
+    # Find IDPSSODescriptor
+    idp = root.find('.//md:IDPSSODescriptor', NS)
+    if idp is None:
+        # Try without namespace prefix (some IdPs use default ns)
+        idp = root.find('.//{urn:oasis:names:tc:SAML:2.0:metadata}IDPSSODescriptor')
+    
+    if idp is not None:
+        # SSO URL (HTTP-Redirect preferred, fallback to HTTP-POST)
+        for binding in ['urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+                        'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']:
+            sso = idp.find(f'md:SingleSignOnService[@Binding="{binding}"]', NS)
+            if sso is None:
+                sso = idp.find(f'{{urn:oasis:names:tc:SAML:2.0:metadata}}SingleSignOnService[@Binding="{binding}"]')
+            if sso is not None:
+                result['sso_url'] = sso.get('Location')
+                break
+        
+        # SLO URL
+        for binding in ['urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+                        'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']:
+            slo = idp.find(f'md:SingleLogoutService[@Binding="{binding}"]', NS)
+            if slo is None:
+                slo = idp.find(f'{{urn:oasis:names:tc:SAML:2.0:metadata}}SingleLogoutService[@Binding="{binding}"]')
+            if slo is not None:
+                result['slo_url'] = slo.get('Location')
+                break
+        
+        # Certificate (first X509Certificate found)
+        cert = idp.find('.//ds:X509Certificate', NS)
+        if cert is None:
+            cert = idp.find('.//{http://www.w3.org/2000/09/xmldsig#}X509Certificate')
+        if cert is not None and cert.text:
+            # Clean up whitespace and format
+            cert_text = cert.text.strip().replace('\n', '').replace(' ', '')
+            # Format as PEM lines of 64 chars
+            lines = [cert_text[i:i+64] for i in range(0, len(cert_text), 64)]
+            result['certificate'] = '\n'.join(lines)
+    
+    if not result['entity_id'] and not result['sso_url']:
+        raise ValueError("Could not find IDP entity ID or SSO URL in metadata")
+    
+    return result
 
 
 # ============ Public SSO Endpoints (no auth) ============

@@ -24,6 +24,7 @@ class SSOProvider(db.Model):
     icon = db.Column(db.String(100))  # Icon name for UI
     
     # SAML settings
+    saml_metadata_url = db.Column(db.String(500))  # IDP metadata URL for auto-config
     saml_entity_id = db.Column(db.String(500))
     saml_sso_url = db.Column(db.String(500))
     saml_slo_url = db.Column(db.String(500))
@@ -135,6 +136,7 @@ class SSOProvider(db.Model):
         # Type-specific fields
         if self.provider_type == 'saml':
             data.update({
+                'saml_metadata_url': self.saml_metadata_url,
                 'saml_entity_id': self.saml_entity_id,
                 'saml_sso_url': self.saml_sso_url,
                 'saml_slo_url': self.saml_slo_url,

@@ -519,6 +519,7 @@ function MappingEditor({ value, onChange, keyLabel, valueLabel, keyPlaceholder, 
 // SSO Provider Form Component
 function SsoProviderForm({ provider, onSave, onCancel }) {
   const { t } = useTranslation()
+  const { showSuccess, showError } = useNotification()
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
@@ -550,15 +551,40 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     oauth2_userinfo_url: provider?.oauth2_userinfo_url || '',
     oauth2_scopes: provider?.oauth2_scopes?.join(' ') || 'openid profile email',
     // SAML
+    saml_metadata_url: provider?.saml_metadata_url || '',
     saml_entity_id: provider?.saml_entity_id || '',
     saml_sso_url: provider?.saml_sso_url || '',
     saml_slo_url: provider?.saml_slo_url || '',
     saml_certificate: provider?.saml_certificate || '',
     saml_sign_requests: provider?.saml_sign_requests ?? true,
   })
+  const [fetchingMetadata, setFetchingMetadata] = useState(false)
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const fetchIdpMetadata = async () => {
+    if (!formData.saml_metadata_url) return
+    setFetchingMetadata(true)
+    try {
+      const response = await apiClient.post('/sso/metadata/fetch', {
+        body: { metadata_url: formData.saml_metadata_url }
+      })
+      const meta = response.data
+      setFormData(prev => ({
+        ...prev,
+        saml_entity_id: meta.entity_id || prev.saml_entity_id,
+        saml_sso_url: meta.sso_url || prev.saml_sso_url,
+        saml_slo_url: meta.slo_url || prev.saml_slo_url,
+        saml_certificate: meta.certificate || prev.saml_certificate,
+      }))
+      showSuccess(t('sso.metadataFetched'))
+    } catch (err) {
+      showError(err.message || t('sso.metadataFetchFailed'))
+    } finally {
+      setFetchingMetadata(false)
+    }
   }
 
   const handleSubmit = (e) => {
@@ -649,6 +675,13 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           <HelpCard variant="info" className="text-xs">
             {t('sso.spMetadataHelp')}
           </HelpCard>
+          {provider?.id && (
+            <CopyableUrl
+              label={t('sso.spMetadataXml')}
+              value={`${baseUrl}/api/v2/sso/providers/${provider.id}/metadata`}
+              description={t('sso.spMetadataXmlDesc')}
+            />
+          )}
           <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
           <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
           <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />
@@ -799,6 +832,30 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
 
         {formData.provider_type === 'saml' && (
           <>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Input
+                  label={t('sso.metadataUrl')}
+                  value={formData.saml_metadata_url}
+                  onChange={e => handleChange('saml_metadata_url', e.target.value)}
+                  placeholder="https://idp.example.com/saml/metadata"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={fetchIdpMetadata}
+                disabled={fetchingMetadata || !formData.saml_metadata_url}
+                className="mb-0.5 gap-1.5 whitespace-nowrap"
+              >
+                {fetchingMetadata ? <LoadingSpinner size="xs" /> : <Download size={14} />}
+                {t('sso.fetchMetadata')}
+              </Button>
+            </div>
+            <HelpCard variant="info" className="text-xs">
+              {t('sso.metadataUrlHelp')}
+            </HelpCard>
             <Input
               label={t('sso.entityId')}
               value={formData.saml_entity_id}
