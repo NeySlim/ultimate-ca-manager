@@ -2383,6 +2383,11 @@ input:focus, select:focus, textarea:focus {
   background: var(--bg-secondary);
 }
 
+/* Force Radix Select portal above modals (inline z-index: 50 override) */
+[data-radix-popper-content-wrapper] {
+  z-index: 300 !important;
+}
+
 /* Search highlight for Help reader */
 ::highlight(search-results) {
   background-color: #fbbf24;
