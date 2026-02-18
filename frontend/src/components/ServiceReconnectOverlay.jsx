@@ -6,6 +6,8 @@
 import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Check, Warning, Timer, SignOut } from '@phosphor-icons/react'
 
+const COUNTDOWN_TOTAL = 60
+
 export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel }) {
   const { t } = useTranslation()
 
@@ -51,7 +53,7 @@ export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel }
                   cx="40" cy="40" r="34" fill="none" stroke="currentColor" strokeWidth="3"
                   className="text-accent-primary transition-all duration-1000 ease-linear"
                   strokeDasharray={`${2 * Math.PI * 34}`}
-                  strokeDashoffset={`${2 * Math.PI * 34 * (1 - countdown / 30)}`}
+                  strokeDashoffset={`${2 * Math.PI * 34 * (1 - countdown / COUNTDOWN_TOTAL)}`}
                   strokeLinecap="round"
                 />
               </svg>

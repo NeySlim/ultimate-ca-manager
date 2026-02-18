@@ -1774,9 +1774,14 @@ export default function SettingsPage() {
         cert_id: selectedHttpsCert
       })
       showSuccess(t('messages.success.https.applied'))
-      setTimeout(() => window.location.reload(), 3000)
+      waitForRestart()
     } catch (error) {
-      showError(error.message || t('messages.errors.https.applyFailed'))
+      if (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK') {
+        // Network error expected — service is already restarting
+        waitForRestart()
+      } else {
+        showError(error.message || t('messages.errors.https.applyFailed'))
+      }
     }
   }
 
@@ -1793,9 +1798,13 @@ export default function SettingsPage() {
         validity_days: 365
       })
       showSuccess(t('messages.success.https.regenerated'))
-      setTimeout(() => window.location.reload(), 3000)
+      waitForRestart()
     } catch (error) {
-      showError(error.message || t('messages.errors.https.regenerateFailed'))
+      if (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK') {
+        waitForRestart()
+      } else {
+        showError(error.message || t('messages.errors.https.regenerateFailed'))
+      }
     }
   }
 
