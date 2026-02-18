@@ -75,17 +75,18 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
       name: day,
       issued: 0,
       revoked: 0,
+      expired: 0,
     }))
   }, [data])
   
   const strokeColor = colors.primary
-  const fillColor = `${colors.primary}30`
   const revokedColor = colors.danger
+  const expiredColor = colors.warning
   const gridColor = mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
   
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+      <AreaChart data={chartData} margin={{ top: 8, right: 20, left: -20, bottom: 5 }}>
         <defs>
           <linearGradient id="issuedGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={strokeColor} stopOpacity={0.2}/>
@@ -97,6 +98,7 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
           axisLine={false}
           tickLine={false}
+          interval={chartData.length > 15 ? Math.floor(chartData.length / 8) : 0}
         />
         <YAxis 
           tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
@@ -112,6 +114,15 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           stroke={strokeColor} 
           fill="url(#issuedGradient)"
           strokeWidth={2}
+        />
+        <Area 
+          type="monotone" 
+          dataKey="expired" 
+          name={t('common.expired')}
+          stroke={expiredColor} 
+          fill="transparent"
+          strokeWidth={2}
+          strokeDasharray="5 3"
         />
         <Area 
           type="monotone" 

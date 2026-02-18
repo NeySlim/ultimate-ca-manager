@@ -159,6 +159,8 @@ export default function DashboardPage() {
   const [systemStatus, setSystemStatus] = useState(null)
   const [nextExpirations, setNextExpirations] = useState([])
   const [certificateTrend, setCertificateTrend] = useState([])
+  const [trendDays, setTrendDays] = useState(7)
+  const trendDaysRef = useRef(7)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [versionInfo, setVersionInfo] = useState({ version: '2.0.0', update_available: false })
@@ -245,7 +247,7 @@ export default function DashboardPage() {
         certificatesService.getAll({ limit: 5, sort: 'created_at', order: 'desc' }),
         dashboardService.getActivityLog(10),
         dashboardService.getSystemStatus(),
-        dashboardService.getCertificateTrend(7),
+        dashboardService.getCertificateTrend(trendDaysRef.current),
       ])
       
       setStats(statsData.data || {})
@@ -289,6 +291,17 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboard()
   }, [loadDashboard])
+
+  // Reload trend when days selector changes (skip initial load)
+  useEffect(() => {
+    if (trendDaysRef.current === trendDays) return
+    trendDaysRef.current = trendDays
+    let cancelled = false
+    dashboardService.getCertificateTrend(trendDays).then(res => {
+      if (!cancelled) setCertificateTrend(res.data?.trend || [])
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [trendDays])
 
   // Load version info
   useEffect(() => {
@@ -530,10 +543,28 @@ export default function DashboardPage() {
                   icon={Lightning}
                   iconColor="amber"
                   title={t('dashboard.certificateActivity')}
-                  subtitle={t('dashboard.last7Days')}
+                  subtitle={t('dashboard.lastNDays', { count: trendDays })}
+                  action={
+                    <div className="flex gap-1">
+                      {[7, 15, 30].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setTrendDays(d)}
+                          className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
+                            trendDays === d
+                              ? 'bg-accent-primary text-white'
+                              : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
+                          }`}
+                        >
+                          {d}d
+                        </button>
+                      ))}
+                    </div>
+                  }
                 />
-                <Card.Body className="flex-1 min-h-[200px] relative !pb-0 !px-2">
-                  <div className="absolute inset-0 px-2 pb-2">
+                <Card.Body className="!p-2 !pr-3 !pt-2">
+                  <div className="h-[220px]">
                     <CertificateTrendChart data={certificateTrend} />
                   </div>
                 </Card.Body>
@@ -553,8 +584,8 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 min-h-[200px] relative !p-0">
-                  <div className="absolute inset-0 flex items-center">
+                <Card.Body className="!p-2">
+                  <div className="h-[220px] flex items-center">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),

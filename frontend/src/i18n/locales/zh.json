@@ -460,6 +460,7 @@
     "lastUpdated": "最后更新",
     "liveUpdates": "实时更新",
     "last7Days": "最近7天",
+    "lastNDays": "最近{{count}}天",
     "currentCertificates": "当前证书",
     "noCertificatesYet": "暂无证书",
     "noCAsYet": "暂无证书颁发机构",

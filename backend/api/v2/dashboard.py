@@ -223,46 +223,66 @@ def get_activity_log():
 @bp.route('/api/v2/dashboard/certificate-trend', methods=['GET'])
 @require_auth()
 def get_certificate_trend():
-    """Get certificate activity for the last 7 days"""
+    """Get certificate activity trend (issued/revoked/expired per day)"""
     
     days = request.args.get('days', 7, type=int)
+    days = min(max(days, 1), 90)  # clamp 1-90
     
     try:
-        # Calculate dates for the last N days
         today = datetime.now().date()
-        trend_data = []
+        start_date = today - timedelta(days=days - 1)
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt = datetime.combine(today, datetime.max.time())
         
-        for i in range(days - 1, -1, -1):
-            day = today - timedelta(days=i)
-            day_start = datetime.combine(day, datetime.min.time())
-            day_end = datetime.combine(day, datetime.max.time())
-            
-            # Count certificates issued on this day
-            issued = db.session.execute(
-                text("""
-                    SELECT COUNT(*) FROM certificates 
-                    WHERE created_at >= :start AND created_at <= :end
-                """),
-                {'start': day_start, 'end': day_end}
-            ).scalar() or 0
-            
-            # Count certificates revoked on this day
-            revoked = db.session.execute(
-                text("""
-                    SELECT COUNT(*) FROM certificates 
-                    WHERE revoked_at >= :start AND revoked_at <= :end
-                """),
-                {'start': day_start, 'end': day_end}
-            ).scalar() or 0
-            
-            # Day name abbreviation
-            day_name = day.strftime('%a')
+        # 3 grouped queries instead of 3×N
+        issued_rows = db.session.execute(
+            text("""
+                SELECT DATE(created_at) as day, COUNT(*) as cnt
+                FROM certificates
+                WHERE created_at >= :start AND created_at <= :end
+                GROUP BY DATE(created_at)
+            """),
+            {'start': start_dt, 'end': end_dt}
+        ).fetchall()
+        
+        revoked_rows = db.session.execute(
+            text("""
+                SELECT DATE(revoked_at) as day, COUNT(*) as cnt
+                FROM certificates
+                WHERE revoked_at >= :start AND revoked_at <= :end
+                GROUP BY DATE(revoked_at)
+            """),
+            {'start': start_dt, 'end': end_dt}
+        ).fetchall()
+        
+        expired_rows = db.session.execute(
+            text("""
+                SELECT DATE(valid_to) as day, COUNT(*) as cnt
+                FROM certificates
+                WHERE valid_to >= :start AND valid_to <= :end
+                  AND (revoked IS NULL OR revoked = 0)
+                GROUP BY DATE(valid_to)
+            """),
+            {'start': start_dt, 'end': end_dt}
+        ).fetchall()
+        
+        # Index by date string for O(1) lookup
+        issued_map = {str(r[0]): r[1] for r in issued_rows}
+        revoked_map = {str(r[0]): r[1] for r in revoked_rows}
+        expired_map = {str(r[0]): r[1] for r in expired_rows}
+        
+        trend_data = []
+        for i in range(days):
+            day = start_date + timedelta(days=i)
+            day_str = day.isoformat()
+            label = day.strftime('%a') if days <= 7 else day.strftime('%d/%m')
             
             trend_data.append({
-                'name': day_name,
-                'date': day.isoformat(),
-                'issued': issued,
-                'revoked': revoked
+                'name': label,
+                'date': day_str,
+                'issued': issued_map.get(day_str, 0),
+                'revoked': revoked_map.get(day_str, 0),
+                'expired': expired_map.get(day_str, 0),
             })
         
         return success_response(data={'trend': trend_data})
