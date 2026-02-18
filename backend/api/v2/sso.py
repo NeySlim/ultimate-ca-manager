@@ -9,6 +9,7 @@ from utils.response import success_response, error_response
 from models import db, User, Certificate
 from models.sso import SSOProvider, SSOSession
 from datetime import datetime, timedelta
+import hmac
 import json
 import base64
 import secrets as py_secrets
@@ -19,6 +20,8 @@ from lxml import etree
 
 import logging
 logger = logging.getLogger(__name__)
+
+VALID_ROLES = {'admin', 'operator', 'viewer'}
 
 bp = Blueprint('sso_pro', __name__)
 
@@ -38,6 +41,59 @@ def _parse_json_field(value):
         except (json.JSONDecodeError, TypeError):
             return {}
     return {}
+
+
+# LDAP brute-force protection (reuses User model's lockout fields)
+LDAP_MAX_FAILED_ATTEMPTS = 5
+LDAP_LOCKOUT_MINUTES = 15
+
+
+def _check_ldap_lockout(username):
+    """Check if account is locked due to failed LDAP attempts."""
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return False
+    if user.locked_until:
+        if datetime.utcnow() < user.locked_until:
+            return True
+        user.locked_until = None
+        user.failed_logins = 0
+        db.session.commit()
+    return False
+
+
+def _record_ldap_failed_attempt(username):
+    """Record a failed LDAP login attempt."""
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return
+    user.failed_logins = (user.failed_logins or 0) + 1
+    if user.failed_logins >= LDAP_MAX_FAILED_ATTEMPTS:
+        user.locked_until = datetime.utcnow() + timedelta(minutes=LDAP_LOCKOUT_MINUTES)
+        logger.warning(f"LDAP account locked for {username} after {LDAP_MAX_FAILED_ATTEMPTS} failed attempts")
+    db.session.commit()
+
+
+def _clear_ldap_failed_attempts(username):
+    """Clear failed attempt counters on successful login."""
+    user = User.query.filter_by(username=username).first()
+    if user and (user.failed_logins or user.locked_until):
+        user.failed_logins = 0
+        user.locked_until = None
+        db.session.commit()
+
+
+def _resolve_role(provider, external_data):
+    """Resolve user role from role_mapping or default_role."""
+    role_mapping = _parse_json_field(provider.role_mapping)
+    if role_mapping:
+        external_roles = external_data.get('roles', external_data.get('groups', []))
+        if isinstance(external_roles, str):
+            external_roles = [external_roles]
+        for ext_role, ucm_role in role_mapping.items():
+            if ext_role in external_roles:
+                return ucm_role if ucm_role in VALID_ROLES else 'viewer'
+    return provider.default_role if provider.default_role in VALID_ROLES else 'viewer'
 
 
 # ============ Provider Management ============
@@ -84,7 +140,7 @@ def create_provider():
         icon=data.get('icon'),
         enabled=data.get('enabled', False),
         is_default=data.get('is_default', False),
-        default_role=data.get('default_role', 'viewer'),
+        default_role=data.get('default_role', 'viewer') if data.get('default_role') in VALID_ROLES else 'viewer',
         auto_create_users=data.get('auto_create_users', True),
         auto_update_users=data.get('auto_update_users', True),
     )
@@ -179,7 +235,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         if provider.is_default:
             SSOProvider.query.filter(SSOProvider.id != provider.id).update({'is_default': False})
     if 'default_role' in data:
-        provider.default_role = data['default_role']
+        provider.default_role = data['default_role'] if data['default_role'] in VALID_ROLES else 'viewer'
     if 'auto_create_users' in data:
         provider.auto_create_users = data['auto_create_users']
     if 'auto_update_users' in data:
@@ -354,7 +410,7 @@ def _ldap_authenticate_user(provider, username, password):
         
         if not conn.entries:
             conn.unbind()
-            return None, "User not found in LDAP"
+            return None, "Invalid credentials"
         
         user_entry = conn.entries[0]
         user_dn = user_entry.entry_dn
@@ -370,16 +426,35 @@ def _ldap_authenticate_user(provider, username, password):
         )
         
         if not user_conn.bind():
-            return None, "Invalid password"
+            return None, "Invalid credentials"
         
         user_conn.unbind()
+        
+        # Fetch user's groups for role mapping
+        groups = []
+        if provider.ldap_group_filter:
+            try:
+                group_conn = Connection(
+                    server,
+                    user=provider.ldap_bind_dn,
+                    password=provider.ldap_bind_password,
+                    auto_bind=True
+                )
+                group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
+                group_filter = f'(&{provider.ldap_group_filter}(member={user_dn}))'
+                group_conn.search(group_base, group_filter, attributes=['cn'])
+                groups = [str(entry.cn) for entry in group_conn.entries if hasattr(entry, 'cn')]
+                group_conn.unbind()
+            except Exception as e:
+                logger.warning(f"Failed to fetch LDAP groups for {username}: {e}")
         
         # Return user info
         return {
             'dn': user_dn,
             'username': str(getattr(user_entry, provider.ldap_username_attr, username)),
             'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
-            'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, ''))
+            'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, '')),
+            'groups': groups
         }, None
         
     except ImportError:
@@ -840,7 +915,8 @@ def sso_callback(provider_type):
     # Verify state for CSRF protection (OAuth2 only — SAML uses its own mechanisms)
     if provider_type == 'oauth2':
         state = request.args.get('state')
-        if state != session.get('sso_state'):
+        stored_state = session.get('sso_state', '')
+        if not state or not hmac.compare_digest(state, stored_state):
             return redirect('/login?error=invalid_state')
     
     if provider.provider_type == 'oauth2':
@@ -1032,6 +1108,10 @@ def ldap_login():
     if not username or not password:
         return error_response("Username and password required", 400)
     
+    # Check account lockout before attempting LDAP auth
+    if _check_ldap_lockout(username):
+        return error_response("Account temporarily locked due to too many failed attempts", 429)
+    
     # Find LDAP provider
     if provider_id:
         provider = SSOProvider.query.get(provider_id)
@@ -1049,7 +1129,8 @@ def ldap_login():
     user_info, error = _ldap_authenticate_user(provider, username, password)
     
     if error:
-        return error_response(f"LDAP authentication failed: {error}", 401)
+        _record_ldap_failed_attempt(username)
+        return error_response("Invalid credentials", 401)
     
     # Create or update user
     user, error_code = _get_or_create_sso_user(
@@ -1064,6 +1145,9 @@ def ldap_login():
         if error_code == 'auto_create_disabled':
             return error_response("User not found and automatic account creation is disabled. Contact your administrator.", 403)
         return error_response("Failed to create user account", 500)
+    
+    # Clear failed attempts on successful login
+    _clear_ldap_failed_attempts(username)
     
     # Create or update session (deduplicate like OAuth2/SAML)
     session_id = user_info['dn']
@@ -1088,9 +1172,18 @@ def ldap_login():
     session['auth_method'] = 'ldap'
     session.permanent = True
     
+    # Generate CSRF token
+    csrf_token = None
+    try:
+        from security.csrf import CSRFProtection
+        csrf_token = CSRFProtection.generate_token(user.id)
+    except ImportError:
+        pass
+    
     return success_response(
         data={
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'csrf_token': csrf_token
         },
         message='LDAP authentication successful'
     )
@@ -1171,6 +1264,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 user.email = email
             if fullname:
                 user.full_name = fullname
+            user.role = _resolve_role(provider, external_data)
             user.last_login = datetime.utcnow()
             db.session.commit()
         return user, None
@@ -1180,20 +1274,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         logger.warning(f"SSO user {username} not found and auto_create disabled")
         return None, 'auto_create_disabled'
     
-    # Map role from provider config
-    role_mapping = _parse_json_field(provider.role_mapping)
-    role = provider.default_role or 'viewer'
-    
-    # Check if external data contains role info
-    if role_mapping:
-        external_roles = external_data.get('roles', external_data.get('groups', []))
-        if isinstance(external_roles, str):
-            external_roles = [external_roles]
-        
-        for ext_role, ucm_role in role_mapping.items():
-            if ext_role in external_roles:
-                role = ucm_role
-                break
+    role = _resolve_role(provider, external_data)
     
     user = User(
         username=username,
