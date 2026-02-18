@@ -563,7 +563,7 @@ export default function DashboardPage() {
                     </div>
                   }
                 />
-                <Card.Body className="flex-1 min-h-0 !p-2 !pr-3 !pt-2">
+                <Card.Body className="flex-1 min-h-[180px] !p-2 !pr-3 !pt-2">
                   <CertificateTrendChart data={certificateTrend} />
                 </Card.Body>
               </Card>
@@ -582,7 +582,7 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 min-h-0 !p-2">
+                <Card.Body className="flex-1 min-h-[180px] !p-2">
                     <StatusPieChart 
                       data={{
                         valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),

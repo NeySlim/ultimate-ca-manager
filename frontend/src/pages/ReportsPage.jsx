@@ -68,12 +68,14 @@ export default function ReportsPage() {
   const [expiryRecipientInput, setExpiryRecipientInput] = useState('')
   const [complianceRecipientInput, setComplianceRecipientInput] = useState('')
 
+  const hasWriteSettings = canWrite('settings')
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const [typesRes, scheduleRes] = await Promise.all([
         reportsService.getTypes(),
-        canWrite('settings') ? reportsService.getSchedule().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+        hasWriteSettings ? reportsService.getSchedule().catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       ])
       setReportTypes(typesRes.data || {})
       if (scheduleRes.data) setSchedule(scheduleRes.data)
@@ -82,7 +84,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
-  }, [showError, t, canWrite])
+  }, [showError, t, hasWriteSettings])
 
   useEffect(() => { loadData() }, [loadData])
 
