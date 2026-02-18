@@ -113,7 +113,7 @@ export function Select({
               "bg-bg-secondary/95 backdrop-blur-md",
               "border border-border/50 rounded-lg",
               "shadow-xl shadow-black/20",
-              "overflow-hidden z-50",
+              "overflow-hidden",
               // Animation
               "animate-in fade-in-0 zoom-in-95",
               "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
