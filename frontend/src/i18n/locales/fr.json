@@ -1733,6 +1733,8 @@
     "sloURL": "URL SLO (optionnel)",
     "certificate": "Certificat IdP (PEM)",
     "noProviders": "Aucun fournisseur SSO",
+    "notConfigured": "Non configuré",
+    "configure": "Configurer",
     "noProvidersDescription": "Ajoutez des fournisseurs LDAP, OAuth2 ou SAML",
     "noMatches": "Aucune correspondance",
     "tryDifferentSearch": "Essayez une autre recherche",

@@ -138,6 +138,11 @@ def create_provider():
     if SSOProvider.query.filter_by(name=data['name']).first():
         return error_response("Provider name already exists", 400)
     
+    # Enforce 1 provider per type
+    existing = SSOProvider.query.filter_by(provider_type=data['provider_type']).first()
+    if existing:
+        return error_response(f"A {data['provider_type'].upper()} provider already exists. Only one provider per type is allowed.", 400)
+    
     provider = SSOProvider(
         name=data['name'],
         provider_type=data['provider_type'],
