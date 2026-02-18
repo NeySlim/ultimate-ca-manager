@@ -351,20 +351,20 @@ jobs:
           ### Debian/Ubuntu
           ```bash
           wget https://github.com/REPO/releases/download/vVERSION/ucm_DEB_VERSION_all.deb
-          sudo dpkg -i ucm_*_all.deb
+          sudo dpkg -i ucm_DEB_VERSION_all.deb
           sudo apt-get install -f
           ```
           
           ### Fedora/RHEL
           ```bash
           wget https://github.com/REPO/releases/download/vVERSION/ucm-RPM_VERSION-1.fc43.noarch.rpm
-          sudo dnf install ./ucm-*.rpm
+          sudo dnf install ./ucm-RPM_VERSION-1.fc43.noarch.rpm
           ```
           
           ### Silent/Automated Install
           ```bash
           # Skip firewall prompts for CI/automation
-          sudo UCM_PORT=8443 UCM_FIREWALL=no dpkg -i ucm_*.deb
+          sudo UCM_PORT=8443 UCM_FIREWALL=no dpkg -i ucm_DEB_VERSION_all.deb
           ```
           
           ## Default Credentials
