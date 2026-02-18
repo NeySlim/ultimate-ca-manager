@@ -454,9 +454,10 @@ def _ldap_authenticate_user(provider, username, password):
                         password=provider.ldap_bind_password,
                         auto_bind=True
                     )
+                    safe_dn = escape_filter_chars(user_dn)
                     memberof_conn.search(
                         provider.ldap_base_dn,
-                        f'(distinguishedName={user_dn})',
+                        f'(distinguishedName={safe_dn})',
                         attributes=['memberOf']
                     )
                     if not memberof_conn.entries:
@@ -493,7 +494,8 @@ def _ldap_authenticate_user(provider, username, password):
                     gf = provider.ldap_group_filter.strip()
                     if not gf.startswith('('):
                         gf = f'({gf})'
-                    group_filter = f'(&{gf}({member_attr}={user_dn}))'
+                    safe_dn = escape_filter_chars(user_dn)
+                    group_filter = f'(&{gf}({member_attr}={safe_dn}))'
                     group_conn.search(group_base, group_filter, attributes=['cn'])
                     groups = [str(entry.cn) for entry in group_conn.entries if hasattr(entry, 'cn')]
                     group_conn.unbind()
@@ -635,7 +637,8 @@ def test_mapping(provider_id):
                                 break
                 else:
                     # Fallback: re-search with memberOf attribute
-                    conn.search(provider.ldap_base_dn, f'(distinguishedName={user_dn})', attributes=['memberOf'])
+                    safe_dn = escape_filter_chars(user_dn)
+                    conn.search(provider.ldap_base_dn, f'(distinguishedName={safe_dn})', attributes=['memberOf'])
                     if conn.entries and hasattr(conn.entries[0], 'memberOf'):
                         group_dns = conn.entries[0].memberOf.values if hasattr(conn.entries[0].memberOf, 'values') else [str(conn.entries[0].memberOf)]
                         for gdn in group_dns:
@@ -650,7 +653,8 @@ def test_mapping(provider_id):
                 gf = provider.ldap_group_filter.strip()
                 if not gf.startswith('('):
                     gf = f'({gf})'
-                group_filter = f'(&{gf}({member_attr}={user_dn}))'
+                safe_dn = escape_filter_chars(user_dn)
+                group_filter = f'(&{gf}({member_attr}={safe_dn}))'
                 conn.search(group_base, group_filter, attributes=['cn'])
                 groups = [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
         
