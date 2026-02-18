@@ -116,7 +116,7 @@ After installation, access UCM at **https://localhost:8443**
 
 **Default Credentials:**
 - **Username:** admin
-- **Password:** shown during install (see `/etc/ucm/ucm.env`)
+- **Password:** `changeme123`
 
 **IMPORTANT:** Change the default password immediately after first login!
 

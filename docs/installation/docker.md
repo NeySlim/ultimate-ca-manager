@@ -33,7 +33,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443
-**Credentials:** admin / password from Docker logs (check `docker logs ucm`)
+**Credentials:** admin / changeme123
 
 ---
 
