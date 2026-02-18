@@ -50,6 +50,15 @@ export default function TrustStorePage() {
     loadCertificates()
   }, [])
 
+  // Reload when floating window actions change data
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.type === 'truststore') loadCertificates()
+    }
+    window.addEventListener('ucm:data-changed', handler)
+    return () => window.removeEventListener('ucm:data-changed', handler)
+  }, [])
+
   const loadCertificates = async () => {
     setLoading(true)
     try {
