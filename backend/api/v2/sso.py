@@ -479,30 +479,79 @@ def fetch_idp_metadata():
 
 @bp.route('/api/v2/sso/saml/metadata', methods=['GET'])
 def get_sp_metadata():
-    """Generate SP metadata XML for configuring the IDP"""
+    """Generate schema-valid SAML 2.0 SP metadata XML for configuring the IDP.
+    
+    Uses python3-saml's metadata builder to ensure compliance with
+    the SAML 2.0 Metadata XSD (correct element ordering, validUntil, etc.).
+    Works with strict IDPs like Omnissa Workspace ONE Access, ADFS, Shibboleth.
+    """
+    from onelogin.saml2.settings import OneLogin_Saml2_Settings
+    
     sp_base = request.url_root.rstrip('/')
     entity_id = f'{sp_base}/api/v2/sso'
     acs_url = f'{sp_base}/api/v2/sso/callback/saml'
     slo_url = f'{sp_base}/api/v2/sso/callback/saml'
     
-    metadata_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+    # Load SAML provider config if available (for NameIDFormat override)
+    provider = SSOProvider.query.filter_by(provider_type='saml').first()
+    name_id_format = (getattr(provider, 'saml_name_id_format', None) 
+                      if provider else None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
+    
+    settings_data = {
+        'strict': False,
+        'sp': {
+            'entityId': entity_id,
+            'assertionConsumerService': {
+                'url': acs_url,
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+            },
+            'singleLogoutService': {
+                'url': slo_url,
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+            },
+            'NameIDFormat': name_id_format,
+        },
+        'idp': {
+            'entityId': 'https://idp.placeholder.local',
+            'singleSignOnService': {
+                'url': 'https://idp.placeholder.local/sso',
+                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+            },
+        },
+    }
+    
+    try:
+        settings = OneLogin_Saml2_Settings(settings_data, custom_base_path='/tmp')
+        metadata = settings.get_sp_metadata()
+        if isinstance(metadata, bytes):
+            metadata = metadata.decode('utf-8')
+        
+        errors = settings.validate_metadata(metadata)
+        if errors:
+            logger.warning(f"SP metadata validation warnings: {errors}")
+        
+        return Response(metadata, mimetype='application/xml',
+                        headers={'Content-Disposition': 'inline; filename="ucm-sp-metadata.xml"'})
+    except Exception as e:
+        logger.error(f"Failed to generate SP metadata via python3-saml: {e}")
+        # Fallback: hand-crafted but schema-compliant (correct element order per XSD)
+        metadata_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
                      entityID="{entity_id}">
   <md:SPSSODescriptor AuthnRequestsSigned="false"
                       WantAssertionsSigned="false"
                       protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified</md:NameIDFormat>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                            Location="{slo_url}"/>
+    <md:NameIDFormat>{name_id_format}</md:NameIDFormat>
     <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
                                 Location="{acs_url}"
                                 index="1"
                                 isDefault="true"/>
-    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-                            Location="{slo_url}"/>
   </md:SPSSODescriptor>
 </md:EntityDescriptor>'''
-    
-    return Response(metadata_xml, mimetype='application/xml',
-                    headers={'Content-Disposition': 'inline; filename="ucm-sp-metadata.xml"'})
+        return Response(metadata_xml, mimetype='application/xml',
+                        headers={'Content-Disposition': 'inline; filename="ucm-sp-metadata.xml"'})
 
 
 def _parse_saml_metadata(xml_text):
