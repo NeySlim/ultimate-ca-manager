@@ -52,6 +52,7 @@ class SSOProvider(db.Model):
     ldap_username_attr = db.Column(db.String(100), default='uid')
     ldap_email_attr = db.Column(db.String(100), default='mail')
     ldap_fullname_attr = db.Column(db.String(100), default='cn')
+    ldap_group_member_attr = db.Column(db.String(100), default='member')  # member, uniqueMember, or memberOf
     
     # Attribute mapping (JSON)
     attribute_mapping = db.Column(db.Text)  # {"username": "...", "email": "...", "role": "..."}
@@ -165,6 +166,7 @@ class SSOProvider(db.Model):
                 'ldap_base_dn': self.ldap_base_dn,
                 'ldap_user_filter': self.ldap_user_filter,
                 'ldap_group_filter': self.ldap_group_filter,
+                'ldap_group_member_attr': self.ldap_group_member_attr or 'member',
                 'ldap_username_attr': self.ldap_username_attr,
                 'ldap_email_attr': self.ldap_email_attr,
                 'ldap_fullname_attr': self.ldap_fullname_attr,

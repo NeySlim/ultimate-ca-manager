@@ -22,6 +22,9 @@ const ssoService = {
   testProvider: (id) =>
     apiClient.post(`/sso/providers/${id}/test`),
 
+  testMapping: (id, username) =>
+    apiClient.post(`/sso/providers/${id}/test-mapping`, { username }),
+
   fetchIdpMetadata: (metadataUrl) =>
     apiClient.post('/sso/saml/metadata/fetch', { metadata_url: metadataUrl }),
 

@@ -90,10 +90,15 @@ def _resolve_role(provider, external_data):
         external_roles = external_data.get('roles', external_data.get('groups', []))
         if isinstance(external_roles, str):
             external_roles = [external_roles]
+        logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
         for ext_role, ucm_role in role_mapping.items():
             if ext_role in external_roles:
-                return ucm_role if ucm_role in VALID_ROLES else 'viewer'
-    return provider.default_role if provider.default_role in VALID_ROLES else 'viewer'
+                resolved = ucm_role if ucm_role in VALID_ROLES else 'viewer'
+                logger.info(f"Role resolved via mapping: {ext_role} -> {resolved}")
+                return resolved
+    fallback = provider.default_role if provider.default_role in VALID_ROLES else 'viewer'
+    logger.info(f"Role resolved via default_role: {fallback}")
+    return fallback
 
 
 # ============ Provider Management ============
@@ -176,6 +181,7 @@ def create_provider():
         provider.ldap_base_dn = data.get('ldap_base_dn')
         provider.ldap_user_filter = data.get('ldap_user_filter', '(uid={username})')
         provider.ldap_group_filter = data.get('ldap_group_filter')
+        provider.ldap_group_member_attr = data.get('ldap_group_member_attr', 'member')
         provider.ldap_username_attr = data.get('ldap_username_attr', 'uid')
         provider.ldap_email_attr = data.get('ldap_email_attr', 'mail')
         provider.ldap_fullname_attr = data.get('ldap_fullname_attr', 'cn')
@@ -261,7 +267,7 @@ def update_provider(provider_id=None, provider_type_name=None):
     elif provider.provider_type == 'ldap':
         for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn', 
                       'ldap_base_dn', 'ldap_user_filter',
-                      'ldap_group_filter', 'ldap_username_attr', 'ldap_email_attr', 
+                      'ldap_group_filter', 'ldap_group_member_attr', 'ldap_username_attr', 'ldap_email_attr', 
                       'ldap_fullname_attr']:
             if field in data:
                 setattr(provider, field, data[field])
@@ -433,18 +439,60 @@ def _ldap_authenticate_user(provider, username, password):
         # Fetch user's groups for role mapping
         groups = []
         if provider.ldap_group_filter:
+            member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
             try:
-                group_conn = Connection(
-                    server,
-                    user=provider.ldap_bind_dn,
-                    password=provider.ldap_bind_password,
-                    auto_bind=True
-                )
-                group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
-                group_filter = f'(&{provider.ldap_group_filter}(member={user_dn}))'
-                group_conn.search(group_base, group_filter, attributes=['cn'])
-                groups = [str(entry.cn) for entry in group_conn.entries if hasattr(entry, 'cn')]
-                group_conn.unbind()
+                if member_attr == 'memberof':
+                    # Method: read memberOf attribute from user entry (AD style)
+                    memberof_conn = Connection(
+                        server,
+                        user=provider.ldap_bind_dn,
+                        password=provider.ldap_bind_password,
+                        auto_bind=True
+                    )
+                    memberof_conn.search(
+                        provider.ldap_base_dn,
+                        f'(distinguishedName={user_dn})',
+                        attributes=['memberOf']
+                    )
+                    if not memberof_conn.entries:
+                        # Fallback: search by user filter
+                        safe_un = escape_filter_chars(username)
+                        uf = provider.ldap_user_filter.replace('{username}', safe_un)
+                        memberof_conn.search(provider.ldap_base_dn, uf, attributes=['memberOf'])
+                    
+                    if memberof_conn.entries:
+                        entry = memberof_conn.entries[0]
+                        if hasattr(entry, 'memberOf'):
+                            group_dns = entry.memberOf.values if hasattr(entry.memberOf, 'values') else [str(entry.memberOf)]
+                            # Extract CN from each group DN
+                            for gdn in group_dns:
+                                gdn_str = str(gdn)
+                                # Parse CN from DN like "CN=Grp_IT_ADM,OU=Groups,DC=example,DC=com"
+                                for part in gdn_str.split(','):
+                                    part = part.strip()
+                                    if part.upper().startswith('CN='):
+                                        groups.append(part[3:])
+                                        break
+                    memberof_conn.unbind()
+                    logger.info(f"LDAP memberOf groups for {username}: {groups}")
+                else:
+                    # Method: search groups where member/uniqueMember = user_dn (OpenLDAP style)
+                    group_conn = Connection(
+                        server,
+                        user=provider.ldap_bind_dn,
+                        password=provider.ldap_bind_password,
+                        auto_bind=True
+                    )
+                    group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
+                    # Ensure group_filter has parentheses
+                    gf = provider.ldap_group_filter.strip()
+                    if not gf.startswith('('):
+                        gf = f'({gf})'
+                    group_filter = f'(&{gf}({member_attr}={user_dn}))'
+                    group_conn.search(group_base, group_filter, attributes=['cn'])
+                    groups = [str(entry.cn) for entry in group_conn.entries if hasattr(entry, 'cn')]
+                    group_conn.unbind()
+                    logger.info(f"LDAP {member_attr} groups for {username}: {groups}")
             except Exception as e:
                 logger.warning(f"Failed to fetch LDAP groups for {username}: {e}")
         
@@ -506,6 +554,122 @@ def _test_saml_connection(provider):
     except Exception as e:
         logger.error(f"SAML certificate validation failed: {e}")
         return error_response("SAML certificate is invalid or malformed", 400)
+
+
+# ============ Test Mapping (Dry Run) ============
+
+@bp.route('/api/v2/sso/providers/<int:provider_id>/test-mapping', methods=['POST'])
+@require_auth(['write:sso'])
+def test_mapping(provider_id):
+    """Dry-run LDAP group lookup: fetches groups for a username without creating a session"""
+    provider = SSOProvider.query.get_or_404(provider_id)
+    
+    if provider.provider_type != 'ldap':
+        return error_response("Test mapping is only available for LDAP providers", 400)
+    
+    data = request.get_json() or {}
+    test_username = data.get('username', '').strip()
+    if not test_username:
+        return error_response("Username is required", 400)
+    
+    try:
+        import ldap3
+        from ldap3 import Server, Connection, ALL
+        from ldap3.utils.conv import escape_filter_chars
+        
+        server = Server(
+            provider.ldap_server,
+            port=provider.ldap_port,
+            use_ssl=provider.ldap_use_ssl,
+            get_info=ALL
+        )
+        
+        conn = Connection(
+            server,
+            user=provider.ldap_bind_dn,
+            password=provider.ldap_bind_password,
+            auto_bind=True
+        )
+        
+        safe_username = escape_filter_chars(test_username)
+        user_filter = provider.ldap_user_filter.replace('{username}', safe_username)
+        
+        attrs = [
+            provider.ldap_username_attr,
+            provider.ldap_email_attr,
+            provider.ldap_fullname_attr
+        ]
+        member_attr = (provider.ldap_group_member_attr or 'member').strip().lower()
+        if member_attr == 'memberof':
+            attrs.append('memberOf')
+        
+        conn.search(provider.ldap_base_dn, user_filter, attributes=attrs)
+        
+        if not conn.entries:
+            conn.unbind()
+            return success_response(data={
+                'found': False,
+                'message': f'User "{test_username}" not found in LDAP'
+            })
+        
+        user_entry = conn.entries[0]
+        user_dn = user_entry.entry_dn
+        
+        # Fetch groups
+        groups = []
+        if provider.ldap_group_filter:
+            if member_attr == 'memberof':
+                if hasattr(user_entry, 'memberOf'):
+                    group_dns = user_entry.memberOf.values if hasattr(user_entry.memberOf, 'values') else [str(user_entry.memberOf)]
+                    for gdn in group_dns:
+                        gdn_str = str(gdn)
+                        for part in gdn_str.split(','):
+                            part = part.strip()
+                            if part.upper().startswith('CN='):
+                                groups.append(part[3:])
+                                break
+                else:
+                    # Fallback: re-search with memberOf attribute
+                    conn.search(provider.ldap_base_dn, f'(distinguishedName={user_dn})', attributes=['memberOf'])
+                    if conn.entries and hasattr(conn.entries[0], 'memberOf'):
+                        group_dns = conn.entries[0].memberOf.values if hasattr(conn.entries[0].memberOf, 'values') else [str(conn.entries[0].memberOf)]
+                        for gdn in group_dns:
+                            gdn_str = str(gdn)
+                            for part in gdn_str.split(','):
+                                part = part.strip()
+                                if part.upper().startswith('CN='):
+                                    groups.append(part[3:])
+                                    break
+            else:
+                group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
+                gf = provider.ldap_group_filter.strip()
+                if not gf.startswith('('):
+                    gf = f'({gf})'
+                group_filter = f'(&{gf}({member_attr}={user_dn}))'
+                conn.search(group_base, group_filter, attributes=['cn'])
+                groups = [str(entry.cn) for entry in conn.entries if hasattr(entry, 'cn')]
+        
+        conn.unbind()
+        
+        # Resolve role using same logic as real login
+        resolved_role = _resolve_role(provider, {'groups': groups})
+        
+        return success_response(data={
+            'found': True,
+            'user_dn': user_dn,
+            'username': str(getattr(user_entry, provider.ldap_username_attr, test_username)),
+            'email': str(getattr(user_entry, provider.ldap_email_attr, '')),
+            'groups': groups,
+            'resolved_role': resolved_role,
+            'role_mapping': _parse_json_field(provider.role_mapping) or {},
+            'default_role': provider.default_role
+        })
+        
+    except ImportError:
+        return error_response("LDAP library not installed", 500)
+    except Exception as e:
+        logger.error(f"LDAP test mapping failed: {e}")
+        return error_response(f"Test mapping failed: check LDAP configuration", 400)
 
 
 # ============ SSO Sessions ============

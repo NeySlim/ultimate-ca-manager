@@ -406,6 +406,31 @@ export default function LoginPage() {
         {/* Step 1: Username */}
         {step === 'username' && (
           <div className="space-y-3 sm:space-y-4">
+            {/* SSO Providers — shown first */}
+            {ssoProviders.length > 0 && (
+              <div className="space-y-3">
+                <div className="grid gap-2">
+                  {ssoProviders.map((provider) => (
+                    <button
+                      key={provider.id}
+                      onClick={() => handleSSOLogin(provider)}
+                      disabled={loading}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary hover:border-accent/50 transition-all text-text-primary font-medium"
+                    >
+                      <span className="text-lg">{provider.icon || getSSOIcon(provider)}</span>
+                      <span>{provider.display_name || provider.name}</span>
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-text-tertiary uppercase tracking-wider">{t('auth.orSignInLocally')}</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+              </div>
+            )}
+
             {/* If username saved from localStorage: show identity card */}
             {hasSavedUsername && username ? (
               <>
@@ -483,31 +508,6 @@ export default function LoginPage() {
                   )}
                 </Button>
               </form>
-            )}
-            
-            {/* SSO Providers */}
-            {ssoProviders.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-text-tertiary uppercase tracking-wider">{t('auth.orContinueWith')}</span>
-                  <div className="flex-1 h-px bg-border" />
-                </div>
-                
-                <div className="grid gap-2">
-                  {ssoProviders.map((provider) => (
-                    <button
-                      key={provider.id}
-                      onClick={() => handleSSOLogin(provider)}
-                      disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary hover:border-accent/50 transition-all text-text-primary font-medium"
-                    >
-                      <span className="text-lg">{provider.icon || getSSOIcon(provider)}</span>
-                      <span>{provider.display_name || provider.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             )}
           </div>
         )}
@@ -875,7 +875,7 @@ export default function LoginPage() {
           
           {/* Version */}
           <p className="text-center text-xs text-text-tertiary">
-            Ultimate Certificate Manager v2
+            Ultimate Certificate Manager v{__APP_VERSION__ || '2'}
           </p>
         </div>
       </Card>
