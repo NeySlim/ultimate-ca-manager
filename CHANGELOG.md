@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0-rc5] - 2026-02-18
+
+### Fixed
+- **SAML SP metadata now schema-valid** — fixes "invalid data" error in Omnissa Workspace ONE Access
+- Uses python3-saml metadata builder with correct XSD element ordering (SLO → NameIDFormat → ACS)
+- Adds `validUntil` and `cacheDuration` attributes per SAML 2.0 spec
+- Reads configured NameIDFormat from SAML provider
+
 ## [2.1.0-rc4] - 2026-02-18
 
 ### Improvements
