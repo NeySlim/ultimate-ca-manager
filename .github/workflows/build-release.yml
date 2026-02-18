@@ -83,6 +83,7 @@ jobs:
       - name: Update VERSION file
         run: |
           echo "${{ steps.version.outputs.version }}" > VERSION
+          echo "${{ steps.version.outputs.version }}" > backend/VERSION
           cd frontend && npm pkg set version="${{ steps.version.outputs.version }}"
       
       - name: Build DEB package
@@ -135,9 +136,8 @@ jobs:
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           echo "$VERSION" > VERSION
+          echo "$VERSION" > backend/VERSION
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
-
-      - name: Build RPM in Fedora container
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           # For RPM Version field (supports ~), and for tarball name (use _)
@@ -221,9 +221,8 @@ jobs:
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           echo "$VERSION" > VERSION
+          echo "$VERSION" > backend/VERSION
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
-      
-      - name: Set image name
         id: image
         run: |
           echo "name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
