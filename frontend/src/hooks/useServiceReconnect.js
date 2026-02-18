@@ -12,7 +12,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 const HEALTH_URL = '/api/v2/health'
 const POLL_INTERVAL = 2000
 const MAX_ATTEMPTS = 90 // 3 minutes max after countdown
-const COUNTDOWN_SECONDS = 30
+const COUNTDOWN_SECONDS = 60
 
 export function useServiceReconnect() {
   const [reconnecting, setReconnecting] = useState(false)

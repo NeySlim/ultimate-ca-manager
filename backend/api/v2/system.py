@@ -224,7 +224,6 @@ def regenerate_https_cert():
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
     from datetime import timedelta
-    import signal
     
     data = request.json or {}
     common_name = data.get('common_name', 'localhost')
@@ -303,21 +302,16 @@ def regenerate_https_cert():
             success=True
         )
         
-        # Restart service - method depends on environment
-        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+        # Restart service using centralized mechanism
+        from utils.service_manager import restart_service as do_restart
+        success, msg = do_restart()
+        if not success:
+            return success_response(
+                message="Certificate regenerated but service restart failed. Please restart manually.",
+                data={'restart_failed': True, 'error': msg}
+            )
         
-        if is_docker:
-            # In Docker, SIGTERM to gunicorn master - Docker will auto-restart
-            try:
-                os.kill(os.getppid(), signal.SIGTERM)
-            except Exception as e:
-                current_app.logger.warning(f"Failed to send restart signal: {e}")
-            return success_response(message="Certificate regenerated. Container restarting...")
-        else:
-            subprocess.Popen(['sudo', '/usr/bin/systemctl', 'restart', 'ucm'],
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL)
-            return success_response(message="Certificate regenerated. Service restarting...")
+        return success_response(message="Certificate regenerated. Service restarting...")
         
     except Exception as e:
         current_app.logger.error(f"Failed to regenerate HTTPS cert: {e}")
@@ -328,7 +322,6 @@ def regenerate_https_cert():
 def apply_https_cert():
     """Apply a managed certificate to HTTPS"""
     import base64
-    import signal
     
     data = request.json
     cert_id = data.get('cert_id')
@@ -401,47 +394,16 @@ def apply_https_cert():
             success=True
         )
         
-        # Restart service - method depends on environment
-        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+        # Restart service using centralized mechanism
+        from utils.service_manager import restart_service as do_restart
+        success, msg = do_restart()
+        if not success:
+            return success_response(
+                message="Certificate applied but service restart failed. Please restart manually.",
+                data={'restart_failed': True, 'error': msg}
+            )
         
-        if is_docker:
-            # In Docker, we need to restart the container for SSL cert changes
-            # SIGHUP doesn't reload SSL certs in gunicorn
-            # Send SIGTERM to master - Docker will auto-restart the container
-            try:
-                import sys
-                # Kill gunicorn master (parent of worker) - Docker restart policy will restart
-                os.kill(os.getppid(), signal.SIGTERM)
-            except Exception as e:
-                current_app.logger.warning(f"Failed to send restart signal: {e}")
-            return success_response(message="Certificate applied. Container restarting...")
-        else:
-            # On systemd systems, restart the service
-            # Use subprocess.run for better error handling
-            try:
-                result = subprocess.run(
-                    ['sudo', '/usr/bin/systemctl', 'restart', 'ucm'],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-                if result.returncode != 0:
-                    current_app.logger.error(f"Service restart failed: {result.stderr}")
-                    # Still return success for cert apply, but warn about restart
-                    return success_response(
-                        message="Certificate applied but service restart failed. Please restart manually: sudo systemctl restart ucm",
-                        data={'restart_failed': True, 'error': result.stderr}
-                    )
-            except subprocess.TimeoutExpired:
-                current_app.logger.warning("Service restart timed out - this is expected as the process restarts")
-            except Exception as e:
-                current_app.logger.error(f"Service restart error: {e}")
-                return success_response(
-                    message="Certificate applied but service restart failed. Please restart manually: sudo systemctl restart ucm",
-                    data={'restart_failed': True, 'error': str(e)}
-                )
-            
-            return success_response(message="Certificate applied. Service restarting...")
+        return success_response(message="Certificate applied. Service restarting...")
         
     except Exception as e:
         current_app.logger.error(f"Failed to apply HTTPS cert: {e}")
