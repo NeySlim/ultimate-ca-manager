@@ -9,7 +9,7 @@ Quick start guide for using Ultimate CA Manager.
 ### First Login
 
 1. Navigate to `https://your-server:8443`
-2. Login with default credentials: `admin` / `changeme123`
+2. Login with default credentials: `admin` / password from install (see `/etc/ucm/ucm.env`)
 3. **Important:** Change your password immediately in Account settings
 
 ### Navigation

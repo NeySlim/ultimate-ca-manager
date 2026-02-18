@@ -27,7 +27,9 @@
 - **Email Notifications** -- SMTP, customizable HTML/text templates, certificate expiry alerts
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
-- **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) x Light/Dark
+- **Reports & Governance** -- Scheduled reports, certificate policies, approval workflows
+- **RBAC** -- Role-based access control with custom roles and granular permissions
+- **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) × Light/Dark
 - **i18n** -- 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
 - **Responsive UI** -- React 18 + Radix UI, mobile-friendly, command palette (Ctrl+K)
 - **Real-time** -- WebSocket live updates
@@ -65,7 +67,7 @@ sudo systemctl enable --now ucm
 ```
 
 **Access:** `https://localhost:8443`
-**Default credentials:** admin / changeme123 -- change immediately.
+**Default credentials:** `admin` / shown during install (see `/etc/ucm/ucm.env`). You will be prompted to change the password on first login.
 
 See [Installation Guide](docs/installation/README.md) for all methods including Docker Compose and source install.
 
@@ -91,7 +93,7 @@ See [Installation Guide](docs/installation/README.md) for all methods including 
 
 | Component | Technology |
 |-----------|------------|
-| Frontend | React 18, Vite, Radix UI |
+| Frontend | React 18, Vite, Radix UI, Recharts |
 | Backend | Python 3.11+, Flask, SQLAlchemy |
 | Database | SQLite (PostgreSQL supported) |
 | Server | Gunicorn + gevent WebSocket |
