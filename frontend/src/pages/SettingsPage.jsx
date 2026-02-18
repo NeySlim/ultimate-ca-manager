@@ -21,7 +21,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import LanguageSelector from '../components/ui/LanguageSelector'
-import { settingsService, systemService, casService, certificatesService } from '../services'
+import { settingsService, systemService, casService, certificatesService, ssoService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
@@ -568,9 +568,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     if (!formData.saml_metadata_url) return
     setFetchingMetadata(true)
     try {
-      const response = await apiClient.post('/sso/saml/metadata/fetch', {
-        body: { metadata_url: formData.saml_metadata_url }
-      })
+      const response = await ssoService.fetchIdpMetadata(formData.saml_metadata_url)
       const meta = response.data
       setFormData(prev => ({
         ...prev,
@@ -1284,7 +1282,7 @@ export default function SettingsPage() {
   const loadSsoProviders = async () => {
     setSsoLoading(true)
     try {
-      const response = await apiClient.get('/sso/providers')
+      const response = await ssoService.getProviders()
       setSsoProviders(response.data || [])
     } catch (error) {
     } finally {
@@ -1305,10 +1303,10 @@ export default function SettingsPage() {
   const handleSsoSave = async (formData) => {
     try {
       if (editingSsoProvider) {
-        await apiClient.put(`/sso/providers/${editingSsoProvider.id}`, formData)
+        await ssoService.updateProvider(editingSsoProvider.id, formData)
         showSuccess(t('sso.updateSuccess'))
       } else {
-        await apiClient.post('/sso/providers', formData)
+        await ssoService.createProvider(formData)
         showSuccess(t('sso.createSuccess'))
       }
       setShowSsoModal(false)
@@ -1321,7 +1319,7 @@ export default function SettingsPage() {
   const handleSsoDelete = async () => {
     if (!ssoConfirmDelete) return
     try {
-      await apiClient.delete(`/sso/providers/${ssoConfirmDelete.id}`)
+      await ssoService.deleteProvider(ssoConfirmDelete.id)
       showSuccess(t('sso.deleteSuccess'))
       loadSsoProviders()
     } catch (error) {
@@ -1333,7 +1331,7 @@ export default function SettingsPage() {
 
   const handleSsoToggle = async (provider) => {
     try {
-      await apiClient.post(`/sso/providers/${provider.id}/toggle`)
+      await ssoService.toggleProvider(provider.id)
       showSuccess(t('sso.toggleSuccess', { action: provider.enabled ? t('common.disabled').toLowerCase() : t('common.enabled').toLowerCase() }))
       loadSsoProviders()
     } catch (error) {
@@ -1344,7 +1342,7 @@ export default function SettingsPage() {
   const handleSsoTest = async (provider) => {
     setSsoTesting(true)
     try {
-      const response = await apiClient.post(`/sso/providers/${provider.id}/test`)
+      const response = await ssoService.testProvider(provider.id)
       if (response.data?.status === 'success') {
         showSuccess(response.data.message || t('sso.testSuccess'))
       } else {
