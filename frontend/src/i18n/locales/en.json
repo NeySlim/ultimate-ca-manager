@@ -1788,6 +1788,8 @@
     "sloURL": "SLO URL (optional)",
     "certificate": "IdP Certificate (PEM)",
     "noProviders": "No SSO providers",
+    "notConfigured": "Not configured",
+    "configure": "Configure",
     "noProvidersDescription": "Add LDAP, OAuth2, or SAML providers",
     "noMatches": "No matches",
     "tryDifferentSearch": "Try a different search",

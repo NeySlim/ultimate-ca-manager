@@ -519,13 +519,14 @@ function MappingEditor({ value, onChange, keyLabel, valueLabel, keyPlaceholder, 
 }
 
 // SSO Provider Form Component — Collapsible sections with Test Connection/Mapping
-function SsoProviderForm({ provider, onSave, onCancel }) {
+function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
+  const providerType = provider?.provider_type || forcedType || 'ldap'
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     display_name: provider?.display_name || '',
-    provider_type: provider?.provider_type || 'ldap',
+    provider_type: providerType,
     enabled: provider?.enabled ?? false,
     is_default: provider?.is_default ?? false,
     default_role: provider?.default_role || 'viewer',
@@ -731,18 +732,6 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
             placeholder={t('sso.displayNamePlaceholder')}
           />
         </div>
-        {!provider && (
-          <Select
-            label={t('common.providerType')}
-            value={formData.provider_type}
-            onChange={value => handleChange('provider_type', value)}
-            options={[
-              { value: 'ldap', label: t('sso.ldap') },
-              { value: 'oauth2', label: t('sso.oauth2') },
-              { value: 'saml', label: t('sso.saml') },
-            ]}
-          />
-        )}
         <div className="flex gap-6">
           <ToggleSwitch
             checked={formData.enabled}
@@ -1539,6 +1528,7 @@ export default function SettingsPage() {
   const [ssoLoading, setSsoLoading] = useState(false)
   const [showSsoModal, setShowSsoModal] = useState(false)
   const [editingSsoProvider, setEditingSsoProvider] = useState(null)
+  const [editingSsoType, setEditingSsoType] = useState(null) // for creating new: 'ldap' | 'oauth2' | 'saml'
   const [ssoTesting, setSsoTesting] = useState(false)
   const [ssoConfirmDelete, setSsoConfirmDelete] = useState(null)
 
@@ -1694,13 +1684,15 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSsoCreate = () => {
+  const handleSsoCreate = (providerType) => {
     setEditingSsoProvider(null)
+    setEditingSsoType(providerType)
     setShowSsoModal(true)
   }
 
   const handleSsoEdit = (provider) => {
     setEditingSsoProvider(provider)
+    setEditingSsoType(null)
     setShowSsoModal(true)
   }
 
@@ -2705,69 +2697,71 @@ export default function SettingsPage() {
               <div className="flex items-center justify-center py-12">
                 <div className="w-6 h-6 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
               </div>
-            ) : ssoProviders.length === 0 ? (
-              <EmptyState
-                icon={Key}
-                title={t('sso.noProviders')}
-                description={t('sso.noProvidersDescription')}
-                action={{ label: t('sso.addProvider'), onClick: handleSsoCreate }}
-              />
             ) : (
-              <DetailSection title={t('sso.configuredProviders')} icon={Key} iconClass="icon-bg-purple">
-                <div className="space-y-3">
-                  {ssoProviders.map(provider => {
-                    const ProviderIcon = SSO_PROVIDER_ICONS[provider.provider_type] || Key
-                    return (
-                      <div key={provider.id} className="flex items-center justify-between p-4 bg-bg-tertiary/50 border border-border/50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-accent-primary/10 flex items-center justify-center">
-                            <ProviderIcon size={20} className="text-accent-primary" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-text-primary">{provider.display_name || provider.name}</span>
-                              <Badge variant={provider.enabled ? 'success' : 'secondary'} size="sm">
-                                {provider.enabled ? t('common.enabled') : t('common.disabled')}
-                              </Badge>
-                              {provider.is_default && (
-                                <Badge variant="primary" size="sm">{t('sso.default')}</Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs text-text-secondary">{provider.provider_type?.toUpperCase()}</p>
-                              {provider.last_used_at && (
-                                <span className="text-xs text-text-muted">· {t('sso.lastUsed')} {formatDate(provider.last_used_at)}</span>
-                              )}
-                            </div>
-                          </div>
+              <div className="space-y-3">
+                {/* One card per provider type */}
+                {[
+                  { type: 'ldap', label: t('sso.ldap'), icon: Database, color: 'icon-bg-blue', desc: 'Active Directory, OpenLDAP' },
+                  { type: 'oauth2', label: t('sso.oauth2'), icon: Globe, color: 'icon-bg-teal', desc: 'Azure AD, Google, GitHub, OIDC' },
+                  { type: 'saml', label: t('sso.saml'), icon: Shield, color: 'icon-bg-violet', desc: 'Okta, ADFS, Keycloak' },
+                ].map(({ type, label, icon: Icon, color, desc }) => {
+                  const provider = ssoProviders.find(p => p.provider_type === type)
+                  return (
+                    <div key={type} className="flex items-center justify-between p-4 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
+                          <Icon size={20} weight="bold" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting} title={t('common.testConnection')}>
-                            {ssoTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)} title={provider.enabled ? t('sso.disable') : t('sso.enable')}>
-                            <Power size={14} />
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)} title={t('common.edit')}>
-                            <PencilSimple size={14} />
-                          </Button>
-                          <Button size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)} title={t('common.delete')}>
-                            <Trash size={14} />
-                          </Button>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-text-primary">{label}</span>
+                            {provider ? (
+                              <>
+                                <Badge variant={provider.enabled ? 'success' : 'secondary'} size="sm">
+                                  {provider.enabled ? t('common.enabled') : t('common.disabled')}
+                                </Badge>
+                                {provider.is_default && (
+                                  <Badge variant="primary" size="sm">{t('sso.default')}</Badge>
+                                )}
+                              </>
+                            ) : (
+                              <Badge variant="secondary" size="sm">{t('sso.notConfigured')}</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-secondary">
+                            {provider ? (provider.display_name || provider.name) : desc}
+                          </p>
                         </div>
                       </div>
-                    )
-                  })}
-                  {hasPermission('admin:system') && (
-                    <div className="pt-2">
-                      <Button onClick={handleSsoCreate}>
-                        <Plus size={16} />
-                        {t('sso.addProvider')}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {provider ? (
+                          <>
+                            <Button size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting} title={t('sso.testConnection')}>
+                              {ssoTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)} title={provider.enabled ? t('sso.disable') : t('sso.enable')}>
+                              <Power size={14} />
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)} title={t('common.edit')}>
+                              <PencilSimple size={14} />
+                            </Button>
+                            <Button size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)} title={t('common.delete')}>
+                              <Trash size={14} />
+                            </Button>
+                          </>
+                        ) : (
+                          hasPermission('admin:system') && (
+                            <Button size="sm" onClick={() => handleSsoCreate(type)}>
+                              <Plus size={14} />
+                              {t('sso.configure')}
+                            </Button>
+                          )
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </DetailSection>
+                  )
+                })}
+              </div>
             )}
           </DetailContent>
         )
@@ -3451,14 +3445,15 @@ export default function SettingsPage() {
       {/* SSO Provider Modal */}
       <Modal
         open={showSsoModal}
-        onClose={() => { setShowSsoModal(false); setEditingSsoProvider(null) }}
+        onClose={() => { setShowSsoModal(false); setEditingSsoProvider(null); setEditingSsoType(null) }}
         title={editingSsoProvider ? t('sso.editProvider') : t('sso.newProvider')}
         size="lg"
       >
         <SsoProviderForm
           provider={editingSsoProvider}
+          forcedType={editingSsoType}
           onSave={handleSsoSave}
-          onCancel={() => { setShowSsoModal(false); setEditingSsoProvider(null) }}
+          onCancel={() => { setShowSsoModal(false); setEditingSsoProvider(null); setEditingSsoType(null) }}
         />
       </Modal>
 
