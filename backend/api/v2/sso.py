@@ -419,7 +419,7 @@ def list_sessions():
 
 # ============ SAML Metadata ============
 
-@bp.route('/api/v2/sso/metadata/fetch', methods=['POST'])
+@bp.route('/api/v2/sso/saml/metadata/fetch', methods=['POST'])
 @require_auth(['write:sso'])
 def fetch_idp_metadata():
     """Fetch and parse IDP metadata XML from a URL"""
@@ -449,13 +449,9 @@ def fetch_idp_metadata():
         return error_response(f"Failed to parse metadata XML: {str(e)}", 400)
 
 
-@bp.route('/api/v2/sso/providers/<int:provider_id>/metadata', methods=['GET'])
-def get_sp_metadata(provider_id):
+@bp.route('/api/v2/sso/saml/metadata', methods=['GET'])
+def get_sp_metadata():
     """Generate SP metadata XML for configuring the IDP"""
-    provider = SSOProvider.query.get_or_404(provider_id)
-    if provider.provider_type != 'saml':
-        return error_response("SP metadata is only available for SAML providers", 400)
-    
     sp_base = request.url_root.rstrip('/')
     entity_id = f'{sp_base}/api/v2/sso'
     acs_url = f'{sp_base}/api/v2/sso/callback/saml'
@@ -479,7 +475,7 @@ def get_sp_metadata(provider_id):
     
     from flask import Response
     return Response(metadata_xml, mimetype='application/xml',
-                    headers={'Content-Disposition': f'inline; filename="ucm-sp-metadata-{provider_id}.xml"'})
+                    headers={'Content-Disposition': 'inline; filename="ucm-sp-metadata.xml"'})
 
 
 def _parse_saml_metadata(xml_text):

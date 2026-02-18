@@ -568,7 +568,7 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
     if (!formData.saml_metadata_url) return
     setFetchingMetadata(true)
     try {
-      const response = await apiClient.post('/sso/metadata/fetch', {
+      const response = await apiClient.post('/sso/saml/metadata/fetch', {
         body: { metadata_url: formData.saml_metadata_url }
       })
       const meta = response.data
@@ -675,13 +675,11 @@ function SsoProviderForm({ provider, onSave, onCancel }) {
           <HelpCard variant="info" className="text-xs">
             {t('sso.spMetadataHelp')}
           </HelpCard>
-          {provider?.id && (
-            <CopyableUrl
-              label={t('sso.spMetadataXml')}
-              value={`${baseUrl}/api/v2/sso/providers/${provider.id}/metadata`}
-              description={t('sso.spMetadataXmlDesc')}
-            />
-          )}
+          <CopyableUrl
+            label={t('sso.spMetadataXml')}
+            value={`${baseUrl}/api/v2/sso/saml/metadata`}
+            description={t('sso.spMetadataXmlDesc')}
+          />
           <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
           <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
           <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />
