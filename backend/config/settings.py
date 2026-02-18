@@ -269,12 +269,16 @@ class Config:
     LOG_FILE = DATA_DIR / "ucm.log"
     AUDIT_LOG_FILE = DATA_DIR / "audit.log"
     
-    # CORS - auto-include FQDN if set
-    _cors_origins = ["https://localhost:8443", "https://127.0.0.1:8443"]
-    _fqdn = get_system_fqdn()
+    # CORS - auto-include FQDN and hostname
     _https_port = int(os.getenv("HTTPS_PORT", "8443"))
+    _cors_origins = [f"https://localhost:{_https_port}", f"https://127.0.0.1:{_https_port}"]
+    _fqdn = get_system_fqdn()
     if _fqdn and _fqdn not in ('localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local'):
         _cors_origins.append(f"https://{_fqdn}:{_https_port}")
+    # Also add short hostname (e.g. "pve" from "pve.lan.pew.pet")
+    _hostname = os.getenv("HOSTNAME", "") or _fqdn.split(".")[0] if _fqdn else ""
+    if _hostname and _hostname not in ('localhost', '127.0.0.1') and f"https://{_hostname}:{_https_port}" not in _cors_origins:
+        _cors_origins.append(f"https://{_hostname}:{_https_port}")
     # Allow extra origins via env
     _extra = os.getenv("CORS_EXTRA_ORIGINS", "")
     if _extra:
