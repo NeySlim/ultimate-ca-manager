@@ -147,14 +147,13 @@ class TestSSOProviderCRUD:
         r = auth_client.post('/api/v2/sso/providers',
             data=json.dumps({
                 'name': 'test-bad-role',
-                'provider_type': 'ldap',
+                'provider_type': 'oauth2',
                 'default_role': 'superadmin',
-                'ldap_server': 'ldap.test.com',
-                'ldap_port': 389,
-                'ldap_bind_dn': 'cn=admin,dc=test',
-                'ldap_bind_password': 'secret',
-                'ldap_base_dn': 'ou=users,dc=test',
-                'ldap_user_filter': '(uid={username})',
+                'oauth2_client_id': 'test-client',
+                'oauth2_client_secret': 'test-secret',
+                'oauth2_auth_url': 'https://auth.test.com/authorize',
+                'oauth2_token_url': 'https://auth.test.com/token',
+                'oauth2_userinfo_url': 'https://auth.test.com/userinfo',
             }),
             content_type='application/json')
         assert r.status_code in (200, 201)
