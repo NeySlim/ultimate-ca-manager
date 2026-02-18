@@ -136,14 +136,14 @@ export function NotificationProvider({ children }) {
           </Toast.Root>
         ))}
 
-        <Toast.Viewport className="fixed top-4 right-4 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-50 outline-none" />
+        <Toast.Viewport className="fixed top-4 right-4 flex flex-col gap-3 w-96 max-w-[calc(100vw-2rem)] z-[300] outline-none" />
       </Toast.Provider>
 
       {/* Confirm Dialog */}
       <Dialog.Root open={!!confirmDialog} onOpenChange={(open) => !open && handleConfirm(false)}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[301] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
             <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
               {confirmDialog?.title}
             </Dialog.Title>
@@ -171,8 +171,8 @@ export function NotificationProvider({ children }) {
       {/* Prompt Dialog */}
       <Dialog.Root open={!!promptDialog} onOpenChange={(open) => !open && handlePrompt(false)}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[301] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
             <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
               {promptDialog?.title}
             </Dialog.Title>

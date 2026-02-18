@@ -235,9 +235,9 @@ export function CommandPalette({ open, onOpenChange }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
-        <Dialog.Content 
-          className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-50 overflow-hidden"
+        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300]" />
+        <Dialog.Content
+          className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-[301] overflow-hidden"
           onKeyDown={handleKeyDown}
           aria-describedby={undefined}
         >
