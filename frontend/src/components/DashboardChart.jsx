@@ -98,7 +98,7 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
           axisLine={false}
           tickLine={false}
-          interval={chartData.length > 15 ? Math.floor(chartData.length / 8) : 0}
+          interval={chartData.length <= 7 ? 0 : Math.max(1, Math.floor(chartData.length / 7))}
         />
         <YAxis 
           tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
@@ -122,7 +122,6 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           stroke={expiredColor} 
           fill="transparent"
           strokeWidth={2}
-          strokeDasharray="5 3"
         />
         <Area 
           type="monotone" 
@@ -131,7 +130,6 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           stroke={revokedColor} 
           fill="transparent"
           strokeWidth={2}
-          strokeDasharray="3 3"
         />
       </AreaChart>
     </ResponsiveContainer>
