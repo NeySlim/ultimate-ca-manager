@@ -219,6 +219,13 @@ export function Sidebar({ activePage }) {
             sideOffset={5}
             side="right"
           >
+            {/* User identity header */}
+            <div className="px-3 py-2 mb-1">
+              <div className="text-sm font-semibold text-text-primary truncate">{user?.username || 'User'}</div>
+              <div className="text-xs text-text-tertiary capitalize">{user?.role || ''}</div>
+            </div>
+            <DropdownMenu.Separator className="h-px bg-border mb-1" />
+
             <DropdownMenu.Item
               onClick={() => navigate('/account')}
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"

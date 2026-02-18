@@ -16,6 +16,7 @@ import { authMethodsService } from '../services/auth-methods.service'
 import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'ucm_last_username'
+const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
 
 // SSO provider icons based on type or name
 const getSSOIcon = (provider) => {
@@ -82,16 +83,30 @@ export default function LoginPage() {
       .then(data => setEmailConfigured(data?.configured || false))
       .catch(() => setEmailConfigured(false))
     
-    // Load SSO providers
+    // Load SSO providers, then restore last auth method
     fetch('/api/v2/sso/available')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.data && Array.isArray(data.data)) {
           setSsoProviders(data.data)
+          
+          // Restore last LDAP provider if applicable
+          if (lastUsername) {
+            try {
+              const saved = JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}')
+              if (saved.method === 'ldap' && saved.providerId) {
+                const provider = data.data.find(p => p.id === saved.providerId)
+                if (provider) {
+                  setSelectedLdapProvider(provider)
+                  setStep('ldap')
+                }
+              }
+            } catch {}
+          }
         }
       })
-      .catch(() => {})  // Don't clear providers on error
-  }, [])  // Empty deps - only run once on mount
+      .catch(() => {})
+  }, [])
   
   // Check for SSO callback or errors in URL - separate effect
   useEffect(() => {
@@ -145,11 +160,16 @@ export default function LoginPage() {
     }
   }, [authMethod, step])
 
-  // Save username to localStorage
+  // Save username and auth method to localStorage
   const saveUsername = (name) => {
     if (name) {
       localStorage.setItem(STORAGE_KEY, name)
     }
+  }
+  const saveAuthMethod = (method, providerId = null) => {
+    try {
+      localStorage.setItem(STORAGE_AUTH_METHOD_KEY, JSON.stringify({ method, providerId }))
+    } catch {}
   }
 
   // Step 1: Continue with username → detect methods and try auto-login
@@ -272,6 +292,7 @@ export default function LoginPage() {
     try {
       const userData = await authMethodsService.loginPassword(username, password)
       saveUsername(username)
+      saveAuthMethod('password')
       await login(username, password, userData)
       showSuccess(`Welcome back, ${username}!`)
       navigate('/dashboard')
@@ -291,12 +312,14 @@ export default function LoginPage() {
     setPassword('')
     setStatusMessage('')
     setSelectedLdapProvider(null)
+    localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
   }
 
   // Change user (clear username)
   const handleChangeUser = () => {
     setUsername('')
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
     handleBack()
   }
 
@@ -343,6 +366,7 @@ export default function LoginPage() {
       
       // Login successful
       saveUsername(username)
+      saveAuthMethod('ldap', selectedLdapProvider?.id)
       await login(username, null, data.data)
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
@@ -418,6 +442,7 @@ export default function LoginPage() {
                     setUsername('')
                     setHasSavedUsername(false)
                     localStorage.removeItem(STORAGE_KEY)
+                    localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
                   }}
                   className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
                   disabled={loading}
