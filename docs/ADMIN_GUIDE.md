@@ -254,7 +254,8 @@ curl -k -b cookies.txt https://localhost:8443/api/v2/scep/requests?status=pendin
 |------|--------------|-----|-------|----------|
 | Admin | Full | Full | Full | Full |
 | Operator | Full | Full | Read | Read |
-| Viewer | Read | Read | None | None |
+| Auditor | Read | Read | None | None |
+| Viewer | Read (limited) | Read | None | None |
 
 ### API Keys
 

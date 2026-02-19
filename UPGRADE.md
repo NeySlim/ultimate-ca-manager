@@ -62,11 +62,11 @@ docker run -d \
 ### Automatic Upgrade
 
 ```bash
-# Download new version from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
+# Download new version (replace VERSION, e.g. 2.1.0)
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_VERSION_all.deb
 
 # Install (automatically backs up database)
-sudo dpkg -i ucm_*.deb
+sudo dpkg -i ucm_VERSION_all.deb
 
 # Fix dependencies if needed
 sudo apt-get install -f
@@ -110,11 +110,11 @@ sudo systemctl start ucm
 ### Using DNF/YUM
 
 ```bash
-# Download new version from https://github.com/NeySlim/ultimate-ca-manager/releases/latest
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm.noarch.rpm
+# Download new version (replace VERSION, e.g. 2.1.0)
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-VERSION-1.noarch.rpm
 
 # Upgrade
-sudo dnf upgrade ./ucm-*.rpm
+sudo dnf upgrade ./ucm-VERSION-1.noarch.rpm
 ```
 
 ### Manual Backup

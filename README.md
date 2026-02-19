@@ -63,7 +63,7 @@ sudo systemctl enable --now ucm
 Download the `.rpm` package from the [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest):
 
 ```bash
-sudo dnf install ./ucm-<version>-1.fc43.noarch.rpm
+sudo dnf install ./ucm-VERSION-1.noarch.rpm
 sudo systemctl enable --now ucm
 ```
 

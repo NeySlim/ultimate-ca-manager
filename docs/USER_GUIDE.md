@@ -147,7 +147,7 @@ Templates define default settings for certificates.
 3. Fill in:
    - **Username** - Login name
    - **Email** - For notifications
-   - **Role** - Admin, Operator, or Viewer
+   - **Role** - Admin, Operator, Auditor, or Viewer
    - **Temporary Password** - User changes on first login
 4. Click **Create**
 
@@ -155,9 +155,22 @@ Templates define default settings for certificates.
 
 | Role | Permissions |
 |------|-------------|
-| **Admin** | Full access, user management |
-| **Operator** | Create/manage certs, CAs, CSRs |
-| **Viewer** | Read-only access |
+| **Admin** | Full access, user management, settings |
+| **Operator** | Create/manage certs, CAs, CSRs, protocols |
+| **Auditor** | Read-only access to all resources (except users/settings) |
+| **Viewer** | Read-only access to certificates, CAs, CSRs, templates, truststore |
+
+---
+
+## Single Sign-On (SSO)
+
+UCM supports external identity providers for authentication:
+
+- **LDAP / Active Directory** — Bind-based authentication with group-to-role mapping
+- **OAuth2** — Google, GitHub, Azure AD, or any OpenID Connect provider
+- **SAML 2.0** — Enterprise identity providers (Okta, Azure AD, ADFS)
+
+Configure SSO in **Settings** → **SSO** tab (admin only). Each provider type supports automatic role mapping based on group membership.
 
 ---
 
@@ -222,13 +235,10 @@ Change the UI theme:
 
 1. Click your **user avatar** (bottom of sidebar) to open the user menu
 2. Select **Theme** submenu
-3. Choose from 6 color schemes, each with Light and Dark variants:
+3. Choose from 3 color schemes, each with Light and Dark variants:
    - Gray (default)
-   - Blue Ocean
    - Purple Night
-   - Green Forest
    - Orange Sunset
-   - Cyber Pink
 4. Or select **Follow System** to match your OS light/dark preference
 
 Theme persists across sessions.

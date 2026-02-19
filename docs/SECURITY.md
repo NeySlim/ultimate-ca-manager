@@ -257,7 +257,7 @@ Access security metrics at Settings > Audit Logs:
 If you discover a security vulnerability, please report it responsibly:
 
 1. **Do NOT** create a public GitHub issue
-2. Email: security@your-domain.com
+2. Open a [GitHub Security Advisory](https://github.com/NeySlim/ultimate-ca-manager/security/advisories)
 3. Include: description, steps to reproduce, impact assessment
 4. Allow 90 days for fix before public disclosure
 
@@ -267,5 +267,6 @@ If you discover a security vulnerability, please report it responsibly:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.1.0 | 2026-02-19 | SSO (LDAP/OAuth2/SAML) with rate limiting, LDAP filter injection fix, CSRF on SSO endpoints, 4-role RBAC (admin/operator/auditor/viewer), 28 SSO security tests |
 | 2.0.2 | 2026-01-31 | Private key encryption, CSRF, password policy, rate limiting |
 | 2.0.0 | 2026-01-29 | Initial security framework, session auth, RBAC |
