@@ -276,6 +276,14 @@ jobs:
           build-args: |
             VERSION=${{ needs.build-deb.outputs.version }}
 
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: neyslim/ultimate-ca-manager
+          readme-filepath: ./DOCKERHUB_README.md
+
   # ============================================================
   # Create GitHub Release
   # ============================================================
