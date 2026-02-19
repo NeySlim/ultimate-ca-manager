@@ -302,10 +302,6 @@ docker exec ucm ps aux | grep gunicorn
 
 ## Advanced Deployment
 
-### Portainer Stack
-
-See: [docker-compose.portainer.yml](../../docker-compose.portainer.yml)
-
 ### Reverse Proxy (Nginx)
 
 UCM uses WebSocket (Socket.IO) for real-time updates. Your reverse proxy must support WebSocket upgrade.

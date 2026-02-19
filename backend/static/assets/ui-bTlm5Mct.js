@@ -1,1 +1,0 @@
-const t={help:"Help",helpAndInfo:"Help and information"};function i(e){return`${e} - ${t.help}`}const a={ca:"CAs",CA:"CAs",csr:"CSRs",CSR:"CSRs",certificate:"certificates",Certificate:"Certificates"};function c(e,l,s){const r=a[l]||`${l}s`;return e===1?`${e} ${l}`:`${e} ${r}`}export{i as g,t as l,c as p};
