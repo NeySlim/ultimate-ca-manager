@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-02-19
+
+### Added
+- **Auditor role** — new `auditor` system role with read-only access to all operational data (certificates, CAs, CSRs, templates, truststore, ACME, audit logs, reports, policies, approvals) except settings and user management
+- **SSO settings restructure** — collapsible sections for Connection, User Search, Groups & Role Mapping, and Provisioning
+- **LDAP Test Connection and Test Mapping buttons** — verify LDAP connectivity and attribute mapping from the SSO settings UI
+- **OAuth2 provider presets** — one-click configuration for Microsoft Entra, Google, and GitHub
+- **SSO provider card layout** — 1 provider per type limit with 3-card layout (LDAP, OAuth2, SAML)
+- **Login page SSO buttons** — SSO authentication buttons shown before local auth form with "or sign in locally" separator
+- **Dynamic version display on login page** — reads version from VERSION file
+- **ESLint linter** for frontend — catches stale closures, undefined variables, hook violations
+- **Ruff linter** for backend — catches undefined names, import errors, security issues
+- **Login method persistence** — remembers username + auth method (LDAP/password) across sessions
+- **SAML SP certificate selector** — choose which certificate to include in SP metadata
+- **LDAP directory presets** — OpenLDAP, Active Directory, Custom templates
+- `npm run lint` and `npm run lint:fix` scripts
+
+### Changed
+- Renamed RBAC system role "User" → "Viewer"
+- Restricted `viewer` role permissions to certificates, CAs, CSRs, templates, and truststore only
+- Migration 036: rename User role to Viewer, add Auditor role
+- Updated all badge/avatar color mappings for auditor role (orange)
+- Updated help content, guides, and all 9 locale files
+- Consistent SAML metadata URLs (no provider ID needed)
+- SSO service layer extracted to `sso.service.js`
+- LDAP sessions deduplicated (no duplicate session per login)
+- ESLint v9 with react-hooks plugin for stale closure detection
+- Ruff configured for bug-catching rules only (E/F/B/S)
+
+### Fixed
+- **LDAP group filter malformed** when user DN contains special characters (`escape_filter_chars`)
+- **17 bugs found by linters**: undefined variables, missing imports, conditional hooks
+  - `CAsPage.jsx`: `loadData()` → `loadCAs()` (undefined function)
+  - `SettingsPage.jsx`: `waitForRestart` undefined (missing hook)
+  - `FloatingDetailWindow.jsx`: conditional `useEffect` (rules-of-hooks violation)
+  - `freedns.py`: 6× `requests` module used without import
+  - `cert_service.py`: `logger` used without definition
+  - `certificate_parser.py`: `serialization` + `logger` missing imports
+- **CSRF token not stored** on multi-method login — caused 403 on POST/PUT/DELETE
+- **Select dropdown hidden behind modals** — Radix portal z-index fix
+- **Copy button closing SSO modal** — missing `type="button"`
+- **SAML SP metadata schema-invalid** — now uses python3-saml builder
+- **Auth contract inconsistency** — LDAP login now returns permissions/role/csrf_token
+
+### Security
+- SSO rate limiting on LDAP login attempts with account lockout
+- CSRF token validation on all SSO endpoints
+- Role validation against allowed roles list
+- Internal error details no longer leaked to API clients
+- 28 new SSO security tests
+
+---
+
 ## [2.1.0-rc8] - 2026-02-18
 
 ### Added

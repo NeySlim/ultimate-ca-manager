@@ -52,7 +52,7 @@ Define granular permissions beyond the built-in roles.
 
 ### Features
 - Create custom roles with specific permissions
-- Inherit from base roles (admin, operator, viewer)
+- Inherit from base roles (admin, operator, auditor, viewer)
 - Granular permission control per resource type
 - Role hierarchy with permission inheritance
 
