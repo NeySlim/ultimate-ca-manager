@@ -1281,7 +1281,7 @@ GET /api/v2/rbac/roles
 ```json
 {
   "data": {
-    "roles": ["admin", "operator", "viewer"],
+    "roles": ["admin", "operator", "auditor", "viewer"],
     "role_permissions": {
       "admin": ["*"],
       "operator": ["read:*", "write:certificates", "write:cas", ...],
