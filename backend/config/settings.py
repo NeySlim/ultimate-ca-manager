@@ -145,15 +145,16 @@ class Config:
     # Version - single source of truth from VERSION file
     @staticmethod
     def _get_version():
-        """Read version from VERSION file"""
+        """Read version from VERSION file - checks multiple locations"""
         try:
+            # Check backend/VERSION first (dev + deployed layout)
+            backend_version = BACKEND_DIR / "VERSION"
+            if backend_version.exists():
+                return backend_version.read_text().strip()
+            # Root VERSION (package installs: /opt/ucm/VERSION)
             version_path = BASE_DIR / "VERSION"
             if version_path.exists():
                 return version_path.read_text().strip()
-            # Docker: VERSION might be at root
-            docker_version = Path("/opt/ucm/VERSION")
-            if docker_version.exists():
-                return docker_version.read_text().strip()
         except Exception:
             pass
         return os.getenv("APP_VERSION", "2.1.0")
