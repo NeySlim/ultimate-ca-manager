@@ -10,317 +10,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.1.0] - 2026-02-19
 
 ### Added
-- **Auditor role** — new `auditor` system role with read-only access to all operational data (certificates, CAs, CSRs, templates, truststore, ACME, audit logs, reports, policies, approvals) except settings and user management
-- **SSO settings restructure** — collapsible sections for Connection, User Search, Groups & Role Mapping, and Provisioning
-- **LDAP Test Connection and Test Mapping buttons** — verify LDAP connectivity and attribute mapping from the SSO settings UI
-- **OAuth2 provider presets** — one-click configuration for Microsoft Entra, Google, and GitHub
-- **SSO provider card layout** — 1 provider per type limit with 3-card layout (LDAP, OAuth2, SAML)
-- **Login page SSO buttons** — SSO authentication buttons shown before local auth form with "or sign in locally" separator
-- **Dynamic version display on login page** — reads version from VERSION file
-- **ESLint linter** for frontend — catches stale closures, undefined variables, hook violations
-- **Ruff linter** for backend — catches undefined names, import errors, security issues
-- **Login method persistence** — remembers username + auth method (LDAP/password) across sessions
+- **SSO authentication** — LDAP/Active Directory, OAuth2 (Google, GitHub, Azure AD), SAML 2.0 with group-to-role mapping
+- **Governance module** — certificate policies, approval workflows, scheduled reports
+- **Auditor role** — new system role with read-only access to all operational data except settings and user management
+- **4-role RBAC** — Administrator, Operator, Auditor, Viewer with granular permissions + custom roles
+- **ACME DNS providers** — 48 providers with card grid selector and official SVG logos
+- **Floating detail windows** — click any table row to open draggable, resizable detail panel with actions (export, renew, revoke, delete)
+- **Email template editor** — split-pane HTML source + live preview with 6 template variables
+- **Certificate expiry alerts** — configurable thresholds, recipients, check-now button
+- **SoftHSM integration** — automatic SoftHSM2 setup across DEB, RPM, and Docker with PKCS#11 key generation
+- **AKI/SKI chain matching** — cryptographic chain relationships instead of fragile DN-based matching
+- **Chain repair scheduler** — hourly background task to backfill SKI/AKI, re-chain orphans, deduplicate CAs
+- **Backup v2.0** — complete backup/restore of all database tables (was only 5, now covers groups, RBAC, templates, trust store, SSO, HSM, API keys, SMTP, policies, etc.)
+- **File regeneration** — startup service regenerates missing certificate/key files from database
+- **Human-readable filenames** — `{cn-slug}-{refid}.ext` instead of UUID-only
+- **Dashboard charts** — day selector, expired series, optimized queries, donut chart with gradients
+- **SSO settings UI** — collapsible sections, LDAP test connection/mapping, OAuth2 provider presets, SAML metadata auto-fetch
+- **Login page SSO buttons** — SSO authentication buttons before local auth form
+- **Login method persistence** — remembers username + auth method across sessions
+- **ESLint + Ruff linters** — catches stale closures, undefined variables, hook violations, import errors
 - **SAML SP certificate selector** — choose which certificate to include in SP metadata
 - **LDAP directory presets** — OpenLDAP, Active Directory, Custom templates
-- `npm run lint` and `npm run lint:fix` scripts
+- **Template duplication** — clone endpoint: POST /templates/{id}/duplicate
+- **Unified export actions** — reusable ExportActions component with inline P12 password field
+- **Trust store chain validation** — visual chain status with export bundle
+- **Service reconnection** — 30s countdown with health + WebSocket readiness check
+- **Settings about** — version, system info, uptime, memory, links to docs
+- **Webhooks** — management tab in Settings for webhook CRUD, test, and event filtering
+- **Searchable Select** component
+- **Complete i18n** — 2273+ keys across all 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
 
 ### Changed
-- Renamed RBAC system role "User" → "Viewer"
-- Restricted `viewer` role permissions to certificates, CAs, CSRs, templates, and truststore only
-- Migration 036: rename User role to Viewer, add Auditor role
-- Updated all badge/avatar color mappings for auditor role (orange)
-- Updated help content, guides, and all 9 locale files
-- Consistent SAML metadata URLs (no provider ID needed)
+- Renamed RBAC system role "User" → "Viewer" with restricted permissions
+- Simplified themes to 3 families: Gray, Purple Night, Orange Sunset (× Light/Dark)
+- Consolidated API routes — removed `features/` module; all routes under `api/v2/`
+- No more Pro/Community distinction — all features are core
 - SSO service layer extracted to `sso.service.js`
-- LDAP sessions deduplicated (no duplicate session per login)
-- ESLint v9 with react-hooks plugin for stale closure detection
-- Ruff configured for bug-catching rules only (E/F/B/S)
+- Tables use proportional column sizing, actions moved to detail windows
+- Mobile navbar with user dropdown, compact 5-column nav grid
+- WebSocket/CORS auto-detect short hostname and dynamic port
+- Default password is always `changeme123` (not random)
+- Removed unnecessary gcc/build-essential from DEB/RPM dependencies
 
 ### Fixed
 - **LDAP group filter malformed** when user DN contains special characters (`escape_filter_chars`)
-- **17 bugs found by linters**: undefined variables, missing imports, conditional hooks
-  - `CAsPage.jsx`: `loadData()` → `loadCAs()` (undefined function)
-  - `SettingsPage.jsx`: `waitForRestart` undefined (missing hook)
-  - `FloatingDetailWindow.jsx`: conditional `useEffect` (rules-of-hooks violation)
-  - `freedns.py`: 6× `requests` module used without import
-  - `cert_service.py`: `logger` used without definition
-  - `certificate_parser.py`: `serialization` + `logger` missing imports
+- **17 bugs found by linters** — undefined variables, missing imports, conditional hooks across 6 files
 - **CSRF token not stored** on multi-method login — caused 403 on POST/PUT/DELETE
 - **Select dropdown hidden behind modals** — Radix portal z-index fix
-- **Copy button closing SSO modal** — missing `type="button"`
 - **SAML SP metadata schema-invalid** — now uses python3-saml builder
-- **Auth contract inconsistency** — LDAP login now returns permissions/role/csrf_token
+- **CORS origin rejection** breaking WebSocket on Docker and fresh installs
+- **Dashboard charts** — width/height(-1) errors, gradient IDs, react-grid-layout API
+- **6 broken API endpoints** — schema mismatches between models and database
+- **z-index conflicts** between confirm dialogs, toasts, and floating windows
+- **CSR download** — endpoint mismatch (`/download` → `/export`)
+- **PFX/P12 export** — missing password prompt in floating detail windows
+- **Auto-update DEB postinst** — updater systemd units were never enabled
+- Fixed force_password_change not set on fresh admin creation
+- Fixed infinite loop in reports from canWrite in useCallback deps
+- Removed 23 console.error statements from production code
 
 ### Security
+- **JWT removal** — session cookies + API keys only (reduces attack surface)
+- **cryptography** upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
 - SSO rate limiting on LDAP login attempts with account lockout
 - CSRF token validation on all SSO endpoints
-- Role validation against allowed roles list
-- Internal error details no longer leaked to API clients
-- 28 new SSO security tests
-
----
-
-<details>
-<summary><strong>Pre-release history (click to expand)</strong></summary>
-
-## [2.1.0-rc8] - 2026-02-18
-
-### Added
-- **ESLint linter** for frontend — catches stale closures, undefined variables, hook violations
-- **Ruff linter** for backend — catches undefined names, import errors, security issues
-- **Login method persistence** — remembers username + auth method (LDAP/password) across sessions
-- **SAML SP certificate selector** — choose which certificate to include in SP metadata
-- **LDAP directory presets** — OpenLDAP, Active Directory, Custom templates
-- `npm run lint` and `npm run lint:fix` scripts
-
-### Fixed
-- **17 bugs found by linters**: undefined variables, missing imports, conditional hooks
-  - `CAsPage.jsx`: `loadData()` → `loadCAs()` (undefined function)
-  - `SettingsPage.jsx`: `waitForRestart` undefined (missing hook)
-  - `FloatingDetailWindow.jsx`: conditional `useEffect` (rules-of-hooks violation)
-  - `freedns.py`: 6× `requests` module used without import
-  - `cert_service.py`: `logger` used without definition
-  - `certificate_parser.py`: `serialization` + `logger` missing imports
-- **CSRF token not stored** on multi-method login — caused 403 on POST/PUT/DELETE
-- **Select dropdown hidden behind modals** — Radix portal z-index fix
-- **Copy button closing SSO modal** — missing `type="button"`
-- **SAML SP metadata schema-invalid** — now uses python3-saml builder
-- **Auth contract inconsistency** — LDAP login now returns permissions/role/csrf_token
-
-### Security
-- SSO rate limiting on LDAP login attempts with account lockout
-- CSRF token validation on all SSO endpoints
-- Role validation against allowed roles list
-- Internal error details no longer leaked to API clients
-- 28 new SSO security tests
-
-### Changed
-- Consistent SAML metadata URLs (no provider ID needed)
-- SSO service layer extracted to `sso.service.js`
-- LDAP sessions deduplicated (no duplicate session per login)
-- ESLint v9 with react-hooks plugin for stale closure detection
-- Ruff configured for bug-catching rules only (E/F/B/S)
-
-## [2.1.0-rc3] - 2026-02-18
-
-### New Features
-- ***SAML IDP metadata URL: auto-fetch and populate Entity ID, SSO/SLO URLs, certificate***
-- ***SP metadata XML endpoint for easy IDP configuration***
-
-### Bug Fixes
-- Fixed release notes using glob patterns instead of exact filenames for install commands
-- Mark rc/beta/alpha releases as prerelease on GitHub
-
-## [2.1.0-rc2] - 2026-02-18
-
-### New Features
-- ***SSO authentication: full SAML/OAuth2 support with Keycloak tested***
-- ***Governance module: certificate policies, approval workflows, scheduled reports***
-- ***ACME DNS providers: 48 providers with card grid selector and official SVG logos***
-- ***Unified ExportModal with RBAC permission guards***
-- ***Dashboard charts: day selector, expired series, optimized queries***
-- ***Complete i18n: all 9 languages with 2273 keys each***
-
-### Security
 - RBAC permission enforcement across all frontend pages and floating windows
 - SQL injection fixes and debug leak prevention
 - Referrer-Policy security header added
-- Hide sidebar pages based on user permissions
-
-### Improvements
-- WebSocket/CORS: auto-detect short hostname and dynamic port for reliable connections
-- Close all floating panels and detail windows on logout
-- Table refresh after floating window actions (revoke/renew/delete)
-- Rich table preview for reports instead of raw JSON
-- Searchable Select component
-
-### Bug Fixes
-- Fixed CORS origin rejection breaking WebSocket on Docker and fresh installs
-- Fixed force_password_change not set on fresh admin creation
-- Fixed infinite loop in reports from canWrite in useCallback deps
-- Fixed 403 console errors and chart sizing issues
-- Fixed z-index conflicts between confirm dialogs, toasts, and floating windows
-
-### Packaging
-- Removed unnecessary gcc/build-essential from DEB/RPM dependencies
-- Fixed backend/VERSION not updated during CI builds
-- Default password is now always `changeme123` (not random)
-
-## [2.1.0-rc1] - 2026-02-15
-
-### Improvements
-- Template editor button disabled on mobile with tooltip (desktop-only feature)
-- Cleaned up unused mobile full-screen editor code
-- Comprehensive API smoke test: 96/97 endpoints verified
-
-### Bug Fixes
-- Fixed `isMobile` reference error in SettingsPage email tab
-- Fixed 6 broken API endpoints (schema mismatches between models and database)
-- Migration 030: added missing columns to user_sessions, approval_requests, certificate_policies
-- Fixed `User.two_factor_enabled` → `User.totp_confirmed` attribute in account API
-- Fixed `AuditLog.created_at` → `AuditLog.timestamp` in audit log queries
-
-## [2.1.0-beta4] - 2026-02-15
-
-### New Features
-- Email template editor with split-pane HTML source + live preview
-- Plain text template tab for non-HTML email clients
-- Customizable email templates with UCM branding and 6 template variables
-- TagsInput component for alert recipients (type + Enter, paste multiple)
-- Certificate expiry alert settings (thresholds, recipients, check now)
-- SMTP settings: content type selector (HTML/Text/Both), test email recipient field
-
-### Improvements
-- Floating window: resize from left/top edge keeps opposite edge fixed
-- Floating window: pointer-events disabled on body during resize (iframe fix)
-- Input field: "Set" badge no longer misaligns adjacent fields
-- Email settings: consistent field widths with DetailGrid layout
-- SMTP gate: real error messages displayed inline (not just "check settings")
-
-### Bug Fixes
-- TagsInput background color matches regular input fields (bg-secondary)
-- Removed broken Tailwind opacity syntax on CSS variables in TagsInput
-- Placeholder comma removed from alert recipients field
-
-### Documentation
-- In-app help: email template editor section with variables and instructions
-- Admin guide: new Email Notifications section (SMTP, template, alerts)
-- Wiki: Email & Notifications section in Configuration page
-
-### Cleanup
-- Removed dead EmailTemplateEditor.jsx (TipTap WYSIWYG, replaced by source editor)
-- Uninstalled 14 unused TipTap npm packages
-
-## [2.1.0-beta3] - 2026-02-15
-
-### New Features
-
-- **Floating Detail Windows** - Click any table row to open draggable, resizable detail window with embedded content
-- **Detail Action Bar** - Export (multi-format dropdown: PEM, DER, PKCS#12, chain), Renew, Revoke, Delete actions in detail windows
-- **Window Manager** - Footer bar with stack/tile, same-window, close-on-navigate options
-- **Trust Store Chain Validation** - Visual chain status (complete/partial/incomplete), export bundle, add from managed CAs
-- **Service Reconnection** - 30s countdown, health + WebSocket readiness check, automatic redirect to login
-- **Health Endpoint** - Consolidated to `/api/v2/health` with WebSocket readiness status, backward-compatible aliases
-- **ACME Account Delete** - DELETE `/api/v2/acme/accounts/{id}` with cascade cleanup (challenges→authorizations→orders)
-- **Settings About** - Version, system info, uptime, memory, links to docs/wiki/issues
-- **Template Duplication** - Clone endpoint: POST /templates/{id}/duplicate
-- **Unified Export Actions** - Reusable `ExportActions` component with inline contextual password field for P12
-
-### UI/UX
-
-- **Dashboard** - Redesigned header with logo, diversified widget colors, donut chart with gradient/shadow effects
-- **Dashboard Mobile** - Compact header with watermark logo, no redundancy with navbar
-- **Logo** - Shield outline, larger on dashboard, smaller in sidebar
-- **Themes** - Simplified to 3 themes: Gray, Purple, Sunset (was 6)
-- **Tables** - Proportional column sizing, actions moved from table to detail windows
-- **Status Footer Bar** - Window management controls, theme-aware design
-- **Mobile Navbar** - User dropdown menu with account, settings, language selector, logout
-- **Mobile Nav Grid** - Short i18n labels for 5-column grid (all 9 languages)
-- **Reconnect Overlay** - Circular countdown ring, connection progress bar, redirect status
-- **Export Consistency** - Uniform PEM/DER/P7B/P12 formats across all detail panels, inline password field replaces modal
-
-### i18n
-
-- **Full Coverage** - 1930+ keys across all 9 languages, 0 missing
-- **Short Mobile Labels** - 16 `*Short` keys per language for compact mobile navigation
-- **New Namespaces** - `reconnect.*`, `table.*`, `windows.*`, `details.daysShort`
-- **Hardcoded Strings** - 20+ user-facing strings replaced with `t()` calls
-
-### Bug Fixes
-
-- **Health Endpoint** - Removed duplicate route from app.py, consolidated in health_routes.py
-- **FloatingHelpPanel** - Defined missing SOFT_MAX_W constant (was causing runtime crash)
-- **Dashboard Charts** - Fixed width/height(-1) errors with absolute positioning wrapper
-- **Dashboard Donut** - Fixed gradient IDs using translated names (SVG invalid refs)
-- **Dashboard** - Fixed react-grid-layout v2.2.2 dragConfig/resizeConfig API
-- **Dashboard** - Fixed Card.Body ignoring style prop
-- **Toast Notifications** - Stack vertically instead of overlapping
-- **Radix Select** - Filter empty value options
-- **SCEP Nav** - Normalize URL for active state detection
-- **OPNsense** - Wrapped password inputs in form element (DOM warning)
-- **Tests** - Mock useWindowManager in PageRendering tests
-- **Mobile Slide-Over** - Fixed detail panels not showing for sidebar pages (ACME, Users, CSRs)
-- **CSR Download** - Fixed endpoint mismatch (`/download` → `/export`)
-- **PFX/P12 Export** - Fixed missing password prompt in floating detail windows
-- **Password Autofill** - Prevent password managers from autofilling non-login fields (CSS text-security masking)
-
-### Code Quality
-
-- Removed dead system.service methods (getHealth, getVersion, getInfo)
-- Removed unused LanguageSelector import
-- Removed 23 console.error statements from production code
-- Removed P12 password modals (replaced by inline ExportActions)
-
----
-
-## [2.1.0-alpha3] - 2026-02-13
-
-### Security
-
-- **Auto-Update** - Fixed DEB postinst: updater systemd units were never enabled (wrong path check)
-
-### Bug Fixes
-
-- **Truststore** - Delete now returns 200 with message instead of broken 204 (was causing UI to not refresh)
-- **CRL** - Returns null data instead of 404 when CRL not yet generated for a CA
-- **i18n** - Fixed certificate decoder translation key (tools.certDecoder -> tools.decoder)
-- **Server** - Suppress noisy SSL tracebacks from reverse proxy health checks
-
-### Improvements
-
-- **Auto-Update** - Clean unused imports, daily scheduled update check
-- **Documentation** - Complete API reference (~270 endpoints), README audit, refreshed screenshots
-
----
-
-## [2.1.0-dev] - 2026-02-12
-
-### Architecture Refactor
-
-- **Consolidated API routes** - Removed `features/` module entirely; all routes now registered under `api/v2/` (33 blueprints total)
-- **Consolidated models** - Removed `models/features/`; models (rbac.py, sso.py, policy.py) moved to `models/`
-- **Moved encryption utils** - `features/encryption.py` → `utils/encryption.py`
-- **Replaced roles endpoint** - `api/v2/roles.py` removed, replaced by `api/v2/rbac.py` with expanded RBAC support
-- **No more Pro/Community distinction** - All features are core; no separate feature modules
-
-### New Features
-
-- ***Backup v2.0*** - Complete backup overhaul: exports/restores all database tables (was only 5, now covers groups, RBAC roles, templates, trust store, SSO, HSM, API keys, SMTP, notifications, policies, auth certificates, DNS providers, ACME domains, HTTPS server files)
-- **File regeneration** - Startup service that regenerates missing certificate/key files from database, ensuring filesystem consistency after restore or data loss
-- **Human-readable file names** - Certificate and CA files now named `{cn-slug}-{refid}.ext` instead of UUID-only (e.g., `www.example.com-550e8400.crt`)
-- ***SoftHSM integration*** - Automatic SoftHSM2 setup across DEB, RPM, and Docker deployments with PKCS#11 key generation
-- **Webhooks** - Management tab in Settings for webhook CRUD, test, and event filtering
-- ***AKI/SKI Chain Matching*** - Certificate chain relationships now use cryptographic Authority Key Identifier / Subject Key Identifier matching instead of fragile DN-based matching. Reliable across imports, machines, and environments
-- **Chain Repair Scheduler** - Hourly background task that: backfills missing SKI/AKI fields from PEM data, re-chains orphan CAs and certificates via AKI→SKI matching, deduplicates CAs with identical Subject Key Identifiers
-- **Chain Repair Widget** - Visual progress bar on CAs page showing chain integrity status with countdown to next repair and manual "Run Now" button
-- **Smart Import Deduplication** - Certificate import detects and prevents duplicate CAs based on Subject Key Identifier
-
-### Improvements
-
-- **Pre-release filter** - Update checker only considers alpha, beta, and rc tags as pre-releases
-- **RBAC-Users integration** - Users can be assigned custom roles with granular permissions
-- **Startup migration** - Automatic SKI/AKI population for certificates imported before v2.1.0
-- **Orphan detection accuracy** - Root CAs (self-signed) correctly excluded from orphan counts
-
-### Bug Fixes
-
-- **HSM frontend** - Fixed field name alignment with `api/v2/hsm.py` backend
-- **Dashboard expiration colors** - Updated thresholds: ≤7 days red, ≤15 days orange, ≤30 days yellow
-- **ACME DNS test** - Fixed import error for `get_dns_provider_instance`
-- **i18n cleanup** - Removed unused ACME translation keys, fixed hardcoded strings
-- **UTC timezone handling** - API timestamps now include 'Z' suffix for correct browser timezone parsing
-- **Certificate name cleanup** - Removed spurious "Imported:" prefix from CA and certificate names
-
-### Security
-
-- ***JWT removal*** - Removed JWT authentication entirely; UCM now uses session cookies + API keys only. Reduces attack surface and eliminates token-related complexity
-- ***cryptography*** - Upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
-
-### Documentation
-
-- Removed decorative emojis from all documentation and wiki (kept functional markers only)
-
-</details>
+- Role validation against allowed roles list
+- Internal error details no longer leaked to API clients
+- 28 new SSO security tests
 
 ---
 
