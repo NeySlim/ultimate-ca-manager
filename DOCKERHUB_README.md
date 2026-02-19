@@ -9,6 +9,8 @@ UCM provides certificate lifecycle management, CA hierarchy, and industry-standa
 
 **Multi-arch:** `linux/amd64`, `linux/arm64`
 
+![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/dashboard-dark.png)
+
 ---
 
 ## Quick Start
