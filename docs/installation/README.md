@@ -39,7 +39,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443  
-**Default credentials:** admin / password from install (check /etc/ucm/ucm.env or Docker logs)
+**Default credentials:** admin / changeme123
 
 ---
 
@@ -48,11 +48,11 @@ docker run -d \
 **Native installation for Debian, Ubuntu, and derivatives.**
 
 ```bash
-# Download latest package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_all.deb
+# Download latest package (replace VERSION with actual version, e.g. 2.1.0)
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_VERSION_all.deb
 
 # Install
-sudo dpkg -i ucm_*_all.deb
+sudo dpkg -i ucm_VERSION_all.deb
 sudo apt-get install -f  # Fix any dependencies
 
 # Enable and start
@@ -70,11 +70,11 @@ sudo systemctl status ucm
 **Native installation for RedHat, Rocky Linux, AlmaLinux, and derivatives.**
 
 ```bash
-# Download latest package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm.noarch.rpm
+# Download latest package (replace VERSION with actual version, e.g. 2.1.0)
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-VERSION-1.noarch.rpm
 
 # Install
-sudo dnf install ./ucm-*.noarch.rpm
+sudo dnf install ./ucm-VERSION-1.noarch.rpm
 
 # Enable and start
 sudo systemctl enable ucm
@@ -137,8 +137,8 @@ After installation, access UCM at **https://localhost:8443**
 
 ### Source Installation
 - **Data:** `./backend/data` (relative to repository root)
-- **Config:** Environment variables or `.env` file
-- **Logs:** stdout/stderr
+- **Config:** Environment variables or `/etc/ucm/ucm.env`
+- **Logs:** `/var/log/ucm/ucm.log`
 
 ---
 
