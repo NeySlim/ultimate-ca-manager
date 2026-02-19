@@ -20,9 +20,10 @@ Technical documentation for Ultimate CA Manager.
 
 ## Operations
 
+- **[HSM_DOCKER.md](./HSM_DOCKER.md)** — HSM integration in Docker
 - **[LOG_ROTATION.md](./LOG_ROTATION.md)** — Log rotation configuration
 - **[REDIS.md](./REDIS.md)** — Optional Redis integration
-- **[TESTING.md](./TESTING.md)** — Testing guide (unit + E2E)
+- **[TESTING.md](./TESTING.md)** — Testing & linting guide (unit + E2E + ESLint + Ruff)
 
 ## Architecture
 

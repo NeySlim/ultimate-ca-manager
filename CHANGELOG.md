@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+<details>
+<summary><strong>Pre-release history (click to expand)</strong></summary>
+
 ## [2.1.0-rc8] - 2026-02-18
 
 ### Added
@@ -316,6 +319,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Removed decorative emojis from all documentation and wiki (kept functional markers only)
+
+</details>
 
 ---
 

@@ -6,8 +6,33 @@ UCM uses a comprehensive testing strategy with unit tests and E2E tests.
 
 | Test Type | Framework | Status |
 |-----------|-----------|--------|
-| Unit Tests | Vitest + React Testing Library | Active |
+| Unit Tests (Frontend) | Vitest + React Testing Library | Active |
+| Unit Tests (Backend) | pytest | Active |
 | E2E Tests | Playwright | Active |
+| Linting (Frontend) | ESLint v9 | Active |
+| Linting (Backend) | Ruff | Active |
+
+## Linting
+
+### Frontend (ESLint)
+
+```bash
+cd frontend
+npm run lint          # Check for issues
+npm run lint:fix      # Auto-fix issues
+```
+
+Configured with `react-hooks` plugin to catch stale closures, conditional hooks, and undefined variables.
+
+### Backend (Ruff)
+
+```bash
+cd backend
+ruff check .          # Check for issues
+ruff check --fix .    # Auto-fix issues
+```
+
+Configured for bug-catching rules only (E/F/B/S categories).
 
 ## Unit Tests
 
@@ -91,8 +116,20 @@ frontend/e2e/
 ├── dashboard.spec.ts  # Dashboard tests
 ├── certificates.spec.ts
 ├── cas.spec.ts
+├── csrs.spec.ts
+├── templates.spec.ts
+├── truststore.spec.ts
+├── acme.spec.ts
+├── scep.spec.ts
+├── crlocsp.spec.ts
+├── hsm.spec.ts
+├── rbac.spec.ts
+├── operations.spec.ts
+├── audit.spec.ts
+├── tools.spec.ts
+├── account.spec.ts
 ├── core.spec.ts       # Users, Settings, Navigation
-└── pro/               # Advanced features
+└── pro/               # SSO & advanced features
     ├── groups.spec.ts
     ├── rbac.spec.ts
     ├── sso.spec.ts

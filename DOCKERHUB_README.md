@@ -61,8 +61,10 @@ volumes:
 - **CRL/CDP** -- Certificate Revocation List distribution
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
+- **SSO** -- LDAP/Active Directory, OAuth2 (Google, GitHub, Azure AD), SAML 2.0
+- **RBAC** -- 4 system roles (Admin, Operator, Auditor, Viewer) + custom roles
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
-- **12 Themes** -- 6 color schemes x Light/Dark
+- **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) × Light/Dark
 - **i18n** -- 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
 - **Real-time** -- WebSocket live updates
 
