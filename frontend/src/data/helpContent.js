@@ -392,7 +392,7 @@ export const helpContent = {
   rbac: {
     title: 'Role-Based Access Control',
     subtitle: 'Fine-grained permission management',
-    overview: 'Define custom roles with granular permissions. System roles (Admin, Operator, Viewer) are built-in. Custom roles let you control exactly which operations each user can perform.',
+    overview: 'Define custom roles with granular permissions. System roles (Admin, Operator, Auditor, Viewer) are built-in. Custom roles let you control exactly which operations each user can perform.',
     sections: [
       {
         title: 'System Roles',
@@ -400,7 +400,8 @@ export const helpContent = {
         definitions: [
           { term: 'Admin', description: 'Full access to all features and settings' },
           { term: 'Operator', description: 'Can manage certificates and CAs but not system settings' },
-          { term: 'Viewer', description: 'Read-only access to certificates and CAs' },
+          { term: 'Auditor', description: 'Read-only access to all operational data for compliance and audit' },
+          { term: 'Viewer', description: 'Basic read-only access to certificates, CAs, and templates' },
         ]
       },
       {

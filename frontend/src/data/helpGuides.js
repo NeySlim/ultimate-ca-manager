@@ -697,7 +697,7 @@ Manage user accounts, groups, and role assignments. Users authenticate to UCM vi
 2. Enter **username** (unique, cannot be changed later)
 3. Enter **email** (used for notifications and recovery)
 4. Set an **initial password**
-5. Select a **role** (Admin, Operator, Viewer, or custom)
+5. Select a **role** (Admin, Operator, Auditor, Viewer, or custom)
 6. Click **Create**
 
 ### User Status
@@ -735,7 +735,8 @@ A user's effective permissions are the **union** of:
 ### System Roles
 - **Admin** — Full access to all features
 - **Operator** — Can manage certificates, CAs, CSRs but not system settings
-- **Viewer** — Read-only access
+- **Auditor** — Read-only access to all operational data for compliance and audit
+- **Viewer** — Read-only access to certificates, CAs, and templates
 
 ### Custom Roles
 Create roles with granular permissions on the **RBAC** page.
@@ -754,11 +755,12 @@ RBAC provides fine-grained permission management. Define custom roles with speci
 
 ## System Roles
 
-Three built-in roles that cannot be modified or deleted:
+Four built-in roles that cannot be modified or deleted:
 
 - **Admin** — Full access to everything
 - **Operator** — Manage certificates, CAs, CSRs, templates. No access to system settings, users, or RBAC
-- **Viewer** — Read-only access to certificates and CAs
+- **Auditor** — Read-only access to all operational data (certificates, CAs, ACME, SCEP, HSM, audit logs, policies, groups) but not settings or user management
+- **Viewer** — Basic read-only access to certificates, CAs, CSRs, templates, and trust store
 
 ## Custom Roles
 

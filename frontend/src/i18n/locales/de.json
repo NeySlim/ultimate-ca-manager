@@ -1684,7 +1684,7 @@
     "inherited": "Geerbt von {{name}}",
     "helpTitle": "RBAC-Verwaltung",
     "helpInfo": "Definieren Sie granulare Berechtigungen pro Rolle. Systemrollen sind schreibgeschützt.",
-    "helpSystemRoles": "Integrierte Rollen (admin, operator, viewer) können nicht geändert werden.",
+    "helpSystemRoles": "Integrierte Rollen (admin, operator, auditor, viewer) können nicht geändert werden.",
     "categories": {
       "csrs": "Zertifikatsanfragen",
       "groups": "Gruppenverwaltung",

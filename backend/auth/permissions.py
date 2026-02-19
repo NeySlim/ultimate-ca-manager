@@ -20,7 +20,7 @@ ROLE_PERMISSIONS = {
         'read:settings',
         'read:groups',
     ],
-    'viewer': [
+    'auditor': [
         'read:certificates',
         'read:cas',
         'read:csrs',
@@ -33,6 +33,13 @@ ROLE_PERMISSIONS = {
         'read:policies', 'read:approvals',
         'read:audit',
         'read:groups',
+    ],
+    'viewer': [
+        'read:certificates',
+        'read:cas',
+        'read:csrs',
+        'read:templates',
+        'read:truststore',
     ]
 }
 

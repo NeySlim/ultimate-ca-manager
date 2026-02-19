@@ -1684,7 +1684,7 @@
     "inherited": "继承自 {{name}}",
     "helpTitle": "RBAC 管理",
     "helpInfo": "定义每个角色的细粒度权限。系统角色是只读的。",
-    "helpSystemRoles": "内置角色 (admin, operator, viewer) 无法修改。",
+    "helpSystemRoles": "内置角色 (admin, operator, auditor, viewer) 无法修改。",
     "categories": {
       "csrs": "证书请求",
       "groups": "组管理",

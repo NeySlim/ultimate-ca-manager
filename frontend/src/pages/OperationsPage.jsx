@@ -204,7 +204,7 @@ function useResourceTypes(t) {
           header: t('common.user'),
           sortable: true, priority: 1,
           render: (val, row) => {
-            const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', viewer: 'icon-bg-teal' }
+            const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', auditor: 'icon-bg-orange', viewer: 'icon-bg-teal' }
             const colorClass = row.active ? (avatarColors[row.role] || avatarColors.viewer) : 'icon-bg-orange'
             return (
               <div className="flex items-center gap-2">
@@ -227,9 +227,9 @@ function useResourceTypes(t) {
           header: t('common.role'),
           sortable: true, priority: 2,
           render: (val) => {
-            const roleConfig = { admin: { variant: 'violet', dot: true }, operator: { variant: 'primary', dot: false }, viewer: { variant: 'teal', dot: false } }
+            const roleConfig = { admin: { variant: 'violet', dot: true }, operator: { variant: 'primary', dot: false }, auditor: { variant: 'orange', dot: false }, viewer: { variant: 'teal', dot: false } }
             const config = roleConfig[val] || roleConfig.viewer
-            const roleLabels = { admin: t('users.admin', 'Admin'), operator: t('common.operator', 'Operator'), viewer: t('common.viewer', 'Viewer') }
+            const roleLabels = { admin: t('users.admin', 'Admin'), operator: t('common.operator', 'Operator'), auditor: t('common.auditor', 'Auditor'), viewer: t('common.viewer', 'Viewer') }
             return (
               <Badge variant={config.variant} size="sm" dot={config.dot}>
                 {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
@@ -853,7 +853,7 @@ export default function OperationsPage() {
       )
     }
     if (type === 'users') {
-      const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', viewer: 'icon-bg-teal' }
+      const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', auditor: 'icon-bg-orange', viewer: 'icon-bg-teal' }
       return (
         <div className="flex items-center gap-2">
           <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>

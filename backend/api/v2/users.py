@@ -198,7 +198,7 @@ def create_user():
         return error_response('Email already exists', 409)
     
     # Validate role
-    valid_roles = ['admin', 'operator', 'viewer']
+    valid_roles = ['admin', 'operator', 'auditor', 'viewer']
     role = data.get('role', 'viewer')
     if role not in valid_roles:
         return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
@@ -300,7 +300,7 @@ def update_user(user_id):
     if 'role' in data:
         if g.current_user.role != 'admin':
             return error_response('Only admins can change roles', 403)
-        valid_roles = ['admin', 'operator', 'viewer']
+        valid_roles = ['admin', 'operator', 'auditor', 'viewer']
         if data['role'] not in valid_roles:
             return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
         user.role = data['role']

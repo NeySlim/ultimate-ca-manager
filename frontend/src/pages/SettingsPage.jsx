@@ -699,6 +699,7 @@ function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
   const roleOptions = [
     { value: 'admin', label: t('common.admin') },
     { value: 'operator', label: t('common.operator') },
+    { value: 'auditor', label: t('common.auditor') },
     { value: 'viewer', label: t('common.viewer') },
   ]
 
