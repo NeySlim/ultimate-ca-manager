@@ -61,7 +61,7 @@ override_dh_auto_install:
 	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ || true
 	cp LICENSE debian/ucm/usr/share/doc/ucm/ || true
 	
-	# Install systemd service
+	# Install systemd service and auto-updater units
 	install -d debian/ucm/lib/systemd/system
 	install -m 644 packaging/debian/ucm.service debian/ucm/lib/systemd/system/
 	install -m 644 packaging/systemd/ucm-updater.path debian/ucm/lib/systemd/system/
