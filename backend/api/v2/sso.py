@@ -21,7 +21,7 @@ from lxml import etree
 import logging
 logger = logging.getLogger(__name__)
 
-VALID_ROLES = {'admin', 'operator', 'viewer'}
+VALID_ROLES = {'admin', 'operator', 'auditor', 'viewer'}
 
 bp = Blueprint('sso_pro', __name__)
 

@@ -1094,11 +1094,23 @@ def init_database(app):
                     ]
                 },
                 {
-                    "name": "User",
-                    "description": "Basic read access to certificates",
+                    "name": "Auditor",
+                    "description": "Read-only access to all operational data for compliance and audit",
                     "is_system": True,
                     "permissions": [
-                        "read:dashboard", "read:certificates", "read:cas", "read:templates"
+                        "read:dashboard", "read:certificates", "read:cas", "read:csrs",
+                        "read:templates", "read:truststore", "read:crl", "read:acme",
+                        "read:scep", "read:hsm", "read:policies", "read:approvals",
+                        "read:audit", "read:groups"
+                    ]
+                },
+                {
+                    "name": "Viewer",
+                    "description": "Basic read access to certificates and CAs",
+                    "is_system": True,
+                    "permissions": [
+                        "read:dashboard", "read:certificates", "read:cas", "read:csrs",
+                        "read:templates", "read:truststore"
                     ]
                 }
             ]

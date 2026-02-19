@@ -667,6 +667,7 @@
     "lastLogin": "Dernière connexion",
     "createdAt": "Créé le",
     "operator": "Opérateur",
+    "auditor": "Auditeur",
     "viewer": "Lecteur",
     "enable2FA": "Activer la 2FA",
     "totp": "TOTP",
@@ -1320,7 +1321,7 @@
     "inherited": "Hérité de {{name}}",
     "helpTitle": "Gestion RBAC",
     "helpInfo": "Définir des permissions granulaires par rôle.",
-    "helpSystemRoles": "Les rôles intégrés (admin, opérateur, viewer) ne peuvent pas être modifiés.",
+    "helpSystemRoles": "Les rôles intégrés (admin, opérateur, auditeur, lecteur) ne peuvent pas être modifiés.",
     "categories": {
       "csrs": "Demandes de certificat",
       "groups": "Gestion des groupes",

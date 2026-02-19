@@ -241,6 +241,7 @@
     "lastLogin": "Last Login",
     "createdAt": "Created At",
     "operator": "Operator",
+    "auditor": "Auditor",
     "viewer": "Viewer",
     "enable2FA": "Enable 2FA",
     "totp": "TOTP",
@@ -1686,7 +1687,7 @@
     "inherited": "Inherited from {{name}}",
     "helpTitle": "RBAC Management",
     "helpInfo": "Define granular permissions per role. System roles are read-only.",
-    "helpSystemRoles": "Built-in roles (admin, operator, viewer) cannot be modified.",
+    "helpSystemRoles": "Built-in roles (admin, operator, auditor, viewer) cannot be modified.",
     "categories": {
       "csrs": "Certificate Requests",
       "groups": "Group Management",

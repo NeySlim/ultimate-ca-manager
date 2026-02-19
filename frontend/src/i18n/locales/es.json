@@ -1684,7 +1684,7 @@
     "inherited": "Inherited from {{name}}",
     "helpTitle": "RBAC Gestión",
     "helpInfo": "Defina permisos granulares por rol. Los roles del sistema son de solo lectura.",
-    "helpSystemRoles": "Built-in roles (admin, operator, verer) cannot be modified.",
+    "helpSystemRoles": "Built-in roles (admin, operator, auditor, viewer) cannot be modified.",
     "categories": {
       "csrs": "Certificado Requests",
       "groups": "Grupo Gestión",

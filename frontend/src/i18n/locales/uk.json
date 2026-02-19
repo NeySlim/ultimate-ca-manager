@@ -1684,7 +1684,7 @@
     "inherited": "Успадковано від {{name}}",
     "helpTitle": "RBAC Керування",
     "helpInfo": "Визначте детальні дозволи для кожної ролі. Системні ролі доступні лише для читання.",
-    "helpSystemRoles": "Вбудовані ролі (admin, operator, viewer) не можуть бути змінені.",
+    "helpSystemRoles": "Вбудовані ролі (admin, operator, auditor, viewer) не можуть бути змінені.",
     "categories": {
       "csrs": "Сертифікат Requests",
       "groups": "Group Керування",

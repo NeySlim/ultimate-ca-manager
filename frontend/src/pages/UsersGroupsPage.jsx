@@ -286,6 +286,7 @@ export default function UsersGroupsPage() {
         const avatarColors = {
           admin: 'icon-bg-violet',
           operator: 'icon-bg-blue',
+          auditor: 'icon-bg-orange',
           viewer: 'icon-bg-teal'
         }
         // Override with orange for disabled users
@@ -312,6 +313,7 @@ export default function UsersGroupsPage() {
         const avatarColors = {
           admin: 'icon-bg-violet',
           operator: 'icon-bg-blue',
+          auditor: 'icon-bg-orange',
           viewer: 'icon-bg-teal'
         }
         const colorClass = row.active 
@@ -345,12 +347,14 @@ export default function UsersGroupsPage() {
         const roleConfig = {
           admin: { variant: 'violet', dot: true },
           operator: { variant: 'primary', dot: false },
+          auditor: { variant: 'orange', dot: false },
           viewer: { variant: 'teal', dot: false }
         }
         const config = roleConfig[val] || roleConfig.viewer
         const roleLabels = {
           admin: t('users.admin'),
           operator: t('common.operator'),
+          auditor: t('common.auditor'),
           viewer: t('common.viewer')
         }
         return (
@@ -365,12 +369,14 @@ export default function UsersGroupsPage() {
         const roleConfig = {
           admin: { variant: 'violet', dot: true },
           operator: { variant: 'primary', dot: false },
+          auditor: { variant: 'orange', dot: false },
           viewer: { variant: 'teal', dot: false }
         }
         const config = roleConfig[val] || roleConfig.viewer
         const roleLabels = {
           admin: t('users.admin'),
           operator: t('common.operator'),
+          auditor: t('common.auditor'),
           viewer: t('common.viewer')
         }
         return (
@@ -719,6 +725,7 @@ export default function UsersGroupsPage() {
               options: [
                 { value: 'admin', label: t('users.admin') },
                 { value: 'operator', label: t('common.operator') },
+                { value: 'auditor', label: t('common.auditor') },
                 { value: 'viewer', label: t('common.viewer') }
               ]
             },
@@ -907,6 +914,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         options={[
           { value: 'admin', label: t('users.admin') },
           { value: 'operator', label: t('common.operator') },
+          { value: 'auditor', label: t('common.auditor') },
           { value: 'viewer', label: t('common.viewer') }
         ]}
       />

@@ -1684,7 +1684,7 @@
     "inherited": "Ereditato da {{name}}",
     "helpTitle": "Gestione RBAC",
     "helpInfo": "Definisci permessi granulari per ruolo. I ruoli di sistema sono di sola lettura.",
-    "helpSystemRoles": "I ruoli integrati (admin, operator, viewer) non possono essere modificati.",
+    "helpSystemRoles": "I ruoli integrati (admin, operator, auditor, viewer) non possono essere modificati.",
     "categories": {
       "csrs": "Richieste Certificato",
       "groups": "Gestione Gruppi",

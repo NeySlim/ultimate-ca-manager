@@ -451,6 +451,7 @@ describe('User Form — POST /users', () => {
     const options = [
       { value: 'admin', label: 'Admin' },
       { value: 'operator', label: 'Operator' },
+      { value: 'auditor', label: 'Auditor' },
       { value: 'viewer', label: 'Viewer' },
     ]
     expectValidSelectOptions(options, 'role')
@@ -518,6 +519,7 @@ describe('Settings — Security', () => {
     const options = [
       { value: 'admin', label: 'Admin' },
       { value: 'operator', label: 'Operator' },
+      { value: 'auditor', label: 'Auditor' },
       { value: 'viewer', label: 'Viewer' },
     ]
     expectValidSelectOptions(options, 'default_role')
