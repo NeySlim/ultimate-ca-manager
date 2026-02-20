@@ -260,7 +260,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ !contains(github.ref, 'dev') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(needs.build-deb.outputs.version, 'dev') }}
+            type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
             type=raw,value=${{ needs.build-deb.outputs.version }}
       
       - name: Build and push
