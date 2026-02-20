@@ -45,14 +45,21 @@ def create_webhook():
     if not url.startswith(('http://', 'https://')):
         return error_response("URL must start with http:// or https://", 400)
     
+    events = data.get('events', ['*'])
+    if not isinstance(events, list):
+        return error_response('Events must be an array', 400)
+    custom_headers = data.get('custom_headers', {})
+    if custom_headers and not isinstance(custom_headers, dict):
+        return error_response('Custom headers must be an object', 400)
+    
     endpoint = WebhookEndpoint(
         name=data['name'],
         url=url,
         secret=data.get('secret') or secrets.token_urlsafe(32),
-        events=json.dumps(data.get('events', ['*'])),
+        events=json.dumps(events),
         ca_filter=data.get('ca_filter'),
         enabled=data.get('enabled', True),
-        custom_headers=json.dumps(data.get('custom_headers', {}))
+        custom_headers=json.dumps(custom_headers)
     )
     
     db.session.add(endpoint)
@@ -78,12 +85,16 @@ def update_webhook(endpoint_id):
     if 'secret' in data:
         endpoint.secret = data['secret']
     if 'events' in data:
+        if not isinstance(data['events'], list):
+            return error_response('Events must be an array', 400)
         endpoint.events = json.dumps(data['events'])
     if 'ca_filter' in data:
         endpoint.ca_filter = data['ca_filter']
     if 'enabled' in data:
         endpoint.enabled = data['enabled']
     if 'custom_headers' in data:
+        if data['custom_headers'] and not isinstance(data['custom_headers'], dict):
+            return error_response('Custom headers must be an object', 400)
         endpoint.custom_headers = json.dumps(data['custom_headers'])
     
     db.session.commit()
