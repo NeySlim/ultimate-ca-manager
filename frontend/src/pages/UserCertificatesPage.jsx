@@ -136,11 +136,10 @@ export default function UserCertificatesPage() {
     }
     setExporting(true)
     try {
-      const response = await userCertificatesService.exportCert(
+      const blob = await userCertificatesService.exportCert(
         exportCert.id, exportFormat,
         { password: exportFormat === 'pkcs12' ? exportPassword : undefined }
       )
-      const blob = response instanceof Blob ? response : new Blob([response.data || response])
       const ext = exportFormat === 'pkcs12' ? 'p12' : 'pem'
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

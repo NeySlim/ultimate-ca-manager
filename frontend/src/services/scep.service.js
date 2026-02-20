@@ -1,7 +1,7 @@
 /**
  * SCEP (Simple Certificate Enrollment Protocol) Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const scepService = {
   // Config
@@ -19,12 +19,7 @@ export const scepService = {
 
   // Requests (enrollments)
   async getRequests(filters = {}) {
-    const params = new URLSearchParams()
-    if (filters.status) params.append('status', filters.status)
-    if (filters.page) params.append('page', filters.page)
-    
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return apiClient.get(`/scep/requests${query}`)
+    return apiClient.get(`/scep/requests${buildQueryString(filters)}`)
   },
 
   async approveRequest(id) {

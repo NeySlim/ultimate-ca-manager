@@ -1,7 +1,7 @@
 /**
  * ACME Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const acmeService = {
   // Settings (ACME Server)
@@ -81,11 +81,7 @@ export const acmeService = {
 
   // Client Orders (certificates from Let's Encrypt)
   async getClientOrders(status, environment) {
-    const params = new URLSearchParams()
-    if (status) params.append('status', status)
-    if (environment) params.append('environment', environment)
-    const query = params.toString()
-    return apiClient.get(`/acme/client/orders${query ? `?${query}` : ''}`)
+    return apiClient.get(`/acme/client/orders${buildQueryString({ status, environment })}`)
   },
 
   async getClientOrder(orderId) {
@@ -178,7 +174,7 @@ export const acmeService = {
   },
 
   async resolveDomain(domain) {
-    return apiClient.get(`/acme/domains/resolve?domain=${encodeURIComponent(domain)}`)
+    return apiClient.get(`/acme/domains/resolve${buildQueryString({ domain })}`)
   },
 
   async testDomainAccess(domain, dnsProviderId = null) {

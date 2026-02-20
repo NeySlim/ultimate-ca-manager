@@ -1,16 +1,11 @@
 /**
  * Users Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const usersService = {
   async getAll(filters = {}) {
-    const params = new URLSearchParams()
-    if (filters.role) params.append('role', filters.role)
-    if (filters.active !== undefined) params.append('active', filters.active)
-    
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return apiClient.get(`/users${query}`)
+    return apiClient.get(`/users${buildQueryString(filters)}`)
   },
 
   async getById(id) {
