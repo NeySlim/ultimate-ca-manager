@@ -694,8 +694,8 @@ def export_certificate(cert_id):
             # Include private key if requested
             if include_key and certificate.prv:
                 key_pem = base64.b64decode(certificate.prv)
-                if not result.endswith(b'\\n'):
-                    result += b'\\n'
+                if not result.endswith(b'\n'):
+                    result += b'\n'
                 result += key_pem
                 filename = f"{certificate.descr or certificate.refid}_with_key.pem"
             
@@ -705,8 +705,8 @@ def export_certificate(cert_id):
                 while ca:
                     if ca.crt:
                         ca_cert = base64.b64decode(ca.crt)
-                        if not result.endswith(b'\\n'):
-                            result += b'\\n'
+                        if not result.endswith(b'\n'):
+                            result += b'\n'
                         result += ca_cert
                     # Get parent CA
                     if ca.caref:
