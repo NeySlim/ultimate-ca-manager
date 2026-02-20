@@ -1581,7 +1581,18 @@
     "templateVarDatetime": "Sendedatum/-zeit",
     "templateVarInstanceUrl": "Instanz-URL",
     "templatePlainText": "Klartext",
-    "templateDesktopOnly": "Der Vorlagen-Editor benötigt einen Desktop-Bildschirm"
+    "templateDesktopOnly": "Der Vorlagen-Editor benötigt einen Desktop-Bildschirm",
+    "mtls": {
+      "title": "mTLS-Authentifizierung",
+      "enable": "Client-Zertifikat-Authentifizierung aktivieren",
+      "trustedCA": "Vertrauenswürdige Zertifizierungsstelle",
+      "selectCA": "CA auswählen...",
+      "required": "Client-Zertifikat erforderlich (kein Passwort-Fallback)",
+      "requiredWarning": "Im erforderlichen Modus können sich Benutzer ohne gültiges Client-Zertifikat nicht anmelden. Stellen Sie sicher, dass mindestens ein Admin ein registriertes Zertifikat hat.",
+      "restartNote": "Ein Dienstneustart ist erforderlich, um mTLS-Änderungen anzuwenden.",
+      "saved": "mTLS-Einstellungen gespeichert",
+      "saveFailed": "Fehler beim Speichern der mTLS-Einstellungen"
+    }
   },
   "account": {
     "profile": "Profil",

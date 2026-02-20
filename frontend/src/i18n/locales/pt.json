@@ -1581,7 +1581,18 @@
     "templateVarDatetime": "Data/hora de envio",
     "templateVarInstanceUrl": "URL da instância",
     "templatePlainText": "Texto simples",
-    "templateDesktopOnly": "O editor de modelos requer uma tela desktop"
+    "templateDesktopOnly": "O editor de modelos requer uma tela desktop",
+    "mtls": {
+      "title": "Autenticação mTLS",
+      "enable": "Ativar autenticação por certificado de cliente",
+      "trustedCA": "Autoridade de certificação confiável",
+      "selectCA": "Selecionar uma CA...",
+      "required": "Exigir certificado de cliente (sem fallback de senha)",
+      "requiredWarning": "No modo obrigatório, usuários sem um certificado de cliente válido não podem fazer login. Certifique-se de que pelo menos um admin tenha um certificado inscrito.",
+      "restartNote": "Uma reinicialização do serviço é necessária para aplicar as alterações mTLS.",
+      "saved": "Configurações mTLS salvas",
+      "saveFailed": "Falha ao salvar as configurações mTLS"
+    }
   },
   "account": {
     "profile": "Perfil",

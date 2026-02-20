@@ -1581,7 +1581,18 @@
     "templateVarDatetime": "Data/ora di invio",
     "templateVarInstanceUrl": "URL dell'istanza",
     "templatePlainText": "Testo semplice",
-    "templateDesktopOnly": "L'editor di modelli richiede uno schermo desktop"
+    "templateDesktopOnly": "L'editor di modelli richiede uno schermo desktop",
+    "mtls": {
+      "title": "Autenticazione mTLS",
+      "enable": "Abilita autenticazione con certificato client",
+      "trustedCA": "Autorità di certificazione attendibile",
+      "selectCA": "Seleziona una CA...",
+      "required": "Richiedi certificato client (nessun fallback con password)",
+      "requiredWarning": "In modalità obbligatoria, gli utenti senza un certificato client valido non possono accedere. Assicurati che almeno un admin abbia un certificato registrato.",
+      "restartNote": "È necessario un riavvio del servizio per applicare le modifiche mTLS.",
+      "saved": "Impostazioni mTLS salvate",
+      "saveFailed": "Errore nel salvataggio delle impostazioni mTLS"
+    }
   },
   "account": {
     "profile": "Profilo",

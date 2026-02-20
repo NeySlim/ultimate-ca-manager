@@ -1581,7 +1581,18 @@
     "templateVarDatetime": "送信日時",
     "templateVarInstanceUrl": "インスタンスURL",
     "templatePlainText": "プレーンテキスト",
-    "templateDesktopOnly": "テンプレートエディタにはデスクトップ画面が必要です"
+    "templateDesktopOnly": "テンプレートエディタにはデスクトップ画面が必要です",
+    "mtls": {
+      "title": "mTLS認証",
+      "enable": "クライアント証明書認証を有効にする",
+      "trustedCA": "信頼された認証局",
+      "selectCA": "CAを選択...",
+      "required": "クライアント証明書を必須にする（パスワードフォールバックなし）",
+      "requiredWarning": "必須モードが有効な場合、有効なクライアント証明書を持たないユーザーはログインできません。少なくとも1人の管理者が登録済み証明書を持っていることを確認してください。",
+      "restartNote": "mTLSの変更を適用するにはサービスの再起動が必要です。",
+      "saved": "mTLS設定が保存されました",
+      "saveFailed": "mTLS設定の保存に失敗しました"
+    }
   },
   "account": {
     "profile": "プロフィール",

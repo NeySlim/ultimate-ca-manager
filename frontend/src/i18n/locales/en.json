@@ -1584,7 +1584,18 @@
     "templateVarDatetime": "Send date/time",
     "templateVarInstanceUrl": "Instance URL",
     "templatePlainText": "Plain Text",
-    "templateDesktopOnly": "Template editor requires a desktop screen"
+    "templateDesktopOnly": "Template editor requires a desktop screen",
+    "mtls": {
+      "title": "mTLS Authentication",
+      "enable": "Enable client certificate authentication",
+      "trustedCA": "Trusted Certificate Authority",
+      "selectCA": "Select a CA...",
+      "required": "Require client certificate (no password fallback)",
+      "requiredWarning": "When required mode is active, users without a valid client certificate cannot log in. Make sure at least one admin has an enrolled certificate.",
+      "restartNote": "A service restart is required to apply mTLS changes.",
+      "saved": "mTLS settings saved",
+      "saveFailed": "Failed to save mTLS settings"
+    }
   },
   "account": {
     "profile": "Profile",
