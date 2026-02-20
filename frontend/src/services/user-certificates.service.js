@@ -6,7 +6,7 @@ export const userCertificatesService = {
   getAll: (params = {}) => apiClient.get(`${BASE}${buildQueryString(params)}`),
   getStats: () => apiClient.get(`${BASE}/stats`),
   getById: (id) => apiClient.get(`${BASE}/${id}`),
-  exportCert: (id, format = 'pem', { password, includeKey = true, includeChain = true } = {}) => {
+  export: (id, format = 'pem', { password, includeKey = true, includeChain = true } = {}) => {
     return apiClient.get(`${BASE}/${id}/export${buildQueryString({
       format,
       include_key: includeKey,
