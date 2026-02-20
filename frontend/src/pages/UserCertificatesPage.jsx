@@ -13,15 +13,14 @@ import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input
 } from '../components'
 import { userCertificatesService } from '../services'
-import { useNotification, useMobile } from '../contexts'
+import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN } from '../lib/utils'
 
 export default function UserCertificatesPage() {
   const { t } = useTranslation()
-  const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
-  const { canWrite, canDelete, isAdmin } = usePermission()
+  const { canWrite, canDelete } = usePermission()
 
   // Data
   const [certificates, setCertificates] = useState([])
@@ -83,7 +82,7 @@ export default function UserCertificatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, perPage, filterStatus, search, sortBy, sortOrder])
+  }, [page, perPage, filterStatus, search, sortBy, sortOrder, showError, t])
 
   useEffect(() => { loadData() }, [loadData])
 
