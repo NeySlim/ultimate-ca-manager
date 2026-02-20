@@ -136,7 +136,7 @@ export default function UserCertificatesPage() {
     }
     setExporting(true)
     try {
-      const blob = await userCertificatesService.exportCert(
+      const blob = await userCertificatesService.export(
         exportCert.id, exportFormat,
         { password: exportFormat === 'pkcs12' ? exportPassword : undefined }
       )
