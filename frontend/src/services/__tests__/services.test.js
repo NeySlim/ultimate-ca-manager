@@ -24,19 +24,10 @@ const mockApiClient = {
   clearCsrfToken: vi.fn(),
 }
 
-vi.mock('../apiClient', () => ({
-  apiClient: mockApiClient,
-  buildQueryString: (params) => {
-    const qs = new URLSearchParams()
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        qs.append(key, String(value))
-      }
-    })
-    const str = qs.toString()
-    return str ? `?${str}` : ''
-  },
-}))
+vi.mock('../apiClient', async () => {
+  const actual = await vi.importActual('../apiClient')
+  return { ...actual, apiClient: mockApiClient }
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
