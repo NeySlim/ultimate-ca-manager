@@ -95,7 +95,7 @@ def create_dns_provider():
     return success_response(
         data=provider.to_dict(),
         message='DNS provider created',
-        status_code=201
+        status=201
     )
 
 

@@ -2424,10 +2424,7 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
       }
     }
     
-    onSubmit({
-      ...formData,
-      credentials: JSON.stringify(formData.credentials)
-    })
+    onSubmit(formData)
   }
   
   const updateCredential = (key, value) => {
