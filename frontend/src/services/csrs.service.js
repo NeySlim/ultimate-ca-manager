@@ -1,25 +1,15 @@
 /**
  * Certificate Signing Requests Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const csrsService = {
   async getAll(filters = {}) {
-    const params = new URLSearchParams()
-    if (filters.page) params.append('page', filters.page)
-    if (filters.per_page) params.append('per_page', filters.per_page)
-    
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return apiClient.get(`/csrs${query}`)
+    return apiClient.get(`/csrs${buildQueryString(filters)}`)
   },
 
   async getHistory(filters = {}) {
-    const params = new URLSearchParams()
-    if (filters.page) params.append('page', filters.page)
-    if (filters.per_page) params.append('per_page', filters.per_page)
-    
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return apiClient.get(`/csrs/history${query}`)
+    return apiClient.get(`/csrs/history${buildQueryString(filters)}`)
   },
 
   async getById(id) {

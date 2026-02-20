@@ -1,15 +1,18 @@
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 const BASE = '/user-certificates'
 
 export const userCertificatesService = {
-  getAll: (params = {}) => apiClient.get(BASE, { params }),
+  getAll: (params = {}) => apiClient.get(`${BASE}${buildQueryString(params)}`),
   getStats: () => apiClient.get(`${BASE}/stats`),
   getById: (id) => apiClient.get(`${BASE}/${id}`),
   exportCert: (id, format = 'pem', { password, includeKey = true, includeChain = true } = {}) => {
-    const params = { format, include_key: includeKey, include_chain: includeChain }
-    if (password) params.password = password
-    return apiClient.get(`${BASE}/${id}/export`, { params, responseType: 'blob' })
+    return apiClient.get(`${BASE}/${id}/export${buildQueryString({
+      format,
+      include_key: includeKey,
+      include_chain: includeChain,
+      password
+    })}`, { responseType: 'blob' })
   },
   revoke: (id, reason = 'unspecified') => apiClient.post(`${BASE}/${id}/revoke`, { reason }),
   delete: (id) => apiClient.delete(`${BASE}/${id}`),

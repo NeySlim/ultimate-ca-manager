@@ -360,8 +360,7 @@ export default function AccountPage() {
 
   const handleExportCert = async (certId, format) => {
     try {
-      const response = await userCertificatesService.exportCert(certId, format)
-      const blob = response instanceof Blob ? response : new Blob([response])
+      const blob = await userCertificatesService.exportCert(certId, format)
       const ext = format === 'pkcs12' ? 'p12' : 'pem'
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')

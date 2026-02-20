@@ -1,14 +1,14 @@
 /**
  * Groups Service - API client for group management
  */
-import { apiClient as api } from './apiClient'
+import { apiClient as api, buildQueryString } from './apiClient'
 
 export const groupsService = {
   /**
    * Get all groups
    */
   getAll: async (params = {}) => {
-    return api.get('/groups', { params })
+    return api.get(`/groups${buildQueryString(params)}`)
   },
 
   /**
