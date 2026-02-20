@@ -877,22 +877,16 @@ describe('opnsenseService', () => {
     opnsenseService = mod.opnsenseService
   })
 
-  it('test → POST /import/opnsense/test via request()', async () => {
+  it('test → POST /import/opnsense/test', async () => {
     const config = { host: '192.168.1.1', port: 443 }
     await opnsenseService.test(config)
-    expect(mockApiClient.request).toHaveBeenCalled()
-    const call = mockApiClient.request.mock.calls[0]
-    expect(call[0]).toContain('/import/opnsense/test')
-    expect(call[1].method).toBe('POST')
+    expect(mockApiClient.post).toHaveBeenCalledWith('/import/opnsense/test', config)
   })
 
-  it('import → POST /import/opnsense/import via request()', async () => {
+  it('import → POST /import/opnsense/import', async () => {
     const config = { host: '192.168.1.1', items: ['ca1'] }
     await opnsenseService.import(config)
-    expect(mockApiClient.request).toHaveBeenCalled()
-    const call = mockApiClient.request.mock.calls[0]
-    expect(call[0]).toContain('/import/opnsense/import')
-    expect(call[1].method).toBe('POST')
+    expect(mockApiClient.post).toHaveBeenCalledWith('/import/opnsense/import', config)
   })
 })
 
