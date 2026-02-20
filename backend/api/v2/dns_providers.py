@@ -46,6 +46,8 @@ def create_dns_provider():
     name = data.get('name')
     provider_type = data.get('provider_type')
     credentials = data.get('credentials', {})
+    if credentials and not isinstance(credentials, dict):
+        return error_response('Credentials must be an object', 400)
     zones = data.get('zones', [])
     is_default = data.get('is_default', False)
     

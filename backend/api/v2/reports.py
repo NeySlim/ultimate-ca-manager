@@ -33,6 +33,8 @@ def generate_report():
         return error_response(f"Unknown report type: {report_type}", 400)
     
     params = data.get('params', {})
+    if params and not isinstance(params, dict):
+        return error_response('Params must be an object', 400)
     
     try:
         report = ReportService.generate_report(report_type, params)
