@@ -97,6 +97,15 @@ Enable/disable in **Settings** > **Security**:
 - **WebAuthn** -- Hardware security keys
 - **mTLS** -- Client certificate authentication
 
+### mTLS Certificate Management
+
+mTLS client certificates can be enrolled from the **Account → mTLS** tab. Once enrolled, certificates are fully managed by UCM:
+
+- **User Certificates page** (`/user-certificates`) — Dedicated page to list, export, revoke, and delete all mTLS client certificates
+- **Export** — Download as PEM (with key and chain) or PKCS12 (password-protected)
+- **Revoke** — Revoke with reason (key compromise, superseded, etc.)
+- **RBAC** — Viewers see only their own certificates; operators and admins see all
+
 ---
 
 ## Email Notifications

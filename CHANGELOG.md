@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - Unreleased
+
+### Added
+- **mTLS client certificate management** — full lifecycle management of mTLS certificates (list, export, revoke, delete) via new `/api/v2/user-certificates` API (6 endpoints)
+- **User Certificates page** — dedicated page with stats bar, floating detail windows, export modal (PEM/PKCS12), row actions, responsive slide-over on mobile
+- **Account page mTLS improvements** — download PEM button per certificate, "Manage all certificates" link, "certificate is managed by UCM" info message
+
+### Changed
+- **Centralized `buildQueryString` utility** — all 10 frontend services now use `buildQueryString()` from `apiClient.js` instead of manual `URLSearchParams` construction
+- **Dev-mode `params` warning** — `apiClient.request()` logs a `console.warn` if `options.params` is passed (silently ignored, common bug source)
+- **Explicit boolean params** — export functions use `? true : undefined` ternary instead of ambiguous `|| undefined`
+
+### Fixed
+- **Export blob handling** — `UserCertificatesPage` and `AccountPage` now correctly handle `apiClient` return value (returns data directly, not `{ data }` wrapper)
+- **`groups.service.js` params bug** — was passing `{ params }` to `apiClient.get()` which silently ignored the query parameters
+- **ResponsiveDataTable render signatures** — fixed `(row)` → `(_value, row)` for column render functions
+
+---
+
 ## [2.1.0] - 2026-02-19
 
 ### Added

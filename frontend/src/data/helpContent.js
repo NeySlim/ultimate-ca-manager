@@ -1,5 +1,5 @@
 /**
- * Help content for all UCM pages — v2.1.0
+ * Help content for all UCM pages — v2.2.0
  * Each entry: { title, subtitle, overview, sections[], tips[], warnings[], related[] }
  * Section: { title, icon, content?, items?[], definitions?[], example? }
  * Item: string | { label, text }
@@ -126,6 +126,55 @@ export const helpContent = {
       'Deleting a certificate removes it from UCM but does not revoke it',
     ],
     related: ['CAs', 'CSRs', 'Templates', 'CRL/OCSP']
+  },
+
+  // ===== USER CERTIFICATES =====
+  'user-certificates': {
+    title: 'User Certificates',
+    subtitle: 'Manage mTLS client certificates',
+    overview: 'Dedicated management for mTLS client certificates enrolled via the Account page. View, export, revoke, and delete certificates issued to users for mutual TLS authentication.',
+    sections: [
+      {
+        title: 'Certificate Status',
+        icon: Certificate,
+        definitions: [
+          { term: 'Valid', description: 'Within validity period and not revoked' },
+          { term: 'Expiring', description: 'Will expire within 30 days' },
+          { term: 'Expired', description: 'Past the "Not After" date' },
+          { term: 'Revoked', description: 'Explicitly revoked by an operator or admin' },
+        ]
+      },
+      {
+        title: 'Actions',
+        icon: Key,
+        items: [
+          { label: 'Export', text: 'Download as PEM (with key and chain) or PKCS#12 (password-protected)' },
+          { label: 'Revoke', text: 'Revoke with a reason — the certificate will appear in the CRL' },
+          { label: 'Delete', text: 'Remove the certificate and its user association from UCM' },
+        ]
+      },
+      {
+        title: 'Permissions',
+        icon: ShieldCheck,
+        items: [
+          { label: 'Viewers', text: 'Can see only their own certificates' },
+          { label: 'Operators', text: 'Can view, export, and revoke all user certificates' },
+          { label: 'Admins', text: 'Full access including delete' },
+          { label: 'Auditors', text: 'Can view certificates but cannot export' },
+        ]
+      },
+    ],
+    tips: [
+      'Enroll new mTLS certificates from Account → mTLS tab',
+      'Certificates are stored and managed by UCM like any other certificate',
+      'Use the stats bar to quickly filter by status',
+      'Click a row to view full certificate details in a floating window',
+    ],
+    warnings: [
+      'Revoking a user certificate immediately prevents mTLS login with that certificate',
+      'Deleting removes the certificate permanently — it cannot be recovered',
+    ],
+    related: ['Certificates', 'Account', 'Settings']
   },
 
   // ===== CSRs =====
