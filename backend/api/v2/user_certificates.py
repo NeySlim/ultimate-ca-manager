@@ -64,7 +64,21 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['revoked'] = certificate.revoked or False
         result['has_private_key'] = bool(certificate.prv)
         result['caref'] = certificate.caref
-        # Compute status
+        # Extract CN from subject for CertificateDetails compatibility
+        subj = certificate.subject or ''
+        cn = ''
+        for part in subj.split(','):
+            part = part.strip()
+            if part.upper().startswith('CN='):
+                cn = part[3:]
+                break
+        result['common_name'] = cn or auth_cert.name or certificate.descr or ''
+        result['cn'] = result['common_name']
+        # Key info (parse from cert if available)
+        result['key_algorithm'] = getattr(certificate, 'key_algorithm', None) or 'RSA'
+        result['key_size'] = getattr(certificate, 'key_size', None)
+        result['signature_algorithm'] = getattr(certificate, 'signature_algorithm', None)
+        # Compute status + days_remaining
         now = datetime.utcnow()
         if certificate.revoked:
             result['status'] = 'revoked'
@@ -74,9 +88,13 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
             result['status'] = 'expiring'
         else:
             result['status'] = 'valid'
+        if certificate.valid_to:
+            result['days_remaining'] = (certificate.valid_to - now).days
     else:
         result['status'] = 'orphan'
         result['has_private_key'] = False
+        result['common_name'] = auth_cert.name or ''
+        result['cn'] = result['common_name']
 
     if owner_user:
         result['owner'] = owner_user.username

@@ -11,7 +11,7 @@ import { FloatingWindow } from './ui/FloatingWindow'
 import { CertificateDetails } from './CertificateDetails'
 import { CADetails } from './CADetails'
 import { TrustCertDetails } from './TrustCertDetails'
-import { certificatesService, casService, truststoreService } from '../services'
+import { certificatesService, casService, truststoreService, userCertificatesService } from '../services'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
@@ -44,6 +44,14 @@ const ENTITY_CONFIG = {
     fetchById: (id) => truststoreService.getById(id),
     getTitle: (data) => data?.name || data?.subject || `Trust Store #${data?.id}`,
     getSubtitle: (data) => data?.purpose || '',
+  },
+  user_certificate: {
+    icon: Certificate,
+    iconClass: 'bg-accent-primary-op15 text-accent-primary',
+    service: () => userCertificatesService,
+    fetchById: (id) => userCertificatesService.getById(id),
+    getTitle: (data) => data?.name || data?.cert_subject || `User Certificate #${data?.id}`,
+    getSubtitle: (data) => data?.owner ? `Owner: ${data.owner}` : '',
   },
 }
 
@@ -160,9 +168,10 @@ export function FloatingDetailWindow({ windowInfo }) {
 
   // Build action bar props
   const isCert = windowInfo.type === 'certificate'
+  const isUserCert = windowInfo.type === 'user_certificate'
   const isCA = windowInfo.type === 'ca'
   const hasPrivateKey = !!data?.has_private_key
-  const resource = isCA ? 'cas' : 'certificates'
+  const resource = isCA ? 'cas' : isUserCert ? 'user_certificates' : 'certificates'
   const actionBarProps = data ? {
     onExport: handleExport,
     hasPrivateKey,
@@ -170,7 +179,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     entityType: isCA ? 'ca' : 'certificate',
     entityName: title,
     onRenew: isCert && canWrite('certificates') && !data.revoked && data.has_private_key ? handleRenew : null,
-    onRevoke: isCert && canWrite('certificates') && !data.revoked ? handleRevoke : null,
+    onRevoke: (isCert || isUserCert) && canWrite(resource) && !data.revoked ? handleRevoke : null,
     onDelete: canDelete(resource) ? handleDelete : null,
     t,
   } : null
@@ -215,7 +224,7 @@ export function FloatingDetailWindow({ windowInfo }) {
  * DetailContent — Renders the appropriate detail view based on entity type
  */
 function DetailContent({ type, data }) {
-  if (type === 'certificate') {
+  if (type === 'certificate' || type === 'user_certificate') {
     return (
       <CertificateDetails
         certificate={data}
