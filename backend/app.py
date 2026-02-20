@@ -575,51 +575,6 @@ def create_app(config_name=None):
             'safe_mode': True
         }), 503
     
-    # Restart signal detector (before_request middleware)
-    @app.before_request
-    def check_restart_signal():
-        """Check if restart was requested and perform graceful shutdown"""
-        from pathlib import Path
-        from config.settings import DATA_DIR
-        
-        restart_signal = DATA_DIR / '.restart_requested'
-        
-        if restart_signal.exists():
-            try:
-                # Remove signal file
-                restart_signal.unlink()
-                
-                print(f"🔄 Restart signal detected! Initiating graceful shutdown...")
-                
-                # Schedule graceful shutdown after this request completes
-                # Docker/Systemd will automatically restart the service
-                def do_shutdown():
-                    import time
-                    import signal
-                    
-                    print(f"🔄 Shutdown thread started, waiting 1 second...")
-                    time.sleep(1)  # Wait for response to be sent
-                    
-                    # Kill gunicorn master to trigger full process restart
-                    master_pid = os.getppid()
-                    print(f"🔄 Killing gunicorn master (PID {master_pid}) for restart...")
-                    sys.stdout.flush()
-                    
-                    try:
-                        os.kill(master_pid, signal.SIGTERM)
-                    except OSError:
-                        os._exit(1)
-                
-                import threading
-                threading.Thread(target=do_shutdown, daemon=False).start()
-                print(f"🔄 Shutdown thread launched")
-                
-            except Exception as e:
-                # Log error but don't fail the request
-                print(f"Restart signal error: {e}")
-        
-        return None
-    
     return app
 
 

@@ -1460,6 +1460,8 @@
     "uptime": "Час роботи",
     "memory": "Пам'ять",
     "serviceStatusUnavailable": "Статус служби недоступний.",
+    "dockerRestartNotice": "У Docker перезапустіть контейнер, щоб застосувати зміни.",
+    "dockerCertNotice": "Сертифікат збережено. Перезапустіть контейнер для застосування: docker restart <container>",
     "settingSavedInBrowser": "Це налаштування зберігається у вашому браузері та зберігається між сесіями.",
     "smtpConfig": "Налаштування SMTP",
     "testEmailSuccess": "Тестовий лист успішно надіслано",

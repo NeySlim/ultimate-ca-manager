@@ -1460,6 +1460,8 @@
     "uptime": "Uptime",
     "memory": "Memory",
     "serviceStatusUnavailable": "Service status unavailable.",
+    "dockerRestartNotice": "Docker環境では、変更を適用するにはコンテナを再起動してください。",
+    "dockerCertNotice": "証明書を保存しました。コンテナを再起動して適用: docker restart <container>",
     "settingSavedInBrowser": "この設定はブラウザに保存され、セッション間で保持されます。",
     "smtpConfig": "SMTP設定",
     "testEmailSuccess": "テストメールを送信しました",

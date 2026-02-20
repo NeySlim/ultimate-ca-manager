@@ -50,11 +50,11 @@ find %{buildroot}%{ucm_home} -name '*.pyc' -delete
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
 install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.sh
 install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
-install -m 755 packaging/scripts/ucm-update.sh %{buildroot}%{ucm_home}/scripts/
+install -m 755 packaging/scripts/ucm-watcher.sh %{buildroot}%{ucm_home}/scripts/
 install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/services/
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
-install -m 644 packaging/systemd/ucm-updater.path %{buildroot}%{_unitdir}/%{name}-updater.path
-install -m 644 packaging/systemd/ucm-updater.service %{buildroot}%{_unitdir}/%{name}-updater.service
+install -m 644 packaging/systemd/ucm-watcher.path %{buildroot}%{_unitdir}/%{name}-watcher.path
+install -m 644 packaging/systemd/ucm-watcher.service %{buildroot}%{_unitdir}/%{name}-watcher.service
 
 %pre
 getent group %{name} >/dev/null || groupadd -r %{name}
@@ -63,7 +63,7 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %post
 %systemd_post %{name}.service
 
-# Install sudoers for service management (auto-update handled by ucm-updater.service)
+# Install sudoers for service management (watcher handles restart/update)
 cat > /etc/sudoers.d/ucm << 'SUDOERSEOF'
 # UCM service management - allows ucm user to restart service without password
 # This is required for HTTPS certificate application and other system operations
@@ -74,10 +74,10 @@ ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ucm
 SUDOERSEOF
 chmod 440 /etc/sudoers.d/ucm
 
-# Enable ucm-updater path watcher for auto-updates
+# Enable ucm-watcher path unit for restart/update handling
 systemctl daemon-reload
-systemctl enable ucm-updater.path
-systemctl start ucm-updater.path
+systemctl enable ucm-watcher.path
+systemctl start ucm-watcher.path
 
 # Paths (same as DEB)
 UCM_HOME=%{ucm_home}
