@@ -107,7 +107,7 @@ export function Sidebar({ activePage }) {
   }
 
   return (
-    <div className={cn(sidebarWidth, "h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px")}>
+    <div className={cn(sidebarWidth, "h-full border-r border-border-op60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px")}>
       {/* Logo */}
       <Link to="/" className="flex items-center justify-center mb-2" style={{ width: isLargeScreen ? 42 : 34, height: isLargeScreen ? 42 : 34 }} title={t('common.dashboard')}>
         <Logo variant="icon" withText={false} size={isLargeScreen ? 'sm' : 'xs'} />
@@ -128,7 +128,7 @@ export function Sidebar({ activePage }) {
         return arr[idx - 1] !== 'separator'
       }).map((page, idx) => {
         if (page === 'separator') {
-          return <div key={`sep-${idx}`} className="w-6 h-px bg-border/40 my-2" />
+          return <div key={`sep-${idx}`} className="w-6 h-px bg-border-op40 my-2" />
         }
         const Icon = page.icon
         const isActive = activePage === page.id
@@ -142,8 +142,8 @@ export function Sidebar({ activePage }) {
               buttonSize,
               "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
               isActive
-                ? "sidebar-active-gradient text-accent-primary border border-accent-primary/20" 
-                : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
+                ? "sidebar-active-gradient text-accent-primary border border-accent-primary-op20" 
+                : "text-text-secondary hover:bg-tertiary-op70 hover:text-text-primary"
             )}
             title={showBadge ? `${label} (${expiringCount} ${t('common.expiring').toLowerCase()})` : label}
           >
@@ -184,8 +184,8 @@ export function Sidebar({ activePage }) {
           buttonSize,
           "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
           activePage === 'settings'
-            ? "sidebar-active-gradient text-accent-primary border border-accent-primary/20"
-            : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
+            ? "sidebar-active-gradient text-accent-primary border border-accent-primary-op20"
+            : "text-text-secondary hover:bg-tertiary-op70 hover:text-text-primary"
         )}
         title={t('common.settings')}
       >
@@ -205,7 +205,7 @@ export function Sidebar({ activePage }) {
       {/* User Menu (with Theme) */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className={cn(buttonSize, "rounded-sm bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary hover:bg-accent-primary/20 transition-all group")}>
+          <button className={cn(buttonSize, "rounded-sm bg-accent-primary-op10 border border-accent-primary-op20 flex items-center justify-center text-accent-primary hover:bg-accent-primary-op20 transition-all group")}>
             <UserCircle size={iconSize} weight="bold" />
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
               {user?.username || 'User'}

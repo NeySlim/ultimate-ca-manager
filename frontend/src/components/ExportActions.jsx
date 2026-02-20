@@ -68,7 +68,7 @@ export function ExportActions({
 
   if (passwordMode) {
     return (
-      <div className={cn('flex items-center gap-1.5 p-1 rounded-lg bg-bg-tertiary/50', className)}>
+      <div className={cn('flex items-center gap-1.5 p-1 rounded-lg bg-tertiary-op50', className)}>
         <Lock size={14} className="text-text-tertiary shrink-0 ml-1" />
         <input
           ref={inputRef}
@@ -80,7 +80,7 @@ export function ExportActions({
           style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
           className={cn(
             'w-24 sm:w-32 h-6 px-2 text-xs rounded-md border border-border bg-bg-primary text-text-primary',
-            'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary/50 focus:border-accent-primary'
+            'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary-op50 focus:border-accent-primary'
           )}
         />
         <Button 
@@ -103,7 +103,7 @@ export function ExportActions({
   }
 
   return (
-    <div className={cn('flex flex-wrap gap-1 p-1 rounded-lg bg-bg-tertiary/50', className)}>
+    <div className={cn('flex flex-wrap gap-1 p-1 rounded-lg bg-tertiary-op50', className)}>
       {formats.map(f => (
         <Button 
           key={f.key} 

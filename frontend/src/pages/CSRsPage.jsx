@@ -492,11 +492,11 @@ export default function CSRsPage() {
           columnStorageKey={`ucm-csrs-${activeTab}-columns`}
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
-              <Button size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
+              <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
                 <UploadSimple size={22} weight="bold" />
               </Button>
             ) : (
-              <Button size="sm" onClick={() => setShowImportModal(true)}>
+              <Button type="button" size="sm" onClick={() => setShowImportModal(true)}>
                 <UploadSimple size={14} weight="bold" />
                 {t('common.import')}
               </Button>
@@ -516,7 +516,7 @@ export default function CSRsPage() {
             ? t('csrs.uploadToStart') 
             : t('csrs.signToSee')}
           emptyAction={activeTab === 'pending' && canWrite('csrs') && (
-            <Button onClick={() => setShowImportModal(true)}>
+            <Button type="button" onClick={() => setShowImportModal(true)}>
               <UploadSimple size={16} /> {t('csrs.importCSR')}
             </Button>
           )}
@@ -582,10 +582,10 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                 className="font-mono text-xs"
               />
               <div className="flex justify-end gap-2 pt-2 border-t border-border">
-                <Button variant="secondary" onClick={() => { closeModal('upload'); setPastedPEM('') }}>
+                <Button type="button" variant="secondary" onClick={() => { closeModal('upload'); setPastedPEM('') }}>
                   {t('common.cancel')}
                 </Button>
-                <Button onClick={handlePasteUpload} disabled={!pastedPEM.trim()}>
+                <Button type="button" onClick={handlePasteUpload} disabled={!pastedPEM.trim()}>
                   <UploadSimple size={16} /> {t('common.upload')}
                 </Button>
               </div>
@@ -623,8 +623,8 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           />
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => closeModal('sign')}>{t('common.cancel')}</Button>
-            <Button onClick={handleSign} disabled={!signCA}>
+            <Button type="button" variant="secondary" onClick={() => closeModal('sign')}>{t('common.cancel')}</Button>
+            <Button type="button" onClick={handleSign} disabled={!signCA}>
               <SignIn size={16} /> {t('common.signCSR')}
             </Button>
           </div>
@@ -660,10 +660,10 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             placeholder={t('csrs.passphraseHint')}
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
+            <Button type="button" variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
+            <Button type="button" onClick={handleUploadKey} disabled={!keyPem.trim()}>
               <UploadSimple size={16} /> {t('csrs.uploadKey')}
             </Button>
           </div>
@@ -693,7 +693,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       {/* Header */}
       <CompactHeader
         icon={FileText}
-        iconClass="bg-accent-warning/20"
+        iconClass="bg-accent-warning-op20"
         title={csr.common_name || csr.cn || t('csrs.unnamedCSR')}
         subtitle={csr.organization}
         badge={
@@ -712,21 +712,21 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
 
       {/* Actions */}
       <div className="flex gap-2 flex-wrap">
-        <Button size="sm" variant="secondary" onClick={onDownload}>
+        <Button type="button" size="sm" variant="secondary" onClick={onDownload}>
           <Download size={14} /> {t('common.download')}
         </Button>
         {canWrite('csrs') && !csr.has_private_key && (
-          <Button size="sm" variant="secondary" onClick={onUploadKey}>
+          <Button type="button" size="sm" variant="secondary" onClick={onUploadKey}>
             <UploadSimple size={14} /> {t('csrs.uploadKey')}
           </Button>
         )}
         {canWrite('csrs') && (
-          <Button size="sm" onClick={onSign}>
+          <Button type="button" size="sm" onClick={onSign}>
             <SignIn size={14} /> {t('csrs.sign')}
           </Button>
         )}
         {canDelete('csrs') && (
-          <Button size="sm" variant="danger" onClick={onDelete}>
+          <Button type="button" size="sm" variant="danger" onClick={onDelete}>
             <Trash size={14} />
           </Button>
         )}
@@ -793,7 +793,7 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       {/* Header */}
       <CompactHeader
         icon={Certificate}
-        iconClass="bg-accent-success/20"
+        iconClass="bg-accent-success-op20"
         title={cert.common_name || cert.cn || t('csrs.unnamedCertificate')}
         subtitle={cert.organization}
         badge={
@@ -813,7 +813,7 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
+        <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
           <Download size={14} /> {t('common.download')}
         </Button>
         <Button 

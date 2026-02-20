@@ -77,7 +77,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
       title={title}
       subtitle={subtitle}
       icon={BookOpen}
-      iconClass="bg-accent-primary/15 text-accent-primary"
+      iconClass="bg-accent-primary-op15 text-accent-primary"
       zIndex={50}
       onClose={onClose}
     >
@@ -102,13 +102,13 @@ function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {showTabs && (
-        <div className="shrink-0 flex border-b border-border bg-bg-secondary/30">
+        <div className="shrink-0 flex border-b border-border bg-secondary-op30">
           <button
             onClick={() => setTab('quick')}
             className={cn(
               'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
               tab === 'quick'
-                ? 'text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5'
+                ? 'text-accent-primary border-b-2 border-accent-primary bg-accent-primary-op5'
                 : 'text-text-tertiary hover:text-text-secondary'
             )}
           >
@@ -120,7 +120,7 @@ function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
             className={cn(
               'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors',
               tab === 'guide'
-                ? 'text-accent-primary border-b-2 border-accent-primary bg-accent-primary/5'
+                ? 'text-accent-primary border-b-2 border-accent-primary bg-accent-primary-op5'
                 : 'text-text-tertiary hover:text-text-secondary'
             )}
           >
@@ -157,7 +157,7 @@ function QuickHelpContent({ content, t }) {
   return (
     <>
       {content.overview && (
-        <div className="p-3 rounded-xl bg-bg-tertiary/50 border border-border">
+        <div className="p-3 rounded-xl bg-tertiary-op50 border border-border">
           <div className="flex items-start gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-accent-25 flex items-center justify-center shrink-0 mt-0.5">
               <Info size={14} weight="duotone" className="text-accent-primary" />
@@ -193,7 +193,7 @@ function QuickHelpContent({ content, t }) {
       )}
 
       {content.warnings?.length > 0 && (
-        <div className="rounded-xl overflow-hidden border border-status-danger/30">
+        <div className="rounded-xl overflow-hidden border border-status-danger-op30">
           <div className="visual-section-header !py-2" style={{ background: 'color-mix(in srgb, var(--status-danger) 10%, var(--bg-tertiary))' }}>
             <div className="w-6 h-6 rounded-md icon-bg-red flex items-center justify-center">
               <Warning size={12} weight="fill" />
@@ -442,7 +442,7 @@ function GuideContent({ markdown, t, isMobileView, panelWidth }) {
       <div className="flex-1 flex min-h-0">
         {/* Desktop Sidebar TOC */}
         {showSidebar && (
-          <div className="w-[150px] shrink-0 border-r border-border overflow-y-auto bg-bg-secondary/30">
+          <div className="w-[150px] shrink-0 border-r border-border overflow-y-auto bg-secondary-op30">
             <div className="py-2">
               {toc.map((item, idx) => (
                 <button
@@ -451,8 +451,8 @@ function GuideContent({ markdown, t, isMobileView, panelWidth }) {
                   className={cn(
                     'w-full text-left px-3 py-1.5 text-[11px] leading-snug transition-colors border-l-2',
                     activeSection === idx
-                      ? 'border-accent-primary text-accent-primary bg-accent-primary/5 font-medium'
-                      : 'border-transparent text-text-tertiary hover:text-text-secondary hover:bg-bg-tertiary/50'
+                      ? 'border-accent-primary text-accent-primary bg-accent-primary-op5 font-medium'
+                      : 'border-transparent text-text-tertiary hover:text-text-secondary hover:bg-tertiary-op50'
                   )}
                 >
                   {item}
@@ -483,7 +483,7 @@ function GuideContent({ markdown, t, isMobileView, panelWidth }) {
                 onClick={() => toggleSection(idx)}
                 className={cn(
                   'w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors',
-                  readerPrefs.contrast === 'sepia' ? 'hover:bg-[#ebe0c8]' : 'hover:bg-bg-tertiary/50'
+                  readerPrefs.contrast === 'sepia' ? 'hover:bg-[#ebe0c8]' : 'hover:bg-tertiary-op50'
                 )}
               >
                 {openSections.has(idx)
@@ -521,7 +521,7 @@ function ReaderToolbar({
   tocCollapsed, setTocCollapsed, showSidebarToggle, t
 }) {
   return (
-    <div className="shrink-0 border-b border-border bg-bg-secondary/40">
+    <div className="shrink-0 border-b border-border bg-secondary-op40">
       <div className="flex items-center gap-1 px-2 py-1.5 flex-wrap">
         {/* Sidebar toggle */}
         {showSidebarToggle && (
@@ -621,7 +621,7 @@ function ToolbarBtn({ icon, title, active, onClick }) {
       className={cn(
         'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
         active
-          ? 'bg-accent-primary/15 text-accent-primary'
+          ? 'bg-accent-primary-op15 text-accent-primary'
           : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
       )}
     >
@@ -641,7 +641,7 @@ function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
     <div className="shrink-0 border-b border-border">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-bg-tertiary/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-tertiary-op50 transition-colors"
       >
         <List size={13} className="text-text-tertiary shrink-0" />
         <span className="text-[11px] font-medium text-text-secondary flex-1 truncate">
@@ -658,7 +658,7 @@ function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
               className={cn(
                 'w-full text-left px-3 py-1.5 rounded-md text-[11px] transition-colors',
                 activeSection === idx
-                  ? 'bg-accent-primary/10 text-accent-primary font-medium'
+                  ? 'bg-accent-primary-op10 text-accent-primary font-medium'
                   : 'text-text-tertiary hover:bg-bg-tertiary'
               )}
             >
@@ -778,9 +778,9 @@ function renderLines(lines) {
       elements.push(
         <div key={`q-${i}`} className={cn(
           'p-2.5 rounded-lg border text-xs leading-relaxed',
-          isWarning ? 'bg-status-danger/5 border-status-danger/20 text-status-danger'
-            : isTip ? 'bg-status-warning/5 border-status-warning/20 text-text-secondary'
-            : 'bg-accent-primary/5 border-accent-primary/20 text-text-secondary'
+          isWarning ? 'bg-status-danger-op5 border-status-danger-op20 text-status-danger'
+            : isTip ? 'bg-status-warning-op5 border-status-warning-op20 text-text-secondary'
+            : 'bg-accent-primary-op5 border-accent-primary-op20 text-text-secondary'
         )}>
           {formatInline(text)}
         </div>
@@ -937,7 +937,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
           <div className="w-10 h-1 rounded-full bg-border mx-auto mb-3" />
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-accent-primary/15 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-accent-primary-op15 flex items-center justify-center">
                 <BookOpen size={16} weight="duotone" className="text-accent-primary" />
               </div>
               <div>

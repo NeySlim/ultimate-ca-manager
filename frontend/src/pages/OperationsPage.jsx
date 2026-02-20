@@ -574,22 +574,22 @@ export default function OperationsPage() {
     return (
       <div className="flex items-center gap-1.5">
         {resourceConfig.actions.includes('revoke') && (
-          <Button size="sm" variant="secondary" onClick={() => setBulkAction('revoke')}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => setBulkAction('revoke')}>
             <Prohibit size={14} /> {t('common.revoke', 'Revoke')}
           </Button>
         )}
         {resourceConfig.actions.includes('renew') && (
-          <Button size="sm" variant="secondary" onClick={() => setBulkAction('renew')}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => setBulkAction('renew')}>
             <ArrowsClockwise size={14} /> {t('common.renew', 'Renew')}
           </Button>
         )}
         {resourceConfig.actions.includes('sign') && (
-          <Button size="sm" variant="secondary" onClick={() => setBulkAction('sign')}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => setBulkAction('sign')}>
             <PencilSimple size={14} /> {t('common.sign', 'Sign')}
           </Button>
         )}
         {resourceConfig.actions.includes('export') && (
-          <Button size="sm" variant="secondary" onClick={async () => {
+          <Button type="button" size="sm" variant="secondary" onClick={async () => {
             const ids = Array.from(selectedIds)
             if (!ids.length) return
             try {
@@ -610,7 +610,7 @@ export default function OperationsPage() {
           </Button>
         )}
         {resourceConfig.actions.includes('delete') && (
-          <Button size="sm" variant="danger" onClick={() => setBulkAction('delete')}>
+          <Button type="button" size="sm" variant="danger" onClick={() => setBulkAction('delete')}>
             <Trash size={14} /> {t('common.delete', 'Delete')}
           </Button>
         )}
@@ -693,7 +693,7 @@ export default function OperationsPage() {
                         {testItems.map(item => (
                           <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
                             <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} className="w-4 h-4 rounded border-border text-accent-primary shrink-0" />
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary/15 text-accent-primary' : 'bg-status-info/15 text-status-info'}`}>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
                               {item.type}
                             </span>
                             <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
@@ -710,11 +710,11 @@ export default function OperationsPage() {
           )}
 
           <div className="flex gap-3 pt-2">
-            <Button variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
+            <Button type="button" variant="secondary" onClick={handleTestConf} disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}>
               {processing ? t('common.testing') : t('common.testConnection')}
             </Button>
             {testResult?.success && testItems.some(i => i.selected) && (
-              <Button onClick={handleImportFromOpnsense} disabled={processing}>
+              <Button type="button" onClick={handleImportFromOpnsense} disabled={processing}>
                 <UploadSimple size={16} />
                 {t('importExport.opnsense.importSelected', { count: testItems.filter(i => i.selected).length })}
               </Button>
@@ -736,7 +736,7 @@ export default function OperationsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => handleExport(certificatesService.exportAll, 'pem', 'certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
               <FileText size={20} weight="fill" className="text-white" />
@@ -751,7 +751,7 @@ export default function OperationsPage() {
           </button>
           <button
             onClick={() => handleExport(certificatesService.exportAll, 'pkcs7', 'certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
               <Package size={20} weight="fill" className="text-white" />
@@ -771,7 +771,7 @@ export default function OperationsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => handleExport(casService.exportAll, 'pem', 'ca-certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-emerald flex items-center justify-center">
               <FileText size={20} weight="fill" className="text-white" />
@@ -786,7 +786,7 @@ export default function OperationsPage() {
           </button>
           <button
             onClick={() => handleExport(casService.exportAll, 'pkcs7', 'ca-certificates')}
-            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-bg-secondary/50 hover:bg-bg-secondary hover:border-accent-primary/30 transition-all text-left"
+            className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-orange flex items-center justify-center">
               <Package size={20} weight="fill" className="text-white" />
@@ -885,7 +885,7 @@ export default function OperationsPage() {
             <select
               value={bulkResourceType}
               onChange={(e) => { setBulkResourceType(e.target.value); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
-              className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-medium focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
+              className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-medium focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary"
             >
               {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
                 const count = resourceCounts[key]
@@ -913,7 +913,7 @@ export default function OperationsPage() {
                     className={cn(
                       "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all border",
                       isActive
-                        ? "border-accent-primary/40 bg-accent-primary/10 text-accent-primary"
+                        ? "border-accent-primary-op40 bg-accent-primary-op10 text-accent-primary"
                         : "border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover"
                     )}
                   >
@@ -922,7 +922,7 @@ export default function OperationsPage() {
                     {count !== undefined && (
                       <span className={cn(
                         "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
-                        isActive ? "bg-accent-primary/15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
+                        isActive ? "bg-accent-primary-op15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
                       )}>
                         {count}
                       </span>
@@ -941,7 +941,7 @@ export default function OperationsPage() {
                   value={bulkSearch}
                   onChange={(e) => setBulkSearch(e.target.value)}
                   placeholder={t('common.search')}
-                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary transition-all"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary transition-all"
                 />
               </div>
 
@@ -951,7 +951,7 @@ export default function OperationsPage() {
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary"
+                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary"
                   >
                     <option value="">{t('common.allStatuses', 'All Statuses')}</option>
                     <option value="valid">{t('common.valid', 'Valid')}</option>
@@ -961,7 +961,7 @@ export default function OperationsPage() {
                   <select
                     value={caFilter}
                     onChange={(e) => setCaFilter(e.target.value)}
-                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary max-w-[180px] truncate"
+                    className="appearance-none shrink-0 px-2.5 py-1.5 pr-7 text-[13px] rounded-lg border border-border bg-bg-primary text-text-primary focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary max-w-[180px] truncate"
                   >
                     <option value="">{t('common.allCAs', 'All CAs')}</option>
                     {cas.map(ca => (

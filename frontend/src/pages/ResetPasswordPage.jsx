@@ -62,7 +62,7 @@ export default function ResetPasswordPage() {
           {success ? (
             <div className="text-center space-y-4">
               <div className="flex justify-center">
-                <div className="p-4 rounded-full bg-accent-success/15">
+                <div className="p-4 rounded-full bg-accent-success-op15">
                   <CheckCircle size={48} weight="duotone" className="text-accent-success" />
                 </div>
               </div>
@@ -74,14 +74,14 @@ export default function ResetPasswordPage() {
                 </p>
               </div>
 
-              <Button onClick={() => navigate('/login')} className="w-full">
+              <Button type="button" onClick={() => navigate('/login')} className="w-full">
                 Go to Login
               </Button>
             </div>
           ) : !token ? (
             <div className="text-center space-y-4">
               <div className="flex justify-center">
-                <div className="p-4 rounded-full bg-accent-danger/15">
+                <div className="p-4 rounded-full bg-accent-danger-op15">
                   <Warning size={48} weight="duotone" className="text-accent-danger" />
                 </div>
               </div>
@@ -109,7 +109,7 @@ export default function ResetPasswordPage() {
               </div>
 
               {error && (
-                <div className="mb-4 p-3 rounded-lg bg-accent-danger/10 border border-accent-danger/30 text-sm text-accent-danger">
+                <div className="mb-4 p-3 rounded-lg bg-accent-danger-op10 border border-accent-danger-op30 text-sm text-accent-danger">
                   {error}
                 </div>
               )}

@@ -254,22 +254,22 @@ export default function TrustStorePage() {
   const toolbarActions = (
     <div className="flex gap-2">
       {certificates.length > 0 && (
-        <Button size="sm" variant="ghost" onClick={() => handleExportBundle('pem')} title={t('trustStore.exportBundle')}>
+        <Button type="button" size="sm" variant="ghost" onClick={() => handleExportBundle('pem')} title={t('trustStore.exportBundle')}>
           <Download size={14} />
           <span className="hidden sm:inline">{t('trustStore.exportBundle')}</span>
         </Button>
       )}
       {canWrite('truststore') && (
         <>
-          <Button size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
+          <Button type="button" size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
             <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</span>
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
             <UploadSimple size={14} />
             <span className="hidden sm:inline">{t('common.import')}</span>
           </Button>
-          <Button size="sm" onClick={handleOpenAddModal}>
+          <Button type="button" size="sm" onClick={handleOpenAddModal}>
             <Plus size={14} />
             <span className="hidden sm:inline">{t('trustStore.add')}</span>
           </Button>
@@ -389,7 +389,7 @@ export default function TrustStorePage() {
         <div className="flex items-start gap-3">
           <div className={cn(
             "p-2.5 rounded-lg shrink-0",
-            isExpired ? "bg-status-danger/10" : "bg-accent-primary/10"
+            isExpired ? "bg-status-danger-op10" : "bg-accent-primary-op10"
           )}>
             <Certificate size={24} className={isExpired ? "text-status-danger" : "text-accent-primary"} />
           </div>
@@ -413,9 +413,9 @@ export default function TrustStorePage() {
         {daysRemaining !== null && (
           <div className={cn(
             "flex items-center gap-2 px-3 py-2 rounded-lg",
-            isExpired && "bg-status-danger/10",
-            isExpiring && "bg-status-warning/10",
-            !isExpired && !isExpiring && "bg-status-success/10"
+            isExpired && "bg-status-danger-op10",
+            isExpiring && "bg-status-warning-op10",
+            !isExpired && !isExpiring && "bg-status-success-op10"
           )}>
             <Clock size={16} className={cn(
               isExpired && "text-status-danger",
@@ -440,17 +440,17 @@ export default function TrustStorePage() {
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
+          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <Key size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary">{selectedCert.key_type || 'RSA'}</div>
             <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
           </div>
-          <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
+          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || 'SHA256'}</div>
             <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
           </div>
-          <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
+          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary">{selectedCert.is_ca ? t('common.ca') : t('common.endEntity')}</div>
             <div className="text-2xs text-text-tertiary">{t('common.type')}</div>
@@ -459,11 +459,11 @@ export default function TrustStorePage() {
 
         {/* Actions */}
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
             <Download size={14} /> {t('common.export')}
           </Button>
           {canDelete('truststore') && (
-            <Button size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
+            <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
               <Trash size={14} /> {t('common.delete')}
             </Button>
           )}
@@ -594,7 +594,7 @@ export default function TrustStorePage() {
           emptyTitle={t('trustStore.noCertificates')}
           emptyDescription={t('trustStore.addCertificatesForChain')}
           emptyAction={canWrite('truststore') && (
-            <Button onClick={handleOpenAddModal}>
+            <Button type="button" onClick={handleOpenAddModal}>
               <Plus size={16} /> {t('trustStore.addCertificate')}
             </Button>
           )}
@@ -650,7 +650,7 @@ export default function TrustStorePage() {
                         <div className="text-sm font-medium truncate">{ca.descr || ca.common_name}</div>
                         {ca.organization && <div className="text-xs text-text-tertiary truncate">{ca.organization}</div>}
                       </div>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary/15 text-accent-primary' : 'bg-status-info/15 text-status-info'}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
                         {ca.is_root ? 'Root' : 'Inter'}
                       </span>
                       {ca.alreadyInTruststore && (
@@ -663,10 +663,10 @@ export default function TrustStorePage() {
             </>
           )}
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => closeModal('add')}>
+            <Button type="button" variant="secondary" onClick={() => closeModal('add')}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleAddFromCAs} disabled={adding || selectedCAIds.length === 0}>
+            <Button type="button" onClick={handleAddFromCAs} disabled={adding || selectedCAIds.length === 0}>
               {adding ? t('trustStore.adding') : t('trustStore.addSelected', { count: selectedCAIds.length })}
             </Button>
           </div>

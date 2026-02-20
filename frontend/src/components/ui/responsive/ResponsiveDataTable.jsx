@@ -550,7 +550,7 @@ export function ResponsiveDataTable({
                   }
                 })
               }}
-              className="text-sm text-accent-primary hover:text-accent-primary/80 font-medium"
+              className="text-sm text-accent-primary hover:text-accent-primary-op80 font-medium"
             >
               {t('table.clearFilters')}
             </button>
@@ -605,7 +605,7 @@ export function ResponsiveDataTable({
       
       {/* BULK ACTION BAR */}
       {multiSelect && selectionCount > 0 && bulkActions && (
-        <div className="flex items-center gap-3 px-4 py-2 bg-accent-primary/10 border border-accent-primary/20 rounded-lg mx-1 mb-1">
+        <div className="flex items-center gap-3 px-4 py-2 bg-accent-primary-op10 border border-accent-primary-op20 rounded-lg mx-1 mb-1">
           <span className="text-sm font-medium text-accent-primary">
             {selectionCount} {t('table.selected')}
           </span>
@@ -719,8 +719,8 @@ function SearchBar({
   const { t } = useTranslation()
   return (
     <div className={cn(
-      'shrink-0 border-b border-border/30',
-      isMobile ? 'px-3 py-2 bg-bg-secondary/10' : 'px-4 py-2 bg-bg-secondary/30'
+      'shrink-0 border-b border-border-op30',
+      isMobile ? 'px-3 py-2 bg-secondary-op10' : 'px-4 py-2 bg-secondary-op30'
     )}>
       <div className="flex items-center gap-2">
         {/* Search input - premium styling on mobile */}
@@ -734,7 +734,7 @@ function SearchBar({
               className={cn(
                 "absolute left-2.5 top-1/2 -translate-y-1/2",
                 isMobile 
-                  ? "text-accent-primary/60 group-focus-within:text-accent-primary"
+                  ? "text-accent-primary-op60 group-focus-within:text-accent-primary"
                   : "text-text-tertiary group-focus-within:text-accent-primary",
                 "transition-colors"
               )}
@@ -750,7 +750,7 @@ function SearchBar({
                 'focus:outline-none',
                 isMobile 
                   ? 'h-9 pl-8 pr-3 text-sm bg-transparent border-none rounded-xl' 
-                  : 'h-8 pl-9 pr-3 text-sm bg-bg-primary border border-border rounded-lg focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary hover:border-border-hover'
+                  : 'h-8 pl-9 pr-3 text-sm bg-bg-primary border border-border rounded-lg focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary hover:border-border-hover'
               )}
             />
             {value && (
@@ -784,7 +784,7 @@ function SearchBar({
                         'h-7 w-28 px-2 text-xs rounded-md border border-border bg-bg-primary',
                         'text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary',
                         '[color-scheme:dark]',
-                        filter.from && 'border-accent-primary/50'
+                        filter.from && 'border-accent-primary-op50'
                       )}
                       title={filter.fromPlaceholder || t('table.fromDate')}
                     />
@@ -797,7 +797,7 @@ function SearchBar({
                         'h-7 w-28 px-2 text-xs rounded-md border border-border bg-bg-primary',
                         'text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary',
                         '[color-scheme:dark]',
-                        filter.to && 'border-accent-primary/50'
+                        filter.to && 'border-accent-primary-op50'
                       )}
                       title={filter.toPlaceholder || t('table.toDate')}
                     />
@@ -827,7 +827,7 @@ function SearchBar({
               className={cn(
                 'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
                 showColumnMenu
-                  ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
+                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
                   : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
               )}
               title={t('table.customizeColumns')}
@@ -892,14 +892,14 @@ function SearchBar({
               className={cn(
                 'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
                 showPresetsMenu
-                  ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
+                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
                   : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
               )}
               title={t('table.filterPresets')}
             >
               <BookmarkSimple size={14} />
               {filterPresets?.length > 0 && (
-                <span className="text-2xs bg-accent-primary/20 text-accent-primary px-1 rounded">
+                <span className="text-2xs bg-accent-primary-op20 text-accent-primary px-1 rounded">
                   {filterPresets.length}
                 </span>
               )}
@@ -942,7 +942,7 @@ function SearchBar({
                       <button
                         onClick={savePreset}
                         disabled={!presetName?.trim()}
-                        className="flex-1 h-6 text-xs rounded bg-accent-primary text-white hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 h-6 text-xs rounded bg-accent-primary text-white hover:bg-accent-primary-op90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('common.save')}
                       </button>
@@ -1004,7 +1004,7 @@ function SearchBar({
               className={cn(
                 'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
                 showExportMenu
-                  ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
+                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary'
                   : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
               )}
               title={t('table.exportData')}
@@ -1218,7 +1218,7 @@ function DesktopTable({
                     <div 
                       className={cn(
                         "absolute right-0 top-0 h-full w-2 cursor-col-resize -mr-1 z-10",
-                        "bg-transparent hover:bg-accent-primary/60",
+                        "bg-transparent hover:bg-accent-primary-op60",
                         "transition-all duration-150",
                         resizingColumn === col.key && "bg-accent-primary"
                       )}
@@ -1242,7 +1242,7 @@ function DesktopTable({
             <tr>
               <td colSpan={columns.length + (rowActions ? 1 : 0) + (multiSelect ? 1 : 0)} className="py-12 text-center">
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
                   <span className="text-xs text-text-secondary">Loading...</span>
                 </div>
               </td>
@@ -1345,8 +1345,8 @@ function RowActionMenu({ row, idx, actions, isOpen, onToggle, menuRef }) {
               'w-7 h-7 rounded-lg flex items-center justify-center',
               'transition-all duration-150',
               action.variant === 'danger'
-                ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger/10'
-                : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary/10'
+                ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10'
+                : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary-op10'
             )}
           >
             {Icon && <Icon size={15} weight="duotone" />}
@@ -1379,7 +1379,7 @@ function MobileCardList({
     return (
       <div className="flex-1 flex items-center justify-center py-12">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-3 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+          <div className="w-10 h-10 border-3 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
           <span className="text-sm text-text-secondary">Loading...</span>
         </div>
       </div>
@@ -1557,7 +1557,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
   
   return (
     <div className={cn(
-      'shrink-0 border-t border-border bg-bg-secondary/30',
+      'shrink-0 border-t border-border bg-secondary-op30',
       'flex items-center justify-between',
       isMobile ? 'px-4 py-2' : 'px-4 py-1'
     )}>
@@ -1594,7 +1594,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
             'border border-border bg-bg-primary',
             'transition-all duration-150',
             'disabled:opacity-40 disabled:cursor-not-allowed',
-            'enabled:hover:bg-accent-primary/5 enabled:hover:border-accent-primary/50 enabled:hover:text-accent-primary',
+            'enabled:hover:bg-accent-primary-op5 enabled:hover:border-accent-primary-op50 enabled:hover:text-accent-primary',
             'enabled:active:scale-95',
             isMobile ? 'w-11 h-11' : 'w-8 h-8'
           )}
@@ -1604,7 +1604,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
         
         {/* Page indicator */}
         <span className={cn(
-          'px-3 py-1 rounded-md bg-bg-tertiary/50 text-text-primary font-medium',
+          'px-3 py-1 rounded-md bg-tertiary-op50 text-text-primary font-medium',
           isMobile ? 'text-sm' : 'text-xs'
         )}>
           <span className="text-accent-primary">{page}</span>
@@ -1621,7 +1621,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
             'border border-border bg-bg-primary',
             'transition-all duration-150',
             'disabled:opacity-40 disabled:cursor-not-allowed',
-            'enabled:hover:bg-accent-primary/5 enabled:hover:border-accent-primary/50 enabled:hover:text-accent-primary',
+            'enabled:hover:bg-accent-primary-op5 enabled:hover:border-accent-primary-op50 enabled:hover:text-accent-primary',
             'enabled:active:scale-95',
             isMobile ? 'w-11 h-11' : 'w-8 h-8'
           )}

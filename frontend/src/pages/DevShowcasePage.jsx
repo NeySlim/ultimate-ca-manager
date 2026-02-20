@@ -398,9 +398,9 @@ export default function DevShowcasePage() {
         <div className="space-y-6">
           <SectionTitle title="Modal Types" />
           <div className="flex flex-wrap gap-3">
-            <Button variant="primary" onClick={() => setModalOpen(true)}>Open Modal</Button>
-            <Button variant="secondary" onClick={() => setFormModalOpen(true)}>Open Form Modal</Button>
-            <Button variant="danger" onClick={() => setConfirmModalOpen(true)}>Open Confirm</Button>
+            <Button type="button" variant="primary" onClick={() => setModalOpen(true)}>Open Modal</Button>
+            <Button type="button" variant="secondary" onClick={() => setFormModalOpen(true)}>Open Form Modal</Button>
+            <Button type="button" variant="danger" onClick={() => setConfirmModalOpen(true)}>Open Confirm</Button>
           </div>
 
           <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Basic Modal">
@@ -410,7 +410,7 @@ export default function DevShowcasePage() {
                 You can put any content here.
               </p>
               <div className="mt-4 flex justify-end">
-                <Button variant="primary" onClick={() => setModalOpen(false)}>Close</Button>
+                <Button type="button" variant="primary" onClick={() => setModalOpen(false)}>Close</Button>
               </div>
             </div>
           </Modal>

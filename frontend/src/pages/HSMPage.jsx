@@ -309,24 +309,24 @@ export default function HSMPage() {
         ]} />
 
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleTest(provider)} disabled={testing}>
+          <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={() => handleTest(provider)} disabled={testing}>
             {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
             {testing ? t('common.testing') : t('common.test')}
           </Button>
           {canWrite('hsm') && (
-          <Button size="sm" variant="secondary" onClick={() => handleEdit(provider)}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => handleEdit(provider)}>
             <PencilSimple size={14} />
           </Button>
           )}
           {canDelete('hsm') && (
-          <Button size="sm" variant="danger" onClick={() => handleDelete(provider)}>
+          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(provider)}>
             <Trash size={14} />
           </Button>
           )}
         </div>
 
         {provider.last_error && (
-          <div className="p-3 rounded-lg bg-status-danger/10 border border-status-danger/30">
+          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
             <div className="flex items-center gap-2 text-status-danger text-xs">
               <Warning size={14} />
               <span className="font-medium">{t('hsm.connectionError')}</span>
@@ -344,7 +344,7 @@ export default function HSMPage() {
               </CompactGrid>
               <div className="mt-2 text-xs">
                 <span className="text-text-tertiary block mb-0.5">{t('hsm.pkcs11Config.libraryPath')}:</span>
-                <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded">
                   {provider.pkcs11_library_path || '-'}
                 </p>
               </div>
@@ -361,7 +361,7 @@ export default function HSMPage() {
             <>
               <div className="text-xs mb-2">
                 <span className="text-text-tertiary block mb-0.5">{t('hsm.azureConfig.vaultUrl')}:</span>
-                <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded">
                   {provider.azure_vault_url || '-'}
                 </p>
               </div>
@@ -384,7 +384,7 @@ export default function HSMPage() {
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-text-tertiary">{t('hsm.keysInHsm', { count: keys.length })}</span>
             {canWrite('hsm') && (
-            <Button size="sm" variant="secondary" onClick={() => setShowKeyModal(true)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setShowKeyModal(true)}>
               <Plus size={12} /> {t('common.generate')}
             </Button>
             )}
@@ -394,7 +394,7 @@ export default function HSMPage() {
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {keys.map(key => (
-                <div key={key.id} className="flex items-center justify-between p-2 bg-bg-tertiary/50 rounded text-xs">
+                <div key={key.id} className="flex items-center justify-between p-2 bg-tertiary-op50 rounded text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <Key size={14} className="text-text-tertiary flex-shrink-0" />
                     <div className="min-w-0">
@@ -407,7 +407,7 @@ export default function HSMPage() {
                       {key.status}
                     </Badge>
                     {canDelete('hsm') && (
-                    <Button size="sm" variant="ghost" onClick={() => handleDeleteKey(key)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteKey(key)}>
                       <Trash size={12} className="text-status-danger" />
                     </Button>
                     )}
@@ -494,11 +494,11 @@ export default function HSMPage() {
             ]}
             toolbarActions={canWrite('hsm') ? (
               isMobile ? (
-                <Button size="lg" onClick={handleCreate} className="w-11 h-11 p-0">
+                <Button type="button" size="lg" onClick={handleCreate} className="w-11 h-11 p-0">
                   <Plus size={22} weight="bold" />
                 </Button>
               ) : (
-                <Button size="sm" onClick={handleCreate}>
+                <Button type="button" size="sm" onClick={handleCreate}>
                   <Plus size={16} /> {t('hsm.newProvider')}
                 </Button>
               )
@@ -507,7 +507,7 @@ export default function HSMPage() {
             emptyTitle={t('hsm.noHSM')}
             emptyDescription={t('hsm.noHSMDescription')}
             emptyAction={canWrite('hsm') ?
-              <Button onClick={handleCreate}>
+              <Button type="button" onClick={handleCreate}>
                 <Plus size={16} /> {t('hsm.newProvider')}
               </Button>
             : null}

@@ -151,17 +151,17 @@ export function TrustCertDetails({
       
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
           <div className="text-xs font-medium text-text-primary">{cert.key_type || t('common.na')}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
           <div className="text-xs font-medium text-text-primary">{cert.signature_algorithm || t('common.na')}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.type')}</div>
           <div className="text-xs font-medium text-text-primary">{cert.is_ca ? t('common.ca') : t('common.endEntity')}</div>
@@ -172,10 +172,10 @@ export function TrustCertDetails({
       {daysRemaining !== null && (
         <div className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-xs",
-          daysRemaining <= 0 && "bg-status-danger/10 text-status-danger",
-          daysRemaining > 0 && daysRemaining <= 30 && "bg-status-warning/10 text-status-warning",
-          daysRemaining > 30 && daysRemaining <= 90 && "bg-status-info/10 text-status-info",
-          daysRemaining > 90 && "bg-status-success/10 text-status-success"
+          daysRemaining <= 0 && "bg-status-danger-op10 text-status-danger",
+          daysRemaining > 0 && daysRemaining <= 30 && "bg-status-warning-op10 text-status-warning",
+          daysRemaining > 30 && daysRemaining <= 90 && "bg-status-info-op10 text-status-info",
+          daysRemaining > 90 && "bg-status-success-op10 text-status-success"
         )}>
           <Clock size={14} />
           {daysRemaining <= 0 ? (
@@ -190,12 +190,12 @@ export function TrustCertDetails({
       {showActions && (
         <div className="flex gap-2 flex-wrap">
           {onExport && (
-            <Button size="sm" variant="secondary" onClick={onExport}>
+            <Button type="button" size="sm" variant="secondary" onClick={onExport}>
               <Download size={14} /> {t('common.export')}
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
+            <Button type="button" size="sm" variant="danger" onClick={onDelete}>
               <Trash size={14} /> {t('common.delete')}
             </Button>
           )}
@@ -205,7 +205,7 @@ export function TrustCertDetails({
 
       {/* Embedded: compact status bar */}
       {embedded && (
-        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-bg-tertiary/30">
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-tertiary-op30">
           <Badge variant={statusConfig[status].variant} size="sm">
             {statusConfig[status].label}
           </Badge>
@@ -268,7 +268,7 @@ export function TrustCertDetails({
         <CompactSection title={t('details.pemCertificate')} icon={Certificate} collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
+              "text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {cert.pem}

@@ -85,20 +85,20 @@ function formatCertType(type) {
 // Expiry indicator - uses t from parent
 function ExpiryIndicator({ daysRemaining, validTo, t }) {
   let color = 'text-status-success'
-  let bgColor = 'bg-status-success/10'
+  let bgColor = 'bg-status-success-op10'
   let label = `${daysRemaining}d`
   
   if (daysRemaining <= 0) {
     color = 'text-status-danger'
-    bgColor = 'bg-status-danger/10'
+    bgColor = 'bg-status-danger-op10'
     label = t('common.expired')
   } else if (daysRemaining <= 7) {
     color = 'text-status-danger'
-    bgColor = 'bg-status-danger/10'
+    bgColor = 'bg-status-danger-op10'
     label = t('details.daysLeft', { count: daysRemaining })
   } else if (daysRemaining <= 30) {
     color = 'text-status-warning'
-    bgColor = 'bg-status-warning/10'
+    bgColor = 'bg-status-warning-op10'
     label = t('details.daysLeft', { count: daysRemaining })
   } else {
     label = t('details.daysLeft', { count: daysRemaining })
@@ -168,7 +168,7 @@ export function CertificateDetails({
       <div className="flex items-start gap-2 sm:gap-3">
         <div className={cn(
           "p-2 sm:p-2.5 rounded-lg shrink-0",
-          cert.revoked ? "bg-status-danger/10" : "bg-accent-primary/10"
+          cert.revoked ? "bg-status-danger-op10" : "bg-accent-primary-op10"
         )}>
           <Certificate size={20} className={cn("sm:w-6 sm:h-6", cert.revoked ? "text-status-danger" : "text-accent-primary")} />
         </div>
@@ -191,19 +191,19 @@ export function CertificateDetails({
       
       {/* Quick stats */}
       <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
           <Key size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
           <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
           <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
           <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? t('common.hasKey') : t('details.noKey')}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">
             {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
           </div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
           <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
           <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{t('common.signature')}</div>
@@ -215,23 +215,23 @@ export function CertificateDetails({
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {/* Export button → modal */}
           {onExport && (
-            <Button size="xs" variant="secondary" onClick={() => setShowExportModal(true)} title={t('export.title')}>
+            <Button type="button" size="xs" variant="secondary" onClick={() => setShowExportModal(true)} title={t('export.title')}>
               <Download size={14} /> {t('export.title')}
             </Button>
           )}
           {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
-            <Button size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')}>
+            <Button type="button" size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')}>
               <ArrowsClockwise size={14} />
             </Button>
           )}
           {onRevoke && canWrite && !cert.revoked && (
-            <Button size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')}>
+            <Button type="button" size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')}>
               <X size={14} />
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="xs" variant="danger-soft" onClick={onDelete} title={t('common.delete')}>
+            <Button type="button" size="xs" variant="danger-soft" onClick={onDelete} title={t('common.delete')}>
               <Trash size={14} />
             </Button>
           )}
@@ -241,7 +241,7 @@ export function CertificateDetails({
 
       {/* Embedded: compact status bar */}
       {embedded && (
-        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-bg-tertiary/30">
+        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-tertiary-op30">
           <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
           {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
           {cert.days_remaining !== undefined && !cert.revoked && (
@@ -296,7 +296,7 @@ export function CertificateDetails({
       {/* SANs */}
       {cert.san_combined && (
         <CompactSection title={t('common.subjectAltNames')} icon={Globe} iconClass="icon-bg-cyan">
-          <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded border border-border/50">
+          <div className="text-xs font-mono text-text-primary break-all bg-tertiary-op30 p-2 rounded border border-border-op50">
             {cert.san_combined}
           </div>
         </CompactSection>
@@ -352,7 +352,7 @@ export function CertificateDetails({
               </div>
             )}
             {cert.chain_status.status === 'incomplete' && (
-              <div className="mt-2 p-2 rounded-lg bg-accent-warning/5 border border-accent-warning/20">
+              <div className="mt-2 p-2 rounded-lg bg-accent-warning-op5 border border-accent-warning-op20">
                 <p className="text-[11px] text-text-secondary">
                   {t('details.chainIncompleteHint')}
                 </p>
@@ -386,7 +386,7 @@ export function CertificateDetails({
         <CompactSection title={t('details.pemCertificate')} icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
+              "text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto border border-border-op30",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {cert.pem}
@@ -428,7 +428,7 @@ export function CertificateDetails({
       {/* Revocation info */}
       {cert.revoked && (
         <CompactSection title={t('details.revocationDetails')}>
-          <div className="bg-status-danger/10 border border-status-danger/20 rounded-lg p-3">
+          <div className="bg-status-danger-op10 border border-status-danger-op20 rounded-lg p-3">
             <div className="flex items-center gap-2 text-status-danger mb-2">
               <X size={16} />
               <span className="font-medium">{t('details.certificateRevoked')}</span>

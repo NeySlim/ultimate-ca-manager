@@ -13,14 +13,14 @@ export function Badge({
 }) {
   // Theme-aware variants using CSS classes defined in index.css
   const variants = {
-    default: 'bg-bg-tertiary/80 text-text-primary border-transparent',
+    default: 'bg-tertiary-op80 text-text-primary border-transparent',
     primary: 'status-primary-bg status-primary-text border-transparent',
-    secondary: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
+    secondary: 'bg-tertiary-op60 text-text-secondary border-transparent',
     success: 'status-success-bg status-success-text border-transparent',
     warning: 'status-warning-bg status-warning-text border-transparent',
     danger: 'status-danger-bg status-danger-text border-transparent',
     info: 'status-primary-bg status-primary-text border-transparent',
-    outline: 'bg-transparent text-text-primary border-border hover:bg-bg-tertiary/50',
+    outline: 'bg-transparent text-text-primary border-border hover:bg-tertiary-op50',
     // Named color variants (still theme-aware through CSS)
     emerald: 'status-success-bg status-success-text border-transparent',
     red: 'status-danger-bg status-danger-text border-transparent',
@@ -32,7 +32,7 @@ export function Badge({
     orange: 'icon-bg-orange border-transparent',
     cyan: 'icon-bg-teal border-transparent',
     teal: 'icon-bg-teal border-transparent',
-    gray: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
+    gray: 'bg-tertiary-op60 text-text-secondary border-transparent',
   }
   
   const dotColors = {

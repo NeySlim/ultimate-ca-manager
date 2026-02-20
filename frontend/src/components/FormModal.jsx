@@ -119,10 +119,10 @@ export function ConfirmModal({
         <p className="text-sm text-text-secondary">{message}</p>
       </div>
       <div className="flex justify-end gap-2 p-4 border-t border-border">
-        <Button variant="secondary" onClick={onClose} disabled={loading}>
+        <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
           {cancelLabel}
         </Button>
-        <Button variant={variant} onClick={onConfirm} disabled={loading}>
+        <Button type="button" variant={variant} onClick={onConfirm} disabled={loading}>
           {loading ? <LoadingSpinner size="sm" /> : confirmLabel}
         </Button>
       </div>

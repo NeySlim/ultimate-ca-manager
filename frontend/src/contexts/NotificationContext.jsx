@@ -152,7 +152,7 @@ export function NotificationProvider({ children }) {
             </Dialog.Description>
             <div className="flex justify-end gap-2">
               {confirmDialog?.cancelText !== null && (
-                <Button variant="secondary" size="sm" onClick={() => handleConfirm(false)}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => handleConfirm(false)}>
                   {confirmDialog?.cancelText || 'Cancel'}
                 </Button>
               )}
@@ -188,10 +188,10 @@ export function NotificationProvider({ children }) {
               onKeyDown={(e) => e.key === 'Enter' && handlePrompt(true)}
             />
             <div className="flex justify-end gap-2 mt-4">
-              <Button variant="secondary" size="sm" onClick={() => handlePrompt(false)}>
+              <Button type="button" variant="secondary" size="sm" onClick={() => handlePrompt(false)}>
                 {promptDialog?.cancelText}
               </Button>
-              <Button size="sm" onClick={() => handlePrompt(true)}>
+              <Button type="button" size="sm" onClick={() => handlePrompt(true)}>
                 {promptDialog?.confirmText}
               </Button>
             </div>

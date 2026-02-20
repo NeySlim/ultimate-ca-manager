@@ -68,7 +68,7 @@ export function ForcePasswordChange({ onComplete }) {
       title={t('password.changeRequired')}
     >
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning/10 border border-accent-warning/30">
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30">
           <Warning size={20} className="text-accent-warning flex-shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-medium text-accent-warning">{t('password.changeRequired')}</p>

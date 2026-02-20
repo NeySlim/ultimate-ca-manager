@@ -515,7 +515,7 @@ export function CommandPalette({ open, onOpenChange }) {
                         className={cn(
                           "w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors",
                           currentIndex === selectedIndex
-                            ? "bg-accent-primary/15 text-accent-primary"
+                            ? "bg-accent-primary-op15 text-accent-primary"
                             : "text-text-secondary hover:bg-bg-tertiary"
                         )}
                       >
@@ -533,7 +533,7 @@ export function CommandPalette({ open, onOpenChange }) {
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-2 border-t border-border bg-bg-tertiary/50 flex items-center gap-4 text-2xs text-text-tertiary">
+          <div className="px-4 py-2 border-t border-border bg-tertiary-op50 flex items-center gap-4 text-2xs text-text-tertiary">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">↑↓</kbd>
               {t('commandPalette.navigate')}

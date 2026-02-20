@@ -9,8 +9,8 @@ const variants = {
   info: {
     icon: Info,
     color: 'text-accent-primary',
-    bg: 'bg-accent-primary/5',
-    border: 'border-accent-primary/20',
+    bg: 'bg-accent-primary-op5',
+    border: 'border-accent-primary-op20',
   },
   tip: {
     icon: Lightbulb,
@@ -21,8 +21,8 @@ const variants = {
   warning: {
     icon: Warning,
     color: 'text-accent-danger',
-    bg: 'bg-accent-danger/5',
-    border: 'border-accent-danger/20',
+    bg: 'bg-accent-danger-op5',
+    border: 'border-accent-danger-op20',
   },
   help: {
     icon: Question,
@@ -33,8 +33,8 @@ const variants = {
   success: {
     icon: CheckCircle,
     color: 'text-accent-success',
-    bg: 'bg-accent-success/5',
-    border: 'border-accent-success/20',
+    bg: 'bg-accent-success-op5',
+    border: 'border-accent-success-op20',
   },
 }
 

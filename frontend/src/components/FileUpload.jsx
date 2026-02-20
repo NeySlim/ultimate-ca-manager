@@ -105,8 +105,8 @@ export function FileUpload({
           "border-2 border-dashed rounded-xl text-center transition-all cursor-pointer",
           compact ? "p-4" : "p-8",
           isDragging 
-            ? "border-accent-primary bg-accent-primary/10" 
-            : "border-border hover:border-accent-primary/50"
+            ? "border-accent-primary bg-accent-primary-op10" 
+            : "border-border hover:border-accent-primary-op50"
         )}
       >
         <input
@@ -159,7 +159,7 @@ export function FileUpload({
           ))}
 
           {onUpload && (
-            <Button onClick={handleUpload} className="w-full">
+            <Button type="button" onClick={handleUpload} className="w-full">
               Upload {files.length} file{files.length > 1 ? 's' : ''}
             </Button>
           )}

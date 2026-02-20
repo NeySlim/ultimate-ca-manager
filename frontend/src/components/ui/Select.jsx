@@ -59,23 +59,23 @@ export function Select({
   const triggerStyles = cn(
     // Base styles
     'flex items-center justify-between rounded-md border',
-    'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
+    'focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary',
     'disabled:opacity-50 disabled:cursor-not-allowed',
     'transition-all duration-200',
     sizeConfig.trigger,
     // Variant styles
     variant === 'filter' && [
       'bg-bg-tertiary border-border',
-      'hover:bg-bg-tertiary/80 hover:border-text-tertiary',
-      hasValue && showActiveState && 'border-accent-primary/50 bg-accent-primary/5',
+      'hover:bg-tertiary-op80 hover:border-text-tertiary',
+      hasValue && showActiveState && 'border-accent-primary-op50 bg-accent-primary-op5',
     ],
     variant === 'default' && [
-      'bg-bg-tertiary/80 border-border',
-      'hover:bg-bg-tertiary hover:border-text-secondary/50',
+      'bg-tertiary-op80 border-border',
+      'hover:bg-bg-tertiary hover:border-secondary-op50',
     ],
     variant === 'minimal' && [
       'bg-transparent border-transparent',
-      'hover:bg-bg-tertiary/50',
+      'hover:bg-tertiary-op50',
     ],
     // Error state
     error && 'border-accent-danger',
@@ -110,8 +110,8 @@ export function Select({
           <SelectPrimitive.Content
             className={cn(
               // Glass effect
-              "bg-bg-secondary/95 backdrop-blur-md",
-              "border border-border/50 rounded-lg",
+              "bg-secondary-op95 backdrop-blur-md",
+              "border border-border-op50 rounded-lg",
               "shadow-xl shadow-black/20",
               "overflow-hidden",
               // Animation
@@ -134,7 +134,7 @@ export function Select({
                     "flex items-center gap-2 rounded-md cursor-pointer outline-none",
                     "transition-colors duration-100",
                     "text-text-primary",
-                    "hover:bg-bg-tertiary/80 data-[highlighted]:bg-bg-tertiary/80",
+                    "hover:bg-tertiary-op80 data-[highlighted]:bg-tertiary-op80",
                     "data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
                     sizeConfig.item
                   )}

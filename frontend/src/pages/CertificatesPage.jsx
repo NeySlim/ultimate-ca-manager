@@ -679,8 +679,8 @@ export default function CertificatesPage() {
             className={cn(
               'p-1.5 rounded-md transition-colors',
               isFavorite(selectedCert.id)
-                ? 'text-status-warning hover:text-status-warning bg-status-warning/10'
-                : 'text-text-tertiary hover:text-status-warning hover:bg-status-warning/10'
+                ? 'text-status-warning hover:text-status-warning bg-status-warning-op10'
+                : 'text-text-tertiary hover:text-status-warning hover:bg-status-warning-op10'
             )}
           >
             <Star size={16} weight={isFavorite(selectedCert.id) ? 'fill' : 'regular'} />
@@ -729,7 +729,7 @@ export default function CertificatesPage() {
           toolbarActions={
             <div className="flex items-center gap-2">
               {!isMobile && (
-                <Button size="sm" variant="secondary" onClick={() => setShowCompareModal(true)}>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setShowCompareModal(true)}>
                   <ArrowsLeftRight size={14} />
                   {t('common.compare') || 'Compare'}
                 </Button>
@@ -737,20 +737,20 @@ export default function CertificatesPage() {
               {canWrite('certificates') && (
                 isMobile ? (
                   <>
-                    <Button size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
+                    <Button type="button" size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
                       <UploadSimple size={22} weight="bold" />
                     </Button>
-                    <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+                    <Button type="button" size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
                       <Plus size={22} weight="bold" />
                     </Button>
                   </>
                 ) : (
                   <>
-                    <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
                       <UploadSimple size={14} />
                       {t('common.import')}
                     </Button>
-                    <Button size="sm" onClick={() => setShowIssueModal(true)}>
+                    <Button type="button" size="sm" onClick={() => setShowIssueModal(true)}>
                       <Plus size={14} weight="bold" />
                       {t('certificates.issueCertificate').split(' ')[0]}
                     </Button>
@@ -773,7 +773,7 @@ export default function CertificatesPage() {
           emptyTitle={t('certificates.noCertificates')}
           emptyDescription={t('certificates.issueCertificate')}
           emptyAction={canWrite('certificates') && (
-            <Button onClick={() => setShowIssueModal(true)}>
+            <Button type="button" onClick={() => setShowIssueModal(true)}>
               <Plus size={16} /> {t('certificates.issueCertificate')}
             </Button>
           )}
@@ -833,10 +833,10 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             placeholder={t('common.optional')}
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
+            <Button type="button" variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
+            <Button type="button" onClick={handleUploadKey} disabled={!keyPem.trim()}>
               <UploadSimple size={16} /> {t('common.upload')}
             </Button>
           </div>

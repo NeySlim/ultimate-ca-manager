@@ -390,7 +390,7 @@ export default function CAsPage() {
         {/* Tree View Content */}
         <div className="flex flex-col h-full">
           {/* Search Bar + Filters + Actions */}
-          <div className="shrink-0 p-3 border-b border-border/50 bg-bg-secondary/30">
+          <div className="shrink-0 p-3 border-b border-border-op50 bg-secondary-op30">
             <div className="flex items-center gap-2">
               <div className="relative flex-1 min-w-0">
                 <input
@@ -401,7 +401,7 @@ export default function CAsPage() {
                   className={cn(
                     'w-full rounded-lg border border-border bg-bg-primary',
                     'text-text-primary placeholder:text-text-tertiary',
-                    'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
+                    'focus:outline-none focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary',
                     isMobile ? 'h-11 px-4 text-base' : 'h-8 px-3 text-sm'
                   )}
                 />
@@ -409,7 +409,7 @@ export default function CAsPage() {
               {!isMobile && (
                 <>
                   {/* View Mode Toggle — 3 views */}
-                  <div className="flex items-center rounded-lg border border-border bg-bg-secondary/50 p-0.5">
+                  <div className="flex items-center rounded-lg border border-border bg-secondary-op50 p-0.5">
                     {[
                       { mode: 'org', icon: SquaresFour, tip: t('cas.orgView') },
                       { mode: 'columns', icon: Columns, tip: t('cas.columnsView') },
@@ -431,7 +431,7 @@ export default function CAsPage() {
                     ))}
                   </div>
                   
-                  <div className="w-px h-5 bg-border/50" />
+                  <div className="w-px h-5 bg-border-op50" />
                   
                   <FilterSelect
                     value={filterType}
@@ -458,16 +458,16 @@ export default function CAsPage() {
               )}
               {canWrite('cas') && (
                 isMobile ? (
-                  <Button size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0 shrink-0">
+                  <Button type="button" size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0 shrink-0">
                     <Plus size={22} weight="bold" />
                   </Button>
                 ) : (
                   <>
-                    <Button size="sm" onClick={() => openModal('create')} className="shrink-0">
+                    <Button type="button" size="sm" onClick={() => openModal('create')} className="shrink-0">
                       <Plus size={14} weight="bold" />
                       {t('common.create')}
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)} className="shrink-0">
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)} className="shrink-0">
                       <UploadSimple size={14} />
                       {t('common.import')}
                     </Button>
@@ -491,7 +491,7 @@ export default function CAsPage() {
                 <h3 className="text-lg font-medium text-text-primary mb-1">{t('common.noCA')}</h3>
                 <p className="text-sm text-text-secondary text-center mb-4">{t('cas.createFirst')}</p>
                 {canWrite('cas') && (
-                  <Button onClick={() => openModal('create')}>
+                  <Button type="button" onClick={() => openModal('create')}>
                     <Plus size={16} /> {t('common.createCA')}
                   </Button>
                 )}
@@ -783,7 +783,7 @@ function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobi
   return (
     <div className={cn(
       'rounded-xl border overflow-hidden transition-all duration-200',
-      isSelected ? 'border-accent-primary ca-org-root-selected' : 'border-border/60'
+      isSelected ? 'border-accent-primary ca-org-root-selected' : 'border-border-op60'
     )}>
       {/* Root header — gradient */}
       <div
@@ -797,7 +797,7 @@ function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobi
           {hasChildren && (
             <button
               onClick={(e) => { e.stopPropagation(); onToggle(ca.id) }}
-              className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-text-tertiary hover:text-accent-primary hover:bg-bg-tertiary/50 transition-all"
+              className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-text-tertiary hover:text-accent-primary hover:bg-tertiary-op50 transition-all"
             >
               <CaretRight
                 size={12} weight="bold"
@@ -856,7 +856,7 @@ function OrgChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
         isMobile ? 'px-3 py-2.5' : 'px-3 py-2',
         isSelected
           ? 'ca-org-child-selected border-accent-primary'
-          : 'border-border/50 bg-bg-primary hover:border-border hover:shadow-sm',
+          : 'border-border-op50 bg-bg-primary hover:border-border hover:shadow-sm',
         isOrphan && 'border-dashed'
       )}
     >
@@ -900,7 +900,7 @@ function ColumnsView({ tree, selectedId, onSelect, isMobile, t }) {
               <ColumnChildCard key={child.id} ca={child} selectedId={selectedId} onSelect={onSelect} isMobile t={t} />
             ))}
             {(!root.children || root.children.length === 0) && (
-              <div className="text-center py-4 text-xs text-text-tertiary rounded-lg border border-dashed border-border/50">
+              <div className="text-center py-4 text-xs text-text-tertiary rounded-lg border border-dashed border-border-op50">
                 {t('cas.noIntermediate')}
               </div>
             )}
@@ -924,7 +924,7 @@ function ColumnsView({ tree, selectedId, onSelect, isMobile, t }) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2" style={{ minHeight: 200 }}>
       {roots.map(root => (
-        <div key={root.id} className="ca-col-wrapper flex-1 min-w-[240px] max-w-[400px] flex flex-col rounded-xl border border-border/60 overflow-hidden">
+        <div key={root.id} className="ca-col-wrapper flex-1 min-w-[240px] max-w-[400px] flex flex-col rounded-xl border border-border-op60 overflow-hidden">
           <ColumnHeader ca={root} selectedId={selectedId} onSelect={onSelect} isMobile={false} t={t} />
           <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
             {root.children?.map(child => (
@@ -939,7 +939,7 @@ function ColumnsView({ tree, selectedId, onSelect, isMobile, t }) {
         </div>
       ))}
       {orphans.length > 0 && (
-        <div className="ca-col-wrapper flex-1 min-w-[220px] max-w-[300px] flex flex-col rounded-xl border border-dashed border-border/60 overflow-hidden">
+        <div className="ca-col-wrapper flex-1 min-w-[220px] max-w-[300px] flex flex-col rounded-xl border border-dashed border-border-op60 overflow-hidden">
           <div className="ca-col-header-orphan px-3 py-2.5">
             <span className="text-xs font-bold text-text-secondary">{t('cas.orphanCAs')}</span>
           </div>
@@ -1003,7 +1003,7 @@ function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
         isMobile ? 'px-3 py-2.5' : 'px-2.5 py-2',
         isSelected
           ? 'ca-org-child-selected border-accent-primary'
-          : 'border-border/40 bg-bg-primary hover:border-border hover:shadow-sm',
+          : 'border-border-op40 bg-bg-primary hover:border-border hover:shadow-sm',
         isOrphan && 'border-dashed'
       )}
     >
@@ -1045,7 +1045,7 @@ function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
 
 function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-bg-secondary/30 overflow-hidden">
+    <div className="rounded-xl border border-border-op60 bg-secondary-op30 overflow-hidden">
       <div className={cn(isMobile ? 'p-1.5 space-y-0.5' : 'p-2 space-y-0.5')}>
         {cas.map(ca => {
           const isSelected = selectedId === ca.id
@@ -1135,11 +1135,11 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
 
       {/* Export + Delete Actions */}
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-        <Button size="xs" variant="secondary" onClick={() => setShowExportModal(true)}>
+        <Button type="button" size="xs" variant="secondary" onClick={() => setShowExportModal(true)}>
           <Download size={14} /> {t('export.title')}
         </Button>
         {canDelete('cas') && (
-          <Button size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
+          <Button type="button" size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
             <Trash size={12} className="sm:w-3.5 sm:h-3.5" />
           </Button>
         )}
@@ -1229,14 +1229,14 @@ function ChainRepairBar({ data, running, onRun, canRunRepair, t }) {
   if (!data) return null
 
   return (
-    <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/30 bg-bg-secondary/30">
+    <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border-op30 bg-secondary-op30">
       <div className="flex items-center gap-1.5 text-text-tertiary shrink-0">
         <LinkSimple size={13} weight="duotone" />
         <span className="text-[11px] font-medium">{t('dashboard.chainRepair')}</span>
       </div>
 
       <div className="flex items-center gap-2 flex-1 max-w-xs">
-        <div className="flex-1 h-1.5 rounded-full bg-bg-tertiary/80 overflow-hidden">
+        <div className="flex-1 h-1.5 rounded-full bg-tertiary-op80 overflow-hidden">
           <div 
             className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-accent-success' : 'bg-accent-warning'}`}
             style={{ width: `${pct}%` }}
@@ -1266,7 +1266,7 @@ function ChainRepairBar({ data, running, onRun, canRunRepair, t }) {
         <button
           onClick={onRun}
           disabled={running}
-          className="p-1 rounded hover:bg-bg-tertiary/80 text-text-tertiary hover:text-accent-primary transition-all disabled:opacity-50"
+          className="p-1 rounded hover:bg-tertiary-op80 text-text-tertiary hover:text-accent-primary transition-all disabled:opacity-50"
           title={t('dashboard.chainRepairRun')}
         >
           {running 

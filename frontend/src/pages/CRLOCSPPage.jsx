@@ -263,7 +263,7 @@ export default function CRLOCSPPage() {
   const helpContent = (
     <div className="p-4 space-y-4">
       {/* CRL Statistics */}
-      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Database size={16} className="text-accent-primary" />
           {t('crlOcsp.crlStatistics')}
@@ -342,17 +342,17 @@ export default function CRLOCSPPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op40 rounded-lg p-2 text-center">
           <Hash size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.crl_number || '-'}</div>
           <div className="text-2xs text-text-tertiary">{t('crlOcsp.crlNumber')}</div>
         </div>
-        <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op40 rounded-lg p-2 text-center">
           <XCircle size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.revoked_count || 0}</div>
           <div className="text-2xs text-text-tertiary">{t('common.revoked')}</div>
         </div>
-        <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op40 rounded-lg p-2 text-center">
           <Calendar size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'}</div>
           <div className="text-2xs text-text-tertiary">{t('common.updated')}</div>
@@ -374,7 +374,7 @@ export default function CRLOCSPPage() {
           </Button>
         )}
         {selectedCRL?.crl_pem && (
-          <Button size="sm" variant="secondary" onClick={handleDownloadCRL}>
+          <Button type="button" size="sm" variant="secondary" onClick={handleDownloadCRL}>
             <Download size={14} />
             {t('common.download')}
           </Button>
@@ -415,7 +415,7 @@ export default function CRLOCSPPage() {
               <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
                 {`${window.location.origin}/crl/${selectedCA.refid}.crl`}
               </code>
-              <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/crl/${selectedCA.refid}.crl`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/crl/${selectedCA.refid}.crl`)}>
                 <Copy size={14} />
               </Button>
             </div>
@@ -426,7 +426,7 @@ export default function CRLOCSPPage() {
               <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
                 {`${window.location.origin}/ocsp/${selectedCA.refid}`}
               </code>
-              <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/ocsp/${selectedCA.refid}`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/ocsp/${selectedCA.refid}`)}>
                 <Copy size={14} />
               </Button>
             </div>
@@ -442,10 +442,10 @@ export default function CRLOCSPPage() {
   // Header actions
   const headerActions = (
     <>
-      <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+      <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
       </Button>
-      <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+      <Button type="button" variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
         <ArrowsClockwise size={22} />
       </Button>
     </>
@@ -490,10 +490,10 @@ export default function CRLOCSPPage() {
         searchKeys={['name', 'common_name', 'cn']}
         toolbarActions={
           <>
-            <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+            <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
               <ArrowsClockwise size={14} />
             </Button>
-            <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+            <Button type="button" variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
               <ArrowsClockwise size={22} />
             </Button>
           </>

@@ -48,7 +48,7 @@ export function UnifiedPageHeader({
 
   return (
     <div className={cn(
-      'shrink-0 border-b border-border/60 bg-bg-secondary shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]',
+      'shrink-0 border-b border-border-op60 bg-bg-secondary shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]',
       className
     )}>
       {/* Title row - HIDDEN on mobile (title already in AppShell navbar) */}
@@ -61,7 +61,7 @@ export function UnifiedPageHeader({
         <div className="flex items-center gap-2 min-w-0">
           {Icon && (
             <div className={cn(
-              "rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0 shadow-sm",
+              "rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary-op70 flex items-center justify-center shrink-0 shadow-sm",
               isMobile ? "w-7 h-7" : "w-9 h-9"
             )}>
               <Icon size={isMobile ? 14 : 18} weight="bold" className="text-white" />
@@ -150,8 +150,8 @@ export function UnifiedPageHeader({
                 onClick={onHelpClick}
                 className={cn(
                   "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
-                  "bg-accent-primary/10 border border-accent-primary/30",
-                  "text-accent-primary hover:bg-accent-primary/20",
+                  "bg-accent-primary-op10 border border-accent-primary-op30",
+                  "text-accent-primary hover:bg-accent-primary-op20",
                   "text-xs font-medium"
                 )}
               >
@@ -184,7 +184,7 @@ export function UnifiedPageHeader({
                     isMobile ? "px-2.5 py-1.5" : "px-3 py-2",
                     isActive
                       ? "border-accent-primary text-accent-primary bg-bg-primary"
-                      : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+                      : "border-transparent text-text-secondary hover:text-text-primary hover:bg-tertiary-op50"
                   )}
                 >
                   {TabIcon && (
@@ -197,7 +197,7 @@ export function UnifiedPageHeader({
                     <span className={cn(
                       'px-1.5 py-0.5 rounded-full text-2xs font-medium',
                       isActive
-                        ? 'bg-accent-primary/15 text-accent-primary'
+                        ? 'bg-accent-primary-op15 text-accent-primary'
                         : 'bg-bg-tertiary text-text-tertiary'
                     )}>
                       {tab.count}

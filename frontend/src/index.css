@@ -806,25 +806,477 @@ tr.row-selected td:first-child {
   background-color: var(--bg-tertiary) !important;
 }
 
-/* Theme-aware background with opacity */
-.bg-tertiary-40 {
+/* Legacy aliases (keep for backward compat) */
+.bg-tertiary-40 { background-color: color-mix(in srgb, var(--bg-tertiary) 40%, transparent); }
+.bg-tertiary-50 { background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent); }
+.bg-tertiary-60 { background-color: color-mix(in srgb, var(--bg-tertiary) 60%, transparent); }
+.bg-accent-25 { background-color: color-mix(in srgb, var(--accent-primary) 25%, transparent); }
+.text-accent-70 { color: color-mix(in srgb, var(--accent-primary) 70%, transparent); }
+
+
+/* ========================================
+ * Color-mix opacity utilities
+ * Auto-generated - do not edit manually
+ * ======================================== */
+
+.bg-accent-danger-op10 {
+  background-color: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+}
+
+.bg-accent-danger-op15 {
+  background-color: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+}
+
+.bg-accent-danger-op5 {
+  background-color: color-mix(in srgb, var(--accent-danger) 5%, transparent);
+}
+
+.bg-accent-primary-op10 {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.bg-accent-primary-op15 {
+  background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+}
+
+.bg-accent-primary-op20 {
+  background-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.bg-accent-primary-op5 {
+  background-color: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+
+.bg-accent-primary-op80 {
+  background-color: color-mix(in srgb, var(--accent-primary) 80%, transparent);
+}
+
+.bg-accent-success-op15 {
+  background-color: color-mix(in srgb, var(--accent-success) 15%, transparent);
+}
+
+.bg-accent-success-op20 {
+  background-color: color-mix(in srgb, var(--accent-success) 20%, transparent);
+}
+
+.bg-accent-success-op5 {
+  background-color: color-mix(in srgb, var(--accent-success) 5%, transparent);
+}
+
+.bg-accent-warning-op10 {
+  background-color: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+}
+
+.bg-accent-warning-op15 {
+  background-color: color-mix(in srgb, var(--accent-warning) 15%, transparent);
+}
+
+.bg-accent-warning-op20 {
+  background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent);
+}
+
+.bg-accent-warning-op5 {
+  background-color: color-mix(in srgb, var(--accent-warning) 5%, transparent);
+}
+
+.bg-primary-op50 {
+  background-color: color-mix(in srgb, var(--bg-primary) 50%, transparent);
+}
+
+.bg-primary-op80 {
+  background-color: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+}
+
+.bg-primary-op90 {
+  background-color: color-mix(in srgb, var(--bg-primary) 90%, transparent);
+}
+
+.bg-secondary-op10 {
+  background-color: color-mix(in srgb, var(--bg-secondary) 10%, transparent);
+}
+
+.bg-secondary-op20 {
+  background-color: color-mix(in srgb, var(--bg-secondary) 20%, transparent);
+}
+
+.bg-secondary-op30 {
+  background-color: color-mix(in srgb, var(--bg-secondary) 30%, transparent);
+}
+
+.bg-secondary-op40 {
+  background-color: color-mix(in srgb, var(--bg-secondary) 40%, transparent);
+}
+
+.bg-secondary-op50 {
+  background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+}
+
+.bg-secondary-op95 {
+  background-color: color-mix(in srgb, var(--bg-secondary) 95%, transparent);
+}
+
+.bg-tertiary-op30 {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 30%, transparent);
+}
+
+.bg-tertiary-op40 {
   background-color: color-mix(in srgb, var(--bg-tertiary) 40%, transparent);
 }
-.bg-tertiary-50 {
+
+.bg-tertiary-op50 {
   background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
 }
-.bg-tertiary-60 {
+
+.bg-tertiary-op60 {
   background-color: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
 }
 
-/* Theme-aware accent with opacity */
-.bg-accent-25 {
-  background-color: color-mix(in srgb, var(--accent-primary) 25%, transparent);
+.bg-tertiary-op80 {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
 }
-.text-accent-70 {
+
+.border-border-op30 {
+  border-color: color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+.border-border-op40 {
+  border-color: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.border-border-op50 {
+  border-color: color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.border-border-op60 {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.border-border-primary-op50 {
+  border-color: color-mix(in srgb, var(--border-primary) 50%, transparent);
+}
+
+.enabled\:hover\:bg-accent-primary-op5:enabled:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+
+.from-accent-primary-op5 {
+  --tw-gradient-from: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+  --tw-gradient-to: transparent;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.group:hover .group-hover\:bg-accent-primary-op10 {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.hover\:bg-accent-danger-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+}
+
+.hover\:bg-accent-primary-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.hover\:bg-accent-primary-op20:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.hover\:bg-accent-primary-op60:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+}
+
+.hover\:bg-accent-primary-op90:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 90%, transparent);
+}
+
+.hover\:bg-accent-success-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-success) 10%, transparent);
+}
+
+.hover\:bg-primary-op50:hover {
+  background-color: color-mix(in srgb, var(--bg-primary) 50%, transparent);
+}
+
+.hover\:bg-secondary-op50:hover {
+  background-color: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+}
+
+.hover\:bg-tertiary-op30:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 30%, transparent);
+}
+
+.hover\:bg-tertiary-op50:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+}
+
+.hover\:bg-tertiary-op60:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+}
+
+.hover\:bg-tertiary-op70:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+}
+
+.hover\:bg-tertiary-op80:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
+}
+
+.hover\:border-secondary-op40:hover {
+  border-color: color-mix(in srgb, var(--text-secondary) 40%, transparent);
+}
+
+.hover\:border-secondary-op50:hover {
+  border-color: color-mix(in srgb, var(--text-secondary) 50%, transparent);
+}
+
+.hover\:border-tertiary-op30:hover {
+  border-color: color-mix(in srgb, var(--text-tertiary) 30%, transparent);
+}
+
+.hover\:file\:bg-accent-primary-op80:hover::file-selector-button {
+  background-color: color-mix(in srgb, var(--accent-primary) 80%, transparent);
+}
+
+.text-secondary-op60 {
+  color: color-mix(in srgb, var(--text-secondary) 60%, transparent);
+}
+
+.text-tertiary-op50 {
+  color: color-mix(in srgb, var(--text-tertiary) 50%, transparent);
+}
+
+
+.bg-accent-op10 {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.bg-accent-op5 {
+  background-color: color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+
+.bg-border-op30 {
+  background-color: color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+.bg-border-op40 {
+  background-color: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.bg-border-op50 {
+  background-color: color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.bg-status-danger-op10 {
+  background-color: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+}
+
+.bg-status-danger-op20 {
+  background-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
+}
+
+.bg-status-danger-op5 {
+  background-color: color-mix(in srgb, var(--accent-danger) 5%, transparent);
+}
+
+.bg-status-error-op10 {
+  background-color: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+}
+
+.bg-status-error-op20 {
+  background-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
+}
+
+.bg-status-info-op10 {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.bg-status-info-op15 {
+  background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+}
+
+.bg-status-success-op10 {
+  background-color: color-mix(in srgb, var(--accent-success) 10%, transparent);
+}
+
+.bg-status-success-op20 {
+  background-color: color-mix(in srgb, var(--accent-success) 20%, transparent);
+}
+
+.bg-status-warning-op10 {
+  background-color: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+}
+
+.bg-status-warning-op20 {
+  background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent);
+}
+
+.bg-status-warning-op5 {
+  background-color: color-mix(in srgb, var(--accent-warning) 5%, transparent);
+}
+
+.bg-text-muted-op20 {
+  background-color: color-mix(in srgb, var(--text-tertiary) 20%, transparent);
+}
+
+.border-accent-danger-op20 {
+  border-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
+}
+
+.border-accent-danger-op30 {
+  border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent);
+}
+
+.border-accent-primary-op20 {
+  border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.border-accent-primary-op30 {
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.border-accent-primary-op40 {
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+.border-accent-primary-op50 {
+  border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
+.border-accent-success-op20 {
+  border-color: color-mix(in srgb, var(--accent-success) 20%, transparent);
+}
+
+.border-accent-warning-op20 {
+  border-color: color-mix(in srgb, var(--accent-warning) 20%, transparent);
+}
+
+.border-accent-warning-op30 {
+  border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent);
+}
+
+.border-status-danger-op20 {
+  border-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
+}
+
+.border-status-danger-op30 {
+  border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent);
+}
+
+.border-status-error-op20 {
+  border-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
+}
+
+.border-status-warning-op20 {
+  border-color: color-mix(in srgb, var(--accent-warning) 20%, transparent);
+}
+
+.border-status-warning-op30 {
+  border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent);
+}
+
+.divide-border-op30 > :not([hidden]) ~ :not([hidden]) {
+  border-color: color-mix(in srgb, var(--border) 30%, transparent);
+}
+
+.enabled\:hover\:border-accent-primary-op50:enabled:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
+.focus\:ring-accent-danger-op50:focus {
+  --tw-ring-color: color-mix(in srgb, var(--accent-danger) 50%, transparent);
+}
+
+.focus\:ring-accent-primary-op30:focus {
+  --tw-ring-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.focus\:ring-accent-primary-op40:focus {
+  --tw-ring-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+.focus\:ring-accent-primary-op50:focus {
+  --tw-ring-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
+.focus\:ring-accent-warning-op50:focus {
+  --tw-ring-color: color-mix(in srgb, var(--accent-warning) 50%, transparent);
+}
+
+.group:hover .group-hover\:bg-accent-op10 {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.hover\:bg-accent-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.hover\:bg-status-danger-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-danger) 10%, transparent);
+}
+
+.hover\:bg-status-success-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-success) 10%, transparent);
+}
+
+.hover\:bg-status-warning-op10:hover {
+  background-color: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+}
+
+.hover\:border-accent-op50:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
+.hover\:border-accent-primary-op30:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.hover\:border-accent-primary-op50:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
+.hover\:text-accent-op80:hover {
+  color: color-mix(in srgb, var(--accent-primary) 80%, transparent);
+}
+
+.hover\:text-accent-primary-op70:hover {
   color: color-mix(in srgb, var(--accent-primary) 70%, transparent);
 }
 
+.hover\:text-accent-primary-op80:hover {
+  color: color-mix(in srgb, var(--accent-primary) 80%, transparent);
+}
+
+.ring-accent-primary-op30 {
+  --tw-ring-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.ring-accent-primary-op40 {
+  --tw-ring-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+.ring-accent-primary-op50 {
+  --tw-ring-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
+.text-accent-primary-op60 {
+  color: color-mix(in srgb, var(--accent-primary) 60%, transparent);
+}
+
+.text-secondary-op60 {
+  color: color-mix(in srgb, var(--text-secondary) 60%, transparent);
+}
+
+.to-accent-op70 {
+  --tw-gradient-to: color-mix(in srgb, var(--accent-primary) 70%, transparent);
+}
+
+.to-accent-primary-op70 {
+  --tw-gradient-to: color-mix(in srgb, var(--accent-primary) 70%, transparent);
+}
+
+.placeholder-secondary-op60::placeholder {
+  color: color-mix(in srgb, var(--text-secondary) 60%, transparent);
+}
 /* CompactSection header gradient - theme aware with accent tint */
 .section-header-gradient {
   background: linear-gradient(to right, 

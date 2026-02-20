@@ -209,7 +209,7 @@ export function MemberTransferModal({
       className={cn(
         "flex items-center gap-2 px-2 py-1.5 rounded-md transition-all cursor-pointer",
         "hover:bg-bg-tertiary",
-        selected && "bg-accent-primary/10 border border-accent-primary/30",
+        selected && "bg-accent-primary-op10 border border-accent-primary-op30",
         !selected && "border border-transparent",
         draggable && "cursor-grab active:cursor-grabbing"
       )}
@@ -228,7 +228,7 @@ export function MemberTransferModal({
       </button>
 
       {/* Avatar */}
-      <div className="w-7 h-7 rounded-full bg-accent-primary/20 flex items-center justify-center shrink-0">
+      <div className="w-7 h-7 rounded-full bg-accent-primary-op20 flex items-center justify-center shrink-0">
         <User size={14} className="text-accent-primary" />
       </div>
 
@@ -247,8 +247,8 @@ export function MemberTransferModal({
         onClick={(e) => { e.stopPropagation(); onAction(user.id) }}
         className={cn(
           "p-1 rounded transition-colors",
-          actionVariant === 'add' && "text-status-success hover:bg-status-success/10",
-          actionVariant === 'remove' && "text-status-danger hover:bg-status-danger/10"
+          actionVariant === 'add' && "text-status-success hover:bg-status-success-op10",
+          actionVariant === 'remove' && "text-status-danger hover:bg-status-danger-op10"
         )}
       >
         <ActionIcon size={16} weight="bold" />
@@ -269,7 +269,7 @@ export function MemberTransferModal({
           <div
             className={cn(
               "flex-1 flex flex-col border rounded-lg overflow-hidden transition-colors",
-              dragOver === 'available' ? "border-accent-primary bg-accent-primary/5" : "border-border"
+              dragOver === 'available' ? "border-accent-primary bg-accent-primary-op5" : "border-border"
             )}
             onDragOver={(e) => handleDragOver(e, 'available')}
             onDragLeave={handleDragLeave}
@@ -370,7 +370,7 @@ export function MemberTransferModal({
           <div
             className={cn(
               "flex-1 flex flex-col border rounded-lg overflow-hidden transition-colors",
-              dragOver === 'members' ? "border-accent-primary bg-accent-primary/5" : "border-border"
+              dragOver === 'members' ? "border-accent-primary bg-accent-primary-op5" : "border-border"
             )}
             onDragOver={(e) => handleDragOver(e, 'members')}
             onDragLeave={handleDragLeave}
@@ -434,10 +434,10 @@ export function MemberTransferModal({
             )}
           </p>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSave} disabled={!hasChanges || loading}>
+            <Button type="button" onClick={handleSave} disabled={!hasChanges || loading}>
               {loading ? t('common.loading') : t('common.save')}
             </Button>
           </div>

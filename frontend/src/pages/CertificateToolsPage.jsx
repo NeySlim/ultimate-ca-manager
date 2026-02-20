@@ -323,7 +323,7 @@ export default function CertificateToolsPage() {
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle size={16} className="text-status-success" />
             <span className="text-text-primary">[{t('tools.binaryFileLoaded')} - {Math.round(value.length / 1.37)} bytes]</span>
-            <Button variant="ghost" size="xs" onClick={() => onChange({ target: { value: '' } })}>
+            <Button type="button" variant="ghost" size="xs" onClick={() => onChange({ target: { value: '' } })}>
               <XCircle size={16} />
             </Button>
           </div>
@@ -372,7 +372,7 @@ export default function CertificateToolsPage() {
           />
         </div>
       </div>
-      <Button onClick={handleCheckSSL} disabled={loading}>
+      <Button type="button" onClick={handleCheckSSL} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Globe size={16} />}
         {t('tools.checkSSL')}
       </Button>
@@ -399,7 +399,7 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.csr,.der"
       />
-      <Button onClick={handleDecodeCSR} disabled={loading}>
+      <Button type="button" onClick={handleDecodeCSR} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
         {t('tools.decodeCsr')}
       </Button>
@@ -426,7 +426,7 @@ export default function CertificateToolsPage() {
         rows={8}
         accept=".pem,.crt,.cer,.der"
       />
-      <Button onClick={handleDecodeCert} disabled={loading}>
+      <Button type="button" onClick={handleDecodeCert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
         {t('tools.decodeCert')}
       </Button>
@@ -480,7 +480,7 @@ export default function CertificateToolsPage() {
         onChange={(e) => setMatchPassword(e.target.value)}
         className="max-w-xs"
       />
-      <Button onClick={handleMatchKeys} disabled={loading}>
+      <Button type="button" onClick={handleMatchKeys} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Key size={16} />}
         {t('tools.matchKeys')}
       </Button>
@@ -500,7 +500,7 @@ export default function CertificateToolsPage() {
       <DetailSection title={t('tools.sectionConversion')} icon={ArrowsLeftRight} iconClass="icon-bg-teal">
     <div className="space-y-4">
       {/* Input section */}
-      <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
+      <div className="p-4 border border-border rounded-lg bg-secondary-op50 space-y-4">
         <div className="text-sm font-medium text-text-primary">{t('tools.inputAnyFormat')}</div>
         
         {/* File upload drop zone */}
@@ -583,7 +583,7 @@ export default function CertificateToolsPage() {
 
       {/* Additional inputs for PKCS12 output */}
       {convertFormat === 'pkcs12' && (
-        <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
+        <div className="p-4 border border-border rounded-lg bg-secondary-op50 space-y-4">
           <div className="text-sm font-medium text-text-primary">{t('tools.pkcs12RequiresKey')}</div>
           
           <FileUpload
@@ -631,7 +631,7 @@ export default function CertificateToolsPage() {
         />
       )}
 
-      <Button onClick={handleConvert} disabled={loading}>
+      <Button type="button" onClick={handleConvert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
         {t('tools.convert')}
       </Button>
@@ -649,7 +649,7 @@ export default function CertificateToolsPage() {
         {/* Status banner */}
         <div className={cn(
           'p-3 rounded-lg flex items-center gap-3',
-          data.has_issues ? 'bg-status-danger/10' : 'bg-status-success/10'
+          data.has_issues ? 'bg-status-danger-op10' : 'bg-status-success-op10'
         )}>
           {data.has_issues ? (
             <XCircle size={24} weight="fill" className="text-status-danger" />
@@ -762,7 +762,7 @@ export default function CertificateToolsPage() {
         {/* Status */}
         <div className={cn(
           'p-3 rounded-lg flex items-center gap-3',
-          data.status !== 'valid' ? 'bg-status-danger/10' : 'bg-status-success/10'
+          data.status !== 'valid' ? 'bg-status-danger-op10' : 'bg-status-success-op10'
         )}>
           {data.status !== 'valid' ? (
             <XCircle size={24} weight="fill" className="text-status-danger" />
@@ -854,7 +854,7 @@ export default function CertificateToolsPage() {
         {/* Overall status */}
         <div className={cn(
           'p-4 rounded-lg flex items-center gap-3',
-          data.all_match ? 'bg-status-success/10' : 'bg-status-danger/10'
+          data.all_match ? 'bg-status-success-op10' : 'bg-status-danger-op10'
         )}>
           {data.all_match ? (
             <CheckCircle size={32} weight="fill" className="text-status-success" />
@@ -958,7 +958,7 @@ export default function CertificateToolsPage() {
           </div>
         )}
 
-        <Button onClick={downloadConverted}>
+        <Button type="button" onClick={downloadConverted}>
           <Download size={16} />
           {t('tools.download', { filename: data.filename })}
         </Button>
@@ -972,7 +972,7 @@ export default function CertificateToolsPage() {
 
     if (result.type === 'error') {
       return (
-        <div className="p-4 bg-status-danger/10 rounded-lg flex items-center gap-3">
+        <div className="p-4 bg-status-danger-op10 rounded-lg flex items-center gap-3">
           <XCircle size={24} className="text-status-danger" />
           <div className="text-status-danger">{result.message}</div>
         </div>

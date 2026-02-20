@@ -37,7 +37,7 @@ export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel }
   const config = statusConfig[status] || statusConfig.countdown
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-bg-primary/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-primary-op90 backdrop-blur-sm">
       <div className="text-center space-y-4 p-8 max-w-sm">
         <div className="flex justify-center">{config.icon}</div>
         <h2 className="text-xl font-semibold text-text-primary">{config.title}</h2>
@@ -91,14 +91,14 @@ export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel }
           <div className="flex justify-center gap-3 mt-4">
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-accent-primary text-white rounded-lg text-sm hover:bg-accent-primary/90"
+              className="px-4 py-2 bg-accent-primary text-white rounded-lg text-sm hover:bg-accent-primary-op90"
             >
               {t('reconnect.refresh', 'Refresh Page')}
             </button>
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-4 py-2 bg-bg-tertiary text-text-secondary rounded-lg text-sm hover:bg-bg-tertiary/80"
+                className="px-4 py-2 bg-bg-tertiary text-text-secondary rounded-lg text-sm hover:bg-tertiary-op80"
               >
                 {t('common.cancel', 'Cancel')}
               </button>

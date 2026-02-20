@@ -168,7 +168,7 @@ export function AppShell() {
         
       {/* Mobile Header - OUTSIDE the row flex, in a column layout */}
       {isMobile && (
-        <div className="shrink-0 h-10 bg-bg-secondary border-b border-border/50 flex items-center px-2 z-40 navbar-mobile-accent">
+        <div className="shrink-0 h-10 bg-bg-secondary border-b border-border-op50 flex items-center px-2 z-40 navbar-mobile-accent">
           {/* Logo - LEFT */}
           <div className="shrink-0 opacity-80 scale-[0.7] origin-left">
             <Logo variant="compact" size="sm" />
@@ -289,7 +289,7 @@ export function AppShell() {
 
                 <DropdownMenu.Item
                   onClick={() => { setMobileMenuOpen(false); logout() }}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-status-danger/10 text-status-danger"
+                  className="flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-status-danger-op10 text-status-danger"
                 >
                   <SignOut size={15} />
                   <span>{t('auth.logout')}</span>
@@ -325,7 +325,7 @@ export function AppShell() {
                 className={cn(
                   "w-full px-2 py-1.5 text-left text-xs rounded flex items-center gap-2",
                   "hover:bg-bg-tertiary transition-colors",
-                  themeFamily === theme.id && "text-accent-primary bg-accent-primary/10"
+                  themeFamily === theme.id && "text-accent-primary bg-accent-primary-op10"
                 )}
               >
                 <div 
@@ -352,7 +352,7 @@ export function AppShell() {
                 className={cn(
                   "w-full px-2 py-1.5 text-left text-xs rounded",
                   "hover:bg-bg-tertiary transition-colors",
-                  mode === opt.id && "text-accent-primary bg-accent-primary/10"
+                  mode === opt.id && "text-accent-primary bg-accent-primary-op10"
                 )}
               >
                 {t(opt.labelKey)}
@@ -388,7 +388,7 @@ export function AppShell() {
                         "flex flex-col items-center justify-center gap-1 p-2 rounded-lg transition-all",
                         "hover:bg-bg-tertiary active:scale-95",
                         isActive 
-                          ? "bg-accent-primary/15 text-accent-primary" 
+                          ? "bg-accent-primary-op15 text-accent-primary" 
                           : "text-text-secondary hover:text-text-primary"
                       )}
                     >
@@ -410,7 +410,7 @@ export function AppShell() {
               <div className="mt-3 pt-3 border-t border-border flex items-center justify-end">
                 <button
                   onClick={() => { setMobileMenuOpen(false); logout(); }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-status-danger hover:bg-status-danger/10 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-status-danger hover:bg-status-danger-op10 transition-colors"
                 >
                   <SignOut size={18} />
                   <span className="text-sm font-medium">{t('auth.logout')}</span>

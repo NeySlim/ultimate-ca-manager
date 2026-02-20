@@ -11,7 +11,7 @@ describe('Badge Component', () => {
   it('renders default variant', () => {
     render(<Badge>Default</Badge>)
     const badge = screen.getByText('Default')
-    expect(badge.className).toContain('bg-bg-tertiary')
+    expect(badge.className).toContain('bg-tertiary-op80')
   })
 
   it('renders success variant', () => {

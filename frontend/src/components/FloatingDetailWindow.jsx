@@ -23,7 +23,7 @@ import { cn } from '../lib/utils'
 const ENTITY_CONFIG = {
   certificate: {
     icon: Certificate,
-    iconClass: 'bg-accent-primary/15 text-accent-primary',
+    iconClass: 'bg-accent-primary-op15 text-accent-primary',
     service: () => certificatesService,
     fetchById: (id) => certificatesService.getById(id),
     getTitle: (data) => data?.common_name || data?.subject || `Certificate #${data?.id}`,
@@ -31,7 +31,7 @@ const ENTITY_CONFIG = {
   },
   ca: {
     icon: ShieldCheck,
-    iconClass: 'bg-accent-success/15 text-accent-success',
+    iconClass: 'bg-accent-success-op15 text-accent-success',
     service: () => casService,
     fetchById: (id) => casService.getById(id),
     getTitle: (data) => data?.common_name || data?.descr || `CA #${data?.id}`,
@@ -39,7 +39,7 @@ const ENTITY_CONFIG = {
   },
   truststore: {
     icon: Fingerprint,
-    iconClass: 'bg-accent-warning/15 text-accent-warning',
+    iconClass: 'bg-accent-warning-op15 text-accent-warning',
     service: () => truststoreService,
     fetchById: (id) => truststoreService.getById(id),
     getTitle: (data) => data?.name || data?.subject || `Trust Store #${data?.id}`,
@@ -261,16 +261,16 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
 
   return (
     <>
-    <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-border/40 bg-bg-tertiary/30">
+    <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-border-op40 bg-tertiary-op30">
       {/* Export button → modal */}
-      <button onClick={() => setShowExportModal(true)} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary/10')}>
+      <button onClick={() => setShowExportModal(true)} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
         <Certificate size={14} weight="duotone" />
         {t('export.title', 'Export')}
       </button>
 
       {/* Renew */}
       {onRenew && (
-        <button onClick={onRenew} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success/10')}>
+        <button onClick={onRenew} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success-op10')}>
           <ArrowsClockwise size={14} weight="duotone" />
           {t('common.renew', 'Renew')}
         </button>
@@ -278,7 +278,7 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
 
       {/* Revoke */}
       {onRevoke && (
-        <button onClick={onRevoke} className={cn(btnBase, 'text-text-secondary hover:text-status-warning hover:bg-status-warning/10')}>
+        <button onClick={onRevoke} className={cn(btnBase, 'text-text-secondary hover:text-status-warning hover:bg-status-warning-op10')}>
           <X size={14} weight="bold" />
           {t('common.revoke', 'Revoke')}
         </button>
@@ -289,7 +289,7 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
 
       {/* Delete — right-aligned */}
       {onDelete && (
-        <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger/10')}>
+        <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10')}>
           <Trash size={14} weight="duotone" />
         </button>
       )}

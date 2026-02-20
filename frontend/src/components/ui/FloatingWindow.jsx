@@ -36,7 +36,7 @@ export function FloatingWindow({
   title,
   subtitle,
   icon: Icon,
-  iconClass = 'bg-accent-primary/15 text-accent-primary',
+  iconClass = 'bg-accent-primary-op15 text-accent-primary',
   headerActions,
   children,
   className,
@@ -106,7 +106,7 @@ export function FloatingWindow({
       <div
         className={cn(
           'shrink-0 flex items-center justify-between gap-2 px-3 py-1.5',
-          'border-b border-border/60 cursor-grab active:cursor-grabbing select-none',
+          'border-b border-border-op60 cursor-grab active:cursor-grabbing select-none',
           'rounded-t-xl',
         )}
         style={{ background: 'linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))' }}
@@ -115,7 +115,7 @@ export function FloatingWindow({
       >
         <div className="flex items-center gap-2 min-w-0">
           {Icon && (
-            <div className={cn('w-6 h-6 rounded-md flex items-center justify-center shrink-0', iconClass.split(' ').find(c => c.startsWith('bg-')) || 'bg-accent-primary/15')}>
+            <div className={cn('w-6 h-6 rounded-md flex items-center justify-center shrink-0', iconClass.split(' ').find(c => c.startsWith('bg-')) || 'bg-accent-primary-op15')}>
               <Icon size={13} weight="duotone" className={iconClass.split(' ').find(c => c.startsWith('text-')) || 'text-accent-primary'} />
             </div>
           )}
@@ -147,7 +147,7 @@ export function FloatingWindow({
           {onClose && (
             <button
               onClick={(e) => { e.stopPropagation(); onClose() }}
-              className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-status-danger hover:bg-status-danger/10 transition-colors"
+              className="w-6 h-6 rounded flex items-center justify-center text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10 transition-colors"
             >
               <X size={13} />
             </button>

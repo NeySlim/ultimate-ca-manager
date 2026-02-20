@@ -451,7 +451,7 @@ export default function AccountPage() {
                 : t('common.never')}
             </p>
           </div>
-          <Button size="sm" onClick={() => setShowPasswordModal(true)}>
+          <Button type="button" size="sm" onClick={() => setShowPasswordModal(true)}>
             {t('common.changePassword')}
           </Button>
         </div>
@@ -483,14 +483,14 @@ export default function AccountPage() {
         title={t('account.securityKeys')}
         subtitle={t('account.webauthnDescription')}
         actions={
-          <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
+          <Button type="button" size="sm" onClick={() => setShowWebAuthnModal(true)}>
             <Plus size={14} className="mr-1" />
             {t('account.addKey')}
           </Button>
         }
       >
         {webauthnCredentials.length === 0 ? (
-          <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
+          <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
             <Fingerprint size={28} className="mx-auto mb-2 text-text-tertiary" />
             <p className="text-sm text-text-secondary">{t('account.noSecurityKeys')}</p>
           </div>
@@ -499,7 +499,7 @@ export default function AccountPage() {
             {webauthnCredentials.map(cred => (
               <div 
                 key={cred.id} 
-                className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
+                className="flex items-center justify-between p-3 bg-tertiary-50 border border-border rounded-lg"
               >
                 <div className="flex items-center gap-3">
                   <Fingerprint size={20} className="text-accent-primary" />
@@ -511,7 +511,7 @@ export default function AccountPage() {
                     </p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => handleDeleteWebAuthn(cred.id)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteWebAuthn(cred.id)}>
                   <Trash size={16} className="text-status-danger" />
                 </Button>
               </div>
@@ -524,7 +524,7 @@ export default function AccountPage() {
       <DetailSection 
         title={t('account.clientCertificates')}
         actions={
-          <Button size="sm" onClick={() => setShowMTLSModal(true)}>
+          <Button type="button" size="sm" onClick={() => setShowMTLSModal(true)}>
             <Plus size={14} className="mr-1" />
             {t('account.addCertificate')}
           </Button>
@@ -535,7 +535,7 @@ export default function AccountPage() {
         </p>
         
         {mtlsCertificates.length === 0 ? (
-          <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
+          <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
             <Certificate size={28} className="mx-auto mb-2 text-text-tertiary" />
             <p className="text-sm text-text-secondary">{t('account.noCertificatesEnrolled')}</p>
           </div>
@@ -544,7 +544,7 @@ export default function AccountPage() {
             {mtlsCertificates.map(cert => (
               <div 
                 key={cert.id} 
-                className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
+                className="flex items-center justify-between p-3 bg-tertiary-50 border border-border rounded-lg"
               >
                 <div className="flex items-center gap-3">
                   <Certificate size={20} className="text-accent-primary" />
@@ -560,7 +560,7 @@ export default function AccountPage() {
                   <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
                     {cert.enabled ? t('common.active') : t('common.disabled')}
                   </Badge>
-                  <Button size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
                     <Trash size={16} className="text-status-danger" />
                   </Button>
                 </div>
@@ -591,7 +591,7 @@ export default function AccountPage() {
 
       <DetailSection title={t('account.yourAPIKeys')}>
         {apiKeys.length === 0 ? (
-          <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
+          <div className="p-4 bg-tertiary-50 border border-border rounded-lg text-center">
             <Key size={28} className="mx-auto mb-2 text-text-tertiary" />
             <p className="text-sm text-text-secondary">{t('account.noAPIKeys')}</p>
             <p className="text-xs text-text-tertiary mt-1">{t('account.createKeyToAccess')}</p>
@@ -601,7 +601,7 @@ export default function AccountPage() {
             {apiKeys.map(key => (
               <div 
                 key={key.id} 
-                className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
+                className="flex items-center justify-between p-3 bg-tertiary-50 border border-border rounded-lg"
               >
                 <div className="flex items-center gap-3">
                   <Key size={20} className={key.is_active ? 'text-accent-primary' : 'text-text-tertiary'} />
@@ -617,7 +617,7 @@ export default function AccountPage() {
                     </p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => handleDeleteApiKey(key.id)}>
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteApiKey(key.id)}>
                   <Trash size={16} className="text-status-danger" />
                 </Button>
               </div>
@@ -760,7 +760,7 @@ export default function AccountPage() {
             </div>
             
             {qrData.backup_codes && (
-              <div className="p-3 bg-status-warning/10 border border-status-warning/30 rounded-lg">
+              <div className="p-3 bg-status-warning-op10 border border-status-warning-op30 rounded-lg">
                 <p className="text-sm font-medium text-status-warning flex items-center gap-2">
                   <Warning size={16} />
                   {t('account.backupCodes')}
@@ -774,10 +774,10 @@ export default function AccountPage() {
             )}
             
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button variant="secondary" onClick={() => setShow2FAModal(false)}>
+              <Button type="button" variant="secondary" onClick={() => setShow2FAModal(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
+              <Button type="button" onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
                 {t('account.verifyAndEnable')}
               </Button>
             </div>
@@ -809,7 +809,7 @@ export default function AccountPage() {
           />
           
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setShowWebAuthnModal(false)}>
+            <Button type="button" variant="secondary" onClick={() => setShowWebAuthnModal(false)}>
               {t('common.cancel')}
             </Button>
             <Button 
@@ -831,7 +831,7 @@ export default function AccountPage() {
         <div className="p-4 space-y-4">
           {mtlsResult ? (
             <>
-              <div className="p-3 rounded-lg bg-status-success/10 text-sm text-status-success font-medium">
+              <div className="p-3 rounded-lg bg-status-success-op10 text-sm text-status-success font-medium">
                 {t('account.mtlsCertCreated')}
               </div>
               <div className="space-y-3">
@@ -851,13 +851,13 @@ export default function AccountPage() {
                     className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none"
                   />
                 </div>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning/10 text-xs text-status-warning">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
                   <Warning size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
                   <span>{t('account.mtlsDownloadWarning')}</span>
                 </div>
               </div>
               <div className="flex justify-end pt-4 border-t border-border">
-                <Button variant="secondary" onClick={handleCloseMTLSModal}>
+                <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
                   {t('common.close')}
                 </Button>
               </div>
@@ -892,7 +892,7 @@ export default function AccountPage() {
                 <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
                   {t('common.cancel')}
                 </Button>
-                <Button onClick={handleCreateMTLS} loading={mtlsCreating} disabled={mtlsCreating}>
+                <Button type="button" onClick={handleCreateMTLS} loading={mtlsCreating} disabled={mtlsCreating}>
                   <Certificate size={16} />
                   {t('account.generateCertificate')}
                 </Button>

@@ -44,7 +44,7 @@ export function ToggleSwitch({
       className={`
         relative inline-flex items-center shrink-0 rounded-full 
         transition-colors duration-200 ease-in-out
-        focus:outline-none focus:ring-2 focus:ring-accent-primary/40 focus:ring-offset-1 focus:ring-offset-bg-primary
+        focus:outline-none focus:ring-2 focus:ring-accent-primary-op40 focus:ring-offset-1 focus:ring-offset-bg-primary
         ${s.track}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${checked ? 'bg-accent-primary' : 'bg-bg-tertiary border border-border'}
@@ -68,7 +68,7 @@ export function ToggleSwitch({
   return (
     <label 
       className={`flex items-center gap-3 p-2 rounded-lg transition-colors
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-bg-tertiary/50'}
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-tertiary-op50'}
         ${className}
       `}
       onClick={(e) => e.preventDefault()}

@@ -401,7 +401,7 @@ export default function DashboardPage() {
       <div className={`flex flex-col px-3 pt-2 pb-1 mx-auto w-full ${isDesktopGrid ? 'flex-1 min-h-0' : 'pb-6'}`}>
         
         {/* Dashboard Header */}
-        <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary/20 px-4 py-3 mb-1.5">
+        <div className="shrink-0 relative overflow-hidden rounded-lg hero-gradient border border-accent-primary-op20 px-4 py-3 mb-1.5">
           <div className="relative flex items-center justify-between gap-4">
             {/* Branding — compact on mobile */}
             <div className="flex items-center gap-3">
@@ -428,37 +428,37 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               {!editMode ? (
                 <>
-                  <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
+                  <Button type="button" size="sm" onClick={() => navigate('/certificates?action=create')}>
                     <Plus size={14} weight="bold" />
                     {t('common.cert')}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
                     <Plus size={14} weight="bold" />
                     {t('common.ca')}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => navigate('/csrs')} className="hidden md:flex">
+                  <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/csrs')} className="hidden md:flex">
                     <ListChecks size={14} weight="bold" />
                     {t('common.csr')}
                   </Button>
-                  <div className="hidden md:flex items-center gap-1 ml-1 border-l border-border/40 pl-2">
-                    <Button size="sm" variant="ghost" onClick={loadDashboard} title={t('common.refresh')}>
+                  <div className="hidden md:flex items-center gap-1 ml-1 border-l border-border-op40 pl-2">
+                    <Button type="button" size="sm" variant="ghost" onClick={loadDashboard} title={t('common.refresh')}>
                       <ArrowsClockwise size={14} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title={t('dashboard.customizeDashboard')}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title={t('dashboard.customizeDashboard')}>
                       <SlidersHorizontal size={14} />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setEditMode(true)} title={t('dashboard.editLayout')}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setEditMode(true)} title={t('dashboard.editLayout')}>
                       <PencilSimpleLine size={14} />
                     </Button>
                   </div>
                 </>
               ) : (
                 <>
-                  <Button size="sm" variant="ghost" onClick={resetLayout}>
+                  <Button type="button" size="sm" variant="ghost" onClick={resetLayout}>
                     <ArrowCounterClockwise size={14} />
                     {t('dashboard.resetLayout')}
                   </Button>
-                  <Button size="sm" onClick={() => setEditMode(false)}>
+                  <Button type="button" size="sm" onClick={() => setEditMode(false)}>
                     <Check size={14} weight="bold" />
                     {t('dashboard.doneEditing')}
                   </Button>
@@ -642,7 +642,7 @@ export default function DashboardPage() {
                           <div 
                             key={cert.id || i}
                             onClick={() => navigate(`/certificates/${cert.id}`)}
-                            className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group"
+                            className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors group"
                           >
                             <div className="flex items-center justify-between gap-2 mb-1">
                               <span className="text-xs font-medium text-text-primary truncate flex-1 group-hover:text-accent-primary transition-colors">
@@ -686,7 +686,7 @@ export default function DashboardPage() {
                   iconColor="blue"
                   title={t('dashboard.recentCertificates')}
                   action={
-                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/certificates')}>
+                    <Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/certificates')}>
                       {t('common.viewAll')} <CaretRight size={12} />
                     </Button>
                   }
@@ -699,9 +699,9 @@ export default function DashboardPage() {
                       <div 
                         key={cert.id || i}
                         onClick={() => navigate(`/certificates/${cert.id}`)}
-                        className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all group flex items-center gap-2.5"
+                        className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-all group flex items-center gap-2.5"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-tertiary-op50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary-op10 transition-colors">
                           <Certificate size={14} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -736,7 +736,7 @@ export default function DashboardPage() {
                   iconColor="emerald"
                   title={t('dashboard.recentCAs')}
                   action={
-                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>
+                    <Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>
                       {t('common.viewAll')} <CaretRight size={12} />
                     </Button>
                   }
@@ -749,9 +749,9 @@ export default function DashboardPage() {
                       <div 
                         key={ca.id || i}
                         onClick={() => navigate(`/cas/${ca.id}`)}
-                        className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5"
+                        className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors group flex items-center gap-2.5"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-tertiary-op50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary-op10 transition-colors">
                           <ShieldCheck size={14} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
                         </div>
                         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
@@ -786,7 +786,7 @@ export default function DashboardPage() {
                       {isConnected && (
                         <Badge variant="success" size="sm" dot pulse>{t('common.live')}</Badge>
                       )}
-                      <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/audit')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/audit')}>
                         {t('common.viewAll')} <CaretRight size={12} />
                       </Button>
                     </div>
@@ -803,7 +803,7 @@ export default function DashboardPage() {
                         const isSuccess = activity.action === 'login_success' || activity.action === 'create'
                         
                         return (
-                          <div key={activity.id || i} className="p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors flex items-start gap-2.5">
+                          <div key={activity.id || i} className="p-2 rounded-lg hover:bg-tertiary-op50 transition-colors flex items-start gap-2.5">
                             <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
                               isError ? 'status-danger-bg' : isSuccess ? 'status-success-bg' : 'bg-bg-tertiary'
                             }`}>
@@ -844,7 +844,7 @@ export default function DashboardPage() {
                   iconColor="blue"
                   title={t('dashboard.systemHealth')}
                   action={
-                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/settings')}>
+                    <Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/settings')}>
                       <Gear size={14} />
                     </Button>
                   }
@@ -901,7 +901,7 @@ export default function DashboardPage() {
                   iconColor="violet"
                   title={t('dashboard.acmeAccounts')}
                   action={
-                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>
+                    <Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>
                       {t('common.viewAll')} <CaretRight size={12} />
                     </Button>
                   }
@@ -914,10 +914,10 @@ export default function DashboardPage() {
                       {recentAcme.slice(0, 4).map((account, i) => (
                         <div 
                           key={account.id || i} 
-                          className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5"
+                          className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors group flex items-center gap-2.5"
                           onClick={() => navigate('/acme')}
                         >
-                          <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
+                          <div className="w-7 h-7 rounded-lg bg-tertiary-op50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary-op10 transition-colors">
                             <User size={14} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
                           </div>
                           <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
@@ -946,7 +946,7 @@ export default function DashboardPage() {
                   iconColor="orange"
                   title={t('dashboard.trustStoreExpiry')}
                   action={
-                    <Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/truststore')}>
+                    <Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/truststore')}>
                       {t('common.viewAll')} <CaretRight size={12} />
                     </Button>
                   }
@@ -957,8 +957,8 @@ export default function DashboardPage() {
                   ) : (
                     <div className="space-y-0.5">
                       {trustStoreExpiring.expired.slice(0, 2).map((cert) => (
-                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
-                          <div className="w-7 h-7 rounded-lg bg-status-danger/10 flex items-center justify-center shrink-0">
+                        <div key={cert.id} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
+                          <div className="w-7 h-7 rounded-lg bg-status-danger-op10 flex items-center justify-center shrink-0">
                             <Warning size={14} weight="duotone" className="text-status-danger" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -968,8 +968,8 @@ export default function DashboardPage() {
                         </div>
                       ))}
                       {trustStoreExpiring.expiring.slice(0, 3).map((cert) => (
-                        <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
-                          <div className="w-7 h-7 rounded-lg bg-accent-warning/10 flex items-center justify-center shrink-0">
+                        <div key={cert.id} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors group flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
+                          <div className="w-7 h-7 rounded-lg bg-accent-warning-op10 flex items-center justify-center shrink-0">
                             <Clock size={14} weight="duotone" className="text-accent-warning" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1038,7 +1038,7 @@ export default function DashboardPage() {
                       const urgency = daysLeft === null ? 'gray' : daysLeft <= 7 ? 'danger' : daysLeft <= 15 ? 'warning' : daysLeft <= 30 ? 'yellow' : 'success'
                       const barColor = { danger: 'var(--accent-danger)', warning: 'var(--accent-warning)', yellow: '#EAB308', success: 'var(--accent-success)', gray: 'var(--text-tertiary)' }[urgency]
                       return (
-                        <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors">
+                        <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="text-xs font-medium text-text-primary truncate flex-1">{cert.common_name || cert.descr || cert.subject || '—'}</span>
                             <span className={`text-[10px] font-semibold whitespace-nowrap ${urgency === 'danger' ? 'status-danger-text' : urgency === 'warning' ? 'status-warning-text' : 'text-text-secondary'}`}>
@@ -1059,14 +1059,14 @@ export default function DashboardPage() {
 
             {isVisible('certs') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={Certificate} iconColor="blue" title={t('dashboard.recentCertificates')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/certificates')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Header icon={Certificate} iconColor="blue" title={t('dashboard.recentCertificates')} action={<Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/certificates')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
               <Card.Body className="space-y-0.5 !pt-0">
                 {recentCerts.length === 0 ? (
                   <EmptyWidget icon={Certificate} text={t('dashboard.noCertificatesYet')} />
                 ) : (
                   recentCerts.slice(0, 4).map((cert, i) => (
-                    <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0">
+                    <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-tertiary-op50 flex items-center justify-center shrink-0">
                         <Certificate size={14} weight="duotone" className="text-text-tertiary" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1087,14 +1087,14 @@ export default function DashboardPage() {
 
             {isVisible('cas') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={ShieldCheck} iconColor="emerald" title={t('dashboard.recentCAs')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Header icon={ShieldCheck} iconColor="emerald" title={t('dashboard.recentCAs')} action={<Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/cas')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
               <Card.Body className="space-y-0.5 !pt-0">
                 {recentCAs.length === 0 ? (
                   <EmptyWidget icon={ShieldCheck} text={t('dashboard.noCAsYet')} />
                 ) : (
                   recentCAs.slice(0, 4).map((ca, i) => (
-                    <div key={ca.id || i} onClick={() => navigate(`/cas/${ca.id}`)} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0">
+                    <div key={ca.id || i} onClick={() => navigate(`/cas/${ca.id}`)} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-tertiary-op50 flex items-center justify-center shrink-0">
                         <ShieldCheck size={14} weight="duotone" className="text-text-tertiary" />
                       </div>
                       <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
@@ -1110,7 +1110,7 @@ export default function DashboardPage() {
 
             {isVisible('activity') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={ClockCounterClockwise} iconColor="teal" title={t('dashboard.recentActivity')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/audit')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Header icon={ClockCounterClockwise} iconColor="teal" title={t('dashboard.recentActivity')} action={<Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/audit')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
               <Card.Body className="!pt-0">
                 {activityLog.length === 0 ? (
                   <EmptyWidget icon={ClockCounterClockwise} text={t('dashboard.noRecentActivity')} />
@@ -1121,7 +1121,7 @@ export default function DashboardPage() {
                       const isError = activity.action === 'login_failed' || activity.action === 'revoke'
                       const isSuccess = activity.action === 'login_success' || activity.action === 'create'
                       return (
-                        <div key={activity.id || i} className="p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors flex items-start gap-2.5">
+                        <div key={activity.id || i} className="p-2 rounded-lg hover:bg-tertiary-op50 transition-colors flex items-start gap-2.5">
                           <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${isError ? 'status-danger-bg' : isSuccess ? 'status-success-bg' : 'bg-bg-tertiary'}`}>
                             <Icon size={12} weight="bold" className={isError ? 'status-danger-text' : isSuccess ? 'status-success-text' : 'text-text-tertiary'} />
                           </div>
@@ -1165,15 +1165,15 @@ export default function DashboardPage() {
 
             {isVisible('acme') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={Globe} iconColor="violet" title={t('dashboard.acmeAccounts')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Header icon={Globe} iconColor="violet" title={t('dashboard.acmeAccounts')} action={<Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/acme')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
               <Card.Body className="!pt-0">
                 {recentAcme.length === 0 ? (
                   <EmptyWidget icon={Globe} text={t('dashboard.noAcmeAccounts')} />
                 ) : (
                   <div className="space-y-0.5">
                     {recentAcme.slice(0, 4).map((account, i) => (
-                      <div key={account.id || i} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate('/acme')}>
-                        <div className="w-7 h-7 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0">
+                      <div key={account.id || i} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate('/acme')}>
+                        <div className="w-7 h-7 rounded-lg bg-tertiary-op50 flex items-center justify-center shrink-0">
                           <User size={14} weight="duotone" className="text-text-tertiary" />
                         </div>
                         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
@@ -1190,15 +1190,15 @@ export default function DashboardPage() {
 
             {isVisible('trustExpiry') && (
             <Card variant="elevated" className="p-0">
-              <Card.Header icon={ShieldCheck} iconColor="orange" title={t('dashboard.trustStoreExpiry')} action={<Button size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/truststore')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
+              <Card.Header icon={ShieldCheck} iconColor="orange" title={t('dashboard.trustStoreExpiry')} action={<Button type="button" size="sm" variant="ghost" className="text-accent-primary" onClick={() => navigate('/truststore')}>{t('common.viewAll')} <CaretRight size={12} /></Button>} compact />
               <Card.Body className="!pt-0">
                 {trustStoreExpiring.expiring_count === 0 && trustStoreExpiring.expired_count === 0 ? (
                   <EmptyWidget icon={ShieldCheck} text={t('dashboard.noTrustStoreExpiring')} />
                 ) : (
                   <div className="space-y-0.5">
                     {trustStoreExpiring.expired.slice(0, 2).map((cert) => (
-                      <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
-                        <div className="w-7 h-7 rounded-lg bg-status-danger/10 flex items-center justify-center shrink-0">
+                      <div key={cert.id} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
+                        <div className="w-7 h-7 rounded-lg bg-status-danger-op10 flex items-center justify-center shrink-0">
                           <Warning size={14} weight="duotone" className="text-status-danger" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1208,8 +1208,8 @@ export default function DashboardPage() {
                       </div>
                     ))}
                     {trustStoreExpiring.expiring.slice(0, 3).map((cert) => (
-                      <div key={cert.id} className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
-                        <div className="w-7 h-7 rounded-lg bg-accent-warning/10 flex items-center justify-center shrink-0">
+                      <div key={cert.id} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors flex items-center gap-2.5" onClick={() => navigate(`/truststore/${cert.id}`)}>
+                        <div className="w-7 h-7 rounded-lg bg-accent-warning-op10 flex items-center justify-center shrink-0">
                           <Clock size={14} weight="duotone" className="text-accent-warning" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1249,7 +1249,7 @@ function WidgetWrapper({ editMode, children }) {
   return (
     <div className="h-full relative">
       {editMode && (
-        <div className="widget-drag-handle absolute top-0 left-0 right-0 h-8 z-10 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-t-xl bg-accent-primary/5 border-b border-dashed border-accent-primary/20 opacity-0 hover:opacity-100 transition-opacity">
+        <div className="widget-drag-handle absolute top-0 left-0 right-0 h-8 z-10 flex items-center justify-center cursor-grab active:cursor-grabbing rounded-t-xl bg-accent-primary-op5 border-b border-dashed border-accent-primary-op20 opacity-0 hover:opacity-100 transition-opacity">
           <DotsSixVertical size={16} className="text-accent-primary" />
         </div>
       )}
@@ -1315,14 +1315,14 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
         </div>
         
         <div className="flex items-center justify-between pt-3 border-t border-border">
-          <Button size="sm" variant="ghost" onClick={resetToDefaults}>
+          <Button type="button" size="sm" variant="ghost" onClick={resetToDefaults}>
             {t('common.reset')}
           </Button>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={onClose}>
+            <Button type="button" size="sm" variant="secondary" onClick={onClose}>
               {t('common.cancel')}
             </Button>
-            <Button size="sm" onClick={() => onSave(localWidgets)}>
+            <Button type="button" size="sm" onClick={() => onSave(localWidgets)}>
               {t('common.save')}
             </Button>
           </div>
@@ -1427,7 +1427,7 @@ function ServiceBadge({ name, status }) {
     <div className={`px-2.5 py-2 rounded-lg border text-center transition-all duration-200 group cursor-default ${
       isOnline 
         ? 'stat-card-success' 
-        : 'bg-bg-tertiary border-border hover:border-text-tertiary/30'
+        : 'bg-bg-tertiary border-border hover:border-tertiary-op30'
     }`}>
       <div className="flex items-center justify-center gap-1.5">
         <div className={`w-2 h-2 rounded-full transition-transform duration-300 group-hover:scale-125 ${isOnline ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
@@ -1441,7 +1441,7 @@ function ServiceBadge({ name, status }) {
 function EmptyWidget({ icon: Icon, text }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-text-tertiary py-6">
-      <div className="w-10 h-10 rounded-xl bg-bg-tertiary/50 flex items-center justify-center mb-2 border border-border/50">
+      <div className="w-10 h-10 rounded-xl bg-tertiary-op50 flex items-center justify-center mb-2 border border-border-op50">
         <Icon size={20} className="opacity-50" />
       </div>
       <p className="text-xs font-medium opacity-70">{text}</p>

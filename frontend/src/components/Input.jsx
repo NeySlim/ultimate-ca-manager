@@ -78,7 +78,7 @@ export const Input = forwardRef(function Input({
             {typeof label === 'string' ? label : label}
             {required && !hasExistingValue && <span className="status-danger-text">*</span>}
             {hasExistingValue && (
-              <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success/20 text-status-success rounded leading-[16px]">
+              <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
                 <CheckCircle size={10} weight="fill" />
                 {t('common.set')}
               </span>

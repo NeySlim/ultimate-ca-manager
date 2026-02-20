@@ -451,7 +451,7 @@ export default function AuditLogsPage() {
     <div className="p-4 space-y-4">
       {/* Statistics */}
       {stats && (
-        <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
           <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
             <Database size={16} className="text-accent-primary" />
             {t('common.last30DaysStats')}
@@ -605,7 +605,7 @@ export default function AuditLogsPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={actionIcons[selectedLog.action] || actionIcons.default}
-        iconClass={selectedLog.success ? "bg-status-success/20" : "bg-status-danger/20"}
+        iconClass={selectedLog.success ? "bg-status-success-op20" : "bg-status-danger-op20"}
         title={selectedLog.action?.replace(/_/g, ' ') || t('audit.event')}
         subtitle={`${selectedLog.resource_type || t('common.system')}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
         badge={
@@ -657,7 +657,7 @@ export default function AuditLogsPage() {
 
       {selectedLog.details && (
         <CompactSection title={t('common.details')} collapsible>
-          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
+          <pre className="text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
             {selectedLog.details}
           </pre>
         </CompactSection>
@@ -665,7 +665,7 @@ export default function AuditLogsPage() {
 
       {selectedLog.user_agent && (
         <CompactSection title={t('common.clientInfo')} collapsible defaultOpen={false}>
-          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+          <pre className="text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
             {selectedLog.user_agent}
           </pre>
         </CompactSection>
@@ -689,16 +689,16 @@ export default function AuditLogsPage() {
           <Badge variant="primary" size="sm" className="ml-1">1</Badge>
         )}
       </Button>
-      <Button variant="secondary" size="sm" onClick={loadLogs} className="hidden md:inline-flex">
+      <Button type="button" variant="secondary" size="sm" onClick={loadLogs} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
       </Button>
       {canDelete('audit') && (
-      <Button variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
         <Trash size={14} className="text-status-danger" />
         <span className="hidden md:inline">{t('audit.cleanupLogs')}</span>
       </Button>
       )}
-      <Button variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity} className="hidden md:inline-flex">
+      <Button type="button" variant="secondary" size="sm" onClick={handleVerifyIntegrity} loading={verifyingIntegrity} className="hidden md:inline-flex">
         <ShieldCheck size={14} />
         <span>{t('audit.verifyIntegrity')}</span>
       </Button>
@@ -824,7 +824,7 @@ export default function AuditLogsPage() {
           </div>
           
           <div className="flex justify-end gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setShowCleanupModal(false)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setShowCleanupModal(false)}>
               {t('common.cancel')}
             </Button>
             <Button 

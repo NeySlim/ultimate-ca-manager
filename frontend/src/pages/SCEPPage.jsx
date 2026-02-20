@@ -290,7 +290,7 @@ export default function SCEPPage() {
   const helpContent = (
     <div className="p-4 space-y-4">
       {/* SCEP Statistics */}
-      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Database size={16} className="text-accent-primary" />
           {t('scep.scepStats')}
@@ -337,7 +337,7 @@ export default function SCEPPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={Robot}
-        iconClass={selectedRequest.status === 'approved' ? "bg-status-success/20" : selectedRequest.status === 'rejected' ? "bg-status-danger/20" : "bg-status-warning/20"}
+        iconClass={selectedRequest.status === 'approved' ? "bg-status-success-op20" : selectedRequest.status === 'rejected' ? "bg-status-danger-op20" : "bg-status-warning-op20"}
         title={`Request #${selectedRequest.id}`}
         subtitle={selectedRequest.subject || 'SCEP Enrollment Request'}
         badge={getStatusBadge(selectedRequest.status)}
@@ -349,10 +349,10 @@ export default function SCEPPage() {
 
       {selectedRequest.status === 'pending' && hasPermission('write:scep') && (
         <div className="flex gap-2">
-          <Button size="sm" variant="primary" className="flex-1" onClick={() => handleApprove(selectedRequest)}>
+          <Button type="button" size="sm" variant="primary" className="flex-1" onClick={() => handleApprove(selectedRequest)}>
             <CheckCircle size={14} /> {t('scep.approve')}
           </Button>
-          <Button size="sm" variant="danger" onClick={() => setShowRejectModal(true)}>
+          <Button type="button" size="sm" variant="danger" onClick={() => setShowRejectModal(true)}>
             <XCircle size={14} /> {t('scep.reject')}
           </Button>
         </div>
@@ -369,7 +369,7 @@ export default function SCEPPage() {
 
       {selectedRequest.csr_pem && (
         <CompactSection title={t('common.csrContent')} collapsible defaultOpen={false}>
-          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
             {selectedRequest.csr_pem}
           </pre>
         </CompactSection>
@@ -380,10 +380,10 @@ export default function SCEPPage() {
   // Header actions
   const headerActions = (
     <>
-      <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+      <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
       </Button>
-      <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+      <Button type="button" variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
         <ArrowsClockwise size={22} />
       </Button>
     </>
@@ -441,10 +441,10 @@ export default function SCEPPage() {
             searchPlaceholder={t('scep.searchRequests')}
             toolbarActions={
               <>
-                <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+                <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
                   <ArrowsClockwise size={14} />
                 </Button>
-                <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+                <Button type="button" variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
                   <ArrowsClockwise size={22} />
                 </Button>
               </>
@@ -556,7 +556,7 @@ export default function SCEPPage() {
 
             {hasPermission('write:scep') && (
               <div className="flex justify-end">
-                <Button onClick={handleSaveConfig} disabled={saving}>
+                <Button type="button" onClick={handleSaveConfig} disabled={saving}>
                   {saving ? <LoadingSpinner size="sm" /> : <Gear size={14} />}
                   {saving ? t('common.saving') : t('common.saveConfiguration')}
                 </Button>
@@ -617,7 +617,7 @@ export default function SCEPPage() {
                         </code>
                       </div>
                       {ca.scep_challenge && (
-                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(ca.scep_challenge)}>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(ca.scep_challenge)}>
                           <Copy size={14} />
                         </Button>
                       )}
@@ -645,7 +645,7 @@ export default function SCEPPage() {
                     <code className="text-sm font-mono text-text-primary flex-1 break-all">
                       {window.location.origin}/scep/pkiclient.exe
                     </code>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/scep/pkiclient.exe`)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/scep/pkiclient.exe`)}>
                       <Copy size={14} />
                     </Button>
                   </div>
@@ -657,7 +657,7 @@ export default function SCEPPage() {
                     <code className="text-sm font-mono text-text-primary flex-1">
                       {config.ca_ident || 'ucm-ca'}
                     </code>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(config.ca_ident || 'ucm-ca')}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(config.ca_ident || 'ucm-ca')}>
                       <Copy size={14} />
                     </Button>
                   </div>
@@ -724,10 +724,10 @@ crypto ca enroll UCM-CA`}
             rows={3}
           />
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => { setShowRejectModal(false); setRejectReason(''); }}>
+            <Button type="button" variant="secondary" onClick={() => { setShowRejectModal(false); setRejectReason(''); }}>
               {t('common.cancel')}
             </Button>
-            <Button variant="danger" onClick={handleReject}>
+            <Button type="button" variant="danger" onClick={handleReject}>
               <XCircle size={14} />
               {t('scep.rejectRequest')}
             </Button>

@@ -13,7 +13,7 @@ import { cn, formatDate } from '../lib/utils'
 function CompareField({ label, value1, value2, mono = false }) {
   const same = value1 === value2
   return (
-    <div className="grid grid-cols-[140px,1fr,1fr] gap-2 py-1.5 border-b border-border/50 last:border-0">
+    <div className="grid grid-cols-[140px,1fr,1fr] gap-2 py-1.5 border-b border-border-op50 last:border-0">
       <span className="text-xs text-text-secondary font-medium">{label}</span>
       <span className={cn(
         "text-xs truncate",

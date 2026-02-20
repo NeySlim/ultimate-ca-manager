@@ -315,10 +315,10 @@ export default function RBACPage() {
 
       {!role.is_system && (
         <div className="flex gap-2">
-          <Button size="sm" className="flex-1" onClick={handleUpdate}>
+          <Button type="button" size="sm" className="flex-1" onClick={handleUpdate}>
             <CheckCircle size={14} /> {t('common.saveChanges')}
           </Button>
-          <Button size="sm" variant="danger" onClick={() => handleDelete(role)}>
+          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(role)}>
             <Trash size={14} />
           </Button>
         </div>
@@ -354,7 +354,7 @@ export default function RBACPage() {
             const someSelected = categoryPerms.some(p => allPerms.includes(p))
 
             return (
-              <div key={key} className="border-b border-border/30 pb-3 last:border-0 last:pb-0">
+              <div key={key} className="border-b border-border-op30 pb-3 last:border-0 last:pb-0">
                 <button
                   onClick={() => toggleCategoryPermissions(key)}
                   disabled={role.is_system}
@@ -384,8 +384,8 @@ export default function RBACPage() {
                           isDirect
                             ? 'status-success-bg status-success-text status-success-border border'
                             : isInherited
-                            ? 'status-primary-bg status-primary-text border border-dashed border-accent-primary/30'
-                            : 'bg-bg-tertiary text-text-secondary hover:bg-bg-tertiary/80'
+                            ? 'status-primary-bg status-primary-text border border-dashed border-accent-primary-op30'
+                            : 'bg-bg-tertiary text-text-secondary hover:bg-tertiary-op80'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {isDirect ? <CheckCircle size={10} weight="fill" /> : isInherited ? <CheckCircle size={10} weight="duotone" /> : <XCircle size={10} />}
@@ -459,11 +459,11 @@ export default function RBACPage() {
             ]}
             toolbarActions={
               isMobile ? (
-                <Button size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">
+                <Button type="button" size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">
                   <Plus size={22} weight="bold" />
                 </Button>
               ) : (
-                <Button size="sm" onClick={() => openModal('create')}>
+                <Button type="button" size="sm" onClick={() => openModal('create')}>
                   <Plus size={16} /> {t('rbac.createRole')}
                 </Button>
               )
@@ -472,7 +472,7 @@ export default function RBACPage() {
             emptyTitle={t('rbac.noRoles')}
             emptyDescription={t('rbac.noRolesDescription')}
             emptyAction={
-              <Button onClick={() => openModal('create')}>
+              <Button type="button" onClick={() => openModal('create')}>
                 <Plus size={16} /> {t('rbac.createRole')}
               </Button>
             }

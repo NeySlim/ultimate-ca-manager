@@ -324,7 +324,7 @@ export default function ReportsPage() {
                   </thead>
                   <tbody>
                     {Object.entries(item.data || {}).map(([k, v]) => (
-                      <tr key={k} className="border-b border-border-primary/50 last:border-0">
+                      <tr key={k} className="border-b border-border-primary-op50 last:border-0">
                         <td className="px-3 py-1.5 text-text-primary font-mono">{k}</td>
                         <td className="px-3 py-1.5 text-text-primary text-right font-semibold">{v}</td>
                       </tr>
@@ -358,7 +358,7 @@ export default function ReportsPage() {
               </thead>
               <tbody>
                 {items.map((item, i) => (
-                  <tr key={item.id || i} className="border-b border-border-primary/50 last:border-0 hover:bg-bg-secondary/50">
+                  <tr key={item.id || i} className="border-b border-border-primary-op50 last:border-0 hover:bg-secondary-op50">
                     {columns.map((col) => (
                       <td key={col} className="px-3 py-1.5 text-text-primary whitespace-nowrap">
                         {formatCell(item[col], col)}
@@ -387,7 +387,7 @@ export default function ReportsPage() {
         icon={ChartBar}
         helpPageKey="reports"
         actions={canWrite('settings') ? (
-          <Button variant="secondary" onClick={openScheduleModal}>
+          <Button type="button" variant="secondary" onClick={openScheduleModal}>
             <CalendarBlank size={16} className="mr-1.5" /> {t('reports.scheduleReports')}
           </Button>
         ) : null}
@@ -516,13 +516,13 @@ export default function ReportsPage() {
                   {t('reports.generatedPreview')} — {reportTypes[generatedReport.type]?.name}
                 </h3>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="primary" onClick={() => handleDownload(generatedReport.type, 'csv')}>
+                  <Button type="button" size="sm" variant="primary" onClick={() => handleDownload(generatedReport.type, 'csv')}>
                     <FileCsv size={14} className="mr-1" /> CSV
                   </Button>
-                  <Button size="sm" variant="primary" onClick={() => handleDownload(generatedReport.type, 'json')}>
+                  <Button type="button" size="sm" variant="primary" onClick={() => handleDownload(generatedReport.type, 'json')}>
                     <FileJs size={14} className="mr-1" /> JSON
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => setGeneratedReport(null)}>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => setGeneratedReport(null)}>
                     {t('common.close')}
                   </Button>
                 </div>
@@ -553,10 +553,10 @@ export default function ReportsPage() {
             required
           />
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => { setTestSendModal(null); setTestEmail('') }}>
+            <Button type="button" variant="secondary" onClick={() => { setTestSendModal(null); setTestEmail('') }}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleTestSend} disabled={testSending || !testEmail.trim()}>
+            <Button type="button" onClick={handleTestSend} disabled={testSending || !testEmail.trim()}>
               {testSending ? <LoadingSpinner size="sm" /> : (
                 <><PaperPlaneTilt size={14} className="mr-1" /> {t('reports.send')}</>
               )}
@@ -617,10 +617,10 @@ export default function ReportsPage() {
 
           {/* Footer */}
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setShowScheduleModal(false)}>
+            <Button type="button" variant="secondary" onClick={() => setShowScheduleModal(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSaveSchedule} disabled={scheduleSaving}>
+            <Button type="button" onClick={handleSaveSchedule} disabled={scheduleSaving}>
               {scheduleSaving ? <LoadingSpinner size="sm" /> : t('common.save')}
             </Button>
           </div>

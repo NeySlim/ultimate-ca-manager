@@ -15,10 +15,10 @@
  * 
  * Usage:
  * <ActionBar
- *   primary={<Button onClick={create}>New Certificate</Button>}
+ *   primary={<Button type="button" onClick={create}>New Certificate</Button>}
  *   secondary={[
- *     <Button variant="secondary" onClick={refresh}>Refresh</Button>,
- *     <Button variant="secondary" onClick={export}>Export</Button>
+ *     <Button type="button" variant="secondary" onClick={refresh}>Refresh</Button>,
+ *     <Button type="button" variant="secondary" onClick={export}>Export</Button>
  *   ]}
  *   position="header" // 'header' | 'footer' | 'floating'
  * />
@@ -273,14 +273,14 @@ export function HeaderBar({
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap",
                     isActive 
-                      ? "bg-accent-primary/15 text-accent-primary" 
+                      ? "bg-accent-primary-op15 text-accent-primary" 
                       : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
                   )}
                 >
                   {Icon && <Icon size={16} />}
                   {tab.label}
                   {tab.badge && (
-                    <span className="ml-1 px-1.5 py-0.5 text-2xs bg-accent-primary/20 rounded-full">
+                    <span className="ml-1 px-1.5 py-0.5 text-2xs bg-accent-primary-op20 rounded-full">
                       {tab.badge}
                     </span>
                   )}
@@ -339,14 +339,14 @@ export function HeaderBar({
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                       isActive 
-                        ? "bg-accent-primary/15 text-accent-primary" 
+                        ? "bg-accent-primary-op15 text-accent-primary" 
                         : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
                     )}
                   >
                     {Icon && <Icon size={14} />}
                     {tab.label}
                     {tab.badge && (
-                      <span className="ml-1 px-1.5 py-0.5 text-2xs bg-accent-primary/20 rounded-full">
+                      <span className="ml-1 px-1.5 py-0.5 text-2xs bg-accent-primary-op20 rounded-full">
                         {tab.badge}
                       </span>
                     )}

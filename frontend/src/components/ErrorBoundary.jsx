@@ -109,7 +109,7 @@ export class ErrorBoundary extends Component {
           )}
           <button
             onClick={this.handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-md hover:bg-accent-primary/90 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-primary text-white rounded-md hover:bg-accent-primary-op90 transition-colors"
           >
             <ArrowClockwise size={16} />
             Try Again

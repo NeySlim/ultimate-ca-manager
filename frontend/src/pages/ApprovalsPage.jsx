@@ -385,7 +385,7 @@ export default function ApprovalsPage() {
           />
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onClick={() => { setActionModal(null); setComment('') }}>
+            <Button type="button" variant="secondary" onClick={() => { setActionModal(null); setComment('') }}>
               {t('common.cancel')}
             </Button>
             <Button

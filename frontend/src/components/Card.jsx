@@ -13,11 +13,11 @@ export function Card({
   const variants = {
     default: 'card-soft',
     elevated: cn(
-      'bg-bg-secondary border border-border/40 rounded-xl',
+      'bg-bg-secondary border border-border-op40 rounded-xl',
       'elevation-2',
     ),
     bordered: cn(
-      'bg-bg-secondary/50 border-2 border-border rounded-xl',
+      'bg-secondary-op50 border-2 border-border rounded-xl',
     ),
     soft: 'card-soft',
   }
@@ -49,7 +49,7 @@ export function Card({
 Card.Header = function CardHeader({ children, className, icon: Icon, iconColor = 'primary', title, subtitle, action }) {
   if (Icon || title) {
     return (
-      <div className={cn('flex items-start justify-between gap-3 p-4 pb-3 border-b border-border/30 section-header-gradient', className)}>
+      <div className={cn('flex items-start justify-between gap-3 p-4 pb-3 border-b border-border-op30 section-header-gradient', className)}>
         <div className="flex items-center gap-3">
           {Icon && (
             <IconBadge icon={Icon} color={iconColor} size="sm" rounded="lg" />
@@ -63,7 +63,7 @@ Card.Header = function CardHeader({ children, className, icon: Icon, iconColor =
       </div>
     )
   }
-  return <div className={cn('p-4 pb-3 border-b border-border/30', className)}>{children}</div>
+  return <div className={cn('p-4 pb-3 border-b border-border-op30', className)}>{children}</div>
 }
 
 Card.Body = function CardBody({ children, className }) {
@@ -72,7 +72,7 @@ Card.Body = function CardBody({ children, className }) {
 
 Card.Footer = function CardFooter({ children, className }) {
   return (
-    <div className={cn('px-4 py-3 border-t border-border/50 bg-bg-tertiary/30 rounded-b-xl', className)}>
+    <div className={cn('px-4 py-3 border-t border-border-op50 bg-tertiary-op30 rounded-b-xl', className)}>
       {children}
     </div>
   )

@@ -35,7 +35,7 @@ export function StatusFooter() {
   return (
     <div className={cn(
       'shrink-0 h-8 flex items-center justify-between',
-      'px-3 border-t border-border/50 bg-bg-secondary/40',
+      'px-3 border-t border-border-op50 bg-secondary-op40',
       'text-xs select-none',
     )}>
       {/* Left: Window controls */}
@@ -43,7 +43,7 @@ export function StatusFooter() {
         {windowCount > 0 ? (
           <>
             {/* Window count badge */}
-            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent-primary/10 mr-0.5">
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent-primary-op10 mr-0.5">
               <SquaresFour size={12} weight="duotone" className="text-accent-primary" />
               <span className="text-[11px] font-semibold text-accent-primary">{windowCount}</span>
             </div>
@@ -66,7 +66,7 @@ export function StatusFooter() {
 
             <button
               onClick={closeAll}
-              className="h-6 px-1.5 rounded flex items-center gap-1 text-text-secondary hover:text-status-danger hover:bg-status-danger/10 transition-colors"
+              className="h-6 px-1.5 rounded flex items-center gap-1 text-text-secondary hover:text-status-danger hover:bg-status-danger-op10 transition-colors"
               title={t('windows.closeAll', 'Close All')}
             >
               <X size={13} weight="bold" />

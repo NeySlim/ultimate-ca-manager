@@ -438,10 +438,10 @@ export default function PoliciesPage() {
       {/* Actions */}
       {canWrite('policies') && (
         <div className="border-t border-border pt-3 flex gap-2">
-          <Button size="sm" onClick={() => openEditModal(selectedPolicy)}>
+          <Button type="button" size="sm" onClick={() => openEditModal(selectedPolicy)}>
             <PencilSimple size={14} className="mr-1" /> {t('common.edit')}
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => handleToggle(selectedPolicy)}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => handleToggle(selectedPolicy)}>
             <Power size={14} className="mr-1" />
             {selectedPolicy.is_active ? t('policies.disable') : t('policies.enable')}
           </Button>
@@ -486,7 +486,7 @@ export default function PoliciesPage() {
         onStatClick={(stat) => setFilterStatus(prev => prev === stat.filterValue ? '' : stat.filterValue)}
         helpPageKey="policies"
         actions={canWrite('policies') ? (
-          <Button onClick={openCreateModal}>
+          <Button type="button" onClick={openCreateModal}>
             <Plus size={16} className="mr-1.5" /> {t('policies.createPolicy')}
           </Button>
         ) : null}
@@ -513,7 +513,7 @@ export default function PoliciesPage() {
           emptyTitle={t('policies.noPolicies')}
           emptyDescription={t('policies.noPoliciesDesc')}
           emptyAction={canWrite('policies') ? (
-            <Button onClick={openCreateModal} size="sm">
+            <Button type="button" onClick={openCreateModal} size="sm">
               <Plus size={14} className="mr-1" /> {t('policies.createPolicy')}
             </Button>
           ) : null}
@@ -626,7 +626,7 @@ export default function PoliciesPage() {
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
                       formData.rules.allowed_key_types?.includes(opt.value)
-                        ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
+                        ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
                         : 'bg-bg-secondary border-border text-text-muted hover:border-border-hover'
                     )}
                   >
@@ -734,10 +734,10 @@ export default function PoliciesPage() {
             {t('policies.deleteConfirm', { name: showDeleteConfirm?.name })}
           </p>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowDeleteConfirm(null)}>
+            <Button type="button" variant="secondary" onClick={() => setShowDeleteConfirm(null)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="danger" onClick={() => handleDelete(showDeleteConfirm)} disabled={actionInProgress}>
+            <Button type="button" variant="danger" onClick={() => handleDelete(showDeleteConfirm)} disabled={actionInProgress}>
               {actionInProgress ? <LoadingSpinner size="sm" /> : t('common.delete')}
             </Button>
           </div>

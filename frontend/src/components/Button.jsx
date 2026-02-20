@@ -24,8 +24,8 @@ export function Button({ children, variant = 'primary', size = 'sm', loading = f
     'danger-soft': 'btn-danger-soft',
     'warning-soft': 'btn-warning-soft',
     success: 'btn-gradient success text-white',
-    ghost: 'hover:bg-bg-tertiary/80 text-text-primary hover:text-text-primary transition-colors',
-    outline: 'border border-border bg-transparent text-text-primary hover:bg-bg-tertiary/60 hover:border-border-strong transition-all',
+    ghost: 'hover:bg-tertiary-op80 text-text-primary hover:text-text-primary transition-colors',
+    outline: 'border border-border bg-transparent text-text-primary hover:bg-tertiary-op60 hover:border-border-strong transition-all',
   }
   
   // Standardized sizes - sm is the default for content actions

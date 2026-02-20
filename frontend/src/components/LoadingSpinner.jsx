@@ -24,7 +24,7 @@ export function LoadingSpinner({ size = 'md', fullscreen = false, message }) {
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 bg-bg-primary/80 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-primary-op80 backdrop-blur-sm flex items-center justify-center z-50">
         {spinner}
       </div>
     )

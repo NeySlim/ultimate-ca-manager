@@ -192,12 +192,12 @@ export default function EmailTemplateWindow({ onClose }) {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {(isHtmlCustom || isTextCustom) && (
-              <Button variant="ghost" size="xs" onClick={handleReset}>
+              <Button type="button" variant="ghost" size="xs" onClick={handleReset}>
                 <ArrowCounterClockwise size={14} />
                 {t('settings.templateResetDefault')}
               </Button>
             )}
-            <Button variant="primary" size="xs" onClick={handleSave} disabled={saving || !dirty}>
+            <Button type="button" variant="primary" size="xs" onClick={handleSave} disabled={saving || !dirty}>
               {saving ? <ArrowsClockwise size={14} className="animate-spin" /> : <FloppyDisk size={14} />}
               {t('common.save')}
             </Button>

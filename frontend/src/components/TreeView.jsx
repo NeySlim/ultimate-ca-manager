@@ -32,7 +32,7 @@ function TreeNode({ node, level, onSelect, selectedId }) {
         className={cn(
           "flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group",
           isSelected 
-            ? "bg-accent-25 text-accent-primary border border-accent-primary/20 shadow-sm" 
+            ? "bg-accent-25 text-accent-primary border border-accent-primary-op20 shadow-sm" 
             : "hover:bg-bg-tertiary text-text-primary border border-transparent"
         )}
         style={{ paddingLeft: `${level * 20 + 8}px` }}

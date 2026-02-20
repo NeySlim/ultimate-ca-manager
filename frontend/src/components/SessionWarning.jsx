@@ -88,7 +88,7 @@ export function SessionWarning() {
     >
       <div className="p-4 text-center space-y-4">
         <div className="flex justify-center">
-          <div className="p-4 rounded-full bg-accent-warning/15">
+          <div className="p-4 rounded-full bg-accent-warning-op15">
             <Timer size={48} weight="duotone" className="text-accent-warning" />
           </div>
         </div>
@@ -107,10 +107,10 @@ export function SessionWarning() {
         </p>
         
         <div className="flex gap-3 justify-center pt-2">
-          <Button variant="secondary" onClick={logout}>
+          <Button type="button" variant="secondary" onClick={logout}>
             {t('session.logOutNow')}
           </Button>
-          <Button onClick={extendSession}>
+          <Button type="button" onClick={extendSession}>
             <ArrowsClockwise size={16} />
             {t('session.stayLoggedIn')}
           </Button>

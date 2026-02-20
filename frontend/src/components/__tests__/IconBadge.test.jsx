@@ -75,11 +75,14 @@ describe('IconBadge Component', () => {
   })
 
   it('applies neutral colors', () => {
-    const neutralColors = ['slate', 'neutral', 'muted']
+    const neutralColors = ['slate', 'neutral']
     neutralColors.forEach(color => {
       const { container } = render(<IconBadge icon={ShieldCheck} color={color} />)
       expect(container.firstChild.className).toContain('bg-bg-tertiary')
     })
+    // muted uses opacity variant
+    const { container } = render(<IconBadge icon={ShieldCheck} color="muted" />)
+    expect(container.firstChild.className).toContain('bg-tertiary-op50')
   })
 
   it('falls back to neutral for unknown color', () => {

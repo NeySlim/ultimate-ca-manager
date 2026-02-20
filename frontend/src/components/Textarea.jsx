@@ -31,12 +31,12 @@ export function Textarea({
       
       <textarea
         className={cn(
-          "w-full px-3 py-2 bg-bg-tertiary/80 border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
-          "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-tertiary",
+          "w-full px-3 py-2 bg-tertiary-op80 border rounded-md text-sm text-text-primary placeholder-text-secondary-op60",
+          "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "transition-all duration-200 resize-y",
-          "hover:border-text-secondary/50 hover:bg-bg-tertiary",
-          error && "border-accent-danger focus:ring-accent-danger/50",
+          "hover:border-secondary-op50 hover:bg-bg-tertiary",
+          error && "border-accent-danger focus:ring-accent-danger-op50",
           !error && "border-border"
         )}
         value={value}

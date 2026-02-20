@@ -45,13 +45,13 @@ export function SelectComponent({
       <Select.Root value={value} onValueChange={onChange} disabled={disabled}>
         <Select.Trigger
           className={cn(
-            "w-full flex items-center justify-between px-2.5 py-1.5 bg-bg-tertiary/80 border rounded-md text-sm",
-            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-tertiary",
+            "w-full flex items-center justify-between px-2.5 py-1.5 bg-tertiary-op80 border rounded-md text-sm",
+            "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-all duration-200",
-            "hover:border-text-secondary/50 hover:bg-bg-tertiary",
+            "hover:border-secondary-op50 hover:bg-bg-tertiary",
             error ? "border-accent-danger" : "border-border",
-            value ? "text-text-primary" : "text-text-secondary/60"
+            value ? "text-text-primary" : "text-secondary-op60"
           )}
         >
           <Select.Value placeholder={placeholder} />
@@ -62,7 +62,7 @@ export function SelectComponent({
 
         <Select.Portal>
           <Select.Content
-            className="bg-bg-secondary/95 backdrop-blur-md border border-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden z-50 animate-scaleIn"
+            className="bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl shadow-black/30 overflow-hidden z-50 animate-scaleIn"
             position="popper"
             sideOffset={4}
           >
@@ -71,7 +71,7 @@ export function SelectComponent({
                 <Select.Item
                   key={option.value}
                   value={option.value}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded-md cursor-pointer outline-none hover:bg-bg-tertiary/80 data-[highlighted]:bg-bg-tertiary/80 transition-colors duration-100"
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded-md cursor-pointer outline-none hover:bg-tertiary-op80 data-[highlighted]:bg-tertiary-op80 transition-colors duration-100"
                 >
                   <Select.ItemText>{option.label}</Select.ItemText>
                   <Select.ItemIndicator className="ml-auto">
@@ -177,13 +177,13 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
         disabled={disabled}
         onClick={() => { if (!disabled) { setOpen(prev => !prev); setTimeout(() => inputRef.current?.focus(), 0) } }}
         className={cn(
-          "w-full flex items-center justify-between px-2.5 py-1.5 bg-bg-tertiary/80 border rounded-md text-sm text-left",
-          "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-tertiary",
+          "w-full flex items-center justify-between px-2.5 py-1.5 bg-tertiary-op80 border rounded-md text-sm text-left",
+          "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary focus:bg-bg-tertiary",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "transition-all duration-200",
-          "hover:border-text-secondary/50 hover:bg-bg-tertiary",
+          "hover:border-secondary-op50 hover:bg-bg-tertiary",
           error ? "border-accent-danger" : "border-border",
-          value ? "text-text-primary" : "text-text-secondary/60"
+          value ? "text-text-primary" : "text-secondary-op60"
         )}
       >
         <span className="truncate">{selectedOption?.label || placeholder}</span>
@@ -193,9 +193,9 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
       {/* Dropdown */}
       {open && (
         <div className="relative z-50">
-          <div className="absolute top-0 left-0 w-full bg-bg-secondary/95 backdrop-blur-md border border-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden animate-scaleIn">
+          <div className="absolute top-0 left-0 w-full bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl shadow-black/30 overflow-hidden animate-scaleIn">
             {/* Search input */}
-            <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border/30">
+            <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border-op30">
               <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />
               <input
                 ref={inputRef}
@@ -227,7 +227,7 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
                     onMouseEnter={() => setHighlightIdx(idx)}
                     className={cn(
                       "w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded-md cursor-pointer text-left transition-colors duration-100",
-                      idx === highlightIdx && "bg-bg-tertiary/80",
+                      idx === highlightIdx && "bg-tertiary-op80",
                       option.value === value && "font-medium"
                     )}
                   >

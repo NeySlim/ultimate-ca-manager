@@ -615,24 +615,24 @@ export default function ACMEPage() {
   // Header actions
   const headerActions = (
     <>
-      <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+      <Button type="button" variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
         {t('common.refresh')}
       </Button>
       {activeTab === 'accounts' && canWrite('acme') && (
-        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+        <Button type="button" size="sm" onClick={() => setShowCreateModal(true)}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.newAccount')}</span>
         </Button>
       )}
       {activeTab === 'domains' && canWrite('acme') && (
-        <Button size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
+        <Button type="button" size="sm" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.addDomain')}</span>
         </Button>
       )}
       {activeTab === 'localdomains' && canWrite('acme') && (
-        <Button size="sm" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
+        <Button type="button" size="sm" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.addDomain')}</span>
         </Button>
@@ -643,7 +643,7 @@ export default function ACMEPage() {
   // Help content
   const helpContent = (
     <div className="p-4 space-y-4">
-      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary-op5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Database size={16} className="text-accent-primary" />
           {t('acme.statistics')}
@@ -704,7 +704,7 @@ export default function ACMEPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={Key}
-        iconClass={selectedAccount.status === 'valid' ? "bg-status-success/20" : "bg-bg-tertiary"}
+        iconClass={selectedAccount.status === 'valid' ? "bg-status-success-op20" : "bg-bg-tertiary"}
         title={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || t('acme.account')}
         subtitle={`ID: ${selectedAccount.account_id?.substring(0, 24)}...`}
         badge={
@@ -782,7 +782,7 @@ export default function ACMEPage() {
           </CompactSection>
 
           <CompactSection title={t('acme.accountId')} collapsible defaultOpen={false}>
-            <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-2 rounded">
+            <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded">
               {selectedAccount.account_id}
             </p>
           </CompactSection>
@@ -812,7 +812,7 @@ export default function ACMEPage() {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {orders.map((order, i) => (
-                <div key={i} className="p-3 bg-bg-tertiary/50 rounded-lg border border-border/50 hover:border-border transition-colors">
+                <div key={i} className="p-3 bg-tertiary-op50 rounded-lg border border-border-op50 hover:border-border transition-colors">
                   {/* Header: Domain + Status */}
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-sm font-medium text-text-primary truncate flex-1">
@@ -846,7 +846,7 @@ export default function ACMEPage() {
                       <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
                     </div>
                     {order.order_id && (
-                      <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border/30">
+                      <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border-op30">
                         <span className="text-text-tertiary">{t('acme.orderId')}</span>
                         <span className="text-text-tertiary font-mono text-[10px] truncate max-w-[180px]" title={order.order_id}>
                           {order.order_id}
@@ -868,7 +868,7 @@ export default function ACMEPage() {
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {challenges.map((ch, i) => (
-                <div key={i} className="p-2 bg-bg-tertiary/30 rounded text-xs space-y-1">
+                <div key={i} className="p-2 bg-tertiary-op30 rounded text-xs space-y-1">
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary" size="sm">{ch.type}</Badge>
                     <Badge 
@@ -901,12 +901,12 @@ export default function ACMEPage() {
       {/* Request Certificate Button */}
       <div className="flex flex-wrap items-center gap-2">
         {canWrite('acme') && (
-        <Button onClick={() => setShowRequestModal(true)}>
+        <Button type="button" onClick={() => setShowRequestModal(true)}>
           <Plus size={14} />
           {t('acme.requestCertificate')}
         </Button>
         )}
-        <Button variant="secondary" onClick={loadData}>
+        <Button type="button" variant="secondary" onClick={loadData}>
           <ArrowsClockwise size={14} />
           {t('common.refresh')}
         </Button>
@@ -977,7 +977,7 @@ export default function ACMEPage() {
                 />
               </CompactGrid>
               
-              <div className="p-3 bg-bg-tertiary/50 rounded-lg space-y-2">
+              <div className="p-3 bg-tertiary-op50 rounded-lg space-y-2">
                 <p className="text-xs font-medium text-text-secondary">{t('acme.proxyUsage')}</p>
                 <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono">
 {`certbot certonly \\
@@ -1009,7 +1009,7 @@ export default function ACMEPage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3 p-3 bg-bg-tertiary/30 rounded-lg">
+                <div className="space-y-3 p-3 bg-tertiary-op30 rounded-lg">
                   <Input
                     label={t('common.emailAddress')}
                     type="email"
@@ -1048,7 +1048,7 @@ export default function ACMEPage() {
       
       <div className="flex flex-wrap items-center gap-2">
         {canWrite('acme') && (
-        <Button onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
+        <Button type="button" onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
           <Plus size={14} />
           {t('common.addDnsProvider')}
         </Button>
@@ -1136,7 +1136,7 @@ export default function ACMEPage() {
             {t('acme.noDomainsDesc')}
           </p>
           {canWrite('acme') && (
-          <Button onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
+          <Button type="button" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
             <Plus size={14} />
             {t('acme.addDomain')}
           </Button>
@@ -1282,12 +1282,12 @@ export default function ACMEPage() {
           />
           
           {!acmeSettings.revoke_on_renewal && acmeSettings.superseded_count > 0 && (
-            <label className="flex items-center gap-3 cursor-pointer ml-7 p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer ml-7 p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
               <input
                 type="checkbox"
                 checked={revokeSuperseded}
                 onChange={(e) => setRevokeSuperseded(e.target.checked)}
-                className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-warning focus:ring-accent-warning/50"
+                className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-warning focus:ring-accent-warning-op50"
               />
               <div>
                 <p className="text-sm text-accent-warning font-medium">
@@ -1319,7 +1319,7 @@ export default function ACMEPage() {
       {/* Save Button */}
       {canWrite('acme') && (
       <div className="flex gap-2 pt-3 border-t border-border">
-        <Button onClick={handleSaveConfig} disabled={saving}>
+        <Button type="button" onClick={handleSaveConfig} disabled={saving}>
           <FloppyDisk size={14} />
           {saving ? t('common.saving') : t('common.saveConfiguration')}
         </Button>
@@ -1393,7 +1393,7 @@ export default function ACMEPage() {
         title: t('acme.noLocalDomains'),
         description: t('acme.noLocalDomainsDesc'),
         action: canWrite('acme') ? (
-          <Button onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
+          <Button type="button" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
             <Plus size={14} />
             {t('acme.addDomain')}
           </Button>
@@ -1426,7 +1426,7 @@ export default function ACMEPage() {
         title: t('acme.noAccounts'),
         description: searchQuery ? t('acme.noMatchingAccounts') : t('acme.noAccountsDesc'),
         action: !searchQuery && (
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button type="button" onClick={() => setShowCreateModal(true)}>
             <Plus size={14} />
             {t('acme.createAccount')}
           </Button>
@@ -1653,7 +1653,7 @@ export default function ACMEPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={ClockCounterClockwise}
-        iconClass={selectedCert.revoked ? "bg-status-error/20" : "bg-status-success/20"}
+        iconClass={selectedCert.revoked ? "bg-status-error-op20" : "bg-status-success-op20"}
         title={selectedCert.common_name}
         subtitle={`${t('common.issuer')}: ${selectedCert.issuer || t('acme.unknownCA')}`}
         badge={
@@ -1703,9 +1703,9 @@ export default function ACMEPage() {
       <CompactHeader
         icon={Certificate}
         iconClass={cn(
-          selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued' ? "bg-status-success/20" :
-          selectedClientOrder.status === 'invalid' ? "bg-status-error/20" :
-          selectedClientOrder.status === 'pending' ? "bg-status-warning/20" : "bg-bg-tertiary"
+          selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued' ? "bg-status-success-op20" :
+          selectedClientOrder.status === 'invalid' ? "bg-status-error-op20" :
+          selectedClientOrder.status === 'pending' ? "bg-status-warning-op20" : "bg-bg-tertiary"
         )}
         title={selectedClientOrder.primary_domain || selectedClientOrder.domains?.[0]}
         subtitle={`${selectedClientOrder.environment} • ${selectedClientOrder.challenge_type}`}
@@ -1757,7 +1757,7 @@ export default function ACMEPage() {
         <CompactSection title={t('acme.pendingChallenge')}>
           <div className="space-y-3">
             {Object.entries(selectedClientOrder.challenges).map(([domain, data]) => (
-              <div key={domain} className="p-2 bg-bg-tertiary/50 rounded-lg border border-border/50">
+              <div key={domain} className="p-2 bg-tertiary-op50 rounded-lg border border-border-op50">
                 <p className="text-sm font-medium text-text-primary mb-2">{domain}</p>
                 {selectedClientOrder.challenge_type === 'dns-01' && (
                   <div className="space-y-2 text-xs">
@@ -1774,7 +1774,7 @@ export default function ACMEPage() {
       {/* Error Message */}
       {selectedClientOrder.error_message && (
         <CompactSection title={t('common.error')}>
-          <div className="p-2 bg-status-error/10 border border-status-error/20 rounded-lg">
+          <div className="p-2 bg-status-error-op10 border border-status-error-op20 rounded-lg">
             <p className="text-sm text-status-error">{selectedClientOrder.error_message}</p>
           </div>
         </CompactSection>
@@ -1784,19 +1784,19 @@ export default function ACMEPage() {
       {(selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued') && selectedClientOrder.certificate_id && (
         <CompactSection title={t('acme.certificateActions')}>
           <div className="grid grid-cols-2 gap-2">
-            <Button size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', false)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', false)}>
               <DownloadSimple size={12} />
               {t('acme.downloadCert')}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', true)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', true)}>
               <LockKey size={12} />
               {t('acme.downloadWithKey')}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleViewCertificate(selectedClientOrder)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleViewCertificate(selectedClientOrder)}>
               <Eye size={12} />
               {t('common.viewCertificate')}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleRenewCertificate(selectedClientOrder)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleRenewCertificate(selectedClientOrder)}>
               <ArrowsClockwise size={12} />
               {t('acme.renewNow')}
             </Button>
@@ -1807,18 +1807,18 @@ export default function ACMEPage() {
       {/* Actions */}
       <div className="flex flex-wrap gap-2 pt-2">
         {selectedClientOrder.status === 'pending' && (
-          <Button size="sm" onClick={() => handleVerifyChallenge(selectedClientOrder)}>
+          <Button type="button" size="sm" onClick={() => handleVerifyChallenge(selectedClientOrder)}>
             <Play size={12} />
             {t('acme.verifyChallenge')}
           </Button>
         )}
         {selectedClientOrder.status === 'processing' && (
-          <Button size="sm" onClick={() => handleFinalizeOrder(selectedClientOrder)}>
+          <Button type="button" size="sm" onClick={() => handleFinalizeOrder(selectedClientOrder)}>
             <CheckCircle size={12} />
             {t('acme.finalize')}
           </Button>
         )}
-        <Button size="sm" variant="danger" onClick={() => handleDeleteClientOrder(selectedClientOrder)}>
+        <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteClientOrder(selectedClientOrder)}>
           <Trash size={12} />
           {t('common.delete')}
         </Button>
@@ -2054,7 +2054,7 @@ export default function ACMEPage() {
         title={t('acme.revokeSupersededConfirmTitle')}
       >
         <div className="p-4 space-y-4">
-          <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning/10 border border-accent-warning/30">
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30">
             <Warning size={20} className="text-accent-warning flex-shrink-0 mt-0.5" />
             <div className="text-sm">
               <p className="font-medium text-accent-warning">{t('common.warning')}</p>
@@ -2064,10 +2064,10 @@ export default function ACMEPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setShowRevokeConfirm(false)}>
+            <Button type="button" variant="ghost" onClick={() => setShowRevokeConfirm(false)}>
               {t('common.cancel')}
             </Button>
-            <Button variant="danger" onClick={handleConfirmRevokeSuperseded}>
+            <Button type="button" variant="danger" onClick={handleConfirmRevokeSuperseded}>
               {t('acme.revokeSupersededConfirmAction', { count: acmeSettings.superseded_count })}
             </Button>
           </div>
@@ -2212,7 +2212,7 @@ function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvir
           {t('acme.domains')} <span className="text-red-500">*</span>
         </label>
         <textarea
-          className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm resize-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary"
+          className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"
           value={formData.domains}
           onChange={(e) => setFormData(prev => ({ ...prev, domains: e.target.value }))}
           placeholder="example.com&#10;*.example.com&#10;sub.example.com"
@@ -2317,8 +2317,8 @@ function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
           "hover:scale-[1.03] hover:shadow-md",
           disabled && "opacity-50 cursor-not-allowed",
           isSelected
-            ? "border-accent-primary bg-accent-primary/10 ring-2 ring-accent-primary/40 shadow-sm"
-            : "border-border/50 bg-bg-tertiary/40 hover:border-text-secondary/40 hover:bg-bg-tertiary/70"
+            ? "border-accent-primary bg-accent-primary-op10 ring-2 ring-accent-primary-op40 shadow-sm"
+            : "border-border-op50 bg-tertiary-op40 hover:border-secondary-op40 hover:bg-tertiary-op70"
         )}
       >
         <span className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
@@ -2454,7 +2454,7 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
       
       {/* Dynamic credential fields based on provider type schema */}
       {selectedType?.credentials_schema?.length > 0 && (
-        <div className="space-y-3 p-3 bg-bg-tertiary/50 rounded-lg">
+        <div className="space-y-3 p-3 bg-tertiary-op50 rounded-lg">
           <p className="text-sm font-medium text-text-secondary">{t('acme.credentials')}</p>
           {selectedType.credentials_schema.map(field => {
             const hasExistingValue = existingCredentialKeys.includes(field.name)
@@ -2495,12 +2495,12 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
         </div>
       )}
       
-      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
         <input
           type="checkbox"
           checked={formData.is_default}
           onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary-op50"
         />
         <span className="text-sm text-text-primary">{t('acme.setAsDefault')}</span>
       </label>

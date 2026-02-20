@@ -15,7 +15,7 @@ export function EmptyState({
       {/* Decorative background circle */}
       <div className="relative mb-4">
         <div className="absolute inset-0 w-20 h-20 rounded-full bg-accent-25 -translate-x-2 -translate-y-2" />
-        <div className="relative w-16 h-16 rounded-2xl bg-bg-tertiary border border-border/50 flex items-center justify-center">
+        <div className="relative w-16 h-16 rounded-2xl bg-bg-tertiary border border-border-op50 flex items-center justify-center">
           <Icon size={28} className="text-accent-primary" weight="duotone" />
         </div>
       </div>
@@ -24,7 +24,7 @@ export function EmptyState({
         <p className="text-sm text-text-tertiary mb-4 max-w-sm">{description}</p>
       )}
       {action && (
-        <Button onClick={action.onClick} size="sm">
+        <Button type="button" onClick={action.onClick} size="sm">
           {action.label}
         </Button>
       )}

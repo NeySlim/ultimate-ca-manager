@@ -120,7 +120,7 @@ export function ExportModal({
                 className={cn(
                   'flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all',
                   format === f.key
-                    ? 'border-accent-primary bg-accent-primary/10 ring-1 ring-accent-primary/30'
+                    ? 'border-accent-primary bg-accent-primary-op10 ring-1 ring-accent-primary-op30'
                     : 'border-border hover:border-border-hover hover:bg-bg-secondary'
                 )}
               >
@@ -211,7 +211,7 @@ export function ExportModal({
                 autoFocus
                 className={cn(
                   'w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-bg-primary text-text-primary',
-                  'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary/50 focus:border-accent-primary'
+                  'placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary-op50 focus:border-accent-primary'
                 )}
               />
             </div>

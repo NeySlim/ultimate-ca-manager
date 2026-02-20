@@ -51,15 +51,15 @@ const colorStyles = {
   yellow: 'icon-bg-amber icon-text-amber', // alias
   
   // Semantic colors (use accent CSS vars)
-  primary: 'bg-accent-primary/15 text-accent-primary',
-  success: 'bg-accent-success/15 text-accent-success',
-  warning: 'bg-accent-warning/15 text-accent-warning',
-  danger: 'bg-accent-danger/15 text-accent-danger',
+  primary: 'bg-accent-primary-op15 text-accent-primary',
+  success: 'bg-accent-success-op15 text-accent-success',
+  warning: 'bg-accent-warning-op15 text-accent-warning',
+  danger: 'bg-accent-danger-op15 text-accent-danger',
   
   // Neutral
   slate: 'bg-bg-tertiary text-text-secondary',
   neutral: 'bg-bg-tertiary text-text-secondary',
-  muted: 'bg-bg-tertiary/50 text-text-tertiary',
+  muted: 'bg-tertiary-op50 text-text-tertiary',
 }
 
 export function IconBadge({

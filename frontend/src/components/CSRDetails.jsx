@@ -98,17 +98,17 @@ export function CSRDetails({
       
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || t('common.na')}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Hash size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keySize')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_size || t('common.na')}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
+        <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <FileText size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.signature_algorithm || t('common.na')}</div>
@@ -119,22 +119,22 @@ export function CSRDetails({
       {showActions && isPending && (
         <div className="flex gap-2 flex-wrap">
           {onSign && canWrite && (
-            <Button size="sm" variant="primary" onClick={onSign}>
+            <Button type="button" size="sm" variant="primary" onClick={onSign}>
               <Check size={14} /> {t('common.signCSR')}
             </Button>
           )}
           {onReject && canWrite && (
-            <Button size="sm" variant="danger" onClick={onReject}>
+            <Button type="button" size="sm" variant="danger" onClick={onReject}>
               <Trash size={14} /> {t('csrs.rejectCSR')}
             </Button>
           )}
           {onDownload && (
-            <Button size="sm" variant="secondary" onClick={onDownload}>
+            <Button type="button" size="sm" variant="secondary" onClick={onDownload}>
               <Download size={14} /> {t('csrs.downloadCSR')}
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
+            <Button type="button" size="sm" variant="danger" onClick={onDelete}>
               <Trash size={14} />
             </Button>
           )}
@@ -197,7 +197,7 @@ export function CSRDetails({
         <CompactSection title={t('details.csrPem')} collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
+              "text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {csr.pem}

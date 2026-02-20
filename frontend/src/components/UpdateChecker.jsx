@@ -94,7 +94,7 @@ export function UpdateChecker() {
       <Card className="p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className={`p-2 rounded-lg ${updateInfo?.update_available ? 'bg-accent-success/15' : 'bg-bg-tertiary'}`}>
+          <div className={`p-2 rounded-lg ${updateInfo?.update_available ? 'bg-accent-success-op15' : 'bg-bg-tertiary'}`}>
             {updateInfo?.update_available ? (
               <Rocket size={24} weight="duotone" className="text-accent-success" />
             ) : (
@@ -190,13 +190,13 @@ export function UpdateChecker() {
       
       {/* Release notes */}
       {updateInfo?.update_available && updateInfo?.release_notes && (
-        <div className="mt-4 pt-4 border-t border-border/50">
+        <div className="mt-4 pt-4 border-t border-border-op50">
           <details className="group">
             <summary className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer hover:text-text-primary">
               <Info size={14} />
               View Release Notes
             </summary>
-            <div className="mt-3 p-3 bg-bg-tertiary/50 rounded-lg text-sm text-text-secondary whitespace-pre-wrap max-h-48 overflow-y-auto">
+            <div className="mt-3 p-3 bg-tertiary-op50 rounded-lg text-sm text-text-secondary whitespace-pre-wrap max-h-48 overflow-y-auto">
               {updateInfo.release_notes}
             </div>
           </details>
@@ -204,7 +204,7 @@ export function UpdateChecker() {
       )}
       
       {/* Options */}
-      <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-4">
+      <div className="mt-4 pt-4 border-t border-border-op50 flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"

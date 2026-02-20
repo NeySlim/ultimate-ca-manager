@@ -192,20 +192,20 @@ export function BottomSheet({
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); cycleSnap('up') }}
-                    className="w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:bg-bg-primary/50"
+                    className="w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:bg-primary-op50"
                     disabled={currentSnap === snapPoints.length - 1}
                   >
                     <CaretUp size={16} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); cycleSnap('down') }}
-                    className="w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:bg-bg-primary/50"
+                    className="w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:bg-primary-op50"
                   >
                     <CaretDown size={16} />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleClose() }}
-                    className="w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:bg-bg-primary/50 ml-1"
+                    className="w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:bg-primary-op50 ml-1"
                   >
                     <X size={16} />
                   </button>

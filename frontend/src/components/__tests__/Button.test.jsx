@@ -10,7 +10,7 @@ describe('Button Component', () => {
 
   it('calls onClick when clicked', () => {
     const handleClick = vi.fn()
-    render(<Button onClick={handleClick}>Click</Button>)
+    render(<Button type="button" onClick={handleClick}>Click</Button>)
     
     fireEvent.click(screen.getByRole('button'))
     
@@ -24,7 +24,7 @@ describe('Button Component', () => {
 
   it('does not call onClick when disabled', () => {
     const handleClick = vi.fn()
-    render(<Button onClick={handleClick} disabled>Click</Button>)
+    render(<Button type="button" onClick={handleClick} disabled>Click</Button>)
     
     fireEvent.click(screen.getByRole('button'))
     
@@ -56,7 +56,7 @@ describe('Button Component', () => {
   it('renders ghost variant correctly', () => {
     render(<Button variant="ghost">Ghost</Button>)
     const button = screen.getByRole('button')
-    expect(button.className).toContain('hover:bg-bg-tertiary')
+    expect(button.className).toContain('hover:bg-tertiary-op80')
   })
 
   it('renders small size correctly', () => {

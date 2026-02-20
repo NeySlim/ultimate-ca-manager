@@ -415,7 +415,7 @@ export default function LoginPage() {
                       key={provider.id}
                       onClick={() => handleSSOLogin(provider)}
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary hover:border-accent/50 transition-all text-text-primary font-medium"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-bg-secondary hover:bg-bg-tertiary hover:border-accent-op50 transition-all text-text-primary font-medium"
                     >
                       <span className="text-lg">{provider.icon || getSSOIcon(provider)}</span>
                       <span>{provider.display_name || provider.name}</span>
@@ -438,11 +438,11 @@ export default function LoginPage() {
                 <button
                   onClick={handleContinue}
                   disabled={loading}
-                  className="w-full text-left relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4 hover:border-accent/50 hover:shadow-lg transition-all group"
+                  className="w-full text-left relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4 hover:border-accent-op50 hover:shadow-lg transition-all group"
                 >
-                  <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent/10 transition-colors" />
+                  <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent-op10 transition-colors" />
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent-op70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                       <User size={20} className="text-white sm:hidden" weight="bold" />
                       <User size={24} className="text-white hidden sm:block" weight="bold" />
                     </div>
@@ -455,7 +455,7 @@ export default function LoginPage() {
                     </div>
                   </div>
                   {loading && (
-                    <div className="absolute inset-0 bg-bg-primary/50 flex items-center justify-center rounded-xl">
+                    <div className="absolute inset-0 bg-primary-op50 flex items-center justify-center rounded-xl">
                       <LoadingSpinner size="md" />
                     </div>
                   )}
@@ -517,9 +517,9 @@ export default function LoginPage() {
           <div className="space-y-3 sm:space-y-5">
             {/* User identity card - modern design */}
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
-              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent-op70 flex items-center justify-center shadow-lg">
                   <User size={20} className="text-white sm:hidden" weight="bold" />
                   <User size={24} className="text-white hidden sm:block" weight="bold" />
                 </div>
@@ -529,7 +529,7 @@ export default function LoginPage() {
                 </div>
                 <button
                   onClick={handleChangeUser}
-                  className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all"
+                  className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent hover:bg-accent-op10 rounded-lg transition-all"
                   disabled={loading}
                 >
                   {t('common.change')}
@@ -623,7 +623,7 @@ export default function LoginPage() {
                   <div className="text-center">
                     <Link
                       to="/forgot-password"
-                      className="text-sm text-accent hover:text-accent/80 hover:underline transition-colors"
+                      className="text-sm text-accent hover:text-accent-op80 hover:underline transition-colors"
                     >
                       {t('auth.forgotPassword')}
                     </Link>
@@ -687,9 +687,9 @@ export default function LoginPage() {
           <div className="space-y-3 sm:space-y-5">
             {/* Provider header */}
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
-              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg text-xl">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent-op70 flex items-center justify-center shadow-lg text-xl">
                   {selectedLdapProvider.icon || getSSOIcon(selectedLdapProvider)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -787,7 +787,7 @@ export default function LoginPage() {
                         className={cn(
                           "w-full px-2 py-1.5 text-left text-sm rounded flex items-center gap-2",
                           "hover:bg-bg-tertiary transition-colors",
-                          currentLang.code === lang.code && "text-accent-primary bg-accent-primary/10"
+                          currentLang.code === lang.code && "text-accent-primary bg-accent-primary-op10"
                         )}
                       >
                         <span>{lang.flag}</span>
@@ -823,7 +823,7 @@ export default function LoginPage() {
                         className={cn(
                           "w-full px-2 py-1.5 text-left text-sm rounded flex items-center gap-2",
                           "hover:bg-bg-tertiary transition-colors",
-                          themeFamily === theme.id && "text-accent-primary bg-accent-primary/10"
+                          themeFamily === theme.id && "text-accent-primary bg-accent-primary-op10"
                         )}
                       >
                         <div 
@@ -850,7 +850,7 @@ export default function LoginPage() {
                         className={cn(
                           "w-full px-2 py-1.5 text-left text-sm rounded",
                           "hover:bg-bg-tertiary transition-colors",
-                          mode === opt.id && "text-accent-primary bg-accent-primary/10"
+                          mode === opt.id && "text-accent-primary bg-accent-primary-op10"
                         )}
                       >
                         {t(opt.labelKey)}

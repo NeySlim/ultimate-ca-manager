@@ -338,7 +338,7 @@ export default function TemplatesPage() {
     <div className="p-3 space-y-4">
       <CompactHeader
         icon={FileText}
-        iconClass={selectedTemplate.type === 'ca' ? "bg-accent-warning/20" : "bg-accent-primary/20"}
+        iconClass={selectedTemplate.type === 'ca' ? "bg-accent-warning-op20" : "bg-accent-primary-op20"}
         title={selectedTemplate.name}
         subtitle={t('templates.certificatesIssued', { count: selectedTemplate.usage_count || 0 })}
         badge={
@@ -350,24 +350,24 @@ export default function TemplatesPage() {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" onClick={() => setShowPreviewModal(true)}>
+        <Button type="button" size="sm" variant="secondary" onClick={() => setShowPreviewModal(true)}>
           <Eye size={14} /> {t('common.details')}
         </Button>
         {canWrite('templates') && (
           <>
-            <Button size="sm" variant="secondary" onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}>
               <PencilSimple size={14} /> {t('common.edit')}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(selectedTemplate)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(selectedTemplate)}>
               <Copy size={14} /> {t('common.copy')}
             </Button>
           </>
         )}
-        <Button size="sm" variant="secondary" onClick={() => handleExportTemplate(selectedTemplate)}>
+        <Button type="button" size="sm" variant="secondary" onClick={() => handleExportTemplate(selectedTemplate)}>
           <Download size={14} /> {t('common.export')}
         </Button>
         {canDelete('templates') && (
-          <Button size="sm" variant="danger" onClick={() => handleDeleteTemplate(selectedTemplate)}>
+          <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteTemplate(selectedTemplate)}>
             <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
@@ -460,16 +460,16 @@ export default function TemplatesPage() {
           ]}
           toolbarActions={canWrite('templates') && (
             isMobile ? (
-              <Button size="lg" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }} className="w-11 h-11 p-0">
+              <Button type="button" size="lg" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }} className="w-11 h-11 p-0">
                 <Plus size={22} weight="bold" />
               </Button>
             ) : (
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
+                <Button type="button" size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
                   <Plus size={14} weight="bold" />
                   {t('templates.new')}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
                   <FileArrowUp size={14} />
                   {t('common.import')}
                 </Button>
@@ -489,7 +489,7 @@ export default function TemplatesPage() {
           emptyTitle={t('templates.noTemplates')}
           emptyDescription={t('templates.noTemplatesDescription')}
           emptyAction={canWrite('templates') && (
-            <Button onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
+            <Button type="button" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
               <Plus size={16} /> {t('templates.createTemplate')}
             </Button>
           )}
@@ -529,7 +529,7 @@ export default function TemplatesPage() {
               type="file"
               accept=".json"
               onChange={(e) => { setImportFile(e.target.files[0]); setImportJson('') }}
-              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary-op80"
             />
           </div>
           
@@ -551,8 +551,8 @@ export default function TemplatesPage() {
           </div>
           
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setShowImportModal(false)}>{t('common.cancel')}</Button>
-            <Button onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
+            <Button type="button" variant="secondary" onClick={() => setShowImportModal(false)}>{t('common.cancel')}</Button>
+            <Button type="button" onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
               {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
               {t('templates.importTemplate')}
             </Button>

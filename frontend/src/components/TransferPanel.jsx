@@ -36,8 +36,8 @@ function TransferItem({ item, renderItem, onAction, actionIcon: ActionIcon, acti
         onClick={(e) => { e.stopPropagation(); onAction(item.id) }}
         className={cn(
           "p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100",
-          actionVariant === 'add' && "text-accent-success hover:bg-accent-success/10",
-          actionVariant === 'remove' && "text-accent-danger hover:bg-accent-danger/10"
+          actionVariant === 'add' && "text-accent-success hover:bg-accent-success-op10",
+          actionVariant === 'remove' && "text-accent-danger hover:bg-accent-danger-op10"
         )}
       >
         <ActionIcon size={16} weight="bold" />
@@ -170,13 +170,13 @@ export function TransferPanel({
         <div
           className={cn(
             "flex-1 flex flex-col border rounded-xl overflow-hidden transition-colors min-w-0",
-            dragOver === 'available' ? "border-accent-primary bg-accent-primary/5" : "border-border"
+            dragOver === 'available' ? "border-accent-primary bg-accent-primary-op5" : "border-border"
           )}
           onDragOver={(e) => handleDragOver(e, 'available')}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, 'available')}
         >
-          <div className="px-3 py-2.5 bg-bg-secondary/50 border-b border-border space-y-2 shrink-0">
+          <div className="px-3 py-2.5 bg-secondary-op50 border-b border-border space-y-2 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <LeftIcon size={16} className="text-text-tertiary" />
@@ -211,19 +211,19 @@ export function TransferPanel({
 
         {/* Center: Transfer buttons */}
         <div className="flex flex-col items-center justify-center gap-1.5 px-1 shrink-0">
-          <Button size="sm" variant="secondary" onClick={addAll} disabled={availableItems.length === 0}
+          <Button type="button" size="sm" variant="secondary" onClick={addAll} disabled={availableItems.length === 0}
             title={t('operations.addAll', 'Add all')} className="w-8 h-8 p-0">
             <CaretDoubleRight size={14} />
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => {}}
+          <Button type="button" size="sm" variant="secondary" onClick={() => {}}
             disabled title="" className="w-8 h-8 p-0 invisible">
             <CaretRight size={14} />
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => {}}
+          <Button type="button" size="sm" variant="secondary" onClick={() => {}}
             disabled title="" className="w-8 h-8 p-0 invisible">
             <CaretLeft size={14} />
           </Button>
-          <Button size="sm" variant="secondary" onClick={removeAll} disabled={totalBasket === 0}
+          <Button type="button" size="sm" variant="secondary" onClick={removeAll} disabled={totalBasket === 0}
             title={t('operations.removeAll', 'Remove all')} className="w-8 h-8 p-0">
             <CaretDoubleLeft size={14} />
           </Button>
@@ -233,14 +233,14 @@ export function TransferPanel({
         <div
           className={cn(
             "flex-1 flex flex-col border rounded-xl overflow-hidden transition-colors min-w-0",
-            dragOver === 'basket' ? "border-accent-primary bg-accent-primary/5" : "border-border",
-            totalBasket > 0 && "border-accent-primary/30"
+            dragOver === 'basket' ? "border-accent-primary bg-accent-primary-op5" : "border-border",
+            totalBasket > 0 && "border-accent-primary-op30"
           )}
           onDragOver={(e) => handleDragOver(e, 'basket')}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, 'basket')}
         >
-          <div className="px-3 py-2.5 bg-bg-secondary/50 border-b border-border space-y-2 shrink-0">
+          <div className="px-3 py-2.5 bg-secondary-op50 border-b border-border space-y-2 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <RightIcon size={16} className={totalBasket > 0 ? "text-accent-primary" : "text-text-tertiary"} />
@@ -248,7 +248,7 @@ export function TransferPanel({
               </div>
               <span className={cn(
                 "text-xs font-medium px-2 py-0.5 rounded-full",
-                totalBasket > 0 ? "bg-accent-primary/20 text-accent-primary" : "bg-bg-tertiary text-text-secondary"
+                totalBasket > 0 ? "bg-accent-primary-op20 text-accent-primary" : "bg-bg-tertiary text-text-secondary"
               )}>
                 {totalBasket}
               </span>
@@ -258,7 +258,7 @@ export function TransferPanel({
           <div className="flex-1 overflow-auto p-1.5 space-y-0.5">
             {basketItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <ShoppingCart size={32} className="text-text-tertiary/50" />
+                <ShoppingCart size={32} className="text-tertiary-op50" />
                 <p className="text-xs text-text-tertiary text-center">{emptyRight}</p>
               </div>
             ) : (
@@ -282,7 +282,7 @@ export function TransferPanel({
 
       {/* Bottom: Bulk action buttons */}
       {totalBasket > 0 && bulkActions && (
-        <div className="shrink-0 flex items-center justify-between px-3 py-2.5 mt-2 rounded-xl border border-border bg-bg-secondary/50">
+        <div className="shrink-0 flex items-center justify-between px-3 py-2.5 mt-2 rounded-xl border border-border bg-secondary-op50">
           <span className="text-sm text-text-secondary">
             {totalBasket} {t('operations.itemsSelected', 'item(s) selected')}
           </span>

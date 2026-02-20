@@ -47,7 +47,7 @@ export default function ForgotPasswordPage() {
           {sent ? (
             <div className="text-center space-y-4">
               <div className="flex justify-center">
-                <div className="p-4 rounded-full bg-accent-success/15">
+                <div className="p-4 rounded-full bg-accent-success-op15">
                   <CheckCircle size={48} weight="duotone" className="text-accent-success" />
                 </div>
               </div>
@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
                 <p className="text-xs text-text-tertiary">
                   Didn't receive an email? Check your spam folder or try again.
                 </p>
-                <Button variant="secondary" onClick={() => setSent(false)} className="w-full">
+                <Button type="button" variant="secondary" onClick={() => setSent(false)} className="w-full">
                   Try Another Email
                 </Button>
               </div>

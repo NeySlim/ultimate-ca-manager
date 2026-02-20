@@ -382,7 +382,7 @@ export function DetailField({
  * DetailDivider - Section separator (subtle)
  */
 export function DetailDivider({ className }) {
-  return <div className={cn("h-px bg-border/30 my-1", className)} />
+  return <div className={cn("h-px bg-border-op30 my-1", className)} />
 }
 
 /**
@@ -411,7 +411,7 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
   const { isMobile } = useMobile()
   
   return (
-    <div className={cn("border-b border-border bg-bg-secondary/30", className)}>
+    <div className={cn("border-b border-border bg-secondary-op30", className)}>
       <div className={cn(
         "flex",
         isMobile ? "overflow-x-auto scrollbar-hide gap-0 px-4" : "gap-0 px-6"
@@ -424,8 +424,8 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
               "flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap",
               "border-b-2 transition-all -mb-px",
               activeTab === tab.id
-                ? "border-accent-primary text-accent-primary bg-accent-primary/5"
-                : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+                ? "border-accent-primary text-accent-primary bg-accent-primary-op5"
+                : "border-transparent text-text-secondary hover:text-text-primary hover:bg-tertiary-op50"
             )}
           >
             {tab.icon && <tab.icon size={16} />}
@@ -433,7 +433,7 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
             {tab.count !== undefined && (
               <span className={cn(
                 "ml-1 px-1.5 py-0.5 rounded text-xs",
-                activeTab === tab.id ? "bg-accent-primary/20" : "bg-bg-tertiary"
+                activeTab === tab.id ? "bg-accent-primary-op20" : "bg-bg-tertiary"
               )}>
                 {tab.count}
               </span>
@@ -470,7 +470,7 @@ export function CompactSection({ title, children, className, collapsible = false
         className={cn(
           "w-full px-3 py-2 flex items-center justify-between text-left relative",
           "section-header-gradient",
-          "border-b border-border/30",
+          "border-b border-border-op30",
           collapsible && "cursor-pointer transition-all",
           !collapsible && "cursor-default"
         )}
@@ -574,11 +574,11 @@ export function CompactField({
     return (
       <div className={cn(
         "flex items-start gap-2 group p-1.5 -m-1.5 rounded-md transition-colors duration-150",
-        "hover:bg-bg-tertiary/30",
+        "hover:bg-tertiary-op30",
         colSpan && `col-span-${colSpan}`,
         className
       )}>
-        <div className="w-5 h-5 rounded bg-bg-tertiary/50 flex items-center justify-center shrink-0 mt-0.5">
+        <div className="w-5 h-5 rounded bg-tertiary-op50 flex items-center justify-center shrink-0 mt-0.5">
           <Icon size={11} className="text-text-tertiary" />
         </div>
         <div className="min-w-0 flex-1">
@@ -639,7 +639,7 @@ export function CompactStats({ stats, className }) {
   return (
     <div className={cn(
       "flex items-center justify-between text-xs",
-      "bg-bg-tertiary/50 rounded-lg px-3 py-2 border border-border",
+      "bg-tertiary-op50 rounded-lg px-3 py-2 border border-border",
       className
     )}>
       {stats.map((stat, i) => (
@@ -684,7 +684,7 @@ export function CompactHeader({
       {Icon && (
         <div className={cn(
           "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-          iconClass || "bg-accent-primary/20"
+          iconClass || "bg-accent-primary-op20"
         )}>
           <Icon size={20} className="text-accent-primary" />
         </div>

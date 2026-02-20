@@ -493,7 +493,7 @@ export default function UsersGroupsPage() {
     <div className="p-3 space-y-4">
       <CompactHeader
         icon={UserCircle}
-        iconClass={selectedUser.active ? "bg-accent-primary/20" : "bg-text-muted/20"}
+        iconClass={selectedUser.active ? "bg-accent-primary-op20" : "bg-text-muted-op20"}
         title={selectedUser.username}
         subtitle={selectedUser.email}
         badge={
@@ -507,20 +507,20 @@ export default function UsersGroupsPage() {
       <div className="flex flex-wrap gap-2">
         {canWrite('users') && (
           <>
-            <Button size="sm" variant="secondary" onClick={() => { setEditingUser(selectedUser); setShowUserModal(true) }}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingUser(selectedUser); setShowUserModal(true) }}>
               <PencilSimple size={14} /> {t('common.edit')}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleToggleUser(selectedUser)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleToggleUser(selectedUser)}>
               {selectedUser.active ? <XCircle size={14} /> : <CheckCircle size={14} />}
               {selectedUser.active ? t('common.deactivate') : t('users.activate')}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
               <Key size={14} /> {t('users.resetPassword')}
             </Button>
           </>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger-soft" onClick={() => handleDeleteUser(selectedUser)}>
+          <Button type="button" size="sm" variant="danger-soft" onClick={() => handleDeleteUser(selectedUser)}>
             <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
@@ -557,7 +557,7 @@ export default function UsersGroupsPage() {
     <div className="p-3 space-y-4">
       <CompactHeader
         icon={Users}
-        iconClass="bg-accent-primary/20"
+        iconClass="bg-accent-primary-op20"
         title={selectedGroup.name}
         subtitle={t('groups.memberCount', { count: selectedGroup.members?.length || 0 })}
       />
@@ -565,12 +565,12 @@ export default function UsersGroupsPage() {
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
         {canWrite('users') && (
-          <Button size="sm" variant="secondary" onClick={() => { setEditingGroup(selectedGroup); setShowGroupModal(true) }}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingGroup(selectedGroup); setShowGroupModal(true) }}>
             <PencilSimple size={14} /> {t('common.edit')}
           </Button>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger-soft" onClick={() => handleDeleteGroup(selectedGroup)}>
+          <Button type="button" size="sm" variant="danger-soft" onClick={() => handleDeleteGroup(selectedGroup)}>
             <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
@@ -589,7 +589,7 @@ export default function UsersGroupsPage() {
           {/* Manage Members Button */}
           {canWrite('users') && (
             <div className="flex justify-end">
-              <Button size="sm" onClick={() => setShowMemberModal(true)}>
+              <Button type="button" size="sm" onClick={() => setShowMemberModal(true)}>
                 <Users size={14} /> {t('groups.members')}
               </Button>
             </div>
@@ -605,9 +605,9 @@ export default function UsersGroupsPage() {
               {selectedGroup.members.slice(0, 5).map(member => (
                 <div
                   key={member.id || member.user_id || member.username}
-                  className="flex items-center gap-3 px-3 py-2 bg-bg-tertiary/50 border border-border rounded-lg"
+                  className="flex items-center gap-3 px-3 py-2 bg-tertiary-op50 border border-border rounded-lg"
                 >
-                  <div className="w-7 h-7 rounded-full bg-accent-primary/20 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-full bg-accent-primary-op20 flex items-center justify-center">
                     <User size={14} className="text-accent-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -625,7 +625,7 @@ export default function UsersGroupsPage() {
               {selectedGroup.members.length > 5 && (
                 <button
                   onClick={() => setShowMemberModal(true)}
-                  className="w-full text-sm text-accent-primary hover:text-accent-primary/80 py-2"
+                  className="w-full text-sm text-accent-primary hover:text-accent-primary-op80 py-2"
                 >
                   + {selectedGroup.members.length - 5} {t('groups.members')}
                 </button>
@@ -742,11 +742,11 @@ export default function UsersGroupsPage() {
           ] : []}
           toolbarActions={canWrite('users') && (
             isMobile ? (
-              <Button size="lg" onClick={handleOpenCreateModal} className="w-11 h-11 p-0">
+              <Button type="button" size="lg" onClick={handleOpenCreateModal} className="w-11 h-11 p-0">
                 <Plus size={22} weight="bold" />
               </Button>
             ) : (
-              <Button size="sm" onClick={handleOpenCreateModal}>
+              <Button type="button" size="sm" onClick={handleOpenCreateModal}>
                 <Plus size={14} weight="bold" />
                 {activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
               </Button>
@@ -765,7 +765,7 @@ export default function UsersGroupsPage() {
           emptyTitle={activeTab === 'users' ? t('users.noUsers') : t('groups.noGroups')}
           emptyDescription={activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
           emptyAction={canWrite('users') && (
-            <Button onClick={handleOpenCreateModal}>
+            <Button type="button" onClick={handleOpenCreateModal}>
               <Plus size={16} /> {activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
             </Button>
           )}

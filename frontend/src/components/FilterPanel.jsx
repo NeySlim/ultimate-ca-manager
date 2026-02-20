@@ -81,7 +81,7 @@ function FilterDate({ value, onChange, placeholder, isMobile }) {
       placeholder={placeholder}
       className={cn(
         "w-full bg-bg-tertiary border border-border rounded text-text-primary",
-        "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary",
+        "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary",
         "transition-colors",
         isMobile ? "h-11 px-3 text-base" : "h-8 px-2.5 text-sm"
       )}
@@ -102,7 +102,7 @@ function FilterText({ value, onChange, placeholder, isMobile }) {
       className={cn(
         "w-full bg-bg-tertiary border border-border rounded text-text-primary",
         "placeholder:text-text-tertiary",
-        "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary",
+        "focus:outline-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary",
         "transition-colors",
         isMobile ? "h-11 px-3 text-base" : "h-8 px-2.5 text-sm"
       )}
@@ -261,7 +261,7 @@ export function FilterPanel({
               key={i} 
               className={cn(
                 "text-center rounded-lg",
-                isMobile ? "bg-bg-tertiary p-3" : "bg-bg-tertiary/50 p-2"
+                isMobile ? "bg-bg-tertiary p-3" : "bg-tertiary-op50 p-2"
               )}
             >
               {Icon && (
@@ -316,8 +316,8 @@ export function FilterPanel({
                   "inline-flex items-center gap-1.5 rounded-full transition-colors",
                   isMobile ? "px-3 py-2 text-sm" : "px-2.5 py-1 text-xs",
                   qf.active
-                    ? "bg-accent-primary/15 text-accent-primary border border-accent-primary/30"
-                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/80 border border-transparent"
+                    ? "bg-accent-primary-op15 text-accent-primary border border-accent-primary-op30"
+                    : "bg-bg-tertiary text-text-secondary hover:text-text-primary hover:bg-tertiary-op80 border border-transparent"
                 )}
               >
                 {Icon && <Icon size={isMobile ? 16 : 12} />}
@@ -497,7 +497,7 @@ export function FilterChips({
         return (
           <span
             key={f.key}
-            className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-primary/10 text-accent-primary rounded text-xs"
+            className="inline-flex items-center gap-1 px-2 py-0.5 bg-accent-primary-op10 text-accent-primary rounded text-xs"
           >
             <span className="text-text-tertiary">{f.label}:</span>
             <span className="font-medium">{displayValue}</span>
@@ -505,7 +505,7 @@ export function FilterChips({
               <button
                 type="button"
                 onClick={() => onRemove(f.key)}
-                className="ml-0.5 hover:text-accent-primary/70 focus:outline-none"
+                className="ml-0.5 hover:text-accent-primary-op70 focus:outline-none"
                 aria-label={`Remove ${f.label} filter`}
               >
                 <X size={12} />

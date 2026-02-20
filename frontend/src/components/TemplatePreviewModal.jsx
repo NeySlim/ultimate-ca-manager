@@ -10,7 +10,7 @@ import { cn } from '../lib/utils'
 // Preview field component
 function PreviewField({ label, value, icon: Icon, mono = false, badge = false }) {
   return (
-    <div className="flex items-start gap-3 py-2 border-b border-border/30 last:border-0">
+    <div className="flex items-start gap-3 py-2 border-b border-border-op30 last:border-0">
       {Icon && (
         <div className="w-6 h-6 rounded flex items-center justify-center icon-bg-blue shrink-0 mt-0.5">
           <Icon size={14} className="text-accent-primary" />
@@ -85,7 +85,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
         </div>
         
         {/* Preview info banner */}
-        <div className="flex items-center gap-2 p-2 mb-4 rounded-lg bg-accent-primary/10 border border-accent-primary/20">
+        <div className="flex items-center gap-2 p-2 mb-4 rounded-lg bg-accent-primary-op10 border border-accent-primary-op20">
           <Eye size={16} className="text-accent-primary" />
           <span className="text-xs text-text-secondary">
             {t('templates.previewDescription')}

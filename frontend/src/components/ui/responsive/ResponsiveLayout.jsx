@@ -220,7 +220,7 @@ export function ResponsiveLayout({
       
       {/* MOBILE ONLY (< 768px): Horizontal tabs bar (non-sidebar mode) */}
       {!showInlineHeader && !useSidebar && tabs && tabs.length > 0 && (
-        <div className="shrink-0 border-b border-border/50 bg-bg-secondary/50 overflow-x-auto scrollbar-hide px-2">
+        <div className="shrink-0 border-b border-border-op50 bg-secondary-op50 overflow-x-auto scrollbar-hide px-2">
           <div className="flex gap-0.5 min-w-max">
             {tabs.map((tab) => {
               const TabIcon = tab.icon
@@ -242,7 +242,7 @@ export function ResponsiveLayout({
                   {tab.count !== undefined && (
                     <span className={cn(
                       'px-1 py-0.5 rounded text-2xs',
-                      isActive ? 'bg-accent-primary/15' : 'bg-bg-tertiary'
+                      isActive ? 'bg-accent-primary-op15' : 'bg-bg-tertiary'
                     )}>
                       {tab.count}
                     </span>
@@ -302,7 +302,7 @@ export function ResponsiveLayout({
           <div className="flex-1 flex flex-col overflow-hidden">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="shrink-0 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-accent-primary border-b border-border/50 bg-bg-secondary/30"
+              className="shrink-0 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-accent-primary border-b border-border-op50 bg-secondary-op30"
             >
               <ArrowLeft size={16} />
               {(() => {
@@ -343,7 +343,7 @@ export function ResponsiveLayout({
             ref={panelRef}
             style={{ width: panelWidth }}
             className={cn(
-              'shrink-0 overflow-hidden bg-bg-secondary/30 relative',
+              'shrink-0 overflow-hidden bg-secondary-op30 relative',
               isResizing && 'select-none'
             )}
           >
@@ -480,8 +480,8 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
           className={cn(
             "w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-all text-left",
             isActive
-              ? "bg-accent-primary/10 text-accent-primary font-medium border-l-2 border-accent-primary -ml-px"
-              : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+              ? "bg-accent-primary-op10 text-accent-primary font-medium border-l-2 border-accent-primary -ml-px"
+              : "text-text-secondary hover:text-text-primary hover:bg-tertiary-op50"
           )}
         >
           {TabIcon && (
@@ -493,7 +493,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
           {tab.count !== undefined && (
             <span className={cn(
               'ml-auto px-1.5 py-0.5 rounded-full text-2xs font-medium shrink-0',
-              isActive ? 'bg-accent-primary/15 text-accent-primary' : 'bg-bg-tertiary text-text-tertiary'
+              isActive ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-bg-tertiary text-text-tertiary'
             )}>
               {tab.count}
             </span>
@@ -505,7 +505,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
 
   if (tabGroups) {
     return (
-      <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/30 p-3 space-y-5">
+      <nav className="shrink-0 w-[220px] border-r border-border-op50 overflow-y-auto bg-secondary-op30 p-3 space-y-5">
         {tabGroups.map((group, i) => (
           <div key={i}>
             {group.labelKey && (
@@ -523,7 +523,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
   }
 
   return (
-    <nav className="shrink-0 w-[220px] border-r border-border/50 overflow-y-auto bg-bg-secondary/30 p-3">
+    <nav className="shrink-0 w-[220px] border-r border-border-op50 overflow-y-auto bg-secondary-op30 p-3">
       <div className="space-y-0.5">
         {renderTabs(tabs.map(t => t.id))}
       </div>
@@ -545,9 +545,9 @@ function MobileSidebarMenu({ tabs, tabGroups, activeTab, onTabChange, t }) {
         onClick={() => onTabChange?.(tab.id)}
         className={cn(
           "w-full flex items-center gap-3 px-4 py-3.5 text-sm transition-all",
-          "border-b border-border/30",
+          "border-b border-border-op30",
           isActive
-            ? "bg-accent-primary/5 text-accent-primary font-medium"
+            ? "bg-accent-primary-op5 text-accent-primary font-medium"
             : "text-text-primary active:bg-bg-tertiary"
         )}
       >
@@ -569,7 +569,7 @@ function MobileSidebarMenu({ tabs, tabGroups, activeTab, onTabChange, t }) {
 
   if (tabGroups) {
     return (
-      <div className="divide-y divide-border/30">
+      <div className="divide-y divide-border-op30">
         {tabGroups.map((group, i) => (
           <div key={i}>
             {group.labelKey && (
@@ -612,7 +612,7 @@ function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
   if (isMobile) {
     // Mobile: Premium pill-style stats with colored backgrounds
     return (
-      <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-bg-secondary/20">
+      <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-none border-b border-border-op30 bg-secondary-op20">
         {stats.map((stat, i) => {
           const isActive = activeStatFilter && stat.filterValue === activeStatFilter
           const isClickable = onStatClick && stat.filterValue !== undefined
@@ -664,8 +664,8 @@ function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
             key={i} 
             className={cn(
               "rich-stat-item",
-              isClickable && "cursor-pointer hover:bg-bg-tertiary/50 rounded-lg transition-colors",
-              isActive && "ring-2 ring-accent-primary/50 bg-accent-primary/10"
+              isClickable && "cursor-pointer hover:bg-tertiary-op50 rounded-lg transition-colors",
+              isActive && "ring-2 ring-accent-primary-op50 bg-accent-primary-op10"
             )}
             onClick={() => isClickable && onStatClick(stat.filterValue)}
             title={isClickable ? `Click to filter by ${stat.label}` : undefined}
@@ -701,7 +701,7 @@ function DesktopSlideOver({ title, width, onClose, children }) {
   
   return (
     <aside className={cn(
-      'shrink-0 border-l border-border bg-bg-secondary/50',
+      'shrink-0 border-l border-border bg-secondary-op50',
       'flex flex-col overflow-hidden shadow-lg',
       'animate-slide-in-right',
       widthClass
@@ -959,7 +959,7 @@ function FilterContent({ filters, onClearFilters, onClose }) {
               className={cn(
                 'w-full h-11 px-3 rounded-lg border border-border bg-bg-primary',
                 'text-text-primary text-sm',
-                'focus:outline-none focus:ring-2 focus:ring-accent-primary/50'
+                'focus:outline-none focus:ring-2 focus:ring-accent-primary-op50'
               )}
             />
           )}
@@ -987,7 +987,7 @@ function FilterContent({ filters, onClearFilters, onClose }) {
           onClick={onClose}
           className={cn(
             'flex-1 h-11 rounded-lg bg-accent-primary text-white',
-            'font-medium text-sm hover:bg-accent-primary/90 transition-colors'
+            'font-medium text-sm hover:bg-accent-primary-op90 transition-colors'
           )}
         >
           Apply
@@ -1005,7 +1005,7 @@ function LoadingState() {
   return (
     <div className="flex items-center justify-center h-full min-h-[200px]">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
         <p className="text-sm text-text-secondary">Loading...</p>
       </div>
     </div>

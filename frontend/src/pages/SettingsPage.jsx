@@ -132,7 +132,7 @@ function ServiceStatusWidget() {
           </DetailGrid>
           {canWrite('settings') && !status.is_docker && (
             <div className="pt-2">
-              <Button variant="outline" onClick={handleRestart} disabled={restarting}>
+              <Button type="button" variant="outline" onClick={handleRestart} disabled={restarting}>
                 <ArrowClockwise size={16} className={restarting ? 'spin' : ''} />
                 {restarting ? t('settings.restarting') : t('settings.restartService')}
               </Button>
@@ -215,7 +215,7 @@ function AboutSection() {
             href="https://github.com/NeySlim/ultimate-ca-manager"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg hover:bg-bg-tertiary transition-colors"
+            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
           >
             <GithubLogo size={20} className="text-text-secondary" />
             <div>
@@ -227,7 +227,7 @@ function AboutSection() {
             href="https://github.com/NeySlim/ultimate-ca-manager/issues"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg hover:bg-bg-tertiary transition-colors"
+            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
           >
             <WarningCircle size={20} className="text-text-secondary" />
             <div>
@@ -239,7 +239,7 @@ function AboutSection() {
             href="https://github.com/NeySlim/ultimate-ca-manager/wiki"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg hover:bg-bg-tertiary transition-colors"
+            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
           >
             <Globe size={20} className="text-text-secondary" />
             <div>
@@ -252,7 +252,7 @@ function AboutSection() {
 
       {/* License */}
       <DetailSection title={t('settings.about.license')} icon={Shield} iconClass="icon-bg-emerald" className="mt-4">
-        <div className="p-3 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+        <div className="p-3 bg-tertiary-50 border border-border rounded-lg">
           <p className="text-sm text-text-primary font-medium">MIT License</p>
           <p className="text-xs text-text-secondary mt-1">
             © 2024-2026 NeySlim — {t('settings.about.licenseDesc')}
@@ -294,8 +294,8 @@ function AppearanceSettings() {
               className={`
                 p-4 rounded-lg border-2 transition-all text-left
                 ${themeFamily === theme.id 
-                  ? 'border-accent-primary bg-accent-primary/10' 
-                  : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+                  ? 'border-accent-primary bg-accent-primary-op10' 
+                  : 'border-border hover:border-text-tertiary bg-tertiary-50'
                 }
               `}
             >
@@ -332,8 +332,8 @@ function AppearanceSettings() {
                 className={`
                   w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4
                   ${mode === opt.id 
-                    ? 'border-accent-primary bg-accent-primary/10' 
-                    : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+                    ? 'border-accent-primary bg-accent-primary-op10' 
+                    : 'border-border hover:border-text-tertiary bg-tertiary-50'
                   }
                 `}
               >
@@ -369,8 +369,8 @@ function AppearanceSettings() {
           className={`
             w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4
             ${forceDesktop 
-              ? 'border-accent-primary bg-accent-primary/10' 
-              : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+              ? 'border-accent-primary bg-accent-primary-op10' 
+              : 'border-border hover:border-text-tertiary bg-tertiary-50'
             }
           `}
         >
@@ -509,7 +509,7 @@ function MappingEditor({ value, onChange, keyLabel, valueLabel, keyPlaceholder, 
               size="sm"
             />
           )}
-          <Button size="sm" variant="ghost" onClick={() => removeEntry(k)}>
+          <Button type="button" size="sm" variant="ghost" onClick={() => removeEntry(k)}>
             <Trash size={14} className="text-status-danger" />
           </Button>
         </div>
@@ -922,7 +922,7 @@ function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
 
               {/* Test Mapping */}
               {provider?.id && (
-                <div className="pt-2 border-t border-border/50">
+                <div className="pt-2 border-t border-border">
                   <p className="text-xs text-text-muted mb-2">{t('sso.testMappingDesc')}</p>
                   <div className="flex gap-2">
                     <Input
@@ -1021,7 +1021,7 @@ function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
                     onClick={() => applyOAuth2Preset(preset.id)}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
                       oauth2Preset === preset.id 
-                        ? 'border-accent bg-accent/10 text-accent-primary font-medium' 
+                        ? 'border-accent bg-accent-op10 text-accent-primary font-medium' 
                         : 'border-border bg-bg-secondary hover:bg-bg-tertiary text-text-secondary'
                     }`}
                   >
@@ -1114,7 +1114,7 @@ function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
                   valuePlaceholder="e.g., username"
                 />
               </div>
-              <div className="pt-2 border-t border-border/50">
+              <div className="pt-2 border-t border-border">
                 <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
                 <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
                 <MappingEditor
@@ -1296,7 +1296,7 @@ function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
                   valuePlaceholder="e.g., username"
                 />
               </div>
-              <div className="pt-2 border-t border-border/50">
+              <div className="pt-2 border-t border-border">
                 <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
                 <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
                 <MappingEditor
@@ -1445,7 +1445,7 @@ function WebhookForm({ webhook, onSave, onCancel }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           {WEBHOOK_EVENTS.map(event => (
-            <label key={event} className="flex items-center gap-2 p-2 rounded-lg bg-bg-tertiary/50 border border-border/30 cursor-pointer hover:border-accent-primary/50 transition-colors">
+            <label key={event} className="flex items-center gap-2 p-2 rounded-lg bg-tertiary-50 border border-border-op30 cursor-pointer hover:border-accent-primary-op50 transition-colors">
               <input
                 type="checkbox"
                 checked={formData.events.includes(event)}
@@ -2280,7 +2280,7 @@ export default function SettingsPage() {
                 />
                 {canWrite('settings') && (
                   <div className="pt-2">
-                    <Button onClick={() => handleSave('general')} disabled={saving}>
+                    <Button type="button" onClick={() => handleSave('general')} disabled={saving}>
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
@@ -2409,8 +2409,8 @@ export default function SettingsPage() {
                 {emailTestResult && (
                   <div className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
                     emailTestResult.success
-                      ? 'bg-status-success/10 text-status-success'
-                      : 'bg-status-danger/10 text-status-danger'
+                      ? 'bg-status-success-op10 text-status-success'
+                      : 'bg-status-danger-op10 text-status-danger'
                   }`}>
                     {emailTestResult.success
                       ? <CheckCircle size={18} className="shrink-0 mt-0.5" />
@@ -2434,11 +2434,11 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div className="col-span-full md:col-span-1 flex items-end gap-2">
-                        <Button variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
+                        <Button type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
                           {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
                           {t('settings.testEmail')}
                         </Button>
-                        <Button onClick={() => handleSave('email')} disabled={saving}>
+                        <Button type="button" onClick={() => handleSave('email')} disabled={saving}>
                           <FloppyDisk size={16} />
                           {t('common.save')}
                         </Button>
@@ -2454,7 +2454,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-text-secondary">{t('settings.templateDescription')}</p>
                 <div className="relative group shrink-0">
-                  <Button variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
                     <PencilSimple size={16} />
                     {t('settings.editTemplate')}
                   </Button>
@@ -2530,11 +2530,11 @@ export default function SettingsPage() {
                 />
                 {canWrite('settings') && (
                   <div className="flex gap-2 pt-2">
-                    <Button variant="secondary" onClick={triggerExpiryCheck}>
+                    <Button type="button" variant="secondary" onClick={triggerExpiryCheck}>
                       <Bell size={16} />
                       {t('settings.checkNow')}
                     </Button>
-                    <Button onClick={saveExpiryAlerts} disabled={saving}>
+                    <Button type="button" onClick={saveExpiryAlerts} disabled={saving}>
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
@@ -2655,7 +2655,7 @@ export default function SettingsPage() {
                 {anomaliesLoading ? (
                   <LoadingSpinner size="sm" />
                 ) : anomalies.length === 0 ? (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success/10">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success-op10">
                     <CheckCircle size={20} weight="fill" className="text-status-success" />
                     <div>
                       <div className="text-sm font-medium text-text-primary">{t('settings.noAnomalies')}</div>
@@ -2664,7 +2664,7 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   anomalies.map((anomaly, i) => (
-                    <div key={i} className={`p-3 rounded-lg flex items-start gap-3 ${anomaly.details?.severity === 'high' ? 'bg-status-danger/10' : 'bg-status-warning/10'}`}>
+                    <div key={i} className={`p-3 rounded-lg flex items-start gap-3 ${anomaly.details?.severity === 'high' ? 'bg-status-danger-op10' : 'bg-status-warning-op10'}`}>
                       <Warning size={18} weight="fill" className={anomaly.details?.severity === 'high' ? 'text-status-danger' : 'text-status-warning'} />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-text-primary">{anomaly.details?.type || t('settings.unknownAnomaly')}</div>
@@ -2691,7 +2691,7 @@ export default function SettingsPage() {
                     </div>
                   ))
                 )}
-                <Button variant="secondary" size="sm" onClick={loadAnomalies} loading={anomaliesLoading}>
+                <Button type="button" variant="secondary" size="sm" onClick={loadAnomalies} loading={anomaliesLoading}>
                   <ArrowsClockwise size={14} />
                   {t('common.refresh')}
                 </Button>
@@ -2722,7 +2722,7 @@ export default function SettingsPage() {
               </DetailGrid>
               {hasPermission('admin:system') && (
                 <div className="pt-4">
-                  <Button onClick={() => handleSave('security')} disabled={saving}>
+                  <Button type="button" onClick={() => handleSave('security')} disabled={saving}>
                     <FloppyDisk size={16} />
                     {t('common.saveChanges')}
                   </Button>
@@ -2759,7 +2759,7 @@ export default function SettingsPage() {
                         size="sm"
                       />
                       {mtlsSettings.required && (
-                        <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning/10 text-xs text-status-warning">
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
                           <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
                           <span>{t('settings.mtls.requiredWarning')}</span>
                         </div>
@@ -2768,7 +2768,7 @@ export default function SettingsPage() {
                     </>
                   )}
                   {hasPermission('admin:system') && (
-                    <Button onClick={handleMtlsSave} disabled={mtlsSaving} loading={mtlsSaving}>
+                    <Button type="button" onClick={handleMtlsSave} disabled={mtlsSaving} loading={mtlsSaving}>
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
@@ -2794,7 +2794,7 @@ export default function SettingsPage() {
 
             {ssoLoading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
               </div>
             ) : (
               <div className="space-y-3">
@@ -2806,7 +2806,7 @@ export default function SettingsPage() {
                 ].map(({ type, label, icon: Icon, color, desc }) => {
                   const provider = ssoProviders.find(p => p.provider_type === type)
                   return (
-                    <div key={type} className="flex items-center justify-between p-4 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+                    <div key={type} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
                           <Icon size={20} weight="bold" />
@@ -2835,22 +2835,22 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-2">
                         {provider ? (
                           <>
-                            <Button size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting} title={t('sso.testConnection')}>
+                            <Button type="button" size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting} title={t('sso.testConnection')}>
                               {ssoTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
                             </Button>
-                            <Button size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)} title={provider.enabled ? t('sso.disable') : t('sso.enable')}>
+                            <Button type="button" size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)} title={provider.enabled ? t('sso.disable') : t('sso.enable')}>
                               <Power size={14} />
                             </Button>
-                            <Button size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)} title={t('common.edit')}>
+                            <Button type="button" size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)} title={t('common.edit')}>
                               <PencilSimple size={14} />
                             </Button>
-                            <Button size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)} title={t('common.delete')}>
+                            <Button type="button" size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)} title={t('common.delete')}>
                               <Trash size={14} />
                             </Button>
                           </>
                         ) : (
                           hasPermission('admin:system') && (
-                            <Button size="sm" onClick={() => handleSsoCreate(type)}>
+                            <Button type="button" size="sm" onClick={() => handleSsoCreate(type)}>
                               <Plus size={14} />
                               {t('sso.configure')}
                             </Button>
@@ -2917,11 +2917,11 @@ export default function SettingsPage() {
 
                 {hasPermission('admin:system') && (
                   <div className="flex gap-2">
-                    <Button onClick={() => handleSave('backup')} disabled={saving}>
+                    <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
                       <FloppyDisk size={16} />
                       {t('settings.saveSettings')}
                     </Button>
-                    <Button variant="secondary" onClick={() => setShowBackupModal(true)}>
+                    <Button type="button" variant="secondary" onClick={() => setShowBackupModal(true)}>
                       <Database size={16} />
                       {t('settings.createBackup')}
                     </Button>
@@ -2939,7 +2939,7 @@ export default function SettingsPage() {
               ) : (
                 <div className="space-y-2">
                   {backups.map((backup) => (
-                    <div key={backup.filename} className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-white/5 rounded-lg">
+                    <div key={backup.filename} className="flex items-center justify-between p-3 bg-tertiary-50 border border-white/5 rounded-lg">
                       <div>
                         <p className="text-sm font-medium text-text-primary">{backup.filename}</p>
                         <div className="flex gap-4 mt-1">
@@ -2948,10 +2948,10 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handleDownloadBackup(backup.filename)}>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadBackup(backup.filename)}>
                           <Download size={14} />
                         </Button>
-                        <Button size="sm" variant="danger" onClick={() => handleDeleteBackup(backup.filename)}>
+                        <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteBackup(backup.filename)}>
                           <Trash size={14} />
                         </Button>
                       </div>
@@ -3023,7 +3023,7 @@ export default function SettingsPage() {
                 ))}
                 {hasPermission('admin:system') && (
                   <div className="pt-4">
-                    <Button onClick={() => handleSave('audit')} disabled={saving}>
+                    <Button type="button" onClick={() => handleSave('audit')} disabled={saving}>
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
@@ -3107,12 +3107,12 @@ export default function SettingsPage() {
                 )}
                 {hasPermission('admin:system') && (
                   <div className="flex gap-2">
-                    <Button onClick={handleSaveSyslog} loading={syslogSaving}>
+                    <Button type="button" onClick={handleSaveSyslog} loading={syslogSaving}>
                       <FloppyDisk size={16} />
                       {t('common.saveChanges')}
                     </Button>
                     {syslogConfig.enabled && syslogConfig.host && (
-                      <Button variant="secondary" onClick={handleTestSyslog} loading={syslogTesting}>
+                      <Button type="button" variant="secondary" onClick={handleTestSyslog} loading={syslogTesting}>
                         <Lightning size={16} />
                         {t('settings.syslogTest')}
                       </Button>
@@ -3156,15 +3156,15 @@ export default function SettingsPage() {
             <DetailSection title={t('settings.maintenance')} icon={Gear} iconClass="icon-bg-teal">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-3">
-                  <Button size="sm" variant="secondary" onClick={handleOptimizeDb}>
+                  <Button type="button" size="sm" variant="secondary" onClick={handleOptimizeDb}>
                     <Database size={16} />
                     {t('settings.optimizeDatabase')}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={handleIntegrityCheck}>
+                  <Button type="button" size="sm" variant="secondary" onClick={handleIntegrityCheck}>
                     <ShieldCheck size={16} />
                     {t('settings.integrityCheck')}
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={handleExportDb}>
+                  <Button type="button" size="sm" variant="secondary" onClick={handleExportDb}>
                     <Download size={16} />
                     {t('settings.exportDatabase')}
                   </Button>
@@ -3178,7 +3178,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-text-secondary mb-3">
                   {t('settings.databaseResetDesc')}
                 </p>
-                <Button variant="danger" size="sm" onClick={handleResetDb}>
+                <Button type="button" variant="danger" size="sm" onClick={handleResetDb}>
                   <Trash size={16} />
                   {t('settings.resetDatabase')}
                 </Button>
@@ -3265,7 +3265,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-text-secondary">
                   {t('settings.regenerateCertificateDesc')}
                 </p>
-                <Button variant="secondary" size="sm" onClick={handleRegenerateHttpsCert}>
+                <Button type="button" variant="secondary" size="sm" onClick={handleRegenerateHttpsCert}>
                   <Key size={16} />
                   {t('settings.regenerateSelfSigned')}
                 </Button>
@@ -3316,7 +3316,7 @@ export default function SettingsPage() {
 
             {webhooksLoading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
               </div>
             ) : webhooks.length === 0 ? (
               <EmptyState
@@ -3329,9 +3329,9 @@ export default function SettingsPage() {
               <DetailSection title={t('webhooks.configuredWebhooks')} icon={Bell} iconClass="icon-bg-rose">
                 <div className="space-y-3">
                   {webhooks.map(webhook => (
-                    <div key={webhook.id} className="flex items-center justify-between p-4 bg-bg-tertiary/50 border border-border/50 rounded-lg">
+                    <div key={webhook.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-lg bg-accent-primary/10 flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-accent-primary-op10 flex items-center justify-center flex-shrink-0">
                           <Bell size={20} className="text-accent-primary" />
                         </div>
                         <div className="min-w-0">
@@ -3353,16 +3353,16 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                        <Button size="sm" variant="secondary" onClick={() => handleWebhookTest(webhook)} disabled={webhookTesting === webhook.id}>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookTest(webhook)} disabled={webhookTesting === webhook.id}>
                           {webhookTesting === webhook.id ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => handleWebhookToggle(webhook)}>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookToggle(webhook)}>
                           <Lightning size={14} />
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => handleWebhookEdit(webhook)}>
+                        <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookEdit(webhook)}>
                           <PencilSimple size={14} />
                         </Button>
-                        <Button size="sm" variant="danger" onClick={() => setWebhookConfirmDelete(webhook)}>
+                        <Button type="button" size="sm" variant="danger" onClick={() => setWebhookConfirmDelete(webhook)}>
                           <Trash size={14} />
                         </Button>
                       </div>
@@ -3370,7 +3370,7 @@ export default function SettingsPage() {
                   ))}
                   {hasPermission('admin:system') && (
                     <div className="pt-2">
-                      <Button onClick={handleWebhookCreate}>
+                      <Button type="button" onClick={handleWebhookCreate}>
                         <Plus size={16} />
                         {t('webhooks.addWebhook')}
                       </Button>
@@ -3486,7 +3486,7 @@ export default function SettingsPage() {
             showStrength
           />
           <div className="flex gap-3 justify-end pt-4">
-            <Button variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
+            <Button type="button" variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
               {t('common.cancel')}
             </Button>
             <Button 
@@ -3527,7 +3527,7 @@ export default function SettingsPage() {
             autoFocus
           />
           <div className="flex gap-3 justify-end pt-4">
-            <Button variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
+            <Button type="button" variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
               {t('common.cancel')}
             </Button>
             <Button 
@@ -3656,7 +3656,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => {
+            <Button type="button" variant="outline" onClick={() => {
               setShowEnableEncryptionModal(false)
               setEncryptionConfirmText('')
               setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })

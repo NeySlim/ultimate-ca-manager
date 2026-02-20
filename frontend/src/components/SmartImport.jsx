@@ -41,7 +41,7 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
   const displayName = obj.subject || obj.san_dns?.[0] || `${obj.type} #${obj.index + 1}`
   
   return (
-    <div className={`border rounded-lg transition-colors ${selected ? 'border-accent-primary bg-accent-primary/5' : 'border-border hover:border-border-hover'}`}>
+    <div className={`border rounded-lg transition-colors ${selected ? 'border-accent-primary bg-accent-primary-op5' : 'border-border hover:border-border-hover'}`}>
       <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={onToggle}>
         <input 
           type="checkbox"
@@ -427,7 +427,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragOver ? 'border-accent-primary bg-accent-primary/5' : 'border-border hover:border-border-hover'}`}
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragOver ? 'border-accent-primary bg-accent-primary-op5' : 'border-border hover:border-border-hover'}`}
       >
         <UploadSimple size={40} className="mx-auto mb-3 text-text-secondary" />
         <p className="text-sm mb-1">
@@ -533,8 +533,8 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-2">
-        {onCancel && <Button variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>}
-        <Button onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
+        {onCancel && <Button type="button" variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>}
+        <Button type="button" onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
           {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> {t('import.analyzing')}</> : t('import.analyze')}
         </Button>
       </div>
@@ -620,12 +620,12 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={() => {
+          <Button type="button" variant="secondary" onClick={() => {
             setStep('input')
             setAnalysisResult(null)
             setSelectedObjects(new Set())
           }}>{t('common.back')}</Button>
-          <Button onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
+          <Button type="button" onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
             {t('import.importObjects', { count: selectedObjects.size })}
           </Button>
         </div>
@@ -704,8 +704,8 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-4">
-          <Button variant="secondary" onClick={reset}>{t('import.importMore')}</Button>
-          <Button onClick={() => { onImportComplete?.(importResult); }}>{t('common.done')}</Button>
+          <Button type="button" variant="secondary" onClick={reset}>{t('import.importMore')}</Button>
+          <Button type="button" onClick={() => { onImportComplete?.(importResult); }}>{t('common.done')}</Button>
         </div>
       </div>
     )
