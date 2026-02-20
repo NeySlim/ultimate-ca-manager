@@ -23,7 +23,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import LanguageSelector from '../components/ui/LanguageSelector'
-import { settingsService, systemService, casService, certificatesService, ssoService } from '../services'
+import { settingsService, systemService, casService, certificatesService, ssoService, mtlsService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
@@ -1561,6 +1561,11 @@ export default function SettingsPage() {
   const [syslogTesting, setSyslogTesting] = useState(false)
   const [syslogSaving, setSyslogSaving] = useState(false)
 
+  // mTLS state
+  const [mtlsSettings, setMtlsSettings] = useState({ enabled: false, required: false, trusted_ca_id: '', trusted_ca: null })
+  const [mtlsLoading, setMtlsLoading] = useState(false)
+  const [mtlsSaving, setMtlsSaving] = useState(false)
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -1577,6 +1582,7 @@ export default function SettingsPage() {
     loadAnomalies()
     loadExpiryAlerts()
     loadSyslogConfig()
+    loadMtlsSettings()
     systemService.getServiceStatus().then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
   }, [])
 
@@ -1928,6 +1934,40 @@ export default function SettingsPage() {
 
   const updateSyslogConfig = (key, value) => {
     setSyslogConfig(prev => ({ ...prev, [key]: value }))
+  }
+
+  const loadMtlsSettings = async () => {
+    setMtlsLoading(true)
+    try {
+      const response = await mtlsService.getSettings()
+      setMtlsSettings(response.data || {})
+    } catch {
+    } finally {
+      setMtlsLoading(false)
+    }
+  }
+
+  const handleMtlsSave = async () => {
+    setMtlsSaving(true)
+    try {
+      const response = await mtlsService.updateSettings({
+        enabled: mtlsSettings.enabled,
+        required: mtlsSettings.required,
+        trusted_ca_id: mtlsSettings.trusted_ca_id || null,
+      })
+      const data = response.data || {}
+      setMtlsSettings(prev => ({ ...prev, ...data }))
+      showSuccess(t('settings.mtls.saved'))
+      if (data.needs_restart && !isDocker) {
+        waitForRestart()
+      } else if (data.restart_message) {
+        showSuccess(data.restart_message)
+      }
+    } catch (error) {
+      showError(error.message || t('settings.mtls.saveFailed'))
+    } finally {
+      setMtlsSaving(false)
+    }
   }
 
   const handleSave = async (section) => {
@@ -2686,6 +2726,53 @@ export default function SettingsPage() {
                     <FloppyDisk size={16} />
                     {t('common.saveChanges')}
                   </Button>
+                </div>
+              )}
+            </DetailSection>
+            <DetailSection title={t('settings.mtls.title')} icon={ShieldCheck} iconClass="icon-bg-violet">
+              {mtlsLoading ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <div className="space-y-4">
+                  <ToggleSwitch
+                    checked={mtlsSettings.enabled || false}
+                    onChange={(val) => setMtlsSettings(prev => ({ ...prev, enabled: val }))}
+                    label={t('settings.mtls.enable')}
+                    size="sm"
+                  />
+                  {mtlsSettings.enabled && (
+                    <>
+                      <Select
+                        label={t('settings.mtls.trustedCA')}
+                        value={mtlsSettings.trusted_ca_id || ''}
+                        onChange={(val) => setMtlsSettings(prev => ({ ...prev, trusted_ca_id: val }))}
+                        placeholder={t('settings.mtls.selectCA')}
+                        options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({
+                          value: ca.refid,
+                          label: ca.descr || ca.subject || ca.refid,
+                        }))}
+                      />
+                      <ToggleSwitch
+                        checked={mtlsSettings.required || false}
+                        onChange={(val) => setMtlsSettings(prev => ({ ...prev, required: val }))}
+                        label={t('settings.mtls.required')}
+                        size="sm"
+                      />
+                      {mtlsSettings.required && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning/10 text-xs text-status-warning">
+                          <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+                          <span>{t('settings.mtls.requiredWarning')}</span>
+                        </div>
+                      )}
+                      <p className="text-xs text-text-tertiary">{t('settings.mtls.restartNote')}</p>
+                    </>
+                  )}
+                  {hasPermission('admin:system') && (
+                    <Button onClick={handleMtlsSave} disabled={mtlsSaving} loading={mtlsSaving}>
+                      <FloppyDisk size={16} />
+                      {t('common.saveChanges')}
+                    </Button>
+                  )}
                 </div>
               )}
             </DetailSection>

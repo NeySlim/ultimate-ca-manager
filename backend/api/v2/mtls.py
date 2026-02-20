@@ -1,20 +1,142 @@
 """
 mTLS API
-Manage client certificates for mutual TLS authentication
+Manage client certificates and mTLS configuration
 """
 
 import logging
 from flask import Blueprint, request, g, Response
 from auth.unified import require_auth
-from models import User, Certificate, CA, db
+from models import User, Certificate, CA, SystemConfig, db
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
-import json
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
+
+
+# ---------------------------------------------------------------------------
+# mTLS Settings (admin only)
+# ---------------------------------------------------------------------------
+
+def _get_mtls_config(key, default=None):
+    config = SystemConfig.query.filter_by(key=key).first()
+    return config.value if config else default
+
+
+def _set_mtls_config(key, value):
+    config = SystemConfig.query.filter_by(key=key).first()
+    if config:
+        config.value = str(value) if value is not None else None
+    else:
+        config = SystemConfig(key=key, value=str(value) if value is not None else None)
+        db.session.add(config)
+
+
+@bp.route('/settings', methods=['GET'])
+@require_auth(['read:settings'])
+def get_mtls_settings():
+    """Get mTLS configuration"""
+    enabled = _get_mtls_config('mtls_enabled', 'false') == 'true'
+    required = _get_mtls_config('mtls_required', 'false') == 'true'
+    ca_id = _get_mtls_config('mtls_trusted_ca_id')
+
+    ca_info = None
+    if ca_id:
+        ca = CA.query.filter_by(refid=ca_id).first()
+        if ca:
+            ca_info = {
+                'refid': ca.refid,
+                'name': ca.descr,
+                'valid_to': ca.valid_to.isoformat() if ca.valid_to else None,
+                'has_private_key': ca.has_private_key,
+            }
+
+    return success_response(data={
+        'enabled': enabled,
+        'required': required,
+        'trusted_ca_id': ca_id,
+        'trusted_ca': ca_info,
+    })
+
+
+@bp.route('/settings', methods=['PUT'])
+@require_auth(['admin:system'])
+def update_mtls_settings():
+    """Update mTLS configuration. Requires UCM restart to take effect."""
+    data = request.get_json()
+    if not data:
+        return error_response('No data provided', 400)
+
+    enabled = data.get('enabled')
+    required = data.get('required')
+    ca_id = data.get('trusted_ca_id')
+
+    # Validate CA if enabling mTLS
+    if enabled and ca_id:
+        ca = CA.query.filter_by(refid=ca_id).first()
+        if not ca:
+            return error_response('Trusted CA not found', 404)
+
+    # Safety: if requiring mTLS, check at least one admin has an enrolled cert
+    if required and enabled:
+        from models.auth_certificate import AuthCertificate
+        admin_users = User.query.filter_by(role='admin', active=True).all()
+        admin_ids = [u.id for u in admin_users]
+        admin_certs = AuthCertificate.query.filter(
+            AuthCertificate.user_id.in_(admin_ids),
+            AuthCertificate.enabled == True
+        ).count() if admin_ids else 0
+        if admin_certs == 0:
+            return error_response(
+                'Cannot require mTLS: no admin user has an enrolled certificate. '
+                'Enroll at least one admin certificate first.',
+                400
+            )
+
+    changes = []
+    if enabled is not None:
+        _set_mtls_config('mtls_enabled', 'true' if enabled else 'false')
+        changes.append(f"enabled={'true' if enabled else 'false'}")
+    if required is not None:
+        _set_mtls_config('mtls_required', 'true' if required else 'false')
+        changes.append(f"required={'true' if required else 'false'}")
+    if ca_id is not None:
+        _set_mtls_config('mtls_trusted_ca_id', ca_id)
+        changes.append(f"trusted_ca_id={ca_id}")
+
+    db.session.commit()
+
+    AuditService.log_action(
+        action='mtls_settings_update',
+        resource_type='settings',
+        resource_name='mTLS',
+        details=f'Updated mTLS settings: {", ".join(changes)}',
+        success=True
+    )
+
+    # Trigger restart if mTLS config changed (SSL context needs reload)
+    needs_restart = enabled is not None or required is not None or ca_id is not None
+    restart_message = None
+    if needs_restart:
+        from config.settings import is_docker, restart_ucm_service
+        if is_docker():
+            restart_message = 'Restart the container to apply mTLS changes.'
+        else:
+            success, msg = restart_ucm_service()
+            restart_message = msg if not success else 'Service restart initiated to apply mTLS changes.'
+
+    return success_response(
+        data={
+            'enabled': _get_mtls_config('mtls_enabled', 'false') == 'true',
+            'required': _get_mtls_config('mtls_required', 'false') == 'true',
+            'trusted_ca_id': _get_mtls_config('mtls_trusted_ca_id'),
+            'needs_restart': needs_restart,
+            'restart_message': restart_message,
+        },
+        message='mTLS settings updated'
+    )
 
 
 @bp.route('/certificates', methods=['GET'])

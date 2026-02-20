@@ -1581,7 +1581,18 @@
     "templateVarDatetime": "发送日期/时间",
     "templateVarInstanceUrl": "实例URL",
     "templatePlainText": "纯文本",
-    "templateDesktopOnly": "模板编辑器需要桌面屏幕"
+    "templateDesktopOnly": "模板编辑器需要桌面屏幕",
+    "mtls": {
+      "title": "mTLS 认证",
+      "enable": "启用客户端证书认证",
+      "trustedCA": "受信任的证书颁发机构",
+      "selectCA": "选择 CA...",
+      "required": "要求客户端证书（无密码回退）",
+      "requiredWarning": "在强制模式下，没有有效客户端证书的用户将无法登录。请确保至少有一个管理员已注册证书。",
+      "restartNote": "需要重启服务才能应用 mTLS 更改。",
+      "saved": "mTLS 设置已保存",
+      "saveFailed": "保存 mTLS 设置失败"
+    }
   },
   "account": {
     "profile": "个人资料",

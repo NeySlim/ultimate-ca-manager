@@ -1719,7 +1719,18 @@
     "templateVarDatetime": "Date/heure d'envoi",
     "templateVarInstanceUrl": "URL de l'instance",
     "templatePlainText": "Texte brut",
-    "templateDesktopOnly": "L'éditeur de modèle nécessite un écran large"
+    "templateDesktopOnly": "L'éditeur de modèle nécessite un écran large",
+    "mtls": {
+      "title": "Authentification mTLS",
+      "enable": "Activer l'authentification par certificat client",
+      "trustedCA": "Autorité de certification de confiance",
+      "selectCA": "Sélectionner une CA...",
+      "required": "Exiger un certificat client (pas de repli sur mot de passe)",
+      "requiredWarning": "En mode requis, les utilisateurs sans certificat client valide ne peuvent pas se connecter. Assurez-vous qu'au moins un admin a un certificat enrôlé.",
+      "restartNote": "Un redémarrage du service est nécessaire pour appliquer les changements mTLS.",
+      "saved": "Paramètres mTLS enregistrés",
+      "saveFailed": "Échec de l'enregistrement des paramètres mTLS"
+    }
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",
