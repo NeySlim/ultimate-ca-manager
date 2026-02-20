@@ -31,8 +31,8 @@ export const certificatesService = {
   async export(id, format = 'pem', options = {}) {
     return apiClient.get(`/certificates/${id}/export${buildQueryString({
       format,
-      include_key: options.includeKey || undefined,
-      include_chain: options.includeChain || undefined,
+      include_key: options.includeKey ? true : undefined,
+      include_chain: options.includeChain ? true : undefined,
       password: options.password
     })}`, { responseType: 'blob' })
   },
@@ -40,7 +40,7 @@ export const certificatesService = {
   async exportAll(format = 'pem', options = {}) {
     return apiClient.get(`/certificates/export${buildQueryString({
       format,
-      include_chain: options.includeChain || undefined,
+      include_chain: options.includeChain ? true : undefined,
       password: options.password
     })}`, { responseType: 'blob' })
   },
