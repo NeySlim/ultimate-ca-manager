@@ -1669,7 +1669,16 @@
     "registrationFailed": "セキュリティキーの登録に失敗しました",
     "deleteKeyFailed": "セキュリティキーの削除に失敗しました",
     "deleteCertFailed": "証明書の削除に失敗しました",
-    "securityKey": "セキュリティキー"
+    "securityKey": "セキュリティキー",
+    "mtlsCertCreated": "mTLS証明書が正常に作成されました",
+    "mtlsCertCreateFailed": "mTLS証明書の作成に失敗しました",
+    "mtlsDownloadWarning": "秘密鍵を今すぐ保存してください — 後で取得することはできません。証明書と鍵をブラウザまたはOSキーチェーンにインポートしてください。",
+    "mtlsCertName": "証明書名",
+    "mtlsIssuingCA": "発行CA",
+    "mtlsDefaultCA": "デフォルト（信頼されたCA）",
+    "mtlsValidityDays": "有効期間（日）",
+    "generateCertificate": "証明書を生成",
+    "privateKey": "秘密鍵"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

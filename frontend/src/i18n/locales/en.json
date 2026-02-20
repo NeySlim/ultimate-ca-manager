@@ -1672,7 +1672,16 @@
     "registrationFailed": "Failed to register security key",
     "deleteKeyFailed": "Failed to delete security key",
     "deleteCertFailed": "Failed to delete certificate",
-    "securityKey": "Security Key"
+    "securityKey": "Security Key",
+    "mtlsCertCreated": "mTLS certificate created successfully",
+    "mtlsCertCreateFailed": "Failed to create mTLS certificate",
+    "mtlsDownloadWarning": "Save the private key now — it cannot be retrieved later. Import the certificate and key into your browser or OS keychain.",
+    "mtlsCertName": "Certificate name",
+    "mtlsIssuingCA": "Issuing CA",
+    "mtlsDefaultCA": "Default (trusted CA)",
+    "mtlsValidityDays": "Validity (days)",
+    "generateCertificate": "Generate Certificate",
+    "privateKey": "Private Key"
   },
   "rbac": {
     "title": "Role-Based Access Control",

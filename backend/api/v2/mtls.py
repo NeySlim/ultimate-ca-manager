@@ -142,193 +142,262 @@ def update_mtls_settings():
 @bp.route('/certificates', methods=['GET'])
 @require_auth()
 def list_mtls_certificates():
-    """List user's mTLS certificates (certificates with clientAuth EKU)"""
+    """List user's mTLS certificates (enrolled in auth_certificates)"""
+    from models.auth_certificate import AuthCertificate
     user = g.current_user
-    
-    # Get certificates issued for this user (CN contains username@mtls)
-    mtls_certs = Certificate.query.filter(
-        Certificate.subject.like(f'%CN={user.username}@mtls%')
-    ).order_by(Certificate.created_at.desc()).all()
-    
-    result = []
-    for cert in mtls_certs:
-        result.append({
-            'id': cert.id,
-            'name': f'mTLS Certificate #{cert.id}',
-            'serial': cert.serial_number,
-            'subject': cert.subject,
-            'created_at': cert.created_at.isoformat() if cert.created_at else None,
-            'expires_at': cert.not_after.isoformat() if cert.not_after else None,
-            'status': cert.status,
-            'ca_id': cert.ca_id
-        })
-    
-    return success_response(data=result)
+
+    certs = AuthCertificate.query.filter_by(user_id=user.id).order_by(
+        AuthCertificate.created_at.desc()
+    ).all()
+
+    return success_response(data=[c.to_dict() for c in certs])
 
 
 @bp.route('/certificates', methods=['POST'])
 @require_auth()
 def create_mtls_certificate():
-    """Issue a new mTLS certificate for the user"""
+    """Issue a new mTLS client certificate and auto-enroll it"""
+    from models.auth_certificate import AuthCertificate
+    from services.certificate_service import CertificateService
+    import base64
+
     user = g.current_user
     data = request.get_json() or {}
-    
-    # Get CA for issuing
+
+    # Resolve CA — prefer request ca_id, fall back to trusted CA, then first available
     ca_id = data.get('ca_id')
-    if not ca_id:
-        # Use first available CA
-        ca = CA.query.first()
-        if not ca:
-            return error_response('No CA available', 400)
-        ca_id = ca.id
-    
-    ca = CA.query.get(ca_id)
+    ca = None
+    if ca_id:
+        ca = CA.query.get(ca_id) or CA.query.filter_by(refid=str(ca_id)).first()
     if not ca:
-        return error_response('CA not found', 404)
-    
-    # Create client certificate
-    from services.certificate_service import CertificateService
-    cert_service = CertificateService()
-    
-    # Build subject
-    subject = {
-        'CN': f'{user.username}@mtls',
-        'O': data.get('organization', 'UCM Users'),
-        'OU': 'mTLS Clients'
-    }
-    
-    validity_days = data.get('validity_days', 365)
-    
+        trusted_refid = _get_mtls_config('mtls_trusted_ca_id')
+        if trusted_refid:
+            ca = CA.query.filter_by(refid=trusted_refid).first()
+    if not ca:
+        ca = CA.query.first()
+    if not ca:
+        return error_response('No CA available', 400)
+
+    validity_days = min(max(int(data.get('validity_days', 365)), 1), 3650)
+    cert_name = data.get('name', f'{user.username} mTLS')
+
     try:
-        # Issue certificate
+        cert_service = CertificateService()
         cert_data = cert_service.issue_certificate(
-            ca_id=ca_id,
-            subject=subject,
+            ca_id=ca.id,
+            subject={
+                'CN': f'{user.username}@mtls',
+                'O': data.get('organization', 'UCM Users'),
+                'OU': 'mTLS Clients',
+            },
             key_type='RSA',
             key_size=2048,
             validity_days=validity_days,
             key_usage=['digitalSignature', 'keyEncipherment'],
-            extended_key_usage=['clientAuth']
+            extended_key_usage=['clientAuth'],
         )
-        
+
+        # Also enroll in auth_certificates for auto-login
+        cert_obj = Certificate.query.get(cert_data['id'])
+        if cert_obj and cert_obj.crt:
+            cert_pem = base64.b64decode(cert_obj.crt).decode('utf-8')
+            from services.certificate_parser import CertificateParser
+            parsed = CertificateParser.parse_pem_certificate(cert_pem)
+            if parsed:
+                info = CertificateParser.extract_certificate_info(parsed)
+                auth_cert = AuthCertificate(
+                    user_id=user.id,
+                    cert_serial=info['serial'],
+                    cert_subject=info['subject_dn'],
+                    cert_issuer=info['issuer_dn'],
+                    cert_fingerprint=info['fingerprint'],
+                    name=cert_name,
+                    valid_from=info['valid_from'],
+                    valid_until=info['valid_until'],
+                    enabled=True,
+                )
+                db.session.add(auth_cert)
+                db.session.commit()
+
         AuditService.log_action(
             action='mtls_cert_create',
             resource_type='certificate',
             resource_id=str(cert_data['id']),
-            resource_name=f'{user.username}@mtls',
+            resource_name=cert_name,
             details=f'Created mTLS certificate for user: {user.username}',
-            success=True
+            success=True,
         )
-        
+
         return success_response(data={
-                'id': cert_data['id'],
-                'serial': cert_data.get('serial', ''),
-                'certificate': cert_data.get('pem', ''),
-                'private_key': cert_data.get('private_key', ''),
-                'created_at': datetime.now(timezone.utc).isoformat(),
-                'expires_at': cert_data.get('not_after', ''),
-                'status': 'valid'
-            }, message='mTLS certificate created'), 201
-        
+            'id': cert_data['id'],
+            'serial': cert_data.get('serial', ''),
+            'certificate': cert_data.get('pem', ''),
+            'private_key': cert_data.get('private_key', ''),
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'expires_at': cert_data.get('not_after', ''),
+            'status': 'valid',
+        }, message='mTLS certificate created'), 201
+
     except Exception as e:
-        logger.error(f'mTLS error: {e}')
-        return error_response('Internal error', 500)
+        logger.error(f'mTLS cert creation error: {e}')
+        return error_response('Failed to create certificate', 500)
 
 
 @bp.route('/certificates/<int:cert_id>', methods=['DELETE'])
 @require_auth()
-def revoke_mtls_certificate(cert_id):
-    """Revoke a mTLS certificate"""
+def delete_mtls_certificate(cert_id):
+    """Delete an enrolled mTLS certificate"""
+    from models.auth_certificate import AuthCertificate
     user = g.current_user
-    
-    # Find certificate and verify ownership
-    cert = Certificate.query.get(cert_id)
-    if not cert:
+
+    auth_cert = AuthCertificate.query.get(cert_id)
+    if not auth_cert:
         return error_response('Certificate not found', 404)
-    
-    # Verify ownership (CN should contain username@mtls)
-    if f'{user.username}@mtls' not in (cert.subject or ''):
-        return error_response('Not authorized to revoke this certificate', 403)
-    
-    # Revoke the certificate
-    cert.status = 'revoked'
-    cert.revoked_at = datetime.now(timezone.utc)
-    cert.revocation_reason = 'User requested'
+
+    if auth_cert.user_id != user.id and getattr(user, 'role', '') != 'admin':
+        return error_response('Not authorized', 403)
+
+    serial = auth_cert.cert_serial
+    db.session.delete(auth_cert)
     db.session.commit()
-    
+
     AuditService.log_action(
-        action='mtls_cert_revoke',
+        action='mtls_cert_delete',
         resource_type='certificate',
         resource_id=str(cert_id),
-        resource_name=f'{user.username}@mtls',
-        details=f'Revoked mTLS certificate {cert_id} for user: {user.username}',
-        success=True
+        resource_name=auth_cert.name or serial,
+        details=f'Deleted mTLS certificate for user: {user.username}',
+        success=True,
     )
-    
-    return success_response(message='Certificate revoked')
+
+    return success_response(message='Certificate deleted')
 
 
 @bp.route('/certificates/<int:cert_id>/download', methods=['GET'])
 @require_auth()
 def download_mtls_certificate(cert_id):
-    """Download mTLS certificate as PKCS12"""
+    """Download mTLS certificate as PEM or PKCS12"""
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.hazmat.backends import default_backend
+    from cryptography import x509 as cx509
+
     user = g.current_user
-    
-    # Find certificate
+    fmt = request.args.get('format', 'pem')
+    password = request.args.get('password', '')
+
+    # Find the Certificate row matching this user's mTLS cert
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
-    # Verify ownership
+
     if f'{user.username}@mtls' not in (cert.subject or ''):
         return error_response('Not authorized', 403)
-    
-    # Check if we have the certificate PEM
-    if not cert.certificate_pem:
+
+    if not cert.crt:
         return error_response('Certificate data not available', 404)
-    
-    # For now, just return PEM format
-    # TODO: Implement PKCS12 conversion if private key is stored
+
+    cert_pem = base64.b64decode(cert.crt)
+
+    if fmt == 'p12' or fmt == 'pkcs12':
+        if not password:
+            return error_response('Password required for PKCS12 export', 400)
+        if not cert.prv:
+            return error_response('Private key not available for PKCS12 export', 400)
+
+        key_pem = base64.b64decode(cert.prv)
+        private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+        x509_cert = cx509.load_pem_x509_certificate(cert_pem, default_backend())
+
+        ca_certs = []
+        if cert.caref:
+            ca = CA.query.filter_by(refid=cert.caref).first()
+            while ca:
+                if ca.crt:
+                    ca_certs.append(cx509.load_pem_x509_certificate(
+                        base64.b64decode(ca.crt), default_backend()
+                    ))
+                ca = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
+
+        p12_bytes = pkcs12.serialize_key_and_certificates(
+            name=f'{user.username}-mtls'.encode(),
+            key=private_key,
+            cert=x509_cert,
+            cas=ca_certs if ca_certs else None,
+            encryption_algorithm=serialization.BestAvailableEncryption(password.encode()),
+        )
+
+        return Response(
+            p12_bytes,
+            mimetype='application/x-pkcs12',
+            headers={'Content-Disposition': f'attachment; filename="{user.username}-mtls.p12"'},
+        )
+
+    # Default: PEM
     return Response(
-        cert.certificate_pem,
+        cert_pem,
         mimetype='application/x-pem-file',
-        headers={
-            'Content-Disposition': f'attachment; filename=mtls-{cert_id}.pem'
-        }
+        headers={'Content-Disposition': f'attachment; filename="{user.username}-mtls.pem"'},
     )
 
 
-@bp.route('/authenticate', methods=['POST'])
-def authenticate():
-    """Authenticate via mTLS client certificate"""
-    # Get client certificate from request
-    # This requires NGINX/Apache to pass the client cert in a header
-    client_cert = request.headers.get('X-Client-Cert')
-    client_cert_verify = request.headers.get('X-Client-Cert-Verify')
-    
-    if not client_cert or client_cert_verify != 'SUCCESS':
-        return error_response('No valid client certificate', 401)
-    
-    # Parse certificate to get username
-    # The CN should be in format: username@mtls
-    import re
-    match = re.search(r'CN=([^@,]+)@mtls', client_cert)
-    if not match:
-        return error_response('Invalid certificate subject', 401)
-    
-    username = match.group(1)
-    
-    # Find user
-    user = User.query.filter_by(username=username).first()
-    if not user:
-        return error_response('User not found', 401)
-    
-    if not user.active:
-        return error_response('Account disabled', 401)
-    
-    # Create session
-    from flask import session
-    session['user_id'] = user.id
-    session.permanent = True
-    
-    return success_response(data=user.to_dict(), message='mTLS authentication successful')
+@bp.route('/enroll', methods=['POST'])
+@require_auth()
+def enroll_presented_certificate():
+    """Enroll a client certificate already presented via mTLS.
+    Used when user has a valid cert signed by the trusted CA but not yet enrolled."""
+    from models.auth_certificate import AuthCertificate
+    from services.certificate_parser import CertificateParser
+
+    user = g.current_user
+    cert_info = None
+
+    # Try to get the cert from the current TLS connection
+    try:
+        peercert = request.environ.get('peercert')
+        if peercert:
+            cert_info = CertificateParser.extract_from_flask_native(peercert)
+    except Exception as e:
+        logger.error(f"Error extracting peer cert for enrollment: {e}")
+
+    # Also try proxy headers
+    if not cert_info:
+        headers = dict(request.headers)
+        if 'X-SSL-Client-Verify' in headers:
+            cert_info = CertificateParser.extract_from_nginx_headers(headers)
+        elif 'X-SSL-Client-S-DN' in headers:
+            cert_info = CertificateParser.extract_from_apache_headers(headers)
+
+    if not cert_info:
+        return error_response('No client certificate detected in this request', 400)
+
+    # Check if already enrolled
+    existing = AuthCertificate.query.filter_by(cert_serial=cert_info['serial']).first()
+    if existing:
+        return error_response('This certificate is already enrolled', 409)
+
+    data = request.get_json() or {}
+    auth_cert = AuthCertificate(
+        user_id=user.id,
+        cert_serial=cert_info['serial'],
+        cert_subject=cert_info.get('subject_dn', ''),
+        cert_issuer=cert_info.get('issuer_dn', ''),
+        cert_fingerprint=cert_info.get('fingerprint', ''),
+        name=data.get('name') or cert_info.get('common_name') or f"Certificate {cert_info['serial'][:8]}",
+        valid_from=cert_info.get('valid_from'),
+        valid_until=cert_info.get('valid_until'),
+        enabled=True,
+    )
+    db.session.add(auth_cert)
+    db.session.commit()
+
+    AuditService.log_action(
+        action='mtls_cert_enroll',
+        resource_type='certificate',
+        resource_name=auth_cert.name,
+        details=f'Enrolled presented certificate for user: {user.username}',
+        success=True,
+    )
+
+    return success_response(data=auth_cert.to_dict(), message='Certificate enrolled')

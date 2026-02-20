@@ -74,7 +74,16 @@
     "registrationFailed": "Échec de l'enregistrement de la clé de sécurité",
     "deleteKeyFailed": "Échec de la suppression de la clé de sécurité",
     "deleteCertFailed": "Échec de la suppression du certificat",
-    "securityKey": "Clé de sécurité"
+    "securityKey": "Clé de sécurité",
+    "mtlsCertCreated": "Certificat mTLS créé avec succès",
+    "mtlsCertCreateFailed": "Échec de la création du certificat mTLS",
+    "mtlsDownloadWarning": "Enregistrez la clé privée maintenant — elle ne sera plus récupérable. Importez le certificat et la clé dans votre navigateur ou trousseau.",
+    "mtlsCertName": "Nom du certificat",
+    "mtlsIssuingCA": "CA émettrice",
+    "mtlsDefaultCA": "Par défaut (CA de confiance)",
+    "mtlsValidityDays": "Validité (jours)",
+    "generateCertificate": "Générer le certificat",
+    "privateKey": "Clé privée"
   },
   "acme": {
     "title": "Protocole ACME",

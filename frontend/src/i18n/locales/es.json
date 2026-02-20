@@ -1669,7 +1669,16 @@
     "registrationFailed": "Error to register seguridad clave",
     "deleteKeyFailed": "Error to eliminar seguridad clave",
     "deleteCertFailed": "Error to eliminar certificado",
-    "securityKey": "Seguridad Clave"
+    "securityKey": "Seguridad Clave",
+    "mtlsCertCreated": "Certificado mTLS creado exitosamente",
+    "mtlsCertCreateFailed": "Error al crear el certificado mTLS",
+    "mtlsDownloadWarning": "Guarde la clave privada ahora — no se podrá recuperar después. Importe el certificado y la clave en su navegador o llavero.",
+    "mtlsCertName": "Nombre del certificado",
+    "mtlsIssuingCA": "CA emisora",
+    "mtlsDefaultCA": "Predeterminada (CA de confianza)",
+    "mtlsValidityDays": "Validez (días)",
+    "generateCertificate": "Generar certificado",
+    "privateKey": "Clave privada"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",

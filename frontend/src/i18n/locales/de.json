@@ -1669,7 +1669,16 @@
     "registrationFailed": "Fehler beim Registrieren des Sicherheitsschlüssels",
     "deleteKeyFailed": "Fehler beim Löschen des Sicherheitsschlüssels",
     "deleteCertFailed": "Fehler beim Löschen des Zertifikats",
-    "securityKey": "Sicherheitsschlüssel"
+    "securityKey": "Sicherheitsschlüssel",
+    "mtlsCertCreated": "mTLS-Zertifikat erfolgreich erstellt",
+    "mtlsCertCreateFailed": "Erstellung des mTLS-Zertifikats fehlgeschlagen",
+    "mtlsDownloadWarning": "Speichern Sie den privaten Schlüssel jetzt — er kann später nicht abgerufen werden. Importieren Sie Zertifikat und Schlüssel in Ihren Browser oder OS-Schlüsselbund.",
+    "mtlsCertName": "Zertifikatsname",
+    "mtlsIssuingCA": "Ausstellende CA",
+    "mtlsDefaultCA": "Standard (vertrauenswürdige CA)",
+    "mtlsValidityDays": "Gültigkeit (Tage)",
+    "generateCertificate": "Zertifikat generieren",
+    "privateKey": "Privater Schlüssel"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

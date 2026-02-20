@@ -1669,7 +1669,16 @@
     "registrationFailed": "注册安全密钥失败",
     "deleteKeyFailed": "删除安全密钥失败",
     "deleteCertFailed": "删除证书失败",
-    "securityKey": "安全密钥"
+    "securityKey": "安全密钥",
+    "mtlsCertCreated": "mTLS 证书创建成功",
+    "mtlsCertCreateFailed": "创建 mTLS 证书失败",
+    "mtlsDownloadWarning": "请立即保存私钥 — 之后将无法检索。请将证书和密钥导入浏览器或操作系统密钥链。",
+    "mtlsCertName": "证书名称",
+    "mtlsIssuingCA": "签发 CA",
+    "mtlsDefaultCA": "默认（受信任 CA）",
+    "mtlsValidityDays": "有效期（天）",
+    "generateCertificate": "生成证书",
+    "privateKey": "私钥"
   },
   "rbac": {
     "title": "基于角色的访问控制",
