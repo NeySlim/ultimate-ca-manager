@@ -93,22 +93,17 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
     
-    # Version - single source of truth from VERSION file
+    # Version - single source of truth: VERSION file at repo/install root
     @staticmethod
     def _get_version():
-        """Read version from VERSION file - checks multiple locations"""
+        """Read version from VERSION file at project root"""
         try:
-            # Check backend/VERSION first (dev + deployed layout)
-            backend_version = BACKEND_DIR / "VERSION"
-            if backend_version.exists():
-                return backend_version.read_text().strip()
-            # Root VERSION (package installs: /opt/ucm/VERSION)
             version_path = BASE_DIR / "VERSION"
             if version_path.exists():
                 return version_path.read_text().strip()
         except Exception:
             pass
-        return os.getenv("APP_VERSION", "2.1.0")
+        return os.getenv("APP_VERSION", "unknown")
     
     APP_VERSION = _get_version.__func__()
     
