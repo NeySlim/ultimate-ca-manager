@@ -8,7 +8,7 @@ from flask import Blueprint, request, g, Response
 from auth.unified import require_auth
 from models import User, Certificate, CA, SystemConfig, db
 from services.audit_service import AuditService
-from utils.response import success_response, error_response
+from utils.response import success_response, error_response, created_response
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -158,7 +158,8 @@ def list_mtls_certificates():
 def create_mtls_certificate():
     """Issue a new mTLS client certificate and auto-enroll it"""
     from models.auth_certificate import AuthCertificate
-    from services.certificate_service import CertificateService
+    from services.cert_service import CertificateService
+    from utils.file_naming import cert_key_path
     import base64
 
     user = g.current_user
@@ -188,64 +189,63 @@ def create_mtls_certificate():
         return error_response('Invalid organization name', 400)
 
     try:
-        cert_service = CertificateService()
-        cert_data = cert_service.issue_certificate(
-            ca_id=ca.id,
-            subject={
+        cert_obj = CertificateService.create_certificate(
+            descr=cert_name,
+            caref=ca.refid,
+            dn={
                 'CN': f'{user.username}@mtls',
-                'O': data.get('organization', 'UCM Users'),
+                'O': org,
                 'OU': 'mTLS Clients',
             },
-            key_type='RSA',
-            key_size=2048,
+            cert_type='usr_cert',
+            key_type='2048',
             validity_days=validity_days,
-            key_usage=['digitalSignature', 'keyEncipherment'],
-            extended_key_usage=['clientAuth'],
+            username=user.username,
         )
 
-        # Also enroll in auth_certificates for auto-login
-        cert_obj = Certificate.query.get(cert_data['id'])
-        if cert_obj and cert_obj.crt:
-            cert_pem = base64.b64decode(cert_obj.crt).decode('utf-8')
-            from services.certificate_parser import CertificateParser
-            parsed = CertificateParser.parse_pem_certificate(cert_pem)
-            if parsed:
-                info = CertificateParser.extract_certificate_info(parsed)
-                auth_cert = AuthCertificate(
-                    user_id=user.id,
-                    cert_serial=info['serial'],
-                    cert_subject=info['subject_dn'],
-                    cert_issuer=info['issuer_dn'],
-                    cert_fingerprint=info['fingerprint'],
-                    name=cert_name,
-                    valid_from=info['valid_from'],
-                    valid_until=info['valid_until'],
-                    enabled=True,
-                )
-                db.session.add(auth_cert)
-                db.session.commit()
+        # Read back the PEM cert and key for the response
+        cert_pem = base64.b64decode(cert_obj.crt).decode('utf-8') if cert_obj.crt else ''
+        key_pem = ''
+        key_file = cert_key_path(cert_obj)
+        if key_file.exists():
+            key_pem = key_file.read_text()
+
+        # Enroll in auth_certificates for auto-login
+        auth_cert = AuthCertificate(
+            user_id=user.id,
+            cert_serial=cert_obj.serial_number or '',
+            cert_subject=cert_obj.subject or '',
+            cert_issuer=cert_obj.issuer or '',
+            cert_fingerprint='',
+            name=cert_name,
+            valid_from=cert_obj.valid_from,
+            valid_until=cert_obj.valid_to,
+            enabled=True,
+        )
+        db.session.add(auth_cert)
+        db.session.commit()
 
         AuditService.log_action(
             action='mtls_cert_create',
             resource_type='certificate',
-            resource_id=str(cert_data['id']),
+            resource_id=str(cert_obj.id),
             resource_name=cert_name,
             details=f'Created mTLS certificate for user: {user.username}',
             success=True,
         )
 
-        return success_response(data={
-            'id': cert_data['id'],
-            'serial': cert_data.get('serial', ''),
-            'certificate': cert_data.get('pem', ''),
-            'private_key': cert_data.get('private_key', ''),
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'expires_at': cert_data.get('not_after', ''),
+        return created_response(data={
+            'id': cert_obj.id,
+            'serial': cert_obj.serial_number or '',
+            'certificate': cert_pem,
+            'private_key': key_pem,
+            'created_at': cert_obj.valid_from.isoformat() if cert_obj.valid_from else '',
+            'expires_at': cert_obj.valid_to.isoformat() if cert_obj.valid_to else '',
             'status': 'valid',
-        }, message='mTLS certificate created'), 201
+        }, message='mTLS certificate created')
 
     except Exception as e:
-        logger.error(f'mTLS cert creation error: {e}')
+        logger.error(f'mTLS cert creation error: {e}', exc_info=True)
         return error_response('Failed to create certificate', 500)
 
 
