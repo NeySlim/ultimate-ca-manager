@@ -28,6 +28,7 @@ from api.v2.import_opnsense import bp as import_opnsense_bp
 from api.v2.rbac import bp as rbac_bp
 from api.v2.webauthn import bp as webauthn_bp
 from api.v2.mtls import bp as mtls_bp
+from api.v2.user_certificates import bp as user_certificates_bp
 from api.v2.audit import bp as audit_bp
 from api.v2.websocket import websocket_bp
 from api.v2.groups import bp as groups_bp
@@ -65,6 +66,7 @@ API_V2_BLUEPRINTS = [
     rbac_bp,
     webauthn_bp,
     mtls_bp,
+    user_certificates_bp,
     audit_bp,
     websocket_bp,
     groups_bp,

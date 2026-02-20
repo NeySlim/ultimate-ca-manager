@@ -1672,7 +1672,10 @@
     "securityKey": "Sicherheitsschlüssel",
     "mtlsCertCreated": "mTLS-Zertifikat erfolgreich erstellt",
     "mtlsCertCreateFailed": "Erstellung des mTLS-Zertifikats fehlgeschlagen",
-    "mtlsDownloadWarning": "Speichern Sie den privaten Schlüssel jetzt — er kann später nicht abgerufen werden. Importieren Sie Zertifikat und Schlüssel in Ihren Browser oder OS-Schlüsselbund.",
+    "mtlsDownloadWarning": "Speichern Sie den privaten Schlüssel jetzt — er kann später nicht abgerufen werden.",
+    "mtlsCertManaged": "Dieses Zertifikat wird von UCM verwaltet. Sie können es jederzeit unter Benutzerzertifikate herunterladen.",
+    "downloadPEM": "PEM herunterladen",
+    "manageAllCertificates": "Alle Zertifikate verwalten",
     "mtlsCertName": "Zertifikatsname",
     "mtlsIssuingCA": "Ausstellende CA",
     "mtlsDefaultCA": "Standard (vertrauenswürdige CA)",
@@ -2519,5 +2522,61 @@
     "formatP7bDesc": "Zertifikatsketten-Bundle",
     "formatP12Desc": "Zertifikat + Schlüssel in verschlüsseltem Container",
     "formatKeyDesc": "Nur der private Schlüssel im PEM-Format"
+  },
+  "userCertificates": {
+    "title": "Benutzerzertifikate",
+    "description": "Client-Zertifikate für mTLS-Authentifizierung verwalten",
+    "searchPlaceholder": "Nach Name, Betreff oder Seriennummer suchen...",
+    "columns": {
+      "name": "Zertifikat",
+      "owner": "Besitzer",
+      "status": "Status",
+      "expires": "Läuft ab",
+      "lastUsed": "Zuletzt verwendet"
+    },
+    "stats": {
+      "valid": "Gültig",
+      "expiring": "Ablaufend",
+      "expired": "Abgelaufen",
+      "revoked": "Widerrufen"
+    },
+    "actions": {
+      "export": "Exportieren",
+      "exportPEM": "PEM exportieren",
+      "exportPKCS12": "PKCS12 exportieren",
+      "revoke": "Widerrufen",
+      "delete": "Löschen"
+    },
+    "detail": {
+      "owner": "Besitzer",
+      "subject": "Betreff",
+      "issuer": "Aussteller",
+      "serial": "Seriennummer",
+      "fingerprint": "Fingerabdruck",
+      "validFrom": "Gültig ab",
+      "validTo": "Gültig bis",
+      "lastUsed": "Zuletzt verwendet",
+      "created": "Erstellt",
+      "privateKey": "Privater Schlüssel gespeichert"
+    },
+    "empty": {
+      "title": "Keine Benutzerzertifikate",
+      "description": "Es wurden noch keine Client-Zertifikate ausgestellt"
+    },
+    "exportTitle": "Zertifikat exportieren",
+    "exportDescription": "Zertifikat {{name}} im gewünschten Format exportieren",
+    "exportPasswordLabel": "PKCS12-Passwort",
+    "exportPasswordPlaceholder": "Passwort eingeben (min. 8 Zeichen)",
+    "exportPasswordMin": "Das Passwort muss mindestens 8 Zeichen lang sein",
+    "exportSuccess": "Zertifikat erfolgreich exportiert",
+    "exportFailed": "Zertifikat konnte nicht exportiert werden",
+    "revokeTitle": "Zertifikat widerrufen",
+    "revokeDescription": "Möchten Sie {{name}} wirklich widerrufen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "revokeSuccess": "Zertifikat erfolgreich widerrufen",
+    "revokeFailed": "Zertifikat konnte nicht widerrufen werden",
+    "deleteTitle": "Zertifikat löschen",
+    "deleteDescription": "Möchten Sie {{name}} wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteSuccess": "Zertifikat erfolgreich gelöscht",
+    "deleteFailed": "Zertifikat konnte nicht gelöscht werden"
   }
 }

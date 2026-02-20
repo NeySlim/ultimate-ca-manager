@@ -1676,6 +1676,9 @@
     "mtlsCertCreated": "mTLS certificate created successfully",
     "mtlsCertCreateFailed": "Failed to create mTLS certificate",
     "mtlsDownloadWarning": "Save the private key now — it cannot be retrieved later. Import the certificate and key into your browser or OS keychain.",
+    "mtlsCertManaged": "This certificate is managed by UCM. You can download it anytime from User Certificates.",
+    "downloadPEM": "Download PEM",
+    "manageAllCertificates": "Manage all certificates",
     "mtlsCertName": "Certificate name",
     "mtlsIssuingCA": "Issuing CA",
     "mtlsDefaultCA": "Default (trusted CA)",
@@ -2567,5 +2570,61 @@
     "formatP7bDesc": "Certificate chain bundle",
     "formatP12Desc": "Certificate + key in encrypted container",
     "formatKeyDesc": "PEM-encoded private key only"
+  },
+  "userCertificates": {
+    "title": "User Certificates",
+    "description": "Manage client certificates issued to users for mTLS authentication",
+    "searchPlaceholder": "Search by name, subject, or serial...",
+    "columns": {
+      "name": "Certificate",
+      "owner": "Owner",
+      "status": "Status",
+      "expires": "Expires",
+      "lastUsed": "Last Used"
+    },
+    "stats": {
+      "valid": "Valid",
+      "expiring": "Expiring",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "actions": {
+      "export": "Export",
+      "exportPEM": "Export PEM",
+      "exportPKCS12": "Export PKCS12",
+      "revoke": "Revoke",
+      "delete": "Delete"
+    },
+    "detail": {
+      "owner": "Owner",
+      "subject": "Subject",
+      "issuer": "Issuer",
+      "serial": "Serial Number",
+      "fingerprint": "Fingerprint",
+      "validFrom": "Valid From",
+      "validTo": "Valid To",
+      "lastUsed": "Last Used",
+      "created": "Created",
+      "privateKey": "Private Key Stored"
+    },
+    "empty": {
+      "title": "No user certificates",
+      "description": "No client certificates have been issued yet"
+    },
+    "exportTitle": "Export Certificate",
+    "exportDescription": "Export certificate {{name}} in your preferred format",
+    "exportPasswordLabel": "PKCS12 Password",
+    "exportPasswordPlaceholder": "Enter password (min 8 characters)",
+    "exportPasswordMin": "Password must be at least 8 characters",
+    "exportSuccess": "Certificate exported successfully",
+    "exportFailed": "Failed to export certificate",
+    "revokeTitle": "Revoke Certificate",
+    "revokeDescription": "Are you sure you want to revoke {{name}}? This action cannot be undone.",
+    "revokeSuccess": "Certificate revoked successfully",
+    "revokeFailed": "Failed to revoke certificate",
+    "deleteTitle": "Delete Certificate",
+    "deleteDescription": "Are you sure you want to permanently delete {{name}}? This action cannot be undone.",
+    "deleteSuccess": "Certificate deleted successfully",
+    "deleteFailed": "Failed to delete certificate"
   }
 }

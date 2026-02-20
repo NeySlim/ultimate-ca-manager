@@ -4,9 +4,10 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { 
   User, Key, FloppyDisk, Fingerprint, Certificate, 
-  PencilSimple, Trash, Plus, Warning, ShieldCheck
+  PencilSimple, Trash, Plus, Warning, ShieldCheck, Download, ArrowSquareOut
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -14,12 +15,13 @@ import {
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   LoadingSpinner
 } from '../components'
-import { accountService, casService } from '../services'
+import { accountService, casService, userCertificatesService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { formatDate } from '../lib/utils'
 
 export default function AccountPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
@@ -356,6 +358,25 @@ export default function AccountPage() {
     setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
   }
 
+  const handleExportCert = async (certId, format) => {
+    try {
+      const response = await userCertificatesService.exportCert(certId, format)
+      const blob = response instanceof Blob ? response : new Blob([response])
+      const ext = format === 'pkcs12' ? 'p12' : 'pem'
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificate.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showSuccess(t('userCertificates.exportSuccess'))
+    } catch (error) {
+      showError(error.message || t('userCertificates.exportError'))
+    }
+  }
+
   // ============ RENDER TAB CONTENT ============
 
   const renderProfileContent = () => (
@@ -560,6 +581,9 @@ export default function AccountPage() {
                   <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
                     {cert.enabled ? t('common.active') : t('common.disabled')}
                   </Badge>
+                  <Button type="button" size="sm" variant="ghost" title={t('account.downloadPEM')} onClick={() => handleExportCert(cert.cert_id || cert.id, 'pem')}>
+                    <Download size={16} className="text-accent-primary" />
+                  </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
                     <Trash size={16} className="text-status-danger" />
                   </Button>
@@ -568,6 +592,11 @@ export default function AccountPage() {
             ))}
           </div>
         )}
+
+        <Button type="button" variant="outline" size="sm" className="w-full mt-3" onClick={() => navigate('/user-certificates')}>
+          <ArrowSquareOut size={16} className="mr-2" />
+          {t('account.manageAllCertificates')}
+        </Button>
       </DetailSection>
     </DetailContent>
   )
@@ -851,12 +880,16 @@ export default function AccountPage() {
                     className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none"
                   />
                 </div>
-                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-                  <Warning size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-                  <span>{t('account.mtlsDownloadWarning')}</span>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-success-op10 text-xs text-status-success">
+                  <ShieldCheck size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+                  <span>{t('account.mtlsCertManaged')}</span>
                 </div>
               </div>
-              <div className="flex justify-end pt-4 border-t border-border">
+              <div className="flex justify-between pt-4 border-t border-border">
+                <Button type="button" variant="outline" size="sm" onClick={() => handleExportCert(mtlsResult.cert_id || mtlsResult.id, 'pem')}>
+                  <Download size={16} className="mr-1" />
+                  {t('account.downloadPEM')}
+                </Button>
                 <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
                   {t('common.close')}
                 </Button>

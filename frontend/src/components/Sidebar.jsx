@@ -75,6 +75,7 @@ export function Sidebar({ activePage }) {
     'separator',
     // PKI
     { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
+    { id: 'user-certificates', icon: UserCircle, labelKey: 'userCertificates.title', path: '/user-certificates', permission: 'read:user_certificates' },
     { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
     { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
     { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },

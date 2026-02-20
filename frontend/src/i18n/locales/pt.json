@@ -1672,7 +1672,10 @@
     "securityKey": "Chave de Segurança",
     "mtlsCertCreated": "Certificado mTLS criado com sucesso",
     "mtlsCertCreateFailed": "Falha ao criar certificado mTLS",
-    "mtlsDownloadWarning": "Salve a chave privada agora — ela não poderá ser recuperada depois. Importe o certificado e a chave no seu navegador ou chaveiro do SO.",
+    "mtlsDownloadWarning": "Salve a chave privada agora — ela não poderá ser recuperada depois.",
+    "mtlsCertManaged": "Este certificado é gerenciado pelo UCM. Você pode baixá-lo a qualquer momento em Certificados de usuário.",
+    "downloadPEM": "Baixar PEM",
+    "manageAllCertificates": "Gerenciar todos os certificados",
     "mtlsCertName": "Nome do certificado",
     "mtlsIssuingCA": "CA emissora",
     "mtlsDefaultCA": "Padrão (CA confiável)",
@@ -2519,5 +2522,61 @@
     "formatP7bDesc": "Pacote de cadeia de certificados",
     "formatP12Desc": "Certificado + chave em contêiner criptografado",
     "formatKeyDesc": "Apenas a chave privada em formato PEM"
+  },
+  "userCertificates": {
+    "title": "Certificados de Utilizador",
+    "description": "Gerir certificados de cliente emitidos para autenticação mTLS",
+    "searchPlaceholder": "Pesquisar por nome, assunto ou número de série...",
+    "columns": {
+      "name": "Certificado",
+      "owner": "Proprietário",
+      "status": "Estado",
+      "expires": "Expira",
+      "lastUsed": "Último uso"
+    },
+    "stats": {
+      "valid": "Válidos",
+      "expiring": "A expirar",
+      "expired": "Expirados",
+      "revoked": "Revogados"
+    },
+    "actions": {
+      "export": "Exportar",
+      "exportPEM": "Exportar PEM",
+      "exportPKCS12": "Exportar PKCS12",
+      "revoke": "Revogar",
+      "delete": "Eliminar"
+    },
+    "detail": {
+      "owner": "Proprietário",
+      "subject": "Assunto",
+      "issuer": "Emissor",
+      "serial": "Número de série",
+      "fingerprint": "Impressão digital",
+      "validFrom": "Válido desde",
+      "validTo": "Válido até",
+      "lastUsed": "Último uso",
+      "created": "Criado",
+      "privateKey": "Chave privada armazenada"
+    },
+    "empty": {
+      "title": "Sem certificados de utilizador",
+      "description": "Ainda não foram emitidos certificados de cliente"
+    },
+    "exportTitle": "Exportar certificado",
+    "exportDescription": "Exportar certificado {{name}} no formato preferido",
+    "exportPasswordLabel": "Senha PKCS12",
+    "exportPasswordPlaceholder": "Digite a senha (mín 8 caracteres)",
+    "exportPasswordMin": "A senha deve ter pelo menos 8 caracteres",
+    "exportSuccess": "Certificado exportado com sucesso",
+    "exportFailed": "Falha ao exportar certificado",
+    "revokeTitle": "Revogar certificado",
+    "revokeDescription": "Tem certeza que deseja revogar {{name}}?",
+    "revokeSuccess": "Certificado revogado com sucesso",
+    "revokeFailed": "Falha ao revogar certificado",
+    "deleteTitle": "Eliminar certificado",
+    "deleteDescription": "Tem certeza que deseja eliminar permanentemente {{name}}?",
+    "deleteSuccess": "Certificado eliminado com sucesso",
+    "deleteFailed": "Falha ao eliminar certificado"
   }
 }

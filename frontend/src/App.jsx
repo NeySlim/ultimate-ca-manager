@@ -23,6 +23,7 @@ const ForgotPasswordPage = lazyWithRetry(() => import('./pages/ForgotPasswordPag
 const ResetPasswordPage = lazyWithRetry(() => import('./pages/ResetPasswordPage'))
 const DashboardPage = lazyWithRetry(() => import('./pages/DashboardPage'))
 const CertificatesPage = lazyWithRetry(() => import('./pages/CertificatesPage'))
+const UserCertificatesPage = lazyWithRetry(() => import('./pages/UserCertificatesPage'))
 const CAsPage = lazyWithRetry(() => import('./pages/CAsPage'))
 const CSRsPage = lazyWithRetry(() => import('./pages/CSRsPage'))
 const TemplatesPage = lazyWithRetry(() => import('./pages/TemplatesPage'))
@@ -113,6 +114,7 @@ function AppRoutes() {
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
           <Route path="/certificates/:id" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
+          <Route path="/user-certificates" element={<PermissionRoute permission="read:user_certificates"><UserCertificatesPage /></PermissionRoute>} />
           <Route path="/cas" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
           <Route path="/cas/:id" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
           <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />

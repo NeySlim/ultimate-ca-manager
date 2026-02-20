@@ -7,6 +7,7 @@ ROLE_PERMISSIONS = {
     'admin': ['*'],  # Full access
     'operator': [
         'read:certificates', 'write:certificates', 'delete:certificates',
+        'read:user_certificates', 'write:user_certificates', 'delete:user_certificates',
         'read:cas', 'write:cas',
         'read:csrs', 'write:csrs', 'delete:csrs',
         'read:templates',
@@ -22,6 +23,7 @@ ROLE_PERMISSIONS = {
     ],
     'auditor': [
         'read:certificates',
+        'read:user_certificates',
         'read:cas',
         'read:csrs',
         'read:templates',
@@ -36,6 +38,7 @@ ROLE_PERMISSIONS = {
     ],
     'viewer': [
         'read:certificates',
+        'read:user_certificates',
         'read:cas',
         'read:csrs',
         'read:templates',

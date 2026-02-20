@@ -1672,7 +1672,10 @@
     "securityKey": "セキュリティキー",
     "mtlsCertCreated": "mTLS証明書が正常に作成されました",
     "mtlsCertCreateFailed": "mTLS証明書の作成に失敗しました",
-    "mtlsDownloadWarning": "秘密鍵を今すぐ保存してください — 後で取得することはできません。証明書と鍵をブラウザまたはOSキーチェーンにインポートしてください。",
+    "mtlsDownloadWarning": "秘密鍵を今すぐ保存してください。",
+    "mtlsCertManaged": "この証明書はUCMによって管理されています。ユーザー証明書からいつでもダウンロードできます。",
+    "downloadPEM": "PEMダウンロード",
+    "manageAllCertificates": "すべての証明書を管理",
     "mtlsCertName": "証明書名",
     "mtlsIssuingCA": "発行CA",
     "mtlsDefaultCA": "デフォルト（信頼されたCA）",
@@ -2519,5 +2522,61 @@
     "formatP7bDesc": "証明書チェーンバンドル",
     "formatP12Desc": "証明書+鍵を暗号化コンテナに格納",
     "formatKeyDesc": "PEM形式の秘密鍵のみ"
+  },
+  "userCertificates": {
+    "title": "ユーザー証明書",
+    "description": "mTLS認証用に発行されたクライアント証明書を管理",
+    "searchPlaceholder": "名前、件名、シリアル番号で検索...",
+    "columns": {
+      "name": "証明書",
+      "owner": "所有者",
+      "status": "ステータス",
+      "expires": "有効期限",
+      "lastUsed": "最終使用"
+    },
+    "stats": {
+      "valid": "有効",
+      "expiring": "期限切れ間近",
+      "expired": "期限切れ",
+      "revoked": "失効"
+    },
+    "actions": {
+      "export": "エクスポート",
+      "exportPEM": "PEMエクスポート",
+      "exportPKCS12": "PKCS12エクスポート",
+      "revoke": "失効",
+      "delete": "削除"
+    },
+    "detail": {
+      "owner": "所有者",
+      "subject": "件名",
+      "issuer": "発行者",
+      "serial": "シリアル番号",
+      "fingerprint": "フィンガープリント",
+      "validFrom": "有効開始",
+      "validTo": "有効期限",
+      "lastUsed": "最終使用",
+      "created": "作成日",
+      "privateKey": "秘密鍵保存済み"
+    },
+    "empty": {
+      "title": "ユーザー証明書なし",
+      "description": "クライアント証明書はまだ発行されていません"
+    },
+    "exportTitle": "証明書をエクスポート",
+    "exportDescription": "{{name}}を希望のフォーマットでエクスポート",
+    "exportPasswordLabel": "PKCS12パスワード",
+    "exportPasswordPlaceholder": "パスワードを入力（8文字以上）",
+    "exportPasswordMin": "パスワードは8文字以上必要です",
+    "exportSuccess": "証明書のエクスポートに成功",
+    "exportFailed": "証明書のエクスポートに失敗",
+    "revokeTitle": "証明書を失効",
+    "revokeDescription": "{{name}}を失効してよろしいですか？",
+    "revokeSuccess": "証明書の失効に成功",
+    "revokeFailed": "証明書の失効に失敗",
+    "deleteTitle": "証明書を削除",
+    "deleteDescription": "{{name}}を完全に削除してよろしいですか？",
+    "deleteSuccess": "証明書の削除に成功",
+    "deleteFailed": "証明書の削除に失敗"
   }
 }

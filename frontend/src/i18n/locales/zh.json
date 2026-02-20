@@ -1672,7 +1672,10 @@
     "securityKey": "安全密钥",
     "mtlsCertCreated": "mTLS 证书创建成功",
     "mtlsCertCreateFailed": "创建 mTLS 证书失败",
-    "mtlsDownloadWarning": "请立即保存私钥 — 之后将无法检索。请将证书和密钥导入浏览器或操作系统密钥链。",
+    "mtlsDownloadWarning": "请立即保存私钥。",
+    "mtlsCertManaged": "此证书由UCM管理。您可以随时从用户证书下载。",
+    "downloadPEM": "下载PEM",
+    "manageAllCertificates": "管理所有证书",
     "mtlsCertName": "证书名称",
     "mtlsIssuingCA": "签发 CA",
     "mtlsDefaultCA": "默认（受信任 CA）",
@@ -2519,5 +2522,61 @@
     "formatP7bDesc": "证书链捆绑包",
     "formatP12Desc": "证书+密钥加密容器",
     "formatKeyDesc": "仅PEM编码的私钥"
+  },
+  "userCertificates": {
+    "title": "用户证书",
+    "description": "管理为mTLS身份验证颁发的客户端证书",
+    "searchPlaceholder": "按名称、主题或序列号搜索...",
+    "columns": {
+      "name": "证书",
+      "owner": "所有者",
+      "status": "状态",
+      "expires": "过期时间",
+      "lastUsed": "最后使用"
+    },
+    "stats": {
+      "valid": "有效",
+      "expiring": "即将过期",
+      "expired": "已过期",
+      "revoked": "已吊销"
+    },
+    "actions": {
+      "export": "导出",
+      "exportPEM": "导出PEM",
+      "exportPKCS12": "导出PKCS12",
+      "revoke": "吊销",
+      "delete": "删除"
+    },
+    "detail": {
+      "owner": "所有者",
+      "subject": "主题",
+      "issuer": "颁发者",
+      "serial": "序列号",
+      "fingerprint": "指纹",
+      "validFrom": "有效期从",
+      "validTo": "有效期至",
+      "lastUsed": "最后使用",
+      "created": "创建时间",
+      "privateKey": "私钥已存储"
+    },
+    "empty": {
+      "title": "没有用户证书",
+      "description": "尚未颁发客户端证书"
+    },
+    "exportTitle": "导出证书",
+    "exportDescription": "以首选格式导出证书 {{name}}",
+    "exportPasswordLabel": "PKCS12密码",
+    "exportPasswordPlaceholder": "输入密码（至少8个字符）",
+    "exportPasswordMin": "密码必须至少8个字符",
+    "exportSuccess": "证书导出成功",
+    "exportFailed": "证书导出失败",
+    "revokeTitle": "吊销证书",
+    "revokeDescription": "确定要吊销 {{name}} 吗？此操作无法撤消。",
+    "revokeSuccess": "证书吊销成功",
+    "revokeFailed": "证书吊销失败",
+    "deleteTitle": "删除证书",
+    "deleteDescription": "确定要永久删除 {{name}} 吗？此操作无法撤消。",
+    "deleteSuccess": "证书删除成功",
+    "deleteFailed": "证书删除失败"
   }
 }
