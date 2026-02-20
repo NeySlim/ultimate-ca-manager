@@ -1,22 +1,11 @@
 /**
  * Certificates Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const certificatesService = {
   async getAll(filters = {}) {
-    const params = new URLSearchParams()
-    if (filters.status) params.append('status', filters.status)
-    if (filters.ca_id) params.append('ca_id', filters.ca_id)
-    if (filters.issuer) params.append('issuer', filters.issuer)
-    if (filters.search) params.append('search', filters.search)
-    if (filters.page) params.append('page', filters.page)
-    if (filters.per_page) params.append('per_page', filters.per_page)
-    if (filters.sort_by) params.append('sort_by', filters.sort_by)
-    if (filters.sort_order) params.append('sort_order', filters.sort_order)
-    
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return apiClient.get(`/certificates${query}`)
+    return apiClient.get(`/certificates${buildQueryString(filters)}`)
   },
 
   async getStats() {
@@ -40,26 +29,20 @@ export const certificatesService = {
   },
 
   async export(id, format = 'pem', options = {}) {
-    const params = new URLSearchParams()
-    params.append('format', format)
-    if (options.includeKey) params.append('include_key', 'true')
-    if (options.includeChain) params.append('include_chain', 'true')
-    if (options.password) params.append('password', options.password)
-    
-    return apiClient.get(`/certificates/${id}/export?${params.toString()}`, {
-      responseType: 'blob'
-    })
+    return apiClient.get(`/certificates/${id}/export${buildQueryString({
+      format,
+      include_key: options.includeKey || undefined,
+      include_chain: options.includeChain || undefined,
+      password: options.password
+    })}`, { responseType: 'blob' })
   },
 
   async exportAll(format = 'pem', options = {}) {
-    const params = new URLSearchParams()
-    params.append('format', format)
-    if (options.includeChain) params.append('include_chain', 'true')
-    if (options.password) params.append('password', options.password)
-    
-    return apiClient.get(`/certificates/export?${params.toString()}`, {
-      responseType: 'blob'
-    })
+    return apiClient.get(`/certificates/export${buildQueryString({
+      format,
+      include_chain: options.includeChain || undefined,
+      password: options.password
+    })}`, { responseType: 'blob' })
   },
 
   async delete(id) {

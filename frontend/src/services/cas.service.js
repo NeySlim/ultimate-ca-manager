@@ -1,7 +1,7 @@
 /**
  * Certificate Authorities Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const casService = {
   async getAll() {
@@ -34,35 +34,24 @@ export const casService = {
   },
 
   async export(id, format = 'pem', options = {}) {
-    const params = new URLSearchParams()
-    params.append('format', format)
-    if (options.includeKey) params.append('include_key', 'true')
-    if (options.includeChain) params.append('include_chain', 'true')  
-    if (options.password) params.append('password', options.password)
-    
-    return apiClient.get(`/cas/${id}/export?${params.toString()}`, {
-      responseType: 'blob'
-    })
+    return apiClient.get(`/cas/${id}/export${buildQueryString({
+      format,
+      include_key: options.includeKey || undefined,
+      include_chain: options.includeChain || undefined,
+      password: options.password
+    })}`, { responseType: 'blob' })
   },
 
   async exportAll(format = 'pem', options = {}) {
-    const params = new URLSearchParams()
-    params.append('format', format)
-    if (options.includeChain) params.append('include_chain', 'true')
-    if (options.password) params.append('password', options.password)
-    
-    return apiClient.get(`/cas/export?${params.toString()}`, {
-      responseType: 'blob'
-    })
+    return apiClient.get(`/cas/export${buildQueryString({
+      format,
+      include_chain: options.includeChain || undefined,
+      password: options.password
+    })}`, { responseType: 'blob' })
   },
 
   async getCertificates(id, filters = {}) {
-    const params = new URLSearchParams()
-    if (filters.page) params.append('page', filters.page)
-    if (filters.per_page) params.append('per_page', filters.per_page)
-    
-    const query = params.toString() ? `?${params.toString()}` : ''
-    return apiClient.get(`/cas/${id}/certificates${query}`)
+    return apiClient.get(`/cas/${id}/certificates${buildQueryString(filters)}`)
   },
 
   // Bulk operations

@@ -1,6 +1,17 @@
 /**
  * API Client - Centralized HTTP client with auth and error handling
  * Includes CSRF token management for security
+ * 
+ * Supported request options:
+ *   method    - HTTP method (default: 'GET')
+ *   headers   - Custom headers (merged with defaults)
+ *   body      - Request body (auto-JSON stringified)
+ *   responseType - Set to 'blob' for binary downloads
+ * 
+ * NOT supported (will be silently ignored):
+ *   params    - Use buildQueryString() to append query params to the URL
+ *   timeout   - Not implemented
+ *   retry     - Not implemented
  */
 
 const API_BASE_URL = '/api/v2'
@@ -67,6 +78,9 @@ class APIClient {
   }
 
   async request(endpoint, options = {}) {
+    if (import.meta.env.DEV && options.params) {
+      console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
+    }
     const url = `${this.baseURL}${endpoint}`
     
     const headers = {
@@ -238,3 +252,26 @@ class APIClient {
 }
 
 export const apiClient = new APIClient()
+
+/**
+ * Build a URL query string from an object of params.
+ * Skips null, undefined, and empty string values.
+ * Use this instead of passing { params } to apiClient (not supported).
+ * 
+ * @param {Record<string, any>} params - Key-value pairs
+ * @returns {string} Query string with leading '?' or empty string
+ * 
+ * @example
+ * apiClient.get(`/certs${buildQueryString({ status: 'valid', search: '' })}`)
+ * // → apiClient.get('/certs?status=valid')
+ */
+export function buildQueryString(params) {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      qs.append(key, String(value))
+    }
+  })
+  const str = qs.toString()
+  return str ? `?${str}` : ''
+}

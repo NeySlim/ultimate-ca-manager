@@ -1,7 +1,7 @@
 /**
  * Search Service - Global search across all entities
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const searchService = {
   /**
@@ -21,6 +21,6 @@ export const searchService = {
       }
     }
     
-    return apiClient.get(`/search?q=${encodeURIComponent(query)}&limit=${limit}`)
+    return apiClient.get(`/search${buildQueryString({ q: query, limit })}`)
   }
 }
