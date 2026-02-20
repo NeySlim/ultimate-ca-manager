@@ -2,14 +2,26 @@
 mTLS API
 Manage client certificates and mTLS configuration
 """
-
+import base64
 import logging
-from flask import Blueprint, request, g, Response
-from auth.unified import require_auth
-from models import User, Certificate, CA, SystemConfig, db
-from services.audit_service import AuditService
-from utils.response import success_response, error_response, created_response
+import re
 from datetime import datetime, timezone
+
+from flask import Blueprint, request, g, Response
+from cryptography import x509 as cx509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import pkcs12
+
+from auth.unified import require_auth
+from config.settings import is_docker, restart_ucm_service
+from models import User, Certificate, CA, SystemConfig, db
+from models.auth_certificate import AuthCertificate
+from services.audit_service import AuditService
+from services.cert_service import CertificateService
+from services.certificate_parser import CertificateParser
+from utils.file_naming import cert_key_path
+from utils.response import success_response, error_response, created_response
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +93,6 @@ def update_mtls_settings():
 
     # Safety: if requiring mTLS, check at least one admin has an enrolled cert
     if required and enabled:
-        from models.auth_certificate import AuthCertificate
         admin_users = User.query.filter_by(role='admin', active=True).all()
         admin_ids = [u.id for u in admin_users]
         admin_certs = AuthCertificate.query.filter(
@@ -120,7 +131,6 @@ def update_mtls_settings():
     needs_restart = enabled is not None or required is not None or ca_id is not None
     restart_message = None
     if needs_restart:
-        from config.settings import is_docker, restart_ucm_service
         if is_docker():
             restart_message = 'Restart the container to apply mTLS changes.'
         else:
@@ -143,7 +153,6 @@ def update_mtls_settings():
 @require_auth()
 def list_mtls_certificates():
     """List user's mTLS certificates (enrolled in auth_certificates)"""
-    from models.auth_certificate import AuthCertificate
     user = g.current_user
 
     certs = AuthCertificate.query.filter_by(user_id=user.id).order_by(
@@ -157,10 +166,6 @@ def list_mtls_certificates():
 @require_auth()
 def create_mtls_certificate():
     """Issue a new mTLS client certificate and auto-enroll it"""
-    from models.auth_certificate import AuthCertificate
-    from services.cert_service import CertificateService
-    from utils.file_naming import cert_key_path
-    import base64
 
     user = g.current_user
     data = request.get_json() or {}
@@ -183,7 +188,6 @@ def create_mtls_certificate():
     cert_name = data.get('name', f'{user.username} mTLS')
 
     # Sanitize organization field
-    import re
     org = data.get('organization', 'UCM Users')
     if not re.match(r'^[a-zA-Z0-9\s\-\.]{1,64}$', org):
         return error_response('Invalid organization name', 400)
@@ -253,7 +257,6 @@ def create_mtls_certificate():
 @require_auth()
 def delete_mtls_certificate(cert_id):
     """Delete an enrolled mTLS certificate"""
-    from models.auth_certificate import AuthCertificate
     user = g.current_user
 
     auth_cert = AuthCertificate.query.get(cert_id)
@@ -283,12 +286,6 @@ def delete_mtls_certificate(cert_id):
 @require_auth()
 def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
-    import base64
-    from models.auth_certificate import AuthCertificate
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.serialization import pkcs12
-    from cryptography.hazmat.backends import default_backend
-    from cryptography import x509 as cx509
 
     user = g.current_user
     fmt = request.args.get('format', 'pem')
@@ -387,8 +384,6 @@ def download_mtls_certificate(cert_id):
 def enroll_presented_certificate():
     """Enroll a client certificate already presented via mTLS.
     Used when user has a valid cert signed by the trusted CA but not yet enrolled."""
-    from models.auth_certificate import AuthCertificate
-    from services.certificate_parser import CertificateParser
 
     user = g.current_user
     cert_info = None
