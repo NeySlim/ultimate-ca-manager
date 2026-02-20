@@ -1,5 +1,5 @@
 /**
- * Detailed help guides for all UCM pages — v2.1.0
+ * Detailed help guides for all UCM pages — v2.2.0
  * Each entry: { title, content (markdown string) }
  * Markdown supports: ## h2, ### h3, #### h4, **bold**, `code`, *italic*,
  *   - lists, 1. numbered, > blockquotes, ``` code blocks
@@ -250,6 +250,80 @@ Select two certificates and click **Compare** to see a side-by-side diff of thei
 - **CA filter** — Show certificates from a specific CA
 - **Text search** — Search by CN, serial number, or SAN
 - **Sorting** — By name, expiry date, creation date, status
+`
+  },
+
+  // ===================================================================
+  'user-certificates': {
+    title: 'User Certificates',
+    content: `
+## Overview
+
+The User Certificates page manages mTLS client certificates enrolled via the **Account → mTLS** tab. Unlike regular certificates, these are specifically tied to user accounts for mutual TLS authentication.
+
+Certificates here are fully managed by UCM — they are stored in the database with private keys, and can be exported, revoked, or deleted at any time.
+
+## Enrolling a Certificate
+
+1. Go to **Account → mTLS** tab
+2. Click **Enroll Certificate**
+3. The system generates a key pair and issues a client certificate signed by your mTLS CA
+4. The certificate appears on this page and can be used for mTLS login
+
+## Certificate Status
+
+- **Valid** — Within validity period and not revoked
+- **Expiring** — Will expire within 30 days
+- **Expired** — Past the "Not After" date
+- **Revoked** — Explicitly revoked, published in CRL
+
+## Exporting a Certificate
+
+1. Select a certificate → **Export**
+2. Choose format:
+   - **PEM** — Certificate + private key + CA chain in text format
+   - **PKCS#12** — Binary bundle, password-protected (min 8 characters)
+3. Click **Download**
+
+The exported file can be imported into browsers, operating systems, or API clients for mTLS authentication.
+
+> ⚠ PKCS#12 password must be at least 8 characters.
+
+## Revoking a Certificate
+
+1. Select a certificate → **Revoke**
+2. Choose a revocation reason:
+   - Key Compromise
+   - Affiliation Changed
+   - Superseded
+   - Cessation of Operation
+   - Unspecified
+3. Confirm the revocation
+
+> ⚠ Revoking a certificate immediately prevents mTLS login with that certificate. Revocation is permanent.
+
+## Deleting a Certificate
+
+Delete removes both the certificate and the user-certificate association. Only admins and operators can delete.
+
+> ⚠ Deletion is permanent and cannot be undone.
+
+## Permissions
+
+| Role | View | Export | Revoke | Delete |
+|------|------|--------|--------|--------|
+| Admin | All | All | All | All |
+| Operator | All | All | All | All |
+| Auditor | All | ✗ | ✗ | ✗ |
+| Viewer | Own only | Own only | ✗ | ✗ |
+
+### Required Permissions
+
+- **read:user_certificates** — View certificate list and details
+- **write:user_certificates** — Revoke certificates
+- **delete:user_certificates** — Delete certificates
+
+> 💡 Enroll new mTLS certificates from the Account page. This page is for managing existing certificates.
 `
   },
 

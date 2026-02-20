@@ -1,10 +1,10 @@
 # UCM API v2.0 - Complete Reference
 
-> **Version**: 2.1.x  
+> **Version**: 2.2.x  
 > **Base URL**: `https://your-server:8443/api/v2`  
-> **Last Updated**: July 2025  
-> **Total Endpoints**: ~270  
-> **Note**: All endpoints are served from `api/v2/` (33 registered blueprints). There is no separate `features/` module.
+> **Last Updated**: February 2026  
+> **Total Endpoints**: ~276  
+> **Note**: All endpoints are served from `api/v2/` (34 registered blueprints). There is no separate `features/` module.
 
 ---
 
@@ -14,7 +14,8 @@
 2. [Account Management](#account-management)
 3. [Certificate Authorities (CAs)](#certificate-authorities)
 4. [Certificates](#certificates)
-5. [Certificate Signing Requests (CSRs)](#certificate-signing-requests)
+5. [User Certificates (mTLS)](#user-certificates-mtls)
+6. [Certificate Signing Requests (CSRs)](#certificate-signing-requests)
 6. [Templates](#templates)
 7. [Trust Store](#trust-store)
 8. [ACME Server](#acme-server)
@@ -741,6 +742,128 @@ Content-Type: application/json
 ```
 
 Returns a ZIP file containing the exported certificates.
+
+---
+
+## User Certificates (mTLS)
+
+Manage mTLS client certificates enrolled via the Account page. These certificates are stored in the main `certificates` table (with `cert_type='usr_cert'`) and linked to users via `auth_certificates`.
+
+**Permissions**: `read:user_certificates`, `write:user_certificates`, `delete:user_certificates`  
+**Ownership**: Viewers see only their own certificates. Operators and admins see all.
+
+### List User Certificates
+```http
+GET /api/v2/user-certificates
+GET /api/v2/user-certificates?status=valid&page=1&per_page=50
+```
+
+**Query Parameters**:
+| Param | Type | Description |
+|-------|------|-------------|
+| status | string | Filter by status: `valid`, `expired`, `revoked` |
+| page | int | Page number (default: 1) |
+| per_page | int | Items per page (default: 50) |
+
+**Response** `200`:
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "cert_id": 52,
+        "common_name": "admin@mtls",
+        "cn": "admin@mtls",
+        "status": "valid",
+        "days_remaining": 364,
+        "has_private_key": true,
+        "created_at": "2026-02-20T19:05:19",
+        "not_valid_after": "2027-02-20T19:05:19",
+        "issuer": "CN=lan.pew.pet,O=Pew Pet",
+        "username": "admin"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "per_page": 50
+  }
+}
+```
+
+### User Certificate Stats
+```http
+GET /api/v2/user-certificates/stats
+```
+
+**Response** `200`:
+```json
+{
+  "data": {
+    "total": 5,
+    "valid": 3,
+    "expired": 1,
+    "revoked": 1,
+    "expiring_soon": 0
+  }
+}
+```
+
+### Get User Certificate
+```http
+GET /api/v2/user-certificates/{id}
+```
+
+**Response** `200`: Full certificate details including `common_name`, `cn`, `days_remaining`, `key_algorithm`, `signature_algorithm`, `serial_number`, `fingerprint`.
+
+### Export User Certificate
+```http
+GET /api/v2/user-certificates/{id}/export?format=pem&include_key=true&include_chain=true
+GET /api/v2/user-certificates/{id}/export?format=pkcs12&password=mypassword
+```
+
+**Query Parameters**:
+| Param | Type | Description |
+|-------|------|-------------|
+| format | string | `pem` (default) or `pkcs12` |
+| include_key | bool | Include private key (default: true) |
+| include_chain | bool | Include CA chain (default: true) |
+| password | string | PKCS12 password (required for pkcs12, min 8 chars) |
+
+**Response** `200`: Binary file download with `Content-Disposition` header.
+
+> **Note**: Auditors are explicitly blocked from exporting user certificates.
+
+### Revoke User Certificate
+```http
+POST /api/v2/user-certificates/{id}/revoke
+```
+
+**Body**:
+```json
+{
+  "reason": "unspecified"
+}
+```
+
+**Reason values**: `unspecified`, `key_compromise`, `ca_compromise`, `affiliation_changed`, `superseded`, `cessation_of_operation`
+
+**Response** `200`:
+```json
+{
+  "message": "Certificate revoked successfully",
+  "data": { ... }
+}
+```
+
+### Delete User Certificate
+```http
+DELETE /api/v2/user-certificates/{id}
+```
+
+**Response** `204`: No content.
+
+> **Note**: Only admins and operators can delete. Deletes both the `auth_certificates` link and the underlying certificate.
 
 ---
 
@@ -3122,6 +3245,6 @@ const data = await certs.json();
 
 ---
 
-**Documentation generated**: July 2025  
-**API Version**: 2.1.x  
-**Total Endpoints**: ~270
+**Documentation generated**: February 2026  
+**API Version**: 2.2.x  
+**Total Endpoints**: ~276
