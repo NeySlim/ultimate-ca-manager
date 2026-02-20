@@ -180,7 +180,7 @@ export default function UserCertificatesPage() {
       key: 'name',
       label: t('userCertificates.columns.name'),
       sortable: true,
-      render: (row) => (
+      render: (_value, row) => (
         <div className="flex items-center gap-2">
           <ShieldCheck size={16} className="text-accent-primary shrink-0" />
           <div className="min-w-0">
@@ -193,7 +193,7 @@ export default function UserCertificatesPage() {
     {
       key: 'owner',
       label: t('userCertificates.columns.owner'),
-      render: (row) => (
+      render: (_value, row) => (
         <div className="flex items-center gap-1.5">
           <UserCircle size={14} className="text-text-tertiary" />
           <span>{row.owner || '-'}</span>
@@ -203,20 +203,20 @@ export default function UserCertificatesPage() {
     {
       key: 'status',
       label: t('userCertificates.columns.status'),
-      render: (row) => statusBadge(row.status),
+      render: (value) => statusBadge(value),
     },
     {
       key: 'valid_to',
       label: t('userCertificates.columns.expires'),
       sortable: true,
-      render: (row) => <span className="text-text-secondary text-xs">{formatDate(row.valid_to || row.valid_until)}</span>,
+      render: (_value, row) => <span className="text-text-secondary text-xs">{formatDate(row.valid_to || row.valid_until)}</span>,
     },
     {
       key: 'last_used_at',
       label: t('userCertificates.columns.lastUsed'),
-      render: (row) => (
+      render: (value) => (
         <span className="text-text-tertiary text-xs">
-          {row.last_used_at ? formatDate(row.last_used_at) : t('common.never')}
+          {value ? formatDate(value) : t('common.never')}
         </span>
       ),
     },
@@ -224,7 +224,7 @@ export default function UserCertificatesPage() {
       key: 'actions',
       label: '',
       width: 'auto',
-      render: (row) => (
+      render: (_value, row) => (
         <div className="flex items-center gap-1">
           <Button
             type="button"
