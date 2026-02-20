@@ -675,8 +675,8 @@ def export_ca(ca_id):
             # Include private key if requested
             if include_key and ca.prv:
                 key_pem = base64.b64decode(ca.prv)
-                if not result.endswith(b'\\n'):
-                    result += b'\\n'
+                if not result.endswith(b'\n'):
+                    result += b'\n'
                 result += key_pem
                 filename = f"{ca.descr or ca.refid}_with_key.pem"
             
@@ -686,8 +686,8 @@ def export_ca(ca_id):
                 while parent:
                     if parent.crt:
                         parent_cert = base64.b64decode(parent.crt)
-                        if not result.endswith(b'\\n'):
-                            result += b'\\n'
+                        if not result.endswith(b'\n'):
+                            result += b'\n'
                         result += parent_cert
                     if parent.caref:
                         parent = CA.query.filter_by(refid=parent.caref).first()
