@@ -60,6 +60,10 @@ def ensure_system_config_defaults(app):
         # Check if config already exists (read-only check first)
         config = SystemConfig.query.filter_by(key=key).first()
         if config:
+            # Always sync app.version from VERSION file
+            if key == 'app.version' and config.value != value:
+                config.value = value
+                db.session.commit()
             continue  # Already exists, skip
             
         # Try to create it in isolated transaction
