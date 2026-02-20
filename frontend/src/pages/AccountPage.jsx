@@ -10,11 +10,11 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
-  Button, Input, Badge, Modal, FormModal, HelpCard,
+  Button, Input, Select, Badge, Modal, FormModal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   LoadingSpinner
 } from '../components'
-import { accountService } from '../services'
+import { accountService, casService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { formatDate } from '../lib/utils'
 
@@ -43,6 +43,7 @@ export default function AccountPage() {
   const [apiKeys, setApiKeys] = useState([])
   const [webauthnCredentials, setWebauthnCredentials] = useState([])
   const [mtlsCertificates, setMtlsCertificates] = useState([])
+  const [cas, setCas] = useState([])
   
   // Modals
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -50,6 +51,9 @@ export default function AccountPage() {
   const [show2FAModal, setShow2FAModal] = useState(false)
   const [showWebAuthnModal, setShowWebAuthnModal] = useState(false)
   const [showMTLSModal, setShowMTLSModal] = useState(false)
+  const [mtlsCreating, setMtlsCreating] = useState(false)
+  const [mtlsResult, setMtlsResult] = useState(null)
+  const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
   
   // 2FA state
   const [qrData, setQrData] = useState(null)
@@ -71,11 +75,19 @@ export default function AccountPage() {
         loadAccount(),
         loadApiKeys(),
         loadWebAuthnCredentials(),
-        loadMTLSCertificates()
+        loadMTLSCertificates(),
+        loadCAs(),
       ])
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadCAs = async () => {
+    try {
+      const response = await casService.getAll()
+      setCas(response.data || [])
+    } catch {}
   }
 
   const loadAccount = async () => {
@@ -318,6 +330,32 @@ export default function AccountPage() {
     }
   }
 
+  const handleCreateMTLS = async () => {
+    setMtlsCreating(true)
+    setMtlsResult(null)
+    try {
+      const response = await accountService.createMTLSCertificate({
+        name: mtlsForm.name || undefined,
+        validity_days: mtlsForm.validity_days,
+        ca_id: mtlsForm.ca_id || undefined,
+      })
+      const data = response.data || {}
+      setMtlsResult(data)
+      showSuccess(t('account.mtlsCertCreated'))
+      await loadMTLSCertificates()
+    } catch (error) {
+      showError(error.message || t('account.mtlsCertCreateFailed'))
+    } finally {
+      setMtlsCreating(false)
+    }
+  }
+
+  const handleCloseMTLSModal = () => {
+    setShowMTLSModal(false)
+    setMtlsResult(null)
+    setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
+  }
+
   // ============ RENDER TAB CONTENT ============
 
   const renderProfileContent = () => (
@@ -511,15 +549,21 @@ export default function AccountPage() {
                 <div className="flex items-center gap-3">
                   <Certificate size={20} className="text-accent-primary" />
                   <div>
-                    <p className="text-sm font-medium text-text-primary">{cert.cn || cert.subject}</p>
+                    <p className="text-sm font-medium text-text-primary">{cert.name || cert.cert_subject}</p>
                     <p className="text-xs text-text-tertiary">
-                      {t('common.expires')} {formatDate(cert.not_after)}
+                      {t('common.expires')} {formatDate(cert.valid_until)}
+                      {cert.last_used_at && ` • ${t('common.used')} ${formatDate(cert.last_used_at)}`}
                     </p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
-                  <Trash size={16} className="text-status-danger" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
+                    {cert.enabled ? t('common.active') : t('common.disabled')}
+                  </Badge>
+                  <Button size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
+                    <Trash size={16} className="text-status-danger" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -781,18 +825,80 @@ export default function AccountPage() {
       {/* mTLS Certificate Modal */}
       <Modal
         open={showMTLSModal}
-        onOpenChange={setShowMTLSModal}
+        onOpenChange={handleCloseMTLSModal}
         title={t('account.addCertificate')}
       >
-        <div className="p-4">
-          <p className="text-sm text-text-secondary">
-            {t('account.mtlsComingSoon')}
-          </p>
-          <div className="flex justify-end pt-4 border-t border-border mt-4">
-            <Button variant="secondary" onClick={() => setShowMTLSModal(false)}>
-              {t('common.close')}
-            </Button>
-          </div>
+        <div className="p-4 space-y-4">
+          {mtlsResult ? (
+            <>
+              <div className="p-3 rounded-lg bg-status-success/10 text-sm text-status-success font-medium">
+                {t('account.mtlsCertCreated')}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-text-secondary font-medium">{t('common.certificate')}</label>
+                  <textarea
+                    readOnly
+                    value={mtlsResult.certificate || ''}
+                    className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary font-medium">{t('account.privateKey')}</label>
+                  <textarea
+                    readOnly
+                    value={mtlsResult.private_key || ''}
+                    className="w-full h-24 mt-1 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none"
+                  />
+                </div>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning/10 text-xs text-status-warning">
+                  <Warning size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+                  <span>{t('account.mtlsDownloadWarning')}</span>
+                </div>
+              </div>
+              <div className="flex justify-end pt-4 border-t border-border">
+                <Button variant="secondary" onClick={handleCloseMTLSModal}>
+                  {t('common.close')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Input
+                label={t('account.mtlsCertName')}
+                value={mtlsForm.name}
+                onChange={(e) => setMtlsForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder={`${user?.username || 'user'} mTLS`}
+              />
+              <Select
+                label={t('account.mtlsIssuingCA')}
+                value={mtlsForm.ca_id}
+                onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
+                placeholder={t('account.mtlsDefaultCA')}
+                options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({
+                  value: ca.refid || String(ca.id),
+                  label: ca.descr || ca.subject || ca.refid,
+                }))}
+              />
+              <Input
+                label={t('account.mtlsValidityDays')}
+                type="number"
+                value={mtlsForm.validity_days}
+                onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))}
+                min="1"
+                max="3650"
+              />
+              <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
+                  {t('common.cancel')}
+                </Button>
+                <Button onClick={handleCreateMTLS} loading={mtlsCreating} disabled={mtlsCreating}>
+                  <Certificate size={16} />
+                  {t('account.generateCertificate')}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </>

@@ -1669,7 +1669,16 @@
     "registrationFailed": "Не вдалося зареєструвати ключ безпеки",
     "deleteKeyFailed": "Не вдалося видалити ключ безпеки",
     "deleteCertFailed": "Не вдалося видалити сертифікат",
-    "securityKey": "Ключ безпеки"
+    "securityKey": "Ключ безпеки",
+    "mtlsCertCreated": "Сертифікат mTLS успішно створено",
+    "mtlsCertCreateFailed": "Не вдалося створити сертифікат mTLS",
+    "mtlsDownloadWarning": "Збережіть приватний ключ зараз — його неможливо буде отримати пізніше. Імпортуйте сертифікат та ключ у браузер або сховище ключів ОС.",
+    "mtlsCertName": "Назва сертифіката",
+    "mtlsIssuingCA": "CA-видавець",
+    "mtlsDefaultCA": "За замовчуванням (довірена CA)",
+    "mtlsValidityDays": "Термін дії (днів)",
+    "generateCertificate": "Згенерувати сертифікат",
+    "privateKey": "Приватний ключ"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",

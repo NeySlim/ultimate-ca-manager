@@ -1669,7 +1669,16 @@
     "registrationFailed": "Impossibile registrare la chiave di sicurezza",
     "deleteKeyFailed": "Impossibile eliminare la chiave di sicurezza",
     "deleteCertFailed": "Impossibile eliminare il certificato",
-    "securityKey": "Chiave di Sicurezza"
+    "securityKey": "Chiave di Sicurezza",
+    "mtlsCertCreated": "Certificato mTLS creato con successo",
+    "mtlsCertCreateFailed": "Errore nella creazione del certificato mTLS",
+    "mtlsDownloadWarning": "Salva la chiave privata ora — non sarà recuperabile in seguito. Importa certificato e chiave nel browser o portachiavi del SO.",
+    "mtlsCertName": "Nome certificato",
+    "mtlsIssuingCA": "CA emittente",
+    "mtlsDefaultCA": "Predefinita (CA attendibile)",
+    "mtlsValidityDays": "Validità (giorni)",
+    "generateCertificate": "Genera certificato",
+    "privateKey": "Chiave privata"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",

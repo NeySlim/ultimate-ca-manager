@@ -1669,7 +1669,16 @@
     "registrationFailed": "Falhado para register security key",
     "deleteKeyFailed": "Falha ao eliminar chave de segurança",
     "deleteCertFailed": "Falha ao eliminar certificado",
-    "securityKey": "Chave de Segurança"
+    "securityKey": "Chave de Segurança",
+    "mtlsCertCreated": "Certificado mTLS criado com sucesso",
+    "mtlsCertCreateFailed": "Falha ao criar certificado mTLS",
+    "mtlsDownloadWarning": "Salve a chave privada agora — ela não poderá ser recuperada depois. Importe o certificado e a chave no seu navegador ou chaveiro do SO.",
+    "mtlsCertName": "Nome do certificado",
+    "mtlsIssuingCA": "CA emissora",
+    "mtlsDefaultCA": "Padrão (CA confiável)",
+    "mtlsValidityDays": "Validade (dias)",
+    "generateCertificate": "Gerar certificado",
+    "privateKey": "Chave privada"
   },
   "rbac": {
     "title": "Controlo de acesso baseado em funções",
