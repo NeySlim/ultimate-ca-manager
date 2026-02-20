@@ -86,7 +86,7 @@ def update_mtls_settings():
         admin_ids = [u.id for u in admin_users]
         admin_certs = AuthCertificate.query.filter(
             AuthCertificate.user_id.in_(admin_ids),
-            AuthCertificate.enabled == True
+            AuthCertificate.enabled == True  # noqa: E712 — SQLAlchemy requires ==
         ).count() if admin_ids else 0
         if admin_certs == 0:
             return error_response(
@@ -180,6 +180,12 @@ def create_mtls_certificate():
 
     validity_days = min(max(int(data.get('validity_days', 365)), 1), 3650)
     cert_name = data.get('name', f'{user.username} mTLS')
+
+    # Sanitize organization field
+    import re
+    org = data.get('organization', 'UCM Users')
+    if not re.match(r'^[a-zA-Z0-9\s\-\.]{1,64}$', org):
+        return error_response('Invalid organization name', 400)
 
     try:
         cert_service = CertificateService()
@@ -278,6 +284,7 @@ def delete_mtls_certificate(cert_id):
 def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
     import base64
+    from models.auth_certificate import AuthCertificate
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.serialization import pkcs12
     from cryptography.hazmat.backends import default_backend
@@ -287,22 +294,27 @@ def download_mtls_certificate(cert_id):
     fmt = request.args.get('format', 'pem')
     password = request.args.get('password', '')
 
-    # Find the Certificate row matching this user's mTLS cert
-    cert = Certificate.query.get(cert_id)
-    if not cert:
+    # Authorize via auth_certificates ownership (not string match on subject)
+    auth_cert = AuthCertificate.query.filter_by(id=cert_id, user_id=user.id).first()
+    if not auth_cert and getattr(user, 'role', '') != 'admin':
+        return error_response('Certificate not found or not authorized', 404)
+    if not auth_cert:
+        auth_cert = AuthCertificate.query.get(cert_id)
+    if not auth_cert:
         return error_response('Certificate not found', 404)
 
-    if f'{user.username}@mtls' not in (cert.subject or ''):
-        return error_response('Not authorized', 403)
-
-    if not cert.crt:
+    # Find the actual Certificate row by serial
+    cert = Certificate.query.filter(
+        Certificate.serial_number == auth_cert.cert_serial
+    ).first()
+    if not cert or not cert.crt:
         return error_response('Certificate data not available', 404)
 
     cert_pem = base64.b64decode(cert.crt)
 
-    if fmt == 'p12' or fmt == 'pkcs12':
-        if not password:
-            return error_response('Password required for PKCS12 export', 400)
+    if fmt in ('p12', 'pkcs12'):
+        if not password or len(password) < 8:
+            return error_response('PKCS12 export requires a password of at least 8 characters', 400)
         if not cert.prv:
             return error_response('Private key not available for PKCS12 export', 400)
 
@@ -310,14 +322,24 @@ def download_mtls_certificate(cert_id):
         private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
         x509_cert = cx509.load_pem_x509_certificate(cert_pem, default_backend())
 
+        # Build CA chain with cycle detection
         ca_certs = []
         if cert.caref:
+            seen_cas = set()
             ca = CA.query.filter_by(refid=cert.caref).first()
-            while ca:
+            while ca and len(ca_certs) < 10:
+                if ca.refid in seen_cas:
+                    logger.warning(f"Circular CA reference detected: {ca.refid}")
+                    break
+                seen_cas.add(ca.refid)
                 if ca.crt:
-                    ca_certs.append(cx509.load_pem_x509_certificate(
-                        base64.b64decode(ca.crt), default_backend()
-                    ))
+                    try:
+                        ca_certs.append(cx509.load_pem_x509_certificate(
+                            base64.b64decode(ca.crt), default_backend()
+                        ))
+                    except Exception as e:
+                        logger.error(f"Failed to load CA cert {ca.refid}: {e}")
+                        break
                 ca = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
 
         p12_bytes = pkcs12.serialize_key_and_certificates(
@@ -328,6 +350,15 @@ def download_mtls_certificate(cert_id):
             encryption_algorithm=serialization.BestAvailableEncryption(password.encode()),
         )
 
+        AuditService.log_action(
+            action='mtls_cert_download',
+            resource_type='certificate',
+            resource_id=str(cert_id),
+            resource_name=auth_cert.name or str(cert_id),
+            details=f'Downloaded certificate as PKCS12 by user: {user.username}',
+            success=True,
+        )
+
         return Response(
             p12_bytes,
             mimetype='application/x-pkcs12',
@@ -335,6 +366,15 @@ def download_mtls_certificate(cert_id):
         )
 
     # Default: PEM
+    AuditService.log_action(
+        action='mtls_cert_download',
+        resource_type='certificate',
+        resource_id=str(cert_id),
+        resource_name=auth_cert.name or str(cert_id),
+        details=f'Downloaded certificate as PEM by user: {user.username}',
+        success=True,
+    )
+
     return Response(
         cert_pem,
         mimetype='application/x-pem-file',
@@ -371,6 +411,21 @@ def enroll_presented_certificate():
 
     if not cert_info:
         return error_response('No client certificate detected in this request', 400)
+
+    # Validate certificate is not expired and not not-yet-valid
+    valid_until = cert_info.get('valid_until')
+    if valid_until:
+        if isinstance(valid_until, str):
+            valid_until = datetime.fromisoformat(valid_until.replace('Z', '+00:00'))
+        if hasattr(valid_until, 'timestamp') and valid_until < datetime.now(timezone.utc):
+            return error_response('Cannot enroll expired certificate', 400)
+
+    valid_from = cert_info.get('valid_from')
+    if valid_from:
+        if isinstance(valid_from, str):
+            valid_from = datetime.fromisoformat(valid_from.replace('Z', '+00:00'))
+        if hasattr(valid_from, 'timestamp') and valid_from > datetime.now(timezone.utc):
+            return error_response('Cannot enroll certificate that is not yet valid', 400)
 
     # Check if already enrolled
     existing = AuthCertificate.query.filter_by(cert_serial=cert_info['serial']).first()

@@ -86,10 +86,27 @@ def _load_mtls_config():
         except Exception:
             ca_pem = row[0]
 
-        # Write CA cert to a stable file (overwritten on each restart)
+        # Validate PEM format
+        if '-----BEGIN CERTIFICATE-----' not in ca_pem or '-----END CERTIFICATE-----' not in ca_pem:
+            print(f"mTLS: CA cert for {ca_refid} is not valid PEM format", file=sys.stderr)
+            return
+
+        # Write CA cert atomically (temp file + rename) with restricted permissions
+        import tempfile
+        import stat
         ca_file_path = os.path.join(data_path, 'mtls_ca.pem')
-        with open(ca_file_path, 'w') as f:
-            f.write(ca_pem)
+        fd, temp_path = tempfile.mkstemp(dir=data_path, prefix='.mtls_ca_', suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write(ca_pem)
+            os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+            os.rename(temp_path, ca_file_path)
+        except Exception as e:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise e
 
         ca_certs = ca_file_path
         cert_reqs = 2 if config.get('mtls_required') == 'true' else 1

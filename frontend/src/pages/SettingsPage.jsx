@@ -1476,7 +1476,7 @@ function WebhookForm({ webhook, onSave, onCancel }) {
 
 export default function SettingsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
   const { canWrite, hasPermission } = usePermission()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1961,7 +1961,7 @@ export default function SettingsPage() {
       if (data.needs_restart && !isDocker) {
         waitForRestart()
       } else if (data.restart_message) {
-        showSuccess(data.restart_message)
+        showWarning(data.restart_message)
       }
     } catch (error) {
       showError(error.message || t('settings.mtls.saveFailed'))
