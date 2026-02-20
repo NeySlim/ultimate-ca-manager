@@ -302,7 +302,14 @@ def regenerate_https_cert():
             success=True
         )
         
-        # Restart service using centralized mechanism
+        # Restart service (skip in Docker — user must restart container)
+        from config.settings import is_docker
+        if is_docker():
+            return success_response(
+                message="Certificate regenerated. Restart the container to apply.",
+                data={'requires_container_restart': True}
+            )
+        
         from utils.service_manager import restart_service as do_restart
         success, msg = do_restart()
         if not success:
@@ -394,7 +401,14 @@ def apply_https_cert():
             success=True
         )
         
-        # Restart service using centralized mechanism
+        # Restart service (skip in Docker — user must restart container)
+        from config.settings import is_docker
+        if is_docker():
+            return success_response(
+                message="Certificate applied. Restart the container to apply.",
+                data={'requires_container_restart': True}
+            )
+        
         from utils.service_manager import restart_service as do_restart
         success, msg = do_restart()
         if not success:
@@ -1373,6 +1387,10 @@ def get_service_status():
 @require_auth(['write:settings'])
 def restart_service():
     """Restart the UCM service"""
+    from config.settings import is_docker
+    if is_docker():
+        return error_response("Service restart is not available in Docker. Restart the container instead.", 400)
+    
     try:
         AuditService.log_action(
             action='service_restart',

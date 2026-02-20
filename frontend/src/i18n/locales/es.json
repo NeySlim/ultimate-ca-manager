@@ -1460,6 +1460,8 @@
     "uptime": "Tiempo de actividad",
     "memory": "Memoria",
     "serviceStatusUnavailable": "Estado del servicio no disponible.",
+    "dockerRestartNotice": "En Docker, reinicie el contenedor para aplicar los cambios.",
+    "dockerCertNotice": "Certificado guardado. Reinicie el contenedor para aplicar: docker restart <contenedor>",
     "settingSavedInBrowser": "Esta configuración se guarda en su navegador y persiste entre sesiones.",
     "smtpConfig": "Configuración SMTP",
     "testEmailSuccess": "Email de prueba enviado correctamente",

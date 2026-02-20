@@ -183,6 +183,7 @@ vi.mock('../../services/system.service', () => ({
     getVersion: vi.fn().mockResolvedValue({ data: { version: '2.0.4' } }),
     getHealth: vi.fn().mockResolvedValue({ data: {} }),
     getInfo: vi.fn().mockResolvedValue({ data: {} }),
+    getServiceStatus: vi.fn().mockResolvedValue({ data: { is_docker: false } }),
   }
 }))
 vi.mock('../../services/account.service', () => ({

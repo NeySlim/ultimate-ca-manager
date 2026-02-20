@@ -1519,6 +1519,8 @@
     "uptime": "Temps de fonctionnement",
     "memory": "Mémoire",
     "serviceStatusUnavailable": "État du service indisponible.",
+    "dockerRestartNotice": "Sous Docker, redémarrez le conteneur pour appliquer les changements.",
+    "dockerCertNotice": "Certificat enregistré. Redémarrez le conteneur pour appliquer : docker restart <conteneur>",
     "smtpConfig": "Configuration SMTP",
     "testEmailSuccess": "Email de test envoyé avec succès",
     "smtpHost": "Serveur SMTP",

@@ -130,13 +130,16 @@ function ServiceStatusWidget() {
             <DetailField label="Python" value={status.python_version} />
             <DetailField label={t('settings.environment')} value={status.is_docker ? 'Docker' : 'System'} />
           </DetailGrid>
-          {canWrite('settings') && (
+          {canWrite('settings') && !status.is_docker && (
             <div className="pt-2">
               <Button variant="outline" onClick={handleRestart} disabled={restarting}>
                 <ArrowClockwise size={16} className={restarting ? 'spin' : ''} />
                 {restarting ? t('settings.restarting') : t('settings.restartService')}
               </Button>
             </div>
+          )}
+          {status.is_docker && (
+            <p className="text-xs text-text-tertiary pt-2">{t('settings.dockerRestartNotice')}</p>
           )}
         </div>
       ) : (
@@ -1491,7 +1494,7 @@ export default function SettingsPage() {
   const [certificates, setCertificates] = useState([])
   const [selectedHttpsCert, setSelectedHttpsCert] = useState('')
   const [cas, setCas] = useState([])
-  
+  const [isDocker, setIsDocker] = useState(false)  
   // Expiry alert settings
   const [expiryAlerts, setExpiryAlerts] = useState({
     enabled: true, alert_days: [30, 14, 7, 1], include_revoked: false, recipients: []
@@ -1574,6 +1577,7 @@ export default function SettingsPage() {
     loadAnomalies()
     loadExpiryAlerts()
     loadSyslogConfig()
+    systemService.getServiceStatus().then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
   }, [])
 
   const loadSettings = async () => {
@@ -2136,14 +2140,17 @@ export default function SettingsPage() {
     if (!confirmed) return
     
     try {
-      await systemService.applyHttpsCert({
+      const response = await systemService.applyHttpsCert({
         cert_id: selectedHttpsCert
       })
-      showSuccess(t('messages.success.https.applied'))
-      waitForRestart()
+      if (response.data?.requires_container_restart) {
+        showSuccess(t('settings.dockerCertNotice'))
+      } else {
+        showSuccess(t('messages.success.https.applied'))
+        waitForRestart()
+      }
     } catch (error) {
-      if (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK') {
-        // Network error expected — service is already restarting
+      if (!isDocker && (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK')) {
         waitForRestart()
       } else {
         showError(error.message || t('messages.errors.https.applyFailed'))
@@ -2159,14 +2166,18 @@ export default function SettingsPage() {
     if (!confirmed) return
     
     try {
-      await systemService.regenerateHttpsCert({
+      const response = await systemService.regenerateHttpsCert({
         common_name: window.location.hostname,
         validity_days: 365
       })
-      showSuccess(t('messages.success.https.regenerated'))
-      waitForRestart()
+      if (response.data?.requires_container_restart) {
+        showSuccess(t('settings.dockerCertNotice'))
+      } else {
+        showSuccess(t('messages.success.https.regenerated'))
+        waitForRestart()
+      }
     } catch (error) {
-      if (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK') {
+      if (!isDocker && (error.message?.includes('Failed to fetch') || error.code === 'ERR_NETWORK')) {
         waitForRestart()
       } else {
         showError(error.message || t('messages.errors.https.regenerateFailed'))
@@ -3609,9 +3620,13 @@ export default function SettingsPage() {
             })
             if (apply) {
               try {
-                await systemService.applyHttpsCert({ cert_id: imported.id })
-                showSuccess(t('messages.success.https.applied'))
-                setTimeout(() => window.location.reload(), 3000)
+                const response = await systemService.applyHttpsCert({ cert_id: imported.id })
+                if (response.data?.requires_container_restart) {
+                  showSuccess(t('settings.dockerCertNotice'))
+                } else {
+                  showSuccess(t('messages.success.https.applied'))
+                  setTimeout(() => window.location.reload(), 3000)
+                }
               } catch (error) {
                 showError(error.message || t('messages.errors.https.applyFailed'))
               }

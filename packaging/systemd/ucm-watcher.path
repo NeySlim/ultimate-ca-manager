@@ -1,8 +1,9 @@
 [Unit]
-Description=Watch for UCM update requests
+Description=Watch for UCM service actions (restart, update)
 Documentation=https://github.com/NeySlim/ultimate-ca-manager
 
 [Path]
+PathExists=/opt/ucm/data/.restart_requested
 PathExists=/opt/ucm/data/.update_pending
 MakeDirectory=yes
 
