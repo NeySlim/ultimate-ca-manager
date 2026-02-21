@@ -4,10 +4,9 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { 
   User, Key, FloppyDisk, Fingerprint, Certificate, 
-  PencilSimple, Trash, Plus, Warning, ShieldCheck, Download, ArrowSquareOut
+  PencilSimple, Trash, Plus, Warning, ShieldCheck, Download
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -21,7 +20,6 @@ import { formatDate } from '../lib/utils'
 
 export default function AccountPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { user } = useAuth()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
@@ -56,6 +54,8 @@ export default function AccountPage() {
   const [mtlsCreating, setMtlsCreating] = useState(false)
   const [mtlsResult, setMtlsResult] = useState(null)
   const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
+  const [mtlsTab, setMtlsTab] = useState('generate')
+  const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
   
   // 2FA state
   const [qrData, setQrData] = useState(null)
@@ -356,6 +356,36 @@ export default function AccountPage() {
     setShowMTLSModal(false)
     setMtlsResult(null)
     setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
+    setMtlsImportForm({ name: '', pem: '' })
+    setMtlsTab('generate')
+  }
+
+  const handleImportMTLS = async () => {
+    if (!mtlsImportForm.pem.trim()) {
+      showError(t('account.mtlsPemRequired'))
+      return
+    }
+    setMtlsCreating(true)
+    try {
+      await accountService.importMTLSCertificate(mtlsImportForm.pem, mtlsImportForm.name)
+      showSuccess(t('account.mtlsCertImported'))
+      await loadMTLSCertificates()
+      handleCloseMTLSModal()
+    } catch (error) {
+      showError(error.message || t('account.mtlsCertImportFailed'))
+    } finally {
+      setMtlsCreating(false)
+    }
+  }
+
+  const handlePemFileUpload = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      setMtlsImportForm(prev => ({ ...prev, pem: evt.target.result }))
+    }
+    reader.readAsText(file)
   }
 
   const handleExportCert = async (certId, format) => {
@@ -592,10 +622,6 @@ export default function AccountPage() {
           </div>
         )}
 
-        <Button type="button" variant="outline" size="sm" className="w-full mt-3" onClick={() => navigate('/user-certificates')}>
-          <ArrowSquareOut size={16} className="mr-2" />
-          {t('account.manageAllCertificates')}
-        </Button>
       </DetailSection>
     </DetailContent>
   )
@@ -896,39 +922,107 @@ export default function AccountPage() {
             </>
           ) : (
             <>
-              <Input
-                label={t('account.mtlsCertName')}
-                value={mtlsForm.name}
-                onChange={(e) => setMtlsForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder={`${user?.username || 'user'} mTLS`}
-              />
-              <Select
-                label={t('account.mtlsIssuingCA')}
-                value={mtlsForm.ca_id}
-                onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
-                placeholder={t('account.mtlsDefaultCA')}
-                options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({
-                  value: ca.refid || String(ca.id),
-                  label: ca.descr || ca.subject || ca.refid,
-                }))}
-              />
-              <Input
-                label={t('account.mtlsValidityDays')}
-                type="number"
-                value={mtlsForm.validity_days}
-                onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))}
-                min="1"
-                max="3650"
-              />
-              <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
-                  {t('common.cancel')}
-                </Button>
-                <Button type="button" onClick={handleCreateMTLS} loading={mtlsCreating} disabled={mtlsCreating}>
-                  <Certificate size={16} />
-                  {t('account.generateCertificate')}
-                </Button>
+              {/* Tab selector */}
+              <div className="flex border-b border-border">
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    mtlsTab === 'generate' 
+                      ? 'border-accent-primary text-accent-primary' 
+                      : 'border-transparent text-text-secondary hover:text-text-primary'
+                  }`}
+                  onClick={() => setMtlsTab('generate')}
+                >
+                  {t('account.mtlsGenerate')}
+                </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    mtlsTab === 'import' 
+                      ? 'border-accent-primary text-accent-primary' 
+                      : 'border-transparent text-text-secondary hover:text-text-primary'
+                  }`}
+                  onClick={() => setMtlsTab('import')}
+                >
+                  {t('account.mtlsImport')}
+                </button>
               </div>
+
+              {mtlsTab === 'generate' ? (
+                <>
+                  <Input
+                    label={t('account.mtlsCertName')}
+                    value={mtlsForm.name}
+                    onChange={(e) => setMtlsForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder={`${user?.username || 'user'} mTLS`}
+                  />
+                  <Select
+                    label={t('account.mtlsIssuingCA')}
+                    value={mtlsForm.ca_id}
+                    onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
+                    placeholder={t('account.mtlsDefaultCA')}
+                    options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({
+                      value: ca.refid || String(ca.id),
+                      label: ca.descr || ca.subject || ca.refid,
+                    }))}
+                  />
+                  <Input
+                    label={t('account.mtlsValidityDays')}
+                    type="number"
+                    value={mtlsForm.validity_days}
+                    onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))}
+                    min="1"
+                    max="3650"
+                  />
+                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                    <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button type="button" onClick={handleCreateMTLS} loading={mtlsCreating} disabled={mtlsCreating}>
+                      <Certificate size={16} />
+                      {t('account.generateCertificate')}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Input
+                    label={t('account.mtlsCertName')}
+                    value={mtlsImportForm.name}
+                    onChange={(e) => setMtlsImportForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder={t('account.mtlsImportNamePlaceholder')}
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-text-primary mb-1">
+                      {t('account.mtlsPemData')}
+                    </label>
+                    <textarea
+                      value={mtlsImportForm.pem}
+                      onChange={(e) => setMtlsImportForm(prev => ({ ...prev, pem: e.target.value }))}
+                      placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                      className="w-full h-32 p-2 text-xs font-mono bg-bg-tertiary border border-border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-secondary mb-1">{t('account.mtlsOrUploadFile')}</label>
+                    <input
+                      type="file"
+                      accept=".pem,.crt,.cer"
+                      onChange={handlePemFileUpload}
+                      className="block w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border file:text-sm file:font-medium file:bg-bg-secondary file:text-text-primary hover:file:bg-bg-tertiary"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                    <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button type="button" onClick={handleImportMTLS} loading={mtlsCreating} disabled={mtlsCreating || !mtlsImportForm.pem.trim()}>
+                      <Certificate size={16} />
+                      {t('account.importCertificate')}
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

@@ -714,7 +714,20 @@
     "checkEmail": "E-Mail prüfen",
     "resetPasswordFailed": "Fehler beim Zurücksetzen des Passworts",
     "subtitle_one": "{{count}} Benutzer",
-    "subtitle": "{{count}} Benutzer"
+    "subtitle": "{{count}} Benutzer",
+    "mtls": {
+      "title": "mTLS-Zertifikate",
+      "description": "Client-Zertifikate für gegenseitige TLS-Authentifizierung",
+      "noCerts": "Keine mTLS-Zertifikate",
+      "addCert": "mTLS-Zertifikat — {{username}}",
+      "generated": "Zertifikat erfolgreich generiert",
+      "generateFailed": "Generierung des Zertifikats fehlgeschlagen",
+      "imported": "Zertifikat erfolgreich importiert",
+      "importFailed": "Import des Zertifikats fehlgeschlagen",
+      "deleteConfirm": "Möchten Sie dieses mTLS-Zertifikat wirklich löschen?",
+      "deleted": "Zertifikat gelöscht",
+      "deleteFailed": "Löschen des Zertifikats fehlgeschlagen"
+    }
   },
   "groups": {
     "group": "Gruppe",
@@ -1681,7 +1694,16 @@
     "mtlsDefaultCA": "Standard (vertrauenswürdige CA)",
     "mtlsValidityDays": "Gültigkeit (Tage)",
     "generateCertificate": "Zertifikat generieren",
-    "privateKey": "Privater Schlüssel"
+    "privateKey": "Privater Schlüssel",
+    "mtlsGenerate": "Generieren",
+    "mtlsImport": "Importieren",
+    "mtlsPemRequired": "PEM-Zertifikatsdaten sind erforderlich",
+    "mtlsCertImported": "Zertifikat erfolgreich importiert",
+    "mtlsCertImportFailed": "Import des Zertifikats fehlgeschlagen",
+    "mtlsImportNamePlaceholder": "Mein importiertes Zertifikat",
+    "mtlsPemData": "PEM-Zertifikatsdaten",
+    "mtlsOrUploadFile": "Oder Datei hochladen",
+    "importCertificate": "Zertifikat importieren"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

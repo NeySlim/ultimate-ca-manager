@@ -714,7 +714,20 @@
     "checkEmail": "Перевірити електронну пошту",
     "resetPasswordFailed": "Невдало to reset password",
     "subtitle_one": "{{count}} користувач",
-    "subtitle": "{{count}} користувачів"
+    "subtitle": "{{count}} користувачів",
+    "mtls": {
+      "title": "Сертифікати mTLS",
+      "description": "Клієнтські сертифікати для взаємної TLS-автентифікації",
+      "noCerts": "Немає сертифікатів mTLS",
+      "addCert": "Сертифікат mTLS — {{username}}",
+      "generated": "Сертифікат успішно згенеровано",
+      "generateFailed": "Не вдалося згенерувати сертифікат",
+      "imported": "Сертифікат успішно імпортовано",
+      "importFailed": "Не вдалося імпортувати сертифікат",
+      "deleteConfirm": "Ви впевнені, що хочете видалити цей сертифікат mTLS?",
+      "deleted": "Сертифікат видалено",
+      "deleteFailed": "Не вдалося видалити сертифікат"
+    }
   },
   "groups": {
     "group": "Група",
@@ -1681,7 +1694,16 @@
     "mtlsDefaultCA": "За замовчуванням (довірена CA)",
     "mtlsValidityDays": "Термін дії (днів)",
     "generateCertificate": "Згенерувати сертифікат",
-    "privateKey": "Приватний ключ"
+    "privateKey": "Приватний ключ",
+    "mtlsGenerate": "Генерувати",
+    "mtlsImport": "Імпортувати",
+    "mtlsPemRequired": "Дані сертифіката PEM обов'язкові",
+    "mtlsCertImported": "Сертифікат успішно імпортовано",
+    "mtlsCertImportFailed": "Не вдалося імпортувати сертифікат",
+    "mtlsImportNamePlaceholder": "Мій імпортований сертифікат",
+    "mtlsPemData": "Дані сертифіката PEM",
+    "mtlsOrUploadFile": "Або завантажте файл",
+    "importCertificate": "Імпортувати сертифікат"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",

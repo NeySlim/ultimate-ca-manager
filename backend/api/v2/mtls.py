@@ -451,3 +451,85 @@ def enroll_presented_certificate():
     )
 
     return success_response(data=auth_cert.to_dict(), message='Certificate enrolled')
+
+
+@bp.route('/enroll-import', methods=['POST'])
+@require_auth()
+def enroll_import_certificate():
+    """Enroll a certificate by importing PEM data (paste or file upload).
+    Creates an AuthCertificate record for the current user."""
+
+    user = g.current_user
+    data = request.get_json() or {}
+    pem_text = data.get('pem', '').strip()
+    name = data.get('name', '').strip()
+
+    if not pem_text:
+        return error_response('PEM certificate data is required', 400)
+
+    # Validate and parse the PEM
+    try:
+        if not pem_text.startswith('-----BEGIN'):
+            # Try base64 decode in case it's base64-encoded PEM
+            try:
+                pem_text = base64.b64decode(pem_text).decode('utf-8')
+            except Exception:
+                return error_response('Invalid certificate format. Expected PEM data.', 400)
+
+        pem_bytes = pem_text.encode('utf-8')
+        cert_obj = cx509.load_pem_x509_certificate(pem_bytes, default_backend())
+    except Exception as e:
+        logger.error(f"Failed to parse imported PEM: {e}")
+        return error_response('Invalid PEM certificate data', 400)
+
+    import hashlib
+    serial = str(cert_obj.serial_number)
+    subject_dn = cert_obj.subject.rfc4514_string()
+    issuer_dn = cert_obj.issuer.rfc4514_string()
+    fingerprint = hashlib.sha256(cert_obj.public_bytes(serialization.Encoding.DER)).hexdigest().upper()
+    valid_from = cert_obj.not_valid_before_utc if hasattr(cert_obj, 'not_valid_before_utc') else cert_obj.not_valid_before
+    valid_until = cert_obj.not_valid_after_utc if hasattr(cert_obj, 'not_valid_after_utc') else cert_obj.not_valid_after
+
+    # Check expiry
+    now = datetime.now(timezone.utc)
+    if hasattr(valid_until, 'timestamp') and valid_until < now:
+        return error_response('Cannot enroll expired certificate', 400)
+
+    # Check if already enrolled
+    existing = AuthCertificate.query.filter_by(cert_serial=serial).first()
+    if existing:
+        if existing.user_id == user.id:
+            return error_response('This certificate is already enrolled to your account', 409)
+        return error_response('This certificate is already enrolled to another user', 409)
+
+    # Extract CN for default name
+    cn = ''
+    for attr in cert_obj.subject:
+        if attr.oid == cx509.oid.NameOID.COMMON_NAME:
+            cn = attr.value
+            break
+
+    auth_cert = AuthCertificate(
+        user_id=user.id,
+        cert_serial=serial,
+        cert_subject=subject_dn,
+        cert_issuer=issuer_dn,
+        cert_fingerprint=fingerprint,
+        cert_pem=pem_bytes,
+        name=name or cn or f"Imported {serial[:8]}",
+        valid_from=valid_from,
+        valid_until=valid_until,
+        enabled=True,
+    )
+    db.session.add(auth_cert)
+    db.session.commit()
+
+    AuditService.log_action(
+        action='mtls_cert_import',
+        resource_type='certificate',
+        resource_name=auth_cert.name,
+        details=f'Imported PEM certificate for user: {user.username}',
+        success=True,
+    )
+
+    return created_response(data=auth_cert.to_dict(), message='Certificate imported successfully')

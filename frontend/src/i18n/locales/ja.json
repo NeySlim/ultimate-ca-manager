@@ -714,7 +714,20 @@
     "checkEmail": "メールを確認してください",
     "resetPasswordFailed": "パスワードのリセットに失敗しました",
     "subtitle_one": "{{count}} 人のユーザー",
-    "subtitle": "{{count}} 件のユーザー"
+    "subtitle": "{{count}} 件のユーザー",
+    "mtls": {
+      "title": "mTLS証明書",
+      "description": "相互TLS認証用のクライアント証明書",
+      "noCerts": "mTLS証明書なし",
+      "addCert": "mTLS証明書 — {{username}}",
+      "generated": "証明書を正常に生成しました",
+      "generateFailed": "証明書の生成に失敗しました",
+      "imported": "証明書を正常にインポートしました",
+      "importFailed": "証明書のインポートに失敗しました",
+      "deleteConfirm": "このmTLS証明書を削除してもよろしいですか？",
+      "deleted": "証明書を削除しました",
+      "deleteFailed": "証明書の削除に失敗しました"
+    }
   },
   "groups": {
     "group": "グループ",
@@ -1681,7 +1694,16 @@
     "mtlsDefaultCA": "デフォルト（信頼されたCA）",
     "mtlsValidityDays": "有効期間（日）",
     "generateCertificate": "証明書を生成",
-    "privateKey": "秘密鍵"
+    "privateKey": "秘密鍵",
+    "mtlsGenerate": "生成",
+    "mtlsImport": "インポート",
+    "mtlsPemRequired": "PEM証明書データが必要です",
+    "mtlsCertImported": "証明書を正常にインポートしました",
+    "mtlsCertImportFailed": "証明書のインポートに失敗しました",
+    "mtlsImportNamePlaceholder": "インポートした証明書",
+    "mtlsPemData": "PEM証明書データ",
+    "mtlsOrUploadFile": "またはファイルをアップロード",
+    "importCertificate": "証明書をインポート"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

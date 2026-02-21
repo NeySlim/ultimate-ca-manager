@@ -86,7 +86,16 @@
     "mtlsDefaultCA": "Par défaut (CA de confiance)",
     "mtlsValidityDays": "Validité (jours)",
     "generateCertificate": "Générer le certificat",
-    "privateKey": "Clé privée"
+    "privateKey": "Clé privée",
+    "mtlsGenerate": "Générer",
+    "mtlsImport": "Importer",
+    "mtlsPemRequired": "Les données du certificat PEM sont requises",
+    "mtlsCertImported": "Certificat importé avec succès",
+    "mtlsCertImportFailed": "Échec de l'importation du certificat",
+    "mtlsImportNamePlaceholder": "Mon certificat importé",
+    "mtlsPemData": "Données du certificat PEM",
+    "mtlsOrUploadFile": "Ou importer un fichier",
+    "importCertificate": "Importer le certificat"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2123,7 +2132,20 @@
     "checkEmail": "Vérifiez votre email",
     "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
     "subtitle_one": "{{count}} utilisateur",
-    "subtitle": "{{count}} utilisateurs"
+    "subtitle": "{{count}} utilisateurs",
+    "mtls": {
+      "title": "Certificats mTLS",
+      "description": "Certificats client pour l'authentification TLS mutuelle",
+      "noCerts": "Aucun certificat mTLS",
+      "addCert": "Certificat mTLS — {{username}}",
+      "generated": "Certificat généré avec succès",
+      "generateFailed": "Échec de la génération du certificat",
+      "imported": "Certificat importé avec succès",
+      "importFailed": "Échec de l'importation du certificat",
+      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce certificat mTLS ?",
+      "deleted": "Certificat supprimé",
+      "deleteFailed": "Échec de la suppression du certificat"
+    }
   },
   "validation": {
     "required": "Ce champ est requis",

@@ -714,7 +714,20 @@
     "checkEmail": "检查电子邮件",
     "resetPasswordFailed": "重置密码失败",
     "subtitle_one": "{{count}} 个用户",
-    "subtitle": "{{count}} 个用户"
+    "subtitle": "{{count}} 个用户",
+    "mtls": {
+      "title": "mTLS证书",
+      "description": "用于双向TLS认证的客户端证书",
+      "noCerts": "无mTLS证书",
+      "addCert": "mTLS证书 — {{username}}",
+      "generated": "证书生成成功",
+      "generateFailed": "证书生成失败",
+      "imported": "证书导入成功",
+      "importFailed": "证书导入失败",
+      "deleteConfirm": "确定要删除此mTLS证书吗？",
+      "deleted": "证书已删除",
+      "deleteFailed": "证书删除失败"
+    }
   },
   "groups": {
     "group": "组",
@@ -1681,7 +1694,16 @@
     "mtlsDefaultCA": "默认（受信任 CA）",
     "mtlsValidityDays": "有效期（天）",
     "generateCertificate": "生成证书",
-    "privateKey": "私钥"
+    "privateKey": "私钥",
+    "mtlsGenerate": "生成",
+    "mtlsImport": "导入",
+    "mtlsPemRequired": "需要PEM证书数据",
+    "mtlsCertImported": "证书导入成功",
+    "mtlsCertImportFailed": "证书导入失败",
+    "mtlsImportNamePlaceholder": "我的导入证书",
+    "mtlsPemData": "PEM证书数据",
+    "mtlsOrUploadFile": "或上传文件",
+    "importCertificate": "导入证书"
   },
   "rbac": {
     "title": "基于角色的访问控制",
