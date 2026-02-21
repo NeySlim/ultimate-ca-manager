@@ -726,7 +726,10 @@
       "importFailed": "Import des Zertifikats fehlgeschlagen",
       "deleteConfirm": "Möchten Sie dieses mTLS-Zertifikat wirklich löschen?",
       "deleted": "Zertifikat gelöscht",
-      "deleteFailed": "Löschen des Zertifikats fehlgeschlagen"
+      "deleteFailed": "Löschen des Zertifikats fehlgeschlagen",
+      "assigned": "Zertifikat dem Benutzer zugewiesen",
+      "assignFailed": "Zuweisung des Zertifikats fehlgeschlagen",
+      "loadAvailableFailed": "Laden der verfügbaren Zertifikate fehlgeschlagen"
     }
   },
   "groups": {
@@ -1703,7 +1706,14 @@
     "mtlsImportNamePlaceholder": "Mein importiertes Zertifikat",
     "mtlsPemData": "PEM-Zertifikatsdaten",
     "mtlsOrUploadFile": "Oder Datei hochladen",
-    "importCertificate": "Zertifikat importieren"
+    "importCertificate": "Zertifikat importieren",
+    "mtlsAssign": "Vorhandenes zuweisen",
+    "mtlsNoAvailableCerts": "Keine nicht zugewiesenen Benutzerzertifikate verfügbar",
+    "mtlsExpiresOn": "Läuft ab: {{date}}",
+    "mtlsCertAssigned": "Zertifikat erfolgreich zugewiesen",
+    "mtlsCertAssignFailed": "Zuweisung des Zertifikats fehlgeschlagen",
+    "mtlsLoadAvailableFailed": "Laden der verfügbaren Zertifikate fehlgeschlagen",
+    "assignCertificate": "Zertifikat zuweisen"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

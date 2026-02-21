@@ -4,14 +4,20 @@ Users Management Routes v2.0
 """
 
 from flask import Blueprint, request, jsonify, g
+from cryptography import x509 as cx509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
-from models import db, User
+from models import db, User, Certificate, CA
 from services.audit_service import AuditService
 from datetime import datetime
+import base64
 import csv
+import hashlib
 import io
 import re
+import uuid
 
 # Import password policy
 try:
@@ -672,11 +678,6 @@ def list_user_mtls_certificates(user_id):
 @require_auth(['admin:users'])
 def create_user_mtls_certificate(user_id):
     """Generate or import an mTLS certificate for a user (admin only)."""
-    import base64
-    import hashlib
-    from cryptography import x509 as cx509
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
     from models import Certificate, CA, SystemConfig
     from models.auth_certificate import AuthCertificate
     from services.cert_service import CertificateService
@@ -722,6 +723,29 @@ def create_user_mtls_certificate(user_id):
                 cn = attr.value
                 break
 
+        cert_name = name or cn or f"Imported {serial[:8]}"
+
+        # Create Certificate record if not exists
+        existing_cert = Certificate.query.filter_by(serial_number=serial).first()
+        if not existing_cert:
+            issuer_ca = CA.query.filter(CA.subject == issuer_dn).first()
+            existing_cert = Certificate(
+                refid=str(uuid.uuid4()),
+                descr=cert_name,
+                caref=issuer_ca.refid if issuer_ca else None,
+                crt=base64.b64encode(pem_bytes).decode('utf-8'),
+                cert_type='usr_cert',
+                subject=subject_dn,
+                subject_cn=cn,
+                issuer=issuer_dn,
+                serial_number=serial,
+                valid_from=valid_from,
+                valid_to=valid_until,
+                created_by=target_user.username,
+            )
+            db.session.add(existing_cert)
+            db.session.flush()
+
         auth_cert = AuthCertificate(
             user_id=user_id,
             cert_serial=serial,
@@ -729,7 +753,7 @@ def create_user_mtls_certificate(user_id):
             cert_issuer=issuer_dn,
             cert_fingerprint=fingerprint,
             cert_pem=pem_bytes,
-            name=name or cn or f"Imported {serial[:8]}",
+            name=cert_name,
             valid_from=valid_from,
             valid_until=valid_until,
             enabled=True,

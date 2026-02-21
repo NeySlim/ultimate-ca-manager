@@ -95,5 +95,13 @@ export const accountService = {
 
   async importMTLSCertificate(pem, name) {
     return apiClient.post('/mtls/enroll-import', { pem, name })
+  },
+
+  async getAvailableMTLSCertificates() {
+    return apiClient.get('/mtls/available-certificates')
+  },
+
+  async assignMTLSCertificate(certId, name) {
+    return apiClient.post('/mtls/assign', { cert_id: certId, name })
   }
 }

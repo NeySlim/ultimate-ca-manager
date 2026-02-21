@@ -95,7 +95,14 @@
     "mtlsImportNamePlaceholder": "Mon certificat importé",
     "mtlsPemData": "Données du certificat PEM",
     "mtlsOrUploadFile": "Ou importer un fichier",
-    "importCertificate": "Importer le certificat"
+    "importCertificate": "Importer le certificat",
+    "mtlsAssign": "Assigner existant",
+    "mtlsNoAvailableCerts": "Aucun certificat utilisateur non assigné disponible",
+    "mtlsExpiresOn": "Expire le : {{date}}",
+    "mtlsCertAssigned": "Certificat assigné avec succès",
+    "mtlsCertAssignFailed": "Échec de l'assignation du certificat",
+    "mtlsLoadAvailableFailed": "Échec du chargement des certificats disponibles",
+    "assignCertificate": "Assigner le certificat"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2144,7 +2151,10 @@
       "importFailed": "Échec de l'importation du certificat",
       "deleteConfirm": "Êtes-vous sûr de vouloir supprimer ce certificat mTLS ?",
       "deleted": "Certificat supprimé",
-      "deleteFailed": "Échec de la suppression du certificat"
+      "deleteFailed": "Échec de la suppression du certificat",
+      "assigned": "Certificat assigné à l'utilisateur",
+      "assignFailed": "Échec de l'assignation du certificat à l'utilisateur",
+      "loadAvailableFailed": "Échec du chargement des certificats disponibles"
     }
   },
   "validation": {

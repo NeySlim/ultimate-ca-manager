@@ -12,7 +12,7 @@ import {
   ResponsiveLayout,
   Button, Input, Select, Badge, Modal, FormModal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
-  LoadingSpinner
+  LoadingSpinner, ExportModal
 } from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
@@ -56,6 +56,10 @@ export default function AccountPage() {
   const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
   const [mtlsTab, setMtlsTab] = useState('generate')
   const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
+  const [exportCert, setExportCert] = useState(null) // { id, name, hasPrivateKey }
+  const [availableCerts, setAvailableCerts] = useState([])
+  const [availableCertsLoading, setAvailableCertsLoading] = useState(false)
+  const [selectedAssignCert, setSelectedAssignCert] = useState(null)
   
   // 2FA state
   const [qrData, setQrData] = useState(null)
@@ -358,6 +362,8 @@ export default function AccountPage() {
     setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
     setMtlsImportForm({ name: '', pem: '' })
     setMtlsTab('generate')
+    setSelectedAssignCert(null)
+    setAvailableCerts([])
   }
 
   const handleImportMTLS = async () => {
@@ -388,19 +394,48 @@ export default function AccountPage() {
     reader.readAsText(file)
   }
 
-  const handleExportCert = async (certId, format) => {
+  const loadAvailableCerts = async () => {
+    setAvailableCertsLoading(true)
     try {
-      const blob = await userCertificatesService.export(certId, format)
-      const ext = format === 'pkcs12' ? 'p12' : 'pem'
+      const response = await accountService.getAvailableMTLSCertificates()
+      setAvailableCerts(response.data || [])
+    } catch (error) {
+      showError(error.message || t('account.mtlsLoadAvailableFailed'))
+    } finally {
+      setAvailableCertsLoading(false)
+    }
+  }
+
+  const handleAssignMTLS = async () => {
+    if (!selectedAssignCert) return
+    setMtlsCreating(true)
+    try {
+      await accountService.assignMTLSCertificate(selectedAssignCert.id, selectedAssignCert.name)
+      showSuccess(t('account.mtlsCertAssigned'))
+      await loadMTLSCertificates()
+      handleCloseMTLSModal()
+    } catch (error) {
+      showError(error.message || t('account.mtlsCertAssignFailed'))
+    } finally {
+      setMtlsCreating(false)
+    }
+  }
+
+  const handleExportCert = async (format, options) => {
+    if (!exportCert) return
+    try {
+      const blob = await userCertificatesService.export(exportCert.id, format, options)
+      const extMap = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', key: 'key' }
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `certificate.${ext}`
+      a.download = `${exportCert.name || 'certificate'}.${extMap[format] || 'pem'}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
       showSuccess(t('userCertificates.exportSuccess'))
+      setExportCert(null)
     } catch (error) {
       showError(error.message || t('userCertificates.exportError'))
     }
@@ -610,7 +645,7 @@ export default function AccountPage() {
                   <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
                     {cert.enabled ? t('common.active') : t('common.disabled')}
                   </Badge>
-                  <Button type="button" size="sm" variant="ghost" title={t('account.downloadPEM')} onClick={() => handleExportCert(cert.cert_id || cert.id, 'pem')}>
+                  <Button type="button" size="sm" variant="ghost" title={t('common.export')} onClick={() => setExportCert({ id: cert.id, name: cert.name || cert.cert_subject, hasPrivateKey: true })}>
                     <Download size={16} className="text-accent-primary" />
                   </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
@@ -911,7 +946,18 @@ export default function AccountPage() {
                 </div>
               </div>
               <div className="flex justify-between pt-4 border-t border-border">
-                <Button type="button" variant="outline" size="sm" onClick={() => handleExportCert(mtlsResult.cert_id || mtlsResult.id, 'pem')}>
+                <Button type="button" variant="outline" size="sm" onClick={() => {
+                  const pem = (mtlsResult.certificate || '') + '\n' + (mtlsResult.private_key || '')
+                  const blob = new Blob([pem], { type: 'application/x-pem-file' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `${mtlsResult.name || 'mtls-cert'}.pem`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  URL.revokeObjectURL(url)
+                }}>
                   <Download size={16} className="mr-1" />
                   {t('account.downloadPEM')}
                 </Button>
@@ -946,9 +992,20 @@ export default function AccountPage() {
                 >
                   {t('account.mtlsImport')}
                 </button>
+                <button
+                  type="button"
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    mtlsTab === 'assign' 
+                      ? 'border-accent-primary text-accent-primary' 
+                      : 'border-transparent text-text-secondary hover:text-text-primary'
+                  }`}
+                  onClick={() => { setMtlsTab('assign'); loadAvailableCerts() }}
+                >
+                  {t('account.mtlsAssign')}
+                </button>
               </div>
 
-              {mtlsTab === 'generate' ? (
+              {mtlsTab === 'generate' && (
                 <>
                   <Input
                     label={t('account.mtlsCertName')}
@@ -984,7 +1041,9 @@ export default function AccountPage() {
                     </Button>
                   </div>
                 </>
-              ) : (
+              )}
+
+              {mtlsTab === 'import' && (
                 <>
                   <Input
                     label={t('account.mtlsCertName')}
@@ -1023,10 +1082,68 @@ export default function AccountPage() {
                   </div>
                 </>
               )}
+
+              {mtlsTab === 'assign' && (
+                <>
+                  {availableCertsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner size="sm" />
+                    </div>
+                  ) : availableCerts.length === 0 ? (
+                    <div className="text-center py-8 text-text-secondary text-sm">
+                      <Certificate size={32} className="mx-auto mb-2 opacity-50" />
+                      <p>{t('account.mtlsNoAvailableCerts')}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {availableCerts.map(cert => (
+                        <button
+                          key={cert.id}
+                          type="button"
+                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                            selectedAssignCert?.id === cert.id
+                              ? 'border-accent-primary bg-accent-primary-op10'
+                              : 'border-border hover:border-text-secondary bg-bg-secondary'
+                          }`}
+                          onClick={() => setSelectedAssignCert(cert)}
+                        >
+                          <div className="font-medium text-sm text-text-primary">{cert.name}</div>
+                          <div className="text-xs text-text-secondary mt-1 truncate">{cert.subject}</div>
+                          {cert.valid_to && (
+                            <div className="text-xs text-text-tertiary mt-0.5">
+                              {t('account.mtlsExpiresOn', { date: new Date(cert.valid_to).toLocaleDateString() })}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                    <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button type="button" onClick={handleAssignMTLS} loading={mtlsCreating} disabled={mtlsCreating || !selectedAssignCert}>
+                      <Certificate size={16} />
+                      {t('account.assignCertificate')}
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
       </Modal>
+
+      {/* Export Modal for mTLS certificates */}
+      <ExportModal
+        open={!!exportCert}
+        onClose={() => setExportCert(null)}
+        entityType="certificate"
+        entityName={exportCert?.name || ''}
+        hasPrivateKey={exportCert?.hasPrivateKey || false}
+        canExportKey={true}
+        onExport={handleExportCert}
+      />
     </>
   )
 }
