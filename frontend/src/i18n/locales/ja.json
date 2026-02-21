@@ -341,7 +341,10 @@
     "policies": "ポリシー",
     "reports": "レポート",
     "exporting": "エクスポート中...",
-    "exported": "エクスポート完了"
+    "exported": "エクスポート完了",
+    "policiesShort": "ポリシー",
+    "approvalsShort": "承認",
+    "reportsShort": "レポート"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
