@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.5] - 2026-02-21
+
+### Fixed
+- **SAN not populated in certificates** — Frontend sends SAN as raw comma-separated string; added backend parsing that splits by comma/newline/semicolon, strips type prefixes (`DNS:`, `IP:`, `EMAIL:`), and auto-classifies entries as DNS, IP, or email (fixes [#24](https://github.com/NeySlim/ultimate-ca-manager/issues/24))
+
+---
+
 ## [2.1.4] - 2026-02-21
 
 ### Fixed
