@@ -726,7 +726,10 @@
       "importFailed": "証明書のインポートに失敗しました",
       "deleteConfirm": "このmTLS証明書を削除してもよろしいですか？",
       "deleted": "証明書を削除しました",
-      "deleteFailed": "証明書の削除に失敗しました"
+      "deleteFailed": "証明書の削除に失敗しました",
+      "assigned": "ユーザーに証明書を割り当てました",
+      "assignFailed": "ユーザーへの証明書の割り当てに失敗しました",
+      "loadAvailableFailed": "利用可能な証明書の読み込みに失敗しました"
     }
   },
   "groups": {
@@ -1703,7 +1706,14 @@
     "mtlsImportNamePlaceholder": "インポートした証明書",
     "mtlsPemData": "PEM証明書データ",
     "mtlsOrUploadFile": "またはファイルをアップロード",
-    "importCertificate": "証明書をインポート"
+    "importCertificate": "証明書をインポート",
+    "mtlsAssign": "既存を割り当て",
+    "mtlsNoAvailableCerts": "割り当て可能なユーザー証明書がありません",
+    "mtlsExpiresOn": "有効期限: {{date}}",
+    "mtlsCertAssigned": "証明書が正常に割り当てられました",
+    "mtlsCertAssignFailed": "証明書の割り当てに失敗しました",
+    "mtlsLoadAvailableFailed": "利用可能な証明書の読み込みに失敗しました",
+    "assignCertificate": "証明書を割り当て"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

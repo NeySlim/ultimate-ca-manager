@@ -726,7 +726,10 @@
       "importFailed": "证书导入失败",
       "deleteConfirm": "确定要删除此mTLS证书吗？",
       "deleted": "证书已删除",
-      "deleteFailed": "证书删除失败"
+      "deleteFailed": "证书删除失败",
+      "assigned": "已将证书分配给用户",
+      "assignFailed": "将证书分配给用户失败",
+      "loadAvailableFailed": "加载可用证书失败"
     }
   },
   "groups": {
@@ -1703,7 +1706,14 @@
     "mtlsImportNamePlaceholder": "我的导入证书",
     "mtlsPemData": "PEM证书数据",
     "mtlsOrUploadFile": "或上传文件",
-    "importCertificate": "导入证书"
+    "importCertificate": "导入证书",
+    "mtlsAssign": "分配现有证书",
+    "mtlsNoAvailableCerts": "没有可用的未分配用户证书",
+    "mtlsExpiresOn": "到期日期: {{date}}",
+    "mtlsCertAssigned": "证书分配成功",
+    "mtlsCertAssignFailed": "证书分配失败",
+    "mtlsLoadAvailableFailed": "加载可用证书失败",
+    "assignCertificate": "分配证书"
   },
   "rbac": {
     "title": "基于角色的访问控制",

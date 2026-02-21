@@ -726,7 +726,10 @@
       "importFailed": "Falha ao importar o certificado",
       "deleteConfirm": "Tem certeza de que deseja excluir este certificado mTLS?",
       "deleted": "Certificado excluído",
-      "deleteFailed": "Falha ao excluir o certificado"
+      "deleteFailed": "Falha ao excluir o certificado",
+      "assigned": "Certificado atribuído ao utilizador",
+      "assignFailed": "Falha ao atribuir o certificado ao utilizador",
+      "loadAvailableFailed": "Falha ao carregar os certificados disponíveis"
     }
   },
   "groups": {
@@ -1703,7 +1706,14 @@
     "mtlsImportNamePlaceholder": "Meu certificado importado",
     "mtlsPemData": "Dados do certificado PEM",
     "mtlsOrUploadFile": "Ou enviar um arquivo",
-    "importCertificate": "Importar certificado"
+    "importCertificate": "Importar certificado",
+    "mtlsAssign": "Atribuir existente",
+    "mtlsNoAvailableCerts": "Nenhum certificado de utilizador não atribuído disponível",
+    "mtlsExpiresOn": "Expira em: {{date}}",
+    "mtlsCertAssigned": "Certificado atribuído com sucesso",
+    "mtlsCertAssignFailed": "Falha ao atribuir o certificado",
+    "mtlsLoadAvailableFailed": "Falha ao carregar os certificados disponíveis",
+    "assignCertificate": "Atribuir certificado"
   },
   "rbac": {
     "title": "Controlo de acesso baseado em funções",
