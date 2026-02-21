@@ -252,7 +252,7 @@ def create_ca():
         if data.get('keyAlgo') == 'RSA':
             key_type = str(data.get('keySize') or 2048)
         elif data.get('keyAlgo') == 'ECDSA':
-            key_type = data.get('keySize') or 'P-256'
+            key_type = data.get('keySize') or 'prime256v1'
         
         # Resolve parent CA for intermediate CAs
         caref = None
