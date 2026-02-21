@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g., 2.0.0-beta1)'
+        description: 'Version (e.g., 2.48)'
         required: true
         type: string
 
@@ -83,7 +83,6 @@ jobs:
       - name: Update VERSION file
         run: |
           echo "${{ steps.version.outputs.version }}" > VERSION
-          echo "${{ steps.version.outputs.version }}" > backend/VERSION
           cd frontend && npm pkg set version="${{ steps.version.outputs.version }}"
       
       - name: Build DEB package
@@ -136,7 +135,6 @@ jobs:
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           echo "$VERSION" > VERSION
-          echo "$VERSION" > backend/VERSION
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
 
       - name: Build RPM in Fedora container
@@ -223,7 +221,6 @@ jobs:
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           echo "$VERSION" > VERSION
-          echo "$VERSION" > backend/VERSION
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" frontend/package.json
       
       - name: Set image name
@@ -258,10 +255,8 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
             neyslim/ultimate-ca-manager
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
             type=raw,value=${{ needs.build-deb.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
       
       - name: Build and push
         uses: docker/build-push-action@v5
