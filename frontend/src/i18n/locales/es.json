@@ -726,7 +726,10 @@
       "importFailed": "Error al importar el certificado",
       "deleteConfirm": "¿Está seguro de que desea eliminar este certificado mTLS?",
       "deleted": "Certificado eliminado",
-      "deleteFailed": "Error al eliminar el certificado"
+      "deleteFailed": "Error al eliminar el certificado",
+      "assigned": "Certificado asignado al usuario",
+      "assignFailed": "Error al asignar el certificado al usuario",
+      "loadAvailableFailed": "Error al cargar los certificados disponibles"
     }
   },
   "groups": {
@@ -1703,7 +1706,14 @@
     "mtlsImportNamePlaceholder": "Mi certificado importado",
     "mtlsPemData": "Datos del certificado PEM",
     "mtlsOrUploadFile": "O subir un archivo",
-    "importCertificate": "Importar certificado"
+    "importCertificate": "Importar certificado",
+    "mtlsAssign": "Asignar existente",
+    "mtlsNoAvailableCerts": "No hay certificados de usuario sin asignar disponibles",
+    "mtlsExpiresOn": "Expira: {{date}}",
+    "mtlsCertAssigned": "Certificado asignado correctamente",
+    "mtlsCertAssignFailed": "Error al asignar el certificado",
+    "mtlsLoadAvailableFailed": "Error al cargar los certificados disponibles",
+    "assignCertificate": "Asignar certificado"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",

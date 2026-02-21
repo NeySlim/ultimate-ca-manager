@@ -3,8 +3,10 @@ mTLS API
 Manage client certificates and mTLS configuration
 """
 import base64
+import hashlib
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 
 from flask import Blueprint, request, g, Response
@@ -456,21 +458,19 @@ def enroll_presented_certificate():
 @bp.route('/enroll-import', methods=['POST'])
 @require_auth()
 def enroll_import_certificate():
-    """Enroll a certificate by importing PEM data (paste or file upload).
-    Creates an AuthCertificate record for the current user."""
+    """Import a PEM certificate: create Certificate record + AuthCertificate enrollment."""
 
     user = g.current_user
     data = request.get_json() or {}
     pem_text = data.get('pem', '').strip()
     name = data.get('name', '').strip()
+    target_user_id = data.get('user_id')  # Admin can import for another user
 
     if not pem_text:
         return error_response('PEM certificate data is required', 400)
 
-    # Validate and parse the PEM
     try:
         if not pem_text.startswith('-----BEGIN'):
-            # Try base64 decode in case it's base64-encoded PEM
             try:
                 pem_text = base64.b64decode(pem_text).decode('utf-8')
             except Exception:
@@ -482,7 +482,6 @@ def enroll_import_certificate():
         logger.error(f"Failed to parse imported PEM: {e}")
         return error_response('Invalid PEM certificate data', 400)
 
-    import hashlib
     serial = str(cert_obj.serial_number)
     subject_dn = cert_obj.subject.rfc4514_string()
     issuer_dn = cert_obj.issuer.rfc4514_string()
@@ -490,33 +489,69 @@ def enroll_import_certificate():
     valid_from = cert_obj.not_valid_before_utc if hasattr(cert_obj, 'not_valid_before_utc') else cert_obj.not_valid_before
     valid_until = cert_obj.not_valid_after_utc if hasattr(cert_obj, 'not_valid_after_utc') else cert_obj.not_valid_after
 
-    # Check expiry
     now = datetime.now(timezone.utc)
     if hasattr(valid_until, 'timestamp') and valid_until < now:
         return error_response('Cannot enroll expired certificate', 400)
 
-    # Check if already enrolled
-    existing = AuthCertificate.query.filter_by(cert_serial=serial).first()
-    if existing:
-        if existing.user_id == user.id:
+    # Check duplicate
+    existing_cert = Certificate.query.filter_by(serial_number=serial).first()
+    existing_auth = AuthCertificate.query.filter_by(cert_serial=serial).first()
+    if existing_auth:
+        if existing_auth.user_id == user.id:
             return error_response('This certificate is already enrolled to your account', 409)
         return error_response('This certificate is already enrolled to another user', 409)
 
-    # Extract CN for default name
     cn = ''
     for attr in cert_obj.subject:
         if attr.oid == cx509.oid.NameOID.COMMON_NAME:
             cn = attr.value
             break
 
+    cert_name = name or cn or f"Imported {serial[:8]}"
+
+    # Determine target user
+    enroll_user_id = user.id
+    enroll_username = user.username
+    if target_user_id and user.role == 'admin':
+        target = User.query.get(target_user_id)
+        if target:
+            enroll_user_id = target.id
+            enroll_username = target.username
+
+    # Create Certificate record if not exists
+    if not existing_cert:
+        # Find issuing CA by issuer DN match
+        ca_ref = None
+        issuer_ca = CA.query.filter(CA.subject == issuer_dn).first()
+        if issuer_ca:
+            ca_ref = issuer_ca.refid
+
+        existing_cert = Certificate(
+            refid=str(uuid.uuid4()),
+            descr=cert_name,
+            caref=ca_ref,
+            crt=base64.b64encode(pem_bytes).decode('utf-8'),
+            cert_type='usr_cert',
+            subject=subject_dn,
+            subject_cn=cn,
+            issuer=issuer_dn,
+            serial_number=serial,
+            valid_from=valid_from,
+            valid_to=valid_until,
+            created_by=enroll_username,
+        )
+        db.session.add(existing_cert)
+        db.session.flush()
+
+    # Create AuthCertificate
     auth_cert = AuthCertificate(
-        user_id=user.id,
+        user_id=enroll_user_id,
         cert_serial=serial,
         cert_subject=subject_dn,
         cert_issuer=issuer_dn,
         cert_fingerprint=fingerprint,
         cert_pem=pem_bytes,
-        name=name or cn or f"Imported {serial[:8]}",
+        name=cert_name,
         valid_from=valid_from,
         valid_until=valid_until,
         enabled=True,
@@ -527,9 +562,138 @@ def enroll_import_certificate():
     AuditService.log_action(
         action='mtls_cert_import',
         resource_type='certificate',
-        resource_name=auth_cert.name,
-        details=f'Imported PEM certificate for user: {user.username}',
+        resource_name=cert_name,
+        details=f'Imported PEM certificate for user: {enroll_username}',
         success=True,
     )
 
-    return created_response(data=auth_cert.to_dict(), message='Certificate imported successfully')
+    resp = auth_cert.to_dict()
+    resp['cert_id'] = existing_cert.id
+    return created_response(data=resp, message='Certificate imported successfully')
+
+
+@bp.route('/available-certificates', methods=['GET'])
+@require_auth()
+def list_available_certificates():
+    """List usr_cert certificates not yet assigned to any user via auth_certificates.
+    Regular users see only their own certs; admins see all."""
+
+    user = g.current_user
+
+    # Get all enrolled serials
+    enrolled_serials = {s[0] for s in db.session.query(AuthCertificate.cert_serial).all()}
+
+    # Query unassigned usr_cert
+    query = Certificate.query.filter(
+        Certificate.cert_type == 'usr_cert',
+        Certificate.revoked == False,
+    )
+    if enrolled_serials:
+        query = query.filter(~Certificate.serial_number.in_(enrolled_serials))
+
+    # Non-admin: only own certs
+    if user.role not in ('admin', 'operator'):
+        query = query.filter(Certificate.created_by == user.username)
+
+    certs = query.order_by(Certificate.id.desc()).all()
+
+    results = []
+    for c in certs:
+        results.append({
+            'id': c.id,
+            'refid': c.refid,
+            'name': c.descr or c.subject_cn or f'Certificate #{c.id}',
+            'subject': c.subject,
+            'issuer': c.issuer,
+            'serial_number': c.serial_number,
+            'valid_from': c.valid_from.isoformat() if c.valid_from else None,
+            'valid_to': c.valid_to.isoformat() if c.valid_to else None,
+            'created_by': c.created_by,
+            'has_private_key': bool(c.prv),
+        })
+
+    return success_response(data=results)
+
+
+@bp.route('/assign', methods=['POST'])
+@require_auth()
+def assign_certificate():
+    """Assign an existing certificate to the current user's mTLS account.
+    Admin can assign to another user via user_id param."""
+
+    user = g.current_user
+    data = request.get_json() or {}
+    cert_id = data.get('cert_id')
+    target_user_id = data.get('user_id')
+
+    if not cert_id:
+        return error_response('cert_id is required', 400)
+
+    certificate = Certificate.query.get(cert_id)
+    if not certificate:
+        return error_response('Certificate not found', 404)
+
+    if certificate.cert_type != 'usr_cert':
+        return error_response('Only user certificates can be assigned for mTLS', 400)
+
+    # Security: non-admin can only assign their own certs
+    enroll_user_id = user.id
+    enroll_username = user.username
+    if target_user_id and user.role == 'admin':
+        target = User.query.get(target_user_id)
+        if not target:
+            return error_response('Target user not found', 404)
+        enroll_user_id = target.id
+        enroll_username = target.username
+    elif user.role not in ('admin', 'operator'):
+        if certificate.created_by != user.username:
+            return error_response('Not authorized to assign this certificate', 403)
+
+    # Check duplicate enrollment
+    serial = certificate.serial_number
+    existing = AuthCertificate.query.filter_by(cert_serial=serial).first()
+    if existing:
+        if existing.user_id == enroll_user_id:
+            return error_response('This certificate is already assigned to this account', 409)
+        return error_response('This certificate is already assigned to another user', 409)
+
+    # Parse cert for enrollment data
+    try:
+        cert_pem = base64.b64decode(certificate.crt)
+        cert_obj = cx509.load_pem_x509_certificate(cert_pem, default_backend())
+        fingerprint = hashlib.sha256(cert_obj.public_bytes(serialization.Encoding.DER)).hexdigest().upper()
+        valid_from = cert_obj.not_valid_before_utc if hasattr(cert_obj, 'not_valid_before_utc') else cert_obj.not_valid_before
+        valid_until = cert_obj.not_valid_after_utc if hasattr(cert_obj, 'not_valid_after_utc') else cert_obj.not_valid_after
+        subject_dn = cert_obj.subject.rfc4514_string()
+        issuer_dn = cert_obj.issuer.rfc4514_string()
+    except Exception as e:
+        logger.error(f"Failed to parse certificate {cert_id}: {e}")
+        return error_response('Failed to parse certificate', 500)
+
+    auth_cert = AuthCertificate(
+        user_id=enroll_user_id,
+        cert_serial=serial,
+        cert_subject=subject_dn,
+        cert_issuer=issuer_dn,
+        cert_fingerprint=fingerprint,
+        cert_pem=cert_pem,
+        name=data.get('name') or certificate.descr or certificate.subject_cn or f"Certificate {serial[:8]}",
+        valid_from=valid_from,
+        valid_until=valid_until,
+        enabled=True,
+    )
+    db.session.add(auth_cert)
+    db.session.commit()
+
+    AuditService.log_action(
+        action='mtls_cert_assign',
+        resource_type='certificate',
+        resource_id=str(cert_id),
+        resource_name=auth_cert.name,
+        details=f'Assigned certificate to user: {enroll_username}',
+        success=True,
+    )
+
+    resp = auth_cert.to_dict()
+    resp['cert_id'] = certificate.id
+    return created_response(data=resp, message='Certificate assigned successfully')
