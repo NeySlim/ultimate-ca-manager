@@ -714,7 +714,20 @@
     "checkEmail": "Controlla email",
     "resetPasswordFailed": "Reimpostazione password fallita",
     "subtitle_one": "{{count}} utente",
-    "subtitle": "{{count}} utenti"
+    "subtitle": "{{count}} utenti",
+    "mtls": {
+      "title": "Certificati mTLS",
+      "description": "Certificati client per autenticazione TLS reciproca",
+      "noCerts": "Nessun certificato mTLS",
+      "addCert": "Certificato mTLS — {{username}}",
+      "generated": "Certificato generato con successo",
+      "generateFailed": "Generazione del certificato fallita",
+      "imported": "Certificato importato con successo",
+      "importFailed": "Importazione del certificato fallita",
+      "deleteConfirm": "Sei sicuro di voler eliminare questo certificato mTLS?",
+      "deleted": "Certificato eliminato",
+      "deleteFailed": "Eliminazione del certificato fallita"
+    }
   },
   "groups": {
     "group": "Gruppo",
@@ -1681,7 +1694,16 @@
     "mtlsDefaultCA": "Predefinita (CA attendibile)",
     "mtlsValidityDays": "Validità (giorni)",
     "generateCertificate": "Genera certificato",
-    "privateKey": "Chiave privata"
+    "privateKey": "Chiave privata",
+    "mtlsGenerate": "Genera",
+    "mtlsImport": "Importa",
+    "mtlsPemRequired": "I dati del certificato PEM sono obbligatori",
+    "mtlsCertImported": "Certificato importato con successo",
+    "mtlsCertImportFailed": "Impossibile importare il certificato",
+    "mtlsImportNamePlaceholder": "Il mio certificato importato",
+    "mtlsPemData": "Dati certificato PEM",
+    "mtlsOrUploadFile": "Oppure carica un file",
+    "importCertificate": "Importa certificato"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",

@@ -91,5 +91,9 @@ export const accountService = {
     return apiClient.get(`/mtls/certificates/${certId}/download`, {
       responseType: 'blob'
     })
+  },
+
+  async importMTLSCertificate(pem, name) {
+    return apiClient.post('/mtls/enroll-import', { pem, name })
   }
 }

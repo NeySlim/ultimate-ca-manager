@@ -714,7 +714,20 @@
     "checkEmail": "Verificar e-mail",
     "resetPasswordFailed": "Falha ao repor palavra-passe",
     "subtitle_one": "{{count}} usuário",
-    "subtitle": "{{count}} utilizadores"
+    "subtitle": "{{count}} utilizadores",
+    "mtls": {
+      "title": "Certificados mTLS",
+      "description": "Certificados de cliente para autenticação TLS mútua",
+      "noCerts": "Sem certificados mTLS",
+      "addCert": "Certificado mTLS — {{username}}",
+      "generated": "Certificado gerado com sucesso",
+      "generateFailed": "Falha ao gerar o certificado",
+      "imported": "Certificado importado com sucesso",
+      "importFailed": "Falha ao importar o certificado",
+      "deleteConfirm": "Tem certeza de que deseja excluir este certificado mTLS?",
+      "deleted": "Certificado excluído",
+      "deleteFailed": "Falha ao excluir o certificado"
+    }
   },
   "groups": {
     "group": "Grupo",
@@ -1681,7 +1694,16 @@
     "mtlsDefaultCA": "Padrão (CA confiável)",
     "mtlsValidityDays": "Validade (dias)",
     "generateCertificate": "Gerar certificado",
-    "privateKey": "Chave privada"
+    "privateKey": "Chave privada",
+    "mtlsGenerate": "Gerar",
+    "mtlsImport": "Importar",
+    "mtlsPemRequired": "Dados do certificado PEM são obrigatórios",
+    "mtlsCertImported": "Certificado importado com sucesso",
+    "mtlsCertImportFailed": "Falha ao importar o certificado",
+    "mtlsImportNamePlaceholder": "Meu certificado importado",
+    "mtlsPemData": "Dados do certificado PEM",
+    "mtlsOrUploadFile": "Ou enviar um arquivo",
+    "importCertificate": "Importar certificado"
   },
   "rbac": {
     "title": "Controlo de acesso baseado em funções",
