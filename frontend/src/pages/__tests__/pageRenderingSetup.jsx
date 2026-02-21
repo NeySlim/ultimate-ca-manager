@@ -1,13 +1,10 @@
 /**
- * Page Rendering Tests
- * Verifies every page renders without crashing when wrapped in required providers.
- * Uses minimal mocks for services — focuses on "does it mount?" not "does it work?"
+ * Shared mocks for Page Rendering smoke tests.
+ * Import this file at the top of each split test file.
  */
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
-import { render } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { vi, beforeAll } from 'vitest'
 
-// Fix ResizeObserver to be constructable (setup.js mock isn't a proper class)
+// Fix ResizeObserver to be constructable
 beforeAll(() => {
   global.ResizeObserver = class ResizeObserver {
     constructor(cb) { this._cb = cb }
@@ -88,7 +85,7 @@ vi.mock('../../hooks/useWebSocket', () => ({
   }),
 }))
 
-// Mock services that fetch data on mount — inline values (vi.mock is hoisted)
+// Mock services that fetch data on mount
 vi.mock('../../services/certificates.service', () => ({
   certificatesService: {
     getAll: vi.fn().mockResolvedValue({ data: [] }),
@@ -224,8 +221,7 @@ vi.mock('../../services/search.service', () => ({
   }
 }))
 
-
-// Mock contexts — all values inline (vi.mock is hoisted)
+// Mock contexts
 vi.mock('../../contexts', () => ({
   useAuth: () => ({
     user: { id: 1, username: 'admin', email: 'admin@test.com', role: 'admin' },
@@ -325,245 +321,12 @@ vi.mock('../../contexts/WindowManagerContext', () => ({
   WindowManagerProvider: ({ children }) => children,
 }))
 
-// ── Test wrapper component ─────────────────────────────────────────
-function TestWrapper({ children, route = '/' }) {
+// ── Shared test wrapper ────────────────────────────────────────────
+export function TestWrapper({ children, route = '/' }) {
+  const { MemoryRouter } = require('react-router-dom')
   return (
     <MemoryRouter initialEntries={[route]}>
       {children}
     </MemoryRouter>
   )
 }
-
-// ── Page imports ───────────────────────────────────────────────────
-import LoginPage from '../LoginPage'
-import DashboardPage from '../DashboardPage'
-import CertificatesPage from '../CertificatesPage'
-import CAsPage from '../CAsPage'
-import CSRsPage from '../CSRsPage'
-import ACMEPage from '../ACMEPage'
-import TemplatesPage from '../TemplatesPage'
-import SettingsPage from '../SettingsPage'
-import UsersGroupsPage from '../UsersGroupsPage'
-import AuditLogsPage from '../AuditLogsPage'
-import SCEPPage from '../SCEPPage'
-import CRLOCSPPage from '../CRLOCSPPage'
-import TrustStorePage from '../TrustStorePage'
-import CertificateToolsPage from '../CertificateToolsPage'
-import AccountPage from '../AccountPage'
-import ForgotPasswordPage from '../ForgotPasswordPage'
-import ResetPasswordPage from '../ResetPasswordPage'
-import PoliciesPage from '../PoliciesPage'
-import ApprovalsPage from '../ApprovalsPage'
-import ReportsPage from '../ReportsPage'
-
-
-// ════════════════════════════════════════════════════════════════════
-// Tests
-// ════════════════════════════════════════════════════════════════════
-
-describe('Page Rendering — smoke tests', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  // ── Auth pages (no auth required) ──────────────────────────────
-  describe('Auth pages', () => {
-    it('LoginPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/login">
-          <LoginPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('ForgotPasswordPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/forgot-password">
-          <ForgotPasswordPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('ResetPasswordPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/reset-password?token=abc123">
-          <ResetPasswordPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-
-  // ── Dashboard ──────────────────────────────────────────────────
-  describe('Dashboard', () => {
-    it('DashboardPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/dashboard">
-          <DashboardPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-
-  // ── PKI pages ──────────────────────────────────────────────────
-  describe('PKI pages', () => {
-    it('CertificatesPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/certificates">
-          <CertificatesPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('CAsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/cas">
-          <CAsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('CSRsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/csrs">
-          <CSRsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('TemplatesPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/templates">
-          <TemplatesPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('TrustStorePage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/truststore">
-          <TrustStorePage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-
-  // ── Protocol pages ─────────────────────────────────────────────
-  describe('Protocol pages', () => {
-    it('ACMEPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/acme">
-          <ACMEPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('SCEPPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/scep">
-          <SCEPPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('CRLOCSPPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/crl-ocsp">
-          <CRLOCSPPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-
-  // ── Admin pages ────────────────────────────────────────────────
-  describe('Admin pages', () => {
-    it('SettingsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/settings">
-          <SettingsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('UsersGroupsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/users">
-          <UsersGroupsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('AuditLogsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/audit-logs">
-          <AuditLogsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-
-  // ── Utility pages ─────────────────────────────────────────────
-  describe('Utility pages', () => {
-    it('CertificateToolsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/tools">
-          <CertificateToolsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('AccountPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/account">
-          <AccountPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-
-  // ── Governance pages ─────────────────────────────────────────
-  describe('Governance pages', () => {
-    it('PoliciesPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/policies">
-          <PoliciesPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('ApprovalsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/approvals">
-          <ApprovalsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-
-    it('ReportsPage renders without crashing', () => {
-      const { container } = render(
-        <TestWrapper route="/reports">
-          <ReportsPage />
-        </TestWrapper>
-      )
-      expect(container.firstChild).toBeTruthy()
-    })
-  })
-})

@@ -12,6 +12,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.js'],
     exclude: ['node_modules/', 'e2e/**', '**/*.e2e.js', '**/*.spec.js'],
+    pool: 'forks',
+    maxForks: 2,
+    minForks: 1,
+    forks: {
+      execArgv: ['--max-old-space-size=4096'],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
