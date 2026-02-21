@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, ServiceReconnectOverlay } from '../components'
 import { apiClient } from '../services'
-import { useNotification, useTranslationReady } from '../contexts'
+import { useNotification } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
 
