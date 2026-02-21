@@ -220,10 +220,16 @@ def create_certificate():
         
         # Generate key pair
         key_type = data.get('key_type', 'RSA')
-        key_size = int(data.get('key_size') or 2048)
+        key_size = data.get('key_size', '2048')
         
-        if key_type.upper() == 'EC':
-            curve_name = data.get('curve', 'secp256r1')
+        if key_type.upper() in ('EC', 'ECDSA'):
+            # Map key_size to curve name if needed
+            curve_map = {
+                '256': 'secp256r1', 'prime256v1': 'secp256r1', 'secp256r1': 'secp256r1',
+                '384': 'secp384r1', 'secp384r1': 'secp384r1',
+                '521': 'secp521r1', 'secp521r1': 'secp521r1',
+            }
+            curve_name = curve_map.get(str(key_size), data.get('curve', 'secp256r1'))
             curves = {
                 'secp256r1': ec.SECP256R1(),
                 'secp384r1': ec.SECP384R1(),
@@ -234,7 +240,7 @@ def create_certificate():
         else:
             new_key = rsa.generate_private_key(
                 public_exponent=65537,
-                key_size=key_size,
+                key_size=int(key_size),
                 backend=default_backend()
             )
         

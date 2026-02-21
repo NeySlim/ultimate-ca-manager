@@ -43,6 +43,10 @@ export default function CAsPage() {
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
   const [showImportModal, setShowImportModal] = useState(false)
   const [createFormType, setCreateFormType] = useState('root')
+  const [createFormParentCAId, setCreateFormParentCAId] = useState(null)
+  const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState('RSA')
+  const [createFormKeySize, setCreateFormKeySize] = useState('2048')
+  const [createFormValidity, setCreateFormValidity] = useState('10')
   
   // Filter state
   const [filterType, setFilterType] = useState('')
@@ -225,11 +229,11 @@ export default function CAsPage() {
       country: formData.get('country'),
       state: formData.get('state'),
       locality: formData.get('locality'),
-      keyAlgo: formData.get('keyAlgo'),
-      keySize: parseInt(formData.get('keySize')),
-      validityYears: parseInt(formData.get('validityYears')),
-      type: formData.get('type'),
-      parentCAId: formData.get('type') === 'intermediate' ? formData.get('parentCAId') : null
+      keyAlgo: createFormKeyAlgo,
+      keySize: createFormKeyAlgo === 'ECDSA' ? createFormKeySize : parseInt(createFormKeySize),
+      validityYears: parseInt(createFormValidity),
+      type: createFormType,
+      parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null
     }
     
     try {
@@ -567,23 +571,30 @@ export default function CAsPage() {
             <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
             <div className="grid grid-cols-2 gap-4">
               <Select
-                name="keyAlgo"
                 label={t('common.keyAlgorithm')}
                 options={[
                   { value: 'RSA', label: 'RSA' },
                   { value: 'ECDSA', label: 'ECDSA' }
                 ]}
-                defaultValue="RSA"
+                value={createFormKeyAlgo}
+                onChange={(value) => {
+                  setCreateFormKeyAlgo(value)
+                  setCreateFormKeySize(value === 'ECDSA' ? 'prime256v1' : '2048')
+                }}
               />
               <Select
-                name="keySize"
                 label={t('common.keySize')}
-                options={[
+                options={createFormKeyAlgo === 'ECDSA' ? [
+                  { value: 'prime256v1', label: 'P-256 (256 bits)' },
+                  { value: 'secp384r1', label: 'P-384 (384 bits)' },
+                  { value: 'secp521r1', label: 'P-521 (521 bits)' }
+                ] : [
                   { value: '2048', label: '2048 bits' },
                   { value: '3072', label: '3072 bits' },
                   { value: '4096', label: '4096 bits' }
                 ]}
-                defaultValue="2048"
+                value={createFormKeySize}
+                onChange={(value) => setCreateFormKeySize(value)}
               />
             </div>
           </div>
@@ -591,7 +602,6 @@ export default function CAsPage() {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">{t('common.validityPeriod')}</h3>
             <Select
-              name="validityYears"
               label={t('common.validityPeriod')}
               options={[
                 { value: '5', label: t('cas.yearsValidity', { count: 5 }) },
@@ -599,14 +609,14 @@ export default function CAsPage() {
                 { value: '15', label: t('cas.yearsValidity', { count: 15 }) },
                 { value: '20', label: t('cas.yearsValidity', { count: 20 }) }
               ]}
-              defaultValue="10"
+              value={createFormValidity}
+              onChange={(value) => setCreateFormValidity(value)}
             />
           </div>
 
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">{t('cas.caType')}</h3>
             <Select
-              name="type"
               label={t('common.type')}
               options={[
                 { value: 'root', label: t('cas.rootCASelfSigned') },
@@ -617,12 +627,13 @@ export default function CAsPage() {
             />
             {createFormType === 'intermediate' && (
               <Select
-                name="parentCAId"
                 label={t('cas.parentCA')}
                 options={cas.map(ca => ({
                   value: ca.id.toString(),
                   label: ca.name || ca.descr || ca.common_name
                 }))}
+                value={createFormParentCAId}
+                onChange={(value) => setCreateFormParentCAId(value)}
                 required
               />
             )}
