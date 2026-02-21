@@ -345,7 +345,9 @@
     "exported": "Exported",
     "policiesShort": "Policies",
     "approvalsShort": "Approvals",
-    "reportsShort": "Reports"
+    "reportsShort": "Reports",
+    "experimental": "Experimental",
+    "experimentalTooltip": "This feature is experimental and may not work as expected"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",

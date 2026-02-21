@@ -10,7 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
-  Button, Input, Select, Badge, Modal, FormModal, HelpCard,
+  Button, Input, Select, Badge, Modal, FormModal, HelpCard, ExperimentalBadge,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   LoadingSpinner, ExportModal
 } from '../components'
@@ -608,6 +608,7 @@ export default function AccountPage() {
       {/* mTLS Certificates */}
       <DetailSection 
         title={t('account.clientCertificates')}
+        badge={<ExperimentalBadge />}
         actions={
           <Button type="button" size="sm" onClick={() => setShowMTLSModal(true)}>
             <Plus size={14} className="mr-1" />

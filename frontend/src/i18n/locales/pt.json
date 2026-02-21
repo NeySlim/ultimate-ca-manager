@@ -345,7 +345,9 @@
     "policiesShort": "Políticas",
     "approvalsShort": "Aprovações",
     "reportsShort": "Relatórios",
-    "auditor": "Auditor"
+    "auditor": "Auditor",
+    "experimental": "Experimental",
+    "experimentalTooltip": "Este recurso é experimental e pode não funcionar como esperado"
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",

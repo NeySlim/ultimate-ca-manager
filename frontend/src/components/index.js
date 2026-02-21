@@ -14,7 +14,7 @@ export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 // UI Components
 export { Card } from './Card'
 export { Button } from './Button'
-export { Badge, CATypeIcon } from './Badge'
+export { Badge, CATypeIcon, ExperimentalBadge } from './Badge'
 export { IconBadge, IconAvatar } from './IconBadge'
 export { TreeView } from './TreeView'
 export { SearchBar } from './SearchBar'

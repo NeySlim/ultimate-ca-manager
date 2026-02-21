@@ -20,6 +20,7 @@ export function UnifiedPageHeader({
   icon: Icon,
   title,
   subtitle,
+  badge,
   
   // Tabs (optional)
   tabs,
@@ -68,12 +69,15 @@ export function UnifiedPageHeader({
             </div>
           )}
           <div className="min-w-0">
-            <h1 className={cn(
-              "font-semibold text-text-primary truncate",
-              isMobile ? "text-sm" : "text-lg"
-            )}>
-              {title}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className={cn(
+                "font-semibold text-text-primary truncate",
+                isMobile ? "text-sm" : "text-lg"
+              )}>
+                {title}
+              </h1>
+              {badge}
+            </div>
             {subtitle && !isMobile && (
               <p className="text-sm text-text-secondary truncate">
                 {subtitle}

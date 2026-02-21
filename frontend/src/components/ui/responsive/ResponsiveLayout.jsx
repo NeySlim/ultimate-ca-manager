@@ -44,6 +44,7 @@ export function ResponsiveLayout({
   title,
   subtitle,
   icon: Icon,
+  badge,
   
   // Tabs (optional)
   tabs,
@@ -204,6 +205,7 @@ export function ResponsiveLayout({
           title={title}
           subtitle={subtitle}
           icon={Icon}
+          badge={badge}
           tabs={useSidebar ? undefined : tabs}
           activeTab={activeTab}
           onTabChange={onTabChange}

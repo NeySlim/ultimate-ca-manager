@@ -252,7 +252,7 @@ export function DetailHeader({
  * @param {Component} icon - Optional icon component
  * @param {string} iconClass - Optional icon background class (e.g., 'icon-bg-blue')
  */
-export function DetailSection({ title, description, subtitle, actions, children, className, noBorder = false, compact = false, icon: Icon, iconClass }) {
+export function DetailSection({ title, description, subtitle, actions, children, className, noBorder = false, compact = false, icon: Icon, iconClass, badge }) {
   const { isMobile } = useMobile()
   
   return (
@@ -265,12 +265,15 @@ export function DetailSection({ title, description, subtitle, actions, children,
             </div>
           )}
           <div>
-            <h2 className={cn(
-              "font-semibold text-text-secondary tracking-wide",
-              isMobile ? "text-xs" : "text-sm"
-            )}>
-              {title}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className={cn(
+                "font-semibold text-text-secondary tracking-wide",
+                isMobile ? "text-xs" : "text-sm"
+              )}>
+                {title}
+              </h2>
+              {badge}
+            </div>
             {description && (
               <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
             )}

@@ -16,7 +16,7 @@ import {
 import {
   ResponsiveLayout,
   Button, Input, Select, Badge, Textarea, Card, EmptyState, ConfirmModal,
-  LoadingSpinner, FileUpload, Modal, HelpCard, Logo,
+  LoadingSpinner, FileUpload, Modal, HelpCard, Logo, ExperimentalBadge,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   CompactSection,
   UpdateChecker, ServiceReconnectOverlay
@@ -2729,7 +2729,7 @@ export default function SettingsPage() {
                 </div>
               )}
             </DetailSection>
-            <DetailSection title={t('settings.mtls.title')} icon={ShieldCheck} iconClass="icon-bg-violet">
+            <DetailSection title={t('settings.mtls.title')} icon={ShieldCheck} iconClass="icon-bg-violet" badge={<ExperimentalBadge />}>
               {mtlsLoading ? (
                 <LoadingSpinner size="sm" />
               ) : (

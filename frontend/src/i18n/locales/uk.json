@@ -345,7 +345,9 @@
     "policiesShort": "Політики",
     "approvalsShort": "Затвердження",
     "reportsShort": "Звіти",
-    "auditor": "Аудитор"
+    "auditor": "Аудитор",
+    "experimental": "Експериментальна",
+    "experimentalTooltip": "Ця функція є експериментальною і може працювати не так, як очікується"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",

@@ -799,7 +799,9 @@
     "exported": "Exporté",
     "policiesShort": "Politiques",
     "approvalsShort": "Approbations",
-    "reportsShort": "Rapports"
+    "reportsShort": "Rapports",
+    "experimental": "Expérimental",
+    "experimentalTooltip": "Cette fonctionnalité est expérimentale et peut ne pas fonctionner comme prévu"
   },
   "compare": {
     "title": "Comparer les certificats",

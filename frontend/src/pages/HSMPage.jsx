@@ -11,7 +11,7 @@ import {
   Cloud, HardDrive, ArrowsClockwise, Lock, Warning
 } from '@phosphor-icons/react'
 import { 
-  Badge, Button, FormModal, Input, Select,
+  Badge, Button, FormModal, Input, Select, ExperimentalBadge,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
@@ -446,6 +446,7 @@ export default function HSMPage() {
         title={t('common.hsm')}
         subtitle={t('hsm.subtitle', { count: providers.length })}
         icon={Key}
+        badge={<ExperimentalBadge />}
         stats={stats}
         helpPageKey="hsm"
         splitView={true}

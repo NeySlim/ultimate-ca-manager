@@ -345,7 +345,9 @@
     "policiesShort": "策略",
     "approvalsShort": "审批",
     "reportsShort": "报告",
-    "auditor": "审计员"
+    "auditor": "审计员",
+    "experimental": "实验性",
+    "experimentalTooltip": "此功能为实验性功能，可能无法按预期工作"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",

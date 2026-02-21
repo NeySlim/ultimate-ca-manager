@@ -345,7 +345,9 @@
     "policiesShort": "ポリシー",
     "approvalsShort": "承認",
     "reportsShort": "レポート",
-    "auditor": "監査役"
+    "auditor": "監査役",
+    "experimental": "実験的",
+    "experimentalTooltip": "この機能は実験的であり、期待どおりに動作しない場合があります"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",

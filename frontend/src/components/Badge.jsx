@@ -1,5 +1,6 @@
 import { cn } from '../lib/utils'
-import { Crown, ShieldCheck } from '@phosphor-icons/react'
+import { Crown, ShieldCheck, Flask } from '@phosphor-icons/react'
+import { useTranslation } from 'react-i18next'
 
 export function Badge({ 
   children, 
@@ -115,5 +116,23 @@ export function CATypeIcon({ isRoot, size = 'md', className }) {
         <ShieldCheck size={icon} weight="duotone" />
       )}
     </div>
+  )
+}
+
+/**
+ * ExperimentalBadge - Inline badge for features not yet fully tested
+ */
+export function ExperimentalBadge({ className }) {
+  const { t } = useTranslation()
+  return (
+    <Badge
+      variant="amber"
+      size="sm"
+      icon={Flask}
+      className={className}
+      title={t('common.experimentalTooltip')}
+    >
+      {t('common.experimental')}
+    </Badge>
   )
 }
