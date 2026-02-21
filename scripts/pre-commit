@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+# UCM Pre-commit Quality Checks
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# Or: ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+#
+# Checks:
+#   1. i18n locale sync (all 9 files have same keys)
+#   2. Frontend tests (Vitest — component smoke tests)
+#   3. Backend tests (pytest — API logic tests)
+#   4. No 'icon: undefined' in navigation components
+#
+
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+FAILED=0
+
+echo "🔍 UCM Pre-commit Checks"
+echo "========================"
+
+# ── 1. i18n sync ──────────────────────────────────────────────
+echo -n "  i18n sync check... "
+if node "$ROOT/scripts/check-i18n-sync.js" > /tmp/ucm-i18n-check.log 2>&1; then
+    echo -e "${GREEN}✅${NC}"
+else
+    echo -e "${RED}❌${NC}"
+    echo -e "${YELLOW}    $(tail -1 /tmp/ucm-i18n-check.log)${NC}"
+    FAILED=1
+fi
+
+# ── 2. Frontend unit tests ────────────────────────────────────
+echo -n "  Frontend tests... "
+FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1)
+if echo "$FRONT_OUT" | grep -q "Tests.*passed"; then
+    RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
+    echo -e "${GREEN}✅${NC} $RESULT"
+else
+    echo -e "${RED}❌${NC}"
+    echo -e "${YELLOW}    Run 'cd frontend && npx vitest run' for details${NC}"
+    FAILED=1
+fi
+
+# ── 3. Backend tests ──────────────────────────────────────────
+echo -n "  Backend tests... "
+if cd "$ROOT/backend" && python3 -m pytest tests/ -q --tb=no 2>&1 | tail -1 | grep -q "passed"; then
+    RESULT=$(python3 -m pytest tests/ -q --tb=no 2>&1 | tail -1)
+    echo -e "${GREEN}✅${NC} $RESULT"
+else
+    echo -e "${RED}❌${NC}"
+    echo -e "${YELLOW}    Run 'cd backend && python3 -m pytest tests/ -v' for details${NC}"
+    FAILED=1
+fi
+
+# ── 4. Quick grep checks ─────────────────────────────────────
+echo -n "  No 'icon: undefined'... "
+# Exclude test files from this check
+if grep -rn "icon:\s*undefined" "$ROOT/frontend/src/" --include='*.jsx' --include='*.tsx' --include='*.js' \
+    | grep -v '__tests__/' | grep -v '.test.' | grep -v '.spec.' 2>/dev/null; then
+    echo -e "${RED}❌ Found 'icon: undefined' — will cause React Error #130${NC}"
+    FAILED=1
+else
+    echo -e "${GREEN}✅${NC}"
+fi
+
+echo "========================"
+if [ $FAILED -ne 0 ]; then
+    echo -e "${RED}❌ Pre-commit checks FAILED — fix issues before committing${NC}"
+    echo -e "   Use ${YELLOW}git commit --no-verify${NC} to bypass (not recommended)"
+    exit 1
+else
+    echo -e "${GREEN}✅ All checks passed${NC}"
+fi
