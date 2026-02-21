@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.6] - 2026-02-21
+
+### Fixed
+- **DN field parsing** — Certificates created via API stored subject with long OID names (`commonName=`, `organizationName=`) but display only checked short forms (`CN=`, `O=`), causing CN to show as first SAN DNS instead of actual CN. Now supports both formats (fixes [#24](https://github.com/NeySlim/ultimate-ca-manager/issues/24))
+- **CN added as invalid DNS SAN** — Server certificates blindly added CN as DNS SAN even when CN was not a valid hostname (e.g., "HomeAssistant"). Now only adds CN as SAN if it contains a dot or is a wildcard
+- **PEM chain export** — Literal `\n` characters instead of real newlines when concatenating cert+key+chain in PEM export, producing invalid PEM files
+
+---
+
 ## [2.1.5] - 2026-02-21
 
 ### Fixed

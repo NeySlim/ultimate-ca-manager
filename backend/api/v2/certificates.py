@@ -362,9 +362,11 @@ def create_certificate():
             for email in data['san_email']:
                 san_list.append(x509.RFC822Name(email))
         
-        # Always include CN as DNS SAN for server certs
-        if cert_type in ['server', 'combined'] and data['cn'] not in (data.get('san_dns') or []):
-            san_list.insert(0, x509.DNSName(data['cn']))
+        # Add CN as DNS SAN for server certs if it looks like a valid hostname
+        cn = data['cn']
+        cn_looks_like_hostname = '.' in cn or cn.startswith('*')
+        if cert_type in ['server', 'combined'] and cn_looks_like_hostname and cn not in (data.get('san_dns') or []):
+            san_list.insert(0, x509.DNSName(cn))
         
         if san_list:
             builder = builder.add_extension(
@@ -726,8 +728,8 @@ def export_certificate(cert_id):
             # Include private key if requested
             if include_key and certificate.prv:
                 key_pem = base64.b64decode(certificate.prv)
-                if not result.endswith(b'\\n'):
-                    result += b'\\n'
+                if not result.endswith(b'\n'):
+                    result += b'\n'
                 result += key_pem
                 filename = f"{certificate.descr or certificate.refid}_with_key.pem"
             
@@ -737,8 +739,8 @@ def export_certificate(cert_id):
                 while ca:
                     if ca.crt:
                         ca_cert = base64.b64decode(ca.crt)
-                        if not result.endswith(b'\\n'):
-                            result += b'\\n'
+                        if not result.endswith(b'\n'):
+                            result += b'\n'
                         result += ca_cert
                     # Get parent CA
                     if ca.caref:
