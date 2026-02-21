@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g., 2.0.0-beta1)'
+        description: 'Version (e.g., 2.48)'
         required: true
         type: string
 
@@ -255,10 +255,8 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
             neyslim/ultimate-ca-manager
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
             type=raw,value=${{ needs.build-deb.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
       
       - name: Build and push
         uses: docker/build-push-action@v5

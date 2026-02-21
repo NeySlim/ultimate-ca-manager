@@ -33,11 +33,14 @@ def get_current_version():
 
 
 def parse_version(version_str):
-    """Parse version string to tuple for comparison"""
-    # Remove 'v' prefix if present
+    """Parse version string to tuple for comparison.
+    
+    Supports both Major.Build (2.48) and legacy semver (2.1.6) formats.
+    Pre-release suffixes (-dev, -beta, -rc) are ranked lower than release.
+    """
     version_str = version_str.lstrip('v')
     
-    # Handle pre-release versions (e.g., 2.0.0-beta2)
+    # Handle pre-release versions (e.g., 2.48-dev, 2.1.0-beta2)
     parts = version_str.split('-')
     main_version = parts[0]
     prerelease = parts[1] if len(parts) > 1 else None
@@ -48,12 +51,11 @@ def parse_version(version_str):
     except ValueError:
         numbers = (0, 0, 0)
     
-    # Pad to 3 numbers
+    # Pad to 3 numbers for consistent comparison (2.48 → 2.48.0)
     while len(numbers) < 3:
         numbers = numbers + (0,)
     
     # Pre-release versions are considered lower than release
-    # beta2 > beta1, rc1 > beta2
     prerelease_order = 0
     if prerelease:
         num_match = re.search(r'\d+', prerelease)
