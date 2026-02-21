@@ -8,10 +8,6 @@ export const casService = {
     return apiClient.get('/cas')
   },
 
-  async getTree() {
-    return apiClient.get('/cas/tree')
-  },
-
   async getById(id) {
     return apiClient.get(`/cas/${id}`)
   },

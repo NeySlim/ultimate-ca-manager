@@ -120,11 +120,12 @@ export default function CAsPage() {
     }
   }, [urlCAId, loading, cas.length])
 
-  // Expand all root nodes by default
+  // Expand all nodes that have children by default
   useEffect(() => {
     if (cas.length > 0 && expandedNodes.size === 0) {
+      const parentIds = cas.filter(c => cas.some(child => child.parent_id === c.id)).map(c => c.id)
       const rootIds = cas.filter(c => !c.parent_id || c.type === 'root').map(c => c.id)
-      setExpandedNodes(new Set(rootIds))
+      setExpandedNodes(new Set([...rootIds, ...parentIds]))
     }
   }, [cas])
 
@@ -845,6 +846,8 @@ function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobi
               key={child.id}
               ca={child}
               selectedId={selectedId}
+              expandedNodes={expandedNodes}
+              onToggle={onToggle}
               onSelect={onSelect}
               isMobile={isMobile}
               t={t}
@@ -856,38 +859,73 @@ function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobi
   )
 }
 
-function OrgChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
+function OrgChildCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobile, t, isOrphan, depth = 1 }) {
   const isSelected = selectedId === ca.id
+  const hasChildren = ca.children && ca.children.length > 0
+  const isExpanded = expandedNodes?.has(ca.id)
 
   return (
-    <div
-      onClick={() => onSelect(ca)}
-      className={cn(
-        'rounded-lg border cursor-pointer transition-all duration-150',
-        isMobile ? 'px-3 py-2.5' : 'px-3 py-2',
-        isSelected
-          ? 'ca-org-child-selected border-accent-primary'
-          : 'border-border-op50 bg-bg-primary hover:border-border hover:shadow-sm',
-        isOrphan && 'border-dashed'
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <CATypeIcon isRoot={false} size={isMobile ? 'md' : 'sm'} />
-        <div className="flex-1 min-w-0">
-          <span className={cn(
-            'font-semibold truncate block',
-            isMobile ? 'text-sm' : 'text-xs',
-            isSelected ? 'text-accent-primary' : 'text-text-primary'
-          )}>
-            {ca.name || ca.common_name || t('cas.unnamedCA')}
-          </span>
+    <div>
+      <div
+        onClick={() => onSelect(ca)}
+        className={cn(
+          'rounded-lg border cursor-pointer transition-all duration-150',
+          isMobile ? 'px-3 py-2.5' : 'px-3 py-2',
+          isSelected
+            ? 'ca-org-child-selected border-accent-primary'
+            : 'border-border-op50 bg-bg-primary hover:border-border hover:shadow-sm',
+          isOrphan && 'border-dashed'
+        )}
+      >
+        <div className="flex items-center gap-2">
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggle(ca.id) }}
+              className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-text-tertiary hover:text-accent-primary hover:bg-tertiary-op50 transition-all"
+            >
+              <CaretRight
+                size={10} weight="bold"
+                className={cn('transition-transform duration-200', isExpanded && 'rotate-90')}
+              />
+            </button>
+          ) : (
+            <div className="w-5" />
+          )}
+          <CATypeIcon isRoot={false} size={isMobile ? 'md' : 'sm'} />
+          <div className="flex-1 min-w-0">
+            <span className={cn(
+              'font-semibold truncate block',
+              isMobile ? 'text-sm' : 'text-xs',
+              isSelected ? 'text-accent-primary' : 'text-text-primary'
+            )}>
+              {ca.name || ca.common_name || t('cas.unnamedCA')}
+            </span>
+          </div>
+          <TypeBadge type="intermediate" isMobile={isMobile} t={t} />
+          <StatusBadge status={ca.status} />
         </div>
-        <TypeBadge type="intermediate" isMobile={isMobile} t={t} />
-        <StatusBadge status={ca.status} />
+        <div className={cn('mt-1', isMobile ? 'ml-9' : 'ml-7')}>
+          <CAInfoLine ca={ca} isMobile={isMobile} t={t} />
+        </div>
       </div>
-      <div className={cn('mt-1', isMobile ? 'ml-9' : 'ml-7')}>
-        <CAInfoLine ca={ca} isMobile={isMobile} t={t} />
-      </div>
+      {hasChildren && isExpanded && (
+        <div className={cn('space-y-1.5', isMobile ? 'pl-4 pt-1.5' : 'pl-5 pt-1.5')}>
+          {ca.children.map(child => (
+            <OrgChildCard
+              key={child.id}
+              ca={child}
+              selectedId={selectedId}
+              expandedNodes={expandedNodes}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              isMobile={isMobile}
+              t={t}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1002,50 +1040,68 @@ function ColumnHeader({ ca, selectedId, onSelect, isMobile, t }) {
   )
 }
 
-function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan }) {
+function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan, depth = 1 }) {
   const isSelected = selectedId === ca.id
   const expiry = formatExpiry(ca.valid_to || ca.not_after, t)
+  const hasChildren = ca.children && ca.children.length > 0
 
   return (
-    <div
-      onClick={() => onSelect(ca)}
-      className={cn(
-        'rounded-lg border cursor-pointer transition-all duration-150',
-        isMobile ? 'px-3 py-2.5' : 'px-2.5 py-2',
-        isSelected
-          ? 'ca-org-child-selected border-accent-primary'
-          : 'border-border-op40 bg-bg-primary hover:border-border hover:shadow-sm',
-        isOrphan && 'border-dashed'
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <CATypeIcon isRoot={false} size="sm" />
-        <span className={cn(
-          'font-medium truncate flex-1 text-xs',
-          isSelected ? 'text-accent-primary' : 'text-text-primary'
-        )}>
-          {ca.name || ca.common_name}
-        </span>
-        <StatusBadge status={ca.status} />
-      </div>
-      <div className="mt-1 ml-7 flex items-center gap-2 text-2xs text-text-tertiary">
-        <span className="flex items-center gap-1">
-          <Certificate size={10} weight="duotone" className="text-accent-primary" />
-          <span className="font-semibold text-text-secondary">{ca.certs || 0}</span>
-        </span>
-        {expiry && (
-          <>
-            <span className="text-border">·</span>
-            <span className={cn(
-              'font-medium',
-              expiry.variant === 'danger' ? 'text-status-danger' :
-              expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
-            )}>
-              {expiry.text}
-            </span>
-          </>
+    <div>
+      <div
+        onClick={() => onSelect(ca)}
+        className={cn(
+          'rounded-lg border cursor-pointer transition-all duration-150',
+          isMobile ? 'px-3 py-2.5' : 'px-2.5 py-2',
+          isSelected
+            ? 'ca-org-child-selected border-accent-primary'
+            : 'border-border-op40 bg-bg-primary hover:border-border hover:shadow-sm',
+          isOrphan && 'border-dashed'
         )}
+      >
+        <div className="flex items-center gap-2">
+          <CATypeIcon isRoot={false} size="sm" />
+          <span className={cn(
+            'font-medium truncate flex-1 text-xs',
+            isSelected ? 'text-accent-primary' : 'text-text-primary'
+          )}>
+            {ca.name || ca.common_name}
+          </span>
+          <StatusBadge status={ca.status} />
+        </div>
+        <div className="mt-1 ml-7 flex items-center gap-2 text-2xs text-text-tertiary">
+          <span className="flex items-center gap-1">
+            <Certificate size={10} weight="duotone" className="text-accent-primary" />
+            <span className="font-semibold text-text-secondary">{ca.certs || 0}</span>
+          </span>
+          {expiry && (
+            <>
+              <span className="text-border">·</span>
+              <span className={cn(
+                'font-medium',
+                expiry.variant === 'danger' ? 'text-status-danger' :
+                expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
+              )}>
+                {expiry.text}
+              </span>
+            </>
+          )}
+        </div>
       </div>
+      {hasChildren && (
+        <div className="pl-3 pt-1 space-y-1.5">
+          {ca.children.map(child => (
+            <ColumnChildCard
+              key={child.id}
+              ca={child}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              isMobile={isMobile}
+              t={t}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

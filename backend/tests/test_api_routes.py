@@ -134,7 +134,6 @@ class TestAuthRequired:
         ('GET', '/api/v2/certificates'),
         ('GET', '/api/v2/certificates/stats'),
         ('GET', '/api/v2/cas'),
-        ('GET', '/api/v2/cas/tree'),
         ('GET', '/api/v2/csrs'),
         ('GET', '/api/v2/templates'),
         ('GET', '/api/v2/users'),

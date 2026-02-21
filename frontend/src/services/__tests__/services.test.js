@@ -49,11 +49,6 @@ describe('casService', () => {
     expect(mockApiClient.get).toHaveBeenCalledWith('/cas')
   })
 
-  it('getTree → GET /cas/tree', async () => {
-    await casService.getTree()
-    expect(mockApiClient.get).toHaveBeenCalledWith('/cas/tree')
-  })
-
   it('getById → GET /cas/:id', async () => {
     await casService.getById(5)
     expect(mockApiClient.get).toHaveBeenCalledWith('/cas/5')
