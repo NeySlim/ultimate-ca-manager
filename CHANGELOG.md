@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.4] - 2026-02-21
+
+### Fixed
+- **Mobile navigation crash** — React error #130 when opening mobile menu; Policies, Approvals, and Reports nav items had missing Phosphor icons (`Gavel`, `Stamp`, `ChartBar` not imported in AppShell)
+- **Encrypted key import** — Smart Import now detects `ENCRYPTED` in uploaded PEM/key files and shows password field (fixes [#23](https://github.com/NeySlim/ultimate-ca-manager/issues/23))
+- **Mobile nav translations** — added missing `policiesShort`, `approvalsShort`, `reportsShort` i18n keys for all 9 languages
+
+---
+
 ## [2.1.3] - 2026-02-21
 
 ### Fixed
