@@ -206,65 +206,64 @@ class CA(db.Model):
         """Check if CA uses HSM for private key"""
         return bool(self.hsm_key_id)
     
+    # Mapping of short DN field names to their OID long equivalents
+    _DN_FIELD_ALIASES = {
+        'CN': 'commonName',
+        'O': 'organizationName',
+        'OU': 'organizationalUnitName',
+        'C': 'countryName',
+        'ST': 'stateOrProvinceName',
+        'L': 'localityName',
+    }
+
+    def _extract_dn_field(self, dn_string, field):
+        """Extract a field from DN string, supporting both short (CN) and long (commonName) formats"""
+        if not dn_string:
+            return ""
+        prefixes = [f'{field}=']
+        alias = self._DN_FIELD_ALIASES.get(field)
+        if alias:
+            prefixes.append(f'{alias}=')
+        for short, long in self._DN_FIELD_ALIASES.items():
+            if field == long:
+                prefixes.append(f'{short}=')
+                break
+        for part in dn_string.split(','):
+            part = part.strip()
+            for prefix in prefixes:
+                if part.startswith(prefix):
+                    return part[len(prefix):]
+        return ""
+
     @property
     def common_name(self) -> str:
         """Extract Common Name from subject"""
-        if not self.subject:
-            return ""
-        for part in self.subject.split(','):
-            if part.strip().startswith('CN='):
-                return part.strip()[3:]
-        return ""
+        return self._extract_dn_field(self.subject, 'CN')
     
     @property
     def organization(self) -> str:
         """Extract Organization from subject"""
-        if not self.subject:
-            return ""
-        for part in self.subject.split(','):
-            if part.strip().startswith('O='):
-                return part.strip()[2:]
-        return ""
+        return self._extract_dn_field(self.subject, 'O')
     
     @property
     def organizational_unit(self) -> str:
         """Extract Organizational Unit from subject"""
-        if not self.subject:
-            return ""
-        for part in self.subject.split(','):
-            if part.strip().startswith('OU='):
-                return part.strip()[3:]
-        return ""
+        return self._extract_dn_field(self.subject, 'OU')
     
     @property
     def country(self) -> str:
         """Extract Country from subject"""
-        if not self.subject:
-            return ""
-        for part in self.subject.split(','):
-            if part.strip().startswith('C='):
-                return part.strip()[2:]
-        return ""
+        return self._extract_dn_field(self.subject, 'C')
     
     @property
     def state(self) -> str:
         """Extract State/Province from subject"""
-        if not self.subject:
-            return ""
-        for part in self.subject.split(','):
-            if part.strip().startswith('ST='):
-                return part.strip()[3:]
-        return ""
+        return self._extract_dn_field(self.subject, 'ST')
     
     @property
     def locality(self) -> str:
         """Extract Locality/City from subject"""
-        if not self.subject:
-            return ""
-        for part in self.subject.split(','):
-            if part.strip().startswith('L='):
-                return part.strip()[2:]
-        return ""
+        return self._extract_dn_field(self.subject, 'L')
     
     @property
     def is_root(self) -> bool:
@@ -540,11 +539,9 @@ class Certificate(db.Model):
     @property
     def common_name(self) -> str:
         """Extract Common Name from subject, or fallback to first SAN DNS"""
-        if self.subject:
-            # Subject format: "CN=example.com,O=Company,..."
-            for part in self.subject.split(','):
-                if part.strip().startswith('CN='):
-                    return part.strip()[3:]
+        cn = self._extract_dn_field('CN')
+        if cn:
+            return cn
         # Fallback: use first SAN DNS if available
         if self.san_dns:
             try:
@@ -561,35 +558,20 @@ class Certificate(db.Model):
     @property
     def organization(self) -> str:
         """Extract Organization from subject"""
-        if not self.subject:
-            return ""
-        # Subject format: "CN=example.com,O=Company,..."
-        for part in self.subject.split(','):
-            if part.strip().startswith('O='):
-                return part.strip()[2:]
-        return ""
+        return self._extract_dn_field('O')
 
     @property
     def organizational_unit(self) -> str:
         """Extract Organizational Unit from subject"""
-        if not self.subject:
-            return ""
-        # Subject format: "CN=example.com,O=Company,OU=Dept,..."
-        for part in self.subject.split(','):
-            if part.strip().startswith('OU='):
-                return part.strip()[3:]
-        return ""
+        return self._extract_dn_field('OU')
     
     @property
     def issuer_name(self) -> str:
         """Extract issuer Common Name"""
         if not self.issuer:
             return ""
-        # Issuer format: "CN=CA Name,O=Company,..."
-        for part in self.issuer.split(','):
-            if part.strip().startswith('CN='):
-                return part.strip()[3:]
-        return self.issuer
+        cn = self._extract_dn_field('CN', self.issuer)
+        return cn if cn else self.issuer
     
     @property
     def country(self) -> str:
@@ -615,14 +597,35 @@ class Certificate(db.Model):
             email = self._extract_dn_field('1.2.840.113549.1.9.1')
         return email
     
-    def _extract_dn_field(self, field: str) -> str:
-        """Extract a field from subject DN"""
-        if not self.subject:
+    # Mapping of short DN field names to their OID long equivalents
+    _DN_FIELD_ALIASES = {
+        'CN': 'commonName',
+        'O': 'organizationName',
+        'OU': 'organizationalUnitName',
+        'C': 'countryName',
+        'ST': 'stateOrProvinceName',
+        'L': 'localityName',
+    }
+
+    def _extract_dn_field(self, field: str, dn_string: str = None) -> str:
+        """Extract a field from DN string, supporting both short (CN) and long (commonName) formats"""
+        if dn_string is None:
+            dn_string = self.subject
+        if not dn_string:
             return ""
-        for part in self.subject.split(','):
+        prefixes = [f'{field}=']
+        alias = self._DN_FIELD_ALIASES.get(field)
+        if alias:
+            prefixes.append(f'{alias}=')
+        for short, long in self._DN_FIELD_ALIASES.items():
+            if field == long:
+                prefixes.append(f'{short}=')
+                break
+        for part in dn_string.split(','):
             part = part.strip()
-            if part.startswith(f'{field}='):
-                return part[len(field)+1:]
+            for prefix in prefixes:
+                if part.startswith(prefix):
+                    return part[len(prefix):]
         return ""
     
     @property
