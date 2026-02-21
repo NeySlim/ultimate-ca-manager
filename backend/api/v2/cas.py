@@ -197,8 +197,6 @@ def list_cas_tree():
                         ca_obj = CAService.get_ca_by_refid(ca.refid)
                         if ca_obj and not ca_obj.caref:
                             ca_obj.caref = potential_parent.refid
-                            if ca_obj.is_root:
-                                ca_obj.is_root = False
                             db.session.commit()
                     except Exception:
                         db.session.rollback()
@@ -239,7 +237,9 @@ def create_ca():
         dn = {
             'CN': data.get('commonName'),
             'O': data.get('organization'),
-            'C': (data.get('country') or '').upper() or None
+            'C': (data.get('country') or '').upper() or None,
+            'ST': data.get('state') or None,
+            'L': data.get('locality') or None
         }
         
         # SECURITY: Validate DN fields
@@ -254,6 +254,16 @@ def create_ca():
         elif data.get('keyAlgo') == 'ECDSA':
             key_type = data.get('keySize') or 'P-256'
         
+        # Resolve parent CA for intermediate CAs
+        caref = None
+        if data.get('type') == 'intermediate' and data.get('parentCAId'):
+            parent_ca = CA.query.get(int(data['parentCAId']))
+            if not parent_ca:
+                return error_response('Parent CA not found', 400)
+            if not parent_ca.prv:
+                return error_response('Parent CA has no private key', 400)
+            caref = parent_ca.refid
+        
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
             
         ca = CAService.create_internal_ca(
@@ -261,6 +271,7 @@ def create_ca():
             dn=dn,
             key_type=key_type,
             validity_days=int(data.get('validityYears') or 10) * 365,
+            caref=caref,
             username=username
         )
         
@@ -286,7 +297,8 @@ def create_ca():
             message='CA created successfully'
         )
     except Exception as e:
-        return error_response(str(e), 500)
+        logger.error(f"Failed to create CA: {e}")
+        return error_response("Failed to create CA", 500)
 
 
 @bp.route('/api/v2/cas/import', methods=['POST'])
@@ -378,7 +390,7 @@ def import_ca():
         refid = str(uuid.uuid4())
         ca = CA(
             refid=refid,
-            descr=name or cert_info['cn'] or file.filename,
+            descr=name or cert_info['cn'] or filename,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
             serial=0,
