@@ -203,6 +203,32 @@ def create_certificate():
         if not is_valid:
             return error_response(error, 400)
     
+    # Parse SAN string into typed arrays if not already provided
+    if data.get('san') and not data.get('san_dns'):
+        san_dns = []
+        san_ip = []
+        san_email = []
+        raw_sans = [s.strip() for s in re.split(r'[,\n;]+', data['san']) if s.strip()]
+        for entry in raw_sans:
+            # Remove type prefixes if present (e.g. "DNS:example.com", "IP:1.2.3.4")
+            entry_clean = re.sub(r'^(DNS|IP|EMAIL|URI):\s*', '', entry, flags=re.IGNORECASE)
+            if not entry_clean:
+                continue
+            try:
+                ip_address(entry_clean)
+                san_ip.append(entry_clean)
+            except ValueError:
+                if '@' in entry_clean:
+                    san_email.append(entry_clean)
+                else:
+                    san_dns.append(entry_clean)
+        if san_dns:
+            data['san_dns'] = san_dns
+        if san_ip:
+            data['san_ip'] = san_ip
+        if san_email:
+            data['san_email'] = san_email
+    
     # Get the CA
     ca = CA.query.get(data['ca_id'])
     if not ca:
