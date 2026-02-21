@@ -33,11 +33,14 @@ def get_current_version():
 
 
 def parse_version(version_str):
-    """Parse version string to tuple for comparison"""
-    # Remove 'v' prefix if present
+    """Parse version string to tuple for comparison.
+    
+    Supports both Major.Build (2.48) and legacy semver (2.1.6) formats.
+    Pre-release suffixes (-dev, -beta, -rc) are ranked lower than release.
+    """
     version_str = version_str.lstrip('v')
     
-    # Handle pre-release versions (e.g., 2.0.0-beta2)
+    # Handle pre-release versions (e.g., 2.48-dev, 2.1.0-beta2)
     parts = version_str.split('-')
     main_version = parts[0]
     prerelease = parts[1] if len(parts) > 1 else None
@@ -48,12 +51,11 @@ def parse_version(version_str):
     except ValueError:
         numbers = (0, 0, 0)
     
-    # Pad to 3 numbers
+    # Pad to 3 numbers for consistent comparison (2.48 → 2.48.0)
     while len(numbers) < 3:
         numbers = numbers + (0,)
     
     # Pre-release versions are considered lower than release
-    # beta2 > beta1, rc1 > beta2
     prerelease_order = 0
     if prerelease:
         num_match = re.search(r'\d+', prerelease)
@@ -213,7 +215,7 @@ def check_for_updates(include_prereleases=False):
 
 def download_update(download_url, package_name):
     """
-    Download update package to DATA_DIR/updates (accessible by ucm-updater.service)
+    Download update package to DATA_DIR/updates (accessible by ucm-watcher.service)
     
     Note: Cannot use /tmp because ucm.service has PrivateTmp=true,
     so files in /tmp are invisible to other services.
@@ -246,10 +248,10 @@ def download_update(download_url, package_name):
 
 def install_update(package_path):
     """
-    Install downloaded update package via systemd path-activated updater.
+    Install downloaded update package via systemd path-activated watcher.
     
     Writes the package path to /opt/ucm/data/.update_pending which triggers
-    the ucm-updater.path systemd unit. The ucm-updater.service runs as root
+    the ucm-watcher.path systemd unit. The ucm-watcher.service runs as root
     (no NoNewPrivileges restriction) and handles dpkg/rpm install + restart.
     """
     if not package_path.endswith('.deb') and not package_path.endswith('.rpm'):
@@ -260,7 +262,7 @@ def install_update(package_path):
         logger.info(f"Auto-update: writing trigger for {package_path}")
         trigger_file.write_text(package_path)
         
-        logger.info(f"Auto-update: trigger written, ucm-updater.path will handle install + restart")
+        logger.info(f"Auto-update: trigger written, ucm-watcher.path will handle install + restart")
         return True
     except Exception as e:
         raise Exception(f"Install trigger failed: {str(e)}")

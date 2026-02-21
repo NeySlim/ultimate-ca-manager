@@ -1,5 +1,5 @@
 Name:           ucm
-Version:        2.1.3
+Version:        0.0.0
 Release:        1%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
