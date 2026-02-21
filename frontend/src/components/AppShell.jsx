@@ -8,7 +8,8 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   Lightning, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock, Wrench,
-  UserCircle, Palette, Question, SignOut, Globe, Check, CaretRight
+  UserCircle, Palette, Question, SignOut, Globe, Check, CaretRight,
+  Gavel, Stamp, ChartBar
 } from '@phosphor-icons/react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Sidebar } from './Sidebar'
@@ -38,9 +39,9 @@ const mobileNavItems = [
   { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', shortKey: 'common.trustStoreShort', path: '/truststore', permission: 'read:truststore' },
   { id: 'operations', icon: Lightning, labelKey: 'common.operations', shortKey: 'common.operationsShort', path: '/operations', adminOnly: true },
   { id: 'tools', icon: Wrench, labelKey: 'common.tools', shortKey: 'common.toolsShort', path: '/tools' },
-  { id: 'policies', icon: undefined, labelKey: 'common.policies', shortKey: 'common.policiesShort', path: '/policies', permission: 'read:policies' },
-  { id: 'approvals', icon: undefined, labelKey: 'common.approvals', shortKey: 'common.approvalsShort', path: '/approvals', permission: 'read:approvals' },
-  { id: 'reports', icon: undefined, labelKey: 'common.reports', shortKey: 'common.reportsShort', path: '/reports', permission: 'read:audit' },
+  { id: 'policies', icon: Gavel, labelKey: 'common.policies', shortKey: 'common.policiesShort', path: '/policies', permission: 'read:policies' },
+  { id: 'approvals', icon: Stamp, labelKey: 'common.approvals', shortKey: 'common.approvalsShort', path: '/approvals', permission: 'read:approvals' },
+  { id: 'reports', icon: ChartBar, labelKey: 'common.reports', shortKey: 'common.reportsShort', path: '/reports', permission: 'read:audit' },
   { id: 'users', icon: User, labelKey: 'common.users', shortKey: 'common.usersShort', path: '/users', adminOnly: true },
   { id: 'rbac', icon: Shield, labelKey: 'common.rbac', shortKey: 'common.rbacShort', path: '/rbac', adminOnly: true },
   { id: 'hsm', icon: Lock, labelKey: 'common.hsm', shortKey: 'common.hsmShort', path: '/hsm', permission: 'read:hsm' },
