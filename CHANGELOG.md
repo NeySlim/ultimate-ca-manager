@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.2] - 2026-02-21
+
+### Fixed
+- **Sub CA creation** — intermediate CA was created as root CA because parent reference (`caref`) was never passed to the service (fixes [#21](https://github.com/NeySlim/ultimate-ca-manager/issues/21))
+- **CA DN mapping** — State (ST) and Locality (L) fields from the create form were silently ignored
+- **CA import crash** — pasting PEM content (instead of file upload) caused a `NameError` (`file.filename` → `filename`)
+- **Error leak** — `create_ca()` exposed internal exception details via `str(e)` in API response
+- **Dead code** — removed no-op assignment to read-only `is_root` property in tree builder
+
+### Security
+- **Flask** upgraded from 3.1.2 to 3.1.3 (CVE-2026-27205 — missing `Vary: Cookie` header)
+
+---
+
 ## [2.1.0] - 2026-02-19
 
 ### Added
