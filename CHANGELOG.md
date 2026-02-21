@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.3] - 2026-02-21
+
+### Fixed
+- **ECDSA key sizes** — CA and certificate creation forms now show correct curve options (P-256/P-384/P-521) instead of RSA sizes when ECDSA is selected (fixes [#22](https://github.com/NeySlim/ultimate-ca-manager/issues/22))
+- **CA create form** — all Radix Select values (`type`, `parentCAId`, `keyAlgo`, `keySize`, `validityYears`) switched to React state; `FormData.get()` returns null for Radix components
+- **WebSocket crash** — `flask-socketio` `ctx.session` setter incompatible with Flask 3.1/Python 3.13; set `manage_session=False`
+- **Certificate ECDSA backend** — `key_type: 'ecdsa'` was not recognized; added mapping from key_size to curve names
+
+### Changed
+- **Dependencies** — updated `flask-socketio` 5.3.7→5.6.0, `gevent` 24.11.1→25.9.1, `gunicorn` 23.0.0→25.1.0, `marshmallow` 4.2.0→4.2.2, `psutil` 7.2.1→7.2.2, `Flask-Caching` 2.3.0→2.3.1, `webauthn` 2.7.0→2.7.1, `pyasn1-modules` 0.4.1→0.4.2, `black` 25.12.0→26.1.0
+
+---
+
 ## [2.1.2] - 2026-02-21
 
 ### Fixed
