@@ -218,6 +218,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   const hasEncryptedPem = pemContent.includes('ENCRYPTED')
   const encryptedFileIndices = files.reduce((acc, f, i) => {
     if (f.name.match(/\.(p12|pfx)$/i) || f.name.match(/\.key$/i)) acc.push(i)
+    else if (f.type === 'text' && f.data && f.data.includes('ENCRYPTED')) acc.push(i)
     return acc
   }, [])
   const hasEncryptedFiles = encryptedFileIndices.length > 0
@@ -465,7 +466,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
             )}
           </div>
           {files.map((file, i) => {
-            const isEncryptable = file.name.match(/\.(p12|pfx|key)$/i)
+            const isEncryptable = file.name.match(/\.(p12|pfx|key)$/i) || (file.type === 'text' && file.data && file.data.includes('ENCRYPTED'))
             return (
               <div key={i} className="p-2 bg-bg-secondary rounded-lg space-y-2">
                 <div className="flex items-center gap-2">

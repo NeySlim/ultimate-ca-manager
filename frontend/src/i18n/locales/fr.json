@@ -796,7 +796,10 @@
     "settingsShort": "Config",
     "allRoles": "Tous les rôles",
     "exporting": "Export en cours...",
-    "exported": "Exporté"
+    "exported": "Exporté",
+    "policiesShort": "Politiques",
+    "approvalsShort": "Approbations",
+    "reportsShort": "Rapports"
   },
   "compare": {
     "title": "Comparer les certificats",

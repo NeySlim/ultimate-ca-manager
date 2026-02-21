@@ -341,7 +341,10 @@
     "policies": "策略",
     "reports": "报告",
     "exporting": "导出中...",
-    "exported": "已导出"
+    "exported": "已导出",
+    "policiesShort": "策略",
+    "approvalsShort": "审批",
+    "reportsShort": "报告"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
