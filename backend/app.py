@@ -168,7 +168,7 @@ def create_app(config_name=None):
         "info": {
             "title": "UCM API v2.0",
             "description": "Ultimate Certificate Manager - REST API Documentation",
-            "version": "2.1.2",
+            "version": "2.1.3",
             "contact": {
                 "name": "UCM Support",
                 "url": "https://github.com/your-org/ucm"

@@ -30,6 +30,7 @@ def init_websocket(app):
         app,
         cors_allowed_origins=cors_origins,
         async_mode='gevent',
+        manage_session=False,
         logger=True,
         engineio_logger=False,
         ping_timeout=60,
