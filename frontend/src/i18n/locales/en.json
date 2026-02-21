@@ -342,7 +342,10 @@
     "settingsShort": "Settings",
     "allRoles": "All Roles",
     "exporting": "Exporting...",
-    "exported": "Exported"
+    "exported": "Exported",
+    "policiesShort": "Policies",
+    "approvalsShort": "Approvals",
+    "reportsShort": "Reports"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",

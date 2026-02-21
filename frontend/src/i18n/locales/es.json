@@ -341,7 +341,10 @@
     "policies": "Políticas",
     "reports": "Reportes",
     "exporting": "Exportando...",
-    "exported": "Exportado"
+    "exported": "Exportado",
+    "policiesShort": "Políticas",
+    "approvalsShort": "Aprobaciones",
+    "reportsShort": "Informes"
   },
   "commandPalette": {
     "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",

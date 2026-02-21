@@ -341,7 +341,10 @@
     "policies": "Політики",
     "reports": "Звіти",
     "exporting": "Експорт...",
-    "exported": "Експортовано"
+    "exported": "Експортовано",
+    "policiesShort": "Політики",
+    "approvalsShort": "Затвердження",
+    "reportsShort": "Звіти"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
