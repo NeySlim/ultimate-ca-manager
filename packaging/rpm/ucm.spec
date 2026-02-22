@@ -203,7 +203,7 @@ fi
 
 %preun
 %systemd_preun %{name}.service
-%systemd_preun %{name}-updater.path
+%systemd_preun %{name}-watcher.path
 
 %postun
 %systemd_postun_with_restart %{name}.service
@@ -213,18 +213,18 @@ fi
 %dir %{_sysconfdir}/%{name}/
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
-%{_unitdir}/%{name}-updater.path
-%{_unitdir}/%{name}-updater.service
+%{_unitdir}/%{name}-watcher.path
+%{_unitdir}/%{name}-watcher.service
 /usr/lib/firewalld/services/ucm.xml
 
 %changelog
-* Fri Feb 07 2026 UCM Team <dev@ucm.local> - 2.1.0-1
+* Sat Feb 07 2026 UCM Team <dev@ucm.local> - 2.1.0-1
 - Unified release: Pro features merged into main
 - Interactive firewall configuration on install
 - i18n support (9 languages)
 - Column resize in tables
 
-* Mon Feb 03 2026 UCM Team <dev@ucm.local> - 2.0.0-1
+* Tue Feb 03 2026 UCM Team <dev@ucm.local> - 2.0.0-1
 - Version 2.0.0 release
 - Pro features: HSM, SSO, RBAC, Groups
 - WebAuthn multi-key support

@@ -176,9 +176,6 @@ jobs:
               sed -i "s/^Source0:.*/Source0:        ucm-${TAR_VERSION}.tar.gz/" ~/rpmbuild/SPECS/ucm.spec
               sed -i "s/%setup -q/%setup -q -n ucm-${TAR_VERSION}/" ~/rpmbuild/SPECS/ucm.spec
               
-              # Fix bogus date warning
-              sed -i "s/Mon Feb 03 2026/Thu Feb 06 2026/" ~/rpmbuild/SPECS/ucm.spec
-              
               # Build
               rpmbuild -bb ~/rpmbuild/SPECS/ucm.spec
               
