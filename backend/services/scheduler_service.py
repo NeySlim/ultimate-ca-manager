@@ -33,6 +33,7 @@ class ScheduledTask:
             interval: Interval in seconds between executions
             description: Human-readable description
             enabled: Whether task is enabled
+            initial_delay: Seconds to wait before first execution (0 = run immediately)
         """
         self.name = name
         self.func = func
@@ -44,13 +45,17 @@ class ScheduledTask:
         self.run_count = 0
         self.last_error: Optional[str] = None
         self.last_duration_ms = 0.0
+        self._created_at = datetime.utcnow()
     
     def should_run(self) -> bool:
         """Check if task should run based on interval"""
         if not self.enabled:
             return False
         if self.last_run is None:
-            return True
+            # Grace period: wait 30s after creation before first run
+            # to let SSL/network stack initialize after worker fork
+            age = (datetime.utcnow() - self._created_at).total_seconds()
+            return age >= 30
         elapsed = (datetime.utcnow() - self.last_run).total_seconds()
         return elapsed >= self.interval
     
