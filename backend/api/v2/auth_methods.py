@@ -350,6 +350,8 @@ def login_2fa():
         },
         message='Login successful'
     )
+
+@bp.route('/api/v2/auth/login/mtls', methods=['POST'])
 def login_mtls():
     """
     mTLS (client certificate) login

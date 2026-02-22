@@ -17,7 +17,7 @@ export const crlService = {
   },
 
   async generate(caId) {
-    return apiClient.post('/crl/generate', { ca_id: caId })
+    return apiClient.post(`/crl/${caId}/regenerate`)
   },
 
   async download(id) {

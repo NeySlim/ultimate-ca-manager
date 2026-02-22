@@ -226,6 +226,81 @@ def list_acme_accounts():
     return success_response(data=data)
 
 
+@bp.route('/api/v2/acme/accounts', methods=['POST'])
+@require_auth(['write:acme'])
+def create_acme_account():
+    """Create a new ACME account"""
+    data = request.get_json()
+    if not data:
+        return error_response('Request body required', 400)
+
+    email = data.get('email', '').strip()
+    key_type = data.get('key_type', 'RSA-2048')
+    agree_tos = data.get('agree_tos', False)
+
+    if not email:
+        return error_response('Email is required', 400)
+
+    try:
+        import secrets
+        account_id = f'acme-{secrets.token_hex(8)}'
+
+        account = AcmeAccount(
+            account_id=account_id,
+            status='valid',
+            contact=email,
+            terms_of_service_agreed=agree_tos,
+        )
+        db.session.add(account)
+        db.session.commit()
+
+        AuditService.log_action(
+            action='acme.account.create',
+            resource_type='acme_account',
+            resource_id=str(account.id),
+            details=f'Created ACME account: {account_id} ({email})'
+        )
+
+        return success_response(data={
+            'id': account.id,
+            'account_id': account.account_id,
+            'status': account.status,
+            'contact': account.contact_list,
+            'terms_of_service_agreed': account.terms_of_service_agreed,
+            'created_at': account.created_at.isoformat()
+        }, message='Account created')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create ACME account: {e}")
+        return error_response('Failed to create account', 500)
+
+
+@bp.route('/api/v2/acme/accounts/<int:account_id>/deactivate', methods=['POST'])
+@require_auth(['write:acme'])
+def deactivate_acme_account(account_id):
+    """Deactivate an ACME account"""
+    acc = AcmeAccount.query.get(account_id)
+    if not acc:
+        return error_response('Account not found', 404)
+
+    try:
+        acc.status = 'deactivated'
+        db.session.commit()
+
+        AuditService.log_action(
+            action='acme.account.deactivate',
+            resource_type='acme_account',
+            resource_id=str(account_id),
+            details=f'Deactivated ACME account: {acc.account_id}'
+        )
+
+        return success_response(message=f'Account {acc.account_id} deactivated')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to deactivate ACME account {account_id}: {e}")
+        return error_response('Failed to deactivate account', 500)
+
+
 @bp.route('/api/v2/acme/accounts/<int:account_id>', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_account(account_id):
