@@ -36,8 +36,20 @@ class MTLSAuthService:
         if not serial:
             return None, None, "Certificate serial number not found"
         
-        # Try to find certificate by serial number
+        # Try to find certificate by serial number (hex or decimal)
         auth_cert = AuthCertificate.query.filter_by(cert_serial=serial).first()
+        
+        # Serial may be stored in decimal but presented in hex (or vice-versa)
+        if not auth_cert:
+            try:
+                if all(c in '0123456789ABCDEFabcdef' for c in serial):
+                    decimal_serial = str(int(serial, 16))
+                    auth_cert = AuthCertificate.query.filter_by(cert_serial=decimal_serial).first()
+                if not auth_cert:
+                    hex_serial = format(int(serial), 'X')
+                    auth_cert = AuthCertificate.query.filter_by(cert_serial=hex_serial).first()
+            except (ValueError, OverflowError):
+                pass
         
         # If not found by serial, try fingerprint
         if not auth_cert and fingerprint:
