@@ -25,6 +25,7 @@ export function FormModal({
   // Modal props
   open,
   onClose,
+  onOpenChange,
   title,
   size = 'md',
   
@@ -56,10 +57,13 @@ export function FormModal({
     }
   }
 
+  const handleClose = onClose || (onOpenChange ? () => onOpenChange(false) : undefined)
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
+      onOpenChange={onOpenChange}
       title={title}
       size={size}
     >
@@ -73,7 +77,7 @@ export function FormModal({
             <Button
               type="button"
               variant="secondary"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={loading}
             >
               {cancelLabel}

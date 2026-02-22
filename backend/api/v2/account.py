@@ -12,6 +12,11 @@ from models.api_key import APIKey
 from models import db
 from services.audit_service import AuditService
 from datetime import datetime
+import pyotp
+import qrcode
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('account_v2', __name__)
 
@@ -396,8 +401,6 @@ def regenerate_api_key(key_id):
 def enable_2fa():
     """Enable 2FA (TOTP) - generates QR code and secret"""
     from models import User, db
-    import pyotp
-    import qrcode
     import io
     import base64
     
@@ -440,7 +443,6 @@ def enable_2fa():
 def confirm_2fa():
     """Confirm 2FA setup with verification code"""
     from models import User, db
-    import pyotp
     import secrets
     
     data = request.json
@@ -486,7 +488,6 @@ def confirm_2fa():
 def disable_2fa():
     """Disable 2FA"""
     from models import User, db
-    import pyotp
     
     data = request.json
     
@@ -560,7 +561,6 @@ def get_recovery_codes():
 def regenerate_recovery_codes():
     """Regenerate recovery codes (invalidates old ones)"""
     from models import User, db
-    import pyotp
     import secrets
     
     data = request.json

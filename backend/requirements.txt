@@ -20,6 +20,10 @@ asn1crypto==1.5.1
 webauthn==2.7.1
 cbor2==5.8.0
 
+# TOTP/2FA Support
+pyotp>=2.9.0
+qrcode>=7.4
+
 # SCEP Support
 pycryptodome==3.23.0
 pyasn1==0.6.2
