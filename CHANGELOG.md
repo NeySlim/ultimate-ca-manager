@@ -11,6 +11,31 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.50] - 2026-02-22
+
+### Added
+- **Login architecture redesign** — complete rewrite of the authentication flow with state machine (init → username → auth → 2fa/ldap), automatic method detection, and zero-interaction mTLS auto-login
+- **mTLS auto-login** — client certificate authentication now happens entirely in the TLS handshake via middleware; no explicit POST required, browser cert → session → auto-redirect to dashboard
+- **AuthContext session check on all routes** — removed the `/login` skip guard; `checkSession()` now always calls `/auth/verify` on mount, enabling mTLS auto-login discovery
+- **`sessionChecked` state** — new boolean in AuthContext exposed to components, prevents flash of login form during session verification
+- **Enhanced `/auth/methods` endpoint** — returns `mtls_status` (auto_logged_in/present_not_enrolled/not_present), `mtls_user`, and `sso_providers` in a single call
+
+### Changed
+- **mTLS middleware** — clean rewrite with `_extract_certificate()` helper (DRY), `g.mtls_cert_info` for cross-endpoint reuse, proper stale session handling
+- **LoginPage** — removed cascade login logic; each auth method is standalone with proper state transitions; WebAuthn auto-prompts after username entry if keys detected
+- **App.jsx `/login` route** — shows `PageLoader` while session is being checked, then redirects if already authenticated
+
+### Fixed
+- **mTLS peercert injection** — custom Gunicorn worker (`MTLSWebSocketHandler`) extracts peercert DER bytes into WSGI environ
+- **OpenSSL 3.x CA names** — ctypes hack in `gunicorn_config.py` to send client CA names in CertificateRequest
+- **Timezone-aware datetime comparison** — fixed crash in `mtls_auth_service.py` when comparing naive vs aware datetimes
+- **Serial number format mismatch** — normalized hex/decimal serial matching in `mtls_auth_service.py`
+- **Scheduler SSL errors at startup** — added 30s grace period before first scheduled task execution
+- **Stale sessions blocking mTLS** — middleware now validates existing sessions before skipping certificate processing
+- **`checkSession()` false positive** — now properly checks `userData.authenticated` before setting `isAuthenticated=true`
+
+---
+
 ## [2.49] - 2026-02-22
 
 ### Fixed
