@@ -201,6 +201,12 @@ vi.mock('../../services/auth-methods.service', () => ({
   authMethodsService: {
     getAvailableMethods: vi.fn().mockResolvedValue({ data: { methods: ['password'] } }),
     checkUsername: vi.fn().mockResolvedValue({ data: { methods: ['password'] } }),
+    detectMethods: vi.fn().mockResolvedValue({ password: true, mtls: false, webauthn: false, sso_providers: [] }),
+    loginPassword: vi.fn().mockResolvedValue({}),
+    login2FA: vi.fn().mockResolvedValue({}),
+    loginMTLS: vi.fn().mockResolvedValue({}),
+    authenticateWebAuthn: vi.fn().mockResolvedValue({}),
+    isWebAuthnSupported: vi.fn().mockReturnValue(false),
   }
 }))
 vi.mock('../../services/opnsense.service', () => ({
@@ -227,9 +233,12 @@ vi.mock('../../contexts', () => ({
     user: { id: 1, username: 'admin', email: 'admin@test.com', role: 'admin' },
     isAuthenticated: true,
     isLoading: false,
+    loading: false,
+    sessionChecked: true,
     login: vi.fn(),
     logout: vi.fn(),
     checkAuth: vi.fn(),
+    checkSession: vi.fn(),
   }),
   useNotification: () => ({
     showSuccess: vi.fn(),
@@ -281,9 +290,12 @@ vi.mock('../../contexts/AuthContext', () => ({
     user: { id: 1, username: 'admin', email: 'admin@test.com', role: 'admin' },
     isAuthenticated: true,
     isLoading: false,
+    loading: false,
+    sessionChecked: true,
     login: vi.fn(),
     logout: vi.fn(),
     checkAuth: vi.fn(),
+    checkSession: vi.fn(),
   }),
   AuthProvider: ({ children }) => children,
 }))

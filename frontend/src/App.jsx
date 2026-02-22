@@ -85,7 +85,7 @@ function PermissionRoute({ children, permission }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, forcePasswordChange, clearForcePasswordChange, logout } = useAuth()
+  const { isAuthenticated, loading, sessionChecked, forcePasswordChange, clearForcePasswordChange, logout } = useAuth()
   
   return (
     <Suspense fallback={<PageLoader />}>
@@ -100,7 +100,11 @@ function AppRoutes() {
       <Routes>
         <Route 
           path="/login" 
-          element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} 
+          element={
+            loading ? <PageLoader /> :
+            isAuthenticated ? <Navigate to="/" replace /> : 
+            <LoginPage />
+          } 
         />
         <Route 
           path="/login/sso-complete" 

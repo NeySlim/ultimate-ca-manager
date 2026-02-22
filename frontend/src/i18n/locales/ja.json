@@ -454,7 +454,12 @@
     "totpCodeRequired": "6桁の認証コードを入力してください",
     "invalidTotpCode": "認証コードが無効です",
     "verifying": "確認中...",
-    "verify": "確認"
+    "verify": "確認",
+    "checkingMethods": "認証方法を検出中...",
+    "certDetected": "クライアント証明書を検出",
+    "certNotEnrolled": "証明書が登録されていません。パスワードでサインインしてください。",
+    "autoLoginFailed": "自動ログインに失敗しました。手動でサインインしてください。",
+    "mtlsAutoLogin": "証明書でサインイン中..."
   },
   "dashboard": {
     "goodMorning": "おはようございます",

@@ -454,7 +454,12 @@
     "totpCodeRequired": "请输入6位验证码",
     "invalidTotpCode": "验证码无效",
     "verifying": "验证中...",
-    "verify": "验证"
+    "verify": "验证",
+    "checkingMethods": "正在检测身份验证方法...",
+    "certDetected": "检测到客户端证书",
+    "certNotEnrolled": "您的证书未注册。请使用密码登录。",
+    "autoLoginFailed": "自动登录失败。请手动登录。",
+    "mtlsAutoLogin": "正在使用证书登录..."
   },
   "dashboard": {
     "goodMorning": "早上好",

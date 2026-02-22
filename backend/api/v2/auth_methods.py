@@ -36,74 +36,84 @@ bp = Blueprint('auth_methods', __name__)
 @bp.route('/api/v2/auth/methods', methods=['GET', 'POST'])
 def detect_auth_methods():
     """
-    Detect available authentication methods
+    Detect available authentication methods.
     
-    GET: Global methods (mTLS cert present, etc.)
-    POST with {"username": "xxx"}: User-specific methods (WebAuthn credentials count, etc.)
+    GET: Global methods + mTLS cert status (no username needed)
+    POST with {"username": "xxx"}: User-specific (WebAuthn credential count, etc.)
     
-    Returns:
-        {
-            "password": true,
-            "mtls": true|false,
-            "mtls_status": "present"|"enrolled"|"not_present"|"error",
-            "webauthn": true|false,
-            "webauthn_credentials": 0  # Count of user's registered keys (if username provided)
-        }
+    If the mTLS middleware already auto-logged the user in (session exists),
+    returns mtls_status='auto_logged_in' so the frontend can skip the login form.
     """
     methods = {
-        'password': True,  # Always available
+        'password': True,
         'mtls': False,
         'mtls_status': 'not_present',
-        'webauthn': True,  # Browser support is checked client-side
-        'webauthn_credentials': 0,  # User's registered keys
-        'api_keys': True,  # For API access
+        'webauthn': True,
+        'webauthn_credentials': 0,
+        'api_keys': True,
+        'sso_providers': [],
     }
-    
+
+    # If middleware already auto-logged in via cert, signal it
+    if session.get('user_id') and session.get('auth_method') == 'certificate':
+        methods['mtls'] = True
+        methods['mtls_status'] = 'auto_logged_in'
+        methods['mtls_user'] = session.get('username')
+        return success_response(data=methods)
+
     # Check for username in POST body
     username = None
     if request.method == 'POST' and request.json:
         username = request.json.get('username')
-    
-    # If username provided, get user-specific info
+
+    # User-specific info
     if username:
         user = User.query.filter_by(username=username).first()
         if user and user.active:
-            # Count WebAuthn credentials
             from models.webauthn import WebAuthnCredential
             webauthn_count = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).count()
             methods['webauthn_credentials'] = webauthn_count
-            
-            # Count mTLS certificates for this user
+
             from models.auth_certificate import AuthCertificate
             mtls_count = AuthCertificate.query.filter_by(user_id=user.id, enabled=True).count()
             methods['mtls_certificates'] = mtls_count
-    
-    # Check mTLS status (certificate present in request)
-    cert_info = None
-    try:
-        # Try to extract certificate from request
-        headers = dict(request.headers)
-        if 'X-SSL-Client-Verify' in headers:
-            cert_info = CertificateParser.extract_from_nginx_headers(headers)
-        elif 'X-SSL-Client-S-DN' in headers:
-            cert_info = CertificateParser.extract_from_apache_headers(headers)
-        elif request.environ.get('peercert'):
-            cert_info = CertificateParser.extract_from_flask_native(request.environ['peercert'])
-        
-        if cert_info:
-            methods['mtls'] = True
-            # Check if certificate is enrolled
-            user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
-            if user:
-                methods['mtls_status'] = 'enrolled'
-            else:
-                methods['mtls_status'] = 'present_not_enrolled'
+
+    # Detect mTLS cert presence (use middleware's parsed cert if available)
+    cert_info = getattr(g, 'mtls_cert_info', None)
+    if not cert_info:
+        try:
+            headers = dict(request.headers)
+            if 'X-SSL-Client-Verify' in headers:
+                cert_info = CertificateParser.extract_from_nginx_headers(headers)
+            elif 'X-SSL-Client-S-DN' in headers:
+                cert_info = CertificateParser.extract_from_apache_headers(headers)
+            elif request.environ.get('peercert'):
+                cert_info = CertificateParser.extract_from_flask_native(request.environ['peercert'])
+        except Exception as e:
+            logger.error(f"Error detecting mTLS: {e}")
+            methods['mtls_status'] = 'error'
+            return success_response(data=methods)
+
+    if cert_info:
+        methods['mtls'] = True
+        user_match, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
+        if user_match:
+            methods['mtls_status'] = 'enrolled'
+            methods['mtls_user'] = user_match.username
         else:
-            methods['mtls_status'] = 'not_present'
-    except Exception as e:
-        logger.error(f"Error detecting mTLS: {e}")
-        methods['mtls_status'] = 'error'
-    
+            methods['mtls_status'] = 'present_not_enrolled'
+
+    # Fetch SSO providers for login page
+    try:
+        from models.sso_provider import SSOProvider
+        providers = SSOProvider.query.filter_by(enabled=True).all()
+        methods['sso_providers'] = [
+            {'id': p.id, 'name': p.name, 'provider_type': p.provider_type}
+            for p in providers
+        ]
+    except Exception:
+        pass
+
     return success_response(data=methods)
 
 
