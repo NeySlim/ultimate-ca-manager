@@ -11,6 +11,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.49] - 2026-02-22
+
+### Fixed
+- **mTLS login endpoint** — `login_mtls()` was missing its `@bp.route` decorator, causing 404 on client certificate login
+- **ACME account creation** — added missing `POST /acme/accounts` route; "Create Account" button was returning 404
+- **ACME account deactivation** — added missing `POST /acme/accounts/<id>/deactivate` route
+- **CRL generate** — `crlService.generate()` now calls the correct `/crl/<caId>/regenerate` backend endpoint
+
+### Changed
+- **CHANGELOG** — complete rewrite with accurate entries for all versions from 2.1.1 through 2.48 (extracted from git log)
+
+---
+
 ## [2.48] - 2026-02-22
 
 > Version jump from 2.1.6 to 2.48: UCM migrated from Semantic Versioning to Major.Build format.
