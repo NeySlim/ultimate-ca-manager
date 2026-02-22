@@ -447,7 +447,14 @@
     "ssoError": "SSO 认证失败",
     "passwordRequired": "请输入密码",
     "usernameRequired": "请输入用户名",
-    "orSignInLocally": "或本地登录"
+    "orSignInLocally": "或本地登录",
+    "twoFactorTitle": "双因素认证",
+    "twoFactorDescription": "输入您的认证应用中的代码",
+    "totpCode": "验证码",
+    "totpCodeRequired": "请输入6位验证码",
+    "invalidTotpCode": "验证码无效",
+    "verifying": "验证中...",
+    "verify": "验证"
   },
   "dashboard": {
     "goodMorning": "早上好",

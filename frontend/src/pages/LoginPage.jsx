@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe, SignIn } from '@phosphor-icons/react'
+import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe, SignIn, Lock } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
 import { languages } from '../i18n'
 import { useAuth, useNotification } from '../contexts'
@@ -49,10 +49,11 @@ export default function LoginPage() {
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const passwordRef = useRef(null)
   
-  // Login flow step: 'username' | 'auth' | 'ldap'
+  // Login flow step: 'username' | 'auth' | 'ldap' | '2fa'
   const [step, setStep] = useState('username')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [authMethod, setAuthMethod] = useState(null) // 'mtls' | 'webauthn' | 'password'
   const [userMethods, setUserMethods] = useState(null) // Methods available for this user
@@ -291,6 +292,16 @@ export default function LoginPage() {
     
     try {
       const userData = await authMethodsService.loginPassword(username, password)
+      
+      // Check if 2FA is required
+      if (userData.requires_2fa) {
+        setStep('2fa')
+        setTotpCode('')
+        setLoading(false)
+        setStatusMessage('')
+        return
+      }
+      
       saveUsername(username)
       saveAuthMethod('password')
       await login(username, password, userData)
@@ -302,6 +313,33 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
       setStatusMessage('')
+    }
+  }
+
+  // 2FA TOTP verification
+  const handle2FAVerify = async (e) => {
+    e.preventDefault()
+    
+    if (!totpCode || totpCode.length < 6) {
+      showError(t('auth.totpCodeRequired'))
+      return
+    }
+
+    setLoading(true)
+    setStatusMessage('')
+    
+    try {
+      const userData = await authMethodsService.login2FA(totpCode)
+      saveUsername(username)
+      saveAuthMethod('password')
+      await login(username, password, userData)
+      showSuccess(`Welcome back, ${username}!`)
+      navigate('/dashboard')
+    } catch (error) {
+      showError(error.message || t('auth.invalidTotpCode'))
+      setTotpCode('')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -678,6 +716,66 @@ export default function LoginPage() {
             <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
               <Key size={12} weight="fill" />
               <span>{t('common.password')}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2b: 2FA TOTP Verification */}
+        {step === '2fa' && (
+          <div className="space-y-3 sm:space-y-5">
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
+                  <Lock size={20} weight="fill" className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-text-primary text-sm sm:text-base">{t('auth.twoFactorTitle')}</h3>
+                  <p className="text-xs text-text-secondary">{t('auth.twoFactorDescription')}</p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handle2FAVerify} className="space-y-3 sm:space-y-4">
+              <Input
+                label={t('auth.totpCode')}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={8}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="000000"
+                disabled={loading}
+                autoComplete="one-time-code"
+                autoFocus
+                icon={<ShieldCheck size={18} />}
+              />
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || totpCode.length < 6}
+              >
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    <span>{t('auth.verifying')}</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={18} weight="fill" />
+                    <span>{t('auth.verify')}</span>
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div
+              onClick={() => { setStep('auth'); setTotpCode('') }}
+              className="flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary cursor-pointer transition-colors py-2"
+            >
+              <ArrowLeft size={16} />
+              <span>{t('common.back')}</span>
             </div>
           </div>
         )}

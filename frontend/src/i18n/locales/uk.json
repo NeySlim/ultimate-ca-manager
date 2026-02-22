@@ -447,7 +447,14 @@
     "ssoError": "SSO authentication невдало",
     "passwordRequired": "Будь ласка, введіть пароль",
     "usernameRequired": "Будь ласка, введіть ім'я користувача",
-    "orSignInLocally": "або увійти локально"
+    "orSignInLocally": "або увійти локально",
+    "twoFactorTitle": "Двофакторна автентифікація",
+    "twoFactorDescription": "Введіть код з вашого додатку автентифікації",
+    "totpCode": "Код підтвердження",
+    "totpCodeRequired": "Введіть 6-значний код підтвердження",
+    "invalidTotpCode": "Недійсний код підтвердження",
+    "verifying": "Перевірка...",
+    "verify": "Підтвердити"
   },
   "dashboard": {
     "goodMorning": "Доброго ранку",

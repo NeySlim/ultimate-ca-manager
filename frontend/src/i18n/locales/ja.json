@@ -447,7 +447,14 @@
     "ssoError": "SSO認証に失敗しました",
     "passwordRequired": "パスワードを入力してください",
     "usernameRequired": "ユーザー名を入力してください",
-    "orSignInLocally": "またはローカルでサインイン"
+    "orSignInLocally": "またはローカルでサインイン",
+    "twoFactorTitle": "二要素認証",
+    "twoFactorDescription": "認証アプリのコードを入力してください",
+    "totpCode": "認証コード",
+    "totpCodeRequired": "6桁の認証コードを入力してください",
+    "invalidTotpCode": "認証コードが無効です",
+    "verifying": "確認中...",
+    "verify": "確認"
   },
   "dashboard": {
     "goodMorning": "おはようございます",

@@ -447,7 +447,14 @@
     "ssoError": "SSO-Authentifizierung fehlgeschlagen",
     "passwordRequired": "Bitte geben Sie Ihr Passwort ein",
     "usernameRequired": "Bitte geben Sie Ihren Benutzernamen ein",
-    "orSignInLocally": "oder lokal anmelden"
+    "orSignInLocally": "oder lokal anmelden",
+    "twoFactorTitle": "Zwei-Faktor-Authentifizierung",
+    "twoFactorDescription": "Geben Sie den Code aus Ihrer Authentifizierungs-App ein",
+    "totpCode": "Bestätigungscode",
+    "totpCodeRequired": "Bitte geben Sie einen 6-stelligen Code ein",
+    "invalidTotpCode": "Ungültiger Bestätigungscode",
+    "verifying": "Überprüfung...",
+    "verify": "Bestätigen"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",

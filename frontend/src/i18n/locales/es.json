@@ -447,7 +447,14 @@
     "ssoError": "SSO authentication error",
     "passwordRequired": "Ingrese su contraseña",
     "usernameRequired": "Ingrese su nombre de usuario",
-    "orSignInLocally": "o iniciar sesión localmente"
+    "orSignInLocally": "o iniciar sesión localmente",
+    "twoFactorTitle": "Autenticación de dos factores",
+    "twoFactorDescription": "Ingrese el código de su aplicación de autenticación",
+    "totpCode": "Código de verificación",
+    "totpCodeRequired": "Ingrese un código de verificación de 6 dígitos",
+    "invalidTotpCode": "Código de verificación inválido",
+    "verifying": "Verificando...",
+    "verify": "Verificar"
   },
   "dashboard": {
     "goodMorning": "Buenos días",

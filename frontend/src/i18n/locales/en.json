@@ -447,7 +447,14 @@
     "ssoUserCreationFailed": "Failed to create user account",
     "ssoAutoCreateDisabled": "User not found. Automatic account creation is disabled. Contact your administrator.",
     "ssoCallbackError": "SSO authentication error",
-    "ssoError": "SSO authentication failed"
+    "ssoError": "SSO authentication failed",
+    "twoFactorTitle": "Two-Factor Authentication",
+    "twoFactorDescription": "Enter the code from your authenticator app",
+    "totpCode": "Verification Code",
+    "totpCodeRequired": "Please enter a 6-digit verification code",
+    "invalidTotpCode": "Invalid verification code",
+    "verifying": "Verifying...",
+    "verify": "Verify"
   },
   "dashboard": {
     "goodMorning": "Good morning",

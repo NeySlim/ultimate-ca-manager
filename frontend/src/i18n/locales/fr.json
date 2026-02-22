@@ -375,7 +375,14 @@
     "ssoUserCreationFailed": "Impossible de créer le compte utilisateur",
     "ssoAutoCreateDisabled": "Utilisateur non trouvé. La création automatique de comptes est désactivée. Contactez votre administrateur.",
     "ssoCallbackError": "Erreur d'authentification SSO",
-    "ssoError": "Échec de l'authentification SSO"
+    "ssoError": "Échec de l'authentification SSO",
+    "twoFactorTitle": "Authentification à deux facteurs",
+    "twoFactorDescription": "Entrez le code de votre application d'authentification",
+    "totpCode": "Code de vérification",
+    "totpCodeRequired": "Veuillez entrer un code de vérification à 6 chiffres",
+    "invalidTotpCode": "Code de vérification invalide",
+    "verifying": "Vérification...",
+    "verify": "Vérifier"
   },
   "cas": {
     "parentCA": "AC parente",

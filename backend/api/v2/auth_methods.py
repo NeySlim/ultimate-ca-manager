@@ -161,7 +161,33 @@ def login_password():
     user.failed_logins = 0  # Reset failed logins on successful login
     db.session.commit()
     
-    # Create session
+    # Check if 2FA is enabled — require TOTP verification before creating session
+    if user.totp_confirmed:
+        session.clear()
+        session['pending_2fa_user_id'] = user.id
+        session['pending_2fa_username'] = user.username
+        session['pending_2fa_method'] = 'password'
+        session.permanent = True
+        
+        AuditService.log_action(
+            action='login_2fa_required',
+            resource_type='user',
+            resource_id=user.id,
+            resource_name=username,
+            details=f'Password verified, 2FA required for {username}',
+            success=True,
+            username=username
+        )
+        
+        return success_response(
+            data={
+                'requires_2fa': True,
+                'user': {'id': user.id, 'username': user.username}
+            },
+            message='2FA verification required'
+        )
+    
+    # No 2FA — create full session
     session.clear()
     session['user_id'] = user.id
     session['username'] = user.username
@@ -210,7 +236,120 @@ def login_password():
     )
 
 
-@bp.route('/api/v2/auth/login/mtls', methods=['POST'])
+@bp.route('/api/v2/auth/login/2fa', methods=['POST'])
+def login_2fa():
+    """
+    Complete login with TOTP 2FA code
+    
+    POST /api/v2/auth/login/2fa
+    Body: {"code": "123456"}
+    
+    Requires a pending 2FA session (from password login)
+    """
+    import pyotp
+    from auth.permissions import get_role_permissions
+    from services.audit_service import AuditService
+    
+    # Check for pending 2FA session
+    pending_user_id = session.get('pending_2fa_user_id')
+    pending_username = session.get('pending_2fa_username')
+    auth_method = session.get('pending_2fa_method', 'password')
+    
+    if not pending_user_id:
+        return error_response('No pending 2FA verification', 401)
+    
+    data = request.json
+    code = data.get('code') if data else None
+    
+    if not code:
+        return error_response('Verification code required', 400)
+    
+    user = User.query.get(pending_user_id)
+    if not user or not user.active:
+        session.clear()
+        return error_response('Invalid credentials', 401)
+    
+    # Verify TOTP code
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(str(code), valid_window=1):
+        # Check recovery codes
+        recovery_used = False
+        if user.backup_codes:
+            import json
+            try:
+                codes = json.loads(user.backup_codes)
+                if str(code) in codes:
+                    codes.remove(str(code))
+                    user.backup_codes = json.dumps(codes)
+                    db.session.commit()
+                    recovery_used = True
+                    logger.info(f"Recovery code used for {user.username}, {len(codes)} remaining")
+                else:
+                    AuditService.log_action(
+                        action='login_2fa_failure',
+                        resource_type='user',
+                        resource_id=user.id,
+                        details=f'Invalid 2FA code for {pending_username}',
+                        success=False,
+                        username=pending_username
+                    )
+                    return error_response('Invalid verification code', 401)
+            except (json.JSONDecodeError, ValueError):
+                return error_response('Invalid verification code', 401)
+        else:
+            AuditService.log_action(
+                action='login_2fa_failure',
+                resource_type='user',
+                resource_id=user.id,
+                details=f'Invalid 2FA code for {pending_username}',
+                success=False,
+                username=pending_username
+            )
+            return error_response('Invalid verification code', 401)
+    
+    # 2FA verified — create full session
+    session.clear()
+    session['user_id'] = user.id
+    session['username'] = user.username
+    session['auth_method'] = auth_method
+    session.permanent = True
+    
+    permissions = get_role_permissions(user.role)
+    
+    AuditService.log_action(
+        action='login_success',
+        resource_type='user',
+        resource_id=user.id,
+        resource_name=user.username,
+        details=f'Login successful with 2FA for {user.username}',
+        success=True,
+        username=user.username
+    )
+    
+    logger.info(f"✅ 2FA login successful: {user.username}")
+    
+    csrf_token = None
+    if HAS_CSRF:
+        csrf_token = CSRFProtection.generate_token(user.id)
+    
+    return success_response(
+        data={
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'active': user.active
+            },
+            'role': user.role,
+            'permissions': permissions,
+            'auth_method': auth_method,
+            'csrf_token': csrf_token,
+            'force_password_change': user.force_password_change or False
+        },
+        message='Login successful'
+    )
 def login_mtls():
     """
     mTLS (client certificate) login

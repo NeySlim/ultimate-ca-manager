@@ -447,7 +447,14 @@
     "ssoError": "Autenticação SSO falhou",
     "passwordRequired": "Por favor, insira sua senha",
     "usernameRequired": "Por favor, insira seu nome de usuário",
-    "orSignInLocally": "ou entre localmente"
+    "orSignInLocally": "ou entre localmente",
+    "twoFactorTitle": "Autenticação de dois fatores",
+    "twoFactorDescription": "Digite o código do seu aplicativo de autenticação",
+    "totpCode": "Código de verificação",
+    "totpCodeRequired": "Digite um código de verificação de 6 dígitos",
+    "invalidTotpCode": "Código de verificação inválido",
+    "verifying": "Verificando...",
+    "verify": "Verificar"
   },
   "dashboard": {
     "goodMorning": "Bom dia",

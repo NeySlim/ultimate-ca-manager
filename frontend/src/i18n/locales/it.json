@@ -447,7 +447,14 @@
     "ssoError": "Autenticazione SSO fallita",
     "passwordRequired": "Inserire la password",
     "usernameRequired": "Inserire il nome utente",
-    "orSignInLocally": "o accedi localmente"
+    "orSignInLocally": "o accedi localmente",
+    "twoFactorTitle": "Autenticazione a due fattori",
+    "twoFactorDescription": "Inserisci il codice dalla tua app di autenticazione",
+    "totpCode": "Codice di verifica",
+    "totpCodeRequired": "Inserisci un codice di verifica a 6 cifre",
+    "invalidTotpCode": "Codice di verifica non valido",
+    "verifying": "Verifica...",
+    "verify": "Verifica"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",

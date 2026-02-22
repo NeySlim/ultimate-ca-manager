@@ -35,6 +35,16 @@ class AuthMethodsService {
   }
 
   /**
+   * Complete login with 2FA TOTP code
+   * @param {string} code - 6-digit TOTP code or recovery code
+   * @returns {Promise<Object>} User data + permissions
+   */
+  async login2FA(code) {
+    const response = await apiClient.post('/auth/login/2fa', { code })
+    return response.data
+  }
+
+  /**
    * Login with mTLS (client certificate)
    * Certificate must already be presented in request
    * @returns {Promise<Object>} User data + permissions
