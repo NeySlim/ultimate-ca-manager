@@ -33,10 +33,20 @@ export function AuthProvider({ children }) {
     try {
       debug('🔍 Checking session...')
       const response = await authService.getCurrentUser()
-      debug('✅ Session valid:', response)
+      debug('🔍 Session check response:', response)
       
       // Extract data from response (handles {data: {...}} structure)
       const userData = response.data || response
+      
+      // Verify actually authenticated (verify returns 200 even when not authenticated)
+      if (!userData.authenticated) {
+        debug('ℹ️ Not authenticated (no active session)')
+        setUser(null)
+        setIsAuthenticated(false)
+        setPermissions([])
+        setRole(null)
+        return
+      }
       
       setUser(userData.user || userData)
       setIsAuthenticated(true)

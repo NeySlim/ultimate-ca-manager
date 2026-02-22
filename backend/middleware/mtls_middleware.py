@@ -21,9 +21,19 @@ def process_client_certificate():
     
     This allows UCM to work both standalone and behind reverse proxy.
     """
-    # Skip if user already authenticated via session
-    if session.get('user_id'):
+    # Skip if user already authenticated via certificate (avoid re-auth on every request)
+    if session.get('user_id') and session.get('auth_method') == 'certificate':
         return
+    
+    # Skip if user has a valid non-certificate session (respect password/LDAP logins)
+    if session.get('user_id') and session.get('auth_method') != 'certificate':
+        # Verify the session is still valid
+        from auth.unified import verify_request_auth
+        if verify_request_auth():
+            return
+        # Session expired/invalid — clear it and try mTLS below
+        logger.info("mTLS middleware: stale session detected, clearing for mTLS re-auth")
+        session.clear()
     
     # Skip if mTLS not enabled
     if not MTLSAuthService.is_mtls_enabled():
@@ -39,7 +49,7 @@ def process_client_certificate():
         if peercert:
             cert_info = CertificateParser.extract_from_flask_native(peercert)
             if cert_info:
-                logger.debug("Certificate extracted from native Flask (standalone mode)")
+                logger.info("mTLS middleware: certificate extracted from SSL socket")
     except Exception as e:
         logger.debug(f"Native Flask cert extraction failed: {e}")
     
@@ -61,6 +71,8 @@ def process_client_certificate():
     
     if not cert_info:
         # No client certificate present in any source
+        has_peer = request.environ.get('peercert') is not None
+        logger.info("mTLS middleware: no cert_info extracted (peercert=%s)", has_peer)
         return
     
     # Authenticate via certificate
