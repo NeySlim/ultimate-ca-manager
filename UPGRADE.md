@@ -62,7 +62,7 @@ docker run -d \
 ### Automatic Upgrade
 
 ```bash
-# Download new version (replace VERSION, e.g. 2.1.0)
+# Download new version (replace VERSION, e.g. 2.48)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_VERSION_all.deb
 
 # Install (automatically backs up database)
@@ -110,7 +110,7 @@ sudo systemctl start ucm
 ### Using DNF/YUM
 
 ```bash
-# Download new version (replace VERSION, e.g. 2.1.0)
+# Download new version (replace VERSION, e.g. 2.48)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-VERSION-1.noarch.rpm
 
 # Upgrade
@@ -157,9 +157,29 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v2.48 from v2.1.x
+
+**No breaking changes** — safe to upgrade directly.
+
+> **Note:** UCM switched from Semantic Versioning (2.1.x) to Major.Build versioning (2.48) starting with this release. The version jump from 2.1.x to 2.48 is intentional and expected.
+
+**New in v2.48:**
+- Comprehensive backend test suite (1364 tests, ~95% route coverage)
+- ucm-watcher system for safe service restarts and auto-updates
+- Experimental badges for untested features (mTLS, HSM, SSO)
+- TOTP 2FA login flow with QR code setup
+- Auto-update mechanism via GitHub releases
+
+**Auto-update (DEB/RPM):**
+UCM can now check for and install updates automatically. The ucm-watcher systemd service monitors signal files:
+- `/opt/ucm/data/.restart_requested` — triggers a service restart
+- `/opt/ucm/data/.update_pending` — triggers package installation + restart
+
+No manual action required — updates are triggered from the Settings > System page.
+
 ### Upgrading to v2.1.0 from v2.0.x
 
-**No breaking changes** -- safe to upgrade directly.
+**No breaking changes** — safe to upgrade directly.
 
 **New features:**
 - AKI/SKI-based certificate chain matching (automatic migration at startup)
@@ -174,7 +194,7 @@ Database migrations run automatically at startup.
 - Orphan CAs and certificates are automatically re-chained if their parent CA exists
 - Duplicate CAs (same Subject Key Identifier) are merged
 
-No action required -- all migration happens automatically.
+No action required — all migration happens automatically.
 
 ### Upgrading from v1.8.x to v2.0.x
 

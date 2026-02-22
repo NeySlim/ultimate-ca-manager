@@ -3,11 +3,11 @@
 All notable changes to Ultimate CA Manager will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier releases used Semantic Versioning.
 
 ---
 
-## [2.2.0] - Unreleased
+## [Unreleased]
 
 ### Added
 - **mTLS client certificate management** — full lifecycle management of mTLS certificates (list, export, revoke, delete) via new `/api/v2/user-certificates` API (6 endpoints)
@@ -23,6 +23,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Export blob handling** — `UserCertificatesPage` and `AccountPage` now correctly handle `apiClient` return value (returns data directly, not `{ data }` wrapper)
 - **`groups.service.js` params bug** — was passing `{ params }` to `apiClient.get()` which silently ignored the query parameters
 - **ResponsiveDataTable render signatures** — fixed `(row)` → `(_value, row)` for column render functions
+
+---
+
+## [2.48] - 2026-02-22
+
+### Added
+- **Comprehensive backend test suite** — 1364 tests covering all 347 API routes (~95% route coverage)
+- **ucm-watcher system** — systemd path-based service management replacing direct systemctl calls; handles restart requests and package updates via signal files
+- **Experimental badges** — visual indicators for untested features (mTLS, HSM, SSO) in Settings and Account pages
+- **TOTP 2FA login flow** — complete two-factor authentication with QR code setup and verification at login
+- **Auto-update mechanism** — backend checks GitHub releases API, downloads packages, triggers ucm-watcher for installation
+
+### Changed
+- **Versioning scheme** — migrated from Semantic Versioning (2.1.x) to Major.Build (2.48) for simpler release tracking
+- **Service restart** — centralized via signal files (`/opt/ucm/data/.restart_requested`) instead of direct systemctl calls
+- **Branch rename** — development branch renamed from `2.1.0-dev`/`2.2.0-dev` to `dev`
+- **RPM packaging** — systemd units renamed from `ucm-updater` to `ucm-watcher` for consistency with DEB
+
+### Fixed
+- **RPM build failure** — spec referenced non-existent `ucm-updater.path`/`ucm-updater.service` files
+- **RPM changelog dates** — fixed incorrect weekday names causing bogus date warnings
+- **Password change modal** — close button (X) now properly closes the modal
+- **2FA enable endpoint** — fixed 500 error on `/api/v2/account/2fa/enable`
+- **Mobile navigation** — fixed layout issues on small screens
+- **SAN parsing** — fixed Subject Alternative Name parsing for multi-value SANs
+- **CA tree depth** — fixed depth calculation for deeply nested CA hierarchies
+
+### Security
+- **1364 backend security tests** — all authentication, authorization, and RBAC endpoints tested
+- **Rate limiting verified** — brute-force protection on all auth endpoints confirmed via tests
+- **CSRF enforcement** — all state-changing endpoints verified to require CSRF tokens
 
 ---
 

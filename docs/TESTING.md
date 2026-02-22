@@ -4,13 +4,15 @@
 
 UCM uses a comprehensive testing strategy with unit tests and E2E tests.
 
-| Test Type | Framework | Status |
-|-----------|-----------|--------|
-| Unit Tests (Frontend) | Vitest + React Testing Library | Active |
-| Unit Tests (Backend) | pytest | Active |
-| E2E Tests | Playwright | Active |
-| Linting (Frontend) | ESLint v9 | Active |
-| Linting (Backend) | Ruff | Active |
+| Test Type | Framework | Tests | Status |
+|-----------|-----------|-------|--------|
+| Unit Tests (Frontend) | Vitest + React Testing Library | 450 | Active |
+| Unit Tests (Backend) | pytest | 1364 | Active |
+| E2E Tests | Playwright | — | Active |
+| Linting (Frontend) | ESLint v9 | — | Active |
+| Linting (Backend) | Ruff | — | Active |
+
+**Total: 1814 tests** (450 frontend + 1364 backend)
 
 ## Linting
 
@@ -36,7 +38,65 @@ Configured for bug-catching rules only (E/F/B/S categories).
 
 ## Unit Tests
 
-### Running Tests
+### Backend Tests
+
+```bash
+cd backend
+
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_certificates.py
+
+# Run with coverage
+pytest --cov=. --cov-report=term-missing
+```
+
+#### Test Files
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| test_auth_methods.py | 43 | Login, logout, 2FA, method detection |
+| test_account.py | 66 | Profile, password, API keys, 2FA, sessions |
+| test_users.py | 74 | CRUD, bulk operations, roles |
+| test_rbac.py | 38 | Permissions, custom roles |
+| test_cas.py | 68 | CA CRUD, import, export, hierarchy |
+| test_certificates.py | 73 | Cert lifecycle, export, revoke, renew |
+| test_csrs.py | 60 | CSR create, sign, export |
+| test_templates.py | 62 | Template CRUD, duplicate, import/export |
+| test_settings.py | 93 | All settings categories |
+| test_system.py | 89 | Database, HTTPS, backup, updates |
+| test_dashboard.py | 27 | Stats, charts, activity |
+| test_audit.py | 33 | Logs, export, cleanup |
+| test_acme.py | 150 | ACME server, client, domains |
+| test_crl.py | 21 | CRL generation, OCSP |
+| test_hsm.py | 52 | HSM providers, keys |
+| test_sso_routes.py | 37 | SSO providers, sessions |
+| test_mtls.py | 25 | mTLS settings, certificates |
+| test_webauthn.py | 14 | WebAuthn credentials |
+| test_truststore.py | 20 | Trust store CRUD |
+| test_webhooks.py | 24 | Webhook CRUD, test |
+| test_misc_routes.py | 108 | Search, reports, policies, groups, DNS |
+
+#### Test Pattern
+
+Each test file covers 3 levels per endpoint:
+1. **Authentication** — 401 without auth
+2. **Authorization** — 403 with wrong role (viewer testing admin endpoints)
+3. **Happy path** — 200/201 with valid data
+
+#### Test Infrastructure
+
+- Session-scoped fixtures in `conftest.py` (shared SQLite temp DB)
+- Factory helpers: `create_ca()`, `create_cert()`, `create_user()`
+- CSRF disabled via `CSRF_DISABLED=true` environment variable
+- No external dependencies (no Docker, no network)
+
+### Frontend Tests
 
 ```bash
 cd frontend
@@ -238,11 +298,13 @@ jobs:
 
 ## Coverage Goals
 
-| Metric | Target |
-|--------|--------|
-| Unit Test Coverage | 80% |
-| E2E Pass Rate | 95% |
-| Critical Paths | 100% |
+| Metric | Target | Current |
+|--------|--------|---------|
+| Backend Route Coverage | 80% | ~95% (347 routes) |
+| Frontend Unit Tests | — | 450 tests passing |
+| Backend Unit Tests | — | 1364 tests passing |
+| E2E Pass Rate | 95% | Active |
+| Critical Paths | 100% | Covered |
 
 ## Troubleshooting
 

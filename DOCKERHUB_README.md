@@ -99,7 +99,7 @@ volumes:
 ## Tags
 
 - `latest` -- Latest stable release
-- Semantic version tags (e.g. `2.0.6`, `2.0`, `2`)
+- Version tags (e.g. `2.48`, `2.49`)
 
 ## Image Details
 

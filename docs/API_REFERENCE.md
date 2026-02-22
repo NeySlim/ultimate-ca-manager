@@ -1,9 +1,10 @@
-# UCM API v2.0 - Complete Reference
+# UCM API v2 - Complete Reference
 
-> **Version**: 2.2.x  
+> **Version**: 2.48+  
 > **Base URL**: `https://your-server:8443/api/v2`  
 > **Last Updated**: February 2026  
-> **Total Endpoints**: ~276  
+> **Total Endpoints**: 347  
+> **Test Coverage**: 1364 tests (~95% route coverage)  
 > **Note**: All endpoints are served from `api/v2/` (34 registered blueprints). There is no separate `features/` module.
 
 ---
