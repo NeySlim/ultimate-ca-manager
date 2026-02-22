@@ -20,7 +20,7 @@ backlog = 2048
 
 # Worker processes
 workers = int(os.getenv('GUNICORN_WORKERS', 2))
-worker_class = 'geventwebsocket.gunicorn.workers.GeventWebSocketWorker'
+worker_class = 'workers.MTLSGeventWebSocketWorker'
 worker_connections = 1000
 timeout = 120
 keepalive = 5
@@ -36,6 +36,47 @@ keyfile = os.getenv('HTTPS_KEY_PATH', f'{data_path}/https_key.pem')
 cert_reqs = 0
 ca_certs = None
 do_handshake_on_connect = True
+
+
+def ssl_context(conf, default_ssl_context_factory):
+    """Custom SSL context that ensures CA names are sent in CertificateRequest.
+
+    Python's ssl.SSLContext.load_verify_locations() populates the trust store
+    but on OpenSSL 3.x it does NOT set the client CA list sent in the TLS
+    CertificateRequest message. Without that list, browsers cannot determine
+    which client certificate to offer. We call SSL_CTX_set_client_CA_list()
+    via ctypes to fix this.
+    """
+    ctx = default_ssl_context_factory()
+    if conf.ca_certs:
+        try:
+            import ctypes
+            libssl = ctypes.CDLL('libssl.so.3')
+
+            _load_file = libssl.SSL_load_client_CA_file
+            _load_file.argtypes = [ctypes.c_char_p]
+            _load_file.restype = ctypes.c_void_p
+
+            _set_list = libssl.SSL_CTX_set_client_CA_list
+            _set_list.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+            _set_list.restype = None
+
+            _get_verify = libssl.SSL_CTX_get_verify_mode
+            _get_verify.argtypes = [ctypes.c_void_p]
+            _get_verify.restype = ctypes.c_int
+
+            # Extract SSL_CTX* from CPython SSLContext (PyObject_HEAD + first field)
+            ssl_ctx_ptr = ctypes.c_void_p.from_address(id(ctx) + 16).value
+            if ssl_ctx_ptr and _get_verify(ssl_ctx_ptr) == ctx.verify_mode:
+                ca_stack = _load_file(conf.ca_certs.encode())
+                if ca_stack:
+                    _set_list(ssl_ctx_ptr, ca_stack)
+                    print("mTLS: client CA names will be sent in CertificateRequest",
+                          file=sys.stderr)
+        except Exception as e:
+            print(f"mTLS: could not set client CA list (non-fatal): {e}",
+                  file=sys.stderr)
+    return ctx
 
 
 def _load_mtls_config():
