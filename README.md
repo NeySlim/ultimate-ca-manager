@@ -2,7 +2,9 @@
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause%20%2B%20Commons%20Clause-green.svg)
-![Docker](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker&color=blue)
+![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
+![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
+![Tests](https://img.shields.io/badge/tests-1814%20passing-brightgreen)
 
 **Ultimate CA Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and certificate lifecycle management.
 
@@ -48,6 +50,8 @@ docker run -d --restart=unless-stopped \
   -v ucm-data:/opt/ucm/data \
   neyslim/ultimate-ca-manager:latest
 ```
+
+Also available from GitHub Container Registry: `ghcr.io/neyslim/ultimate-ca-manager`
 
 ### Debian/Ubuntu
 

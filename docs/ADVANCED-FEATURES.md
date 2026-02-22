@@ -11,10 +11,19 @@ All features are included in UCM as core functionality. There is no separate "Pr
 | ACME Protocol | Stable | `api/v2/acme.py` |
 | SCEP Protocol | Stable | `api/v2/scep.py` |
 | User Groups | Stable | `api/v2/groups.py` |
-| Custom RBAC Roles | Experimental | `api/v2/rbac.py` |
+| Custom RBAC Roles | Stable | `api/v2/rbac.py` |
 | SSO (LDAP/OAuth2/SAML) | Experimental | `api/v2/sso.py` |
 | HSM Integration | Experimental | `api/v2/hsm.py` |
+| mTLS Authentication | Experimental | `api/v2/mtls.py` |
+| WebAuthn/FIDO2 | Stable | `api/v2/webauthn.py` |
+| TOTP 2FA | Stable | `api/v2/account.py` |
+| Certificate Policies | Experimental | `api/v2/policies.py` |
+| Webhooks | Stable | `api/v2/webhooks.py` |
+| Trust Store | Stable | `api/v2/truststore.py` |
 | Advanced Audit Logs | Stable | `api/v2/audit.py` |
+| Auto-Update (ucm-watcher) | Stable | `services/updates.py` |
+
+> Features marked **Experimental** are functional but may have limited testing. They display an "Experimental" badge in the UI.
 
 ---
 
