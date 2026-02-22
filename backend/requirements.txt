@@ -23,6 +23,7 @@ cbor2==5.8.0
 # TOTP/2FA Support
 pyotp>=2.9.0
 qrcode>=7.4
+Pillow>=10.0.0
 
 # SCEP Support
 pycryptodome==3.23.0
