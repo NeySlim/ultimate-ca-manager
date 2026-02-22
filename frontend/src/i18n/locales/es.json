@@ -454,7 +454,12 @@
     "totpCodeRequired": "Ingrese un código de verificación de 6 dígitos",
     "invalidTotpCode": "Código de verificación inválido",
     "verifying": "Verificando...",
-    "verify": "Verificar"
+    "verify": "Verificar",
+    "checkingMethods": "Detectando métodos de autenticación...",
+    "certDetected": "Certificado de cliente detectado",
+    "certNotEnrolled": "Su certificado no está registrado. Use la contraseña.",
+    "autoLoginFailed": "El inicio de sesión automático falló. Inicie sesión manualmente.",
+    "mtlsAutoLogin": "Iniciando sesión con certificado..."
   },
   "dashboard": {
     "goodMorning": "Buenos días",

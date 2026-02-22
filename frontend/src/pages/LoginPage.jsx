@@ -1,10 +1,15 @@
 /**
  * Multi-Method Login Page
- * Flow: Username → mTLS/WebAuthn → Password (fallback)
- * Supports SSO: OAuth2, SAML, LDAP
- * Remembers last username in localStorage
+ * 
+ * Architecture:
+ * - AuthContext.checkSession() runs on mount (including /login)
+ * - If mTLS middleware auto-logged in → AuthContext sets isAuthenticated → App redirects to /
+ * - If not auto-logged → LoginPage renders with state machine:
+ *   idle → detecting → username → auth (webauthn_prompt | password_form) → 2fa → done
+ * 
+ * Auto-login priority: mTLS (0 interaction) → WebAuthn (1 touch) → Password (manual)
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe, SignIn, Lock } from '@phosphor-icons/react'
@@ -18,12 +23,9 @@ import { cn } from '../lib/utils'
 const STORAGE_KEY = 'ucm_last_username'
 const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
 
-// SSO provider icons based on type or name
 const getSSOIcon = (provider) => {
   const name = provider.name?.toLowerCase() || ''
   const type = provider.provider_type
-  
-  // Common providers
   if (name.includes('google')) return '🔵'
   if (name.includes('microsoft') || name.includes('azure') || name.includes('entra')) return '🟦'
   if (name.includes('github')) return '⚫'
@@ -31,12 +33,9 @@ const getSSOIcon = (provider) => {
   if (name.includes('okta')) return '🔷'
   if (name.includes('keycloak')) return '🔐'
   if (name.includes('auth0')) return '🔴'
-  
-  // By type
   if (type === 'ldap') return '📁'
   if (type === 'saml') return '🔒'
   if (type === 'oauth2') return '🔑'
-  
   return '🔐'
 }
 
@@ -44,99 +43,124 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { login } = useAuth()
+  const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const passwordRef = useRef(null)
-  
-  // Login flow step: 'username' | 'auth' | 'ldap' | '2fa'
-  const [step, setStep] = useState('username')
+
+  // State machine: 'init' | 'username' | 'auth' | '2fa' | 'ldap'
+  const [step, setStep] = useState('init')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
   const [loading, setLoading] = useState(false)
-  const [authMethod, setAuthMethod] = useState(null) // 'mtls' | 'webauthn' | 'password'
-  const [userMethods, setUserMethods] = useState(null) // Methods available for this user
+  const [authMethod, setAuthMethod] = useState(null)
+  const [userMethods, setUserMethods] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
-  const [hasSavedUsername, setHasSavedUsername] = useState(false) // Track if we loaded from storage
+  const [hasSavedUsername, setHasSavedUsername] = useState(false)
   const [emailConfigured, setEmailConfigured] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [langMenuOpen, setLangMenuOpen] = useState(false)
+  const [globalMethods, setGlobalMethods] = useState(null)
   
   // SSO state
   const [ssoProviders, setSsoProviders] = useState([])
   const [selectedLdapProvider, setSelectedLdapProvider] = useState(null)
 
-  // Get current language
   const currentLang = languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en')) || languages[0]
 
-  // Load SSO providers, last username, check email config - ONCE on mount
+  // Save helpers
+  const saveUsername = (name) => {
+    if (name) {
+      try { localStorage.setItem(STORAGE_KEY, name) } catch {}
+    }
+  }
+  const saveAuthMethod = (method, providerId = null) => {
+    try { localStorage.setItem(STORAGE_AUTH_METHOD_KEY, JSON.stringify({ method, providerId })) } catch {}
+  }
+
+  // ═══════════════════════════════════════════════════
+  // INIT: After AuthContext finishes session check,
+  // if we're still here (not auto-logged in), detect methods
+  // ═══════════════════════════════════════════════════
   useEffect(() => {
-    const lastUsername = localStorage.getItem(STORAGE_KEY)
+    if (!sessionChecked) return
+    
+    // Load saved username
+    let lastUsername = ''
+    try { lastUsername = localStorage.getItem(STORAGE_KEY) || '' } catch {}
     if (lastUsername) {
       setUsername(lastUsername)
       setHasSavedUsername(true)
     }
-    
-    // Check if email is configured for "Forgot Password" link
+
+    // Check email config
     fetch('/api/v2/auth/email-configured')
       .then(res => res.ok ? res.json() : null)
       .then(data => setEmailConfigured(data?.configured || false))
-      .catch(() => setEmailConfigured(false))
-    
-    // Load SSO providers, then restore last auth method
-    fetch('/api/v2/sso/available')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.data && Array.isArray(data.data)) {
-          setSsoProviders(data.data)
-          
-          // Restore last LDAP provider if applicable
-          if (lastUsername) {
-            try {
-              const saved = JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}')
-              if (saved.method === 'ldap' && saved.providerId) {
-                const provider = data.data.find(p => p.id === saved.providerId)
-                if (provider) {
-                  setSelectedLdapProvider(provider)
-                  setStep('ldap')
-                }
-              }
-            } catch {}
-          }
-        }
-      })
       .catch(() => {})
-  }, [])
-  
-  // Check for SSO callback or errors in URL - separate effect
+
+    // Load SSO providers + detect global auth methods in parallel
+    Promise.all([
+      fetch('/api/v2/sso/available').then(r => r.ok ? r.json() : null).catch(() => null),
+      authMethodsService.detectMethods(null)
+    ]).then(([ssoData, methods]) => {
+      // SSO providers
+      const providers = ssoData?.data && Array.isArray(ssoData.data) ? ssoData.data : []
+      setSsoProviders(providers)
+      
+      // Global methods (no username - detects cert presence)
+      setGlobalMethods(methods)
+
+      // Restore saved LDAP provider
+      if (lastUsername && providers.length > 0) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}')
+          if (saved.method === 'ldap' && saved.providerId) {
+            const provider = providers.find(p => p.id === saved.providerId)
+            if (provider) {
+              setSelectedLdapProvider(provider)
+              setStep('ldap')
+              return
+            }
+          }
+        } catch {}
+      }
+
+      // If mTLS cert present but not enrolled, show info
+      if (methods?.mtls && methods.mtls_status === 'present_not_enrolled') {
+        showInfo(t('auth.certNotEnrolled'))
+      }
+
+      setStep('username')
+    }).catch(() => {
+      setStep('username')
+    })
+  }, [sessionChecked]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // SSO callback handling
   useEffect(() => {
-    // Handle SSO callback (session already established via cookie)
     const ssoComplete = window.location.pathname.includes('sso-complete')
     if (ssoComplete) {
       setLoading(true)
       setStatusMessage(t('auth.signingIn'))
-      
-      // Verify session is established
-      fetch('/api/v2/auth/verify', {
-        credentials: 'include'
-      })
+      fetch('/api/v2/auth/verify', { credentials: 'include' })
         .then(res => res.ok ? res.json() : Promise.reject('Session not established'))
         .then(async (data) => {
           const verifyData = data.data || data
-          await login(verifyData?.user?.username || verifyData?.username || 'sso_user', null, verifyData)
-          showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || verifyData?.username || 'User' }))
+          await login(verifyData?.user?.username || 'sso_user', null, verifyData)
+          showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || 'User' }))
           navigate('/dashboard')
         })
-        .catch((err) => {
+        .catch(() => {
           showError(t('auth.ssoError'))
           setLoading(false)
           setStatusMessage('')
+          setStep('username')
         })
       return
     }
-    
-    // Handle SSO errors
+
     const error = searchParams.get('error')
     if (error) {
       const errorMessages = {
@@ -151,75 +175,67 @@ export default function LoginPage() {
       }
       showError(errorMessages[error] || t('auth.ssoError'))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])  // Only check on mount
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Focus password field when switching to password auth
+  // Focus password field
   useEffect(() => {
     if (authMethod === 'password' && step === 'auth' && passwordRef.current) {
       passwordRef.current.focus()
     }
   }, [authMethod, step])
 
-  // Save username and auth method to localStorage
-  const saveUsername = (name) => {
-    if (name) {
-      localStorage.setItem(STORAGE_KEY, name)
-    }
-  }
-  const saveAuthMethod = (method, providerId = null) => {
-    try {
-      localStorage.setItem(STORAGE_AUTH_METHOD_KEY, JSON.stringify({ method, providerId }))
-    } catch {}
-  }
+  // ═══════════════════════════════════════════════════
+  // AUTH METHOD HANDLERS (standalone, no cascading)
+  // ═══════════════════════════════════════════════════
 
-  // Step 1: Continue with username → detect methods and try auto-login
+  const attemptWebAuthn = useCallback(async () => {
+    setAuthMethod('webauthn')
+    setStatusMessage(t('auth.touchSecurityKey'))
+    setLoading(true)
+    try {
+      const userData = await authMethodsService.authenticateWebAuthn(username)
+      saveUsername(username)
+      saveAuthMethod('webauthn')
+      await login(username, null, userData)
+      showSuccess(t('auth.welcomeBackUser', { username }))
+      navigate('/dashboard')
+    } catch (error) {
+      // Cancelled or failed → fall to password
+      setAuthMethod('password')
+      setStatusMessage('')
+      setLoading(false)
+      if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
+        showInfo(t('auth.securityKeyCancelled'))
+      }
+    }
+  }, [username, login, navigate, showSuccess, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleContinue = async (e) => {
     e?.preventDefault()
-    
     if (!username.trim()) {
       showError(t('auth.usernameRequired'))
       return
     }
 
     setLoading(true)
-    setStatusMessage('Checking authentication methods...')
-    
+    setStatusMessage(t('auth.checkingMethods'))
+
     try {
-      // Save username for next time
       saveUsername(username)
-      
-      // Check available methods for this user
       const methods = await authMethodsService.detectMethods(username)
       setUserMethods(methods)
-      
-      // Move to auth step
       setStep('auth')
-      
-      // Try cascade: mTLS → WebAuthn → Password
-      
-      // 1. Try mTLS if available
-      if (methods.mtls && methods.mtls_status === 'enrolled') {
-        setAuthMethod('mtls')
-        setStatusMessage('Verifying client certificate...')
-        await tryMTLSLogin()
-        return
-      }
-      
-      // 2. Try WebAuthn if user has registered keys
+
+      // Auto-attempt WebAuthn if user has registered keys
       if (methods.webauthn && methods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
-        setAuthMethod('webauthn')
-        setStatusMessage(t('auth.waitingForSecurityKey'))
-        await tryWebAuthnLogin()
+        await attemptWebAuthn()
         return
       }
-      
-      // 3. Fallback to password
+
+      // Fallback to password
       setAuthMethod('password')
       setStatusMessage('')
-      
-    } catch (error) {
-      // On error, go directly to password
+    } catch {
       setStep('auth')
       setAuthMethod('password')
       setUserMethods({ password: true })
@@ -229,71 +245,18 @@ export default function LoginPage() {
     }
   }
 
-  // Try mTLS auto-login
-  const tryMTLSLogin = async () => {
-    try {
-      const userData = await authMethodsService.loginMTLS()
-      saveUsername(userData.user.username)
-      await login(userData.user.username, null, userData)
-      showSuccess(`Welcome back, ${userData.user.username}!`)
-      navigate('/dashboard')
-    } catch (error) {
-      // Try WebAuthn next
-      if (userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
-        setAuthMethod('webauthn')
-        setStatusMessage(t('auth.waitingForSecurityKey'))
-        await tryWebAuthnLogin()
-      } else {
-        // Fallback to password
-        setAuthMethod('password')
-        setStatusMessage('')
-        setLoading(false)
-      }
-    }
-  }
-
-  // Try WebAuthn login
-  const tryWebAuthnLogin = async () => {
-    try {
-      setStatusMessage(t('auth.touchSecurityKey'))
-      const userData = await authMethodsService.authenticateWebAuthn(username)
-      saveUsername(username)
-      await login(username, null, userData)
-      showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
-    } catch (error) {
-      // User cancelled or error → show password form
-      setAuthMethod('password')
-      setStatusMessage('')
-      setLoading(false)
-      if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
-        showInfo(t('auth.securityKeyCancelled'))
-      }
-    }
-  }
-
-  // Manual WebAuthn retry
-  const handleWebAuthnRetry = async () => {
-    setLoading(true)
-    await tryWebAuthnLogin()
-  }
-
-  // Password login
   const handlePasswordLogin = async (e) => {
     e.preventDefault()
-    
     if (!password) {
       showError(t('auth.passwordRequired'))
       return
     }
 
     setLoading(true)
-    setStatusMessage('Signing in...')
-    
+    setStatusMessage(t('auth.signingIn'))
+
     try {
       const userData = await authMethodsService.loginPassword(username, password)
-      
-      // Check if 2FA is required
       if (userData.requires_2fa) {
         setStep('2fa')
         setTotpCode('')
@@ -301,14 +264,13 @@ export default function LoginPage() {
         setStatusMessage('')
         return
       }
-      
       saveUsername(username)
       saveAuthMethod('password')
       await login(username, password, userData)
-      showSuccess(`Welcome back, ${username}!`)
+      showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
     } catch (error) {
-      showError(error.message || 'Invalid credentials')
+      showError(error.message || t('auth.invalidCredentials'))
       setPassword('')
     } finally {
       setLoading(false)
@@ -316,24 +278,20 @@ export default function LoginPage() {
     }
   }
 
-  // 2FA TOTP verification
   const handle2FAVerify = async (e) => {
     e.preventDefault()
-    
     if (!totpCode || totpCode.length < 6) {
       showError(t('auth.totpCodeRequired'))
       return
     }
 
     setLoading(true)
-    setStatusMessage('')
-    
     try {
       const userData = await authMethodsService.login2FA(totpCode)
       saveUsername(username)
       saveAuthMethod('password')
       await login(username, password, userData)
-      showSuccess(`Welcome back, ${username}!`)
+      showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
     } catch (error) {
       showError(error.message || t('auth.invalidTotpCode'))
@@ -343,40 +301,17 @@ export default function LoginPage() {
     }
   }
 
-  // Go back to username step
-  const handleBack = () => {
-    setStep('username')
-    setAuthMethod(null)
-    setPassword('')
-    setStatusMessage('')
-    setSelectedLdapProvider(null)
-    localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
-  }
-
-  // Change user (clear username)
-  const handleChangeUser = () => {
-    setUsername('')
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
-    handleBack()
-  }
-
-  // SSO: Initiate OAuth2/SAML login (redirect)
   const handleSSOLogin = (provider) => {
     if (provider.provider_type === 'ldap') {
-      // LDAP requires username/password form
       setSelectedLdapProvider(provider)
       setStep('ldap')
     } else {
-      // OAuth2/SAML - redirect to backend
       window.location.href = `/api/v2/sso/login/${provider.provider_type}`
     }
   }
 
-  // SSO: LDAP login (direct auth)
   const handleLDAPLogin = async (e) => {
     e.preventDefault()
-    
     if (!username || !password) {
       showError(t('auth.enterCredentials'))
       return
@@ -384,25 +319,16 @@ export default function LoginPage() {
 
     setLoading(true)
     setStatusMessage(t('auth.authenticating'))
-    
+
     try {
       const response = await fetch('/api/v2/sso/ldap/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          password,
-          provider_id: selectedLdapProvider?.id
-        })
+        body: JSON.stringify({ username, password, provider_id: selectedLdapProvider?.id })
       })
-      
       const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.message || t('auth.invalidCredentials'))
-      }
-      
-      // Login successful
+      if (!response.ok) throw new Error(data.message || t('auth.invalidCredentials'))
+
       saveUsername(username)
       saveAuthMethod('ldap', selectedLdapProvider?.id)
       await login(username, null, data.data)
@@ -415,6 +341,34 @@ export default function LoginPage() {
       setLoading(false)
       setStatusMessage('')
     }
+  }
+
+  const handleBack = () => {
+    setStep('username')
+    setAuthMethod(null)
+    setPassword('')
+    setStatusMessage('')
+    setSelectedLdapProvider(null)
+    try { localStorage.removeItem(STORAGE_AUTH_METHOD_KEY) } catch {}
+  }
+
+  const handleChangeUser = () => {
+    setUsername('')
+    setHasSavedUsername(false)
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
+    } catch {}
+    handleBack()
+  }
+
+  // ═══════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════
+
+  // Show nothing while AuthContext is checking session (App.jsx shows PageLoader)
+  if (!sessionChecked || step === 'init') {
+    return null
   }
 
   return (
@@ -435,7 +389,9 @@ export default function LoginPage() {
           </h1>
           <p className="text-sm text-text-secondary">
             {step === 'username' 
-              ? (username ? t('auth.clickToContinue') : t('auth.signInToContinue'))
+              ? (globalMethods?.mtls && globalMethods.mtls_status === 'present_not_enrolled'
+                ? t('auth.certNotEnrolled')
+                : username ? t('auth.clickToContinue') : t('auth.signInToContinue'))
               : statusMessage || (authMethod === 'password' ? t('auth.enterPasswordToContinue') : t('auth.chooseAuthMethod'))
             }
           </p>
@@ -593,7 +549,7 @@ export default function LoginPage() {
             {authMethod === 'webauthn' && !loading && (
               <div className="space-y-2 sm:space-y-3">
                 <Button
-                  onClick={handleWebAuthnRetry}
+                  onClick={() => attemptWebAuthn()}
                   className="w-full"
                   variant="secondary"
                   disabled={loading}
@@ -671,10 +627,7 @@ export default function LoginPage() {
                 {/* Show WebAuthn option if available */}
                 {userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported() && (
                   <button
-                    onClick={() => {
-                      setAuthMethod('webauthn')
-                      handleWebAuthnRetry()
-                    }}
+                    onClick={() => attemptWebAuthn()}
                     className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2 flex items-center justify-center gap-2"
                     type="button"
                     disabled={loading}
@@ -770,13 +723,13 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div
-              onClick={() => { setStep('auth'); setTotpCode('') }}
-              className="flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary cursor-pointer transition-colors py-2"
+            <button
+              onClick={() => { setStep('auth'); setTotpCode(''); setAuthMethod('password') }}
+              className="flex items-center justify-center gap-2 text-sm text-text-secondary hover:text-text-primary cursor-pointer transition-colors py-2 w-full"
             >
               <ArrowLeft size={16} />
               <span>{t('common.back')}</span>
-            </div>
+            </button>
           </div>
         )}
 

@@ -454,7 +454,12 @@
     "totpCodeRequired": "Please enter a 6-digit verification code",
     "invalidTotpCode": "Invalid verification code",
     "verifying": "Verifying...",
-    "verify": "Verify"
+    "verify": "Verify",
+    "checkingMethods": "Detecting authentication methods...",
+    "certDetected": "Client certificate detected",
+    "certNotEnrolled": "Your certificate is not enrolled. Use password to sign in.",
+    "autoLoginFailed": "Automatic login failed. Please sign in manually.",
+    "mtlsAutoLogin": "Signing in with certificate..."
   },
   "dashboard": {
     "goodMorning": "Good morning",

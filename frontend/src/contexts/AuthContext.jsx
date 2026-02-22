@@ -1,70 +1,66 @@
 /**
  * Auth Context - Global authentication state
+ * 
+ * On mount, ALWAYS calls /auth/verify to check for active session.
+ * This enables mTLS auto-login: the middleware creates the session
+ * during the TLS handshake, and checkSession() picks it up.
  */
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authService } from '../services/auth.service'
 import { apiClient } from '../services/apiClient'
 
 const AuthContext = createContext()
 
-// Only log in development mode
 const debug = import.meta.env.DEV ? console.log : () => {}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [sessionChecked, setSessionChecked] = useState(false)
   const [permissions, setPermissions] = useState([])
   const [role, setRole] = useState(null)
   const [forcePasswordChange, setForcePasswordChange] = useState(false)
 
-  // Check session on mount
-  useEffect(() => {
-    // Don't check session if already on login page (prevents redirect loop)
-    if (window.location.pathname === '/login') {
-      setLoading(false)
-      return
-    }
-    
-    checkSession()
-  }, [])
-
-  const checkSession = async () => {
+  const checkSession = useCallback(async () => {
     try {
       debug('🔍 Checking session...')
       const response = await authService.getCurrentUser()
-      debug('🔍 Session check response:', response)
-      
-      // Extract data from response (handles {data: {...}} structure)
+
       const userData = response.data || response
-      
-      // Verify actually authenticated (verify returns 200 even when not authenticated)
+
       if (!userData.authenticated) {
-        debug('ℹ️ Not authenticated (no active session)')
+        debug('ℹ️ Not authenticated')
         setUser(null)
         setIsAuthenticated(false)
         setPermissions([])
         setRole(null)
-        return
+        return false
       }
-      
+
       setUser(userData.user || userData)
       setIsAuthenticated(true)
       setPermissions(userData.permissions || [])
       setRole(userData.role || null)
-      
-      debug('✅ Permissions loaded:', userData.permissions)
-      debug('✅ Role loaded:', userData.role)
+      debug('✅ Session valid:', userData.user?.username)
+      return true
     } catch (error) {
       debug('❌ Session check failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
       setPermissions([])
       setRole(null)
+      return false
     } finally {
       setLoading(false)
+      setSessionChecked(true)
     }
-  }
+  }, [])
+
+  // Always check session on mount — enables mTLS auto-login on /login too
+  useEffect(() => {
+    checkSession()
+  }, [checkSession])
 
   const login = async (username, password, preAuthData = null) => {
     setLoading(true)
@@ -133,6 +129,7 @@ export function AuthProvider({ children }) {
     user,
     isAuthenticated,
     loading,
+    sessionChecked,
     permissions,
     role,
     forcePasswordChange,

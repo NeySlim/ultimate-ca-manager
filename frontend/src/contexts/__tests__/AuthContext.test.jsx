@@ -56,7 +56,7 @@ describe('AuthContext', () => {
 
     it('checks session on mount', async () => {
       authService.getCurrentUser.mockResolvedValue({
-        data: { user: { username: 'admin' }, permissions: ['read'], role: 'admin' }
+        data: { authenticated: true, user: { username: 'admin' }, permissions: ['read'], role: 'admin' }
       })
 
       render(
@@ -73,8 +73,9 @@ describe('AuthContext', () => {
       expect(authService.getCurrentUser).toHaveBeenCalled()
     })
 
-    it('skips session check on login page', async () => {
+    it('always checks session even on login page', async () => {
       window.location.pathname = '/login'
+      authService.getCurrentUser.mockRejectedValue(new Error('No session'))
 
       render(
         <AuthProvider>
@@ -86,7 +87,9 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('loading').textContent).toBe('false')
       })
       
-      expect(authService.getCurrentUser).not.toHaveBeenCalled()
+      // Session check is always called now (mTLS auto-login support)
+      expect(authService.getCurrentUser).toHaveBeenCalled()
+      expect(screen.getByTestId('authenticated').textContent).toBe('false')
     })
 
     it('handles session check failure gracefully', async () => {
@@ -185,7 +188,7 @@ describe('AuthContext', () => {
   describe('logout', () => {
     it('clears session on logout', async () => {
       authService.getCurrentUser.mockResolvedValue({
-        data: { user: { username: 'admin' } }
+        data: { authenticated: true, user: { username: 'admin' }, permissions: [], role: 'admin' }
       })
       authService.logout.mockResolvedValue({})
 
@@ -211,7 +214,7 @@ describe('AuthContext', () => {
 
     it('clears local state even if API logout fails', async () => {
       authService.getCurrentUser.mockResolvedValue({
-        data: { user: { username: 'admin' } }
+        data: { authenticated: true, user: { username: 'admin' }, permissions: [], role: 'admin' }
       })
       authService.logout.mockRejectedValue(new Error('Network error'))
 

@@ -382,7 +382,12 @@
     "totpCodeRequired": "Veuillez entrer un code de vérification à 6 chiffres",
     "invalidTotpCode": "Code de vérification invalide",
     "verifying": "Vérification...",
-    "verify": "Vérifier"
+    "verify": "Vérifier",
+    "checkingMethods": "Détection des méthodes d'authentification...",
+    "certDetected": "Certificat client détecté",
+    "certNotEnrolled": "Votre certificat n'est pas enregistré. Utilisez le mot de passe.",
+    "autoLoginFailed": "La connexion automatique a échoué. Veuillez vous connecter manuellement.",
+    "mtlsAutoLogin": "Connexion avec le certificat..."
   },
   "cas": {
     "parentCA": "AC parente",

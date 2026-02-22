@@ -7,130 +7,102 @@ from functools import wraps
 from services.certificate_parser import CertificateParser
 from services.mtls_auth_service import MTLSAuthService
 import logging
-import ssl
 
 logger = logging.getLogger(__name__)
 
 
-def process_client_certificate():
-    """
-    Process client certificate from multiple sources (HYBRID MODE):
-    1. Native Flask/werkzeug (request.environ['peercert'])
-    2. Nginx reverse proxy headers (X-SSL-Client-*)
-    3. Apache reverse proxy headers (X-SSL-Client-S-DN)
-    
-    This allows UCM to work both standalone and behind reverse proxy.
-    """
-    # Skip if user already authenticated via certificate (avoid re-auth on every request)
-    if session.get('user_id') and session.get('auth_method') == 'certificate':
-        return
-    
-    # Skip if user has a valid non-certificate session (respect password/LDAP logins)
-    if session.get('user_id') and session.get('auth_method') != 'certificate':
-        # Verify the session is still valid
-        from auth.unified import verify_request_auth
-        if verify_request_auth():
-            return
-        # Session expired/invalid — clear it and try mTLS below
-        logger.info("mTLS middleware: stale session detected, clearing for mTLS re-auth")
-        session.clear()
-    
-    # Skip if mTLS not enabled
-    if not MTLSAuthService.is_mtls_enabled():
-        return
-    
-    # Try to extract certificate info
-    cert_info = None
-    
-    # METHOD 1: Native Flask (standalone mode)
-    # Try to get peer certificate from werkzeug environ
+def _extract_certificate():
+    """Extract client certificate from any source (native TLS or reverse proxy headers)."""
+    # Native Flask/Gunicorn (standalone mode)
     try:
         peercert = request.environ.get('peercert')
         if peercert:
             cert_info = CertificateParser.extract_from_flask_native(peercert)
             if cert_info:
-                logger.info("mTLS middleware: certificate extracted from SSL socket")
+                return cert_info
     except Exception as e:
-        logger.debug(f"Native Flask cert extraction failed: {e}")
+        logger.debug(f"Native cert extraction failed: {e}")
+
+    # Reverse proxy headers
+    headers = dict(request.headers)
+    if 'X-SSL-Client-Verify' in headers:
+        cert_info = CertificateParser.extract_from_nginx_headers(headers)
+        if cert_info:
+            return cert_info
+    if 'X-SSL-Client-S-DN' in headers:
+        cert_info = CertificateParser.extract_from_apache_headers(headers)
+        if cert_info:
+            return cert_info
+
+    return None
+
+
+def process_client_certificate():
+    """
+    Process client certificate and auto-login if valid.
+    Runs as before_request hook on every API call.
     
-    # METHOD 2: Reverse Proxy Headers
-    if not cert_info:
-        headers = dict(request.headers)
-        
-        # Try Nginx headers
-        if 'X-SSL-Client-Verify' in headers:
-            cert_info = CertificateParser.extract_from_nginx_headers(headers)
-            if cert_info:
-                logger.debug("Certificate extracted from Nginx headers (proxy mode)")
-        
-        # Try Apache headers if Nginx failed
-        if not cert_info and 'X-SSL-Client-S-DN' in headers:
-            cert_info = CertificateParser.extract_from_apache_headers(headers)
-            if cert_info:
-                logger.debug("Certificate extracted from Apache headers (proxy mode)")
-    
-    if not cert_info:
-        # No client certificate present in any source
-        has_peer = request.environ.get('peercert') is not None
-        logger.info("mTLS middleware: no cert_info extracted (peercert=%s)", has_peer)
+    Sources: native TLS peercert, Nginx headers, Apache headers.
+    """
+    # Already authenticated via certificate — skip
+    if session.get('user_id') and session.get('auth_method') == 'certificate':
         return
-    
-    # Authenticate via certificate
+
+    # Valid non-certificate session — respect it (don't overwrite password/LDAP/WebAuthn)
+    if session.get('user_id'):
+        from auth.unified import verify_request_auth
+        if verify_request_auth():
+            return
+        # Stale session — clear and try mTLS
+        logger.info("Stale session cleared, attempting mTLS re-auth")
+        session.clear()
+
+    if not MTLSAuthService.is_mtls_enabled():
+        return
+
+    cert_info = _extract_certificate()
+    if not cert_info:
+        return
+
+    # Store cert_info in g for /auth/methods to use without re-parsing
+    g.mtls_cert_info = cert_info
+
     user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
-    
+
     if user:
-        # Auto-login user
         session['user_id'] = user.id
         session['username'] = user.username
         session['role'] = user.role
         session['auth_method'] = 'certificate'
         session['cert_id'] = auth_cert.id
         session['cert_serial'] = auth_cert.cert_serial
-        
-        # Store in request context
+        session.permanent = True
+
         g.user = user
         g.auth_cert = auth_cert
         g.auth_method = 'certificate'
-        
-        logger.info(f"Auto-login via certificate: user={user.username}, serial={auth_cert.cert_serial}")
+
+        logger.info(f"mTLS auto-login: user={user.username}")
     else:
-        # Certificate present but authentication failed
-        logger.warning(f"Certificate authentication failed: {error}")
+        logger.debug(f"mTLS cert present but auth failed: {error}")
         g.cert_error = error
 
 
 def require_client_certificate(f):
-    """
-    Decorator to require client certificate authentication
-    
-    Usage:
-        @app.route('/secure')
-        @require_client_certificate
-        def secure_endpoint():
-            return "Authenticated via certificate"
-    """
+    """Decorator to require client certificate authentication."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Check if authenticated via certificate
         if session.get('auth_method') != 'certificate':
             return {
                 'error': 'Client certificate required',
                 'message': 'This endpoint requires authentication via client certificate'
             }, 403
-        
         return f(*args, **kwargs)
-    
     return decorated_function
 
 
 def init_mtls_middleware(app):
-    """
-    Initialize mTLS middleware for Flask app
-    
-    Args:
-        app: Flask application instance
-    """
+    """Initialize mTLS before_request middleware."""
     @app.before_request
     def check_client_certificate():
-        """Check for client certificate before each request"""
         process_client_certificate()

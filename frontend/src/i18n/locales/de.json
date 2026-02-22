@@ -454,7 +454,12 @@
     "totpCodeRequired": "Bitte geben Sie einen 6-stelligen Code ein",
     "invalidTotpCode": "Ungültiger Bestätigungscode",
     "verifying": "Überprüfung...",
-    "verify": "Bestätigen"
+    "verify": "Bestätigen",
+    "checkingMethods": "Authentifizierungsmethoden werden erkannt...",
+    "certDetected": "Client-Zertifikat erkannt",
+    "certNotEnrolled": "Ihr Zertifikat ist nicht registriert. Verwenden Sie das Passwort.",
+    "autoLoginFailed": "Automatische Anmeldung fehlgeschlagen. Bitte melden Sie sich manuell an.",
+    "mtlsAutoLogin": "Anmeldung mit Zertifikat..."
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
