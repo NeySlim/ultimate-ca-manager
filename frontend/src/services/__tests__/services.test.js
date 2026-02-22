@@ -856,9 +856,9 @@ describe('crlService', () => {
     expect(mockApiClient.get).toHaveBeenCalledWith('/crl/3')
   })
 
-  it('generate → POST /crl/generate with ca_id', async () => {
+  it('generate → POST /crl/<caId>/regenerate', async () => {
     await crlService.generate(3)
-    expect(mockApiClient.post).toHaveBeenCalledWith('/crl/generate', { ca_id: 3 })
+    expect(mockApiClient.post).toHaveBeenCalledWith('/crl/3/regenerate')
   })
 })
 
