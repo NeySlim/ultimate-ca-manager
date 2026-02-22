@@ -3,7 +3,7 @@ mTLS Authentication Service
 Handle client certificate authentication
 """
 from typing import Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from models import db, User
 from models.auth_certificate import AuthCertificate
 from services.certificate_parser import CertificateParser
@@ -54,12 +54,16 @@ class MTLSAuthService:
         
         # Check validity dates if available
         if cert_info.get('valid_until'):
-            if datetime.utcnow() > cert_info['valid_until']:
+            valid_until = cert_info['valid_until']
+            now = datetime.now(timezone.utc) if valid_until.tzinfo else datetime.utcnow()
+            if now > valid_until:
                 logger.warning(f"Certificate expired: serial={serial}")
                 return None, None, "Certificate has expired"
         
         if cert_info.get('valid_from'):
-            if datetime.utcnow() < cert_info['valid_from']:
+            valid_from = cert_info['valid_from']
+            now = datetime.now(timezone.utc) if valid_from.tzinfo else datetime.utcnow()
+            if now < valid_from:
                 logger.warning(f"Certificate not yet valid: serial={serial}")
                 return None, None, "Certificate is not yet valid"
         
