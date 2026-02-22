@@ -309,24 +309,24 @@ jobs:
           IMAGE="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
           REPO="${{ github.repository }}"
           
-          # Extract highlights from CHANGELOG.md (lines with ***bold italic***)
-          HIGHLIGHTS_FILE=$(mktemp)
+          # Extract changelog section for this version
+          CHANGES_FILE=$(mktemp)
           if [ -f CHANGELOG.md ]; then
+            # Extract content between ## [VERSION] and the next ## [
             SECTION=$(sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | head -n -1)
             if [ -z "$SECTION" ]; then
               SECTION=$(sed -n "/^## ${VERSION}/,/^## /p" CHANGELOG.md | head -n -1)
             fi
-            echo "$SECTION" | grep -E '^\s*- \*\*\*' | sed 's/\*\*\*/\*\*/g' > "$HIGHLIGHTS_FILE" || true
+            # Remove the heading line itself, keep the content
+            echo "$SECTION" | tail -n +2 | sed '/^$/d; 1i\\' > "$CHANGES_FILE" || true
           fi
           
           # Build release notes
           {
-            if [ -s "$HIGHLIGHTS_FILE" ]; then
-              echo "## Highlights"
+            if [ -s "$CHANGES_FILE" ]; then
+              echo "## What's Changed"
               echo ""
-              cat "$HIGHLIGHTS_FILE"
-              echo ""
-              echo "See full [CHANGELOG](https://github.com/${REPO}/blob/main/CHANGELOG.md) for all changes."
+              cat "$CHANGES_FILE"
               echo ""
               echo "---"
               echo ""
@@ -392,7 +392,7 @@ jobs:
           sed -i "s|REPO|$REPO|g" notes.md
           sed -i "s|VERSION|$VERSION|g" notes.md
           
-          rm -f "$HIGHLIGHTS_FILE"
+          rm -f "$CHANGES_FILE"
           cat notes.md
       
       - name: Delete existing release assets
