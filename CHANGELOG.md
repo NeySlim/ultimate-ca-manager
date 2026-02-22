@@ -2,58 +2,106 @@
 
 All notable changes to Ultimate CA Manager will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier releases used Semantic Versioning.
 
 ---
 
 ## [Unreleased]
 
-### Added
-- **mTLS client certificate management** — full lifecycle management of mTLS certificates (list, export, revoke, delete) via new `/api/v2/user-certificates` API (6 endpoints)
-- **User Certificates page** — dedicated page with stats bar, floating detail windows, export modal (PEM/PKCS12), row actions, responsive slide-over on mobile
-- **Account page mTLS improvements** — download PEM button per certificate, "Manage all certificates" link, "certificate is managed by UCM" info message
-
-### Changed
-- **Centralized `buildQueryString` utility** — all 10 frontend services now use `buildQueryString()` from `apiClient.js` instead of manual `URLSearchParams` construction
-- **Dev-mode `params` warning** — `apiClient.request()` logs a `console.warn` if `options.params` is passed (silently ignored, common bug source)
-- **Explicit boolean params** — export functions use `? true : undefined` ternary instead of ambiguous `|| undefined`
-
-### Fixed
-- **Export blob handling** — `UserCertificatesPage` and `AccountPage` now correctly handle `apiClient` return value (returns data directly, not `{ data }` wrapper)
-- **`groups.service.js` params bug** — was passing `{ params }` to `apiClient.get()` which silently ignored the query parameters
-- **ResponsiveDataTable render signatures** — fixed `(row)` → `(_value, row)` for column render functions
-
 ---
 
 ## [2.48] - 2026-02-22
 
+> Version jump from 2.1.6 to 2.48: UCM migrated from Semantic Versioning to Major.Build format.
+
 ### Added
 - **Comprehensive backend test suite** — 1364 tests covering all 347 API routes (~95% route coverage)
-- **ucm-watcher system** — systemd path-based service management replacing direct systemctl calls; handles restart requests and package updates via signal files
-- **Experimental badges** — visual indicators for untested features (mTLS, HSM, SSO) in Settings and Account pages
+- **mTLS client certificate management** — full lifecycle (list, export, revoke, delete) via `/api/v2/user-certificates` API (6 endpoints), User Certificates page, mTLS enrollment modal, PKCS12 export, dynamic Gunicorn mTLS config, admin per-user mTLS management
 - **TOTP 2FA login flow** — complete two-factor authentication with QR code setup and verification at login
+- **Experimental badges** — visual indicators for untested features (mTLS, HSM, SSO) in Settings and Account pages
+- **ucm-watcher system** — systemd path-based service management replacing direct systemctl calls; handles restart requests and package updates via signal files
 - **Auto-update mechanism** — backend checks GitHub releases API, downloads packages, triggers ucm-watcher for installation
+- **Pre-commit checks** — i18n sync, frontend tests (450), backend tests (1364), icon validation — all run before every commit
 
 ### Changed
 - **Versioning scheme** — migrated from Semantic Versioning (2.1.x) to Major.Build (2.48) for simpler release tracking
+- **Single VERSION file** — removed `backend/VERSION` duplicate; repo root `VERSION` is sole source of truth
 - **Service restart** — centralized via signal files (`/opt/ucm/data/.restart_requested`) instead of direct systemctl calls
 - **Branch rename** — development branch renamed from `2.1.0-dev`/`2.2.0-dev` to `dev`
 - **RPM packaging** — systemd units renamed from `ucm-updater` to `ucm-watcher` for consistency with DEB
+- **Centralized `buildQueryString` utility** — all 10 frontend services now use `buildQueryString()` from `apiClient.js`
+- **Tailwind opacity removal** — replaced `bg-x/40` patterns with `color-mix` CSS utilities
 
 ### Fixed
 - **RPM build failure** — spec referenced non-existent `ucm-updater.path`/`ucm-updater.service` files
 - **RPM changelog dates** — fixed incorrect weekday names causing bogus date warnings
+- **CA tree depth** — recursive rendering for unlimited depth hierarchies
+- **DN parsing** — support both short (`CN=`) and long (`commonName=`) field formats
 - **Password change modal** — close button (X) now properly closes the modal
 - **2FA enable endpoint** — fixed 500 error on `/api/v2/account/2fa/enable`
-- **Mobile navigation** — fixed layout issues on small screens
-- **SAN parsing** — fixed Subject Alternative Name parsing for multi-value SANs
-- **CA tree depth** — fixed depth calculation for deeply nested CA hierarchies
+- **PEM export** — use real newlines in PEM concatenation
+- **Export blob handling** — pages now correctly handle `apiClient` return value (data directly, not `{ data }` wrapper)
+- **`groups.service.js` params bug** — was passing `{ params }` to `apiClient.get()` which silently ignored query parameters
 
 ### Security
 - **1364 backend security tests** — all authentication, authorization, and RBAC endpoints tested
 - **Rate limiting verified** — brute-force protection on all auth endpoints confirmed via tests
 - **CSRF enforcement** — all state-changing endpoints verified to require CSRF tokens
+
+---
+
+## [2.1.6] - 2026-02-21
+
+Versioning cleanup release — no code changes.
+
+---
+
+## [2.1.5] - 2026-02-21
+
+### Fixed
+- **SAN parsing** — parse SAN string into typed arrays (DNS, IP, Email, URI) for proper display and editing
+
+---
+
+## [2.1.4] - 2026-02-21
+
+### Fixed
+- **Encrypted key password** — password field now shown in SmartImport for encrypted private keys
+- **Mobile navigation i18n** — use short translation keys for nav items on mobile
+- **Missing mobile icons** — added Gavel, Stamp, ChartBar icons to AppShell mobile nav
+
+---
+
+## [2.1.3] - 2026-02-21
+
+### Fixed
+- **ECDSA key sizes** — correct key size options (256, 384, 521) and backend mapping (fixes #22)
+
+---
+
+## [2.1.2] - 2026-02-21
+
+### Fixed
+- **Sub CA creation** — fixed parent CA being ignored + DN fields lost + error detail leak + import crash
+
+### Security
+- **Flask 3.1.2 → 3.1.3** — CVE-2026-27205
+
+---
+
+## [2.1.1] - 2026-02-20
+
+### Fixed
+- **DB version sync** — `app.version` in database now synced from VERSION file on startup
+- **OPNsense import** — fixed double JSON.stringify on API client POST, added type validation for nested JSON fields
+- **DNS provider status** — fixed `status` kwarg in DNS provider endpoints
+- **Screenshots** — replaced with correct dark theme 1920×1080 screenshots
+
+### Changed
+- Consolidated changelog — merged all 2.1.0 pre-release entries into single entry
+- CI: exclude `rc` tags from Docker `latest` tag
+- CI: auto-push DOCKERHUB_README.md to Docker Hub on release
 
 ---
 
@@ -133,24 +181,43 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [2.0.3] - 2026-02-10
+## [2.0.7] - 2026-02-13
 
-### Bug Fixes
+### Fixed
+- **Packaging** — ensure scripts are executable after global `chmod 644`
+- **Auto-update** — replace shell command injection with systemd trigger
+- **Packaging** — restart service on upgrade instead of start
 
-- **CA Creation Fix** - Fixed crash when creating CA with null `validityYears` or `keySize` values (Docker/fresh installs)
-- **DN Field Validation** - Country code now auto-uppercased across all endpoints (CAs, Certificates, CSRs)
-- **CSR Validation** - Added missing Distinguished Name validation to CSR creation endpoint
+---
 
-### Docker Improvements
+## [2.0.6] - 2026-02-12
 
-- **Unified Data Path** - All Docker data now stored in `/opt/ucm/data` (same as DEB/RPM installs)
-- **Migration Support** - Automatic migration from old path (`/app/backend/data`) on container upgrade
-- **Volume Mount Simplified** - Single volume mount: `-v ucm-data:/opt/ucm/data`
+### Fixed
+- **OPNsense import** — import button not showing after connection test
 
-### Documentation
+### Security
+- **cryptography** upgraded from 46.0.3 to 46.0.5 (CVE-2026-26007)
 
-- Updated Docker installation guides with correct volume paths
-- Updated docker-compose examples
+---
+
+## [2.0.4] - 2026-02-11
+
+### Fixed
+- **Certificate issue form** — broken Select options and field names
+- **SSL/gevent** — early gevent monkey-patch for Python 3.13 recursion bug, safe_requests in OPNsense import
+- **Docker** — fix data directory names and migration, use `.env.docker.example`
+- **VERSION** — centralize VERSION file as single source of truth
+
+---
+
+## [2.0.1] - 2026-02-08
+
+### Fixed
+- **HTTPS cert paths** — use `DATA_DIR` dynamically instead of hardcoded paths
+- **Docker** — WebSocket `worker_class` (geventwebsocket), HTTPS cert restart uses `SIGTERM`
+- **Service restart** — reliable restart via sudoers for HTTPS cert apply
+- **WebSocket** — connect handler accepts auth parameter
+- **Version** — single source of truth from `frontend/package.json`
 
 ---
 
