@@ -120,6 +120,7 @@ def create_ca():
         dn = {
             'CN': data.get('commonName'),
             'O': data.get('organization'),
+            'OU': data.get('organizationalUnit') or None,
             'C': (data.get('country') or '').upper() or None,
             'ST': data.get('state') or None,
             'L': data.get('locality') or None
@@ -150,7 +151,7 @@ def create_ca():
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
             
         ca = CAService.create_internal_ca(
-            descr=data.get('commonName'), # Use CN as description
+            descr=data.get('description') or data.get('commonName'),
             dn=dn,
             key_type=key_type,
             validity_days=int(data.get('validityYears') or 10) * 365,

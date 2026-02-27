@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "Descrizione opzionale per questo certificato",
     "orgPlaceholder": "La Mia Azienda",
     "ouPlaceholder": "Dipartimento IT",
-    "emailPlaceholder": "admin@esempio.com"
+    "emailPlaceholder": "admin@esempio.com",
+    "certTypePlaceholder": "Seleziona tipo"
   },
   "cas": {
     "parentCA": "CA padre",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}} certificati",
     "certificateCount": "{{count}} certificati",
     "daysLeft": "{{count}} giorni rimanenti",
-    "daysLeft_one": "{{count}} giorno rimanente"
+    "daysLeft_one": "{{count}} giorno rimanente",
+    "descriptionPlaceholder": "Descrizione opzionale per questa CA"
   },
   "csrs": {
     "uploadCSR": "Carica CSR",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "Caricamento chiave privata fallito",
     "downloadFailed": "Download fallito",
     "unnamedCSR": "CSR Senza Nome",
-    "unnamedCertificate": "Certificato Senza Nome"
+    "unnamedCertificate": "Certificato Senza Nome",
+    "generateCSR": "Genera CSR",
+    "generateDescription": "Genera una nuova richiesta di firma certificato",
+    "department": "Dipartimento (OU)",
+    "departmentPlaceholder": "Dipartimento IT",
+    "sansList": "Nomi alternativi soggetto",
+    "certTypeForSign": "Tipo di certificato"
   },
   "templates": {
     "template": "Modello",
@@ -782,7 +790,8 @@
       "assigned": "Certificato assegnato all'utente",
       "assignFailed": "Errore nell'assegnazione del certificato all'utente",
       "loadAvailableFailed": "Errore nel caricamento dei certificati disponibili"
-    }
+    },
+    "activeDescription": "Attivare o disattivare questo account utente"
   },
   "groups": {
     "group": "Gruppo",

@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "この証明書の説明（任意）",
     "orgPlaceholder": "会社名",
     "ouPlaceholder": "IT部門",
-    "emailPlaceholder": "admin@example.com"
+    "emailPlaceholder": "admin@example.com",
+    "certTypePlaceholder": "タイプを選択"
   },
   "cas": {
     "parentCA": "親CA",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}}個の証明書",
     "certificateCount": "{{count}}個の証明書",
     "daysLeft": "残り{{count}}日",
-    "daysLeft_one": "{{count}} day left"
+    "daysLeft_one": "{{count}} day left",
+    "descriptionPlaceholder": "このCAの任意の説明"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "秘密鍵のアップロードに失敗しました",
     "downloadFailed": "ダウンロードに失敗しました",
     "unnamedCSR": "名称未設定のCSR",
-    "unnamedCertificate": "名称未設定の証明書"
+    "unnamedCertificate": "名称未設定の証明書",
+    "generateCSR": "CSR生成",
+    "generateDescription": "新しい証明書署名要求を生成",
+    "department": "部門 (OU)",
+    "departmentPlaceholder": "IT部門",
+    "sansList": "サブジェクト代替名",
+    "certTypeForSign": "証明書タイプ"
   },
   "templates": {
     "template": "テンプレート",
@@ -782,7 +790,8 @@
       "assigned": "ユーザーに証明書を割り当てました",
       "assignFailed": "ユーザーへの証明書の割り当てに失敗しました",
       "loadAvailableFailed": "利用可能な証明書の読み込みに失敗しました"
-    }
+    },
+    "activeDescription": "このユーザーアカウントを有効化または無効化"
   },
   "groups": {
     "group": "グループ",

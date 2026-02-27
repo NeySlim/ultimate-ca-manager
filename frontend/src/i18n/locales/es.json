@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "Descripción opcional para este certificado",
     "orgPlaceholder": "Mi Empresa",
     "ouPlaceholder": "Departamento IT",
-    "emailPlaceholder": "admin@ejemplo.com"
+    "emailPlaceholder": "admin@ejemplo.com",
+    "certTypePlaceholder": "Seleccionar tipo"
   },
   "cas": {
     "parentCA": "CA padre",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}} certificados",
     "certificateCount": "{{count}} certificados",
     "daysLeft": "{{count}} días restantes",
-    "daysLeft_one": "{{count}} día restante"
+    "daysLeft_one": "{{count}} día restante",
+    "descriptionPlaceholder": "Descripción opcional para esta CA"
   },
   "csrs": {
     "uploadCSR": "Subir CSR",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "Error to subir private clave",
     "downloadFailed": "Error to descargar",
     "unnamedCSR": "Unnombred CSR",
-    "unnamedCertificate": "Unnombred Certificado"
+    "unnamedCertificate": "Unnombred Certificado",
+    "generateCSR": "Generar CSR",
+    "generateDescription": "Generar una nueva solicitud de firma de certificado",
+    "department": "Departamento (OU)",
+    "departmentPlaceholder": "Departamento IT",
+    "sansList": "Nombres alternativos del sujeto",
+    "certTypeForSign": "Tipo de certificado"
   },
   "templates": {
     "template": "Plantilla",
@@ -782,7 +790,8 @@
       "assigned": "Certificado asignado al usuario",
       "assignFailed": "Error al asignar el certificado al usuario",
       "loadAvailableFailed": "Error al cargar los certificados disponibles"
-    }
+    },
+    "activeDescription": "Activar o desactivar esta cuenta de usuario"
   },
   "groups": {
     "group": "Grupo",

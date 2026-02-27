@@ -1152,7 +1152,8 @@ function UserForm({ user, onSubmit, onCancel }) {
     password: '',
     full_name: '',
     role: 'viewer',
-    custom_role_id: ''
+    custom_role_id: '',
+    active: true
   })
   const [loading, setLoading] = useState(false)
   const [customRoles, setCustomRoles] = useState([])
@@ -1171,7 +1172,8 @@ function UserForm({ user, onSubmit, onCancel }) {
         password: '',
         full_name: user.full_name || '',
         role: user.role || 'viewer',
-        custom_role_id: user.custom_role_id || ''
+        custom_role_id: user.custom_role_id || '',
+        active: user.active !== false
       })
     } else {
       setFormData({
@@ -1180,7 +1182,8 @@ function UserForm({ user, onSubmit, onCancel }) {
         password: '',
         full_name: '',
         role: 'viewer',
-        custom_role_id: ''
+        custom_role_id: '',
+        active: true
       })
     }
   }, [user])
@@ -1253,6 +1256,29 @@ function UserForm({ user, onSubmit, onCancel }) {
             ...customRoles.map(r => ({ value: String(r.id), label: r.name }))
           ]}
         />
+      )}
+      {user && (
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="text-sm font-medium text-text-primary">{t('common.status')}</label>
+            <p className="text-xs text-text-secondary">{t('users.activeDescription')}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={formData.active}
+            onClick={() => setFormData(p => ({ ...p, active: !p.active }))}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+              formData.active ? "bg-accent-primary" : "bg-bg-tertiary"
+            )}
+          >
+            <span className={cn(
+              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+              formData.active ? "translate-x-6" : "translate-x-1"
+            )} />
+          </button>
+        </div>
       )}
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>

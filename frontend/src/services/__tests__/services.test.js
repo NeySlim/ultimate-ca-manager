@@ -208,7 +208,7 @@ describe('csrsService', () => {
   it('sign → POST /csrs/:id/sign with ca_id and validity_days', async () => {
     await csrsService.sign(10, '2', 365)
     expect(mockApiClient.post).toHaveBeenCalledWith('/csrs/10/sign', {
-      ca_id: '2', validity_days: 365
+      ca_id: '2', validity_days: 365, cert_type: 'server'
     })
   })
 

@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "此证书的可选描述",
     "orgPlaceholder": "我的公司",
     "ouPlaceholder": "IT部门",
-    "emailPlaceholder": "admin@example.com"
+    "emailPlaceholder": "admin@example.com",
+    "certTypePlaceholder": "选择类型"
   },
   "cas": {
     "parentCA": "父CA",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}}个证书",
     "certificateCount": "{{count}}个证书",
     "daysLeft": "剩余{{count}}天",
-    "daysLeft_one": "{{count}} day left"
+    "daysLeft_one": "{{count}} day left",
+    "descriptionPlaceholder": "此CA的可选描述"
   },
   "csrs": {
     "uploadCSR": "上传CSR",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "上传私钥失败",
     "downloadFailed": "下载失败",
     "unnamedCSR": "未命名 CSR",
-    "unnamedCertificate": "未命名证书"
+    "unnamedCertificate": "未命名证书",
+    "generateCSR": "生成 CSR",
+    "generateDescription": "生成新的证书签名请求",
+    "department": "部门 (OU)",
+    "departmentPlaceholder": "IT部门",
+    "sansList": "主题备选名称",
+    "certTypeForSign": "证书类型"
   },
   "templates": {
     "template": "模板",
@@ -782,7 +790,8 @@
       "assigned": "已将证书分配给用户",
       "assignFailed": "将证书分配给用户失败",
       "loadAvailableFailed": "加载可用证书失败"
-    }
+    },
+    "activeDescription": "启用或禁用此用户帐户"
   },
   "groups": {
     "group": "组",

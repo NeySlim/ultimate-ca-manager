@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "Необов'язковий опис для цього сертифіката",
     "orgPlaceholder": "Моя Компанія",
     "ouPlaceholder": "IT відділ",
-    "emailPlaceholder": "admin@приклад.com"
+    "emailPlaceholder": "admin@приклад.com",
+    "certTypePlaceholder": "Оберіть тип"
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}} сертифікатів",
     "certificateCount": "{{count}} сертифікатів",
     "daysLeft": "{{count}} днів залишилось",
-    "daysLeft_one": "{{count}} день залишився"
+    "daysLeft_one": "{{count}} день залишився",
+    "descriptionPlaceholder": "Необов'язковий опис для цього ЦС"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "Невдало to upload private key",
     "downloadFailed": "Невдало to download",
     "unnamedCSR": "CSR без назви",
-    "unnamedCertificate": "Unnamed Сертифікат"
+    "unnamedCertificate": "Unnamed Сертифікат",
+    "generateCSR": "Генерувати CSR",
+    "generateDescription": "Створити новий запит на підпис сертифіката",
+    "department": "Відділ (OU)",
+    "departmentPlaceholder": "IT відділ",
+    "sansList": "Альтернативні імена суб'єкта",
+    "certTypeForSign": "Тип сертифіката"
   },
   "templates": {
     "template": "Шаблон",
@@ -782,7 +790,8 @@
       "assigned": "Сертифікат призначено користувачу",
       "assignFailed": "Не вдалося призначити сертифікат користувачу",
       "loadAvailableFailed": "Не вдалося завантажити доступні сертифікати"
-    }
+    },
+    "activeDescription": "Увімкнути або вимкнути цей обліковий запис"
   },
   "groups": {
     "group": "Група",

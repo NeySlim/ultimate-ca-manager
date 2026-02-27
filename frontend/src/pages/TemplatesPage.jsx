@@ -501,7 +501,7 @@ export default function TemplatesPage() {
         open={showTemplateModal}
         onOpenChange={(open) => { setShowTemplateModal(open); if (!open) setEditingTemplate(null) }}
         title={editingTemplate ? t('templates.editTemplate') : t('templates.createTemplate')}
-        size="lg"
+        size="xl"
       >
         <TemplateForm
           template={editingTemplate}
@@ -572,93 +572,148 @@ export default function TemplatesPage() {
 
 // ============= TEMPLATE FORM =============
 
+const TEMPLATE_TYPE_OPTIONS = [
+  'web_server', 'email', 'vpn_server', 'vpn_client',
+  'code_signing', 'client_auth', 'custom'
+]
+const KEY_TYPE_OPTIONS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384']
+const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
+const KEY_USAGE_OPTIONS = [
+  'digitalSignature', 'keyEncipherment', 'contentCommitment',
+  'dataEncipherment', 'keyAgreement', 'keyCertSign', 'crlSign'
+]
+const EXT_KEY_USAGE_OPTIONS = [
+  'serverAuth', 'clientAuth', 'codeSigning',
+  'emailProtection', 'ipsecEndSystem', 'ipsecUser'
+]
+const SAN_TYPE_OPTIONS = ['dns', 'ip', 'email', 'uri']
+
+function buildInitialState(template) {
+  if (!template) {
+    return {
+      name: '', description: '', template_type: 'web_server',
+      key_type: 'RSA-2048', digest: 'sha256',
+      validity_days: 397, max_validity_days: 3650,
+      subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '' },
+      key_usage: ['digitalSignature', 'keyEncipherment'],
+      extended_key_usage: ['serverAuth'],
+      san_types: ['dns', 'ip']
+    }
+  }
+  const dn = template.dn_template || {}
+  const ext = template.extensions_template || {}
+  return {
+    name: template.name || '',
+    description: template.description || '',
+    template_type: template.template_type || 'web_server',
+    key_type: template.key_type || 'RSA-2048',
+    digest: template.digest || 'sha256',
+    validity_days: template.validity_days || 397,
+    max_validity_days: template.max_validity_days || 3650,
+    subject: {
+      C: dn.C || '', ST: dn.ST || '', L: dn.L || '',
+      O: dn.O || '', OU: dn.OU || '', CN: dn.CN || ''
+    },
+    key_usage: ext.key_usage || [],
+    extended_key_usage: ext.extended_key_usage || [],
+    san_types: ext.san_types || []
+  }
+}
+
 function TemplateForm({ template, onSubmit, onCancel }) {
   const { t } = useTranslation()
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    type: 'certificate',
-    validity_days: 365,
-    max_validity_days: 3650,
-    subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '' },
-    key_usage: [],
-    extended_key_usage: []
-  })
+  const [formData, setFormData] = useState(() => buildInitialState(template))
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (template) {
-      setFormData({
-        name: template.name || '',
-        description: template.description || '',
-        type: template.type || 'certificate',
-        validity_days: template.validity_days || 365,
-        max_validity_days: template.max_validity_days || 3650,
-        subject: template.subject || { C: '', ST: '', L: '', O: '', OU: '', CN: '' },
-        key_usage: template.key_usage || [],
-        extended_key_usage: template.extended_key_usage || []
-      })
-    } else {
-      setFormData({
-        name: '',
-        description: '',
-        type: 'certificate',
-        validity_days: 365,
-        max_validity_days: 3650,
-        subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '' },
-        key_usage: [],
-        extended_key_usage: []
-      })
-    }
+    setFormData(buildInitialState(template))
   }, [template])
+
+  const set = (field, value) => setFormData(p => ({ ...p, [field]: value }))
+  const updateSubject = (field, value) =>
+    setFormData(p => ({ ...p, subject: { ...p.subject, [field]: value } }))
+
+  const toggleCheckbox = (field, item) => {
+    setFormData(p => {
+      const arr = p[field]
+      return { ...p, [field]: arr.includes(item) ? arr.filter(v => v !== item) : [...arr, item] }
+    })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.name.trim()) return
     setLoading(true)
     try {
-      await onSubmit(formData)
+      await onSubmit({
+        name: formData.name,
+        description: formData.description,
+        template_type: formData.template_type,
+        key_type: formData.key_type,
+        digest: formData.digest,
+        validity_days: formData.validity_days,
+        max_validity_days: formData.max_validity_days,
+        dn_template: { ...formData.subject },
+        extensions_template: {
+          key_usage: formData.key_usage,
+          extended_key_usage: formData.extended_key_usage,
+          basic_constraints: { ca: false },
+          san_types: formData.san_types
+        }
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const updateSubject = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      subject: { ...prev.subject, [field]: value }
-    }))
-  }
+  const checkboxCls = 'flex items-center gap-1.5 text-sm text-text-primary cursor-pointer select-none'
+  const sectionTitle = 'text-sm font-medium text-text-primary mb-3'
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
       {/* Basic Info */}
       <div className="grid grid-cols-2 gap-4">
         <Input
           label={t('templates.templateName')}
           value={formData.name}
-          onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+          onChange={(e) => set('name', e.target.value)}
           placeholder={t('templates.namePlaceholder')}
           required
         />
         <Select
-          label={t('common.type')}
-          value={formData.type}
-          onChange={(val) => setFormData(p => ({ ...p, type: val }))}
-          options={[
-            { value: 'certificate', label: t('common.certificate') },
-            { value: 'ca', label: t('common.certificateAuthority') }
-          ]}
+          label={t('templates.templateType')}
+          value={formData.template_type}
+          onChange={(val) => set('template_type', val)}
+          options={TEMPLATE_TYPE_OPTIONS.map(v => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))}
         />
       </div>
 
       <Textarea
         label={t('common.description')}
         value={formData.description}
-        onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
+        onChange={(e) => set('description', e.target.value)}
         placeholder={t('templates.descriptionPlaceholder')}
         rows={2}
       />
+
+      {/* Key Settings */}
+      <div className="border-t border-border pt-4">
+        <h4 className={sectionTitle}>{t('templates.keySettings')}</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <Select
+            label={t('common.keyType')}
+            value={formData.key_type}
+            onChange={(val) => set('key_type', val)}
+            options={KEY_TYPE_OPTIONS.map(v => ({ value: v, label: v }))}
+          />
+          <Select
+            label="Digest"
+            value={formData.digest}
+            onChange={(val) => set('digest', val)}
+            options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
+          />
+        </div>
+      </div>
 
       {/* Validity */}
       <div className="grid grid-cols-2 gap-4">
@@ -666,44 +721,70 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           label={t('templates.defaultValidity')}
           type="number"
           value={formData.validity_days}
-          onChange={(e) => setFormData(p => ({ ...p, validity_days: parseInt(e.target.value) || 365 }))}
+          onChange={(e) => set('validity_days', parseInt(e.target.value) || 397)}
         />
         <Input
           label={t('templates.maxValidity')}
           type="number"
           value={formData.max_validity_days}
-          onChange={(e) => setFormData(p => ({ ...p, max_validity_days: parseInt(e.target.value) || 3650 }))}
+          onChange={(e) => set('max_validity_days', parseInt(e.target.value) || 3650)}
         />
       </div>
 
       {/* Subject Template */}
       <div className="border-t border-border pt-4">
-        <h4 className="text-sm font-medium text-text-primary mb-3">{t('templates.subjectTemplate')}</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label={t('templates.country')}
-            value={formData.subject.C}
-            onChange={(e) => updateSubject('C', e.target.value)}
-            placeholder={t('common.countryPlaceholder')}
-          />
-          <Input
-            label={t('templates.state')}
-            value={formData.subject.ST}
-            onChange={(e) => updateSubject('ST', e.target.value)}
-            placeholder={t('common.statePlaceholder')}
-          />
-          <Input
-            label={t('templates.organization')}
-            value={formData.subject.O}
-            onChange={(e) => updateSubject('O', e.target.value)}
-            placeholder={t('templates.orgPlaceholder')}
-          />
-          <Input
-            label={t('templates.commonName')}
-            value={formData.subject.CN}
-            onChange={(e) => updateSubject('CN', e.target.value)}
-            placeholder={t('templates.cnPlaceholder')}
-          />
+        <h4 className={sectionTitle}>{t('templates.subjectTemplate')}</h4>
+        <div className="grid grid-cols-3 gap-4">
+          <Input label={t('templates.country')} value={formData.subject.C} onChange={(e) => updateSubject('C', e.target.value)} placeholder="US" />
+          <Input label={t('templates.state')} value={formData.subject.ST} onChange={(e) => updateSubject('ST', e.target.value)} placeholder="California" />
+          <Input label={t('common.locality')} value={formData.subject.L} onChange={(e) => updateSubject('L', e.target.value)} placeholder="San Francisco" />
+          <Input label={t('templates.organization')} value={formData.subject.O} onChange={(e) => updateSubject('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
+          <Input label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder="IT Department" />
+          <Input label={t('templates.commonName')} value={formData.subject.CN} onChange={(e) => updateSubject('CN', e.target.value)} placeholder={t('templates.cnPlaceholder')} />
+        </div>
+      </div>
+
+      {/* Extensions */}
+      <div className="border-t border-border pt-4 space-y-4">
+        <h4 className={sectionTitle}>{t('templates.extensions')}</h4>
+
+        {/* Key Usage */}
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.keyUsage')}</label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {KEY_USAGE_OPTIONS.map(ku => (
+              <label key={ku} className={checkboxCls}>
+                <input type="checkbox" checked={formData.key_usage.includes(ku)} onChange={() => toggleCheckbox('key_usage', ku)} className="accent-accent-primary" />
+                {ku}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Extended Key Usage */}
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.extKeyUsage')}</label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {EXT_KEY_USAGE_OPTIONS.map(eku => (
+              <label key={eku} className={checkboxCls}>
+                <input type="checkbox" checked={formData.extended_key_usage.includes(eku)} onChange={() => toggleCheckbox('extended_key_usage', eku)} className="accent-accent-primary" />
+                {eku}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* SAN Types */}
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-2">SAN Types</label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {SAN_TYPE_OPTIONS.map(st => (
+              <label key={st} className={checkboxCls}>
+                <input type="checkbox" checked={formData.san_types.includes(st)} onChange={() => toggleCheckbox('san_types', st)} className="accent-accent-primary" />
+                {st.toUpperCase()}
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 

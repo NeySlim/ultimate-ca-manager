@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
   Clock, Key, UploadSimple, CheckCircle, Warning,
-  ClockCounterClockwise, Certificate, Stamp, ClipboardText
+  ClockCounterClockwise, Certificate, Stamp, ClipboardText,
+  Plus, X, GlobeSimple, At
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, FileUpload, Textarea,
@@ -16,7 +17,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { csrsService, casService } from '../services'
+import { csrsService, casService, templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
@@ -28,7 +29,7 @@ export default function CSRsPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { modals, open: openModal, close: closeModal } = useModals(['upload', 'sign'])
+  const { modals, open: openModal, close: closeModal } = useModals(['upload', 'sign', 'generate'])
   
   // Tab definitions (inside component for translations)
   const TABS = [
@@ -49,7 +50,19 @@ export default function CSRsPage() {
   const [selectedCSR, setSelectedCSR] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [signCA, setSignCA] = useState('')
+  const [signCertType, setSignCertType] = useState('server')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
+  
+  // Generate CSR form state
+  const [genCN, setGenCN] = useState('')
+  const [genOrg, setGenOrg] = useState('')
+  const [genOU, setGenOU] = useState('')
+  const [genCountry, setGenCountry] = useState('')
+  const [genState, setGenState] = useState('')
+  const [genLocality, setGenLocality] = useState('')
+  const [genKeyType, setGenKeyType] = useState('RSA 2048')
+  const [genSans, setGenSans] = useState([{ type: 'DNS', value: '' }])
+  const [generating, setGenerating] = useState(false)
   
   // Upload modal
   const [uploadMode, setUploadMode] = useState('file') // 'file' or 'paste'
@@ -149,7 +162,7 @@ export default function CSRsPage() {
       return
     }
     try {
-      await csrsService.sign(selectedCSR.id, signCA, validityDays)
+      await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType)
       showSuccess(t('messages.success.other.signed'))
       closeModal('sign')
       loadData()
@@ -157,6 +170,41 @@ export default function CSRsPage() {
     } catch (error) {
       showError(error.message || t('csrs.signFailed'))
     }
+  }
+
+  const handleGenerate = async () => {
+    if (!genCN.trim()) {
+      showError(t('certificates.cnRequired'))
+      return
+    }
+    setGenerating(true)
+    try {
+      const sans = genSans.filter(s => s.value.trim()).map(s => `${s.type}:${s.value.trim()}`)
+      await csrsService.create({
+        cn: genCN.trim(),
+        organization: genOrg.trim() || undefined,
+        department: genOU.trim() || undefined,
+        country: genCountry.trim() || undefined,
+        state: genState.trim() || undefined,
+        locality: genLocality.trim() || undefined,
+        key_type: genKeyType,
+        sans
+      })
+      showSuccess(t('messages.success.create.csr'))
+      closeModal('generate')
+      resetGenerateForm()
+      loadData()
+    } catch (error) {
+      showError(error.message || t('csrs.generateFailed'))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const resetGenerateForm = () => {
+    setGenCN(''); setGenOrg(''); setGenOU(''); setGenCountry('')
+    setGenState(''); setGenLocality(''); setGenKeyType('RSA 2048')
+    setGenSans([{ type: 'DNS', value: '' }])
   }
 
   const handleDelete = async (id) => {
@@ -492,14 +540,25 @@ export default function CSRsPage() {
           columnStorageKey={`ucm-csrs-${activeTab}-columns`}
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
-              <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
-                <UploadSimple size={22} weight="bold" />
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="lg" onClick={() => openModal('generate')} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+                <Button type="button" size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
+                  <UploadSimple size={22} weight="bold" />
+                </Button>
+              </div>
             ) : (
-              <Button type="button" size="sm" onClick={() => setShowImportModal(true)}>
-                <UploadSimple size={14} weight="bold" />
-                {t('common.import')}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={() => openModal('generate')}>
+                  <Plus size={14} weight="bold" />
+                  {t('csrs.generateCSR')}
+                </Button>
+                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                  <UploadSimple size={14} weight="bold" />
+                  {t('common.import')}
+                </Button>
+              </div>
             )
           )}
           sortable
@@ -613,6 +672,19 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             placeholder={t('csrs.selectCA')}
           />
 
+          <Select
+            label={t('csrs.certTypeForSign')}
+            options={[
+              { value: 'server', label: t('certificates.certTypes.server') },
+              { value: 'client', label: t('certificates.certTypes.client') },
+              { value: 'combined', label: t('certificates.certTypes.combined') },
+              { value: 'code_signing', label: t('certificates.certTypes.codeSigning') },
+              { value: 'email', label: t('certificates.certTypes.email') },
+            ]}
+            value={signCertType}
+            onChange={setSignCertType}
+          />
+
           <Input
             label={t('csrs.validityPeriod')}
             type="number"
@@ -626,6 +698,140 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             <Button type="button" variant="secondary" onClick={() => closeModal('sign')}>{t('common.cancel')}</Button>
             <Button type="button" onClick={handleSign} disabled={!signCA}>
               <SignIn size={16} /> {t('common.signCSR')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Generate CSR Modal */}
+      <Modal
+        open={modals.generate}
+        onOpenChange={() => { closeModal('generate'); resetGenerateForm() }}
+        title={t('csrs.generateCSR')}
+        size="lg"
+      >
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <p className="text-sm text-text-secondary">
+            {t('csrs.generateDescription')}
+          </p>
+
+          {/* Common Name (required) */}
+          <Input
+            label={`${t('common.commonName')} *`}
+            value={genCN}
+            onChange={(e) => setGenCN(e.target.value)}
+            placeholder="example.com"
+          />
+
+          {/* Key Type */}
+          <Select
+            label={t('common.keyType')}
+            options={[
+              { value: 'RSA 2048', label: 'RSA 2048' },
+              { value: 'RSA 4096', label: 'RSA 4096' },
+              { value: 'EC P-256', label: 'EC P-256' },
+              { value: 'EC P-384', label: 'EC P-384' },
+            ]}
+            value={genKeyType}
+            onChange={setGenKeyType}
+          />
+
+          {/* Subject Details */}
+          <details className="group">
+            <summary className="cursor-pointer text-sm font-medium text-text-primary flex items-center gap-1 py-1">
+              <span className="transition-transform group-open:rotate-90">▶</span>
+              {t('certificates.subjectDetails')}
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Input
+                label={t('common.organization')}
+                value={genOrg}
+                onChange={(e) => setGenOrg(e.target.value)}
+                placeholder={t('certificates.orgPlaceholder')}
+              />
+              <Input
+                label={t('csrs.department')}
+                value={genOU}
+                onChange={(e) => setGenOU(e.target.value)}
+                placeholder={t('csrs.departmentPlaceholder')}
+              />
+              <Input
+                label={t('common.country')}
+                value={genCountry}
+                onChange={(e) => setGenCountry(e.target.value)}
+                placeholder="US"
+                maxLength={2}
+              />
+              <Input
+                label={t('common.state')}
+                value={genState}
+                onChange={(e) => setGenState(e.target.value)}
+                placeholder={t('certificates.statePlaceholder')}
+              />
+              <Input
+                label={t('common.locality')}
+                value={genLocality}
+                onChange={(e) => setGenLocality(e.target.value)}
+                placeholder={t('certificates.localityPlaceholder')}
+              />
+            </div>
+          </details>
+
+          {/* SANs */}
+          <div>
+            <label className="text-sm font-medium text-text-primary mb-2 block">
+              {t('csrs.sansList')}
+            </label>
+            <div className="space-y-2">
+              {genSans.map((san, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <Select
+                    options={[
+                      { value: 'DNS', label: 'DNS' },
+                      { value: 'IP', label: 'IP' },
+                      { value: 'Email', label: 'Email' },
+                      { value: 'URI', label: 'URI' },
+                    ]}
+                    value={san.type}
+                    onChange={(val) => {
+                      const updated = [...genSans]
+                      updated[i].type = val
+                      setGenSans(updated)
+                    }}
+                    className="w-24 shrink-0"
+                  />
+                  <Input
+                    value={san.value}
+                    onChange={(e) => {
+                      const updated = [...genSans]
+                      updated[i].value = e.target.value
+                      setGenSans(updated)
+                    }}
+                    placeholder={san.type === 'DNS' ? 'example.com' : san.type === 'IP' ? '10.0.0.1' : san.type === 'Email' ? 'admin@example.com' : 'https://example.com'}
+                    className="flex-1"
+                  />
+                  {genSans.length > 1 && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setGenSans(genSans.filter((_, j) => j !== i))}>
+                      <X size={14} />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => setGenSans([...genSans, { type: 'DNS', value: '' }])}
+              >
+                <Plus size={14} /> {t('certificates.addSan')}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => { closeModal('generate'); resetGenerateForm() }}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" onClick={handleGenerate} disabled={!genCN.trim() || generating}>
+              <Plus size={16} /> {generating ? t('common.generating') : t('csrs.generateCSR')}
             </Button>
           </div>
         </div>

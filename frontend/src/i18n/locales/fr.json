@@ -434,7 +434,8 @@
     "certificateCount_other": "{{count}} certificats",
     "certificateCount": "{{count}} certificats",
     "daysLeft": "{{count}} jours restants",
-    "daysLeft_one": "{{count}} jour restant"
+    "daysLeft_one": "{{count}} jour restant",
+    "descriptionPlaceholder": "Description optionnelle pour cette AC"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -496,7 +497,8 @@
     "descriptionPlaceholder": "Description optionnelle pour ce certificat",
     "orgPlaceholder": "Mon Entreprise",
     "ouPlaceholder": "Département IT",
-    "emailPlaceholder": "admin@exemple.com"
+    "emailPlaceholder": "admin@exemple.com",
+    "certTypePlaceholder": "Sélectionner le type"
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -950,7 +952,13 @@
     "keyUploadFailed": "Échec du téléversement de la clé privée",
     "downloadFailed": "Échec du téléchargement",
     "unnamedCSR": "CSR sans nom",
-    "unnamedCertificate": "Certificat sans nom"
+    "unnamedCertificate": "Certificat sans nom",
+    "generateCSR": "Générer un CSR",
+    "generateDescription": "Générer une nouvelle demande de signature de certificat",
+    "department": "Département (OU)",
+    "departmentPlaceholder": "Département IT",
+    "sansList": "Noms alternatifs du sujet",
+    "certTypeForSign": "Type de certificat"
   },
   "dashboard": {
     "goodMorning": "Bonjour",
@@ -2205,7 +2213,8 @@
       "assigned": "Certificat assigné à l'utilisateur",
       "assignFailed": "Échec de l'assignation du certificat à l'utilisateur",
       "loadAvailableFailed": "Échec du chargement des certificats disponibles"
-    }
+    },
+    "activeDescription": "Activer ou désactiver ce compte utilisateur"
   },
   "validation": {
     "required": "Ce champ est requis",

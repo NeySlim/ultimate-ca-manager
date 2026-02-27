@@ -530,6 +530,17 @@ def sign_csr(csr_id):
     data = request.get_json() or {}
     ca_id = data.get('ca_id')
     validity_days = data.get('validity_days', 365)
+    cert_type = data.get('cert_type', 'server')
+    
+    # Map frontend cert_type to backend cert_type format
+    cert_type_map = {
+        'server': 'server_cert',
+        'client': 'client_cert', 
+        'combined': 'combined_cert',
+        'code_signing': 'code_signing',
+        'email': 'email_cert'
+    }
+    backend_cert_type = cert_type_map.get(cert_type, 'server_cert')
     
     if not ca_id:
         return error_response('CA ID required', 400)
@@ -547,7 +558,8 @@ def sign_csr(csr_id):
         signed_cert = CertificateService.sign_csr(
             cert_id=csr_id,
             caref=ca.refid,
-            validity_days=validity_days
+            validity_days=validity_days,
+            cert_type=backend_cert_type
         )
         
         # Audit log

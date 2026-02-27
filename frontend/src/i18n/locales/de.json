@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "Optionale Beschreibung für dieses Zertifikat",
     "orgPlaceholder": "Meine Firma",
     "ouPlaceholder": "IT-Abteilung",
-    "emailPlaceholder": "admin@beispiel.de"
+    "emailPlaceholder": "admin@beispiel.de",
+    "certTypePlaceholder": "Typ auswählen"
   },
   "cas": {
     "parentCA": "Übergeordnete CA",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}} Zertifikate",
     "certificateCount": "{{count}} Zertifikate",
     "daysLeft": "{{count}} Tage übrig",
-    "daysLeft_one": "{{count}} Tag übrig"
+    "daysLeft_one": "{{count}} Tag übrig",
+    "descriptionPlaceholder": "Optionale Beschreibung für diese CA"
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "Fehler beim Hochladen des privaten Schlüssels",
     "downloadFailed": "Fehler beim Herunterladen",
     "unnamedCSR": "Unbenannte CSR",
-    "unnamedCertificate": "Unbenanntes Zertifikat"
+    "unnamedCertificate": "Unbenanntes Zertifikat",
+    "generateCSR": "CSR generieren",
+    "generateDescription": "Neuen Zertifikatsignierungsantrag erstellen",
+    "department": "Abteilung (OU)",
+    "departmentPlaceholder": "IT-Abteilung",
+    "sansList": "Subjektalternativnamen",
+    "certTypeForSign": "Zertifikatstyp"
   },
   "templates": {
     "template": "Vorlage",
@@ -782,7 +790,8 @@
       "assigned": "Zertifikat dem Benutzer zugewiesen",
       "assignFailed": "Zuweisung des Zertifikats fehlgeschlagen",
       "loadAvailableFailed": "Laden der verfügbaren Zertifikate fehlgeschlagen"
-    }
+    },
+    "activeDescription": "Benutzerkonto aktivieren oder deaktivieren"
   },
   "groups": {
     "group": "Gruppe",

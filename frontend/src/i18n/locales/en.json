@@ -588,7 +588,8 @@
     "descriptionPlaceholder": "Optional description for this certificate",
     "orgPlaceholder": "My Company",
     "ouPlaceholder": "IT Department",
-    "emailPlaceholder": "admin@example.com"
+    "emailPlaceholder": "admin@example.com",
+    "certTypePlaceholder": "Select certificate type"
   },
   "cas": {
     "parentCA": "Parent CA",
@@ -635,7 +636,8 @@
     "certificateCount_other": "{{count}} certificates",
     "certificateCount": "{{count}} certificates",
     "daysLeft": "{{count}} days left",
-    "daysLeft_one": "{{count}} day left"
+    "daysLeft_one": "{{count}} day left",
+    "descriptionPlaceholder": "Optional description for this CA"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -688,7 +690,13 @@
     "keyUploadFailed": "Failed to upload private key",
     "downloadFailed": "Failed to download",
     "unnamedCSR": "Unnamed CSR",
-    "unnamedCertificate": "Unnamed Certificate"
+    "unnamedCertificate": "Unnamed Certificate",
+    "generateCSR": "Generate CSR",
+    "generateDescription": "Generate a new Certificate Signing Request",
+    "department": "Department (OU)",
+    "departmentPlaceholder": "IT Department",
+    "sansList": "Subject Alternative Names",
+    "certTypeForSign": "Certificate Type"
   },
   "templates": {
     "template": "Template",
@@ -782,7 +790,8 @@
       "assigned": "Certificate assigned to user",
       "assignFailed": "Failed to assign certificate to user",
       "loadAvailableFailed": "Failed to load available certificates"
-    }
+    },
+    "activeDescription": "Enable or disable this user account"
   },
   "groups": {
     "group": "Group",
