@@ -392,6 +392,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register certificate auto-renewal task (runs every 12 hours)
+        try:
+            from services.auto_renewal_service import run_auto_renewal_task
+            scheduler.register_task(
+                name="cert_auto_renewal",
+                func=run_auto_renewal_task,
+                interval=43200,  # 12 hours
+                description="Auto-renew certificates before expiry"
+            )
+            app.logger.info("Registered certificate auto-renewal task (every 12 hours)")
+        except ImportError:
+            pass
+        
         # Register update check task (runs daily)
         try:
             from services.updates import scheduled_update_check

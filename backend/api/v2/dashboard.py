@@ -333,8 +333,18 @@ def get_system_status():
     # SCEP is always available if UCM is running
     status['scep'] = {'status': 'online', 'message': 'Endpoint available'}
     
-    # OCSP responder status
-    status['ocsp'] = {'status': 'online', 'message': 'Responder active'}
+    # OCSP responder status - check if any CA has OCSP enabled
+    try:
+        ocsp_enabled_count = db.session.execute(
+            text("SELECT COUNT(*) FROM certificate_authorities WHERE ocsp_enabled = 1")
+        ).scalar() or 0
+        if ocsp_enabled_count > 0:
+            status['ocsp'] = {'status': 'online', 'message': f'{ocsp_enabled_count} CA(s) with OCSP'}
+        else:
+            status['ocsp'] = {'status': 'offline', 'message': 'No CA has OCSP enabled'}
+    except Exception:
+        logger.debug('OCSP status check failed')
+        status['ocsp'] = {'status': 'offline', 'message': 'Status unknown'}
     
     # CRL distribution status
     status['crl'] = {'status': 'online', 'message': 'Distribution active'}
