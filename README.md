@@ -71,7 +71,7 @@ sudo dnf install ./ucm-VERSION-1.noarch.rpm
 sudo systemctl enable --now ucm
 ```
 
-**Access:** `https://localhost:8443`
+**Access:** `https://localhost:8443` or `https://your-server-fqdn:8443`
 **Default credentials:** `admin` / `changeme123` — you will be prompted to change on first login.
 
 See [Installation Guide](docs/installation/README.md) for all methods including Docker Compose and source install.

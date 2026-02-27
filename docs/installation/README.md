@@ -38,7 +38,7 @@ docker run -d \
   neyslim/ultimate-ca-manager:latest
 ```
 
-**Access:** https://localhost:8443  
+**Access:** https://localhost:8443 or https://your-server-fqdn:8443  
 **Default credentials:** admin / changeme123
 
 ---
@@ -61,7 +61,7 @@ sudo systemctl start ucm
 sudo systemctl status ucm
 ```
 
-**Access:** https://localhost:8443
+**Access:** https://localhost:8443 or https://your-server-fqdn:8443
 
 ---
 
@@ -82,7 +82,7 @@ sudo systemctl start ucm
 sudo systemctl status ucm
 ```
 
-**Access:** https://localhost:8443
+**Access:** https://localhost:8443 or https://your-server-fqdn:8443
 
 ---
 
@@ -106,13 +106,13 @@ pip install -r backend/requirements.txt
 python wsgi.py
 ```
 
-**Access:** https://localhost:8443
+**Access:** https://localhost:8443 or https://your-server-fqdn:8443
 
 ---
 
 ## First Login
 
-After installation, access UCM at **https://localhost:8443**
+After installation, access UCM at **https://localhost:8443** (or **https://your-server-fqdn:8443** for remote access)
 
 **Default Credentials:**
 - **Username:** admin

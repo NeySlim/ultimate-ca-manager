@@ -32,7 +32,7 @@ docker run -d \
   neyslim/ultimate-ca-manager:latest
 ```
 
-**Access:** https://localhost:8443
+**Access:** https://localhost:8443 or https://your-server-fqdn:8443
 **Credentials:** admin / changeme123
 
 ---

@@ -3202,6 +3202,7 @@ Returns 200 if the application process is alive, regardless of dependency status
 ### cURL with Session Cookie
 ```bash
 # Login and save cookie
+# Replace localhost with your server FQDN for remote access
 curl -sk -c cookies.txt \
   -X POST https://localhost:8443/api/v2/auth/login/password \
   -H "Content-Type: application/json" \

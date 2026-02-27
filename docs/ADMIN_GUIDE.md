@@ -282,6 +282,7 @@ Users can create API keys for automation:
 
 ```bash
 curl -k https://localhost:8443/api/health
+# Or remotely: curl -k https://your-server-fqdn:8443/api/health
 ```
 
 ### Metrics
