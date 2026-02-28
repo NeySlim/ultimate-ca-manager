@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, WindowManagerProvider, useAuth } from './contexts'
+import { WebSocketProvider } from './hooks/useWebSocket'
 import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, SafeModeOverlay, DetailWindowLayer } from './components'
 
 // Auto-reload on chunk load failure (stale cache after update)
@@ -164,6 +165,7 @@ export default function App() {
       <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
+            <WebSocketProvider>
             <NotificationProvider>
               <MobileProvider>
                 <WindowManagerProvider>
@@ -173,6 +175,7 @@ export default function App() {
                 </WindowManagerProvider>
               </MobileProvider>
             </NotificationProvider>
+            </WebSocketProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

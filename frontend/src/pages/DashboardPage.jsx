@@ -237,7 +237,7 @@ export default function DashboardPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // WebSocket for live updates
-  const { isConnected, subscribe } = useWebSocket({ showToasts: true })
+  const { isConnected, subscribe } = useWebSocket({ showToasts: false })
 
   const loadDashboard = useCallback(async () => {
     try {
