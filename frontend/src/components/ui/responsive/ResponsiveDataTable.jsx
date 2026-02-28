@@ -1087,9 +1087,9 @@ function DesktopTable({
   
   // Density-based padding for rows
   const densityStyles = {
-    compact: { cell: 'px-4 py-1', header: 'px-4 py-1.5' },
-    default: { cell: 'px-4 py-1.5', header: 'px-4 py-2' },
-    comfortable: { cell: 'px-4 py-2.5', header: 'px-4 py-2.5' }
+    compact: { cell: 'px-3 py-0.5', header: 'px-3 py-1.5' },
+    default: { cell: 'px-3 py-1', header: 'px-3 py-2' },
+    comfortable: { cell: 'px-3 py-2', header: 'px-3 py-2.5' }
   }
   const dStyle = densityStyles[density] || densityStyles.compact
   
@@ -1171,7 +1171,7 @@ function DesktopTable({
   return (
     <div className="flex-1 overflow-auto" ref={tableRef}>
       <table 
-        className={cn("w-full text-sm", resizingColumn && "select-none")} 
+        className={cn("w-full text-[13px]", resizingColumn && "select-none")} 
         style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}
       >
         {/* Header */}
