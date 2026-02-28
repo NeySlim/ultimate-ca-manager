@@ -320,6 +320,7 @@
     "policies": "Policies",
     "approvals": "Approvals",
     "reports": "Reports",
+    "discovery": "Certificate Discovery",
     "logout": "Logout",
     "allCAs": "All CAs",
     "allStatuses": "All Statuses",

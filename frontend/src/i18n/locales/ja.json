@@ -345,6 +345,7 @@
     "approvals": "承認",
     "policies": "ポリシー",
     "reports": "レポート",
+    "discovery": "Certificate Discovery",
     "exporting": "エクスポート中...",
     "exported": "エクスポート完了",
     "policiesShort": "ポリシー",

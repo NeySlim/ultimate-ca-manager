@@ -972,9 +972,13 @@ from .ocsp import OCSPResponse
 # Import ACME models
 from .acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce, DnsProvider, AcmeClientOrder, AcmeDomain, AcmeLocalDomain
 
+# Import Discovery model
+from .discovered_certificate import DiscoveredCertificate
+
 __all__ = [
     "db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", 
     "AuditLog", "CRLMetadata", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce",
-    "DnsProvider", "AcmeClientOrder", "AcmeDomain", "AcmeLocalDomain", "HsmProvider", "HsmKey"
+    "DnsProvider", "AcmeClientOrder", "AcmeDomain", "AcmeLocalDomain", "HsmProvider", "HsmKey",
+    "DiscoveredCertificate"
 ]

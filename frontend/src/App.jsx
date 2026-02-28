@@ -45,6 +45,7 @@ const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
 const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'))
 const ApprovalsPage = lazyWithRetry(() => import('./pages/ApprovalsPage'))
 const ReportsPage = lazyWithRetry(() => import('./pages/ReportsPage'))
+const DiscoveryPage = lazyWithRetry(() => import('./pages/DiscoveryPage'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -149,6 +150,7 @@ function AppRoutes() {
           <Route path="/policies" element={<PermissionRoute permission="read:policies"><PoliciesPage /></PermissionRoute>} />
           <Route path="/approvals" element={<PermissionRoute permission="read:approvals"><ApprovalsPage /></PermissionRoute>} />
           <Route path="/reports" element={<PermissionRoute permission="read:audit"><ReportsPage /></PermissionRoute>} />
+          <Route path="/discovery" element={<PermissionRoute permission="read:certificates"><DiscoveryPage /></PermissionRoute>} />
           {/* Component showcase — accessible by URL only, not in sidebar */}
           <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />
         </Route>
