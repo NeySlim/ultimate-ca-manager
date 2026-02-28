@@ -18,8 +18,9 @@ is_docker = os.path.exists('/.dockerenv')
 bind = f"0.0.0.0:{os.getenv('HTTPS_PORT', '8443')}"
 backlog = 2048
 
-# Worker processes
-workers = int(os.getenv('GUNICORN_WORKERS', 2))
+# Worker processes — single worker required for WebSocket broadcast across tabs
+# gevent handles concurrency via greenlets (1000+ concurrent connections)
+workers = 1
 worker_class = 'workers.MTLSGeventWebSocketWorker'
 worker_connections = 1000
 timeout = 120
