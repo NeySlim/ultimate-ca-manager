@@ -850,7 +850,7 @@ export default function DashboardPage() {
                     </Button>
                   }
                 />
-                <Card.Body className="flex-1 overflow-hidden !pt-0.5 !pb-0.5">
+                <Card.Body className="flex-1 overflow-hidden !pt-2 !pb-0.5">
                   <div className="grid grid-cols-2 gap-1 mb-1.5">
                     <SystemStat 
                       icon={WifiHigh} 
@@ -1146,7 +1146,7 @@ export default function DashboardPage() {
             {isVisible('system') && (
             <Card variant="elevated" className="p-0">
               <Card.Header icon={Heartbeat} iconColor="blue" title={t('dashboard.systemHealth')} compact />
-              <Card.Body className="!pt-0.5 !pb-1.5">
+              <Card.Body className="!pt-2 !pb-1.5">
                 <div className="grid grid-cols-2 gap-1 mb-1.5">
                   <SystemStat icon={WifiHigh} label={t('dashboard.websocket')} value={isConnected ? t('common.connected') : t('common.disconnected')} status={isConnected ? 'online' : 'offline'} />
                   <SystemStat icon={Database} label={t('common.database')} value={t('dashboard.healthy')} status="online" />

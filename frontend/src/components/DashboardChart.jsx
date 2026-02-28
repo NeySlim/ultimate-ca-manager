@@ -105,10 +105,11 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           axisLine={false}
           tickLine={false}
           allowDecimals={false}
+          domain={[0, 'auto']}
         />
         <Tooltip content={<CustomTooltip />} />
         <Area 
-          type="monotone" 
+          type="catmullRom" 
           dataKey="issued" 
           name={t('common.issued')}
           stroke={strokeColor} 
@@ -116,7 +117,7 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           strokeWidth={2}
         />
         <Area 
-          type="monotone" 
+          type="catmullRom" 
           dataKey="expired" 
           name={t('common.expired')}
           stroke={expiredColor} 
@@ -124,7 +125,7 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
           strokeWidth={2}
         />
         <Area 
-          type="monotone" 
+          type="catmullRom" 
           dataKey="revoked" 
           name={t('common.revoked')}
           stroke={revokedColor} 
@@ -229,7 +230,7 @@ export function MiniSparkline({ data = [], color = 'blue', height = 30 }) {
           </linearGradient>
         </defs>
         <Area 
-          type="monotone" 
+          type="catmullRom" 
           dataKey="value" 
           stroke={strokeColor} 
           fill={`url(#spark-${color})`}
