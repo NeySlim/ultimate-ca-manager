@@ -886,7 +886,7 @@ export default function DashboardPage() {
                     <ServiceBadge name="EST" status={systemStatus?.est} />
                     <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
                     <ServiceBadge name="CRL" status={systemStatus?.crl} />
-                    <ServiceBadge name={t('dashboard.autoRenewal')} status={systemStatus?.auto_renewal} />
+                    <ServiceBadge name={t('acme.autoRenewal')} status={systemStatus?.auto_renewal} />
                     <ServiceBadge name="SMTP" status={systemStatus?.smtp} />
                     <ServiceBadge name="Webhooks" status={systemStatus?.webhooks} />
                   </div>
@@ -1164,7 +1164,7 @@ export default function DashboardPage() {
                   <ServiceBadge name="EST" status={systemStatus?.est} />
                   <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
                   <ServiceBadge name="CRL" status={systemStatus?.crl} />
-                  <ServiceBadge name={t('dashboard.autoRenewal')} status={systemStatus?.auto_renewal} />
+                  <ServiceBadge name={t('acme.autoRenewal')} status={systemStatus?.auto_renewal} />
                   <ServiceBadge name="SMTP" status={systemStatus?.smtp} />
                   <ServiceBadge name="Webhooks" status={systemStatus?.webhooks} />
                 </div>
