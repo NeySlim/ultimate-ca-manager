@@ -356,7 +356,8 @@
     "experimentalTooltip": "Este recurso é experimental e pode não funcionar como esperado",
     "est": "EST",
     "estShort": "EST",
-    "new": "novo"
+    "new": "novo",
+    "completed": "Concluído"
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",
@@ -2860,6 +2861,33 @@
     "groups": {
       "monitoring": "Monitoramento",
       "configuration": "Configuração"
-    }
+    },
+    "aboutDiscovery": "Sobre a descoberta",
+    "aboutDiscoveryDesc": "Escaneie sua rede para encontrar certificados TLS e compare com seu inventário PKI.",
+    "createProfile": "Criar perfil",
+    "deleteDiscoveredConfirm": "Tem certeza de que deseja excluir este certificado descoberto?",
+    "deleteProfile": "Excluir perfil",
+    "deleteProfileConfirm": "Tem certeza de que deseja excluir este perfil de escaneamento?",
+    "duration": "Duração",
+    "host": "Host",
+    "managed": "Gerenciado",
+    "manual": "Manual",
+    "noHistoryDesc": "Execute um escaneamento para ver os resultados aqui.",
+    "noProfilesDesc": "Crie um perfil para automatizar a descoberta de certificados.",
+    "noResultsDesc": "Execute um escaneamento rápido ou crie um perfil para descobrir certificados.",
+    "notifyEmail": "Email de notificação",
+    "portsHelp": "Lista de portas TCP separadas por vírgula (padrão: 443).",
+    "profileCreated": "Perfil de escaneamento criado",
+    "profileDeleted": "Perfil de escaneamento excluído",
+    "profileNamePlaceholder": "ex. Servidores de produção",
+    "profileUpdated": "Perfil de escaneamento atualizado",
+    "quickScanHelp": "Insira nomes de host, IPs ou intervalos CIDR para escanear imediatamente.",
+    "runScan": "Executar escaneamento",
+    "scanFailed": "Escaneamento falhou",
+    "searchDiscovered": "Pesquisar certificados descobertos...",
+    "searchHistory": "Pesquisar no histórico...",
+    "searchProfiles": "Pesquisar perfis...",
+    "startScan": "Iniciar escaneamento",
+    "unmanaged": "Não gerenciado"
   }
 }

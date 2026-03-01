@@ -356,7 +356,8 @@
     "experimentalTooltip": "This feature is experimental and may not work as expected",
     "est": "EST",
     "estShort": "EST",
-    "new": "new"
+    "new": "new",
+    "completed": "Completed"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -2863,6 +2864,33 @@
     "groups": {
       "monitoring": "Monitoring",
       "configuration": "Configuration"
-    }
+    },
+    "aboutDiscovery": "About Discovery",
+    "aboutDiscoveryDesc": "Scan your network to find TLS certificates deployed on servers and endpoints. Match them against your managed PKI inventory.",
+    "createProfile": "Create Profile",
+    "deleteDiscoveredConfirm": "Are you sure you want to delete this discovered certificate?",
+    "deleteProfile": "Delete Profile",
+    "deleteProfileConfirm": "Are you sure you want to delete this scan profile? This will not delete discovered certificates.",
+    "duration": "Duration",
+    "host": "Host",
+    "managed": "Managed",
+    "manual": "Manual",
+    "noHistoryDesc": "Run a scan to see results here.",
+    "noProfilesDesc": "Create a scan profile to automate certificate discovery.",
+    "noResultsDesc": "Run a quick scan or create a profile to discover certificates on your network.",
+    "notifyEmail": "Notification Email",
+    "portsHelp": "Comma-separated list of TCP ports to scan (default: 443).",
+    "profileCreated": "Scan profile created",
+    "profileDeleted": "Scan profile deleted",
+    "profileNamePlaceholder": "e.g. Production Servers",
+    "profileUpdated": "Scan profile updated",
+    "quickScanHelp": "Enter hostnames, IPs, or CIDR ranges to scan immediately without saving a profile.",
+    "runScan": "Run Scan",
+    "scanFailed": "Scan failed",
+    "searchDiscovered": "Search discovered certificates...",
+    "searchHistory": "Search scan history...",
+    "searchProfiles": "Search profiles...",
+    "startScan": "Start Scan",
+    "unmanaged": "Unmanaged"
   }
 }

@@ -356,7 +356,8 @@
     "experimentalTooltip": "此功能为实验性功能，可能无法按预期工作",
     "est": "EST",
     "estShort": "EST",
-    "new": "新"
+    "new": "新",
+    "completed": "已完成"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -2860,6 +2861,33 @@
     "groups": {
       "monitoring": "监控",
       "configuration": "配置"
-    }
+    },
+    "aboutDiscovery": "关于发现",
+    "aboutDiscoveryDesc": "扫描网络以查找TLS证书，并与您的PKI库存进行匹配。",
+    "createProfile": "创建配置文件",
+    "deleteDiscoveredConfirm": "确定要删除此发现的证书吗？",
+    "deleteProfile": "删除配置文件",
+    "deleteProfileConfirm": "确定要删除此扫描配置文件吗？",
+    "duration": "持续时间",
+    "host": "主机",
+    "managed": "已管理",
+    "manual": "手动",
+    "noHistoryDesc": "运行扫描以在此处查看结果。",
+    "noProfilesDesc": "创建扫描配置文件以自动发现证书。",
+    "noResultsDesc": "运行快速扫描或创建配置文件以发现证书。",
+    "notifyEmail": "通知邮箱",
+    "portsHelp": "以逗号分隔的TCP端口列表（默认：443）。",
+    "profileCreated": "扫描配置文件已创建",
+    "profileDeleted": "扫描配置文件已删除",
+    "profileNamePlaceholder": "例如 生产服务器",
+    "profileUpdated": "扫描配置文件已更新",
+    "quickScanHelp": "输入主机名、IP或CIDR范围立即扫描。",
+    "runScan": "运行扫描",
+    "scanFailed": "扫描失败",
+    "searchDiscovered": "搜索已发现的证书...",
+    "searchHistory": "搜索扫描历史...",
+    "searchProfiles": "搜索配置文件...",
+    "startScan": "开始扫描",
+    "unmanaged": "未管理"
   }
 }

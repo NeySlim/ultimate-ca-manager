@@ -862,7 +862,8 @@
     "experimentalTooltip": "Cette fonctionnalité est expérimentale et peut ne pas fonctionner comme prévu",
     "est": "EST",
     "estShort": "EST",
-    "new": "nouveau"
+    "new": "nouveau",
+    "completed": "Terminé"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -2863,6 +2864,33 @@
     "groups": {
       "monitoring": "Surveillance",
       "configuration": "Configuration"
-    }
+    },
+    "aboutDiscovery": "À propos de la découverte",
+    "aboutDiscoveryDesc": "Scannez votre réseau pour trouver les certificats TLS déployés. Comparez-les avec votre inventaire PKI géré.",
+    "createProfile": "Créer un profil",
+    "deleteDiscoveredConfirm": "Voulez-vous vraiment supprimer ce certificat découvert ?",
+    "deleteProfile": "Supprimer le profil",
+    "deleteProfileConfirm": "Voulez-vous vraiment supprimer ce profil de scan ?",
+    "duration": "Durée",
+    "host": "Hôte",
+    "managed": "Géré",
+    "manual": "Manuel",
+    "noHistoryDesc": "Lancez un scan pour voir les résultats ici.",
+    "noProfilesDesc": "Créez un profil pour automatiser la découverte de certificats.",
+    "noResultsDesc": "Lancez un scan rapide ou créez un profil pour découvrir les certificats sur votre réseau.",
+    "notifyEmail": "Email de notification",
+    "portsHelp": "Liste de ports TCP séparés par des virgules (défaut : 443).",
+    "profileCreated": "Profil de scan créé",
+    "profileDeleted": "Profil de scan supprimé",
+    "profileNamePlaceholder": "ex. Serveurs de production",
+    "profileUpdated": "Profil de scan mis à jour",
+    "quickScanHelp": "Entrez des noms d'hôtes, IPs ou plages CIDR pour scanner immédiatement.",
+    "runScan": "Lancer le scan",
+    "scanFailed": "Échec du scan",
+    "searchDiscovered": "Rechercher des certificats découverts...",
+    "searchHistory": "Rechercher dans l'historique...",
+    "searchProfiles": "Rechercher des profils...",
+    "startScan": "Démarrer le scan",
+    "unmanaged": "Non géré"
   }
 }

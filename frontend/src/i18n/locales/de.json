@@ -356,7 +356,8 @@
     "experimentalTooltip": "Diese Funktion ist experimentell und funktioniert möglicherweise nicht wie erwartet",
     "est": "EST",
     "estShort": "EST",
-    "new": "neu"
+    "new": "neu",
+    "completed": "Abgeschlossen"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -2860,6 +2861,33 @@
     "groups": {
       "monitoring": "Überwachung",
       "configuration": "Konfiguration"
-    }
+    },
+    "aboutDiscovery": "Über Entdeckung",
+    "aboutDiscoveryDesc": "Scannen Sie Ihr Netzwerk, um TLS-Zertifikate auf Servern zu finden und mit Ihrem PKI-Inventar abzugleichen.",
+    "createProfile": "Profil erstellen",
+    "deleteDiscoveredConfirm": "Möchten Sie dieses entdeckte Zertifikat wirklich löschen?",
+    "deleteProfile": "Profil löschen",
+    "deleteProfileConfirm": "Möchten Sie dieses Scan-Profil wirklich löschen?",
+    "duration": "Dauer",
+    "host": "Host",
+    "managed": "Verwaltet",
+    "manual": "Manuell",
+    "noHistoryDesc": "Führen Sie einen Scan durch, um Ergebnisse anzuzeigen.",
+    "noProfilesDesc": "Erstellen Sie ein Scan-Profil zur automatischen Zertifikatserkennung.",
+    "noResultsDesc": "Führen Sie einen Schnellscan durch oder erstellen Sie ein Profil.",
+    "notifyEmail": "Benachrichtigungs-E-Mail",
+    "portsHelp": "Kommagetrennte Liste von TCP-Ports (Standard: 443).",
+    "profileCreated": "Scan-Profil erstellt",
+    "profileDeleted": "Scan-Profil gelöscht",
+    "profileNamePlaceholder": "z.B. Produktionsserver",
+    "profileUpdated": "Scan-Profil aktualisiert",
+    "quickScanHelp": "Geben Sie Hostnamen, IPs oder CIDR-Bereiche für einen sofortigen Scan ein.",
+    "runScan": "Scan starten",
+    "scanFailed": "Scan fehlgeschlagen",
+    "searchDiscovered": "Entdeckte Zertifikate suchen...",
+    "searchHistory": "Scan-Verlauf suchen...",
+    "searchProfiles": "Profile suchen...",
+    "startScan": "Scan starten",
+    "unmanaged": "Nicht verwaltet"
   }
 }

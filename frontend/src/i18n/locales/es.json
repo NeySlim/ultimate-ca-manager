@@ -356,7 +356,8 @@
     "experimentalTooltip": "Esta función es experimental y puede no funcionar como se espera",
     "est": "EST",
     "estShort": "EST",
-    "new": "nuevo"
+    "new": "nuevo",
+    "completed": "Completado"
   },
   "commandPalette": {
     "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",
@@ -2860,6 +2861,33 @@
     "groups": {
       "monitoring": "Monitoreo",
       "configuration": "Configuración"
-    }
+    },
+    "aboutDiscovery": "Acerca del descubrimiento",
+    "aboutDiscoveryDesc": "Escanee su red para encontrar certificados TLS y compárelos con su inventario PKI.",
+    "createProfile": "Crear perfil",
+    "deleteDiscoveredConfirm": "¿Está seguro de que desea eliminar este certificado descubierto?",
+    "deleteProfile": "Eliminar perfil",
+    "deleteProfileConfirm": "¿Está seguro de que desea eliminar este perfil de escaneo?",
+    "duration": "Duración",
+    "host": "Host",
+    "managed": "Gestionado",
+    "manual": "Manual",
+    "noHistoryDesc": "Ejecute un escaneo para ver resultados aquí.",
+    "noProfilesDesc": "Cree un perfil para automatizar el descubrimiento de certificados.",
+    "noResultsDesc": "Ejecute un escaneo rápido o cree un perfil para descubrir certificados.",
+    "notifyEmail": "Email de notificación",
+    "portsHelp": "Lista de puertos TCP separados por comas (predeterminado: 443).",
+    "profileCreated": "Perfil de escaneo creado",
+    "profileDeleted": "Perfil de escaneo eliminado",
+    "profileNamePlaceholder": "ej. Servidores de producción",
+    "profileUpdated": "Perfil de escaneo actualizado",
+    "quickScanHelp": "Ingrese nombres de host, IPs o rangos CIDR para escanear inmediatamente.",
+    "runScan": "Ejecutar escaneo",
+    "scanFailed": "Escaneo fallido",
+    "searchDiscovered": "Buscar certificados descubiertos...",
+    "searchHistory": "Buscar en historial...",
+    "searchProfiles": "Buscar perfiles...",
+    "startScan": "Iniciar escaneo",
+    "unmanaged": "No gestionado"
   }
 }

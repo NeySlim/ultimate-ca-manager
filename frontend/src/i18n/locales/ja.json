@@ -356,7 +356,8 @@
     "experimentalTooltip": "この機能は実験的であり、期待どおりに動作しない場合があります",
     "est": "EST",
     "estShort": "EST",
-    "new": "新規"
+    "new": "新規",
+    "completed": "完了"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -2860,6 +2861,33 @@
     "groups": {
       "monitoring": "モニタリング",
       "configuration": "構成"
-    }
+    },
+    "aboutDiscovery": "ディスカバリーについて",
+    "aboutDiscoveryDesc": "ネットワークをスキャンしてTLS証明書を検出し、PKIインベントリと照合します。",
+    "createProfile": "プロファイル作成",
+    "deleteDiscoveredConfirm": "この検出された証明書を削除しますか？",
+    "deleteProfile": "プロファイル削除",
+    "deleteProfileConfirm": "このスキャンプロファイルを削除しますか？",
+    "duration": "所要時間",
+    "host": "ホスト",
+    "managed": "管理済み",
+    "manual": "手動",
+    "noHistoryDesc": "スキャンを実行して結果を表示します。",
+    "noProfilesDesc": "スキャンプロファイルを作成して証明書の検出を自動化します。",
+    "noResultsDesc": "クイックスキャンを実行するかプロファイルを作成して証明書を検出します。",
+    "notifyEmail": "通知メール",
+    "portsHelp": "カンマ区切りのTCPポートリスト（デフォルト: 443）。",
+    "profileCreated": "スキャンプロファイルを作成しました",
+    "profileDeleted": "スキャンプロファイルを削除しました",
+    "profileNamePlaceholder": "例: 本番サーバー",
+    "profileUpdated": "スキャンプロファイルを更新しました",
+    "quickScanHelp": "ホスト名、IP、CIDRを入力して即座にスキャンします。",
+    "runScan": "スキャン実行",
+    "scanFailed": "スキャン失敗",
+    "searchDiscovered": "検出された証明書を検索...",
+    "searchHistory": "スキャン履歴を検索...",
+    "searchProfiles": "プロファイルを検索...",
+    "startScan": "スキャン開始",
+    "unmanaged": "未管理"
   }
 }

@@ -1,69 +1,69 @@
 /**
- * DiscoveryPage v2 — Scan profiles, async scanning, results, history
- * Uses sidebar tab layout (same as Settings/Operations)
+ * DiscoveryPage — Certificate Discovery with scan profiles, results & history
+ * Pattern: CSRsPage (stats + sidebar tabs + table) 
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Globe, MagnifyingGlass, ShieldCheck, Warning, Clock,
-  ArrowsClockwise, Network, Trash, Play, Plus,
-  ChartBar, ListBullets, ClockCounterClockwise, FolderOpen,
-  CheckCircle, XCircle, Pencil, CalendarBlank
+  ArrowsClockwise, Trash, Play, Plus, CheckCircle, XCircle,
+  ClockCounterClockwise, FolderOpen, Pencil, CalendarBlank,
+  WifiHigh, WifiSlash, Certificate, ArrowSquareOut, Network
 } from '@phosphor-icons/react'
 import {
-  ResponsiveLayout, Card, Button, Input, Badge, Modal, Textarea, Select,
-  LoadingSpinner, EmptyState,
-  CompactSection
+  ResponsiveLayout, ResponsiveDataTable,
+  Badge, Button, Input, Modal, Textarea, Select,
+  LoadingSpinner, EmptyState, HelpCard,
+  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats
 } from '../components'
-import { ResponsiveDataTable } from '../components/ui/responsive/ResponsiveDataTable'
 import { ConfirmModal } from '../components/FormModal'
 import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
+import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useWebSocket } from '../hooks'
+import { formatDate, cn } from '../lib/utils'
 
 export default function DiscoveryPage() {
   const { t } = useTranslation()
+  const { isMobile } = useMobile()
   const { showSuccess, showError } = useNotification()
-  const { isAdmin } = usePermission()
+  const { isAdmin, canWrite } = usePermission()
   const { subscribe } = useWebSocket({ showToasts: false })
+  const [searchParams, setSearchParams] = useSearchParams()
 
+  // Tab state
+  const TABS = [
+    { id: 'discovered', label: t('discovery.tabDiscovered'), icon: Globe },
+    { id: 'profiles', label: t('discovery.tabProfiles'), icon: FolderOpen },
+    { id: 'history', label: t('discovery.tabHistory'), icon: ClockCounterClockwise },
+  ]
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'discovered')
+
+  // Data
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
-  const [stats, setStats] = useState({ total: 0, managed: 0, unmanaged: 0, expired: 0, expiring_soon: 0, errors: 0 })
-  const [profiles, setProfiles] = useState([])
   const [discovered, setDiscovered] = useState([])
   const [discoveredTotal, setDiscoveredTotal] = useState(0)
+  const [profiles, setProfiles] = useState([])
   const [runs, setRuns] = useState([])
   const [runsTotal, setRunsTotal] = useState(0)
+  const [stats, setStats] = useState({ total: 0, managed: 0, unmanaged: 0, expired: 0, expiring_soon: 0, errors: 0 })
 
   // Scan state
   const [scanning, setScanning] = useState(false)
   const [scanProgress, setScanProgress] = useState(null)
 
-  // Filters
-  const [statusFilter, setStatusFilter] = useState('')
-  const [profileFilter, setProfileFilter] = useState('')
-
   // Modals
   const [showProfileForm, setShowProfileForm] = useState(false)
   const [editingProfile, setEditingProfile] = useState(null)
-  const [showAdHocScan, setShowAdHocScan] = useState(false)
+  const [showQuickScan, setShowQuickScan] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
-  // ── Tabs config (sidebar layout) ──────────────────
-  const TABS = [
-    { id: 'overview', label: t('discovery.tabOverview'), icon: ChartBar, color: 'icon-bg-blue' },
-    { id: 'profiles', label: t('discovery.tabProfiles'), icon: FolderOpen, color: 'icon-bg-violet' },
-    { id: 'discovered', label: `${t('discovery.tabDiscovered')} (${discoveredTotal})`, icon: Globe, color: 'icon-bg-teal' },
-    { id: 'history', label: t('discovery.tabHistory'), icon: ClockCounterClockwise, color: 'icon-bg-orange' },
-  ]
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
-  const TAB_GROUPS = [
-    { labelKey: 'discovery.groups.monitoring', tabs: ['overview', 'discovered'], color: 'icon-bg-blue' },
-    { labelKey: 'discovery.groups.configuration', tabs: ['profiles', 'history'], color: 'icon-bg-violet' },
-  ]
-
-  // ── Load data ─────────────────────────────────────
+  // ── Data loaders ──────────────────────────────────────
   const loadStats = useCallback(async () => {
     try {
       const res = await discoveryService.getStats()
@@ -80,22 +80,29 @@ export default function DiscoveryPage() {
 
   const loadDiscovered = useCallback(async () => {
     try {
-      const params = { limit: 200 }
-      if (statusFilter) params.status = statusFilter
-      if (profileFilter) params.profile_id = profileFilter
-      const res = await discoveryService.getAll(params)
+      const res = await discoveryService.getAll({ page, per_page: perPage })
       const data = res.data ?? res
-      setDiscovered(data.items ?? data ?? [])
-      setDiscoveredTotal(data.total ?? 0)
+      if (Array.isArray(data)) {
+        setDiscovered(data)
+        setDiscoveredTotal(data.length)
+      } else {
+        setDiscovered(data.items ?? [])
+        setDiscoveredTotal(data.total ?? data.items?.length ?? 0)
+      }
     } catch { /* silent */ }
-  }, [statusFilter, profileFilter])
+  }, [page, perPage])
 
   const loadRuns = useCallback(async () => {
     try {
       const res = await discoveryService.getRuns({ limit: 50 })
       const data = res.data ?? res
-      setRuns(data.items ?? data ?? [])
-      setRunsTotal(data.total ?? 0)
+      if (Array.isArray(data)) {
+        setRuns(data)
+        setRunsTotal(data.length)
+      } else {
+        setRuns(data.items ?? [])
+        setRunsTotal(data.total ?? data.items?.length ?? 0)
+      }
     } catch { /* silent */ }
   }, [])
 
@@ -106,19 +113,19 @@ export default function DiscoveryPage() {
   }, [loadStats, loadProfiles, loadDiscovered, loadRuns])
 
   useEffect(() => { loadAll() }, [loadAll])
-  useEffect(() => { loadDiscovered() }, [loadDiscovered])
+  useEffect(() => { loadDiscovered() }, [page, perPage])
 
-  // ── WebSocket events ──────────────────────────────
+  // ── WebSocket ─────────────────────────────────────────
   useEffect(() => {
-    const unsub1 = subscribe('discovery.scan_started', (data) => {
+    const unsub1 = subscribe('discovery.scan_started', () => {
       setScanning(true)
-      setScanProgress({ total: data?.total_targets ?? 0, scanned: 0, found: 0 })
+      setScanProgress({ scanned: 0, total: 0, found: 0 })
     })
     const unsub2 = subscribe('discovery.scan_progress', (data) => {
       setScanProgress(prev => ({
-        ...prev,
-        scanned: data?.targets_scanned ?? 0,
-        found: data?.certs_found ?? 0,
+        scanned: data.scanned ?? prev?.scanned ?? 0,
+        total: data.total ?? prev?.total ?? 0,
+        found: data.found ?? prev?.found ?? 0,
       }))
     })
     const unsub3 = subscribe('discovery.scan_complete', () => {
@@ -129,32 +136,39 @@ export default function DiscoveryPage() {
     return () => { unsub1(); unsub2(); unsub3() }
   }, [subscribe, loadAll])
 
-  // ── Profile CRUD ──────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId)
+    setPage(1)
+    setSearchParams({ tab: tabId })
+  }
+
   const handleSaveProfile = async (formData) => {
     try {
       if (editingProfile) {
         await discoveryService.updateProfile(editingProfile.id, formData)
-        showSuccess(t('discovery.success.profileUpdated'))
+        showSuccess(t('discovery.profileUpdated'))
       } else {
         await discoveryService.createProfile(formData)
-        showSuccess(t('discovery.success.profileCreated'))
+        showSuccess(t('discovery.profileCreated'))
       }
       setShowProfileForm(false)
       setEditingProfile(null)
       loadProfiles()
     } catch (error) {
-      showError(error.message || t('discovery.errors.saveFailed'))
+      showError(error.message || t('messages.errors.saveFailed'))
     }
   }
 
   const handleDeleteProfile = async (id) => {
     try {
       await discoveryService.deleteProfile(id)
-      showSuccess(t('discovery.success.profileDeleted'))
+      showSuccess(t('discovery.profileDeleted'))
       loadProfiles()
     } catch (error) {
-      showError(error.message)
+      showError(error.message || t('messages.errors.deleteFailed'))
     }
+    setDeleteConfirm(null)
   }
 
   const handleScanProfile = async (profileId) => {
@@ -162,715 +176,588 @@ export default function DiscoveryPage() {
       setScanning(true)
       await discoveryService.scanProfile(profileId)
     } catch (error) {
+      showError(error.message || t('discovery.scanFailed'))
       setScanning(false)
-      showError(error.message || t('discovery.errors.scanFailed'))
     }
   }
 
-  // ── Ad-hoc scan ───────────────────────────────────
-  const handleAdHocScan = async (formData) => {
+  const handleQuickScan = async (formData) => {
     try {
       setScanning(true)
-      setShowAdHocScan(false)
-      if (formData.subnet) {
-        await discoveryService.scanSubnet(formData.subnet, formData.ports)
-      } else {
-        await discoveryService.scan(formData.targets, formData.ports)
-      }
+      setShowQuickScan(false)
+      await discoveryService.scan(formData.targets, formData.ports)
     } catch (error) {
+      showError(error.message || t('discovery.scanFailed'))
       setScanning(false)
-      showError(error.message || t('discovery.errors.scanFailed'))
     }
   }
 
-  // ── Delete discovered ─────────────────────────────
   const handleDeleteDiscovered = async (id) => {
     try {
       await discoveryService.delete(id)
-      showSuccess(t('discovery.success.deleted'))
+      showSuccess(t('messages.success.delete'))
       loadDiscovered()
       loadStats()
     } catch (error) {
       showError(error.message)
     }
+    setDeleteConfirm(null)
   }
 
   const handleDeleteAll = async () => {
     try {
       await discoveryService.deleteAll()
-      showSuccess(t('discovery.success.deletedAll'))
-      setDeleteConfirm(null)
-      loadAll()
+      showSuccess(t('discovery.deleteAll'))
+      loadDiscovered()
+      loadStats()
     } catch (error) {
       showError(error.message)
     }
+    setDeleteConfirm(null)
   }
 
-  // ── Render active tab content ─────────────────────
+  // ── Stats bar ─────────────────────────────────────────
+  const statsBar = useMemo(() => [
+    { icon: Globe, label: t('common.total'), value: stats.total, variant: 'primary' },
+    { icon: ShieldCheck, label: t('discovery.managed'), value: stats.managed, variant: 'success' },
+    { icon: Warning, label: t('discovery.unmanaged'), value: stats.unmanaged, variant: 'warning' },
+    { icon: XCircle, label: t('common.expired'), value: stats.expired, variant: 'danger' },
+  ], [stats, t])
+
+  // ── Discovered columns ────────────────────────────────
+  const discoveredColumns = useMemo(() => [
+    {
+      key: 'subject',
+      header: t('common.commonName'),
+      sortable: true,
+      priority: 1,
+      render: (val, row) => {
+        const extractCN = (s) => { const m = s?.match(/CN=([^,]+)/); return m ? m[1] : null }
+        const name = extractCN(row.subject) || row.target || t('common.unknown')
+        return (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
+              row.status === 'managed' ? 'icon-bg-emerald' : 'icon-bg-orange'
+            )}>
+              <Certificate size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{name}</span>
+          </div>
+        )
+      }
+    },
+    {
+      key: 'target',
+      header: t('discovery.host'),
+      sortable: true,
+      priority: 2,
+      hideOnMobile: true,
+      render: (val, row) => (
+        <span className="text-text-secondary text-sm">{val || '—'}:{row.port || 443}</span>
+      )
+    },
+    {
+      key: 'status',
+      header: t('common.status'),
+      sortable: true,
+      priority: 2,
+      render: (val) => {
+        const cfg = {
+          managed: { variant: 'success', icon: ShieldCheck, label: t('discovery.managed') },
+          unmanaged: { variant: 'warning', icon: Warning, label: t('discovery.unmanaged') },
+          error: { variant: 'danger', icon: XCircle, label: t('common.error') },
+        }
+        const { variant, icon, label } = cfg[val] || cfg.error
+        return <Badge variant={variant} size="sm" icon={icon} dot>{label}</Badge>
+      }
+    },
+    {
+      key: 'not_after',
+      header: t('common.expires'),
+      sortable: true,
+      priority: 3,
+      hideOnMobile: true,
+      render: (val) => {
+        if (!val) return <span className="text-text-tertiary">—</span>
+        const d = new Date(val)
+        const now = new Date()
+        const days = Math.floor((d - now) / 86400000)
+        const isExpired = days < 0
+        const isExpiring = days >= 0 && days <= 30
+        return (
+          <span className={cn(
+            "text-xs whitespace-nowrap",
+            isExpired ? "text-status-danger" : isExpiring ? "text-status-warning" : "text-text-secondary"
+          )}>
+            {formatDate(val)}
+            {isExpired && <span className="ml-1">({t('common.expired')})</span>}
+            {isExpiring && <span className="ml-1">({days}d)</span>}
+          </span>
+        )
+      }
+    },
+    {
+      key: 'issuer',
+      header: t('common.issuer'),
+      sortable: true,
+      priority: 4,
+      hideOnMobile: true,
+      render: (val) => <span className="text-text-secondary truncate text-sm">{val || '—'}</span>
+    },
+    {
+      key: 'actions',
+      header: '',
+      priority: 1,
+      width: 60,
+      render: (_, row) => (
+        <div className="flex items-center gap-1">
+          {canWrite('certificates') && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'discovered', id: row.id }) }}
+              className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-status-danger transition-colors"
+              title={t('common.delete')}
+            >
+              <Trash size={14} />
+            </button>
+          )}
+        </div>
+      )
+    }
+  ], [t, canWrite])
+
+  // ── Profile columns ───────────────────────────────────
+  const profileColumns = useMemo(() => [
+    {
+      key: 'name',
+      header: t('common.name'),
+      sortable: true,
+      priority: 1,
+      render: (val, row) => (
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 icon-bg-violet">
+            <FolderOpen size={14} weight="duotone" />
+          </div>
+          <div className="min-w-0">
+            <span className="font-medium truncate block">{val}</span>
+            {row.description && (
+              <span className="text-xs text-text-tertiary truncate block">{row.description}</span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'targets',
+      header: t('discovery.targets'),
+      priority: 2,
+      hideOnMobile: true,
+      render: (val, row) => {
+        const targets = row.targets_list || (typeof val === 'string' ? val.split(',') : val) || []
+        return (
+          <span className="text-text-secondary text-sm truncate">
+            {targets.slice(0, 3).join(', ')}
+            {targets.length > 3 && ` +${targets.length - 3}`}
+          </span>
+        )
+      }
+    },
+    {
+      key: 'schedule_interval',
+      header: t('discovery.schedule'),
+      priority: 3,
+      hideOnMobile: true,
+      render: (val) => {
+        if (!val) return <Badge variant="secondary" size="sm">{t('discovery.manual')}</Badge>
+        const hours = Math.round(val / 3600)
+        return <Badge variant="info" size="sm" icon={Clock}>{hours}h</Badge>
+      }
+    },
+    {
+      key: 'enabled',
+      header: t('common.status'),
+      priority: 2,
+      render: (val) => (
+        <Badge variant={val ? 'success' : 'secondary'} size="sm" dot>
+          {val ? t('common.enabled') : t('common.disabled')}
+        </Badge>
+      )
+    },
+    {
+      key: 'actions',
+      header: '',
+      priority: 1,
+      width: 100,
+      render: (_, row) => (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleScanProfile(row.id) }}
+            disabled={scanning}
+            className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-accent-primary transition-colors disabled:opacity-40"
+            title={t('discovery.runScan')}
+          >
+            <Play size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setEditingProfile(row); setShowProfileForm(true) }}
+            className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+            title={t('common.edit')}
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'profile', id: row.id }) }}
+            className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-status-danger transition-colors"
+            title={t('common.delete')}
+          >
+            <Trash size={14} />
+          </button>
+        </div>
+      )
+    }
+  ], [t, scanning, handleScanProfile])
+
+  // ── History columns ───────────────────────────────────
+  const historyColumns = useMemo(() => [
+    {
+      key: 'profile_name',
+      header: t('discovery.profile'),
+      sortable: true,
+      priority: 1,
+      render: (val, row) => (
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
+            row.status === 'completed' ? 'icon-bg-emerald' : row.status === 'running' ? 'icon-bg-blue' : 'icon-bg-rose'
+          )}>
+            <ClockCounterClockwise size={14} weight="duotone" />
+          </div>
+          <span className="font-medium truncate">{val || t('discovery.adHocScan')}</span>
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      header: t('common.status'),
+      sortable: true,
+      priority: 2,
+      render: (val) => {
+        const cfg = {
+          completed: { variant: 'success', icon: CheckCircle, label: t('common.completed') },
+          running: { variant: 'info', icon: ArrowsClockwise, label: t('discovery.scanning') },
+          failed: { variant: 'danger', icon: XCircle, label: t('common.failed') },
+        }
+        const { variant, icon, label } = cfg[val] || { variant: 'secondary', icon: Clock, label: val }
+        return <Badge variant={variant} size="sm" icon={icon} dot={val === 'running'}>{label}</Badge>
+      }
+    },
+    {
+      key: 'certs_found',
+      header: t('discovery.certsFound'),
+      sortable: true,
+      priority: 3,
+      render: (val) => (
+        <span className="text-sm text-text-secondary">{val ?? 0}</span>
+      )
+    },
+    {
+      key: 'started_at',
+      header: t('common.date'),
+      sortable: true,
+      priority: 2,
+      render: (val) => (
+        <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(val)}</span>
+      )
+    },
+    {
+      key: 'duration_seconds',
+      header: t('discovery.duration'),
+      priority: 4,
+      hideOnMobile: true,
+      render: (val) => {
+        if (!val && val !== 0) return <span className="text-text-tertiary">—</span>
+        const secs = Math.round(val)
+        return <span className="text-xs text-text-secondary">{secs < 60 ? `${secs}s` : `${Math.round(secs / 60)}m`}</span>
+      }
+    }
+  ], [t])
+
+  // ── Tab content ───────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
-      case 'overview':
-        return (
-          <OverviewTab
-            stats={stats}
-            profiles={profiles}
-            runs={runs}
-            scanning={scanning}
-            scanProgress={scanProgress}
-            onScanProfile={handleScanProfile}
-            onQuickScan={() => setShowAdHocScan(true)}
-            t={t}
-          />
-        )
-      case 'profiles':
-        return (
-          <ProfilesTab
-            profiles={profiles}
-            onEdit={(p) => { setEditingProfile(p); setShowProfileForm(true) }}
-            onDelete={handleDeleteProfile}
-            onScan={handleScanProfile}
-            onCreate={() => { setEditingProfile(null); setShowProfileForm(true) }}
-            scanning={scanning}
-            isAdmin={isAdmin}
-            t={t}
-          />
-        )
       case 'discovered':
         return (
-          <DiscoveredTab
-            discovered={discovered}
-            total={discoveredTotal}
-            statusFilter={statusFilter}
-            onStatusFilter={setStatusFilter}
-            profiles={profiles}
-            profileFilter={profileFilter}
-            onProfileFilter={setProfileFilter}
-            onDelete={handleDeleteDiscovered}
-            onDeleteAll={() => setDeleteConfirm('all')}
-            isAdmin={isAdmin}
-            t={t}
+          <ResponsiveDataTable
+            data={discovered}
+            columns={discoveredColumns}
+            loading={loading}
+            searchable
+            searchPlaceholder={t('discovery.searchDiscovered')}
+            searchKeys={['subject', 'target', 'issuer', 'serial_number']}
+            columnStorageKey="ucm-discovery-columns"
+            sortable
+            defaultSort={{ key: 'cn', direction: 'asc' }}
+            toolbarActions={canWrite('certificates') && (
+              isMobile ? (
+                <Button type="button" size="lg" onClick={() => setShowQuickScan(true)} disabled={scanning} className="w-11 h-11 p-0">
+                  <MagnifyingGlass size={22} weight="bold" />
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  {discovered.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDeleteConfirm({ type: 'all' })}
+                    >
+                      <Trash size={14} />
+                      {t('discovery.deleteAll')}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setShowQuickScan(true)}
+                    disabled={scanning}
+                  >
+                    {scanning ? <ArrowsClockwise size={14} className="animate-spin" /> : <MagnifyingGlass size={14} />}
+                    {scanning ? t('discovery.scanning') : t('discovery.quickScan')}
+                  </Button>
+                </div>
+              )
+            )}
+            emptyIcon={Globe}
+            emptyTitle={t('discovery.noResults')}
+            emptyDescription={t('discovery.noResultsDesc')}
+            emptyAction={canWrite('certificates') && (
+              <Button type="button" onClick={() => setShowQuickScan(true)}>
+                <MagnifyingGlass size={16} />
+                {t('discovery.quickScan')}
+              </Button>
+            )}
           />
         )
+
+      case 'profiles':
+        return (
+          <ResponsiveDataTable
+            data={profiles}
+            columns={profileColumns}
+            loading={loading}
+            searchable
+            searchPlaceholder={t('discovery.searchProfiles')}
+            searchKeys={['name', 'description', 'targets']}
+            columnStorageKey="ucm-discovery-profiles-columns"
+            sortable
+            defaultSort={{ key: 'name', direction: 'asc' }}
+            toolbarActions={canWrite('certificates') && (
+              isMobile ? (
+                <Button type="button" size="lg" onClick={() => { setEditingProfile(null); setShowProfileForm(true) }} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+              ) : (
+                <Button type="button" size="sm" onClick={() => { setEditingProfile(null); setShowProfileForm(true) }}>
+                  <Plus size={14} weight="bold" />
+                  {t('discovery.createProfile')}
+                </Button>
+              )
+            )}
+            emptyIcon={FolderOpen}
+            emptyTitle={t('discovery.noProfiles')}
+            emptyDescription={t('discovery.noProfilesDesc')}
+            emptyAction={canWrite('certificates') && (
+              <Button type="button" onClick={() => { setEditingProfile(null); setShowProfileForm(true) }}>
+                <Plus size={16} />
+                {t('discovery.createProfile')}
+              </Button>
+            )}
+          />
+        )
+
       case 'history':
-        return <HistoryTab runs={runs} total={runsTotal} t={t} />
+        return (
+          <ResponsiveDataTable
+            data={runs}
+            columns={historyColumns}
+            loading={loading}
+            searchable
+            searchPlaceholder={t('discovery.searchHistory')}
+            searchKeys={['profile_name', 'status']}
+            columnStorageKey="ucm-discovery-history-columns"
+            sortable
+            defaultSort={{ key: 'started_at', direction: 'desc' }}
+            emptyIcon={ClockCounterClockwise}
+            emptyTitle={t('discovery.noHistory')}
+            emptyDescription={t('discovery.noHistoryDesc')}
+          />
+        )
+
       default:
         return null
     }
   }
 
-  if (loading) {
-    return (
-      <ResponsiveLayout>
-        <LoadingSpinner size="lg" />
-      </ResponsiveLayout>
-    )
-  }
+  // ── Help content ──────────────────────────────────────
+  const helpContent = (
+    <div className="space-y-4">
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <Globe size={16} className="status-primary-text" />
+          {t('discovery.title')}
+        </div>
+        <div className="visual-section-body">
+          <div className="quick-info-grid">
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-primary">{stats.total}</div>
+              <div className="help-stat-label">{t('common.total')}</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-success">{stats.managed}</div>
+              <div className="help-stat-label">{t('discovery.managed')}</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-warning">{stats.unmanaged}</div>
+              <div className="help-stat-label">{t('discovery.unmanaged')}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <HelpCard title={t('discovery.aboutDiscovery')} variant="info">
+        {t('discovery.aboutDiscoveryDesc')}
+      </HelpCard>
+      <HelpCard title={t('discovery.quickScan')} variant="tip">
+        {t('discovery.quickScanHelp')}
+      </HelpCard>
+    </div>
+  )
+
+  // Tabs with counts
+  const tabsWithCounts = TABS.map(tab => ({
+    ...tab,
+    count: tab.id === 'discovered' ? discoveredTotal
+      : tab.id === 'profiles' ? profiles.length
+      : tab.id === 'history' ? runsTotal
+      : undefined
+  }))
+
+  // Scanning progress subtitle
+  const subtitle = scanning && scanProgress
+    ? `${t('discovery.scanning')}… ${scanProgress.scanned}/${scanProgress.total}`
+    : t('discovery.subtitle')
 
   return (
     <>
       <ResponsiveLayout
         title={t('discovery.title')}
-        subtitle={t('discovery.subtitle')}
+        subtitle={subtitle}
         icon={Globe}
-        tabs={TABS}
+        stats={statsBar}
+        tabs={tabsWithCounts}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         tabLayout="sidebar"
-        tabGroups={TAB_GROUPS}
-        actions={
-          <div className="flex items-center gap-2">
-            {scanning && scanProgress && (
-              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <ArrowsClockwise size={16} className="animate-spin text-accent-primary" />
-                <span>{scanProgress.scanned}/{scanProgress.total}</span>
-              </div>
-            )}
-            <Button
-              variant="secondary"
-              onClick={() => setShowAdHocScan(true)}
-              disabled={scanning}
-              icon={<MagnifyingGlass size={16} />}
-            >
-              {t('discovery.quickScan')}
-            </Button>
-            {isAdmin && (
-              <Button
-                onClick={() => { setEditingProfile(null); setShowProfileForm(true) }}
-                icon={<Plus size={16} />}
-              >
-                {t('discovery.newProfile')}
-              </Button>
-            )}
-          </div>
-        }
+        helpPageKey="discovery"
       >
         {renderContent()}
       </ResponsiveLayout>
 
+      {/* Quick Scan Modal */}
+      <QuickScanModal
+        open={showQuickScan}
+        onClose={() => setShowQuickScan(false)}
+        onScan={handleQuickScan}
+        scanning={scanning}
+        t={t}
+      />
+
       {/* Profile Form Modal */}
-      {showProfileForm && (
-        <ProfileFormModal
-          profile={editingProfile}
-          onSave={handleSaveProfile}
-          onClose={() => { setShowProfileForm(false); setEditingProfile(null) }}
-          t={t}
-        />
-      )}
+      <ProfileFormModal
+        open={showProfileForm}
+        onClose={() => { setShowProfileForm(false); setEditingProfile(null) }}
+        onSave={handleSaveProfile}
+        profile={editingProfile}
+        t={t}
+      />
 
-      {/* Ad-hoc Scan Modal */}
-      {showAdHocScan && (
-        <AdHocScanModal
-          onScan={handleAdHocScan}
-          onClose={() => setShowAdHocScan(false)}
-          t={t}
-        />
-      )}
-
-      {/* Delete All Confirm */}
+      {/* Confirm Dialogs */}
       <ConfirmModal
-        open={deleteConfirm === 'all'}
+        open={deleteConfirm?.type === 'profile'}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => handleDeleteProfile(deleteConfirm?.id)}
+        title={t('discovery.deleteProfile')}
+        message={t('discovery.deleteProfileConfirm')}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+      />
+      <ConfirmModal
+        open={deleteConfirm?.type === 'discovered'}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => handleDeleteDiscovered(deleteConfirm?.id)}
+        title={t('common.delete')}
+        message={t('discovery.deleteDiscoveredConfirm')}
+        confirmLabel={t('common.delete')}
+        variant="danger"
+      />
+      <ConfirmModal
+        open={deleteConfirm?.type === 'all'}
         onClose={() => setDeleteConfirm(null)}
         onConfirm={handleDeleteAll}
-        title={t('discovery.deleteAllConfirm')}
+        title={t('discovery.deleteAll')}
+        message={t('discovery.deleteAllConfirm')}
+        confirmLabel={t('discovery.deleteAll')}
         variant="danger"
       />
     </>
   )
 }
 
-// ═══════════════════════════════════════════════════
-// Overview Tab
-// ═══════════════════════════════════════════════════
-function OverviewTab({ stats, profiles, runs, scanning, scanProgress, onScanProfile, onQuickScan, t }) {
-  const recentRuns = runs.slice(0, 5)
 
-  return (
-    <div className="space-y-6">
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          icon={Globe} label={t('discovery.stats.total')} value={stats.total}
-          color="text-accent-primary" bgClass="icon-bg-blue"
-        />
-        <StatCard
-          icon={ShieldCheck} label={t('discovery.stats.managed')} value={stats.managed}
-          color="text-status-success" bgClass="icon-bg-emerald"
-        />
-        <StatCard
-          icon={Warning} label={t('discovery.stats.unmanaged')} value={stats.unmanaged}
-          color="text-status-warning" bgClass="icon-bg-amber"
-        />
-        <StatCard
-          icon={XCircle} label={t('discovery.stats.expired')} value={stats.expired}
-          color="text-status-error" bgClass="icon-bg-rose"
-        />
-      </div>
-
-      {/* Scan Progress */}
-      {scanning && scanProgress && (
-        <Card className="p-4">
-          <div className="flex items-center gap-3 mb-2">
-            <ArrowsClockwise size={20} className="animate-spin text-accent-primary" />
-            <span className="font-medium">{t('discovery.scanInProgress')}</span>
-          </div>
-          <div className="w-full bg-bg-tertiary rounded-full h-2">
-            <div
-              className="bg-accent-primary h-2 rounded-full transition-all duration-300"
-              style={{ width: `${scanProgress.total ? (scanProgress.scanned / scanProgress.total * 100) : 0}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-text-secondary mt-1">
-            <span>{scanProgress.scanned}/{scanProgress.total} {t('discovery.targets')}</span>
-            <span>{scanProgress.found} {t('discovery.certsFound')}</span>
-          </div>
-        </Card>
-      )}
-
-      {/* Quick scan profiles */}
-      {profiles.length > 0 && (
-        <CompactSection title={t('discovery.scanProfiles')} icon={FolderOpen}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {profiles.map(p => (
-              <Card key={p.id} className="p-4 flex items-center justify-between">
-                <div className="min-w-0">
-                  <div className="font-medium text-sm truncate">{p.name}</div>
-                  <div className="text-xs text-text-tertiary">
-                    {(p.targets || []).length} {t('discovery.targets')} · {(p.ports || []).join(', ')}
-                  </div>
-                  {p.schedule_enabled && (
-                    <div className="flex items-center gap-1 text-xs text-status-success mt-1">
-                      <CalendarBlank size={12} />
-                      <span>{t('discovery.everyNMin', { n: p.schedule_interval_minutes || 1440 })}</span>
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => onScanProfile(p.id)}
-                  disabled={scanning}
-                  icon={<Play size={14} />}
-                >
-                  {t('discovery.scan')}
-                </Button>
-              </Card>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-
-      {/* Recent scans */}
-      {recentRuns.length > 0 && (
-        <CompactSection title={t('discovery.recentScans')} icon={ClockCounterClockwise}>
-          <div className="space-y-2">
-            {recentRuns.map(run => (
-              <Card key={run.id} className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <RunStatusBadge status={run.status} />
-                  <div>
-                    <div className="text-sm font-medium">
-                      {run.profile_name || t('discovery.adHocScan')}
-                    </div>
-                    <div className="text-xs text-text-tertiary">
-                      {new Date(run.started_at).toLocaleString()} · {run.triggered_by}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-sm text-text-secondary">
-                  {run.certs_found ?? 0} {t('discovery.certsFound')}
-                  {run.new_certs > 0 && (
-                    <Badge variant="info" size="sm" className="ml-2">+{run.new_certs} {t('common.new')}</Badge>
-                  )}
-                </div>
-              </Card>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-
-      {/* Empty state */}
-      {profiles.length === 0 && recentRuns.length === 0 && !scanning && (
-        <EmptyState
-          icon={Network}
-          title={t('discovery.noResults')}
-          description={t('discovery.noResultsDescription')}
-          action={
-            <Button onClick={onQuickScan} icon={<MagnifyingGlass size={16} />}>
-              {t('discovery.quickScan')}
-            </Button>
-          }
-        />
-      )}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════
-// Profiles Tab
-// ═══════════════════════════════════════════════════
-function ProfilesTab({ profiles, onEdit, onDelete, onScan, onCreate, scanning, isAdmin, t }) {
-  const columns = [
-    { key: 'name', label: t('common.name'), sortable: true },
-    {
-      key: 'targets', label: t('discovery.targets'),
-      render: (val) => <span className="text-xs">{(val || []).length} {t('discovery.targets')}</span>
-    },
-    {
-      key: 'ports', label: t('discovery.ports'),
-      render: (val) => <span className="text-xs font-mono">{(val || [443]).join(', ')}</span>
-    },
-    {
-      key: 'schedule_enabled', label: t('discovery.schedule'),
-      render: (val, row) => val ? (
-        <Badge variant="success" size="sm">
-          {t('discovery.everyNMin', { n: row.schedule_interval_minutes || 1440 })}
-        </Badge>
-      ) : (
-        <span className="text-text-tertiary text-xs">{t('common.disabled')}</span>
-      )
-    },
-    {
-      key: 'last_scan_at', label: t('discovery.lastScan'),
-      render: (val) => val
-        ? <span className="text-xs">{new Date(val).toLocaleString()}</span>
-        : <span className="text-text-tertiary text-xs">{t('common.never')}</span>
-    },
-    {
-      key: 'actions', label: t('common.actions'), width: 120,
-      render: (_, row) => (
-        <div className="flex items-center gap-1 justify-end">
-          <Button
-            variant="ghost" size="sm" onClick={() => onScan(row.id)}
-            disabled={scanning} icon={<Play size={14} />}
-            title={t('discovery.scan')}
-          />
-          {isAdmin && (
-            <>
-              <Button
-                variant="ghost" size="sm" onClick={() => onEdit(row)}
-                icon={<Pencil size={14} />} title={t('common.edit')}
-              />
-              <Button
-                variant="ghost" size="sm" onClick={() => onDelete(row.id)}
-                icon={<Trash size={14} />} className="text-status-error"
-                title={t('common.delete')}
-              />
-            </>
-          )}
-        </div>
-      )
-    },
-  ]
-
-  if (profiles.length === 0) {
-    return (
-      <EmptyState
-        icon={FolderOpen}
-        title={t('discovery.noProfiles')}
-        description={t('discovery.noProfilesDescription')}
-        action={
-          isAdmin && (
-            <Button onClick={onCreate} icon={<Plus size={16} />}>
-              {t('discovery.newProfile')}
-            </Button>
-          )
-        }
-      />
-    )
-  }
-
-  return <ResponsiveDataTable columns={columns} data={profiles} pageSize={20} />
-}
-
-// ═══════════════════════════════════════════════════
-// Discovered Certs Tab
-// ═══════════════════════════════════════════════════
-function DiscoveredTab({
-  discovered, total, statusFilter, onStatusFilter,
-  profiles, profileFilter, onProfileFilter,
-  onDelete, onDeleteAll, isAdmin, t
-}) {
-  const statusOptions = [
-    { value: '', label: t('common.all') },
-    { value: 'managed', label: t('discovery.stats.managed') },
-    { value: 'unmanaged', label: t('discovery.stats.unmanaged') },
-    { value: 'error', label: t('common.error') },
-  ]
-
-  const columns = [
-    { key: 'target', label: t('discovery.columns.target'), sortable: true },
-    { key: 'port', label: t('discovery.columns.port'), width: 70 },
-    {
-      key: 'subject', label: t('discovery.columns.subject'), sortable: true,
-      render: (val) => <span className="font-mono text-xs truncate max-w-[200px] block">{val || '-'}</span>
-    },
-    {
-      key: 'issuer', label: t('discovery.columns.issuer'),
-      render: (val) => <span className="text-xs truncate max-w-[150px] block text-text-secondary">{val || '-'}</span>
-    },
-    {
-      key: 'not_after', label: t('discovery.columns.expiry'),
-      sortable: true,
-      render: (val) => {
-        if (!val) return '-'
-        const d = new Date(val)
-        const days = Math.ceil((d - new Date()) / 86400000)
-        return (
-          <div className="text-xs">
-            <div>{d.toLocaleDateString()}</div>
-            <div className={days <= 0 ? 'text-status-error' : days <= 30 ? 'text-status-warning' : 'text-text-tertiary'}>
-              {days <= 0 ? t('discovery.expired') : `${days}d`}
-            </div>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'status', label: t('discovery.columns.status'),
-      render: (val) => (
-        <Badge
-          variant={val === 'managed' ? 'success' : val === 'error' ? 'danger' : 'warning'}
-          size="sm"
-        >
-          {val === 'managed' ? t('discovery.stats.managed')
-            : val === 'error' ? t('common.error')
-            : t('discovery.stats.unmanaged')}
-        </Badge>
-      )
-    },
-    {
-      key: 'last_seen', label: t('discovery.columns.lastSeen'),
-      render: (val) => val ? <span className="text-xs">{new Date(val).toLocaleString()}</span> : '-'
-    },
-    ...(isAdmin ? [{
-      key: 'id', label: '',
-      render: (val) => (
-        <Button
-          variant="ghost" size="sm" onClick={() => onDelete(val)}
-          icon={<Trash size={14} />} className="text-status-error"
-        />
-      )
-    }] : []),
-  ]
-
-  return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select
-          value={statusFilter}
-          onChange={onStatusFilter}
-          options={statusOptions}
-          placeholder={t('discovery.filterByStatus')}
-          className="w-40"
-        />
-        {profiles.length > 0 && (
-          <Select
-            value={profileFilter}
-            onChange={onProfileFilter}
-            options={[
-              { value: '', label: t('common.all') },
-              ...profiles.map(p => ({ value: String(p.id), label: p.name }))
-            ]}
-            placeholder={t('discovery.filterByProfile')}
-            className="w-48"
-          />
-        )}
-        <span className="text-sm text-text-secondary ml-auto">{total} {t('common.total')}</span>
-        {isAdmin && total > 0 && (
-          <Button variant="ghost" size="sm" onClick={onDeleteAll} className="text-status-error">
-            <Trash size={14} className="mr-1" /> {t('discovery.deleteAll')}
-          </Button>
-        )}
-      </div>
-
-      {discovered.length === 0 ? (
-        <EmptyState
-          icon={Globe}
-          title={t('discovery.noDiscovered')}
-          description={t('discovery.noDiscoveredDescription')}
-        />
-      ) : (
-        <ResponsiveDataTable columns={columns} data={discovered} pageSize={50} />
-      )}
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════════════
-// History Tab
-// ═══════════════════════════════════════════════════
-function HistoryTab({ runs, total, t }) {
-  const columns = [
-    {
-      key: 'status', label: t('discovery.columns.status'),
-      render: (val) => <RunStatusBadge status={val} />
-    },
-    {
-      key: 'profile_name', label: t('discovery.profile'),
-      render: (val) => val || t('discovery.adHocScan')
-    },
-    {
-      key: 'started_at', label: t('discovery.startedAt'),
-      sortable: true,
-      render: (val) => val ? <span className="text-xs">{new Date(val).toLocaleString()}</span> : '-'
-    },
-    {
-      key: 'completed_at', label: t('discovery.completedAt'),
-      render: (val) => val ? <span className="text-xs">{new Date(val).toLocaleString()}</span> : '-'
-    },
-    { key: 'total_targets', label: t('discovery.targets'), width: 80 },
-    { key: 'certs_found', label: t('discovery.certsFound'), width: 100 },
-    {
-      key: 'new_certs', label: t('common.new'), width: 70,
-      render: (val) => val > 0 ? <Badge variant="info" size="sm">+{val}</Badge> : '0'
-    },
-    {
-      key: 'changed_certs', label: t('discovery.changed'), width: 80,
-      render: (val) => val > 0 ? <Badge variant="warning" size="sm">{val}</Badge> : '0'
-    },
-    {
-      key: 'triggered_by', label: t('discovery.triggeredBy'),
-      render: (val, row) => (
-        <span className="text-xs text-text-secondary">
-          {val === 'scheduled' ? '⏰' : '👤'} {row.triggered_by_user || val}
-        </span>
-      )
-    },
-  ]
-
-  if (runs.length === 0) {
-    return (
-      <EmptyState
-        icon={ClockCounterClockwise}
-        title={t('discovery.noHistory')}
-        description={t('discovery.noHistoryDescription')}
-      />
-    )
-  }
-
-  return <ResponsiveDataTable columns={columns} data={runs} pageSize={20} />
-}
-
-// ═══════════════════════════════════════════════════
-// Helpers
-// ═══════════════════════════════════════════════════
-function RunStatusBadge({ status }) {
-  const map = {
-    running: { variant: 'info', icon: ArrowsClockwise },
-    completed: { variant: 'success', icon: CheckCircle },
-    failed: { variant: 'danger', icon: XCircle },
-  }
-  const cfg = map[status] || map.completed
-  return (
-    <Badge variant={cfg.variant} size="sm">
-      <cfg.icon size={12} className="mr-1" />
-      {status}
-    </Badge>
-  )
-}
-
-function StatCard({ icon: Icon, label, value, color, bgClass }) {
-  return (
-    <Card className="p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${bgClass}`}>
-          <Icon size={20} weight="duotone" />
-        </div>
-        <div>
-          <div className="text-2xl font-bold">{value}</div>
-          <div className="text-xs text-text-secondary">{label}</div>
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-// ═══════════════════════════════════════════════════
-// Profile Form Modal
-// ═══════════════════════════════════════════════════
-function ProfileFormModal({ profile, onSave, onClose, t }) {
-  const [name, setName] = useState(profile?.name || '')
-  const [description, setDescription] = useState(profile?.description || '')
-  const [targets, setTargets] = useState((profile?.targets || []).join('\n'))
-  const [ports, setPorts] = useState((profile?.ports || [443]).join(', '))
-  const [scheduleEnabled, setScheduleEnabled] = useState(profile?.schedule_enabled || false)
-  const [interval, setInterval] = useState(profile?.schedule_interval_minutes || 1440)
-  const [notifyNew, setNotifyNew] = useState(profile?.notify_on_new ?? true)
-  const [notifyChange, setNotifyChange] = useState(profile?.notify_on_change ?? true)
-  const [notifyExpiry, setNotifyExpiry] = useState(profile?.notify_on_expiry ?? false)
+// ════════════════════════════════════════════════════════
+// Quick Scan Modal
+// ════════════════════════════════════════════════════════
+function QuickScanModal({ open, onClose, onScan, scanning, t }) {
+  const [targets, setTargets] = useState('')
+  const [ports, setPorts] = useState('443')
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    const targetsList = targets.split('\n').map(s => s.trim()).filter(Boolean)
-    const portsList = ports.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0 && n <= 65535)
-    if (!name.trim()) return
-    if (targetsList.length === 0) return
-
-    onSave({
-      name: name.trim(),
-      description: description.trim(),
-      targets: targetsList,
-      ports: portsList.length > 0 ? portsList : [443],
-      schedule_enabled: scheduleEnabled,
-      schedule_interval_minutes: interval,
-      notify_on_new: notifyNew,
-      notify_on_change: notifyChange,
-      notify_on_expiry: notifyExpiry,
-    })
+    const targetList = targets.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+    const portList = ports.split(/[,\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0 && n <= 65535)
+    if (!targetList.length) return
+    onScan({ targets: targetList, ports: portList.length ? portList : [443] })
   }
 
   return (
-    <Modal
-      open={true}
-      onClose={onClose}
-      title={profile ? t('discovery.editProfile') : t('discovery.newProfile')}
-    >
+    <Modal open={open} onClose={onClose} title={t('discovery.quickScan')}>
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <Input
-          label={t('common.name')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+        <Textarea
+          label={t('discovery.targets')}
+          value={targets}
+          onChange={(e) => setTargets(e.target.value)}
+          placeholder="google.com&#10;192.168.1.0/24&#10;10.0.0.1"
+          rows={5}
           required
-          placeholder="Production servers"
+          helperText={t('discovery.targetsHelp')}
         />
-        <Input
-          label={t('common.description')}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={t('discovery.profileDescPlaceholder')}
-        />
-        <div>
-          <label className="block text-sm font-medium text-text-primary mb-1">
-            {t('discovery.targets')}
-          </label>
-          <Textarea
-            value={targets}
-            onChange={(e) => setTargets(e.target.value)}
-            rows={5}
-            placeholder={t('discovery.targetsHelp')}
-            required
-          />
-        </div>
         <Input
           label={t('discovery.ports')}
           value={ports}
           onChange={(e) => setPorts(e.target.value)}
           placeholder="443, 8443, 636"
+          helperText={t('discovery.portsHelp')}
         />
-
-        {/* Schedule */}
-        <div className="border-t border-border pt-4">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={scheduleEnabled}
-              onChange={(e) => setScheduleEnabled(e.target.checked)}
-              className="rounded"
-            />
-            <span className="text-sm font-medium">{t('discovery.enableSchedule')}</span>
-          </label>
-          {scheduleEnabled && (
-            <div className="mt-3">
-              <Select
-                label={t('discovery.scanInterval')}
-                value={String(interval)}
-                onChange={(v) => setInterval(parseInt(v, 10))}
-                options={[
-                  { value: '60', label: t('discovery.every1h') },
-                  { value: '360', label: t('discovery.every6h') },
-                  { value: '720', label: t('discovery.every12h') },
-                  { value: '1440', label: t('discovery.every24h') },
-                  { value: '10080', label: t('discovery.every7d') },
-                ]}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Notifications */}
-        <div className="border-t border-border pt-4 space-y-2">
-          <span className="text-sm font-medium">{t('discovery.notifications')}</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={notifyNew} onChange={(e) => setNotifyNew(e.target.checked)} className="rounded" />
-            <span className="text-xs">{t('discovery.notifyOnNew')}</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={notifyChange} onChange={(e) => setNotifyChange(e.target.checked)} className="rounded" />
-            <span className="text-xs">{t('discovery.notifyOnChange')}</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={notifyExpiry} onChange={(e) => setNotifyExpiry(e.target.checked)} className="rounded" />
-            <span className="text-xs">{t('discovery.notifyOnExpiry')}</span>
-          </label>
-        </div>
-
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button type="submit">
-            {profile ? t('common.save') : t('common.create')}
+          <Button type="submit" disabled={scanning || !targets.trim()}>
+            {scanning ? <ArrowsClockwise size={14} className="animate-spin" /> : <MagnifyingGlass size={14} />}
+            {t('discovery.startScan')}
           </Button>
         </div>
       </form>
@@ -878,77 +765,117 @@ function ProfileFormModal({ profile, onSave, onClose, t }) {
   )
 }
 
-// ═══════════════════════════════════════════════════
-// Ad-hoc Scan Modal
-// ═══════════════════════════════════════════════════
-function AdHocScanModal({ onScan, onClose, t }) {
-  const [scanType, setScanType] = useState('targets')
+
+// ════════════════════════════════════════════════════════
+// Profile Form Modal
+// ════════════════════════════════════════════════════════
+function ProfileFormModal({ open, onClose, onSave, profile, t }) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [targets, setTargets] = useState('')
-  const [subnet, setSubnet] = useState('')
   const [ports, setPorts] = useState('443')
+  const [schedule, setSchedule] = useState('0')
+  const [enabled, setEnabled] = useState(true)
+  const [notifyEmail, setNotifyEmail] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      if (profile) {
+        setName(profile.name || '')
+        setDescription(profile.description || '')
+        const t = profile.targets_list || (typeof profile.targets === 'string' ? JSON.parse(profile.targets) : profile.targets) || []
+        setTargets(t.join('\n'))
+        const p = profile.ports_list || (typeof profile.ports === 'string' ? JSON.parse(profile.ports) : profile.ports) || [443]
+        setPorts(p.join(', '))
+        setSchedule(String(profile.schedule_interval || 0))
+        setEnabled(profile.enabled !== false)
+        setNotifyEmail(profile.notify_email || '')
+      } else {
+        setName(''); setDescription(''); setTargets(''); setPorts('443')
+        setSchedule('0'); setEnabled(true); setNotifyEmail('')
+      }
+    }
+  }, [open, profile])
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    const portsList = ports.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0 && n <= 65535)
-    if (scanType === 'subnet') {
-      if (!subnet.trim()) return
-      onScan({ subnet: subnet.trim(), ports: portsList.length > 0 ? portsList : [443] })
-    } else {
-      const list = targets.split('\n').map(s => s.trim()).filter(Boolean)
-      if (list.length === 0) return
-      onScan({ targets: list, ports: portsList.length > 0 ? portsList : [443] })
-    }
+    const targetList = targets.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+    const portList = ports.split(/[,\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0 && n <= 65535)
+    if (!name.trim() || !targetList.length) return
+    onSave({
+      name: name.trim(),
+      description: description.trim(),
+      targets: targetList,
+      ports: portList.length ? portList : [443],
+      schedule_interval: parseInt(schedule) || 0,
+      enabled,
+      notify_email: notifyEmail.trim() || null,
+    })
   }
 
+  const scheduleOptions = [
+    { value: '0', label: t('discovery.manual') },
+    { value: '3600', label: t('discovery.every1h') },
+    { value: '21600', label: t('discovery.every6h') },
+    { value: '43200', label: t('discovery.every12h') },
+    { value: '86400', label: t('discovery.every24h') },
+    { value: '604800', label: t('discovery.every7d') },
+  ]
+
   return (
-    <Modal open={true} onClose={onClose} title={t('discovery.quickScan')}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={profile ? t('discovery.editProfile') : t('discovery.createProfile')}
+    >
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <Select
-          label={t('discovery.scanType')}
-          value={scanType}
-          onChange={setScanType}
-          options={[
-            { value: 'targets', label: t('discovery.scanTypeTargets') },
-            { value: 'subnet', label: t('discovery.scanTypeSubnet') },
-          ]}
+        <Input
+          label={t('common.name')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          placeholder={t('discovery.profileNamePlaceholder')}
         />
-
-        {scanType === 'targets' ? (
-          <div>
-            <label className="block text-sm font-medium text-text-primary mb-1">
-              {t('discovery.targets')}
-            </label>
-            <Textarea
-              value={targets}
-              onChange={(e) => setTargets(e.target.value)}
-              rows={5}
-              placeholder={t('discovery.targetsHelp')}
-              required
-            />
-          </div>
-        ) : (
-          <Input
-            label={t('discovery.subnet')}
-            value={subnet}
-            onChange={(e) => setSubnet(e.target.value)}
-            placeholder={t('discovery.subnetHelp')}
-            required
-          />
-        )}
-
+        <Input
+          label={t('common.description')}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t('discovery.profileDescPlaceholder')}
+        />
+        <Textarea
+          label={t('discovery.targets')}
+          value={targets}
+          onChange={(e) => setTargets(e.target.value)}
+          placeholder="example.com&#10;192.168.1.0/24&#10;10.0.0.1"
+          rows={4}
+          required
+          helperText={t('discovery.targetsHelp')}
+        />
         <Input
           label={t('discovery.ports')}
           value={ports}
           onChange={(e) => setPorts(e.target.value)}
           placeholder="443, 8443, 636"
         />
-
+        <Select
+          label={t('discovery.schedule')}
+          value={schedule}
+          onChange={(val) => setSchedule(val)}
+          options={scheduleOptions}
+        />
+        <Input
+          label={t('discovery.notifyEmail')}
+          value={notifyEmail}
+          onChange={(e) => setNotifyEmail(e.target.value)}
+          placeholder="admin@example.com"
+          type="email"
+        />
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>
-          <Button type="submit" icon={<MagnifyingGlass size={16} />}>
-            {t('discovery.scan')}
+          <Button type="submit" disabled={!name.trim() || !targets.trim()}>
+            {profile ? t('common.save') : t('common.create')}
           </Button>
         </div>
       </form>
