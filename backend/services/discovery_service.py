@@ -353,10 +353,12 @@ class DiscoveryService:
 
         # Save results to DB
         for r in results:
-            is_refused = r.get('error_type') == 'refused'
+            error_type = r.get('error_type', '')
             if 'error' in r and 'fingerprint_sha256' not in r:
-                if is_refused:
+                # Skip connection-level errors (not TLS endpoints)
+                if error_type in ('refused', 'network', 'timeout', 'dns'):
                     continue
+                # Only save TLS-level errors (SNI rejected, cert parse, etc.)
                 self._save_error(r, profile_id, now)
                 continue
 
