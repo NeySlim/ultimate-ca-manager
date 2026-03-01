@@ -10,7 +10,8 @@ import {
   ArrowsClockwise, Trash, Play, Plus, CheckCircle, XCircle,
   ClockCounterClockwise, FolderOpen, Pencil, CalendarBlank,
   WifiHigh, WifiSlash, Certificate, ArrowSquareOut, Network,
-  Export, Gauge, Lightning, MapPin
+  Export, Gauge, Lightning, MapPin, Crosshair, Plugs,
+  GearSix, Timer, Bell, CaretDown, Envelope
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable,
@@ -19,6 +20,7 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats
 } from '../components'
 import TagsInput from '../components/ui/TagsInput'
+import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { ConfirmModal } from '../components/FormModal'
 import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
@@ -877,101 +879,113 @@ function QuickScanModal({ open, onClose, onScan, scanning, t }) {
   }
 
   const portPresets = [
-    { label: 'HTTPS (443)', value: '443' },
-    { label: 'HTTPS + Alt', value: '443, 8443' },
-    { label: t('discovery.allCommon'), value: '443, 8443, 8080, 636, 993, 995, 465, 587' },
+    { label: 'HTTPS', value: '443', desc: '443' },
+    { label: 'HTTPS + Alt', value: '443, 8443', desc: '443, 8443' },
+    { label: t('discovery.allCommon'), value: '443, 8443, 8080, 636, 993, 995, 465, 587', desc: '8 ports' },
   ]
 
   return (
     <Modal open={open} onClose={onClose} title={t('discovery.quickScan')}>
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <TagsInput
-          label={t('discovery.targets')}
-          value={targets}
-          onChange={setTargets}
-          placeholder={t('discovery.targetsPlaceholder')}
-          helperText={t('discovery.targetsTagHelp')}
-        />
-        <div>
-          <Input
-            label={t('discovery.ports')}
-            value={ports}
-            onChange={(e) => setPorts(e.target.value)}
-            placeholder="443, 8443, 636"
-            helperText={t('discovery.portsHelpDetailed')}
+      <form onSubmit={handleSubmit} className="p-5 space-y-5">
+        {/* ── Targets Section ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            <Crosshair size={14} weight="bold" />
+            {t('discovery.targets')}
+          </div>
+          <TagsInput
+            value={targets}
+            onChange={setTargets}
+            placeholder={t('discovery.targetsPlaceholder')}
+            helperText={t('discovery.targetsTagHelp')}
           />
-          <div className="flex flex-wrap gap-1.5 mt-2">
+        </div>
+
+        {/* ── Ports Section ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            <Plugs size={14} weight="bold" />
+            {t('discovery.ports')}
+          </div>
+          <div className="flex flex-wrap gap-2">
             {portPresets.map((preset) => (
               <button
                 key={preset.value}
                 type="button"
                 className={cn(
-                  'text-xs px-2 py-0.5 rounded-full border transition-colors',
+                  'flex flex-col items-center px-3.5 py-2 rounded-lg border text-xs transition-all',
                   ports === preset.value
-                    ? 'bg-accent-primary text-white border-accent-primary'
-                    : 'border-border text-text-secondary hover:border-accent-primary hover:text-accent-primary'
+                    ? 'bg-accent-op10 border-accent-primary text-accent-primary ring-1 ring-accent-primary'
+                    : 'border-border bg-bg-secondary text-text-secondary hover:border-text-tertiary hover:bg-bg-tertiary'
                 )}
                 onClick={() => setPorts(preset.value)}
               >
-                {preset.label}
+                <span className="font-medium">{preset.label}</span>
+                <span className="text-2xs opacity-60 mt-0.5">{preset.desc}</span>
               </button>
             ))}
           </div>
+          <Input
+            value={ports}
+            onChange={(e) => setPorts(e.target.value)}
+            placeholder="443, 8443, 636"
+            helperText={t('discovery.portsHelpDetailed')}
+            className="text-sm"
+          />
         </div>
 
-        {/* Advanced options toggle */}
-        <button
-          type="button"
-          className="flex items-center gap-1 text-xs text-text-tertiary hover:text-accent-primary transition-colors"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-        >
-          <Gauge size={12} />
-          {t('discovery.advancedOptions')}
-          <span className={cn("transition-transform", showAdvanced && "rotate-180")}>▾</span>
-        </button>
+        {/* ── Advanced Options ── */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <button
+            type="button"
+            className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-text-secondary hover:bg-bg-secondary transition-colors"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <span className="flex items-center gap-2">
+              <GearSix size={15} weight="bold" />
+              {t('discovery.advancedOptions')}
+            </span>
+            <CaretDown size={14} className={cn("transition-transform duration-200", showAdvanced && "rotate-180")} />
+          </button>
 
-        {showAdvanced && (
-          <div className="space-y-3 pl-2 border-l-2 border-border">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+          {showAdvanced && (
+            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-border bg-secondary-op50">
+              <ToggleSwitch
                 checked={resolveDns}
-                onChange={(e) => setResolveDns(e.target.checked)}
-                className="rounded border-border"
+                onChange={setResolveDns}
+                label={t('discovery.reverseDns')}
+                description="PTR records"
+                size="sm"
               />
-              <span className="text-sm text-text-secondary">{t('discovery.reverseDns')}</span>
-            </label>
-            <div className="flex gap-3">
-              <Input
-                label={t('discovery.timeout')}
-                type="number"
-                value={timeout}
-                onChange={(e) => setTimeout_(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 30))}
-                min={1}
-                max={30}
-                className="w-24"
-                helperText={`1-30s`}
-              />
-              <Input
-                label={t('discovery.concurrency')}
-                type="number"
-                value={maxWorkers}
-                onChange={(e) => setMaxWorkers(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 50))}
-                min={1}
-                max={50}
-                className="w-24"
-                helperText={`1-50`}
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label={t('discovery.timeout')}
+                  type="number"
+                  value={timeout}
+                  onChange={(e) => setTimeout_(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 30))}
+                  min={1} max={30}
+                  helperText="1–30s"
+                />
+                <Input
+                  label={t('discovery.concurrency')}
+                  type="number"
+                  value={maxWorkers}
+                  onChange={(e) => setMaxWorkers(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 50))}
+                  min={1} max={50}
+                  helperText="1–50"
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
+        {/* ── Footer ── */}
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>
           <Button type="submit" disabled={scanning || !targets.length}>
-            {scanning ? <ArrowsClockwise size={14} className="animate-spin" /> : <MagnifyingGlass size={14} />}
+            {scanning ? <ArrowsClockwise size={14} className="animate-spin" /> : <Play size={14} weight="fill" />}
             {t('discovery.startScan')}
           </Button>
         </div>
@@ -990,7 +1004,6 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
   const [targets, setTargets] = useState([])
   const [ports, setPorts] = useState('443')
   const [schedule, setSchedule] = useState('0')
-  const [enabled, setEnabled] = useState(true)
   const [notifyEmail, setNotifyEmail] = useState('')
   const [timeout, setTimeout_] = useState(5)
   const [maxWorkers, setMaxWorkers] = useState(20)
@@ -1009,7 +1022,6 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
           : (typeof profile.ports === 'string' ? (() => { try { return JSON.parse(profile.ports) } catch { return profile.ports.split(',') } })() : [443])
         setPorts(pList.join(', '))
         setSchedule(String(profile.schedule_interval_minutes || 0))
-        setEnabled(profile.schedule_enabled !== false)
         setNotifyEmail(profile.notify_email || '')
         setTimeout_(profile.timeout || 5)
         setMaxWorkers(profile.max_workers || 20)
@@ -1017,7 +1029,7 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
         setShowAdvanced(!!(profile.resolve_dns || profile.timeout !== 5 || profile.max_workers !== 20))
       } else {
         setName(''); setDescription(''); setTargets([]); setPorts('443')
-        setSchedule('0'); setEnabled(true); setNotifyEmail('')
+        setSchedule('0'); setNotifyEmail('')
         setTimeout_(5); setMaxWorkers(20); setResolveDns(false); setShowAdvanced(false)
       }
     }
@@ -1042,18 +1054,18 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
   }
 
   const scheduleOptions = [
-    { value: '0', label: t('discovery.manual') },
-    { value: '60', label: t('discovery.every1h') },
-    { value: '360', label: t('discovery.every6h') },
-    { value: '720', label: t('discovery.every12h') },
-    { value: '1440', label: t('discovery.every24h') },
-    { value: '10080', label: t('discovery.every7d') },
+    { value: '0', label: t('discovery.manual'), icon: '—' },
+    { value: '60', label: t('discovery.every1h'), icon: '1h' },
+    { value: '360', label: t('discovery.every6h'), icon: '6h' },
+    { value: '720', label: t('discovery.every12h'), icon: '12h' },
+    { value: '1440', label: t('discovery.every24h'), icon: '24h' },
+    { value: '10080', label: t('discovery.every7d'), icon: '7d' },
   ]
 
   const portPresets = [
-    { label: 'HTTPS (443)', value: '443' },
-    { label: 'HTTPS + Alt', value: '443, 8443' },
-    { label: t('discovery.allCommon'), value: '443, 8443, 8080, 636, 993, 995, 465, 587' },
+    { label: 'HTTPS', value: '443', desc: '443' },
+    { label: 'HTTPS + Alt', value: '443, 8443', desc: '443, 8443' },
+    { label: t('discovery.allCommon'), value: '443, 8443, 8080, 636, 993, 995, 465, 587', desc: '8 ports' },
   ]
 
   return (
@@ -1062,114 +1074,157 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
       onClose={onClose}
       title={profile ? t('discovery.editProfile') : t('discovery.createProfile')}
     >
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
-        <Input
-          label={t('common.name')}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          placeholder={t('discovery.profileNamePlaceholder')}
-        />
-        <Input
-          label={t('common.description')}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={t('discovery.profileDescPlaceholder')}
-        />
-        <TagsInput
-          label={t('discovery.targets')}
-          value={targets}
-          onChange={setTargets}
-          placeholder={t('discovery.targetsPlaceholder')}
-          helperText={t('discovery.targetsTagHelp')}
-        />
-        <div>
-          <Input
-            label={t('discovery.ports')}
-            value={ports}
-            onChange={(e) => setPorts(e.target.value)}
-            placeholder="443, 8443, 636"
-            helperText={t('discovery.portsHelpDetailed')}
+      <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+        {/* ── Identity Section ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            <FolderOpen size={14} weight="bold" />
+            {t('discovery.profile')}
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder={t('discovery.profileNamePlaceholder')}
+              label={t('common.name')}
+            />
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('discovery.profileDescPlaceholder')}
+              label={t('common.description')}
+            />
+          </div>
+        </div>
+
+        {/* ── Targets Section ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            <Crosshair size={14} weight="bold" />
+            {t('discovery.targets')}
+          </div>
+          <TagsInput
+            value={targets}
+            onChange={setTargets}
+            placeholder={t('discovery.targetsPlaceholder')}
+            helperText={t('discovery.targetsTagHelp')}
           />
-          <div className="flex flex-wrap gap-1.5 mt-2">
+        </div>
+
+        {/* ── Ports Section ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            <Plugs size={14} weight="bold" />
+            {t('discovery.ports')}
+          </div>
+          <div className="flex flex-wrap gap-2">
             {portPresets.map((preset) => (
               <button
                 key={preset.value}
                 type="button"
                 className={cn(
-                  'text-xs px-2 py-0.5 rounded-full border transition-colors',
+                  'flex flex-col items-center px-3.5 py-2 rounded-lg border text-xs transition-all',
                   ports === preset.value
-                    ? 'bg-accent-primary text-white border-accent-primary'
-                    : 'border-border text-text-secondary hover:border-accent-primary hover:text-accent-primary'
+                    ? 'bg-accent-op10 border-accent-primary text-accent-primary ring-1 ring-accent-primary'
+                    : 'border-border bg-bg-secondary text-text-secondary hover:border-text-tertiary hover:bg-bg-tertiary'
                 )}
                 onClick={() => setPorts(preset.value)}
               >
-                {preset.label}
+                <span className="font-medium">{preset.label}</span>
+                <span className="text-2xs opacity-60 mt-0.5">{preset.desc}</span>
               </button>
             ))}
           </div>
+          <Input
+            value={ports}
+            onChange={(e) => setPorts(e.target.value)}
+            placeholder="443, 8443, 636"
+            helperText={t('discovery.portsHelpDetailed')}
+          />
         </div>
-        <Select
-          label={t('discovery.schedule')}
-          value={schedule}
-          onChange={(val) => setSchedule(val)}
-          options={scheduleOptions}
-        />
-        <Input
-          label={t('discovery.notifyEmail')}
-          value={notifyEmail}
-          onChange={(e) => setNotifyEmail(e.target.value)}
-          placeholder="admin@example.com"
-          type="email"
-        />
 
-        {/* Advanced scan options */}
-        <button
-          type="button"
-          className="flex items-center gap-1 text-xs text-text-tertiary hover:text-accent-primary transition-colors"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-        >
-          <Gauge size={12} />
-          {t('discovery.advancedOptions')}
-          <span className={cn("transition-transform", showAdvanced && "rotate-180")}>▾</span>
-        </button>
-
-        {showAdvanced && (
-          <div className="space-y-3 pl-2 border-l-2 border-border">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={resolveDns}
-                onChange={(e) => setResolveDns(e.target.checked)}
-                className="rounded border-border"
-              />
-              <span className="text-sm text-text-secondary">{t('discovery.reverseDns')}</span>
-            </label>
-            <div className="flex gap-3">
-              <Input
-                label={t('discovery.timeout')}
-                type="number"
-                value={timeout}
-                onChange={(e) => setTimeout_(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 30))}
-                min={1}
-                max={30}
-                className="w-24"
-                helperText={`1-30s`}
-              />
-              <Input
-                label={t('discovery.concurrency')}
-                type="number"
-                value={maxWorkers}
-                onChange={(e) => setMaxWorkers(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 50))}
-                min={1}
-                max={50}
-                className="w-24"
-                helperText={`1-50`}
-              />
-            </div>
+        {/* ── Schedule Section ── */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            <CalendarBlank size={14} weight="bold" />
+            {t('discovery.schedule')}
           </div>
-        )}
+          <div className="flex flex-wrap gap-2">
+            {scheduleOptions.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={cn(
+                  'px-3 py-1.5 rounded-lg border text-xs font-medium transition-all',
+                  schedule === opt.value
+                    ? 'bg-accent-op10 border-accent-primary text-accent-primary ring-1 ring-accent-primary'
+                    : 'border-border bg-bg-secondary text-text-secondary hover:border-text-tertiary hover:bg-bg-tertiary'
+                )}
+                onClick={() => setSchedule(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {schedule !== '0' && (
+            <Input
+              label={t('discovery.notifyEmail')}
+              value={notifyEmail}
+              onChange={(e) => setNotifyEmail(e.target.value)}
+              placeholder="admin@example.com"
+              type="email"
+              helperText={t('discovery.notifyOnNew')}
+            />
+          )}
+        </div>
 
+        {/* ── Advanced Options ── */}
+        <div className="rounded-lg border border-border overflow-hidden">
+          <button
+            type="button"
+            className="flex items-center justify-between w-full px-4 py-2.5 text-sm text-text-secondary hover:bg-bg-secondary transition-colors"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <span className="flex items-center gap-2">
+              <GearSix size={15} weight="bold" />
+              {t('discovery.advancedOptions')}
+            </span>
+            <CaretDown size={14} className={cn("transition-transform duration-200", showAdvanced && "rotate-180")} />
+          </button>
+
+          {showAdvanced && (
+            <div className="px-4 pb-4 pt-1 space-y-4 border-t border-border bg-secondary-op50">
+              <ToggleSwitch
+                checked={resolveDns}
+                onChange={setResolveDns}
+                label={t('discovery.reverseDns')}
+                description="PTR records"
+                size="sm"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label={t('discovery.timeout')}
+                  type="number"
+                  value={timeout}
+                  onChange={(e) => setTimeout_(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 30))}
+                  min={1} max={30}
+                  helperText="1–30s"
+                />
+                <Input
+                  label={t('discovery.concurrency')}
+                  type="number"
+                  value={maxWorkers}
+                  onChange={(e) => setMaxWorkers(Math.min(Math.max(parseInt(e.target.value) || 1, 1), 50))}
+                  min={1} max={50}
+                  helperText="1–50"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer ── */}
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel')}
