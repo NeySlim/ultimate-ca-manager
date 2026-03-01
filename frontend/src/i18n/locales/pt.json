@@ -2890,6 +2890,9 @@
     "searchHistory": "Pesquisar no histórico...",
     "searchProfiles": "Pesquisar perfis...",
     "startScan": "Iniciar escaneamento",
-    "unmanaged": "Não gerenciado"
+    "unmanaged": "Não gerenciado",
+    "targetsHelpDetailed": "Um por linha: hostname, IP, sub-rede CIDR (192.168.1.0/24) ou host:porta (10.0.0.1:8443)",
+    "portsHelpDetailed": "Portas TCP separadas por vírgula para escanear em cada alvo (ex: 443, 8443, 636)",
+    "allCommon": "Todas as portas TLS comuns"
   }
 }

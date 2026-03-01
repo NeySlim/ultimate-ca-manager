@@ -2890,6 +2890,9 @@
     "searchHistory": "搜索扫描历史...",
     "searchProfiles": "搜索配置文件...",
     "startScan": "开始扫描",
-    "unmanaged": "未管理"
+    "unmanaged": "未管理",
+    "targetsHelpDetailed": "每行一个：主机名、IP、CIDR子网 (192.168.1.0/24) 或 主机:端口 (10.0.0.1:8443)",
+    "portsHelpDetailed": "以逗号分隔的TCP端口，用于扫描每个目标（例如：443, 8443, 636）",
+    "allCommon": "所有常见TLS端口"
   }
 }

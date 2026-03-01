@@ -2890,6 +2890,9 @@
     "searchHistory": "スキャン履歴を検索...",
     "searchProfiles": "プロファイルを検索...",
     "startScan": "スキャン開始",
-    "unmanaged": "未管理"
+    "unmanaged": "未管理",
+    "targetsHelpDetailed": "1行に1つ: ホスト名、IP、CIDRサブネット (192.168.1.0/24)、またはホスト:ポート (10.0.0.1:8443)",
+    "portsHelpDetailed": "各ターゲットでスキャンするTCPポート（カンマ区切り、例: 443, 8443, 636）",
+    "allCommon": "一般的なTLSポート全て"
   }
 }

@@ -96,9 +96,23 @@ class DiscoveryService:
         if ports is None:
             ports = [443]
 
-        # Build job list
+        # Build job list — auto-expand CIDR notation in targets
         jobs = []
         for raw in targets:
+            raw = raw.strip()
+            if not raw:
+                continue
+            # Detect CIDR notation (e.g. 192.168.1.0/24)
+            if '/' in raw and ':' not in raw:
+                try:
+                    network = ipaddress.ip_network(raw, strict=False)
+                    for ip in network.hosts():
+                        for p in ports:
+                            jobs.append((str(ip), p))
+                    continue
+                except ValueError:
+                    pass  # Not a valid CIDR, fall through to normal parse
+
             host, custom_port = self._parse_target(raw)
             if not host:
                 continue

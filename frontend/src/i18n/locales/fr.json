@@ -2893,6 +2893,9 @@
     "searchHistory": "Rechercher dans l'historique...",
     "searchProfiles": "Rechercher des profils...",
     "startScan": "Démarrer le scan",
-    "unmanaged": "Non géré"
+    "unmanaged": "Non géré",
+    "targetsHelpDetailed": "Un par ligne : nom d'hôte, IP, sous-réseau CIDR (192.168.1.0/24) ou hôte:port (10.0.0.1:8443)",
+    "portsHelpDetailed": "Ports TCP séparés par des virgules à scanner sur chaque cible (ex : 443, 8443, 636)",
+    "allCommon": "Tous les ports TLS courants"
   }
 }

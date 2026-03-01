@@ -732,6 +732,13 @@ function QuickScanModal({ open, onClose, onScan, scanning, t }) {
     onScan({ targets: targetList, ports: portList.length ? portList : [443] })
   }
 
+  // Common port presets
+  const portPresets = [
+    { label: 'HTTPS (443)', value: '443' },
+    { label: 'HTTPS + Alt', value: '443, 8443' },
+    { label: t('discovery.allCommon'), value: '443, 8443, 8080, 636, 993, 995, 465, 587' },
+  ]
+
   return (
     <Modal open={open} onClose={onClose} title={t('discovery.quickScan')}>
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -739,18 +746,37 @@ function QuickScanModal({ open, onClose, onScan, scanning, t }) {
           label={t('discovery.targets')}
           value={targets}
           onChange={(e) => setTargets(e.target.value)}
-          placeholder="google.com&#10;192.168.1.0/24&#10;10.0.0.1"
+          placeholder={`example.com\n192.168.1.0/24\n10.0.0.1:8443`}
           rows={5}
           required
-          helperText={t('discovery.targetsHelp')}
+          helperText={t('discovery.targetsHelpDetailed')}
         />
-        <Input
-          label={t('discovery.ports')}
-          value={ports}
-          onChange={(e) => setPorts(e.target.value)}
-          placeholder="443, 8443, 636"
-          helperText={t('discovery.portsHelp')}
-        />
+        <div>
+          <Input
+            label={t('discovery.ports')}
+            value={ports}
+            onChange={(e) => setPorts(e.target.value)}
+            placeholder="443, 8443, 636"
+            helperText={t('discovery.portsHelpDetailed')}
+          />
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {portPresets.map((preset) => (
+              <button
+                key={preset.value}
+                type="button"
+                className={cn(
+                  'text-xs px-2 py-0.5 rounded-full border transition-colors',
+                  ports === preset.value
+                    ? 'bg-accent-primary text-white border-accent-primary'
+                    : 'border-border text-text-secondary hover:border-accent-primary hover:text-accent-primary'
+                )}
+                onClick={() => setPorts(preset.value)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex justify-end gap-2 pt-4 border-t border-border">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common.cancel')}
@@ -846,16 +872,17 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
           label={t('discovery.targets')}
           value={targets}
           onChange={(e) => setTargets(e.target.value)}
-          placeholder="example.com&#10;192.168.1.0/24&#10;10.0.0.1"
+          placeholder={`example.com\n192.168.1.0/24\n10.0.0.1:8443`}
           rows={4}
           required
-          helperText={t('discovery.targetsHelp')}
+          helperText={t('discovery.targetsHelpDetailed')}
         />
         <Input
           label={t('discovery.ports')}
           value={ports}
           onChange={(e) => setPorts(e.target.value)}
           placeholder="443, 8443, 636"
+          helperText={t('discovery.portsHelpDetailed')}
         />
         <Select
           label={t('discovery.schedule')}
