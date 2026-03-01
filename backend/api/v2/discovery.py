@@ -298,13 +298,18 @@ def export_discovered():
 
     # CSV export
     output = io.StringIO()
-    fields = ['target', 'port', 'dns_hostname', 'subject', 'issuer', 'serial_number',
+    fields = ['target', 'port', 'sni_hostname', 'dns_hostname', 'subject', 'issuer', 'serial_number',
               'not_before', 'not_after', 'fingerprint_sha256', 'status',
-              'first_seen', 'last_seen', 'is_expired', 'days_until_expiry', 'scan_error']
+              'first_seen', 'last_seen', 'is_expired', 'days_until_expiry',
+              'san_dns_names', 'san_ip_addresses', 'scan_error']
     writer = csv.DictWriter(output, fieldnames=fields, extrasaction='ignore')
     writer.writeheader()
     for item in items:
-        writer.writerow(item)
+        row = dict(item)
+        # Flatten SAN lists for CSV
+        row['san_dns_names'] = ', '.join(row.get('san_dns_names') or [])
+        row['san_ip_addresses'] = ', '.join(row.get('san_ip_addresses') or [])
+        writer.writerow(row)
 
     _audit('discovery_export', details=f"CSV export: {total} certificates")
     return Response(
@@ -312,3 +317,15 @@ def export_discovered():
         mimetype='text/csv',
         headers={'Content-Disposition': 'attachment; filename=discovered_certificates.csv'}
     )
+
+
+# ==================== Bulk Operations ====================
+
+@bp.route('/api/v2/discovery/bulk-resolve-dns', methods=['POST'])
+@require_auth(['admin:system'])
+def bulk_resolve_dns():
+    """Re-resolve reverse DNS for all discovered certificates."""
+    svc = _get_service()
+    result = svc.bulk_resolve_dns()
+    _audit('discovery_bulk_dns', details=f"Resolved {result['updated']}/{result['total']} certificates")
+    return success_response(data=result, message=f"Updated {result['updated']} DNS hostnames")

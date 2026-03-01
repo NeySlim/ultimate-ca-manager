@@ -133,6 +133,7 @@ class DiscoveredCertificate(db.Model):
     scan_profile_id = db.Column(db.Integer, db.ForeignKey('discovery_scan_profiles.id', ondelete='SET NULL'))
     target = db.Column(db.String(1024), nullable=False)
     port = db.Column(db.Integer, nullable=False, default=443)
+    sni_hostname = db.Column(db.String(1024), nullable=False, default='')
     subject = db.Column(db.Text)
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100))
@@ -147,12 +148,14 @@ class DiscoveredCertificate(db.Model):
     last_changed_at = db.Column(db.DateTime)
     previous_fingerprint = db.Column(db.String(64))
     dns_hostname = db.Column(db.String(1024))
+    san_dns_names = db.Column(db.Text, nullable=False, default='[]')
+    san_ip_addresses = db.Column(db.Text, nullable=False, default='[]')
     scan_error = db.Column(db.Text)
 
     ucm_certificate = db.relationship('Certificate', backref='discovered_instances')
 
     __table_args__ = (
-        db.UniqueConstraint('target', 'port', name='uq_disc_cert_target_port'),
+        db.UniqueConstraint('target', 'port', 'sni_hostname', name='uq_disc_cert_target_port_sni'),
     )
 
     @property
@@ -179,6 +182,7 @@ class DiscoveredCertificate(db.Model):
             'scan_profile_id': self.scan_profile_id,
             'target': self.target,
             'port': self.port,
+            'sni_hostname': self.sni_hostname or None,
             'subject': self.subject,
             'issuer': self.issuer,
             'serial_number': self.serial_number,
@@ -192,6 +196,8 @@ class DiscoveredCertificate(db.Model):
             'last_changed_at': self.last_changed_at.isoformat() if self.last_changed_at else None,
             'previous_fingerprint': self.previous_fingerprint,
             'dns_hostname': self.dns_hostname,
+            'san_dns_names': json.loads(self.san_dns_names) if self.san_dns_names else [],
+            'san_ip_addresses': json.loads(self.san_ip_addresses) if self.san_ip_addresses else [],
             'is_expired': self.is_expired,
             'days_until_expiry': self.days_until_expiry,
             'scan_error': self.scan_error,

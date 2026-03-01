@@ -2917,6 +2917,9 @@
     "concurrency": "Concorrência",
     "dnsHostname": "Nome de host DNS",
     "exportSuccess": "Exportação concluída",
-    "exportFailed": "Falha na exportação"
+    "exportFailed": "Falha na exportação",
+    "subjectAltNames": "Nomes alternativos do titular",
+    "bulkResolveDns": "Resolver DNS",
+    "bulkDnsSuccess": "DNS resolvido: {{updated}}/{{total}} atualizados"
   }
 }

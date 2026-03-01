@@ -2917,6 +2917,9 @@
     "concurrency": "并发数",
     "dnsHostname": "DNS主机名",
     "exportSuccess": "导出完成",
-    "exportFailed": "导出失败"
+    "exportFailed": "导出失败",
+    "subjectAltNames": "主体备用名称",
+    "bulkResolveDns": "解析DNS",
+    "bulkDnsSuccess": "DNS已解析: {{updated}}/{{total}} 已更新"
   }
 }

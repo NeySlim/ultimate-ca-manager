@@ -2917,6 +2917,9 @@
     "concurrency": "Parallelität",
     "dnsHostname": "DNS-Hostname",
     "exportSuccess": "Export abgeschlossen",
-    "exportFailed": "Export fehlgeschlagen"
+    "exportFailed": "Export fehlgeschlagen",
+    "subjectAltNames": "Alternative Antragstellernamen",
+    "bulkResolveDns": "DNS auflösen",
+    "bulkDnsSuccess": "DNS aufgelöst: {{updated}}/{{total}} aktualisiert"
   }
 }

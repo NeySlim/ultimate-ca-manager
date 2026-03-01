@@ -53,4 +53,8 @@ export const discoveryService = {
   // ── Export ────────────────────────────────────────────
   export: (format = 'csv', params = {}) =>
     apiClient.get(`/discovery/export${buildQueryString({ format, ...params })}`, { responseType: 'blob' }),
+
+  // ── Bulk Operations ──────────────────────────────────
+  bulkResolveDns: () =>
+    apiClient.post('/discovery/bulk-resolve-dns'),
 }

@@ -2917,6 +2917,9 @@
     "concurrency": "同時実行数",
     "dnsHostname": "DNSホスト名",
     "exportSuccess": "エクスポート完了",
-    "exportFailed": "エクスポート失敗"
+    "exportFailed": "エクスポート失敗",
+    "subjectAltNames": "サブジェクト代替名",
+    "bulkResolveDns": "DNS解決",
+    "bulkDnsSuccess": "DNS解決: {{updated}}/{{total}} 更新"
   }
 }

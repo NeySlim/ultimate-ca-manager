@@ -10,7 +10,7 @@ import {
   ArrowsClockwise, Trash, Play, Plus, CheckCircle, XCircle,
   ClockCounterClockwise, FolderOpen, Pencil, CalendarBlank,
   WifiHigh, WifiSlash, Certificate, ArrowSquareOut, Network,
-  Export, Gauge, Lightning
+  Export, Gauge, Lightning, MapPin
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable,
@@ -237,6 +237,17 @@ export default function DiscoveryPage() {
     }
   }
 
+  const handleBulkResolveDns = async () => {
+    try {
+      const res = await discoveryService.bulkResolveDns()
+      const data = res.data ?? res
+      showSuccess(t('discovery.bulkDnsSuccess', { updated: data.updated, total: data.total }))
+      loadDiscovered()
+    } catch (error) {
+      showError(error.message)
+    }
+  }
+
   // ── Stats bar ─────────────────────────────────────────
   const statsBar = useMemo(() => [
     { icon: Globe, label: t('common.total'), value: stats.total, variant: 'primary' },
@@ -277,6 +288,9 @@ export default function DiscoveryPage() {
       render: (val, row) => (
         <div className="text-sm">
           <span className="text-text-secondary">{val || '—'}:{row.port || 443}</span>
+          {row.sni_hostname && (
+            <div className="text-2xs text-accent-primary truncate" title={`SNI: ${row.sni_hostname}`}>SNI: {row.sni_hostname}</div>
+          )}
           {row.dns_hostname && (
             <div className="text-2xs text-text-tertiary truncate">{row.dns_hostname}</div>
           )}
@@ -542,9 +556,30 @@ export default function DiscoveryPage() {
                   <MagnifyingGlass size={22} weight="bold" />
                 </Button>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  {scanning && scanProgress && scanProgress.total > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-text-secondary mr-1">
+                      <div className="w-24 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-accent-primary rounded-full transition-all"
+                          style={{ width: `${Math.round(scanProgress.scanned / scanProgress.total * 100)}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums whitespace-nowrap">{scanProgress.scanned}/{scanProgress.total}</span>
+                    </div>
+                  )}
                   {discovered.length > 0 && (
                     <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleBulkResolveDns}
+                        title={t('discovery.bulkResolveDns')}
+                      >
+                        <MapPin size={14} />
+                        {t('discovery.bulkResolveDns')}
+                      </Button>
                       <Button
                         type="button"
                         size="sm"
@@ -1172,6 +1207,9 @@ function DiscoveredDetailPanel({ item, t }) {
         <CompactGrid>
           <CompactField label={t('common.commonName')} value={name} />
           <CompactField label={t('discovery.host')} value={`${item.target}:${item.port || 443}`} />
+          {item.sni_hostname && (
+            <CompactField label="SNI" value={item.sni_hostname} mono />
+          )}
           {item.dns_hostname && (
             <CompactField label={t('discovery.dnsHostname')} value={item.dns_hostname} />
           )}
@@ -1204,6 +1242,33 @@ function DiscoveredDetailPanel({ item, t }) {
           </div>
         </div>
       </CompactSection>
+
+      {(item.san_dns_names?.length > 0 || item.san_ip_addresses?.length > 0) && (
+        <CompactSection title={t('discovery.subjectAltNames')}>
+          <div className="space-y-2">
+            {item.san_dns_names?.length > 0 && (
+              <div>
+                <div className="text-2xs text-text-tertiary uppercase tracking-wider mb-1">DNS</div>
+                <div className="flex flex-wrap gap-1">
+                  {item.san_dns_names.map((san, i) => (
+                    <Badge key={i} variant="secondary" size="sm">{san}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {item.san_ip_addresses?.length > 0 && (
+              <div>
+                <div className="text-2xs text-text-tertiary uppercase tracking-wider mb-1">IP</div>
+                <div className="flex flex-wrap gap-1">
+                  {item.san_ip_addresses.map((san, i) => (
+                    <Badge key={i} variant="secondary" size="sm">{san}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </CompactSection>
+      )}
 
       <CompactSection title={t('common.validity')}>
         <CompactGrid>

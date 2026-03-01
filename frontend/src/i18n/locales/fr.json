@@ -2920,6 +2920,9 @@
     "concurrency": "Concurrence",
     "dnsHostname": "Nom d'hôte DNS",
     "exportSuccess": "Export terminé",
-    "exportFailed": "Échec de l'export"
+    "exportFailed": "Échec de l'export",
+    "subjectAltNames": "Noms alternatifs du sujet",
+    "bulkResolveDns": "Résoudre DNS",
+    "bulkDnsSuccess": "DNS résolu : {{updated}}/{{total}} mis à jour"
   }
 }

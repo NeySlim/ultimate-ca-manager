@@ -2917,6 +2917,9 @@
     "concurrency": "Паралельність",
     "dnsHostname": "DNS-ім'я хоста",
     "exportSuccess": "Експорт завершено",
-    "exportFailed": "Помилка експорту"
+    "exportFailed": "Помилка експорту",
+    "subjectAltNames": "Альтернативні імена суб'єкта",
+    "bulkResolveDns": "Розв'язати DNS",
+    "bulkDnsSuccess": "DNS розв'язано: {{updated}}/{{total}} оновлено"
   }
 }

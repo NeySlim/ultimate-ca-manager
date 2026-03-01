@@ -39,17 +39,21 @@ class DiscoveryService:
     # ------------------------------------------------------------------
 
     def probe_tls(self, host: str, port: int = 443, timeout: int = None,
-                  resolve_dns: bool = False) -> Dict:
-        """Connect to host:port via TLS and return certificate info."""
+                  resolve_dns: bool = False, sni_hostname: str = None) -> Dict:
+        """Connect to host:port via TLS and return certificate info.
+        If sni_hostname is set, connect to host but use sni_hostname for TLS SNI."""
         connect_timeout = timeout or self.timeout
+        server_name = sni_hostname or host
         result = {'target': host, 'port': port}
+        if sni_hostname:
+            result['sni_hostname'] = sni_hostname
         try:
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
 
             with socket.create_connection((host, port), timeout=connect_timeout) as sock:
-                with ctx.wrap_socket(sock, server_hostname=host) as tls:
+                with ctx.wrap_socket(sock, server_hostname=server_name) as tls:
                     der = tls.getpeercert(binary_form=True)
                     if not der:
                         result['error'] = 'No certificate returned'
@@ -60,6 +64,16 @@ class DiscoveryService:
                     pem = cert.public_bytes(serialization.Encoding.PEM).decode()
                     fp = hashlib.sha256(der).hexdigest().upper()
 
+                    # Extract SANs
+                    san_dns = []
+                    san_ips = []
+                    try:
+                        san_ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+                        san_dns = san_ext.value.get_values_for_type(x509.DNSName)
+                        san_ips = [str(ip) for ip in san_ext.value.get_values_for_type(x509.IPAddress)]
+                    except x509.ExtensionNotFound:
+                        pass
+
                     result.update({
                         'subject': cert.subject.rfc4514_string(),
                         'issuer': cert.issuer.rfc4514_string(),
@@ -68,10 +82,12 @@ class DiscoveryService:
                         'not_after': cert.not_valid_after_utc.isoformat(),
                         'fingerprint_sha256': fp,
                         'pem_certificate': pem,
+                        'san_dns_names': san_dns,
+                        'san_ip_addresses': san_ips,
                     })
 
             # Reverse DNS resolution
-            if resolve_dns:
+            if resolve_dns and not sni_hostname:
                 try:
                     hostname, _, _ = socket.gethostbyaddr(host)
                     if hostname and hostname != host:
@@ -92,7 +108,7 @@ class DiscoveryService:
             result['error'] = str(e)
             result['error_type'] = 'network'
         except Exception as e:
-            logger.debug(f"TLS probe {host}:{port} failed: {e}")
+            logger.debug(f"TLS probe {host}:{port} (SNI={server_name}) failed: {e}")
             result['error'] = str(e)
             result['error_type'] = 'tls'
         return result
@@ -194,6 +210,7 @@ class DiscoveryService:
     def _do_scan(self, run_id: int, jobs: List[Tuple[str, int]], profile_id: int,
                  timeout: int = 5, max_workers: int = 20, resolve_dns: bool = False):
         """Core scanning logic running in background."""
+        import json as _json
         from websocket.emitters import (on_discovery_scan_started,
                                         on_discovery_scan_progress,
                                         on_discovery_scan_complete,
@@ -245,24 +262,66 @@ class DiscoveryService:
                 elif has_error and not is_refused:
                     errors_real += 1
 
+        # SNI probing — re-probe IP targets with SAN hostnames to discover multi-cert proxies
+        sni_jobs = {}  # (host, port, sni) -> default_fingerprint
+        for r in results:
+            if 'fingerprint_sha256' not in r:
+                continue
+            try:
+                ipaddress.ip_address(r['target'])
+            except ValueError:
+                continue  # Only SNI-probe IP targets
+            for san in (r.get('san_dns_names') or [])[:20]:
+                if san.startswith('*.') or san == r['target']:
+                    continue
+                key = (r['target'], r['port'], san)
+                if key not in sni_jobs:
+                    sni_jobs[key] = r['fingerprint_sha256']
+
+        if sni_jobs:
+            logger.info(f"SNI probing: {len(sni_jobs)} additional probes for scan {run_id}")
+            total_with_sni = len(jobs) + len(sni_jobs)
+            run.total_targets = total_with_sni
+            db.session.commit()
+
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                sni_futures = {
+                    pool.submit(self.probe_tls, h, p, timeout, False, sni): (h, p, sni, orig_fp)
+                    for (h, p, sni), orig_fp in sni_jobs.items()
+                }
+                for future in as_completed(sni_futures):
+                    h, p, sni, orig_fp = sni_futures[future]
+                    r = future.result()
+                    scanned += 1
+                    if scanned % 10 == 0 or (time.time() - last_progress) > 3:
+                        on_discovery_scan_progress(run_id, scanned, total_with_sni, found)
+                        last_progress = time.time()
+                    if 'fingerprint_sha256' in r and r['fingerprint_sha256'] != orig_fp:
+                        logger.info(f"SNI discovery: {h}:{p} SNI={sni} → different cert ({r['fingerprint_sha256'][:16]})")
+                        results.append(r)
+                        found += 1
+                        new_certs += 1
+
         # Save results to DB
         for r in results:
             is_refused = r.get('error_type') == 'refused'
             if 'error' in r and 'fingerprint_sha256' not in r:
                 if is_refused:
-                    # Skip connection refused — not interesting
                     continue
-                # Real error — save for tracking
                 self._save_error(r, profile_id, now)
                 continue
 
             fp = r['fingerprint_sha256']
             ucm_id = fp_index.get(fp)
             status = 'managed' if ucm_id else 'unmanaged'
+            sni = r.get('sni_hostname', '')
 
             existing = DiscoveredCertificate.query.filter_by(
-                target=r['target'], port=r['port']
+                target=r['target'], port=r['port'], sni_hostname=sni
             ).first()
+
+            san_dns_json = _json.dumps(r.get('san_dns_names', []))
+            san_ips_json = _json.dumps(r.get('san_ip_addresses', []))
 
             if existing:
                 # Change detection
@@ -286,6 +345,8 @@ class DiscoveryService:
                 existing.scan_profile_id = profile_id or existing.scan_profile_id
                 existing.last_seen = now
                 existing.scan_error = None
+                existing.san_dns_names = san_dns_json
+                existing.san_ip_addresses = san_ips_json
                 if r.get('dns_hostname'):
                     existing.dns_hostname = r['dns_hostname']
             else:
@@ -293,6 +354,7 @@ class DiscoveryService:
                 dc = DiscoveredCertificate(
                     scan_profile_id=profile_id,
                     target=r['target'], port=r['port'],
+                    sni_hostname=sni,
                     subject=r.get('subject'),
                     issuer=r.get('issuer'),
                     serial_number=r.get('serial_number'),
@@ -303,6 +365,8 @@ class DiscoveryService:
                     status=status,
                     ucm_certificate_id=ucm_id,
                     dns_hostname=r.get('dns_hostname'),
+                    san_dns_names=san_dns_json,
+                    san_ip_addresses=san_ips_json,
                     first_seen=now, last_seen=now,
                 )
                 db.session.add(dc)
@@ -343,8 +407,9 @@ class DiscoveryService:
 
     def _save_error(self, r: Dict, profile_id: int, now: datetime):
         """Save a scan error (not connection_refused)."""
+        sni = r.get('sni_hostname', '')
         existing = DiscoveredCertificate.query.filter_by(
-            target=r['target'], port=r['port']
+            target=r['target'], port=r['port'], sni_hostname=sni
         ).first()
         if existing:
             existing.last_seen = now
@@ -354,6 +419,7 @@ class DiscoveryService:
             dc = DiscoveredCertificate(
                 scan_profile_id=profile_id,
                 target=r['target'], port=r['port'],
+                sni_hostname=sni,
                 status='error', scan_error=r.get('error'),
                 first_seen=now, last_seen=now,
             )
@@ -476,6 +542,27 @@ class DiscoveryService:
     # ------------------------------------------------------------------
     # Query helpers
     # ------------------------------------------------------------------
+
+    def bulk_resolve_dns(self) -> Dict:
+        """Re-resolve reverse DNS for all discovered certificates."""
+        certs = DiscoveredCertificate.query.filter(
+            DiscoveredCertificate.status != 'error',
+            DiscoveredCertificate.fingerprint_sha256.isnot(None),
+        ).all()
+
+        updated = 0
+        for cert in certs:
+            try:
+                hostname, _, _ = socket.gethostbyaddr(cert.target)
+                if hostname and hostname != cert.target:
+                    if cert.dns_hostname != hostname:
+                        cert.dns_hostname = hostname
+                        updated += 1
+            except (socket.herror, socket.gaierror, OSError):
+                pass
+
+        db.session.commit()
+        return {'total': len(certs), 'updated': updated}
 
     def get_all(self, limit: int = 200, offset: int = 0,
                 profile_id: int = None, status: str = None) -> Tuple[List[Dict], int]:
