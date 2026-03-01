@@ -5,7 +5,7 @@ Scan profiles, async scanning, results, history.
 import ipaddress
 import logging
 
-from flask import Blueprint, request, current_app
+from flask import Blueprint, request, current_app, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 
@@ -22,6 +22,22 @@ def _get_service():
         from services.discovery_service import DiscoveryService
         _service = DiscoveryService()
     return _service
+
+
+def _audit(action, resource_name='', resource_id=None, details=''):
+    """Helper to log discovery audit events."""
+    try:
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action=action,
+            resource_type='discovery',
+            resource_id=resource_id,
+            resource_name=resource_name,
+            details=details,
+            success=True,
+        )
+    except Exception:
+        pass
 
 
 # ==================== Scan Profiles ====================
@@ -48,6 +64,8 @@ def create_profile():
     svc = _get_service()
     try:
         profile = svc.create_profile(data)
+        _audit('discovery_profile_created', resource_name=data['name'],
+               resource_id=profile.get('id'), details=f"Targets: {', '.join(data['targets'][:5])}")
         return created_response(data=profile, message="Profile created")
     except Exception as e:
         if 'UNIQUE' in str(e):
@@ -78,6 +96,8 @@ def update_profile(profile_id):
     profile = svc.update_profile(profile_id, data)
     if not profile:
         return error_response("Profile not found", 404)
+    _audit('discovery_profile_updated', resource_name=profile.get('name', ''),
+           resource_id=profile_id, details=f"Updated fields: {', '.join(data.keys())}")
     return success_response(data=profile, message="Profile updated")
 
 
@@ -88,6 +108,8 @@ def delete_profile(profile_id):
     svc = _get_service()
     if not svc.delete_profile(profile_id):
         return error_response("Profile not found", 404)
+    _audit('discovery_profile_deleted', resource_id=profile_id,
+           details=f"Profile {profile_id} deleted")
     return no_content_response()
 
 
@@ -102,7 +124,6 @@ def scan_profile(profile_id):
     if not profile:
         return error_response("Profile not found", 404)
 
-    from flask import g
     username = g.current_user.username if hasattr(g, 'current_user') else 'unknown'
 
     run_id = svc.start_scan(
@@ -113,6 +134,8 @@ def scan_profile(profile_id):
         triggered_by_user=username,
         app=current_app._get_current_object(),
     )
+    _audit('discovery_scan_started', resource_name=profile.get('name', ''),
+           resource_id=run_id, details=f"Profile scan: {profile.get('name')}, targets: {len(profile['targets'])}")
     return success_response(data={'scan_run_id': run_id}, message="Scan started")
 
 
@@ -142,7 +165,6 @@ def ad_hoc_scan():
             return error_response(f"Invalid subnet: {e}", 400)
 
     svc = _get_service()
-    from flask import g
     username = g.current_user.username if hasattr(g, 'current_user') else 'unknown'
 
     if subnet:
@@ -151,12 +173,16 @@ def ad_hoc_scan():
             triggered_by='manual', triggered_by_user=username,
             app=current_app._get_current_object(),
         )
+        _audit('discovery_scan_started', resource_id=run_id,
+               details=f"Ad-hoc subnet scan: {subnet}")
     else:
         run_id = svc.start_scan(
             targets=targets, ports=ports,
             triggered_by='manual', triggered_by_user=username,
             app=current_app._get_current_object(),
         )
+        _audit('discovery_scan_started', resource_id=run_id,
+               details=f"Ad-hoc scan: {len(targets)} targets")
 
     return success_response(data={'scan_run_id': run_id}, message="Scan started")
 
@@ -218,6 +244,8 @@ def delete_discovered(disc_id):
     svc = _get_service()
     if not svc.delete(disc_id):
         return error_response("Not found", 404)
+    _audit('discovery_result_deleted', resource_id=disc_id,
+           details=f"Discovered certificate {disc_id} deleted")
     return no_content_response()
 
 
@@ -228,4 +256,6 @@ def delete_all_discovered():
     profile_id = request.args.get('profile_id', type=int)
     svc = _get_service()
     count = svc.delete_all(profile_id=profile_id)
+    _audit('discovery_results_purged', details=f"Deleted {count} discovered certificates"
+           + (f" for profile {profile_id}" if profile_id else ""))
     return success_response(data={'deleted': count}, message=f"Deleted {count} records")

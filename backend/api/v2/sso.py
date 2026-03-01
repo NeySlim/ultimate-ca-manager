@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, User, Certificate
 from models.sso import SSOProvider, SSOSession
+from services.audit_service import AuditService
 from datetime import datetime, timedelta
 import hmac
 import json
@@ -206,6 +207,15 @@ def create_provider():
     db.session.add(provider)
     db.session.commit()
     
+    AuditService.log_action(
+        action='sso_provider_created',
+        resource_type='sso_provider',
+        resource_id=provider.id,
+        resource_name=provider.name,
+        details=f"Type: {provider.provider_type}",
+        success=True,
+    )
+    
     return success_response(data=provider.to_dict(), message="SSO provider created")
 
 
@@ -293,6 +303,14 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider.role_mapping = json.dumps(val)
     
     db.session.commit()
+    AuditService.log_action(
+        action='sso_provider_updated',
+        resource_type='sso_provider',
+        resource_id=provider.id,
+        resource_name=provider.name,
+        details=f"Updated fields: {', '.join(data.keys())}",
+        success=True,
+    )
     return success_response(data=provider.to_dict(), message="SSO provider updated")
 
 
@@ -301,12 +319,23 @@ def update_provider(provider_id=None, provider_type_name=None):
 def delete_provider(provider_id):
     """Delete SSO provider"""
     provider = SSOProvider.query.get_or_404(provider_id)
+    provider_name = provider.name
+    provider_type = provider.provider_type
     
     # Delete associated sessions first
     SSOSession.query.filter_by(provider_id=provider_id).delete()
     
     db.session.delete(provider)
     db.session.commit()
+    
+    AuditService.log_action(
+        action='sso_provider_deleted',
+        resource_type='sso_provider',
+        resource_id=provider_id,
+        resource_name=provider_name,
+        details=f"Type: {provider_type}",
+        success=True,
+    )
     
     return success_response(message="SSO provider deleted")
 
@@ -320,6 +349,14 @@ def toggle_provider(provider_id):
     db.session.commit()
     
     status = "enabled" if provider.enabled else "disabled"
+    AuditService.log_action(
+        action=f'sso_provider_{status}',
+        resource_type='sso_provider',
+        resource_id=provider.id,
+        resource_name=provider.name,
+        details=f"Type: {provider.provider_type}",
+        success=True,
+    )
     return success_response(data=provider.to_dict(), message=f"SSO provider {status}")
 
 
