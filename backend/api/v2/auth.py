@@ -159,9 +159,11 @@ def login():
     session.clear()
     
     # Create new session with regenerated ID
+    now = datetime.utcnow()
     session['user_id'] = user.id
     session['username'] = user.username
-    session['login_time'] = datetime.utcnow().isoformat()
+    session['login_time'] = now.isoformat()
+    session['last_activity'] = now.isoformat()
     session.permanent = True
     session.modified = True
     

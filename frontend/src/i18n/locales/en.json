@@ -1685,7 +1685,9 @@
       "restartNote": "A service restart is required to apply mTLS changes.",
       "saved": "mTLS settings saved",
       "saveFailed": "Failed to save mTLS settings"
-    }
+    },
+    "sessionTimeoutHelper": "Inactivity timeout in minutes. Sessions expire after this period of no activity.",
+    "sessionDurationHelper": "Maximum session duration in hours, regardless of activity."
   },
   "account": {
     "profile": "Profile",

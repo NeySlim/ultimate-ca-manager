@@ -1831,7 +1831,9 @@
       "restartNote": "Un redémarrage du service est nécessaire pour appliquer les changements mTLS.",
       "saved": "Paramètres mTLS enregistrés",
       "saveFailed": "Échec de l'enregistrement des paramètres mTLS"
-    }
+    },
+    "sessionTimeoutHelper": "Délai d'inactivité en minutes. Les sessions expirent après cette période sans activité.",
+    "sessionDurationHelper": "Durée maximale de session en heures, indépendamment de l'activité."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

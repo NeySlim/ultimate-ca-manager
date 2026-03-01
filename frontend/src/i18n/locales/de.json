@@ -1684,7 +1684,9 @@
       "restartNote": "Ein Dienstneustart ist erforderlich, um mTLS-Änderungen anzuwenden.",
       "saved": "mTLS-Einstellungen gespeichert",
       "saveFailed": "Fehler beim Speichern der mTLS-Einstellungen"
-    }
+    },
+    "sessionTimeoutHelper": "Inaktivitäts-Timeout in Minuten. Sitzungen laufen nach dieser Zeit ohne Aktivität ab.",
+    "sessionDurationHelper": "Maximale Sitzungsdauer in Stunden, unabhängig von Aktivität."
   },
   "account": {
     "profile": "Profil",

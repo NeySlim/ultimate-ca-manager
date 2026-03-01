@@ -40,7 +40,8 @@ def get_general_settings():
         'backup_frequency': get_config('backup_frequency', 'daily'),
         'backup_retention_days': int(get_config('backup_retention_days', '30')),
         'backup_password': '',  # Never return password
-        'session_timeout': int(get_config('session_timeout', '3600')),
+        'session_timeout': int(get_config('session_timeout', '28800')),
+        'session_max_lifetime': int(get_config('session_max_lifetime', '86400')),
         'max_login_attempts': int(get_config('max_login_attempts', '5')),
         'lockout_duration': int(get_config('lockout_duration', '300')),
     })
@@ -56,7 +57,7 @@ def update_general_settings():
     allowed_keys = [
         'site_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
         'backup_retention_days', 'backup_password', 'session_timeout',
-        'max_login_attempts', 'lockout_duration'
+        'session_max_lifetime', 'max_login_attempts', 'lockout_duration'
     ]
     
     for key in allowed_keys:

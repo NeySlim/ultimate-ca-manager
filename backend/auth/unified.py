@@ -106,10 +106,10 @@ class AuthManager:
     
     def verify_session(self):
         """
-        Verify Flask session
+        Verify Flask session with inactivity + absolute lifetime checks.
         
         Returns:
-            dict: User info, or None
+            dict: User info, or None if session is invalid/expired
         """
         if not User:
             return None
@@ -122,6 +122,45 @@ class AuthManager:
         if not user or not user.active:
             return None
         
+        now = datetime.utcnow()
+        
+        # Check absolute session lifetime (default 24h)
+        login_time_str = session.get('login_time')
+        if login_time_str:
+            try:
+                login_time = datetime.fromisoformat(login_time_str)
+                max_lifetime = self._get_session_max_lifetime()
+                if (now - login_time).total_seconds() > max_lifetime:
+                    import logging
+                    logging.getLogger(__name__).info(
+                        f"Session expired (max lifetime): user={user.username}, "
+                        f"login_time={login_time_str}, max={max_lifetime}s"
+                    )
+                    session.clear()
+                    return None
+            except (ValueError, TypeError):
+                pass
+        
+        # Check inactivity timeout (default 8h)
+        last_activity_str = session.get('last_activity')
+        if last_activity_str:
+            try:
+                last_activity = datetime.fromisoformat(last_activity_str)
+                inactivity_timeout = self._get_session_timeout()
+                if (now - last_activity).total_seconds() > inactivity_timeout:
+                    import logging
+                    logging.getLogger(__name__).info(
+                        f"Session expired (inactivity): user={user.username}, "
+                        f"last_activity={last_activity_str}, timeout={inactivity_timeout}s"
+                    )
+                    session.clear()
+                    return None
+            except (ValueError, TypeError):
+                pass
+        
+        # Update last activity timestamp
+        session['last_activity'] = now.isoformat()
+        
         from auth.permissions import get_role_permissions
         permissions = get_role_permissions(user.role)
         
@@ -132,6 +171,30 @@ class AuthManager:
             'permissions': permissions,
             'session_expires': session.get('expires_at')
         }
+    
+    @staticmethod
+    def _get_session_timeout():
+        """Get inactivity timeout in seconds from DB config (default 8h = 28800s)"""
+        try:
+            from models import SystemConfig
+            config = SystemConfig.query.filter_by(key='session_timeout').first()
+            if config and config.value:
+                return int(config.value)
+        except Exception:
+            pass
+        return 28800  # 8 hours default
+    
+    @staticmethod
+    def _get_session_max_lifetime():
+        """Get absolute max session lifetime in seconds from DB config (default 24h = 86400s)"""
+        try:
+            from models import SystemConfig
+            config = SystemConfig.query.filter_by(key='session_max_lifetime').first()
+            if config and config.value:
+                return int(config.value)
+        except Exception:
+            pass
+        return 86400  # 24 hours default
     
     def create_api_key(self, user_id, name, permissions, expires_days=365):
         """
@@ -188,9 +251,11 @@ def create_session_for_user(user):
     Returns:
         dict: {'user': dict}
     """
+    now = datetime.utcnow()
     session['user_id'] = user.id
     session['username'] = user.username
-    session['login_time'] = datetime.utcnow().isoformat()
+    session['login_time'] = now.isoformat()
+    session['last_activity'] = now.isoformat()
     session.permanent = True
     session.modified = True
     

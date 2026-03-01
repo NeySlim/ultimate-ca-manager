@@ -445,6 +445,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register session cleanup task (every 15 minutes)
+        try:
+            from services.session_cleanup_task import SessionCleanupTask
+            scheduler.register_task(
+                name="session_cleanup",
+                func=SessionCleanupTask.execute,
+                interval=900,  # Every 15 minutes
+                description="Clean up expired session files"
+            )
+            app.logger.info("Registered session cleanup task (every 15m)")
+        except ImportError:
+            pass
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
         app.logger.info("Scheduler service started with all tasks")

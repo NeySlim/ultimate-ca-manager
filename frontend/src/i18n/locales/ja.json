@@ -1684,7 +1684,9 @@
       "restartNote": "mTLSの変更を適用するにはサービスの再起動が必要です。",
       "saved": "mTLS設定が保存されました",
       "saveFailed": "mTLS設定の保存に失敗しました"
-    }
+    },
+    "sessionTimeoutHelper": "非アクティブタイムアウト（分）。この期間操作がないとセッションが期限切れになります。",
+    "sessionDurationHelper": "セッションの最大持続時間（時間）。アクティビティに関係なく適用されます。"
   },
   "account": {
     "profile": "プロフィール",

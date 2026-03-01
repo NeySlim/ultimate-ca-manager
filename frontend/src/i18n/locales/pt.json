@@ -1684,7 +1684,9 @@
       "restartNote": "Uma reinicialização do serviço é necessária para aplicar as alterações mTLS.",
       "saved": "Configurações mTLS salvas",
       "saveFailed": "Falha ao salvar as configurações mTLS"
-    }
+    },
+    "sessionTimeoutHelper": "Timeout de inatividade em minutos. As sessões expiram após este período sem atividade.",
+    "sessionDurationHelper": "Duração máxima da sessão em horas, independentemente da atividade."
   },
   "account": {
     "profile": "Perfil",

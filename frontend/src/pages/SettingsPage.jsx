@@ -2262,10 +2262,11 @@ export default function SettingsPage() {
                 <Input
                   label={t('settings.sessionTimeout')}
                   type="number"
-                  value={settings.session_timeout || 30}
-                  onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value))}
+                  value={Math.round((settings.session_timeout || 28800) / 60)}
+                  onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
                   min="5"
                   max="1440"
+                  helperText={t('settings.sessionTimeoutHelper')}
                 />
                 <Select
                   label={t('settings.timezone')}
@@ -2703,10 +2704,11 @@ export default function SettingsPage() {
                   <Input
                     label={t('settings.sessionDuration')}
                     type="number"
-                    value={settings.session_duration || 24}
-                    onChange={(e) => updateSetting('session_duration', parseInt(e.target.value))}
+                    value={Math.round((settings.session_max_lifetime || 86400) / 3600)}
+                    onChange={(e) => updateSetting('session_max_lifetime', parseInt(e.target.value) * 3600)}
                     min="1"
                     max="720"
+                    helperText={t('settings.sessionDurationHelper')}
                   />
                 </div>
                 <div className="col-span-full md:col-span-1">
