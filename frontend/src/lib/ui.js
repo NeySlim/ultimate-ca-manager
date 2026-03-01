@@ -3,6 +3,8 @@
  * Centralized helpers for consistent UI across the app
  */
 
+import { getAppTimezone } from '../stores/timezoneStore'
+
 // =============================================================================
 // LABELS / i18n
 // =============================================================================
@@ -200,10 +202,12 @@ export function statusVariant(status) {
 export function formatDate(date, options = {}) {
   if (!date) return '-'
   
+  const tz = getAppTimezone()
   const defaultOptions = {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: tz,
     ...options
   }
   

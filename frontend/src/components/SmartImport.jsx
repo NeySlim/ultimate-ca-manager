@@ -16,6 +16,7 @@ import { Badge } from './Badge'
 import { Modal } from './Modal'
 import { apiClient as api } from '../services'
 import { useNotification } from '../contexts/NotificationContext'
+import { getAppTimezone } from '../stores/timezoneStore'
 
 // Supported file formats
 const SUPPORTED_FORMATS = {
@@ -94,7 +95,7 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
           {obj.not_before && (
             <div className="flex gap-2">
               <span className="text-text-secondary w-20 shrink-0">{t('common.valid')}:</span>
-              <span className="text-xs">{new Date(obj.not_before).toLocaleDateString()} → {new Date(obj.not_after).toLocaleDateString()}</span>
+              <span className="text-xs">{new Date(obj.not_before).toLocaleDateString(undefined, { timeZone: getAppTimezone() })} → {new Date(obj.not_after).toLocaleDateString(undefined, { timeZone: getAppTimezone() })}</span>
             </div>
           )}
           {obj.key_algorithm && (

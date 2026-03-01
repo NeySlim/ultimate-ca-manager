@@ -25,6 +25,7 @@ import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
+import { getAppTimezone } from '../stores/timezoneStore'
 
 export default function CAsPage() {
   const { t } = useTranslation()
@@ -684,7 +685,7 @@ function formatExpiry(date, t) {
   if (diffDays < 0) return { text: t('common.expired'), variant: 'danger' }
   if (diffDays < 30) return { text: t('cas.daysLeft', { count: diffDays }), variant: 'warning' }
   if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default' }
-  return { text: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), variant: 'default' }
+  return { text: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: getAppTimezone() }), variant: 'default' }
 }
 
 function getStatusBadgeClass(status) {

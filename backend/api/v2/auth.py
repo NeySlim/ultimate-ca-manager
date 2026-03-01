@@ -261,6 +261,11 @@ def verify():
     if HAS_CSRF:
         csrf_token = CSRFProtection.generate_token(g.user_id)
     
+    # Include app timezone setting
+    from models import SystemConfig
+    tz_row = SystemConfig.query.filter_by(key='timezone').first()
+    app_timezone = tz_row.value if tz_row else 'UTC'
+    
     # If authenticated
     return success_response(
         data={
@@ -274,7 +279,8 @@ def verify():
                 'username': g.current_user.username,
                 'role': g.current_user.role
             },
-            'csrf_token': csrf_token
+            'csrf_token': csrf_token,
+            'timezone': app_timezone
         }
     )
 

@@ -17,6 +17,7 @@ import { reportsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { cn } from '../lib/utils'
+import { getAppTimezone } from '../stores/timezoneStore'
 
 const REPORT_ICONS = {
   certificate_inventory: Certificate,
@@ -373,7 +374,7 @@ export default function ReportsPage() {
           <p className="text-xs text-text-tertiary italic py-2">{t('common.noData')}</p>
         ) : null}
         <p className="text-xs text-text-tertiary">
-          {items.length} {items.length === 1 ? 'record' : 'records'} • {t('reports.generatedAt')} {new Date().toLocaleString()}
+          {items.length} {items.length === 1 ? 'record' : 'records'} • {t('reports.generatedAt')} {new Date().toLocaleString(undefined, { timeZone: getAppTimezone() })}
         </p>
       </div>
     )

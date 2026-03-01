@@ -29,21 +29,24 @@ import { Badge } from './Badge'
 import { Button } from './Button'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
+import { getAppTimezone } from '../stores/timezoneStore'
 
 // Format date helper
 function formatDate(dateStr, format = 'full') {
   if (!dateStr) return '—'
   try {
+    const tz = getAppTimezone()
     const date = new Date(dateStr)
     if (format === 'short') {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: tz })
     }
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: tz
     })
   } catch {
     return dateStr

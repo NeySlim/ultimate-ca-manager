@@ -8,6 +8,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authService } from '../services/auth.service'
 import { apiClient } from '../services/apiClient'
+import { setAppTimezone } from '../stores/timezoneStore'
 
 const AuthContext = createContext()
 
@@ -42,6 +43,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       setPermissions(userData.permissions || [])
       setRole(userData.role || null)
+      if (userData.timezone) setAppTimezone(userData.timezone)
       debug('✅ Session valid:', userData.user?.username)
       return true
     } catch (error) {

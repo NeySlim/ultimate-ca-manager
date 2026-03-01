@@ -6,6 +6,7 @@
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getAppTimezone } from '../stores/timezoneStore'
 import { 
   Certificate, 
   Key, 
@@ -35,16 +36,18 @@ import { cn } from '../lib/utils'
 function formatDate(dateStr, format = 'full') {
   if (!dateStr) return '—'
   try {
+    const tz = getAppTimezone()
     const date = new Date(dateStr)
     if (format === 'short') {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: tz })
     }
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      timeZone: tz
     })
   } catch {
     return dateStr

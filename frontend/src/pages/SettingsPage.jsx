@@ -33,6 +33,7 @@ import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
 import EmailTemplateWindow from '../components/EmailTemplateWindow'
 import { apiClient } from '../services/apiClient'
+import { getAppTimezone, setAppTimezone } from '../stores/timezoneStore'
 
 // Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
@@ -1232,7 +1233,7 @@ function SsoProviderForm({ provider, forcedType, onSave, onCancel }) {
                   ? availableCerts.map(c => ({
                       value: c.id,
                       label: c.not_after
-                        ? `${c.label} (${new Date(c.not_after).toLocaleDateString()})`
+                        ? `${c.label} (${new Date(c.not_after).toLocaleDateString(undefined, { timeZone: getAppTimezone() })})`
                         : c.label
                     }))
                   : [{ value: 'https', label: t('sso.httpsDefault') }]
@@ -1991,6 +1992,7 @@ export default function SettingsPage() {
         await settingsService.updateBulk(settings)
       }
       showSuccess(t('messages.success.update.settings'))
+      if (settings.timezone) setAppTimezone(settings.timezone)
       await loadSettings()
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
@@ -2271,10 +2273,32 @@ export default function SettingsPage() {
                 <Select
                   label={t('settings.timezone')}
                   options={[
-                    { value: 'UTC', label: 'UTC' },
-                    { value: 'America/New_York', label: 'America/New York' },
-                    { value: 'Europe/Paris', label: 'Europe/Paris' },
-                    { value: 'Asia/Tokyo', label: 'Asia/Tokyo' },
+                    { value: 'UTC', label: 'UTC (GMT+0)' },
+                    { value: 'Europe/London', label: 'Europe/London (GMT+0/+1)' },
+                    { value: 'Europe/Paris', label: 'Europe/Paris (GMT+1/+2)' },
+                    { value: 'Europe/Berlin', label: 'Europe/Berlin (GMT+1/+2)' },
+                    { value: 'Europe/Zurich', label: 'Europe/Zurich (GMT+1/+2)' },
+                    { value: 'Europe/Brussels', label: 'Europe/Brussels (GMT+1/+2)' },
+                    { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (GMT+1/+2)' },
+                    { value: 'Europe/Rome', label: 'Europe/Rome (GMT+1/+2)' },
+                    { value: 'Europe/Madrid', label: 'Europe/Madrid (GMT+1/+2)' },
+                    { value: 'Europe/Helsinki', label: 'Europe/Helsinki (GMT+2/+3)' },
+                    { value: 'Europe/Athens', label: 'Europe/Athens (GMT+2/+3)' },
+                    { value: 'Europe/Moscow', label: 'Europe/Moscow (GMT+3)' },
+                    { value: 'America/New_York', label: 'America/New York (GMT-5/-4)' },
+                    { value: 'America/Chicago', label: 'America/Chicago (GMT-6/-5)' },
+                    { value: 'America/Denver', label: 'America/Denver (GMT-7/-6)' },
+                    { value: 'America/Los_Angeles', label: 'America/Los Angeles (GMT-8/-7)' },
+                    { value: 'America/Toronto', label: 'America/Toronto (GMT-5/-4)' },
+                    { value: 'America/Sao_Paulo', label: 'America/São Paulo (GMT-3)' },
+                    { value: 'Asia/Dubai', label: 'Asia/Dubai (GMT+4)' },
+                    { value: 'Asia/Kolkata', label: 'Asia/Kolkata (GMT+5:30)' },
+                    { value: 'Asia/Shanghai', label: 'Asia/Shanghai (GMT+8)' },
+                    { value: 'Asia/Tokyo', label: 'Asia/Tokyo (GMT+9)' },
+                    { value: 'Asia/Seoul', label: 'Asia/Seoul (GMT+9)' },
+                    { value: 'Asia/Singapore', label: 'Asia/Singapore (GMT+8)' },
+                    { value: 'Australia/Sydney', label: 'Australia/Sydney (GMT+10/+11)' },
+                    { value: 'Pacific/Auckland', label: 'Pacific/Auckland (GMT+12/+13)' },
                   ]}
                   value={settings.timezone || 'UTC'}
                   onChange={(val) => updateSetting('timezone', val)}
@@ -2673,7 +2697,7 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
                           <span className="flex items-center gap-1">
                             <Clock size={12} />
-                            {new Date(anomaly.timestamp).toLocaleString()}
+                            {new Date(anomaly.timestamp).toLocaleString(undefined, { timeZone: getAppTimezone() })}
                           </span>
                           {anomaly.details?.ip && (
                             <span className="flex items-center gap-1">

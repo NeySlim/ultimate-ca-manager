@@ -1,5 +1,6 @@
 import { clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { getAppTimezone } from '../stores/timezoneStore'
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs))
@@ -47,10 +48,12 @@ export function extractData(obj, key, fallback = null) {
 export function formatDate(date, options = {}) {
   if (!date) return '-'
   try {
+    const tz = getAppTimezone()
     return new Date(date).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
+      timeZone: tz,
       ...options
     })
   } catch {

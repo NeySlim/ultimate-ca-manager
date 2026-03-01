@@ -17,6 +17,7 @@ import {
 import { accountService, casService, userCertificatesService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { formatDate } from '../lib/utils'
+import { getAppTimezone } from '../stores/timezoneStore'
 
 export default function AccountPage() {
   const { t } = useTranslation()
@@ -1112,7 +1113,7 @@ export default function AccountPage() {
                           <div className="text-xs text-text-secondary mt-1 truncate">{cert.subject}</div>
                           {cert.valid_to && (
                             <div className="text-xs text-text-tertiary mt-0.5">
-                              {t('account.mtlsExpiresOn', { date: new Date(cert.valid_to).toLocaleDateString() })}
+                              {t('account.mtlsExpiresOn', { date: new Date(cert.valid_to).toLocaleDateString(undefined, { timeZone: getAppTimezone() }) })}
                             </div>
                           )}
                         </button>
