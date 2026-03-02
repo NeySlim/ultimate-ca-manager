@@ -11,7 +11,8 @@ import {
   ClockCounterClockwise, FolderOpen, Pencil, CalendarBlank,
   WifiHigh, WifiSlash, Certificate, ArrowSquareOut, Network,
   Export, Gauge, Lightning, MapPin, Crosshair, Plugs,
-  GearSix, Timer, Bell, CaretDown, Envelope, Funnel, ArrowCounterClockwise
+  GearSix, Timer, Bell, CaretDown, Envelope, Funnel, ArrowCounterClockwise,
+  IdentificationBadge, Stamp
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable,
@@ -1455,13 +1456,13 @@ function FormattedDN({ dn }) {
   if (!parts.length) return <span className="text-xs font-mono text-text-primary break-all">{dn}</span>
 
   return (
-    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
       {parts.map((p, i) => (
         <Fragment key={i}>
-          <span className="text-2xs text-text-tertiary font-medium whitespace-nowrap py-0.5">
+          <span className="text-2xs text-text-tertiary whitespace-nowrap py-0.5 text-right">
             {DN_LABELS[p.key] || p.key}
           </span>
-          <span className="text-xs text-text-primary break-all py-0.5">
+          <span className="text-xs font-medium text-text-primary break-all py-0.5">
             {p.value}
           </span>
         </Fragment>
@@ -1569,17 +1570,12 @@ function DiscoveredDetailPanel({ item, t }) {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title={t('common.subject')}>
-        <div className="space-y-3">
-          <div>
-            <div className="text-2xs text-text-tertiary uppercase tracking-wider mb-1.5">{t('common.subject')}</div>
-            <FormattedDN dn={item.subject} />
-          </div>
-          <div>
-            <div className="text-2xs text-text-tertiary uppercase tracking-wider mb-1.5">{t('common.issuer')}</div>
-            <FormattedDN dn={item.issuer} />
-          </div>
-        </div>
+      <CompactSection title={t('common.subject')} icon={IdentificationBadge} iconClass="icon-bg-blue">
+        <FormattedDN dn={item.subject} />
+      </CompactSection>
+
+      <CompactSection title={t('common.issuer')} icon={Stamp} iconClass="icon-bg-violet">
+        <FormattedDN dn={item.issuer} />
       </CompactSection>
 
       {(item.san_dns_names?.length > 0 || item.san_ip_addresses?.length > 0) && (
