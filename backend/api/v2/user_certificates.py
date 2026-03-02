@@ -417,7 +417,8 @@ def revoke_user_certificate(cert_id):
             message='Certificate revoked successfully'
         )
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.error(f'User certificate revocation validation error: {e}')
+        return error_response('Invalid revocation request', 400)
     except Exception as e:
         logger.error(f"Failed to revoke user certificate {cert_id}: {e}")
         return error_response('Failed to revoke certificate', 500)

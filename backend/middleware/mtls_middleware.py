@@ -24,7 +24,13 @@ def _extract_certificate():
     except Exception as e:
         logger.debug(f"Native cert extraction failed: {e}")
 
-    # Reverse proxy headers
+    # Reverse proxy headers — only trust from known proxy IPs
+    remote_addr = request.remote_addr or ''
+    trusted_proxies = _get_trusted_proxies()
+    if trusted_proxies and remote_addr not in trusted_proxies:
+        logger.debug(f"mTLS proxy headers ignored: {remote_addr} not in trusted proxies")
+        return None
+
     headers = dict(request.headers)
     if 'X-SSL-Client-Verify' in headers:
         cert_info = CertificateParser.extract_from_nginx_headers(headers)
@@ -36,6 +42,18 @@ def _extract_certificate():
             return cert_info
 
     return None
+
+
+def _get_trusted_proxies():
+    """Get list of trusted proxy IPs from config or env."""
+    import os
+    proxies_str = os.environ.get('UCM_TRUSTED_PROXIES', '')
+    if not proxies_str:
+        # If not configured, trust localhost only (conservative default)
+        return {'127.0.0.1', '::1'}
+    if proxies_str == '*':
+        return None  # Trust all (explicit opt-in)
+    return set(p.strip() for p in proxies_str.split(',') if p.strip())
 
 
 def process_client_certificate():

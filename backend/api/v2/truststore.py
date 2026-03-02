@@ -18,6 +18,9 @@ import base64
 import os
 
 bp = Blueprint('truststore_v2', __name__)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def parse_certificate(pem_data):
@@ -100,7 +103,8 @@ def import_trusted_certificate():
     try:
         file_content, safe_filename = validate_upload(file, CERT_EXTENSIONS)
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.error(f'Trust store file validation failed: {e}')
+        return error_response('Invalid file upload', 400)
     
     name = request.form.get('name', safe_filename.rsplit('.', 1)[0])
     purpose = request.form.get('purpose', 'custom')
@@ -161,10 +165,12 @@ def import_trusted_certificate():
         
     except ValueError as e:
         db.session.rollback()
-        return error_response(str(e), 400)
+        logger.error(f'Trust store import validation error: {e}')
+        return error_response('Invalid certificate data', 400)
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Import failed: {str(e)}', 500)
+        logger.error(f'Trust store import failed: {e}')
+        return error_response('Import failed', 500)
 
 
 @bp.route('/api/v2/truststore', methods=['GET'])
@@ -229,7 +235,8 @@ def add_trusted_certificate():
     try:
         cert_details = parse_certificate(data['certificate_pem'])
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.error(f'Trust store certificate parse failed: {e}')
+        return error_response('Invalid certificate data', 400)
     
     # Check if already exists (by fingerprint)
     existing = TrustedCertificate.query.filter_by(
@@ -275,7 +282,8 @@ def add_trusted_certificate():
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to add certificate: {str(e)}', 500)
+        logger.error(f'Failed to add certificate to trust store: {e}')
+        return error_response('Failed to add certificate', 500)
 
 
 @bp.route('/api/v2/truststore/<int:cert_id>', methods=['GET'])
@@ -319,7 +327,8 @@ def remove_trusted_certificate(cert_id):
         return success_response(message=f'Certificate {cert_name} removed from trust store')
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to remove certificate: {str(e)}', 500)
+        logger.error(f'Failed to remove certificate from trust store: {e}')
+        return error_response('Failed to remove certificate', 500)
 
 
 @bp.route('/api/v2/truststore/sync', methods=['POST'])
@@ -442,7 +451,8 @@ def sync_trust_store():
         
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to sync trust store: {str(e)}', 500)
+        logger.error(f'Failed to sync trust store: {e}')
+        return error_response('Failed to sync trust store', 500)
 
 
 @bp.route('/api/v2/truststore/export', methods=['GET'])
@@ -517,7 +527,8 @@ def export_trust_bundle():
             )
     
     except Exception as e:
-        return error_response(f'Failed to export bundle: {str(e)}', 500)
+        logger.error(f'Failed to export trust store bundle: {e}')
+        return error_response('Failed to export bundle', 500)
 
 
 @bp.route('/api/v2/truststore/expiring', methods=['GET'])
@@ -575,7 +586,8 @@ def get_expiring_trusted_certs():
         })
     
     except Exception as e:
-        return error_response(f'Failed to get expiring certificates: {str(e)}', 500)
+        logger.error(f'Failed to get expiring certificates: {e}')
+        return error_response('Failed to get expiring certificates', 500)
 
 
 @bp.route('/api/v2/truststore/add-from-ca/<string:ca_refid>', methods=['POST'])

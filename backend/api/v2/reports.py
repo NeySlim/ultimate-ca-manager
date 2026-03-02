@@ -8,6 +8,9 @@ from utils.response import success_response, error_response
 from services.report_service import ReportService
 from models import db, SystemConfig
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('reports_pro', __name__)
 
@@ -40,7 +43,8 @@ def generate_report():
         report = ReportService.generate_report(report_type, params)
         return success_response(data=report)
     except Exception as e:
-        return error_response(f"Report generation failed: {str(e)}", 500)
+        logger.error(f'Report generation failed: {e}')
+        return error_response("Report generation failed", 500)
 
 
 @bp.route('/api/v2/reports/download/<report_type>', methods=['GET'])
@@ -75,7 +79,8 @@ def download_report(report_type):
                 }
             )
     except Exception as e:
-        return error_response(f"Report generation failed: {str(e)}", 500)
+        logger.error(f'Report download generation failed: {e}')
+        return error_response("Report generation failed", 500)
 
 
 @bp.route('/api/v2/reports/schedule', methods=['GET'])
@@ -141,7 +146,8 @@ def send_test_report():
         )
         return success_response(message=f"Test report sent to {recipient}")
     except Exception as e:
-        return error_response(f"Failed to send test report: {str(e)}", 500)
+        logger.error(f'Failed to send test report: {e}')
+        return error_response("Failed to send test report", 500)
 
 
 def _get_config(key: str, default: str = '') -> str:

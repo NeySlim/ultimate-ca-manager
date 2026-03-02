@@ -19,6 +19,42 @@ from cryptography.hazmat.primitives import hashes, serialization
 
 from models import db, Certificate, ScanProfile, ScanRun, DiscoveredCertificate
 
+# Private/reserved IP ranges — block SSRF via scan targets
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network('127.0.0.0/8'),       # Loopback
+    ipaddress.ip_network('169.254.0.0/16'),     # Link-local
+    ipaddress.ip_network('224.0.0.0/4'),        # Multicast
+    ipaddress.ip_network('240.0.0.0/4'),        # Reserved
+    ipaddress.ip_network('::1/128'),            # IPv6 loopback
+    ipaddress.ip_network('fe80::/10'),          # IPv6 link-local
+    ipaddress.ip_network('ff00::/8'),           # IPv6 multicast
+]
+
+
+def _is_blocked_ip(host: str) -> bool:
+    """Check if host IP is in a blocked range (SSRF protection)."""
+    try:
+        addr = ipaddress.ip_address(host)
+        if addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved:
+            return True
+        for net in _BLOCKED_NETWORKS:
+            if addr in net:
+                return True
+    except ValueError:
+        pass  # Not an IP — hostname, check after DNS resolution
+    return False
+
+
+def _validate_port(port) -> int:
+    """Validate port number is in valid TCP range."""
+    try:
+        p = int(port)
+        if 1 <= p <= 65535:
+            return p
+    except (ValueError, TypeError):
+        pass
+    return 0
+
 logger = logging.getLogger(__name__)
 
 # Module-level fingerprint cache
@@ -57,6 +93,12 @@ class DiscoveryService:
         except ValueError:
             pass
 
+        # SSRF protection: block scans to loopback/link-local/multicast
+        if is_ip and _is_blocked_ip(host):
+            result['error'] = 'Target IP is in a restricted range'
+            result['error_type'] = 'blocked'
+            return result
+
         if sni_hostname:
             sni_attempts = [sni_hostname]
         elif is_ip:
@@ -65,10 +107,27 @@ class DiscoveryService:
             try:
                 ptr_host, _, _ = socket.gethostbyaddr(host)
                 if ptr_host and ptr_host != host:
-                    sni_attempts.append(ptr_host)
+                    # SEC-06: Validate PTR hostname resolves back to same IP (anti-rebinding)
+                    try:
+                        resolved = socket.getaddrinfo(ptr_host, None)[0][4][0]
+                        if resolved == host:
+                            sni_attempts.append(ptr_host)
+                        else:
+                            logger.debug(f"PTR rebinding blocked: {ptr_host} resolves to {resolved}, expected {host}")
+                    except (socket.gaierror, OSError):
+                        pass
             except (socket.herror, socket.gaierror, OSError):
                 pass
         else:
+            # For hostnames: resolve and check SSRF before connecting
+            try:
+                resolved = socket.getaddrinfo(host, port)[0][4][0]
+                if _is_blocked_ip(resolved):
+                    result['error'] = 'Target hostname resolves to a restricted IP'
+                    result['error_type'] = 'blocked'
+                    return result
+            except (socket.gaierror, OSError):
+                pass  # Let the connection attempt handle DNS errors
             sni_attempts = [host]
 
         ctx = ssl.create_default_context()
@@ -174,6 +233,9 @@ class DiscoveryService:
         """Start an async scan. Returns scan_run_id immediately."""
         if ports is None:
             ports = [443]
+        # Validate ports
+        ports = [_validate_port(p) for p in ports]
+        ports = [p for p in ports if p > 0] or [443]
         scan_timeout = timeout or self.timeout
         scan_workers = max_workers or self.max_workers
 
@@ -697,11 +759,14 @@ class DiscoveryService:
 
     def create_profile(self, data: Dict) -> Dict:
         import json
+        raw_ports = data.get('ports', [443])
+        valid_ports = [_validate_port(p) for p in raw_ports]
+        valid_ports = [p for p in valid_ports if p > 0] or [443]
         profile = ScanProfile(
-            name=data['name'],
-            description=data.get('description', ''),
+            name=data['name'].strip()[:200],
+            description=data.get('description', '').strip()[:1000],
             targets=json.dumps(data.get('targets', [])),
-            ports=json.dumps(data.get('ports', [443])),
+            ports=json.dumps(valid_ports),
             schedule_enabled=data.get('schedule_enabled', False),
             schedule_interval_minutes=data.get('schedule_interval_minutes', 1440),
             notify_on_new=data.get('notify_on_new', True),
@@ -724,13 +789,15 @@ class DiscoveryService:
         if not profile:
             return None
         if 'name' in data:
-            profile.name = data['name']
+            profile.name = data['name'].strip()[:200]
         if 'description' in data:
-            profile.description = data['description']
+            profile.description = data['description'].strip()[:1000]
         if 'targets' in data:
             profile.targets = json.dumps(data['targets'])
         if 'ports' in data:
-            profile.ports = json.dumps(data['ports'])
+            valid_ports = [_validate_port(p) for p in data['ports']]
+            valid_ports = [p for p in valid_ports if p > 0] or [443]
+            profile.ports = json.dumps(valid_ports)
         if 'schedule_enabled' in data:
             profile.schedule_enabled = data['schedule_enabled']
         if 'schedule_interval_minutes' in data:

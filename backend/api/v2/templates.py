@@ -487,7 +487,8 @@ def import_template():
             raw, _ = validate_upload(file, JSON_EXTENSIONS)
             json_data = raw.decode('utf-8')
         except ValueError as e:
-            return error_response(str(e), 400)
+            logger.error(f'Template import file validation failed: {e}')
+            return error_response('Invalid file upload', 400)
     elif request.form.get('json_content'):
         json_data = request.form.get('json_content')
     else:
@@ -579,7 +580,8 @@ def import_template():
         
     except json.JSONDecodeError as e:
         db.session.rollback()
-        return error_response(f'Invalid JSON: {str(e)}', 400)
+        logger.error(f'Template import invalid JSON: {e}')
+        return error_response('Invalid JSON format', 400)
     except Exception as e:
         db.session.rollback()
         logger.error(f"Template Import Error: {str(e)}")

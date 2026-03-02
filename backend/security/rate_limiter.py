@@ -77,6 +77,9 @@ class RateLimitConfig:
             '/api/v2/auth/login': {'rpm': auth_rpm, 'burst': auth_burst},
             '/api/v2/auth/register': {'rpm': auth_rpm // 2, 'burst': auth_burst - 1},
             '/api/v2/auth/reset-password': {'rpm': auth_rpm // 2, 'burst': auth_burst - 1},
+            # SSO endpoints - auth-level limits
+            '/api/v2/sso/callback': {'rpm': auth_rpm, 'burst': auth_burst},
+            '/api/v2/sso/ldap/login': {'rpm': auth_rpm, 'burst': auth_burst},
             # Public auth endpoints - no rate limit (read-only checks)
             '/api/v2/auth/email-configured': {'rpm': 1000, 'burst': 100},
             '/api/v2/sso/available': {'rpm': 1000, 'burst': 100},

@@ -11,6 +11,9 @@ from auth.unified import require_auth
 from services.smart_import import SmartImporter
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('smart_import', __name__)
 
@@ -57,7 +60,8 @@ def analyze_import():
         return success_response(data=result.to_dict())
         
     except Exception as e:
-        return error_response(str(e), 500)
+        logger.error(f'Smart import analysis failed: {e}')
+        return error_response('Import analysis failed', 500)
 
 
 @bp.route('/api/v2/import/execute', methods=['POST'])
@@ -123,7 +127,8 @@ def execute_import():
         return success_response(data=result.to_dict())
         
     except Exception as e:
-        return error_response(str(e), 500)
+        logger.error(f'Smart import execution failed: {e}')
+        return error_response('Import execution failed', 500)
 
 
 @bp.route('/api/v2/import/formats', methods=['GET'])

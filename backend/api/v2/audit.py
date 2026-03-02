@@ -88,7 +88,7 @@ def get_logs():
         
     except Exception as e:
         logger.error(f"Error getting audit logs: {e}")
-        return error_response(f"Failed to get audit logs: {str(e)}", 500)
+        return error_response("Failed to get audit logs", 500)
 
 
 @bp.route('/api/v2/audit/logs/<int:log_id>', methods=['GET'])

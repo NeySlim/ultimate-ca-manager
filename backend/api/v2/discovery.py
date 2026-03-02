@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('discovery', __name__)
 
+import re
+_VALID_TARGET_RE = re.compile(r'^[a-zA-Z0-9._:\-\[\]/]+$')
+
 
 def _safe_int(val, default, lo=None, hi=None):
     """Safely cast to int with bounds. Returns default on invalid input."""
@@ -74,6 +77,10 @@ def create_profile():
         return error_response("Targets must be a non-empty list", 400)
     if len(data['targets']) > 1000:
         return error_response("Maximum 1000 targets per profile", 400)
+    # SEC-10: Validate target format
+    for t in data['targets']:
+        if not isinstance(t, str) or not _VALID_TARGET_RE.match(t.strip()):
+            return error_response(f"Invalid target format: targets must be hostnames, IPs, or CIDR notation", 400)
     svc = _get_service()
     try:
         profile = svc.create_profile(data)
@@ -174,14 +181,18 @@ def ad_hoc_scan():
         return error_response("Provide either 'targets' or 'subnet'", 400)
     if targets and len(targets) > 500:
         return error_response("Maximum 500 targets per ad-hoc scan", 400)
+    # SEC-10: Validate target format
+    for t in targets:
+        if not isinstance(t, str) or not _VALID_TARGET_RE.match(t.strip()):
+            return error_response("Invalid target format: targets must be hostnames, IPs, or CIDR notation", 400)
 
     if subnet:
         try:
             net = ipaddress.ip_network(subnet, strict=False)
             if net.prefixlen < 22:
                 return error_response("Subnet too large (max /22)", 400)
-        except ValueError as e:
-            return error_response(f"Invalid subnet: {e}", 400)
+        except ValueError:
+            return error_response("Invalid subnet notation", 400)
 
     svc = _get_service()
     username = g.current_user.username if hasattr(g, 'current_user') else 'unknown'

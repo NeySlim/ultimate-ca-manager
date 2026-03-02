@@ -9,6 +9,9 @@ from utils.response import success_response, error_response
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import AcmeClientService
 from services.audit_service import AuditService
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('acme_client', __name__)
 
@@ -302,7 +305,8 @@ def request_certificate():
         )
         
     except Exception as e:
-        return error_response(f'Failed to create order: {str(e)}', 500)
+        logger.error(f'Failed to create ACME order: {e}')
+        return error_response('Failed to create order', 500)
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>/verify', methods=['POST'])
@@ -358,7 +362,8 @@ def verify_challenges(order_id):
         
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Verification failed: {str(e)}', 500)
+        logger.error(f'ACME challenge verification failed: {e}')
+        return error_response('Verification failed', 500)
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>/status', methods=['GET'])
@@ -380,7 +385,8 @@ def check_order_status(order_id):
         })
         
     except Exception as e:
-        return error_response(f'Status check failed: {str(e)}', 500)
+        logger.error(f'ACME order status check failed: {e}')
+        return error_response('Status check failed', 500)
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>/finalize', methods=['POST'])
@@ -422,7 +428,8 @@ def finalize_order(order_id):
             return error_response(message, 400)
             
     except Exception as e:
-        return error_response(f'Finalization failed: {str(e)}', 500)
+        logger.error(f'ACME order finalization failed: {e}')
+        return error_response('Finalization failed', 500)
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['DELETE'])
@@ -490,7 +497,8 @@ def renew_order(order_id):
             return error_response(message, 400)
             
     except Exception as e:
-        return error_response(f'Renewal failed: {str(e)}', 500)
+        logger.error(f'ACME certificate renewal failed: {e}')
+        return error_response('Renewal failed', 500)
 
 
 # =============================================================================
@@ -547,4 +555,5 @@ def register_account():
             
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Registration failed: {str(e)}', 500)
+        logger.error(f'ACME account registration failed: {e}')
+        return error_response('Registration failed', 500)

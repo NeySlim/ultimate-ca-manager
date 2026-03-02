@@ -207,11 +207,11 @@ class TestWebAuthnStart:
         assert r.status_code in (401, 404)
 
     def test_start_user_without_credentials(self, client):
-        """Admin has no WebAuthn credentials registered → 404."""
+        """Admin has no WebAuthn credentials registered → 401 (no user enumeration)."""
         r = _post(client, '/api/v2/auth/login/webauthn/start', {
             'username': 'admin',
         })
-        assert r.status_code in (404, 500)
+        assert r.status_code == 401
 
 
 # ============================================================

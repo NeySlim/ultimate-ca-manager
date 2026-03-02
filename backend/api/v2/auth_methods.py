@@ -32,6 +32,38 @@ except ImportError:
 
 bp = Blueprint('auth_methods', __name__)
 
+# In-memory 2FA/WebAuthn brute-force tracking (per-session, cleared on success)
+_2fa_failed_attempts = {}  # key: pending_user_id, value: {'count': int, 'locked_until': datetime}
+_WEBAUTHN_FAILED = {}      # key: username, value: {'count': int, 'locked_until': datetime}
+_MAX_2FA_ATTEMPTS = 5
+_2FA_LOCKOUT_SECONDS = 900  # 15 minutes
+
+
+def _check_2fa_lockout(key: str, tracker: dict) -> bool:
+    """Check if key is locked out from 2FA/WebAuthn attempts."""
+    entry = tracker.get(key)
+    if not entry:
+        return False
+    if entry.get('locked_until') and datetime.utcnow() < entry['locked_until']:
+        return True
+    if entry.get('locked_until') and datetime.utcnow() >= entry['locked_until']:
+        tracker.pop(key, None)
+    return False
+
+
+def _record_2fa_failure(key: str, tracker: dict):
+    """Record a failed 2FA/WebAuthn attempt."""
+    from datetime import timedelta
+    entry = tracker.setdefault(key, {'count': 0, 'locked_until': None})
+    entry['count'] += 1
+    if entry['count'] >= _MAX_2FA_ATTEMPTS:
+        entry['locked_until'] = datetime.utcnow() + timedelta(seconds=_2FA_LOCKOUT_SECONDS)
+
+
+def _clear_2fa_failures(key: str, tracker: dict):
+    """Clear failed attempts on success."""
+    tracker.pop(key, None)
+
 
 @bp.route('/api/v2/auth/methods', methods=['GET', 'POST'])
 def detect_auth_methods():
@@ -268,6 +300,11 @@ def login_2fa():
     if not pending_user_id:
         return error_response('No pending 2FA verification', 401)
     
+    # SEC-03: Brute-force protection on 2FA
+    lockout_key = str(pending_user_id)
+    if _check_2fa_lockout(lockout_key, _2fa_failed_attempts):
+        return error_response('Too many failed attempts. Try again later.', 429)
+    
     data = request.json
     code = data.get('code') if data else None
     
@@ -303,8 +340,10 @@ def login_2fa():
                         success=False,
                         username=pending_username
                     )
+                    _record_2fa_failure(lockout_key, _2fa_failed_attempts)
                     return error_response('Invalid verification code', 401)
             except (json.JSONDecodeError, ValueError):
+                _record_2fa_failure(lockout_key, _2fa_failed_attempts)
                 return error_response('Invalid verification code', 401)
         else:
             AuditService.log_action(
@@ -315,9 +354,11 @@ def login_2fa():
                 success=False,
                 username=pending_username
             )
+            _record_2fa_failure(lockout_key, _2fa_failed_attempts)
             return error_response('Invalid verification code', 401)
     
     # 2FA verified — create full session
+    _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
     session.clear()
     session['user_id'] = user.id
     session['username'] = user.username
@@ -467,7 +508,8 @@ def webauthn_start():
     from models.webauthn import WebAuthnCredential
     creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
     if not creds:
-        return error_response('No WebAuthn credentials registered', 404)
+        # SEC-05: Don't reveal whether user exists or has credentials
+        return error_response('WebAuthn authentication not available', 401)
     
     # Generate authentication options
     try:
@@ -511,10 +553,14 @@ def webauthn_verify():
     username = data['username']
     credential_response = data['response']
     
+    # SEC-04: Brute-force protection on WebAuthn
+    if _check_2fa_lockout(username, _WEBAUTHN_FAILED):
+        return error_response('Too many failed attempts. Try again later.', 429)
+    
     # Find user
     user = User.query.filter_by(username=username).first()
     if not user or not user.active:
-        return error_response('Invalid username', 401)
+        return error_response('Invalid credentials', 401)
     
     # Verify authentication response
     try:
@@ -530,13 +576,15 @@ def webauthn_verify():
                 action='login_failure',
                 resource_type='user',
                 resource_id=user.id,
-                details=f'WebAuthn login failed for {username}: {message}',
+                details=f'WebAuthn login failed for {username}',
                 success=False,
                 username=username
             )
-            return error_response(message or 'WebAuthn verification failed', 401)
+            _record_2fa_failure(username, _WEBAUTHN_FAILED)
+            return error_response('WebAuthn verification failed', 401)
         
         # Update login stats
+        _clear_2fa_failures(username, _WEBAUTHN_FAILED)
         user.last_login = datetime.utcnow()
         user.login_count = (user.login_count or 0) + 1
         user.failed_logins = 0  # Reset failed logins on successful login

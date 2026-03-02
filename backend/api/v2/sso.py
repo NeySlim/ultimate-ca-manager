@@ -27,6 +27,33 @@ VALID_ROLES = {'admin', 'operator', 'auditor', 'viewer'}
 bp = Blueprint('sso_pro', __name__)
 
 
+def _encrypt_ldap_password(password: str) -> str:
+    """Encrypt LDAP bind password if encryption is available."""
+    if not password:
+        return password
+    try:
+        from security.encryption import key_encryption
+        if key_encryption.is_enabled:
+            return key_encryption.encrypt_string(password)
+    except ImportError:
+        pass
+    return password
+
+
+def _decrypt_ldap_password(provider) -> str:
+    """Decrypt LDAP bind password from provider config."""
+    password = provider.ldap_bind_password
+    if not password:
+        return password
+    try:
+        from security.encryption import key_encryption
+        if key_encryption.is_enabled:
+            return key_encryption.decrypt_string(password)
+    except ImportError:
+        pass
+    return password
+
+
 def _parse_json_field(value):
     """Parse a JSON field that may be a string, double-encoded string, or dict/list."""
     if not value:
@@ -183,7 +210,7 @@ def create_provider():
         provider.ldap_port = data.get('ldap_port', 389)
         provider.ldap_use_ssl = data.get('ldap_use_ssl', False)
         provider.ldap_bind_dn = data.get('ldap_bind_dn')
-        provider.ldap_bind_password = data.get('ldap_bind_password')
+        provider.ldap_bind_password = _encrypt_ldap_password(data.get('ldap_bind_password'))
         provider.ldap_base_dn = data.get('ldap_base_dn')
         provider.ldap_user_filter = data.get('ldap_user_filter', '(uid={username})')
         provider.ldap_group_filter = data.get('ldap_group_filter')
@@ -288,7 +315,7 @@ def update_provider(provider_id=None, provider_type_name=None):
                 setattr(provider, field, data[field])
         # Only update password if non-empty (empty = keep existing)
         if data.get('ldap_bind_password'):
-            provider.ldap_bind_password = data['ldap_bind_password']
+            provider.ldap_bind_password = _encrypt_ldap_password(data['ldap_bind_password'])
     
     # JSON fields
     if 'attribute_mapping' in data:
@@ -393,7 +420,7 @@ def _test_ldap_connection(provider):
         conn = Connection(
             server,
             user=provider.ldap_bind_dn,
-            password=provider.ldap_bind_password,
+            password=_decrypt_ldap_password(provider),
             auto_bind=True
         )
         
@@ -437,7 +464,7 @@ def _ldap_authenticate_user(provider, username, password):
         conn = Connection(
             server,
             user=provider.ldap_bind_dn,
-            password=provider.ldap_bind_password,
+            password=_decrypt_ldap_password(provider),
             auto_bind=True
         )
         
@@ -488,7 +515,7 @@ def _ldap_authenticate_user(provider, username, password):
                     memberof_conn = Connection(
                         server,
                         user=provider.ldap_bind_dn,
-                        password=provider.ldap_bind_password,
+                        password=_decrypt_ldap_password(provider),
                         auto_bind=True
                     )
                     safe_dn = escape_filter_chars(user_dn)
@@ -523,7 +550,7 @@ def _ldap_authenticate_user(provider, username, password):
                     group_conn = Connection(
                         server,
                         user=provider.ldap_bind_dn,
-                        password=provider.ldap_bind_password,
+                        password=_decrypt_ldap_password(provider),
                         auto_bind=True
                     )
                     group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
@@ -631,7 +658,7 @@ def test_mapping(provider_id):
         conn = Connection(
             server,
             user=provider.ldap_bind_dn,
-            password=provider.ldap_bind_password,
+            password=_decrypt_ldap_password(provider),
             auto_bind=True
         )
         
@@ -1211,11 +1238,28 @@ def sso_callback(provider_type):
             session['auth_method'] = 'sso'
             session.permanent = True
             
+            # SEC-07: Audit log SSO login
+            AuditService.log_action(
+                action='login_success',
+                resource_type='user',
+                resource_id=user.id,
+                resource_name=user.username,
+                details=f'OAuth2 SSO login via {provider.name}',
+                success=True,
+                username=user.username
+            )
+            
             # Redirect to app (session cookie is set automatically)
             return redirect('/login/sso-complete')
             
         except Exception as e:
             logger.error(f"OAuth2 callback error: {e}\n{traceback.format_exc()}")
+            AuditService.log_action(
+                action='login_failure',
+                resource_type='sso',
+                details=f'OAuth2 callback error for provider {provider.name}',
+                success=False
+            )
             return redirect('/login?error=callback_error')
     
     elif provider.provider_type == 'saml':
@@ -1294,10 +1338,27 @@ def sso_callback(provider_type):
             session['auth_method'] = 'sso'
             session.permanent = True
             
+            # SEC-07: Audit log SAML SSO login
+            AuditService.log_action(
+                action='login_success',
+                resource_type='user',
+                resource_id=user.id,
+                resource_name=user.username,
+                details=f'SAML SSO login via {provider.name}',
+                success=True,
+                username=user.username
+            )
+            
             return redirect('/login/sso-complete')
             
         except Exception as e:
             logger.error(f"SAML callback error: {e}\n{traceback.format_exc()}")
+            AuditService.log_action(
+                action='login_failure',
+                resource_type='sso',
+                details=f'SAML callback error for provider {provider.name}',
+                success=False
+            )
             return redirect('/login?error=callback_error')
     
     return redirect('/login?error=unknown_provider_type')
@@ -1340,6 +1401,14 @@ def ldap_login():
     
     if error:
         _record_ldap_failed_attempt(username)
+        # SEC-11: Audit log failed LDAP attempt
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            details=f'LDAP authentication failed for {username}',
+            success=False,
+            username=username
+        )
         return error_response("Invalid credentials", 401)
     
     # Create or update user
@@ -1381,6 +1450,17 @@ def ldap_login():
     session['role'] = user.role
     session['auth_method'] = 'ldap'
     session.permanent = True
+    
+    # Audit log LDAP login success
+    AuditService.log_action(
+        action='login_success',
+        resource_type='user',
+        resource_id=user.id,
+        resource_name=user.username,
+        details=f'LDAP login via {provider.name}',
+        success=True,
+        username=user.username
+    )
     
     # Generate CSRF token
     csrf_token = None

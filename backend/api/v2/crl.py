@@ -9,6 +9,9 @@ from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
 from services.audit_service import AuditService
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('crl_v2', __name__)
 
@@ -101,7 +104,8 @@ def regenerate_crl(ca_id):
             message='CRL regenerated successfully'
         )
     except Exception as e:
-        return error_response(f"Failed to regenerate CRL: {str(e)}", 500)
+        logger.error(f'Failed to regenerate CRL: {e}')
+        return error_response("Failed to regenerate CRL", 500)
 
 
 @bp.route('/api/v2/crl/<int:ca_id>/auto-regen', methods=['POST'])
@@ -139,7 +143,8 @@ def toggle_auto_regen(ca_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f"Failed to update: {str(e)}", 500)
+        logger.error(f'Failed to update CRL auto-regen setting: {e}')
+        return error_response("Failed to update CRL settings", 500)
 
 
 @bp.route('/api/v2/ocsp/status', methods=['GET'])
