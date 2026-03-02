@@ -82,6 +82,8 @@
     "justNow": "たった今",
     "minutesAgo": "{{count}}分前",
     "hoursAgo": "{{count}}時間前",
+    "hoursMinutesAgo": "{{hours}}時間{{minutes}}分前",
+    "daysHoursAgo": "{{days}}日{{hours}}時間前",
     "daysAgo": "{{count}}日前",
     "last30DaysStats": "過去30日間の統計",
     "totalEvents": "イベント総数",

@@ -82,6 +82,8 @@
     "justNow": "Щойно",
     "minutesAgo": "{{count}}хв тому",
     "hoursAgo": "{{count}}год тому",
+    "hoursMinutesAgo": "{{hours}}г {{minutes}}хв тому",
+    "daysHoursAgo": "{{days}}д {{hours}}г тому",
     "daysAgo": "{{count}} дн. тому",
     "last30DaysStats": "Статистика за останні 30 днів",
     "totalEvents": "Всього подій",

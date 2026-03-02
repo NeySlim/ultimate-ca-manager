@@ -82,6 +82,8 @@
     "justNow": "Agora mesmo",
     "minutesAgo": "Há {{count}}m",
     "hoursAgo": "Há {{count}}h",
+    "hoursMinutesAgo": "Há {{hours}}h {{minutes}}m",
+    "daysHoursAgo": "Há {{days}}d {{hours}}h",
     "daysAgo": "{{count}}d atrás",
     "last30DaysStats": "Estatísticas dos últimos 30 dias",
     "totalEvents": "Total de eventos",

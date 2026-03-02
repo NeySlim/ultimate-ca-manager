@@ -82,6 +82,8 @@
     "justNow": "Proprio ora",
     "minutesAgo": "{{count}}m fa",
     "hoursAgo": "{{count}}h fa",
+    "hoursMinutesAgo": "{{hours}}h {{minutes}}m fa",
+    "daysHoursAgo": "{{days}}g {{hours}}h fa",
     "daysAgo": "{{count}}g fa",
     "last30DaysStats": "Statistiche ultimi 30 giorni",
     "totalEvents": "Eventi totali",

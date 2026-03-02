@@ -589,6 +589,8 @@
     "justNow": "À l'instant",
     "minutesAgo": "Il y a {{count}}m",
     "hoursAgo": "Il y a {{count}}h",
+    "hoursMinutesAgo": "Il y a {{hours}}h {{minutes}}m",
+    "daysHoursAgo": "Il y a {{days}}j {{hours}}h",
     "last30DaysStats": "Statistiques des 30 derniers jours",
     "totalEvents": "Total des événements",
     "successful": "Réussi",

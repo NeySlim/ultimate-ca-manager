@@ -950,7 +950,7 @@ class AuditLog(db.Model):
         """Convert to dictionary"""
         return {
             "id": self.id,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "timestamp": (self.timestamp.isoformat() + 'Z') if self.timestamp else None,
             "username": self.username,
             "action": self.action,
             "resource_type": self.resource_type,

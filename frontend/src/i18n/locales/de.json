@@ -82,6 +82,8 @@
     "justNow": "Gerade eben",
     "minutesAgo": "Vor {{count}}m",
     "hoursAgo": "Vor {{count}}h",
+    "hoursMinutesAgo": "Vor {{hours}}h {{minutes}}m",
+    "daysHoursAgo": "Vor {{days}}T {{hours}}h",
     "daysAgo": "vor {{count}}d",
     "last30DaysStats": "Statistik der letzten 30 Tage",
     "totalEvents": "Ereignisse gesamt",

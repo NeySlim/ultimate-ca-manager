@@ -83,6 +83,8 @@
     "justNow": "Just now",
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
+    "hoursMinutesAgo": "{{hours}}h {{minutes}}m ago",
+    "daysHoursAgo": "{{days}}d {{hours}}h ago",
     "daysAgo": "{{count}}d ago",
     "last30DaysStats": "Last 30 Days Statistics",
     "totalEvents": "Total Events",

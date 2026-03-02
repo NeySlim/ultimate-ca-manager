@@ -49,6 +49,7 @@ import { usePermission } from '../hooks';
 import auditService from '../services/audit.service';
 import { apiClient } from '../services/apiClient';
 import { getAppTimezone } from '../stores/timezoneStore';
+import { formatRelativeTime } from '../lib/ui';
 // Action icons mapping
 const actionIcons = {
   login_success: SignIn,
@@ -244,23 +245,9 @@ export default function AuditLogsPage() {
     setPage(1);
   }, []);
 
-  // Format timestamp
+  // Format timestamp — use shared utility for relative time, with UTC-safe parsing
   const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = (now - date) / 1000;
-    
-    if (diff < 60) return t('common.justNow');
-    if (diff < 3600) return t('common.minutesAgo', { count: Math.floor(diff / 60) });
-    if (diff < 86400) return t('common.hoursAgo', { count: Math.floor(diff / 3600) });
-    
-    return date.toLocaleDateString(undefined, { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: getAppTimezone()
-    });
+    return formatRelativeTime(timestamp, t);
   };
 
   // Get unique usernames for filter
