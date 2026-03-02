@@ -210,7 +210,8 @@ def import_ca():
         try:
             file_data, filename = validate_upload(file, CERT_EXTENSIONS)
         except ValueError as e:
-            return error_response(str(e), 400)
+            logger.warning(f"CA upload validation error: {e}")
+            return error_response('Invalid file upload', 400)
     elif request.form.get('pem_content'):
         pem_content = request.form.get('pem_content')
         file_data = pem_content.encode('utf-8')
@@ -311,12 +312,13 @@ def import_ca():
         
     except ValueError as e:
         db.session.rollback()
-        return error_response(str(e), 400)
+        logger.warning(f"CA import validation error: {e}")
+        return error_response('Invalid CA data', 400)
     except Exception as e:
         db.session.rollback()
-        logger.error(f"CA Import Error: {str(e)}")
+        logger.error(f"CA Import Error: {e}")
         logger.error(traceback.format_exc())
-        return error_response(f'Import failed: {str(e)}', 500)
+        return error_response('Import failed', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>', methods=['GET'])
@@ -430,7 +432,8 @@ def update_ca(ca_id):
         return success_response(data=ca.to_dict(), message='CA updated successfully')
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to update CA: {str(e)}', 500)
+        logger.error(f"Failed to update CA: {e}")
+        return error_response('Failed to update CA', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>', methods=['DELETE'])
@@ -520,7 +523,8 @@ def export_all_cas():
             return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
     
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"Export failed: {e}")
+        return error_response('Export failed', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/export', methods=['GET'])
@@ -723,7 +727,8 @@ def export_ca(ca_id):
             return error_response(f'Unsupported format: {export_format}', 400)
     
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"Export failed: {e}")
+        return error_response('Export failed', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/certificates', methods=['GET'])
@@ -777,7 +782,8 @@ def bulk_delete_cas():
             results['success'].append(ca_id)
         except Exception as e:
             db.session.rollback()
-            results['failed'].append({'id': ca_id, 'error': str(e)})
+            logger.error(f"Failed to delete CA {ca_id}: {e}")
+            results['failed'].append({'id': ca_id, 'error': 'Deletion failed'})
 
     AuditService.log_action(
         action='cas_bulk_deleted',
@@ -832,4 +838,5 @@ def bulk_export_cas():
         else:
             return error_response('Supported formats: pem, p7b', 400)
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"Export failed: {e}")
+        return error_response('Export failed', 500)

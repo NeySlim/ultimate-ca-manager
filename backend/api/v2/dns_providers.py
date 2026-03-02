@@ -15,6 +15,9 @@ from services.acme.dns_providers import (
     get_provider_class
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
 bp = Blueprint('dns_providers', __name__)
 
 
@@ -67,7 +70,8 @@ def create_dns_provider():
                 if not credentials.get(key):
                     return error_response(f'Missing required credential: {key}', 400)
     except Exception as e:
-        return error_response(f'Invalid credentials: {str(e)}', 400)
+        logger.warning(f"Invalid DNS provider credentials: {e}")
+        return error_response('Invalid credentials format', 400)
     
     # If setting as default, unset any existing default
     if is_default:
@@ -228,10 +232,11 @@ def test_provider(provider_id):
             message='Connection test completed'
         )
     except Exception as e:
+        logger.error(f"DNS provider test failed: {e}")
         return success_response(
             data={
                 'success': False,
-                'message': str(e)
+                'message': 'Connection test failed'
             },
             message='Connection test failed'
         )

@@ -350,7 +350,7 @@ def delete_acme_account(account_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to delete ACME account {account_id}: {e}")
-        return error_response(f'Failed to delete account: {str(e)}', 500)
+        return error_response('Failed to delete ACME account', 500)
 
 
 @bp.route('/api/v2/acme/orders', methods=['GET'])

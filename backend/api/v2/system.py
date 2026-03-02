@@ -14,6 +14,9 @@ import subprocess
 import shutil
 import werkzeug.utils
 from datetime import datetime, timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('system_v2', __name__)
 
@@ -47,7 +50,8 @@ def get_db_stats():
             'last_check': 'Never'
         })
     except Exception as e:
-        return error_response(f"Failed to get stats: {str(e)}")
+        logger.error(f"Failed to get stats: {e}")
+        return error_response("Failed to get database stats")
 
 @bp.route('/api/v2/system/database/optimize', methods=['POST'])
 @require_auth(['admin:system'])
@@ -65,7 +69,8 @@ def optimize_db():
         )
         return success_response(message="Database optimized successfully")
     except Exception as e:
-        return error_response(f"Optimization failed: {str(e)}")
+        logger.error(f"Optimization failed: {e}")
+        return error_response("Database optimization failed")
 
 @bp.route('/api/v2/system/database/integrity-check', methods=['POST'])
 @require_auth(['admin:system'])
@@ -78,7 +83,8 @@ def check_integrity():
         else:
             return error_response(f"Integrity check failed: {result}")
     except Exception as e:
-        return error_response(f"Check failed: {str(e)}")
+        logger.error(f"Integrity check failed: {e}")
+        return error_response("Integrity check failed")
 
 @bp.route('/api/v2/system/database/export', methods=['GET'])
 @require_auth(['admin:system'])
@@ -106,7 +112,8 @@ def export_db():
             headers={'Content-Disposition': f'attachment; filename=ucm_database_{datetime.now().strftime("%Y%m%d_%H%M%S")}.sql'}
         )
     except Exception as e:
-        return error_response(f"Export failed: {str(e)}")
+        logger.error(f"Database export failed: {e}")
+        return error_response("Database export failed")
 
 @bp.route('/api/v2/system/database/reset', methods=['POST'])
 @require_auth(['admin:system'])
@@ -148,7 +155,8 @@ def reset_db():
         return success_response(message="Database reset successfully. Default admin user created.")
     except Exception as e:
         db.session.rollback()
-        return error_response(f"Reset failed: {str(e)}")
+        logger.error(f"Database reset failed: {e}")
+        return error_response("Database reset failed")
 
 @bp.route('/api/v2/system/https/cert-info', methods=['GET'])
 @require_auth(['read:settings'])
@@ -322,7 +330,7 @@ def regenerate_https_cert():
         
     except Exception as e:
         current_app.logger.error(f"Failed to regenerate HTTPS cert: {e}")
-        return error_response(f"Failed to regenerate certificate: {str(e)}", 500)
+        return error_response("Failed to regenerate certificate", 500)
 
 @bp.route('/api/v2/system/https/apply', methods=['POST'])
 @require_auth(['admin:system'])
@@ -421,7 +429,7 @@ def apply_https_cert():
         
     except Exception as e:
         current_app.logger.error(f"Failed to apply HTTPS cert: {e}")
-        return error_response(f"Failed to apply certificate: {str(e)}", 500)
+        return error_response("Failed to apply certificate", 500)
 
 @bp.route('/api/v2/system/backup', methods=['POST'])
 @bp.route('/api/v2/system/backup/create', methods=['POST'])
@@ -477,9 +485,11 @@ def create_backup():
             }
         )
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"Backup validation error: {e}")
+        return error_response("Invalid backup parameters", 400)
     except Exception as e:
-        return error_response(f"Backup failed: {str(e)}", 500)
+        logger.error(f"Backup failed: {e}")
+        return error_response("Backup failed", 500)
 
 @bp.route('/api/v2/system/backups', methods=['GET'])
 @bp.route('/api/v2/system/backup/list', methods=['GET'])
@@ -518,7 +528,8 @@ def list_backups():
         files.sort(key=lambda x: x['created_at'], reverse=True)
         return success_response(data=files)
     except Exception as e:
-        return error_response(f"Failed to list backups: {str(e)}")
+        logger.error(f"Failed to list backups: {e}")
+        return error_response("Failed to list backups")
 
 @bp.route('/api/v2/system/backup/<filename>/download', methods=['GET'])
 @require_auth(['read:settings'])
@@ -555,7 +566,8 @@ def delete_backup(filename):
         )
         return success_response(message="Backup deleted successfully")
     except Exception as e:
-        return error_response(f"Failed to delete backup: {str(e)}", 500)
+        logger.error(f"Failed to delete backup: {e}")
+        return error_response("Failed to delete backup", 500)
 
 @bp.route('/api/v2/system/restore', methods=['POST'])
 @bp.route('/api/v2/system/backup/restore', methods=['POST'])
@@ -582,7 +594,8 @@ def restore_backup():
         try:
             backup_bytes, _ = validate_upload(file, BACKUP_EXTENSIONS, max_size=100 * 1024 * 1024)
         except ValueError as e:
-            return error_response(str(e), 400)
+            logger.warning(f"Backup upload validation error: {e}")
+            return error_response("Invalid backup file", 400)
         
         service = BackupService()
         results = service.restore_backup(backup_bytes, password)
@@ -600,9 +613,11 @@ def restore_backup():
             data=results
         )
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"Restore validation error: {e}")
+        return error_response("Invalid restore parameters", 400)
     except Exception as e:
-        return error_response(f"Restore failed: {str(e)}", 500)
+        logger.error(f"Restore failed: {e}")
+        return error_response("Restore failed", 500)
 
 
 # ============================================================================
@@ -642,7 +657,8 @@ def get_encryption_status():
         })
         
     except Exception as e:
-        return error_response(f"Failed to get encryption status: {str(e)}", 500)
+        logger.error(f"Failed to get encryption status: {e}")
+        return error_response("Failed to get encryption status", 500)
 
 
 @bp.route('/api/v2/system/security/enable-encryption', methods=['POST'])
@@ -700,7 +716,8 @@ def enable_encryption():
             "Ensure the UCM process has write access to /etc/ucm/.", 403
         )
     except Exception as e:
-        return error_response(f"Failed to enable encryption: {str(e)}", 500)
+        logger.error(f"Failed to enable encryption: {e}")
+        return error_response("Failed to enable encryption", 500)
 
 
 @bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])
@@ -751,7 +768,8 @@ def disable_encryption():
         )
         
     except Exception as e:
-        return error_response(f"Failed to disable encryption: {str(e)}", 500)
+        logger.error(f"Failed to disable encryption: {e}")
+        return error_response("Failed to disable encryption", 500)
 
 
 @bp.route('/api/v2/system/security/encrypt-all-keys', methods=['POST'])
@@ -790,7 +808,8 @@ def encrypt_all_keys():
         )
         
     except Exception as e:
-        return error_response(f"Encryption failed: {str(e)}", 500)
+        logger.error(f"Encryption failed: {e}")
+        return error_response("Encryption failed", 500)
 
 
 @bp.route('/api/v2/system/security/generate-key', methods=['GET'])
@@ -802,7 +821,8 @@ def generate_encryption_key():
         key = KeyEncryption.generate_key()
         return success_response(data={'key': key})
     except Exception as e:
-        return error_response(f"Key generation failed: {str(e)}", 500)
+        logger.error(f"Key generation failed: {e}")
+        return error_response("Key generation failed", 500)
 
 
 # ============ Audit Log Retention ============
@@ -815,7 +835,8 @@ def get_audit_retention():
         from services.retention_service import RetentionPolicy
         return success_response(data=RetentionPolicy.get_stats())
     except Exception as e:
-        return error_response(f"Failed to get retention settings: {str(e)}", 500)
+        logger.error(f"Failed to get retention settings: {e}")
+        return error_response("Failed to get retention settings", 500)
 
 
 @bp.route('/api/v2/system/audit/retention', methods=['PUT'])
@@ -832,7 +853,8 @@ def update_audit_retention():
             data=settings
         )
     except Exception as e:
-        return error_response(f"Failed to update settings: {str(e)}", 500)
+        logger.error(f"Failed to update retention settings: {e}")
+        return error_response("Failed to update settings", 500)
 
 
 @bp.route('/api/v2/system/audit/cleanup', methods=['POST'])
@@ -849,7 +871,8 @@ def cleanup_audit_logs():
             data=result
         )
     except Exception as e:
-        return error_response(f"Cleanup failed: {str(e)}", 500)
+        logger.error(f"Cleanup failed: {e}")
+        return error_response("Cleanup failed", 500)
 
 
 # ============ Syslog Forwarding ============
@@ -862,7 +885,8 @@ def get_syslog_config():
         from services.syslog_service import syslog_forwarder
         return success_response(data=syslog_forwarder.config)
     except Exception as e:
-        return error_response(f"Failed to get syslog config: {str(e)}", 500)
+        logger.error(f"Failed to get syslog config: {e}")
+        return error_response("Failed to get syslog config", 500)
 
 
 @bp.route('/api/v2/system/audit/syslog', methods=['PUT'])
@@ -917,7 +941,8 @@ def update_syslog_config():
             data=syslog_forwarder.config
         )
     except Exception as e:
-        return error_response(f"Failed to update syslog config: {str(e)}", 500)
+        logger.error(f"Failed to update syslog config: {e}")
+        return error_response("Failed to update syslog config", 500)
 
 
 @bp.route('/api/v2/system/audit/syslog/test', methods=['POST'])
@@ -932,7 +957,8 @@ def test_syslog():
         else:
             return error_response(result['error'], 400)
     except Exception as e:
-        return error_response(f"Syslog test failed: {str(e)}", 500)
+        logger.error(f"Syslog test failed: {e}")
+        return error_response("Syslog test failed", 500)
 
 @bp.route('/api/v2/system/alerts/expiry', methods=['GET'])
 @require_auth(['read:settings'])
@@ -942,7 +968,8 @@ def get_expiry_alert_settings():
         from services.expiry_alert_service import ExpiryAlertSettings
         return success_response(data=ExpiryAlertSettings.get_settings())
     except Exception as e:
-        return error_response(f"Failed to get settings: {str(e)}", 500)
+        logger.error(f"Failed to get expiry alert settings: {e}")
+        return error_response("Failed to get settings", 500)
 
 
 @bp.route('/api/v2/system/alerts/expiry', methods=['PUT'])
@@ -959,7 +986,8 @@ def update_expiry_alert_settings():
             data=settings
         )
     except Exception as e:
-        return error_response(f"Failed to update settings: {str(e)}", 500)
+        logger.error(f"Failed to update expiry alert settings: {e}")
+        return error_response("Failed to update settings", 500)
 
 
 @bp.route('/api/v2/system/alerts/expiry/check', methods=['POST'])
@@ -974,7 +1002,8 @@ def trigger_expiry_check():
             data=result
         )
     except Exception as e:
-        return error_response(f"Expiry check failed: {str(e)}", 500)
+        logger.error(f"Expiry check failed: {e}")
+        return error_response("Expiry check failed", 500)
 
 
 # NOTE: get_expiring_certificates moved to dashboard.py (/api/v2/dashboard/expiring-certs)
@@ -997,7 +1026,8 @@ def get_rate_limit_config():
             'stats': stats
         })
     except Exception as e:
-        return error_response(f"Failed to get rate limit config: {str(e)}", 500)
+        logger.error(f"Failed to get rate limit config: {e}")
+        return error_response("Failed to get rate limit config", 500)
 
 
 @bp.route('/api/v2/system/security/rate-limit', methods=['PUT'])
@@ -1028,7 +1058,8 @@ def update_rate_limit_config():
             data=RateLimitConfig.get_config()
         )
     except Exception as e:
-        return error_response(f"Failed to update config: {str(e)}", 500)
+        logger.error(f"Failed to update rate limit config: {e}")
+        return error_response("Failed to update config", 500)
 
 
 @bp.route('/api/v2/system/security/rate-limit/stats', methods=['GET'])
@@ -1039,7 +1070,8 @@ def get_rate_limit_stats():
         from security.rate_limiter import get_rate_limiter
         return success_response(data=get_rate_limiter().get_stats())
     except Exception as e:
-        return error_response(f"Failed to get stats: {str(e)}", 500)
+        logger.error(f"Failed to get rate limit stats: {e}")
+        return error_response("Failed to get stats", 500)
 
 
 @bp.route('/api/v2/system/security/rate-limit/reset', methods=['POST'])
@@ -1059,7 +1091,8 @@ def reset_rate_limits():
         
         return success_response(message="Rate limits reset")
     except Exception as e:
-        return error_response(f"Failed to reset: {str(e)}", 500)
+        logger.error(f"Failed to reset rate limits: {e}")
+        return error_response("Failed to reset", 500)
 
 
 @bp.route('/api/v2/system/security/rotate-secrets', methods=['POST'])
@@ -1158,7 +1191,7 @@ def rotate_secrets():
             
         except Exception as e:
             current_app.logger.error(f"Failed to rotate secrets: {e}")
-            return error_response(f"Failed to rotate secrets: {str(e)}", 500)
+            return error_response("Failed to rotate secrets", 500)
     
     else:
         from services.audit_service import AuditService
@@ -1219,7 +1252,8 @@ def get_security_anomalies():
             }
         )
     except Exception as e:
-        return error_response(f"Failed to get anomalies: {str(e)}", 500)
+        logger.error(f"Failed to get anomalies: {e}")
+        return error_response("Failed to get anomalies", 500)
 
 
 # ============================================================================
@@ -1240,7 +1274,8 @@ def check_updates():
         
         return success_response(data=result)
     except Exception as e:
-        return error_response(f"Failed to check for updates: {str(e)}", 500)
+        logger.error(f"Failed to check for updates: {e}")
+        return error_response("Failed to check for updates", 500)
 
 
 @bp.route('/api/v2/system/updates/install', methods=['POST'])
@@ -1287,7 +1322,8 @@ def install_update():
             message=f"Update to {update_info['latest_version']} initiated. Service will restart shortly."
         )
     except Exception as e:
-        return error_response(f"Update failed: {str(e)}", 500)
+        logger.error(f"Update failed: {e}")
+        return error_response("Update failed", 500)
 
 
 @bp.route('/api/v2/system/updates/version', methods=['GET'])
@@ -1309,7 +1345,8 @@ def get_hsm_status():
         status = _get_status()
         return success_response(data=status)
     except Exception as e:
-        return error_response(f"HSM status check failed: {str(e)}", 500)
+        logger.error(f"HSM status check failed: {e}")
+        return error_response("HSM status check failed", 500)
 
 
 @bp.route('/api/v2/system/chain-repair', methods=['GET'])
@@ -1326,7 +1363,8 @@ def get_chain_repair_status():
             'stats': stats
         })
     except Exception as e:
-        return error_response(f"Failed to get chain repair status: {str(e)}", 500)
+        logger.error(f"Failed to get chain repair status: {e}")
+        return error_response("Failed to get chain repair status", 500)
 
 
 @bp.route('/api/v2/system/chain-repair/run', methods=['POST'])
@@ -1344,7 +1382,8 @@ def run_chain_repair():
             'stats': get_last_run_stats()
         })
     except Exception as e:
-        return error_response(f"Chain repair failed: {str(e)}", 500)
+        logger.error(f"Chain repair failed: {e}")
+        return error_response("Chain repair failed", 500)
 
 
 @bp.route('/api/v2/system/service/status', methods=['GET'])
@@ -1380,7 +1419,8 @@ def get_service_status():
             'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}"
         })
     except Exception as e:
-        return error_response(f"Failed to get service status: {str(e)}", 500)
+        logger.error(f"Failed to get service status: {e}")
+        return error_response("Failed to get service status", 500)
 
 
 @bp.route('/api/v2/system/service/restart', methods=['POST'])
@@ -1407,4 +1447,5 @@ def restart_service():
         else:
             return error_response(message, 500)
     except Exception as e:
-        return error_response(f"Failed to restart service: {str(e)}", 500)
+        logger.error(f"Failed to restart service: {e}")
+        return error_response("Failed to restart service", 500)

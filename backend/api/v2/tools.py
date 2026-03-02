@@ -465,10 +465,11 @@ def match_keys():
                     'fingerprint': cert.fingerprint(hashes.SHA256()).hex()[:16]
                 })
             except Exception as e:
+                logger.warning(f"Invalid certificate data during PEM validation: {e}")
                 results['items'].append({
                     'type': 'certificate',
                     'valid': False,
-                    'error': str(e)
+                    'error': 'Invalid certificate data'
                 })
         
         # Parse private key
@@ -492,10 +493,11 @@ def match_keys():
                     'valid': True
                 })
             except Exception as e:
+                logger.warning(f"Invalid private key data during PEM validation: {e}")
                 results['items'].append({
                     'type': 'private_key',
                     'valid': False,
-                    'error': str(e)
+                    'error': 'Invalid private key data'
                 })
         
         # Parse CSR
@@ -519,10 +521,11 @@ def match_keys():
                     'signature_valid': csr.is_signature_valid
                 })
             except Exception as e:
+                logger.warning(f"Invalid CSR data during PEM validation: {e}")
                 results['items'].append({
                     'type': 'csr',
                     'valid': False,
-                    'error': str(e)
+                    'error': 'Invalid CSR data'
                 })
         
         # Compare public keys

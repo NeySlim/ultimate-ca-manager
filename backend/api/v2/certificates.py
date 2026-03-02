@@ -480,7 +480,8 @@ def create_certificate():
         
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to create certificate: {str(e)}', 500)
+        logger.error(f"Failed to create certificate: {e}")
+        return error_response('Failed to create certificate', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>', methods=['GET'])
@@ -677,7 +678,8 @@ def export_all_certificates():
             return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
     
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"Bulk export failed: {e}")
+        return error_response('Export failed', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/export', methods=['GET'])
@@ -897,7 +899,8 @@ def export_certificate(cert_id):
             return error_response(f'Unsupported format: {export_format}', 400)
     
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"Certificate export failed: {e}")
+        return error_response('Export failed', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/revoke', methods=['POST'])
@@ -947,9 +950,11 @@ def revoke_certificate(cert_id):
             message='Certificate revoked successfully'
         )
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.error(f"Certificate revocation validation error: {e}")
+        return error_response('Validation failed', 400)
     except Exception as e:
-        return error_response(f'Failed to revoke certificate: {str(e)}', 500)
+        logger.error(f"Failed to revoke certificate: {e}")
+        return error_response('Failed to revoke certificate', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/unhold', methods=['POST'])
@@ -1064,7 +1069,8 @@ def upload_private_key(cert_id):
         except Exception as e:
             if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
                 return error_response('Private key is encrypted - please provide passphrase', 400)
-            return error_response(f'Invalid private key: {str(e)}', 400)
+            logger.error(f"Invalid private key format: {e}")
+            return error_response('Invalid private key format', 400)
         
         # Verify key matches certificate public key
         if cert.crt:
@@ -1087,7 +1093,8 @@ def upload_private_key(cert_id):
                 if cert_pub_bytes != key_pub_bytes:
                     return error_response('Private key does not match certificate public key', 400)
             except Exception as e:
-                return error_response(f'Failed to verify key matches certificate: {str(e)}', 400)
+                logger.error(f"Failed to verify key matches certificate: {e}")
+                return error_response('Failed to verify key matches certificate', 400)
         
         # Store key (decrypt if needed, re-encode without password)
         unencrypted_key = private_key.private_bytes(
@@ -1120,7 +1127,8 @@ def upload_private_key(cert_id):
         
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to upload private key: {str(e)}', 500)
+        logger.error(f"Failed to upload private key: {e}")
+        return error_response('Failed to upload private key', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
@@ -1286,7 +1294,8 @@ def renew_certificate(cert_id):
         
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to renew certificate: {str(e)}', 500)
+        logger.error(f"Failed to renew certificate: {e}")
+        return error_response('Failed to renew certificate', 500)
 
 
 @bp.route('/api/v2/certificates/import', methods=['POST'])
@@ -1317,7 +1326,8 @@ def import_certificate():
         try:
             file_data, filename = validate_upload(file, CERT_EXTENSIONS)
         except ValueError as e:
-            return error_response(str(e), 400)
+            logger.error(f"Certificate upload validation error: {e}")
+            return error_response('Invalid input', 400)
     elif request.form.get('pem_content'):
         pem_content = request.form.get('pem_content')
         file_data = pem_content.encode('utf-8')
@@ -1507,12 +1517,13 @@ def import_certificate():
         
     except ValueError as e:
         db.session.rollback()
-        return error_response(str(e), 400)
+        logger.error(f"Certificate import validation error: {e}")
+        return error_response('Invalid input', 400)
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Certificate Import Error: {str(e)}")
+        logger.error(f"Certificate Import Error: {e}")
         logger.error(traceback.format_exc())
-        return error_response(f'Import failed: {str(e)}', 500)
+        return error_response('Import failed', 500)
 
 
 # ============================================================
@@ -1545,7 +1556,8 @@ def bulk_revoke_certificates():
             CertificateService.revoke_certificate(cert_id=cert_id, reason=reason, username=username)
             results['success'].append(cert_id)
         except Exception as e:
-            results['failed'].append({'id': cert_id, 'error': str(e)})
+            logger.error(f"Bulk revoke failed for cert {cert_id}: {e}")
+            results['failed'].append({'id': cert_id, 'error': 'Revocation failed'})
 
     AuditService.log_action(
         action='certificates_bulk_revoked',
@@ -1640,7 +1652,8 @@ def bulk_renew_certificates():
             results['success'].append(cert_id)
         except Exception as e:
             db.session.rollback()
-            results['failed'].append({'id': cert_id, 'error': str(e)})
+            logger.error(f"Bulk renew failed for cert {cert_id}: {e}")
+            results['failed'].append({'id': cert_id, 'error': 'Renewal failed'})
 
     AuditService.log_action(
         action='certificates_bulk_renewed',
@@ -1677,7 +1690,8 @@ def bulk_delete_certificates():
             results['success'].append(cert_id)
         except Exception as e:
             db.session.rollback()
-            results['failed'].append({'id': cert_id, 'error': str(e)})
+            logger.error(f"Bulk delete failed for cert {cert_id}: {e}")
+            results['failed'].append({'id': cert_id, 'error': 'Deletion failed'})
 
     AuditService.log_action(
         action='certificates_bulk_deleted',
@@ -1732,4 +1746,5 @@ def bulk_export_certificates():
         else:
             return error_response('Supported formats: pem, p7b', 400)
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"Bulk export failed: {e}")
+        return error_response('Export failed', 500)

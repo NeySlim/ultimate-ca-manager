@@ -9,6 +9,8 @@ from utils.response import success_response, error_response, created_response
 from models import db, SystemConfig
 from services.audit_service import AuditService
 from datetime import datetime, timezone
+import logging
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('settings_v2', __name__)
 
@@ -152,7 +154,8 @@ def create_backup():
             message='Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
         )
     except Exception as e:
-        return error_response(f'Backup failed: {str(e)}', 500)
+        logger.error(f"Settings backup failed: {e}")
+        return error_response('Backup failed', 500)
 
 
 @bp.route('/api/v2/settings/backup/restore', methods=['POST'])
@@ -201,7 +204,8 @@ def restore_backup():
             message='Backup restored successfully. Please restart the application.'
         )
     except Exception as e:
-        return error_response(f'Restore failed: {str(e)}', 500)
+        logger.error(f"Settings restore failed: {e}")
+        return error_response('Restore failed', 500)
 
 
 @bp.route('/api/v2/settings/backup/<path:filename>/download', methods=['GET'])
@@ -742,7 +746,8 @@ def test_ldap_connection():
     except ImportError:
         return error_response('LDAP support not installed (pip install ldap3)', 501)
     except Exception as e:
-        return error_response(f'LDAP connection failed: {str(e)}', 400)
+        logger.error(f"LDAP connection test failed: {e}")
+        return error_response('LDAP connection failed', 400)
 
 
 # ============================================================================
@@ -881,7 +886,8 @@ def test_webhook(webhook_id):
             message=f'Test webhook sent (status: {response.status_code})'
         )
     except Exception as e:
-        return error_response(f'Failed to send webhook: {str(e)}', 500)
+        logger.error(f"Failed to send test webhook: {e}")
+        return error_response('Failed to send webhook', 500)
 
 
 # ============================================================================

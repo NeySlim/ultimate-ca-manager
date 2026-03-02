@@ -487,7 +487,7 @@ def webauthn_start():
         )
     except Exception as e:
         logger.error(f"WebAuthn start error: {e}")
-        return error_response(f'Failed to generate WebAuthn options: {str(e)}', 500)
+        return error_response('Failed to generate WebAuthn options', 500)
 
 
 @bp.route('/api/v2/auth/login/webauthn/verify', methods=['POST'])
@@ -591,7 +591,7 @@ def webauthn_verify():
     except Exception as e:
         db.session.rollback()
         logger.error(f"WebAuthn verification error: {e}")
-        return error_response(f'WebAuthn verification failed: {str(e)}', 401)
+        return error_response('WebAuthn verification failed', 401)
 
 
 @bp.route('/api/v2/auth/logout', methods=['POST'])

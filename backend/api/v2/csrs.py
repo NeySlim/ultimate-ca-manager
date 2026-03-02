@@ -187,7 +187,8 @@ def create_csr():
             message='CSR created successfully'
         )
     except Exception as e:
-        return error_response(f"Failed to create CSR: {str(e)}", 500)
+        logger.error(f"Failed to create CSR: {e}")
+        return error_response('Failed to create CSR', 500)
 
 
 @bp.route('/api/v2/csrs/upload', methods=['POST'])
@@ -267,7 +268,8 @@ def upload_csr():
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f"Failed to upload CSR: {str(e)}", 500)
+        logger.error(f"Failed to upload CSR: {e}")
+        return error_response('Failed to upload CSR', 500)
 
 
 @bp.route('/api/v2/csrs/import', methods=['POST'])
@@ -290,7 +292,8 @@ def import_csr():
         try:
             csr_pem, _ = validate_upload(file, CERT_EXTENSIONS)
         except ValueError as e:
-            return error_response(str(e), 400)
+            logger.warning(f"CSR upload validation error: {e}")
+            return error_response('Invalid file upload', 400)
     elif request.form.get('pem_content'):
         csr_pem = request.form.get('pem_content').encode('utf-8')
     else:
@@ -373,7 +376,7 @@ def import_csr():
         
     except Exception as e:
         db.session.rollback()
-        logger.error(f"CSR Import Error: {str(e)}", exc_info=True)
+        logger.error(f"CSR Import Error: {e}", exc_info=True)
         return error_response('Import failed', 500)
 
 @bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET'])
@@ -393,7 +396,8 @@ def export_csr(csr_id):
             headers={'Content-Disposition': f'attachment; filename="{cert.descr or cert.refid}.csr"'}
         )
     except Exception as e:
-        return error_response(f'Export failed: {str(e)}', 500)
+        logger.error(f"CSR export failed: {e}")
+        return error_response('Export failed', 500)
 
 @bp.route('/api/v2/csrs/<int:csr_id>', methods=['DELETE'])
 @require_auth(['delete:csrs'])
@@ -413,7 +417,8 @@ def delete_csr(csr_id):
         else:
             return error_response("CSR not found", 404)
     except Exception as e:
-        return error_response(str(e), 500)
+        logger.error(f"Failed to get CSR details: {e}")
+        return error_response('Failed to get CSR details', 500)
 
 
 @bp.route('/api/v2/csrs/<int:csr_id>/key', methods=['POST'])
@@ -470,7 +475,8 @@ def upload_csr_private_key(csr_id):
         except Exception as e:
             if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
                 return error_response('Private key is encrypted - please provide passphrase', 400)
-            return error_response(f'Invalid private key: {str(e)}', 400)
+            logger.error(f"Invalid private key for CSR: {e}")
+            return error_response('Invalid private key format', 400)
         
         # Store key (decrypt if needed, re-encode without password)
         unencrypted_key = private_key.private_bytes(
@@ -503,7 +509,8 @@ def upload_csr_private_key(csr_id):
         
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to upload private key: {str(e)}', 500)
+        logger.error(f"Failed to upload private key: {e}")
+        return error_response('Failed to upload private key', 500)
 
 
 @bp.route('/api/v2/csrs/<int:csr_id>/sign', methods=['POST'])
@@ -575,7 +582,7 @@ def sign_csr(csr_id):
             message='CSR signed successfully'
         )
     except Exception as e:
-        logger.error(f"CSR Sign Error: {str(e)}", exc_info=True)
+        logger.error(f"CSR Sign Error: {e}", exc_info=True)
         return error_response("Failed to sign CSR", 500)
 
 
@@ -622,7 +629,7 @@ def bulk_sign_csrs():
                 cert_id=csr_id, caref=ca.refid, validity_days=validity_days)
             results['success'].append(csr_id)
         except Exception as e:
-            results['failed'].append({'id': csr_id, 'error': str(e)})
+            results['failed'].append({'id': csr_id, 'error': 'Signing failed'})
 
     AuditService.log_action(
         action='csrs_bulk_signed',
@@ -655,7 +662,7 @@ def bulk_delete_csrs():
             else:
                 results['failed'].append({'id': csr_id, 'error': 'Not found'})
         except Exception as e:
-            results['failed'].append({'id': csr_id, 'error': str(e)})
+            results['failed'].append({'id': csr_id, 'error': 'Deletion failed'})
 
     AuditService.log_action(
         action='csrs_bulk_deleted',

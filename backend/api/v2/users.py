@@ -18,6 +18,8 @@ import hashlib
 import io
 import re
 import uuid
+import logging
+logger = logging.getLogger(__name__)
 
 # Import password policy
 try:
@@ -449,7 +451,8 @@ def bulk_delete_users():
             results['success'].append(user_id)
         except Exception as e:
             db.session.rollback()
-            results['failed'].append({'id': user_id, 'error': str(e)})
+            logger.error(f"Failed to delete user {user_id}: {e}")
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
 
     AuditService.log_action(
         action='users_bulk_deactivated',

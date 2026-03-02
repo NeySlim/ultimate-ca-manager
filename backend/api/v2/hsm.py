@@ -99,10 +99,11 @@ def create_provider():
         return created_response(data=provider.to_dict())
         
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"HSM provider validation error: {e}")
+        return error_response('Invalid provider configuration', 400)
     except Exception as e:
         logger.exception(f"Failed to create HSM provider: {name}")
-        return error_response(f'Failed to create provider: {str(e)}', 500)
+        return error_response('Failed to create provider', 500)
 
 
 @bp.route('/api/v2/hsm/providers/<int:provider_id>', methods=['GET'])
@@ -168,10 +169,11 @@ def update_provider(provider_id):
         return success_response(data=updated.to_dict(include_config=True))
         
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"HSM provider update validation error: {e}")
+        return error_response('Invalid provider configuration', 400)
     except Exception as e:
         logger.exception(f"Failed to update HSM provider: {provider_id}")
-        return error_response(f'Failed to update provider: {str(e)}', 500)
+        return error_response('Failed to update provider', 500)
 
 
 @bp.route('/api/v2/hsm/providers/<int:provider_id>', methods=['DELETE'])
@@ -199,10 +201,11 @@ def delete_provider(provider_id):
         return no_content_response()
         
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"HSM provider delete validation error: {e}")
+        return error_response('Invalid request', 400)
     except Exception as e:
         logger.exception(f"Failed to delete HSM provider: {provider_id}")
-        return error_response(f'Failed to delete provider: {str(e)}', 500)
+        return error_response('Failed to delete provider', 500)
 
 
 @bp.route('/api/v2/hsm/providers/<int:provider_id>/test', methods=['POST'])
@@ -228,10 +231,11 @@ def test_provider(provider_id):
         return success_response(data=result)
         
     except HsmConfigError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"HSM config error: {e}")
+        return error_response('HSM configuration error', 400)
     except Exception as e:
         logger.exception(f"Failed to test HSM provider: {provider_id}")
-        return error_response(f'Failed to test provider: {str(e)}', 500)
+        return error_response('Failed to test provider', 500)
 
 
 @bp.route('/api/v2/hsm/providers/<int:provider_id>/sync', methods=['POST'])
@@ -257,10 +261,11 @@ def sync_provider_keys(provider_id):
         return success_response(data=result)
         
     except HsmError as e:
-        return error_response(str(e), 500)
+        logger.error(f"HSM sync error: {e}")
+        return error_response('HSM synchronization error', 500)
     except Exception as e:
         logger.exception(f"Failed to sync HSM keys: {provider_id}")
-        return error_response(f'Failed to sync keys: {str(e)}', 500)
+        return error_response('Failed to sync keys', 500)
 
 
 # =============================================================================
@@ -355,12 +360,14 @@ def generate_key(provider_id):
         return created_response(data=key.to_dict())
         
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.warning(f"HSM key generation validation error: {e}")
+        return error_response('Invalid key parameters', 400)
     except HsmError as e:
-        return error_response(str(e), 500)
+        logger.error(f"HSM key generation error: {e}")
+        return error_response('HSM key generation error', 500)
     except Exception as e:
         logger.exception(f"Failed to generate HSM key: {label}")
-        return error_response(f'Failed to generate key: {str(e)}', 500)
+        return error_response('Failed to generate key', 500)
 
 
 @bp.route('/api/v2/hsm/keys/<int:key_id>', methods=['GET'])
@@ -401,10 +408,11 @@ def delete_key(key_id):
         return no_content_response()
         
     except HsmError as e:
-        return error_response(str(e), 500)
+        logger.error(f"HSM key deletion error: {e}")
+        return error_response('HSM key deletion error', 500)
     except Exception as e:
         logger.exception(f"Failed to delete HSM key: {key_id}")
-        return error_response(f'Failed to delete key: {str(e)}', 500)
+        return error_response('Failed to delete key', 500)
 
 
 @bp.route('/api/v2/hsm/keys/<int:key_id>/public', methods=['GET'])
@@ -423,10 +431,11 @@ def get_public_key(key_id):
         return success_response(data={'pem': pem})
         
     except HsmError as e:
-        return error_response(str(e), 500)
+        logger.error(f"HSM public key error: {e}")
+        return error_response('Failed to retrieve public key', 500)
     except Exception as e:
         logger.exception(f"Failed to get public key: {key_id}")
-        return error_response(f'Failed to get public key: {str(e)}', 500)
+        return error_response('Failed to get public key', 500)
 
 
 @bp.route('/api/v2/hsm/keys/<int:key_id>/sign', methods=['POST'])
@@ -480,10 +489,11 @@ def sign_data(key_id):
         return success_response(data={'signature': signature_b64})
         
     except HsmError as e:
-        return error_response(str(e), 500)
+        logger.error(f"HSM signing error: {e}")
+        return error_response('HSM signing operation failed', 500)
     except Exception as e:
         logger.exception(f"Failed to sign with HSM key: {key_id}")
-        return error_response(f'Failed to sign: {str(e)}', 500)
+        return error_response('Failed to sign data', 500)
 
 
 # =============================================================================
@@ -691,4 +701,4 @@ def install_dependencies():
         return error_response('Installation timed out', 504)
     except Exception as e:
         logger.exception(f"Failed to install HSM dependencies: {e}")
-        return error_response(f'Installation error: {str(e)}', 500)
+        return error_response('HSM dependency installation failed', 500)
