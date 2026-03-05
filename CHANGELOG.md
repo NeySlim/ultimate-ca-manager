@@ -11,6 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.56] - 2026-03-05
+
+### Fixed
+- **ACME/CSR Certificate Compatibility** — Certificates signed from CSRs (ACME, SCEP) now include Extended Key Usage (`serverAuth`) and populate CN from SAN when subject is empty, fixing Edge/Chrome rejection while Firefox accepted them
+
+---
+
 ## [2.55] - 2026-03-05
 
 ### Fixed
