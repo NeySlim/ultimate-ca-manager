@@ -11,6 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.54] - 2026-03-05
+
+### Fixed
+- **ACME Client Orders Visibility** — Orders are now displayed in the Let's Encrypt tab with status, actions (verify, finalize, download, renew, delete), and error messages (#29)
+
+---
+
 ## [2.53] - 2026-03-05
 
 ### Added
