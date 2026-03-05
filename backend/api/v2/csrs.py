@@ -320,10 +320,7 @@ def import_csr():
                 ou = attr.value
         
         # Build subject string
-        subject_parts = []
-        for attr in subject:
-            subject_parts.append(f"{attr.oid._name}={attr.value}")
-        subject_str = ', '.join(subject_parts)
+        subject_str = subject.rfc4514_string()
         
         # Extract SANs if present
         san_dns = []

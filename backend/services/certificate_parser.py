@@ -60,16 +60,10 @@ class CertificateParser:
             Dictionary with certificate information
         """
         # Extract subject DN
-        subject_parts = []
-        for attr in cert.subject:
-            subject_parts.append(f"{attr.oid._name}={attr.value}")
-        subject_dn = ", ".join(subject_parts)
+        subject_dn = cert.subject.rfc4514_string()
         
         # Extract issuer DN
-        issuer_parts = []
-        for attr in cert.issuer:
-            issuer_parts.append(f"{attr.oid._name}={attr.value}")
-        issuer_dn = ", ".join(issuer_parts)
+        issuer_dn = cert.issuer.rfc4514_string()
         
         # Get serial number (hex format)
         serial = format(cert.serial_number, 'X')
@@ -275,12 +269,10 @@ class CertificateParser:
                 cert = load_der_x509_certificate(peercert, default_backend())
                 
                 # Extract subject
+                subject_dn = cert.subject.rfc4514_string()
                 subject_parts = {}
                 for attr in cert.subject:
                     subject_parts[attr.oid._name.upper()] = attr.value
-                
-                # Build DN string
-                subject_dn = ', '.join([f'{k}={v}' for k, v in subject_parts.items()])
                 
                 # Get serial as hex
                 serial = format(cert.serial_number, 'X')
@@ -292,7 +284,7 @@ class CertificateParser:
                 return {
                     'cert_pem': cert.public_bytes(encoding=serialization.Encoding.PEM).decode('utf-8'),
                     'subject_dn': subject_dn,
-                    'issuer_dn': ', '.join([f'{attr.oid._name.upper()}={attr.value}' for attr in cert.issuer]),
+                    'issuer_dn': cert.issuer.rfc4514_string(),
                     'serial': serial,
                     'fingerprint': fingerprint,
                     'common_name': subject_parts.get('COMMONNAME') or subject_parts.get('CN'),
