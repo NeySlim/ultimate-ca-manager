@@ -200,31 +200,29 @@ import ipaddress
 def is_safe_host(hostname):
     """
     Check if hostname is safe to connect to (SSRF protection)
-    Blocks loopback, link-local, and private networks unless explicitly allowed
+    UCM is a self-hosted PKI tool — private/local network access is allowed
+    since users need to check certificates on their own infrastructure.
+    Only link-local and multicast addresses are blocked.
     """
-    # Allow whitelisted domains (e.g. for testing)
     ALLOWED_DOMAINS = os.getenv('SSRF_ALLOWED_DOMAINS', '').split(',')
     if hostname in ALLOWED_DOMAINS:
         return True
         
     try:
-        # Check if it's an IP address
         ip = ipaddress.ip_address(hostname)
-        # Block private/loopback/link-local/multicast
-        if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_private:
+        if ip.is_link_local or ip.is_multicast:
             return False
         return True
     except ValueError:
-        # It's a hostname - resolve it
+        # It's a hostname - resolve it (supports both IPv4 and IPv6)
         try:
-            # Resolve to IP
-            ip_str = socket.gethostbyname(hostname)
-            ip = ipaddress.ip_address(ip_str)
-            if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_private:
-                return False
+            results = socket.getaddrinfo(hostname, None)
+            for family, _, _, _, sockaddr in results:
+                ip = ipaddress.ip_address(sockaddr[0])
+                if ip.is_link_local or ip.is_multicast:
+                    return False
             return True
         except (socket.gaierror, ValueError):
-            # Could not resolve - safe to block
             return False
 
 

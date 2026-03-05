@@ -1481,7 +1481,7 @@ export default function SettingsPage() {
   const { canWrite, hasPermission } = usePermission()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { waitForRestart } = useServiceReconnect()
+  const { reconnecting, status: reconnectStatus, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -3470,6 +3470,9 @@ export default function SettingsPage() {
 
   return (
     <>
+      {reconnecting && (
+        <ServiceReconnectOverlay status={reconnectStatus} attempt={attempt} countdown={countdown} onCancel={cancel} />
+      )}
       <ResponsiveLayout
         title={t('common.settings')}
         subtitle={t('settings.subtitle')}
