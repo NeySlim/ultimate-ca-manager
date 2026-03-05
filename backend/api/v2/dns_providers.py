@@ -233,10 +233,4 @@ def test_provider(provider_id):
         )
     except Exception as e:
         logger.error(f"DNS provider test failed: {e}")
-        return success_response(
-            data={
-                'success': False,
-                'message': 'Connection test failed'
-            },
-            message='Connection test failed'
-        )
+        return error_response('Connection test failed', 500)

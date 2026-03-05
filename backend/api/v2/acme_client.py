@@ -292,15 +292,22 @@ def request_certificate():
         
         # Set up DNS challenges if using dns-01
         challenge_info = {}
+        challenge_warning = None
         if challenge_type == 'dns-01':
-            _, setup_message, challenge_info = client.setup_dns_challenge(order)
+            setup_success, setup_message, challenge_info = client.setup_dns_challenge(order)
+            if not setup_success:
+                challenge_warning = setup_message
+        
+        response_data = {
+            'order': order.to_dict(),
+            'challenges': challenge_info,
+        }
+        if challenge_warning:
+            response_data['challenge_warning'] = challenge_warning
         
         return success_response(
-            data={
-                'order': order.to_dict(),
-                'challenges': challenge_info,
-            },
-            message=message,
+            data=response_data,
+            message=challenge_warning or message,
             status=201
         )
         

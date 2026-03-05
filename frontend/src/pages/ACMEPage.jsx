@@ -222,7 +222,11 @@ export default function ACMEPage() {
   const handleRequestCertificate = async (data) => {
     try {
       const result = await acmeService.requestCertificate(data)
-      showSuccess(t('acme.certificateRequestCreated'))
+      if (result.data?.challenge_warning) {
+        showWarning(result.data.challenge_warning)
+      } else {
+        showSuccess(t('acme.certificateRequestCreated'))
+      }
       setShowRequestModal(false)
       loadData()
       if (result.data) {
@@ -347,10 +351,10 @@ export default function ACMEPage() {
   const handleTestDnsProvider = async (provider) => {
     try {
       const result = await acmeService.testDnsProvider(provider.id)
-      if (result.success) {
+      if (result.data?.success) {
         showSuccess(t('acme.dnsProviderTestSuccess'))
       } else {
-        showWarning(result.message || t('common.dnsProviderTestFailed'))
+        showWarning(result.data?.message || result.message || t('common.dnsProviderTestFailed'))
       }
     } catch (error) {
       showError(error.message || t('common.dnsProviderTestFailed'))
