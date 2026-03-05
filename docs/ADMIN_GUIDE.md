@@ -106,6 +106,27 @@ mTLS client certificates can be enrolled from the **Account → mTLS** tab. Once
 - **Revoke** — Revoke with reason (key compromise, superseded, etc.)
 - **RBAC** — Viewers see only their own certificates; operators and admins see all
 
+### Single Sign-On (SSO)
+
+Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
+
+**LDAP / Active Directory:**
+- Server URL, bind DN, search base, user/group filters
+- Group-to-role mapping (map AD groups to UCM roles)
+- Test connection before saving
+
+**OAuth2 (Azure AD, Google, GitHub):**
+- Client ID, Client Secret, Authorization/Token/UserInfo URLs
+- Callback URL: `https://your-server:8443/api/v2/auth/sso/oauth2/callback`
+- Role claim mapping from token attributes
+
+**SAML 2.0:**
+- IdP Metadata URL or manual XML upload
+- Entity ID, ACS URL, certificate configuration
+- Attribute mapping for username, email, roles
+
+**Important:** After configuring SSO, test with a non-admin account first. Keep at least one local admin account as fallback.
+
 ---
 
 ## Email Notifications
@@ -243,6 +264,26 @@ View pending SCEP requests in the SCEP page, or via API:
 ```bash
 curl -k -b cookies.txt https://localhost:8443/api/v2/scep/requests?status=pending
 ```
+
+### EST Administration
+
+EST (RFC 7030) is configured under **Operations → EST**:
+
+1. **Enable EST** and select the issuing CA
+2. **Authentication** — Configure client authentication (HTTP Basic or TLS mutual auth)
+3. **Endpoint** — `https://your-server:8443/.well-known/est/`
+4. **Operations** — Simple enroll, re-enroll, CA certs distribution
+5. Monitor EST requests in the Operations page
+
+### Discovery Administration
+
+Configure certificate discovery under **Operations → Discovery**:
+
+1. **Scan Profiles** — Create profiles with target hosts/CIDR ranges, port lists, and scan options
+2. **Scheduling** — Enable scheduled scans with configurable intervals
+3. **Results** — View discovered certificates, filter by status, expiry, issuer
+4. **Quick Scan** — One-off scans without creating a profile
+5. **SNI support** — Enable SNI for virtual host scanning
 
 ---
 

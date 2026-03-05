@@ -157,6 +157,34 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v2.56 from v2.5x
+
+**No breaking changes** — safe to upgrade directly.
+
+**Fixed in v2.55–v2.56:**
+- Certificate subject/issuer fields now use standard RFC 4514 format (CN=, C=, O= instead of verbose names)
+- Existing certificates with wrong format are auto-corrected by migration on startup
+- ACME/CSR-signed certificates now include Extended Key Usage (`serverAuth`) — fixes Edge/Chrome rejecting certs
+- CSRs with empty subject (common from ACME clients) now get CN populated from SAN
+
+**Note:** Existing ACME certificates need to be re-issued to benefit from the EKU fix.
+
+### Upgrading to v2.52 from v2.48–v2.51
+
+**No breaking changes** — safe to upgrade directly.
+
+**New in v2.49–v2.52:**
+- Certificate Discovery with network scanning (scan profiles, scheduling, results management)
+- EST protocol (RFC 7030) for device enrollment
+- Certificate Templates (server, client, VPN, code signing, email)
+- Certificate Toolbox (SSL checker, CSR decoder, key matcher, format converter)
+- SSO integration (LDAP/Active Directory, OAuth2, SAML 2.0) with role mapping
+- HSM support (SoftHSM, PKCS#11, Azure Key Vault, Google Cloud KMS)
+- ACME client for Let's Encrypt integration
+- Intermediate CA signing from CSRs
+- Email notifications with customizable templates
+- Certificate policies and approval workflows
+
 ### Upgrading to v2.48 from v2.1.x
 
 **No breaking changes** — safe to upgrade directly.

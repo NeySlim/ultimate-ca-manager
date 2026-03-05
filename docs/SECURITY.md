@@ -204,6 +204,34 @@ Requires SMTP configuration in Settings > Email.
 
 ---
 
+### 7. SSRF Protection (v2.52+)
+
+Network scan endpoints (discovery, SSL checker) are protected against SSRF attacks:
+
+- Private/loopback IP ranges blocked by default (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+- DNS rebinding protection — resolved IPs are validated against the blocklist
+- Configurable allowlist for internal network scanning use cases
+- Cloud metadata endpoints (169.254.169.254) always blocked
+
+### 8. WebAuthn Brute-Force Protection (v2.52+)
+
+WebAuthn authentication includes rate limiting:
+
+- Failed attempts tracked per user
+- Account lockout after repeated failures
+- Separate rate limit from password login
+
+### 9. SSO Audit Logging (v2.52+)
+
+All SSO authentication events are logged:
+
+- Login attempts (success/failure) with provider type
+- LDAP bind errors (generic messages to prevent enumeration)
+- OAuth2/SAML token validation failures
+- Session creation from SSO providers
+
+---
+
 ## Security Best Practices
 
 ### 1. Initial Setup
@@ -267,6 +295,9 @@ If you discover a security vulnerability, please report it responsibly:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.56 | 2026-07-17 | ACME/CSR certificates now include Extended Key Usage (serverAuth), empty subject populated from SAN |
+| 2.55 | 2026-07-17 | DN format fix (RFC 4514), auto-migration corrects existing records |
+| 2.52 | 2026-07-14 | SSRF protection, DNS rebinding prevention, WebAuthn brute-force protection, SSO audit logging, certificate discovery security |
 | 2.1.0 | 2026-02-19 | SSO (LDAP/OAuth2/SAML) with rate limiting, LDAP filter injection fix, CSRF on SSO endpoints, 4-role RBAC (admin/operator/auditor/viewer), 28 SSO security tests |
 | 2.0.2 | 2026-01-31 | Private key encryption, CSRF, password policy, rate limiting |
 | 2.0.0 | 2026-01-29 | Initial security framework, session auth, RBAC |

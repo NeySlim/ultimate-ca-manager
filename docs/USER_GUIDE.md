@@ -227,6 +227,43 @@ Real-time certificate validation:
 2. URL: `https://your-server:8443/ocsp`
 3. Configure in CA settings for CDP/AIA extensions
 
+### EST Server
+
+RFC 7030 device enrollment:
+
+1. Go to **Operations > EST**
+2. Enable EST and assign a CA
+3. Devices use: `https://your-server:8443/.well-known/est`
+4. Supports simple enrollment and re-enrollment
+
+---
+
+## Certificate Discovery
+
+Scan your network for certificates:
+
+1. Go to **Operations > Discovery**
+2. Create a **Scan Profile** with target hosts/networks, ports, and schedule
+3. Run a scan manually or let it run on schedule
+4. Review discovered certificates — status, expiry, issuer, SAN
+5. Import discovered certificates into UCM or flag them for tracking
+
+### Quick Scan
+
+For one-off checks, use the **Quick Scan** button to scan a single host or range without creating a profile.
+
+---
+
+## Certificate Tools
+
+The **Tools** section provides utilities for working with certificates:
+
+- **SSL Checker** — Test SSL/TLS configuration of any server (public or internal)
+- **CSR Decoder** — Paste a CSR to inspect subject, SANs, key type, and extensions
+- **Certificate Decoder** — Paste a PEM certificate to view all fields
+- **Key Matcher** — Verify that a certificate and private key match
+- **Format Converter** — Convert between PEM, DER, and PKCS#12 formats
+
 ---
 
 ## Themes
