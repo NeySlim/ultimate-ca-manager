@@ -610,7 +610,15 @@
     "unholdCertificate": "Sperre aufheben",
     "unheld": "Zertifikatssperre aufgehoben",
     "unholdFailed": "Fehler beim Aufheben der Sperre",
-    "removeHold": "Sperre aufheben"
+    "removeHold": "Sperre aufheben",
+    "certTypes": {
+      "server": "Server (TLS)",
+      "client": "Client",
+      "combined": "Server + Client",
+      "intermediateCA": "Zwischen-CA",
+      "codeSigning": "Code-Signierung",
+      "email": "E-Mail (S/MIME)"
+    }
   },
   "cas": {
     "parentCA": "Übergeordnete CA",

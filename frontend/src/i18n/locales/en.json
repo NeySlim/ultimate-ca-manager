@@ -610,7 +610,15 @@
     "unholdCertificate": "Remove Certificate Hold",
     "unheld": "Certificate hold removed",
     "unholdFailed": "Failed to remove certificate hold",
-    "removeHold": "Remove Hold"
+    "removeHold": "Remove Hold",
+    "certTypes": {
+      "server": "Server (TLS)",
+      "client": "Client",
+      "combined": "Server + Client",
+      "intermediateCA": "Intermediate CA",
+      "codeSigning": "Code Signing",
+      "email": "Email (S/MIME)"
+    }
   },
   "cas": {
     "parentCA": "Parent CA",

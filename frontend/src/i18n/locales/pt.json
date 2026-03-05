@@ -610,7 +610,15 @@
     "unholdCertificate": "Remover suspensão",
     "unheld": "Suspensão do certificado removida",
     "unholdFailed": "Falha ao remover a suspensão",
-    "removeHold": "Remover suspensão"
+    "removeHold": "Remover suspensão",
+    "certTypes": {
+      "server": "Servidor (TLS)",
+      "client": "Cliente",
+      "combined": "Servidor + Cliente",
+      "intermediateCA": "CA Intermediária",
+      "codeSigning": "Assinatura de código",
+      "email": "Email (S/MIME)"
+    }
   },
   "cas": {
     "parentCA": "CA pai",

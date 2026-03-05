@@ -563,16 +563,37 @@ class TrustStoreService:
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
         except x509.ExtensionNotFound:
-            builder = builder.add_extension(
-                x509.BasicConstraints(ca=False, path_length=None),
-                critical=True,
-            )
+            if cert_type == 'intermediate_ca':
+                builder = builder.add_extension(
+                    x509.BasicConstraints(ca=True, path_length=0),
+                    critical=True,
+                )
+            else:
+                builder = builder.add_extension(
+                    x509.BasicConstraints(ca=False, path_length=None),
+                    critical=True,
+                )
         
         # Add key usage based on cert type
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE)
         except x509.ExtensionNotFound:
-            if cert_type == 'server_cert':
+            if cert_type == 'intermediate_ca':
+                builder = builder.add_extension(
+                    x509.KeyUsage(
+                        digital_signature=True,
+                        key_encipherment=False,
+                        content_commitment=False,
+                        data_encipherment=False,
+                        key_agreement=False,
+                        key_cert_sign=True,
+                        crl_sign=True,
+                        encipher_only=False,
+                        decipher_only=False,
+                    ),
+                    critical=True,
+                )
+            elif cert_type == 'server_cert':
                 builder = builder.add_extension(
                     x509.KeyUsage(
                         digital_signature=True,

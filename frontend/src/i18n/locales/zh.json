@@ -610,7 +610,15 @@
     "unholdCertificate": "解除暂停",
     "unheld": "证书暂停已解除",
     "unholdFailed": "解除暂停失败",
-    "removeHold": "解除暂停"
+    "removeHold": "解除暂停",
+    "certTypes": {
+      "server": "服务器 (TLS)",
+      "client": "客户端",
+      "combined": "服务器 + 客户端",
+      "intermediateCA": "中间CA",
+      "codeSigning": "代码签名",
+      "email": "邮件 (S/MIME)"
+    }
   },
   "cas": {
     "parentCA": "父CA",

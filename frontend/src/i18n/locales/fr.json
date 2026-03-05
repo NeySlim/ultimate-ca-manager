@@ -503,7 +503,15 @@
     "unholdCertificate": "Lever la suspension",
     "unheld": "Suspension du certificat levée",
     "unholdFailed": "Échec de la levée de suspension",
-    "removeHold": "Lever la suspension"
+    "removeHold": "Lever la suspension",
+    "certTypes": {
+      "server": "Serveur (TLS)",
+      "client": "Client",
+      "combined": "Serveur + Client",
+      "intermediateCA": "CA Intermédiaire",
+      "codeSigning": "Signature de code",
+      "email": "Email (S/MIME)"
+    }
   },
   "common": {
     "saved": "Paramètres enregistrés",

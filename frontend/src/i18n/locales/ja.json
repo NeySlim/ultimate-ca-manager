@@ -610,7 +610,15 @@
     "unholdCertificate": "一時停止を解除",
     "unheld": "証明書の一時停止が解除されました",
     "unholdFailed": "一時停止の解除に失敗しました",
-    "removeHold": "一時停止解除"
+    "removeHold": "一時停止解除",
+    "certTypes": {
+      "server": "サーバー (TLS)",
+      "client": "クライアント",
+      "combined": "サーバー + クライアント",
+      "intermediateCA": "中間CA",
+      "codeSigning": "コード署名",
+      "email": "メール (S/MIME)"
+    }
   },
   "cas": {
     "parentCA": "親CA",

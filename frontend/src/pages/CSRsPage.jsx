@@ -678,6 +678,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
               { value: 'server', label: t('certificates.certTypes.server') },
               { value: 'client', label: t('certificates.certTypes.client') },
               { value: 'combined', label: t('certificates.certTypes.combined') },
+              { value: 'intermediate_ca', label: t('certificates.certTypes.intermediateCA') },
               { value: 'code_signing', label: t('certificates.certTypes.codeSigning') },
               { value: 'email', label: t('certificates.certTypes.email') },
             ]}

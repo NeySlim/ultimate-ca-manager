@@ -545,7 +545,8 @@ def sign_csr(csr_id):
         'client': 'client_cert', 
         'combined': 'combined_cert',
         'code_signing': 'code_signing',
-        'email': 'email_cert'
+        'email': 'email_cert',
+        'intermediate_ca': 'intermediate_ca'
     }
     backend_cert_type = cert_type_map.get(cert_type, 'server_cert')
     

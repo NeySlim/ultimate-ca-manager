@@ -610,7 +610,15 @@
     "unholdCertificate": "Зняти призупинення",
     "unheld": "Призупинення сертифіката знято",
     "unholdFailed": "Не вдалося зняти призупинення",
-    "removeHold": "Зняти призупинення"
+    "removeHold": "Зняти призупинення",
+    "certTypes": {
+      "server": "Сервер (TLS)",
+      "client": "Клієнт",
+      "combined": "Сервер + Клієнт",
+      "intermediateCA": "Проміжний CA",
+      "codeSigning": "Підпис коду",
+      "email": "Email (S/MIME)"
+    }
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
