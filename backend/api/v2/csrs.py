@@ -165,11 +165,27 @@ def create_csr():
         else:
             key_type = '2048'
 
+        # Parse SANs - frontend sends ["DNS:example.com", "IP:1.2.3.4"]
+        san_dns = []
+        san_ip = []
+        for entry in data.get('sans', []):
+            entry = entry.strip()
+            entry_clean = re.sub(r'^(DNS|IP|EMAIL|URI):\s*', '', entry, flags=re.IGNORECASE)
+            if not entry_clean:
+                continue
+            try:
+                from ipaddress import ip_address
+                ip_address(entry_clean)
+                san_ip.append(entry_clean)
+            except ValueError:
+                san_dns.append(entry_clean)
+
         cert = CertificateService.generate_csr(
             descr=f"CSR for {data['cn']}",
             dn=dn,
             key_type=key_type,
-            san_dns=data.get('sans', []),
+            san_dns=san_dns or None,
+            san_ip=san_ip or None,
             username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin' # TODO: Get real user
         )
         

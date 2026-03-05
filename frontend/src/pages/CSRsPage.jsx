@@ -239,10 +239,10 @@ export default function CSRsPage() {
       setShowKeyModal(false)
       setKeyPem('')
       setKeyPassphrase('')
-      loadData()
-      // Refresh selected CSR
+      // Refresh selected CSR first, then background-refresh list
       const updated = await csrsService.getById(selectedCSR.id)
       setSelectedCSR(updated.data || updated)
+      loadData()
     } catch (error) {
       showError(error.message || t('csrs.keyUploadFailed'))
     }
