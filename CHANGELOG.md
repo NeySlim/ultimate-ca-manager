@@ -11,6 +11,25 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.53] - 2026-03-05
+
+### Added
+- **Intermediate CA Signing** — CSR signing now supports "Intermediate CA" certificate type with `BasicConstraints(CA:TRUE, pathlen:0)` and keyCertSign/crlSign key usage
+- **DNS Challenge Warnings** — ACME certificate requests now surface DNS challenge setup failures as user-visible warnings instead of silently failing
+
+### Fixed
+- **ACME Account Creation** — Generate JWK key pair (RSA/EC) when creating accounts; previously failed with NOT NULL constraint on `jwk` field (#28)
+- **ACME Order Status** — Orders no longer get stuck in "pending" when DNS challenge setup fails (#29)
+- **DNS Provider Test Feedback** — Test button now correctly shows success/failure result to user (#30)
+- **SSL Checker Local Networks** — Allow checking certificates on private/local networks (192.168.x, 10.x, loopback) — essential for self-hosted PKI
+- **HTTPS Certificate Apply** — Show restart overlay when applying a new HTTPS certificate in Settings
+- **IPv6 Resolution** — SSL checker uses `getaddrinfo` instead of `gethostbyname` for proper IPv6 support
+
+### Changed
+- Removed hardcoded version references from docker-compose files
+
+---
+
 ## [2.52] - 2025-07-14
 
 ### Added
