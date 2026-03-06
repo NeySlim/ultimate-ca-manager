@@ -11,6 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.62] - 2026-03-06
+
+### Fixed
+- **ACME Challenges Endpoint** — Fixed crash on `/api/v2/acme/accounts/{id}/challenges` caused by accessing non-existent `identifier_value` attribute; now correctly parses JSON `identifier` field
+
+---
+
 ## [2.61] - 2026-03-06
 
 ### Fixed
