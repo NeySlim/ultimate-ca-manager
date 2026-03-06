@@ -568,6 +568,9 @@ def finalize_order(order_id: str):
             "finalize": f"{order_url}/finalize"
         }
         
+        if order.certificate_url:
+            response_data["certificate"] = order.certificate_url
+        
         response = acme_response(response_data)
         response.headers['Location'] = order_url
         
