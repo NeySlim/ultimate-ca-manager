@@ -308,7 +308,8 @@
     "orderReady": "La commande est prête pour la finalisation",
     "orderInvalid": "La validation de la commande a échoué",
     "orderStillProcessing": "La commande est encore en cours de validation par le serveur ACME",
-    "statusCheckFailed": "Échec de la vérification du statut"
+    "statusCheckFailed": "Échec de la vérification du statut",
+    "renew": "Renouveler"
   },
   "audit": {
     "event": "Événement",
@@ -519,7 +520,10 @@
       "intermediateCA": "CA Intermédiaire",
       "codeSigning": "Signature de code",
       "email": "Email (S/MIME)"
-    }
+    },
+    "cnRequired": "Le nom commun est requis",
+    "localityPlaceholder": "ex. Paris",
+    "statePlaceholder": "ex. Île-de-France"
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -885,7 +889,12 @@
     "notBefore": "Pas avant",
     "notAfter": "Pas après",
     "fingerprint": "Empreinte",
-    "started": "Démarré"
+    "started": "Démarré",
+    "createdBy": "Créé par",
+    "deleted": "Supprimé avec succès",
+    "dismiss": "Fermer",
+    "exportFailed": "Échec de l'export",
+    "generating": "Génération..."
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -995,7 +1004,8 @@
     "department": "Département (OU)",
     "departmentPlaceholder": "Département IT",
     "sansList": "Noms alternatifs du sujet",
-    "certTypeForSign": "Type de certificat"
+    "certTypeForSign": "Type de certificat",
+    "generateFailed": "Échec de la génération du CSR"
   },
   "dashboard": {
     "goodMorning": "Bonjour",
@@ -1385,7 +1395,8 @@
     "groups": {
       "actions": "Actions"
     },
-    "selectResource": "Type de ressource"
+    "selectResource": "Type de ressource",
+    "selectCA": "Veuillez sélectionner une CA"
   },
   "notifications": {
     "certificateIssued": "Certificat émis : {{name}}",
@@ -2756,7 +2767,8 @@
     "deleteTitle": "Supprimer le certificat",
     "deleteDescription": "Êtes-vous sûr de vouloir supprimer définitivement {{name}} ? Cette action est irréversible.",
     "deleteSuccess": "Certificat supprimé avec succès",
-    "deleteFailed": "Échec de la suppression du certificat"
+    "deleteFailed": "Échec de la suppression du certificat",
+    "exportError": "Échec de l'export du certificat"
   },
   "est": {
     "title": "Protocole EST",

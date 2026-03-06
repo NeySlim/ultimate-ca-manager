@@ -363,7 +363,12 @@
     "notBefore": "Nicht vor",
     "notAfter": "Nicht nach",
     "fingerprint": "Fingerabdruck",
-    "started": "Gestartet"
+    "started": "Gestartet",
+    "createdBy": "Erstellt von",
+    "deleted": "Erfolgreich gelöscht",
+    "dismiss": "Schließen",
+    "exportFailed": "Export fehlgeschlagen",
+    "generating": "Wird generiert..."
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "Aktionen"
     },
-    "selectResource": "Ressourcentyp"
+    "selectResource": "Ressourcentyp",
+    "selectCA": "Bitte wählen Sie eine CA"
   },
   "auth": {
     "login": "Anmelden",
@@ -618,7 +624,10 @@
       "intermediateCA": "Zwischen-CA",
       "codeSigning": "Code-Signierung",
       "email": "E-Mail (S/MIME)"
-    }
+    },
+    "cnRequired": "Allgemeiner Name ist erforderlich",
+    "localityPlaceholder": "z.B. Berlin",
+    "statePlaceholder": "z.B. Bayern"
   },
   "cas": {
     "parentCA": "Übergeordnete CA",
@@ -725,7 +734,8 @@
     "department": "Abteilung (OU)",
     "departmentPlaceholder": "IT-Abteilung",
     "sansList": "Subjektalternativnamen",
-    "certTypeForSign": "Zertifikatstyp"
+    "certTypeForSign": "Zertifikatstyp",
+    "generateFailed": "CSR-Generierung fehlgeschlagen"
   },
   "templates": {
     "template": "Vorlage",
@@ -1045,7 +1055,8 @@
     "orderReady": "Auftrag ist bereit zur Finalisierung",
     "orderInvalid": "Auftragsvalidierung fehlgeschlagen",
     "orderStillProcessing": "Auftrag wird noch vom ACME-Server validiert",
-    "statusCheckFailed": "Statusprüfung fehlgeschlagen"
+    "statusCheckFailed": "Statusprüfung fehlgeschlagen",
+    "renew": "Erneuern"
   },
   "scep": {
     "title": "SCEP-Protokoll",
@@ -2753,7 +2764,8 @@
     "deleteTitle": "Zertifikat löschen",
     "deleteDescription": "Möchten Sie {{name}} wirklich dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "deleteSuccess": "Zertifikat erfolgreich gelöscht",
-    "deleteFailed": "Zertifikat konnte nicht gelöscht werden"
+    "deleteFailed": "Zertifikat konnte nicht gelöscht werden",
+    "exportError": "Zertifikatexport fehlgeschlagen"
   },
   "est": {
     "title": "EST-Protokoll",

@@ -363,7 +363,12 @@
     "notBefore": "Not Before",
     "notAfter": "Not After",
     "fingerprint": "Fingerprint",
-    "started": "Started"
+    "started": "Started",
+    "createdBy": "Created by",
+    "deleted": "Successfully deleted",
+    "dismiss": "Dismiss",
+    "exportFailed": "Export failed",
+    "generating": "Generating..."
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "Actions"
     },
-    "selectResource": "Resource type"
+    "selectResource": "Resource type",
+    "selectCA": "Please select a CA"
   },
   "auth": {
     "login": "Sign In",
@@ -618,7 +624,10 @@
       "intermediateCA": "Intermediate CA",
       "codeSigning": "Code Signing",
       "email": "Email (S/MIME)"
-    }
+    },
+    "cnRequired": "Common Name is required",
+    "localityPlaceholder": "e.g. San Francisco",
+    "statePlaceholder": "e.g. California"
   },
   "cas": {
     "parentCA": "Parent CA",
@@ -725,7 +734,8 @@
     "department": "Department (OU)",
     "departmentPlaceholder": "IT Department",
     "sansList": "Subject Alternative Names",
-    "certTypeForSign": "Certificate Type"
+    "certTypeForSign": "Certificate Type",
+    "generateFailed": "Failed to generate CSR"
   },
   "templates": {
     "template": "Template",
@@ -1045,7 +1055,8 @@
     "orderReady": "Order is ready for finalization",
     "orderInvalid": "Order validation failed",
     "orderStillProcessing": "Order is still being validated by the ACME server",
-    "statusCheckFailed": "Failed to check order status"
+    "statusCheckFailed": "Failed to check order status",
+    "renew": "Renew"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -2756,7 +2767,8 @@
     "deleteTitle": "Delete Certificate",
     "deleteDescription": "Are you sure you want to permanently delete {{name}}? This action cannot be undone.",
     "deleteSuccess": "Certificate deleted successfully",
-    "deleteFailed": "Failed to delete certificate"
+    "deleteFailed": "Failed to delete certificate",
+    "exportError": "Failed to export certificate"
   },
   "est": {
     "title": "EST Protocol",

@@ -363,7 +363,12 @@
     "notBefore": "Não antes de",
     "notAfter": "Não depois de",
     "fingerprint": "Impressão digital",
-    "started": "Iniciado"
+    "started": "Iniciado",
+    "createdBy": "Criado por",
+    "deleted": "Eliminado com sucesso",
+    "dismiss": "Fechar",
+    "exportFailed": "Falha na exportação",
+    "generating": "A gerar..."
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "Ações"
     },
-    "selectResource": "Tipo de recurso"
+    "selectResource": "Tipo de recurso",
+    "selectCA": "Selecione uma CA"
   },
   "auth": {
     "login": "Iniciar sessão",
@@ -618,7 +624,10 @@
       "intermediateCA": "CA Intermediária",
       "codeSigning": "Assinatura de código",
       "email": "Email (S/MIME)"
-    }
+    },
+    "cnRequired": "O nome comum é obrigatório",
+    "localityPlaceholder": "ex. Lisboa",
+    "statePlaceholder": "ex. Lisboa"
   },
   "cas": {
     "parentCA": "CA pai",
@@ -725,7 +734,8 @@
     "department": "Departamento (OU)",
     "departmentPlaceholder": "Departamento de TI",
     "sansList": "Nomes alternativos do sujeito",
-    "certTypeForSign": "Tipo de certificado"
+    "certTypeForSign": "Tipo de certificado",
+    "generateFailed": "Falha ao gerar CSR"
   },
   "templates": {
     "template": "Modelo",
@@ -1045,7 +1055,8 @@
     "orderReady": "O pedido está pronto para finalização",
     "orderInvalid": "A validação do pedido falhou",
     "orderStillProcessing": "O pedido ainda está sendo validado pelo servidor ACME",
-    "statusCheckFailed": "Falha ao verificar o estado"
+    "statusCheckFailed": "Falha ao verificar o estado",
+    "renew": "Renovar"
   },
   "scep": {
     "title": "Protocolo SCEP",
@@ -2753,7 +2764,8 @@
     "deleteTitle": "Eliminar certificado",
     "deleteDescription": "Tem certeza que deseja eliminar permanentemente {{name}}?",
     "deleteSuccess": "Certificado eliminado com sucesso",
-    "deleteFailed": "Falha ao eliminar certificado"
+    "deleteFailed": "Falha ao eliminar certificado",
+    "exportError": "Falha ao exportar certificado"
   },
   "est": {
     "title": "Protocolo EST",

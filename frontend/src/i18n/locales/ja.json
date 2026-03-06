@@ -363,7 +363,12 @@
     "notBefore": "開始日",
     "notAfter": "終了日",
     "fingerprint": "フィンガープリント",
-    "started": "開始"
+    "started": "開始",
+    "createdBy": "作成者",
+    "deleted": "正常に削除されました",
+    "dismiss": "閉じる",
+    "exportFailed": "エクスポートに失敗しました",
+    "generating": "生成中..."
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "アクション"
     },
-    "selectResource": "リソースタイプ"
+    "selectResource": "リソースタイプ",
+    "selectCA": "CAを選択してください"
   },
   "auth": {
     "login": "ログイン",
@@ -618,7 +624,10 @@
       "intermediateCA": "中間CA",
       "codeSigning": "コード署名",
       "email": "メール (S/MIME)"
-    }
+    },
+    "cnRequired": "コモンネームは必須です",
+    "localityPlaceholder": "例: 東京",
+    "statePlaceholder": "例: 東京都"
   },
   "cas": {
     "parentCA": "親CA",
@@ -725,7 +734,8 @@
     "department": "部門 (OU)",
     "departmentPlaceholder": "IT部門",
     "sansList": "サブジェクト代替名",
-    "certTypeForSign": "証明書タイプ"
+    "certTypeForSign": "証明書タイプ",
+    "generateFailed": "CSRの生成に失敗しました"
   },
   "templates": {
     "template": "テンプレート",
@@ -1045,7 +1055,8 @@
     "orderReady": "オーダーの最終化準備が完了しました",
     "orderInvalid": "オーダーの検証に失敗しました",
     "orderStillProcessing": "オーダーはACMEサーバーで検証中です",
-    "statusCheckFailed": "ステータス確認に失敗しました"
+    "statusCheckFailed": "ステータス確認に失敗しました",
+    "renew": "更新"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -2753,7 +2764,8 @@
     "deleteTitle": "証明書を削除",
     "deleteDescription": "{{name}}を完全に削除してよろしいですか？",
     "deleteSuccess": "証明書の削除に成功",
-    "deleteFailed": "証明書の削除に失敗"
+    "deleteFailed": "証明書の削除に失敗",
+    "exportError": "証明書のエクスポートに失敗しました"
   },
   "est": {
     "title": "ESTプロトコル",

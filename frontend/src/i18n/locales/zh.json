@@ -363,7 +363,12 @@
     "notBefore": "生效日期",
     "notAfter": "过期日期",
     "fingerprint": "指纹",
-    "started": "开始时间"
+    "started": "开始时间",
+    "createdBy": "创建者",
+    "deleted": "删除成功",
+    "dismiss": "关闭",
+    "exportFailed": "导出失败",
+    "generating": "生成中..."
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "操作"
     },
-    "selectResource": "资源类型"
+    "selectResource": "资源类型",
+    "selectCA": "请选择一个CA"
   },
   "auth": {
     "login": "登录",
@@ -618,7 +624,10 @@
       "intermediateCA": "中间CA",
       "codeSigning": "代码签名",
       "email": "邮件 (S/MIME)"
-    }
+    },
+    "cnRequired": "通用名称为必填项",
+    "localityPlaceholder": "例如 北京",
+    "statePlaceholder": "例如 北京市"
   },
   "cas": {
     "parentCA": "父CA",
@@ -725,7 +734,8 @@
     "department": "部门 (OU)",
     "departmentPlaceholder": "IT部门",
     "sansList": "主题备选名称",
-    "certTypeForSign": "证书类型"
+    "certTypeForSign": "证书类型",
+    "generateFailed": "CSR生成失败"
   },
   "templates": {
     "template": "模板",
@@ -1045,7 +1055,8 @@
     "orderReady": "订单已准备好进行最终化",
     "orderInvalid": "订单验证失败",
     "orderStillProcessing": "订单仍在被ACME服务器验证中",
-    "statusCheckFailed": "检查状态失败"
+    "statusCheckFailed": "检查状态失败",
+    "renew": "续期"
   },
   "scep": {
     "title": "SCEP协议",
@@ -2753,7 +2764,8 @@
     "deleteTitle": "删除证书",
     "deleteDescription": "确定要永久删除 {{name}} 吗？此操作无法撤消。",
     "deleteSuccess": "证书删除成功",
-    "deleteFailed": "证书删除失败"
+    "deleteFailed": "证书删除失败",
+    "exportError": "证书导出失败"
   },
   "est": {
     "title": "EST协议",

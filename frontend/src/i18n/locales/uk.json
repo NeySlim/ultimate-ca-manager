@@ -363,7 +363,12 @@
     "notBefore": "Не раніше",
     "notAfter": "Не пізніше",
     "fingerprint": "Відбиток",
-    "started": "Розпочато"
+    "started": "Розпочато",
+    "createdBy": "Створено",
+    "deleted": "Успішно видалено",
+    "dismiss": "Закрити",
+    "exportFailed": "Помилка експорту",
+    "generating": "Генерація..."
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "Дії"
     },
-    "selectResource": "Тип ресурсу"
+    "selectResource": "Тип ресурсу",
+    "selectCA": "Виберіть CA"
   },
   "auth": {
     "login": "Увійти",
@@ -618,7 +624,10 @@
       "intermediateCA": "Проміжний CA",
       "codeSigning": "Підпис коду",
       "email": "Email (S/MIME)"
-    }
+    },
+    "cnRequired": "Загальне ім'я є обов'язковим",
+    "localityPlaceholder": "напр. Київ",
+    "statePlaceholder": "напр. Київська область"
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
@@ -725,7 +734,8 @@
     "department": "Відділ (OU)",
     "departmentPlaceholder": "IT відділ",
     "sansList": "Альтернативні імена суб'єкта",
-    "certTypeForSign": "Тип сертифіката"
+    "certTypeForSign": "Тип сертифіката",
+    "generateFailed": "Не вдалося згенерувати CSR"
   },
   "templates": {
     "template": "Шаблон",
@@ -1045,7 +1055,8 @@
     "orderReady": "Замовлення готове до завершення",
     "orderInvalid": "Перевірка замовлення не вдалася",
     "orderStillProcessing": "Замовлення ще перевіряється сервером ACME",
-    "statusCheckFailed": "Не вдалося перевірити статус"
+    "statusCheckFailed": "Не вдалося перевірити статус",
+    "renew": "Оновити"
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -2753,7 +2764,8 @@
     "deleteTitle": "Видалити сертифікат",
     "deleteDescription": "Ви впевнені, що хочете видалити {{name}} назавжди?",
     "deleteSuccess": "Сертифікат успішно видалено",
-    "deleteFailed": "Не вдалося видалити сертифікат"
+    "deleteFailed": "Не вдалося видалити сертифікат",
+    "exportError": "Не вдалося експортувати сертифікат"
   },
   "est": {
     "title": "Протокол EST",

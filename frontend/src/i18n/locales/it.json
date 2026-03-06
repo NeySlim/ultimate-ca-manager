@@ -363,7 +363,12 @@
     "notBefore": "Non prima di",
     "notAfter": "Non dopo",
     "fingerprint": "Impronta",
-    "started": "Avviato"
+    "started": "Avviato",
+    "createdBy": "Creato da",
+    "deleted": "Eliminato con successo",
+    "dismiss": "Chiudi",
+    "exportFailed": "Esportazione fallita",
+    "generating": "Generazione..."
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -410,7 +415,8 @@
     "groups": {
       "actions": "Azioni"
     },
-    "selectResource": "Tipo di risorsa"
+    "selectResource": "Tipo di risorsa",
+    "selectCA": "Selezionare una CA"
   },
   "auth": {
     "login": "Accedi",
@@ -618,7 +624,10 @@
       "intermediateCA": "CA Intermedia",
       "codeSigning": "Firma del codice",
       "email": "Email (S/MIME)"
-    }
+    },
+    "cnRequired": "Il nome comune è obbligatorio",
+    "localityPlaceholder": "es. Roma",
+    "statePlaceholder": "es. Lazio"
   },
   "cas": {
     "parentCA": "CA padre",
@@ -725,7 +734,8 @@
     "department": "Dipartimento (OU)",
     "departmentPlaceholder": "Dipartimento IT",
     "sansList": "Nomi alternativi soggetto",
-    "certTypeForSign": "Tipo di certificato"
+    "certTypeForSign": "Tipo di certificato",
+    "generateFailed": "Generazione CSR fallita"
   },
   "templates": {
     "template": "Modello",
@@ -1045,7 +1055,8 @@
     "orderReady": "L'ordine è pronto per la finalizzazione",
     "orderInvalid": "Validazione dell'ordine fallita",
     "orderStillProcessing": "L'ordine è ancora in fase di validazione dal server ACME",
-    "statusCheckFailed": "Verifica dello stato fallita"
+    "statusCheckFailed": "Verifica dello stato fallita",
+    "renew": "Rinnova"
   },
   "scep": {
     "title": "Protocollo SCEP",
@@ -2753,7 +2764,8 @@
     "deleteTitle": "Elimina certificato",
     "deleteDescription": "Sei sicuro di voler eliminare permanentemente {{name}}?",
     "deleteSuccess": "Certificato eliminato con successo",
-    "deleteFailed": "Eliminazione certificato fallita"
+    "deleteFailed": "Eliminazione certificato fallita",
+    "exportError": "Esportazione certificato fallita"
   },
   "est": {
     "title": "Protocollo EST",
