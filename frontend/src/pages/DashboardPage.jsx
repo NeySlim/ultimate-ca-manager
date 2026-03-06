@@ -927,7 +927,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                             <span className="text-xs font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                              {(account.contact?.[0] || account.email || account.contact || '').replace('mailto:', '')}
+                              {String(account.contact?.[0] || account.email || '').replace('mailto:', '')}
                             </span>
                             <Badge variant="secondary" size="sm">{account.orders_count || 0} {t('dashboard.orders')}</Badge>
                           </div>
@@ -1186,7 +1186,7 @@ export default function DashboardPage() {
                           <User size={14} weight="duotone" className="text-text-tertiary" />
                         </div>
                         <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-text-primary truncate">{(account.contact?.[0] || account.email || account.contact || '').replace('mailto:', '')}</span>
+                          <span className="text-xs font-medium text-text-primary truncate">{String(account.contact?.[0] || account.email || '').replace('mailto:', '')}</span>
                           <Badge variant="secondary" size="sm">{account.orders_count || 0} {t('dashboard.orders')}</Badge>
                         </div>
                       </div>
