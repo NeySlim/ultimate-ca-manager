@@ -1789,8 +1789,15 @@ export default function ACMEPage() {
       header: t('acme.environment'),
       priority: 5,
       hideOnMobile: true,
-      render: (value) => {
+      render: (value, row) => {
         if (!value) return <span className="text-text-tertiary">-</span>
+        if (value === 'local' || row?.source === 'acme') {
+          return (
+            <Badge variant="cyan" size="sm">
+              {t('acme.localAcmeLabel')}
+            </Badge>
+          )
+        }
         const isProduction = value === 'production'
         return (
           <Badge 
@@ -2692,7 +2699,7 @@ function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     domain: domain?.domain || '',
     dns_provider_id: domain?.dns_provider_id || (dnsProviders[0]?.id || ''),
-    issuing_ca_id: domain?.issuing_ca_id || '',
+    issuing_ca_id: domain?.issuing_ca_id?.toString() || '',
     is_wildcard_allowed: domain?.is_wildcard_allowed ?? true,
     auto_approve: domain?.auto_approve ?? true,
   })
@@ -2725,7 +2732,7 @@ function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
         value={formData.dns_provider_id}
         onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: parseInt(val) }))}
         options={dnsProviders.map(p => ({
-          value: p.id,
+          value: p.id.toString(),
           label: `${p.name} (${p.provider_type})`
         }))}
         required
@@ -2738,7 +2745,7 @@ function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
         options={[
           { value: '', label: t('acme.useDefaultCA') },
           ...signingCas.map(ca => ({
-            value: ca.id,
+            value: ca.id.toString(),
             label: ca.common_name || ca.descr || `CA #${ca.id}`
           }))
         ]}
@@ -2776,7 +2783,7 @@ function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
     domain: domain?.domain || '',
-    issuing_ca_id: domain?.issuing_ca_id || '',
+    issuing_ca_id: domain?.issuing_ca_id?.toString() || '',
     auto_approve: domain?.auto_approve ?? true,
   })
 
@@ -2807,7 +2814,7 @@ function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
         value={formData.issuing_ca_id}
         onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val }))}
         options={signingCas.map(ca => ({
-          value: ca.id,
+          value: ca.id.toString(),
           label: ca.common_name || ca.descr || `CA #${ca.id}`
         }))}
         required
