@@ -11,6 +11,24 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.60] - 2026-03-06
+
+### Fixed
+- **ACME Finalize Response** — Certificate URL was missing from finalize order response, causing GitLab and other ACME clients to fail with "No certificate_url to collect the order"
+
+### Improved
+- **ACME RFC 8555 Compliance** — Comprehensive audit and fixes for full RFC compliance:
+  - Error responses now use `application/problem+json` with `status` field (RFC 7807)
+  - EC signature verification converts raw R||S to DER format (RFC 7518 §3.4) — fixes EC key clients
+  - Challenge lookup uses proper URL suffix/ID matching instead of unreliable LIKE query
+  - JWS signature verification enforced on finalize, order, authz, and cert endpoints
+  - POST-as-GET pattern implemented on all resource endpoints (RFC 8555 §6.3)
+  - `Retry-After` header on pending/processing order responses
+- **ACME New Endpoints** — Added `revokeCert` (RFC 8555 §7.6) and `keyChange` (RFC 8555 §7.3.5) endpoints
+- **ACME Account Management** — Support for `onlyReturnExisting` account lookup, contact updates, and account deactivation
+
+---
+
 ## [2.59] - 2026-03-06
 
 ### Fixed
