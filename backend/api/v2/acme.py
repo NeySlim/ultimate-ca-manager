@@ -510,12 +510,19 @@ def list_account_challenges(account_id):
     data = []
     for order in orders:
         for authz in order.authorizations:
+            # identifier is JSON: {"type": "dns", "value": "example.com"}
+            try:
+                import json
+                ident = json.loads(authz.identifier) if isinstance(authz.identifier, str) else authz.identifier
+                domain = ident.get('value', '') if isinstance(ident, dict) else str(authz.identifier)
+            except Exception:
+                domain = str(authz.identifier)
             for challenge in authz.challenges:
                 data.append({
                     'id': challenge.id,
                     'type': challenge.type.upper(),
                     'status': challenge.status.capitalize(),
-                    'domain': authz.identifier_value,
+                    'domain': domain,
                     'token': challenge.token[:20] + '...' if challenge.token and len(challenge.token) > 20 else challenge.token,
                     'validated': challenge.validated.isoformat() if challenge.validated else None,
                     'order_id': order.order_id,
