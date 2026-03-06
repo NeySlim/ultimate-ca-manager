@@ -14,6 +14,9 @@ from cryptography.x509.oid import ExtensionOID
 from models import db, CA, Certificate, AuditLog
 from models.crl import CRLMetadata
 
+import logging
+logger = logging.getLogger(__name__)
+
 # Import key decryption (optional - fallback if not available)
 try:
     from security.encryption import decrypt_private_key
@@ -116,7 +119,10 @@ class CRLService:
                 # RFC 5280: CRL serial numbers must be <= 20 octets (160 bits)
                 # cryptography library enforces 159 bits max
                 if serial_int.bit_length() > 159:
-                    # Truncate to 159 bits by masking
+                    logger.warning(
+                        f"CRL: serial {cert.serial_number} exceeds 159 bits "
+                        f"({serial_int.bit_length()} bits), truncating for CRL entry"
+                    )
                     serial_int = serial_int & ((1 << 159) - 1)
             except (ValueError, AttributeError):
                 continue

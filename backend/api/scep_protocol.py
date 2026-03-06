@@ -103,18 +103,26 @@ def handle_get_ca_caps():
 
 
 def handle_get_ca_cert():
-    """Handle GetCACert operation - return CA certificate"""
+    """Handle GetCACert operation - return CA certificate (RFC 8894 §3.2)"""
     service, error = get_scep_service()
     
     if error:
         return make_error_response(error, 500)
     
     try:
-        # Get CA certificate in DER format
-        ca_cert_der = service.get_ca_cert()
+        # Check if this is an intermediate CA (has a parent)
+        ca = service.ca
+        if ca.caref:
+            # Intermediate CA — return PKCS#7 chain (RFC 8894 §3.2)
+            chain_der = service.get_ca_cert_chain()
+            response = make_response(chain_der)
+            response.headers['Content-Type'] = 'application/x-x509-ca-ra-cert'
+        else:
+            # Root CA — return single DER certificate
+            ca_cert_der = service.get_ca_cert()
+            response = make_response(ca_cert_der)
+            response.headers['Content-Type'] = 'application/x-x509-ca-cert'
         
-        response = make_response(ca_cert_der)
-        response.headers['Content-Type'] = 'application/x-x509-ca-cert'
         return response
         
     except Exception as e:
@@ -158,9 +166,7 @@ def handle_pki_operation():
         return response
         
     except Exception as e:
-        current_app.logger.error(f"SCEP PKIOperation error: {e}")
-        import traceback
-        traceback.print_exc()
+        current_app.logger.error(f"SCEP PKIOperation error: {e}", exc_info=True)
         return make_error_response(str(e), 500)
 
 

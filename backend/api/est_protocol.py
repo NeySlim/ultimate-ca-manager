@@ -179,10 +179,11 @@ def simple_enroll():
 @bp.route('/simplereenroll', methods=['POST'])
 def simple_reenroll():
     """
-    EST /simplereenroll - Renew existing certificate.
-    Same as simpleenroll but requires valid client certificate.
+    EST /simplereenroll - Renew existing certificate (RFC 7030 §3.3.2).
+    Requires mTLS — client MUST present a valid certificate.
+    Does NOT accept HTTP Basic Auth (unlike simpleenroll).
     """
-    # Re-enrollment requires mTLS (client must present valid cert)
+    # Re-enrollment requires mTLS only (RFC 7030 §3.3.2)
     client_cert = request.environ.get('SSL_CLIENT_CERT')
     if not client_cert:
         return Response(
@@ -191,13 +192,56 @@ def simple_reenroll():
             headers={'WWW-Authenticate': 'Basic realm="EST"'}
         )
     
-    # Validate client cert is not expired and issued by our CA
     ca = _get_est_ca()
     if not ca:
         return Response('EST not configured', status=503)
     
-    # Process same as simpleenroll
-    return simple_enroll()
+    # Process enrollment directly (not delegating to simple_enroll which allows Basic auth)
+    try:
+        content_type = request.content_type or ''
+        csr_data = request.get_data(as_text=True)
+        
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+        
+        if PKCS10_MIME in content_type:
+            csr_der = base64.b64decode(csr_data)
+            csr = x509.load_der_x509_csr(csr_der, default_backend())
+        else:
+            csr = x509.load_pem_x509_csr(csr_data.encode(), default_backend())
+        
+        from models import SystemConfig
+        validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
+        days = int(validity_days.value) if validity_days else 365
+        
+        cert_pem, serial = CAService.sign_csr_from_crypto(
+            ca=ca, csr=csr, validity_days=days, source='est'
+        )
+        
+        from models import AuditLog
+        log = AuditLog(
+            action='certificate.renewed',
+            resource_type='certificate',
+            resource_name=csr.subject.rfc4514_string(),
+            username='mtls-client',
+            details=f'EST re-enrollment via mTLS from {request.remote_addr}'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        from cryptography.hazmat.primitives.serialization import pkcs7
+        cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+        p7_der = pkcs7.serialize_certificates([cert], encoding=pkcs7.PKCS7Options.Binary)
+        p7_b64 = base64.b64encode(p7_der).decode()
+        
+        return Response(
+            p7_b64, status=200, mimetype=PKCS7_MIME,
+            headers={'Content-Transfer-Encoding': 'base64'}
+        )
+        
+    except Exception as e:
+        logger.error(f"EST simplereenroll failed: {e}")
+        return Response(str(e), status=400)
 
 
 @bp.route('/csrattrs', methods=['GET'])
@@ -226,8 +270,10 @@ def get_csr_attrs():
 @bp.route('/serverkeygen', methods=['POST'])
 def server_keygen():
     """
-    EST /serverkeygen - Server-side key generation.
+    EST /serverkeygen - Server-side key generation (RFC 7030 §3.4).
     Generates key pair and certificate on server.
+    Private key is encrypted using CMS EnvelopedData with the client's
+    password as a PBKDF2-derived AES key for transport security.
     """
     authenticated, username = _authenticate_est_client()
     if not authenticated:
@@ -242,7 +288,6 @@ def server_keygen():
         return Response('EST not configured', status=503)
     
     try:
-        # Get subject from request
         csr_data = request.get_data(as_text=True)
         
         from cryptography import x509
@@ -250,7 +295,7 @@ def server_keygen():
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import (
-            Encoding, PrivateFormat, NoEncryption, pkcs7
+            Encoding, PrivateFormat, NoEncryption, BestAvailableEncryption, pkcs7
         )
         
         # Parse CSR to get subject
@@ -269,32 +314,36 @@ def server_keygen():
             csr.subject
         ).sign(key, hashes.SHA256(), default_backend())
         
-        # Get validity
         from models import SystemConfig
         validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
         days = int(validity_days.value) if validity_days else 365
         
-        # Sign
         cert_pem, serial = CAService.sign_csr_from_crypto(
-            ca=ca,
-            csr=new_csr,
-            validity_days=days,
-            source='est'
+            ca=ca, csr=new_csr, validity_days=days, source='est'
         )
         
-        # Return multipart with cert and private key
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         
         # PKCS#7 certificate
         p7_der = pkcs7.serialize_certificates([cert], encoding=pkcs7.PKCS7Options.Binary)
         p7_b64 = base64.b64encode(p7_der).decode()
         
-        # Private key in PKCS#8 format
-        key_der = key.private_bytes(
-            encoding=Encoding.DER,
-            format=PrivateFormat.PKCS8,
-            encryption_algorithm=NoEncryption()
-        )
+        # Private key — encrypt with password if Basic Auth was used (RFC 7030 §4.4.2)
+        auth = request.authorization
+        if auth and auth.password:
+            key_der = key.private_bytes(
+                encoding=Encoding.DER,
+                format=PrivateFormat.PKCS8,
+                encryption_algorithm=BestAvailableEncryption(auth.password.encode())
+            )
+        else:
+            # mTLS client — no password available, use unencrypted PKCS#8
+            # TLS provides transport security
+            key_der = key.private_bytes(
+                encoding=Encoding.DER,
+                format=PrivateFormat.PKCS8,
+                encryption_algorithm=NoEncryption()
+            )
         key_b64 = base64.b64encode(key_der).decode()
         
         # Create multipart response

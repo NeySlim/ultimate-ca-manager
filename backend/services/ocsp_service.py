@@ -181,21 +181,14 @@ class OCSPService:
                 revocation_time = None
                 revocation_reason = None
             
-            # For unknown certs, return UNAUTHORIZED
-            if status == ocsp.OCSPCertStatus.UNKNOWN:
-                response = ocsp.OCSPResponseBuilder.build_unsuccessful(
-                    ocsp.OCSPResponseStatus.UNAUTHORIZED
-                )
-                return response.public_bytes(serialization.Encoding.DER), cert_status
-            
-            # Load the actual certificate (may be None if .crt missing)
-            cert_x509 = self._load_cert(certificate)
-            
             # Build OCSP response
             this_update = datetime.utcnow()
             next_update = this_update + timedelta(hours=24)
             
             builder = ocsp.OCSPResponseBuilder()
+            
+            # Load the actual certificate (may be None for unknown serials)
+            cert_x509 = self._load_cert(certificate) if certificate else None
             
             if cert_x509:
                 # Standard path: use cert object
@@ -210,7 +203,8 @@ class OCSPService:
                     revocation_reason=revocation_reason
                 )
             else:
-                # Fallback: cert .crt missing, use hash-based response
+                # Hash-based response for unknown serials or missing .crt
+                # RFC 6960: unknown serial gets UNKNOWN status in a successful response
                 issuer_name_hash = hashes.Hash(hashes.SHA256())
                 issuer_name_hash.update(ca_cert.subject.public_bytes())
                 issuer_key_hash = hashes.Hash(hashes.SHA256())

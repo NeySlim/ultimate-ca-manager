@@ -28,7 +28,7 @@ def ocsp_responder():
     """
     OCSP responder endpoint (RFC 6960).
     
-    GET:  /ocsp/{base64-encoded-request}
+    GET:  /ocsp?{base64-encoded-request} (query string)
     POST: body = DER-encoded OCSP request
     """
     try:
@@ -36,10 +36,10 @@ def ocsp_responder():
         if request.method == 'POST':
             request_der = request.get_data()
         else:
-            # GET: request is base64-encoded in the URL path
+            # GET: request is base64-encoded in the URL query string or path
             path_info = request.query_string.decode('utf-8') if request.query_string else ''
             if not path_info and request.path.startswith('/ocsp/'):
-                path_info = request.path[6:]  # strip /ocsp/
+                path_info = request.path[6:]
             if not path_info:
                 return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
             try:
@@ -47,52 +47,7 @@ def ocsp_responder():
             except Exception:
                 return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
 
-        if not request_der:
-            return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
-
-        # Parse OCSP request
-        ocsp_req = ocsp_service.parse_request(request_der)
-        if not ocsp_req:
-            return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
-
-        # Extract issuer hash and serial from request
-        cert_serial = ocsp_req.serial_number
-        issuer_name_hash = ocsp_req.issuer_name_hash
-        issuer_key_hash = ocsp_req.issuer_key_hash
-        hash_algorithm = ocsp_req.hash_algorithm
-
-        # Extract nonce for replay protection
-        request_nonce = None
-        try:
-            nonce_ext = ocsp_req.extensions.get_extension_for_class(x509.OCSPNonce)
-            request_nonce = nonce_ext.value.nonce
-        except x509.ExtensionNotFound:
-            pass
-
-        # Find the issuing CA by matching issuer hash
-        ca = _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm)
-        if not ca:
-            return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
-
-        # Check if OCSP is enabled for this CA
-        if not ca.ocsp_enabled:
-            return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
-
-        # Check cache first
-        cert_serial_hex = format(cert_serial, 'x')
-        cached = ocsp_service.get_cached_response(ca.id, cert_serial_hex)
-        if cached:
-            return Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
-
-        # Generate fresh response
-        response_der, status_str = ocsp_service.generate_response(
-            ca=ca,
-            cert_serial=cert_serial,
-            request_nonce=request_nonce
-        )
-
-        logger.info(f"OCSP response for serial {cert_serial_hex}: {status_str}")
-        return Response(response_der, status=200, content_type=OCSP_CONTENT_TYPE)
+        return _process_ocsp_request(request_der)
 
     except Exception as e:
         logger.error(f"OCSP responder error: {e}", exc_info=True)
@@ -101,59 +56,79 @@ def ocsp_responder():
 
 @ocsp_bp.route('/ocsp/<path:encoded_request>', methods=['GET'])
 def ocsp_responder_get(encoded_request):
-    """Handle GET requests with base64-encoded OCSP request in URL path"""
+    """Handle GET requests with base64-encoded OCSP request in URL path (RFC 6960 §A.1)"""
     try:
         request_der = base64.b64decode(unquote(encoded_request))
     except Exception:
         return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
 
-    # Reuse POST logic by setting data
-    from flask import make_response
-    with ocsp_bp.test_request_context(
-        '/ocsp', method='POST', data=request_der,
-        content_type=OCSP_REQUEST_TYPE
-    ):
-        pass
-
-    # Direct implementation for GET
     try:
-        ocsp_req = ocsp_service.parse_request(request_der)
-        if not ocsp_req:
-            return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
-
-        cert_serial = ocsp_req.serial_number
-        issuer_name_hash = ocsp_req.issuer_name_hash
-        issuer_key_hash = ocsp_req.issuer_key_hash
-        hash_algorithm = ocsp_req.hash_algorithm
-
-        request_nonce = None
-        try:
-            nonce_ext = ocsp_req.extensions.get_extension_for_class(x509.OCSPNonce)
-            request_nonce = nonce_ext.value.nonce
-        except x509.ExtensionNotFound:
-            pass
-
-        ca = _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm)
-        if not ca:
-            return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
-
-        if not ca.ocsp_enabled:
-            return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
-
-        cert_serial_hex = format(cert_serial, 'x')
-        cached = ocsp_service.get_cached_response(ca.id, cert_serial_hex)
-        if cached:
-            return Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
-
-        response_der, status_str = ocsp_service.generate_response(
-            ca=ca, cert_serial=cert_serial, request_nonce=request_nonce
-        )
-
-        return Response(response_der, status=200, content_type=OCSP_CONTENT_TYPE)
-
+        return _process_ocsp_request(request_der)
     except Exception as e:
         logger.error(f"OCSP GET responder error: {e}", exc_info=True)
         return _error_response(ocsp.OCSPResponseStatus.INTERNAL_ERROR)
+
+
+def _process_ocsp_request(request_der: bytes) -> Response:
+    """
+    Shared OCSP request processing for both GET and POST (RFC 6960).
+    Returns OCSP response with proper Cache-Control headers.
+    """
+    if not request_der:
+        return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
+
+    ocsp_req = ocsp_service.parse_request(request_der)
+    if not ocsp_req:
+        return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
+
+    cert_serial = ocsp_req.serial_number
+    issuer_name_hash = ocsp_req.issuer_name_hash
+    issuer_key_hash = ocsp_req.issuer_key_hash
+    hash_algorithm = ocsp_req.hash_algorithm
+
+    # Extract nonce for replay protection
+    request_nonce = None
+    try:
+        nonce_ext = ocsp_req.extensions.get_extension_for_class(x509.OCSPNonce)
+        request_nonce = nonce_ext.value.nonce
+    except x509.ExtensionNotFound:
+        pass
+
+    ca = _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm)
+    if not ca:
+        return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
+
+    if not ca.ocsp_enabled:
+        return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
+
+    cert_serial_hex = format(cert_serial, 'x')
+    cached = ocsp_service.get_cached_response(ca.id, cert_serial_hex)
+    if cached:
+        resp = Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
+        _add_cache_headers(resp, request_nonce)
+        return resp
+
+    response_der, status_str = ocsp_service.generate_response(
+        ca=ca, cert_serial=cert_serial, request_nonce=request_nonce
+    )
+
+    logger.info(f"OCSP response for serial {cert_serial_hex}: {status_str}")
+    resp = Response(response_der, status=200, content_type=OCSP_CONTENT_TYPE)
+    _add_cache_headers(resp, request_nonce)
+    return resp
+
+
+def _add_cache_headers(resp: Response, request_nonce):
+    """Add RFC 6960 recommended Cache-Control and Expires headers"""
+    if request_nonce:
+        # Nonce present — response is unique, don't cache
+        resp.headers['Cache-Control'] = 'no-cache, no-store'
+    else:
+        # No nonce — response can be cached (24h matches nextUpdate)
+        resp.headers['Cache-Control'] = 'max-age=3600, public'
+        from datetime import datetime, timedelta
+        expires = datetime.utcnow() + timedelta(hours=1)
+        resp.headers['Expires'] = expires.strftime('%a, %d %b %Y %H:%M:%S GMT')
 
 
 def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):

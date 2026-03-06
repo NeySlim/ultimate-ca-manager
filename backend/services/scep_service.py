@@ -5,6 +5,7 @@ Implements RFC 8894 (SCEP)
 import os
 import base64
 import hashlib
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
 
@@ -23,6 +24,8 @@ from pyasn1_modules import rfc5652
 
 from models import db, CA, Certificate, SCEPRequest
 from config.settings import Config
+
+logger = logging.getLogger(__name__)
 
 
 class SCEPService:
@@ -100,12 +103,24 @@ class SCEPService:
     
     def get_ca_cert_chain(self) -> bytes:
         """
-        Get CA certificate chain in degenerate PKCS#7 format
-        Used when CA has issuer chain
+        Get CA certificate chain in degenerate PKCS#7 format (RFC 8894 §3.2).
+        Includes the CA cert and all parent CA certs up to root.
         """
-        # For now, return single cert in PKCS#7
-        # TODO: Include full chain if intermediate CA
-        return self._create_degenerate_pkcs7([self.ca_cert])
+        certs = [self.ca_cert]
+        
+        # Walk up the chain
+        current_ca = self.ca
+        while current_ca.caref:
+            parent = CA.query.filter_by(refid=current_ca.caref).first()
+            if not parent or not parent.crt:
+                break
+            parent_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(parent.crt), default_backend()
+            )
+            certs.append(parent_cert)
+            current_ca = parent
+        
+        return self._create_degenerate_pkcs7(certs)
     
     def process_pkcs_req(self, pkcs7_data: bytes, client_ip: str) -> Tuple[bytes, int]:
         """
@@ -192,6 +207,11 @@ class SCEPService:
                         # Remove PKCS#7 padding
                         pad_len = csr_data[-1]
                         csr_data = csr_data[:-pad_len]
+                    elif '2.16.840.1.101.3.4.1' in alg_oid:  # AES (any variant)
+                        cipher = AES.new(content_encryption_key, AES.MODE_CBC, iv)
+                        csr_data = cipher.decrypt(encrypted_content_bytes)
+                        pad_len = csr_data[-1]
+                        csr_data = csr_data[:-pad_len]
                     else:
                         raise ValueError(f"Unsupported encryption algorithm: {alg_oid}")
                 else:
@@ -201,14 +221,14 @@ class SCEPService:
             except Exception as e:
                 # If decryption fails, try using the data as-is
                 import traceback
-                print(f"Warning: Could not decrypt envelopedData: {e}", flush=True)
+                logger.warning(f"SCEP: Could not decrypt envelopedData: {e}")
                 traceback.print_exc()
                 csr_data = encrypted_bytes
             
             # Parse CSR
             csr = x509.load_der_x509_csr(csr_data, default_backend())
             
-            print(f"DEBUG: CSR parsed successfully, subject = {csr.subject.rfc4514_string()}", flush=True)
+            logger.debug(f"SCEP: CSR parsed, subject={csr.subject.rfc4514_string()}")
             
             # Extract attributes from SCEP message
             attrs = self._extract_scep_attributes(signed_data)
@@ -226,9 +246,9 @@ class SCEPService:
                             challenge_pwd = attr.value
                             break
                 except Exception as e:
-                    print(f"DEBUG: Could not extract challenge from CSR: {e}", flush=True)
+                    logger.debug(f"SCEP: Could not extract challenge from CSR: {e}")
             
-            print(f"DEBUG: Extracted attributes: txn_id={transaction_id}, msg_type={message_type}, challenge_pwd={'***' if challenge_pwd else None}", flush=True)
+            logger.debug(f"SCEP: txn_id={transaction_id}, msg_type={message_type}")
             
             if not transaction_id:
                 return self._create_error_response(
@@ -308,21 +328,21 @@ class SCEPService:
                 cert_obj = x509.load_pem_x509_certificate(
                     base64.b64decode(cert.crt), default_backend()
                 )
-                print(f"DEBUG: Returning SUCCESS response", flush=True)
+                logger.debug("SCEP: Returning SUCCESS response")
                 return self._create_cert_rep_success(
                     cert_obj, transaction_id, sender_nonce, csr
                 ), 200
             
             else:
                 # Manual approval required
-                print(f"DEBUG: auto_approve is FALSE, returning PENDING", flush=True)
+                logger.debug("SCEP: auto_approve=False, returning PENDING")
                 db.session.commit()
                 return self._create_cert_rep_pending(
                     transaction_id, sender_nonce
                 ), 200
         
         except Exception as e:
-            print(f"SCEP PKCSReq error: {e}")
+            logger.error(f"SCEP PKCSReq error: {e}", exc_info=True)
             import traceback
             traceback.print_exc()
             return self._create_error_response(
@@ -554,7 +574,7 @@ class SCEPService:
                             attrs['challengePassword'] = value.native
         
         except Exception as e:
-            print(f"Error extracting SCEP attributes: {e}")
+            logger.error(f"SCEP: Error extracting attributes: {e}")
         
         return attrs
     
@@ -583,22 +603,25 @@ class SCEPService:
         )
     
     def _create_error_response(self, fail_info: int, message: str) -> bytes:
-        """Create error CertRep PKCS#7 response"""
-        # For now, return simple failure
-        # TODO: Include proper failInfo attribute
-        return self._create_cert_rep(self.STATUS_FAILURE, b'', '', None)
+        """Create error CertRep PKCS#7 response with failInfo attribute (RFC 8894)"""
+        logger.warning(f"SCEP error response: failInfo={fail_info}, message={message}")
+        return self._create_cert_rep(
+            self.STATUS_FAILURE, b'', '', None, fail_info=fail_info
+        )
     
     def _create_cert_rep(self, status: int, data: bytes,
                         transaction_id: str,
-                        recipient_nonce: Optional[bytes]) -> bytes:
+                        recipient_nonce: Optional[bytes],
+                        fail_info: Optional[int] = None) -> bytes:
         """
-        Create CertRep PKCS#7 response with proper SCEP signature
+        Create CertRep PKCS#7 response with proper SCEP signature (RFC 8894)
         
         Args:
             status: SCEP status (SUCCESS, PENDING, FAILURE)
             data: Content data (certificates for success, empty for others)
             transaction_id: SCEP transaction ID
             recipient_nonce: Recipient nonce for response
+            fail_info: Failure reason code (required when status=FAILURE)
             
         Returns:
             Signed PKCS#7 CertRep message
@@ -628,11 +651,17 @@ class SCEPService:
         })
         
         # pkiStatus
-        print(f"DEBUG _create_cert_rep: status={status}, data_len={len(data) if data else 0}", flush=True)
         scep_attrs.append({
             'type': '2.16.840.1.113733.1.9.3',  # pkiStatus
             'values': [asn1crypto.core.PrintableString(str(status))]
         })
+        
+        # failInfo — required when status is FAILURE (RFC 8894 §4.3)
+        if status == self.STATUS_FAILURE and fail_info is not None:
+            scep_attrs.append({
+                'type': '2.16.840.1.113733.1.9.4',  # failInfo
+                'values': [asn1crypto.core.PrintableString(str(fail_info))]
+            })
         
         # senderNonce (our nonce)
         sender_nonce = secrets.token_bytes(16)
@@ -778,7 +807,8 @@ class SCEPService:
     
     def _encrypt_for_client(self, data: bytes, client_csr: x509.CertificateSigningRequest) -> bytes:
         """
-        Encrypt data for SCEP client using EnvelopedData
+        Encrypt data for SCEP client using EnvelopedData (RFC 8894).
+        Uses AES-256-CBC (preferred) or falls back to 3DES-CBC.
         
         Args:
             data: Data to encrypt (usually the degenerate PKCS#7 with certificates)
@@ -788,22 +818,18 @@ class SCEPService:
             PKCS#7 EnvelopedData structure
         """
         from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-        from Crypto.Cipher import DES
         import secrets
         
         client_public_key = client_csr.public_key()
         
-        # Generate random content encryption key (DES = 8 bytes)
-        content_key = secrets.token_bytes(8)
+        # Use AES-256-CBC (advertised in GetCACaps)
+        content_key = secrets.token_bytes(32)  # AES-256 = 32 bytes
+        iv = secrets.token_bytes(16)  # AES block size = 16 bytes
         
-        # Generate random IV for DES-CBC
-        iv = secrets.token_bytes(8)
+        cipher = AES.new(content_key, AES.MODE_CBC, iv)
         
-        # Encrypt data with DES-CBC
-        cipher = DES.new(content_key, DES.MODE_CBC, iv)
-        
-        # Pad data to DES block size (8 bytes) using PKCS#7 padding
-        block_size = 8
+        # Pad data to AES block size (16 bytes) using PKCS#7 padding
+        block_size = 16
         padding_len = block_size - (len(data) % block_size)
         padded_data = data + bytes([padding_len] * padding_len)
         
@@ -816,10 +842,6 @@ class SCEPService:
         )
         
         # RecipientInfo - use CSR subject as issuer
-        from cryptography.x509.oid import NameOID
-        from cryptography import x509 as crypto_x509
-        
-        # Use CSR subject for recipient identifier
         csr_subject_der = client_csr.subject.public_bytes(serialization.Encoding.DER)
         recipient_name = asn1crypto.x509.Name.load(csr_subject_der)
         
@@ -828,8 +850,8 @@ class SCEPService:
                 'version': 'v0',
                 'rid': {
                     'issuer_and_serial_number': {
-                        'issuer': recipient_name,  # Use CSR subject
-                        'serial_number': 1  # Use 1 as dummy serial
+                        'issuer': recipient_name,
+                        'serial_number': 1
                     }
                 },
                 'key_encryption_algorithm': {
@@ -839,11 +861,11 @@ class SCEPService:
             }
         })
         
-        # Create EncryptedContentInfo
+        # Create EncryptedContentInfo — AES-256-CBC OID: 2.16.840.1.101.3.4.1.42
         encrypted_content_info = {
             'content_type': 'data',
             'content_encryption_algorithm': {
-                'algorithm': '1.3.14.3.2.7',  # DES-CBC
+                'algorithm': '2.16.840.1.101.3.4.1.42',  # AES-256-CBC
                 'parameters': asn1crypto.core.OctetString(iv)
             },
             'encrypted_content': asn1crypto.core.OctetString(encrypted_content)
