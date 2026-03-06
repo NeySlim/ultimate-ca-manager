@@ -144,7 +144,7 @@ class SSOProvider(db.Model):
                 'saml_slo_url': self.saml_slo_url,
                 'saml_sign_requests': self.saml_sign_requests,
                 'saml_sp_cert_source': self.saml_sp_cert_source or 'https',
-                'saml_certificate': self.saml_certificate if include_secrets else bool(self.saml_certificate),
+                'saml_certificate': self.saml_certificate,
             })
         elif self.provider_type == 'oauth2':
             data.update({
