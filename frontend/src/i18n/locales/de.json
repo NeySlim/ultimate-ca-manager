@@ -2894,6 +2894,8 @@
     "noResultsDesc": "Führen Sie einen Schnellscan durch oder erstellen Sie ein Profil.",
     "noResultsDescription": "Führen Sie einen Scan durch, um TLS-Zertifikate in Ihrem Netzwerk zu entdecken.",
     "notifications": "Benachrichtigungen",
+    "notifyEvents": "Benachrichtigungsereignisse",
+    "notifyEmailHelper": "Verwendet SMTP-Einstellungen, wenn nicht angegeben",
     "notifyEmail": "Benachrichtigungs-E-Mail",
     "notifyOnChange": "Bei Zertifikatänderungen auf Endpunkten benachrichtigen",
     "notifyOnExpiry": "Bei ablaufenden entdeckten Zertifikaten benachrichtigen",

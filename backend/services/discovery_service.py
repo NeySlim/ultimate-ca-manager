@@ -496,6 +496,17 @@ class DiscoveryService:
         run.errors = errors_real
         db.session.commit()
 
+        # Count expiring/expired certs for this profile
+        expiring_certs = 0
+        if profile_id:
+            threshold = datetime.now(timezone.utc) + timedelta(days=30)
+            expiring_certs = DiscoveredCertificate.query.filter(
+                DiscoveredCertificate.scan_profile_id == profile_id,
+                DiscoveredCertificate.not_after.isnot(None),
+                DiscoveredCertificate.not_after <= threshold,
+                DiscoveredCertificate.scan_error.is_(None),
+            ).count()
+
         # Update profile last_scan_at + next_scan_at
         if profile_id:
             profile = ScanProfile.query.get(profile_id)
@@ -510,13 +521,14 @@ class DiscoveryService:
             'certs_found': found,
             'new_certs': new_certs,
             'changed_certs': changed_certs,
+            'expiring_certs': expiring_certs,
             'errors': errors_real,
         }
         on_discovery_scan_complete(run_id, summary)
         logger.info(f"Discovery scan {run_id} complete: {summary}")
 
         # Send email notifications if configured
-        self._send_notifications(profile_id, summary, new_certs, changed_certs)
+        self._send_notifications(profile_id, summary, new_certs, changed_certs, expiring_certs)
 
     def _save_error(self, r: Dict, profile_id: int, now: datetime):
         """Save a scan error (not connection_refused)."""
@@ -590,7 +602,7 @@ class DiscoveryService:
     # ------------------------------------------------------------------
 
     def _send_notifications(self, profile_id: int, summary: Dict,
-                            new_certs: int, changed_certs: int):
+                            new_certs: int, changed_certs: int, expiring_certs: int = 0):
         """Send email digest if profile has notifications enabled."""
         if not profile_id:
             return
@@ -600,7 +612,8 @@ class DiscoveryService:
 
         should_notify = (
             (profile.notify_on_new and new_certs > 0) or
-            (profile.notify_on_change and changed_certs > 0)
+            (profile.notify_on_change and changed_certs > 0) or
+            (profile.notify_on_expiry and expiring_certs > 0)
         )
         if not should_notify:
             return
@@ -627,6 +640,8 @@ class DiscoveryService:
                 parts.append(f"{new_certs} new unmanaged certificate(s)")
             if changed_certs > 0:
                 parts.append(f"{changed_certs} certificate(s) changed")
+            if expiring_certs > 0:
+                parts.append(f"{expiring_certs} certificate(s) expiring soon")
 
             subject = f"[UCM] Discovery scan '{profile.name}': {', '.join(parts)}"
             body = (
@@ -635,6 +650,7 @@ class DiscoveryService:
                 f"<p>Certificates found: {summary['certs_found']}</p>"
                 f"<p>New unmanaged: <strong>{new_certs}</strong></p>"
                 f"<p>Changed: <strong>{changed_certs}</strong></p>"
+                f"<p>Expiring within 30 days: <strong style='color:#e67e22'>{expiring_certs}</strong></p>"
                 f"<p>Errors: {summary['errors']}</p>"
             )
 

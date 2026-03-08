@@ -2894,6 +2894,8 @@
     "noResultsDesc": "クイックスキャンを実行するかプロファイルを作成して証明書を検出します。",
     "noResultsDescription": "スキャンを実行してネットワーク上のTLS証明書を検出します。",
     "notifications": "通知",
+    "notifyEvents": "通知イベント",
+    "notifyEmailHelper": "指定されていない場合はSMTP設定を使用",
     "notifyEmail": "通知メール",
     "notifyOnChange": "エンドポイントで証明書が変更された時に通知",
     "notifyOnExpiry": "検出された証明書の有効期限が近い時に通知",

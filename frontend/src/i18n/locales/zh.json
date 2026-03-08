@@ -2894,6 +2894,8 @@
     "noResultsDesc": "运行快速扫描或创建配置文件以发现证书。",
     "noResultsDescription": "运行扫描以发现网络上的TLS证书。",
     "notifications": "通知",
+    "notifyEvents": "通知事件",
+    "notifyEmailHelper": "未指定时使用SMTP设置",
     "notifyEmail": "通知邮箱",
     "notifyOnChange": "端点证书变更时通知",
     "notifyOnExpiry": "已发现的证书即将过期时通知",

@@ -2897,6 +2897,8 @@
     "noResultsDesc": "Run a quick scan or create a profile to discover certificates on your network.",
     "noResultsDescription": "Run a scan to discover TLS certificates on your network.",
     "notifications": "Notifications",
+    "notifyEvents": "Notification events",
+    "notifyEmailHelper": "Uses SMTP settings if not specified",
     "notifyEmail": "Notification Email",
     "notifyOnChange": "Notify when a certificate changes on an endpoint",
     "notifyOnExpiry": "Notify when discovered certificates are expiring",

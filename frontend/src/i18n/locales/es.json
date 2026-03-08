@@ -2894,6 +2894,8 @@
     "noResultsDesc": "Ejecute un escaneo rápido o cree un perfil para descubrir certificados.",
     "noResultsDescription": "Ejecute un escaneo para descubrir certificados TLS en su red.",
     "notifications": "Notificaciones",
+    "notifyEvents": "Eventos de notificación",
+    "notifyEmailHelper": "Usa la configuración SMTP si no se especifica",
     "notifyEmail": "Email de notificación",
     "notifyOnChange": "Notificar al cambiar un certificado en un endpoint",
     "notifyOnExpiry": "Notificar cuando los certificados descubiertos expiren",
