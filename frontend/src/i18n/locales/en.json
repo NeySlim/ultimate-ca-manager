@@ -1414,6 +1414,7 @@
     "installUpdate": "Install Update",
     "installUpdateConfirm": "Install update v{{version}}?\n\nThe service will restart and you may need to log in again.",
     "prerelease": "Pre-release",
+    "viewReleaseNotes": "View Release Notes",
     "includePreReleaseVersions": "Include pre-release versions",
     "current": "Current",
     "edition": "Edition",

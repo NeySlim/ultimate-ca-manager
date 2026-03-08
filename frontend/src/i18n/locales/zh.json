@@ -1413,6 +1413,7 @@
     "installUpdate": "安装更新",
     "installUpdateConfirm": "安装更新 v{{version}}？\n\n服务将重新启动，您可能需要重新登录。",
     "prerelease": "预发布",
+    "viewReleaseNotes": "查看发行说明",
     "includePreReleaseVersions": "Include pre-release versions",
     "current": "当前",
     "edition": "版本",

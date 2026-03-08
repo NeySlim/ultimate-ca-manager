@@ -1774,6 +1774,7 @@
     "installUpdate": "Installer la mise à jour",
     "installUpdateConfirm": "Installer la mise à jour v{{version}} ?\n\nLe service redémarrera et vous devrez peut-être vous reconnecter.",
     "prerelease": "Pré-version",
+    "viewReleaseNotes": "Voir les notes de version",
     "includePreReleaseVersions": "Inclure les pré-versions",
     "current": "Actuelle",
     "edition": "Édition",

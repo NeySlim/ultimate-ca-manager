@@ -1413,6 +1413,7 @@
     "installUpdate": "アップデートをインストール",
     "installUpdateConfirm": "v{{version}}にアップデートしますか？\n\nサービスが再起動され、再ログインが必要になる場合があります。",
     "prerelease": "プレリリース",
+    "viewReleaseNotes": "リリースノートを表示",
     "includePreReleaseVersions": "Include pre-release versions",
     "current": "現在",
     "edition": "エディション",

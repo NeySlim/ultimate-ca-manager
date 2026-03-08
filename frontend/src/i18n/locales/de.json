@@ -1413,6 +1413,7 @@
     "installUpdate": "Update installieren",
     "installUpdateConfirm": "Update v{{version}} installieren?\n\nDer Dienst wird neu gestartet und Sie müssen sich möglicherweise erneut anmelden.",
     "prerelease": "Vorabversion",
+    "viewReleaseNotes": "Versionshinweise anzeigen",
     "includePreReleaseVersions": "Include pre-release versions",
     "current": "Aktuell",
     "edition": "Edition",

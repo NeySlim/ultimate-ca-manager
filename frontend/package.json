@@ -40,6 +40,7 @@
     "react-grid-layout": "^2.2.2",
     "react-i18next": "^16.5.4",
     "react-is": "^19.2.4",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.30.3",
     "recharts": "^3.7.0",
     "socket.io-client": "^4.8.3",

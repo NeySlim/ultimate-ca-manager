@@ -3,6 +3,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import ReactMarkdown from 'react-markdown'
 import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, ServiceReconnectOverlay } from '../components'
 import { apiClient } from '../services'
@@ -194,10 +195,22 @@ export function UpdateChecker() {
           <details className="group">
             <summary className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer hover:text-text-primary">
               <Info size={14} />
-              View Release Notes
+              {t('settings.viewReleaseNotes')}
             </summary>
-            <div className="mt-3 p-3 bg-tertiary-op50 rounded-lg text-sm text-text-secondary whitespace-pre-wrap max-h-48 overflow-y-auto">
-              {updateInfo.release_notes}
+            <div className="mt-3 p-3 bg-tertiary-op50 rounded-lg text-sm text-text-secondary max-h-64 overflow-y-auto prose prose-sm prose-invert max-w-none
+              [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-text-primary [&_h1]:mt-3 [&_h1]:mb-1
+              [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-text-primary [&_h2]:mt-3 [&_h2]:mb-1
+              [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-text-primary [&_h3]:mt-2 [&_h3]:mb-1
+              [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1
+              [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1
+              [&_li]:my-0.5 [&_li]:text-text-secondary
+              [&_strong]:text-text-primary [&_strong]:font-semibold
+              [&_code]:text-accent-primary [&_code]:bg-bg-tertiary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs
+              [&_p]:my-1
+              [&_a]:text-accent-primary [&_a]:underline
+              [&_hr]:border-border [&_hr]:my-2
+            ">
+              <ReactMarkdown>{updateInfo.release_notes}</ReactMarkdown>
             </div>
           </details>
         </div>

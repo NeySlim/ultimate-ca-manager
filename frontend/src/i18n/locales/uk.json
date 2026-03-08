@@ -1413,6 +1413,7 @@
     "installUpdate": "Встановити оновлення",
     "installUpdateConfirm": "Встановити оновлення v{{version}}?\n\nСервіс буде перезапущено, і вам може знадобитися увійти знову.",
     "prerelease": "Попередня версія",
+    "viewReleaseNotes": "Переглянути примітки до випуску",
     "includePreReleaseVersions": "Включати попередні версії",
     "current": "Поточний",
     "edition": "Редагуватиion",
