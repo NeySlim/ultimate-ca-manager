@@ -1126,6 +1126,9 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
   const [ports, setPorts] = useState(['443'])
   const [schedule, setSchedule] = useState('0')
   const [notifyEmail, setNotifyEmail] = useState('')
+  const [notifyOnNew, setNotifyOnNew] = useState(true)
+  const [notifyOnChange, setNotifyOnChange] = useState(true)
+  const [notifyOnExpiry, setNotifyOnExpiry] = useState(true)
   const [timeout, setTimeout_] = useState(5)
   const [maxWorkers, setMaxWorkers] = useState(20)
   const [resolveDns, setResolveDns] = useState(false)
@@ -1144,6 +1147,9 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
         setPorts(pList.map(String))
         setSchedule(String(profile.schedule_interval_minutes || 0))
         setNotifyEmail(profile.notify_email || '')
+        setNotifyOnNew(profile.notify_on_new !== false)
+        setNotifyOnChange(profile.notify_on_change !== false)
+        setNotifyOnExpiry(profile.notify_on_expiry !== false)
         setTimeout_(profile.timeout || 5)
         setMaxWorkers(profile.max_workers || 20)
         setResolveDns(profile.resolve_dns || false)
@@ -1151,6 +1157,7 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
       } else {
         setName(''); setDescription(''); setTargets([]); setPorts(['443'])
         setSchedule('0'); setNotifyEmail('')
+        setNotifyOnNew(true); setNotifyOnChange(true); setNotifyOnExpiry(true)
         setTimeout_(5); setMaxWorkers(20); setResolveDns(false); setShowAdvanced(false)
       }
     }
@@ -1171,6 +1178,9 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
       max_workers: maxWorkers,
       resolve_dns: resolveDns,
       notify_email: notifyEmail.trim() || null,
+      notify_on_new: notifyOnNew,
+      notify_on_change: notifyOnChange,
+      notify_on_expiry: notifyOnExpiry,
     })
   }
 
@@ -1292,14 +1302,33 @@ function ProfileFormModal({ open, onClose, onSave, profile, t }) {
             ))}
           </div>
           {schedule !== '0' && (
-            <Input
-              label={t('discovery.notifyEmail')}
-              value={notifyEmail}
-              onChange={(e) => setNotifyEmail(e.target.value)}
-              placeholder="admin@example.com"
-              type="email"
-              helperText={t('discovery.notifyOnNew')}
-            />
+            <div className="space-y-3">
+              <Input
+                label={t('discovery.notifyEmail')}
+                value={notifyEmail}
+                onChange={(e) => setNotifyEmail(e.target.value)}
+                placeholder="admin@example.com"
+                type="email"
+                helperText={t('discovery.notifyEmailHelper')}
+              />
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-text-secondary">{t('discovery.notifyEvents')}</label>
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={notifyOnNew} onChange={(e) => setNotifyOnNew(e.target.checked)} className="rounded border-border" />
+                    <span className="text-text-secondary">{t('discovery.notifyOnNew')}</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={notifyOnChange} onChange={(e) => setNotifyOnChange(e.target.checked)} className="rounded border-border" />
+                    <span className="text-text-secondary">{t('discovery.notifyOnChange')}</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={notifyOnExpiry} onChange={(e) => setNotifyOnExpiry(e.target.checked)} className="rounded border-border" />
+                    <span className="text-text-secondary">{t('discovery.notifyOnExpiry')}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
