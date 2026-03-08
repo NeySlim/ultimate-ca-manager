@@ -1002,6 +1002,45 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
     return map[type] || ''
   }
 
+  // Auto-included SANs based on CN and cert type
+  const autoSans = useMemo(() => {
+    const items = []
+    const cn = formData.cn.trim()
+    if (!cn) return items
+    const certType = formData.cert_type
+    const isHostname = cn.includes('.') || cn.startsWith('*')
+    const isEmail = cn.includes('@') && cn.split('@').pop()?.includes('.')
+
+    if (['server', 'combined'].includes(certType) && isHostname) {
+      items.push({ type: 'dns', value: cn })
+    }
+    if (['email', 'combined'].includes(certType) && isEmail) {
+      items.push({ type: 'email', value: cn })
+    }
+    const subjectEmail = formData.email?.trim()
+    if (['email', 'combined'].includes(certType) && subjectEmail && subjectEmail.includes('@')) {
+      if (subjectEmail !== cn && !items.some(s => s.type === 'email' && s.value === subjectEmail)) {
+        items.push({ type: 'email', value: subjectEmail })
+      }
+    }
+    return items
+  }, [formData.cn, formData.cert_type, formData.email])
+
+  // Wildcard → suggest base domain
+  const wildcardSuggestion = useMemo(() => {
+    const cn = formData.cn.trim()
+    if (!cn.startsWith('*.')) return null
+    const baseDomain = cn.slice(2)
+    if (!baseDomain || !baseDomain.includes('.')) return null
+    if (sans.some(s => s.type === 'dns' && s.value === baseDomain)) return null
+    return baseDomain
+  }, [formData.cn, sans])
+
+  const addWildcardBase = () => {
+    if (!wildcardSuggestion) return
+    setSans(prev => [...prev, { type: 'dns', value: wildcardSuggestion }])
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     // Build SAN arrays
@@ -1169,6 +1208,36 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
         <label className="block text-xs font-medium text-text-secondary">
           {t('common.subjectAltNames')}
         </label>
+
+        {/* Auto-included SANs from CN */}
+        {autoSans.length > 0 && (
+          <div className="space-y-1">
+            {autoSans.map((s, idx) => (
+              <div key={`auto-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-accent-primary/8 border border-accent-primary/20 rounded-md">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-accent-primary/70 w-12">{s.type}</span>
+                <span className="text-xs text-text-primary font-mono flex-1">{s.value}</span>
+                <span className="text-[10px] text-accent-primary/60 italic">{t('certificates.autoIncluded')}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Wildcard base domain suggestion */}
+        {wildcardSuggestion && (
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-status-warning/8 border border-status-warning/20 rounded-md">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-status-warning/70 w-12">dns</span>
+            <span className="text-xs text-text-secondary font-mono flex-1">{wildcardSuggestion}</span>
+            <Button type="button" variant="ghost" size="sm" onClick={addWildcardBase} className="text-[10px] text-status-warning hover:text-status-warning/80 !px-1.5 !py-0.5">
+              <Plus size={10} /> {t('certificates.addBaseDomain')}
+            </Button>
+          </div>
+        )}
+
+        {/* Additional SANs label when auto-SANs present */}
+        {autoSans.length > 0 && (
+          <p className="text-[10px] text-text-tertiary">{t('certificates.additionalSans')}</p>
+        )}
+
         <div className="space-y-2">
           {sans.map((san, idx) => (
             <div key={idx} className="flex items-center gap-2">

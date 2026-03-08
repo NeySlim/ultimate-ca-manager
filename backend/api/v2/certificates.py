@@ -367,11 +367,26 @@ def create_certificate():
             for uri in data['san_uri']:
                 san_list.append(x509.UniformResourceIdentifier(uri))
         
-        # Add CN as DNS SAN for server certs if it looks like a valid hostname
+        # Auto-add CN as SAN based on cert type
         cn = data['cn']
         cn_looks_like_hostname = '.' in cn or cn.startswith('*')
+        cn_looks_like_email = '@' in cn and '.' in cn.split('@')[-1]
+
+        # Server/combined: CN → DNS SAN
         if cert_type in ['server', 'combined'] and cn_looks_like_hostname and cn not in (data.get('san_dns') or []):
             san_list.insert(0, x509.DNSName(cn))
+
+        # Email/combined: CN → Email SAN (if CN is an email address)
+        if cert_type in ['email', 'combined'] and cn_looks_like_email and cn not in (data.get('san_email') or []):
+            san_list.insert(0, x509.RFC822Name(cn))
+
+        # Email/combined: Subject email → Email SAN
+        subject_email = data.get('email', '')
+        if cert_type in ['email', 'combined'] and subject_email and '@' in subject_email:
+            if subject_email != cn and subject_email not in (data.get('san_email') or []):
+                existing_emails = [str(s.value) for s in san_list if isinstance(s, x509.RFC822Name)]
+                if subject_email not in existing_emails:
+                    san_list.append(x509.RFC822Name(subject_email))
         
         if san_list:
             builder = builder.add_extension(
