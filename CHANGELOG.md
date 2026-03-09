@@ -11,6 +11,23 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.66] - 2026-03-09
+
+### Added
+- **SSO SSL Verification Controls** — Per-protocol SSL toggle and custom CA certificate (PEM) for OAuth2, SAML, and LDAP providers (fixes #33)
+- Users with private/self-signed CA certificates can now connect to OIDC, SAML, and LDAP identity providers
+- Custom CA bundle stored as PEM text in database — no filesystem dependency
+- SSL warning banner when verification is disabled
+- 4 new i18n keys across all 9 locales
+
+### Security
+- **SAML Silent Fallback Removed** — SAML metadata fetch no longer silently falls back to `verify=False` (MITM risk)
+
+### Fixed
+- All 5 outbound HTTPS requests in SSO module now respect SSL verification settings (3 OAuth2, 1 SAML, 3 LDAP)
+
+---
+
 ## [2.65] - 2026-03-09
 
 ### Security
