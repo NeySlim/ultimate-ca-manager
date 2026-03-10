@@ -65,14 +65,14 @@ export default function ReportsPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
   // All schedulable report configs
-  const SCHEDULE_REPORTS = [
+  const SCHEDULE_REPORTS = useMemo(() => [
     { key: 'certificate_inventory', icon: Certificate, label: t('reports.types.certificate_inventory.name', { defaultValue: 'Certificate Inventory' }), variant: 'info' },
     { key: 'expiring_certificates', icon: Clock, label: t('reports.types.expiring_certificates.name', { defaultValue: 'Expiring Certificates' }), variant: 'warning' },
     { key: 'ca_hierarchy', icon: TreeStructure, label: t('reports.types.ca_hierarchy.name', { defaultValue: 'CA Hierarchy' }), variant: 'success' },
     { key: 'audit_summary', icon: ClockCounterClockwise, label: t('reports.types.audit_summary.name', { defaultValue: 'Audit Summary' }), variant: 'default' },
     { key: 'compliance_status', icon: Gavel, label: t('reports.types.compliance_status.name', { defaultValue: 'Compliance Status' }), variant: 'danger' },
     { key: 'executive_pdf', icon: FilePdf, label: t('reports.executiveReport'), variant: 'info', formatLocked: 'pdf' },
-  ]
+  ], [t])
 
   const hasWriteSettings = canWrite('settings')
 
@@ -141,10 +141,15 @@ export default function ReportsPage() {
   }
 
   const handleTestSend = async () => {
-    if (!testEmail.trim() || !testSendModal) return
+    const email = testEmail.trim()
+    if (!email || !testSendModal) return
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError(t('reports.invalidEmail', { defaultValue: 'Invalid email address' }))
+      return
+    }
     try {
       setTestSending(true)
-      await reportsService.sendTest(testSendModal, testEmail)
+      await reportsService.sendTest(testSendModal, email)
       showSuccess(t('reports.testSent'))
       setTestSendModal(null)
       setTestEmail('')

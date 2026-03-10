@@ -8,9 +8,13 @@ from utils.response import success_response, error_response
 from services.report_service import ReportService
 from models import db, SystemConfig
 import json
+import re
 import logging
 
 logger = logging.getLogger(__name__)
+
+EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+TIME_RE = re.compile(r'^([01]\d|2[0-3]):[0-5]\d$')
 
 bp = Blueprint('reports_pro', __name__)
 
@@ -53,7 +57,7 @@ def generate_report():
         return error_response("report_type is required", 400)
     
     if report_type not in ReportService.REPORT_TYPES:
-        return error_response(f"Unknown report type: {report_type}", 400)
+        return error_response("Unknown report type", 400)
     
     params = data.get('params', {})
     if params and not isinstance(params, dict):
@@ -72,12 +76,20 @@ def generate_report():
 def download_report(report_type):
     """Download a report as CSV"""
     if report_type not in ReportService.REPORT_TYPES:
-        return error_response(f"Unknown report type: {report_type}", 400)
+        return error_response("Unknown report type", 400)
     
-    params = {
-        'format': request.args.get('format', 'csv'),
-        'days': int(request.args.get('days', 30)),
-    }
+    format_val = request.args.get('format', 'csv')
+    if format_val not in ('csv', 'json'):
+        return error_response("Format must be 'csv' or 'json'", 400)
+    
+    try:
+        days = int(request.args.get('days', 30))
+        if not (1 <= days <= 3650):
+            return error_response("days must be between 1 and 3650", 400)
+    except (ValueError, TypeError):
+        return error_response("days must be a valid integer", 400)
+    
+    params = {'format': format_val, 'days': days}
     
     try:
         report = ReportService.generate_report(report_type, params)
@@ -119,7 +131,7 @@ def download_executive_pdf():
         )
     except ImportError as e:
         logger.error(f'PDF dependencies missing: {e}')
-        return error_response("PDF generation requires fpdf2. Install with: pip install fpdf2", 500)
+        return error_response("PDF generation is not available", 500)
     except Exception as e:
         logger.error(f'Executive PDF generation failed: {e}', exc_info=True)
         return error_response("Failed to generate executive report", 500)
@@ -174,19 +186,48 @@ def update_schedule_settings():
     for report_key in SCHEDULABLE_REPORTS:
         if report_key in data:
             sched = data[report_key]
-            # Validate
+            # Validate frequency
             freq = sched.get('frequency', 'weekly')
             if freq not in ('daily', 'weekly', 'monthly'):
-                return error_response(f"Invalid frequency for {report_key}: {freq}", 400)
+                return error_response(f"Invalid frequency for {report_key}", 400)
+            
+            # Validate time format
+            time_val = sched.get('time', '08:00')
+            if not TIME_RE.match(str(time_val)):
+                return error_response(f"Invalid time format for {report_key}: use HH:MM", 400)
+            
+            # Validate day_of_week / day_of_month
+            try:
+                dow = int(sched.get('day_of_week', 1))
+                dom = int(sched.get('day_of_month', 1))
+            except (ValueError, TypeError):
+                return error_response(f"Invalid day value for {report_key}", 400)
+            if not (0 <= dow <= 6):
+                return error_response(f"day_of_week must be 0-6 for {report_key}", 400)
+            if not (1 <= dom <= 28):
+                return error_response(f"day_of_month must be 1-28 for {report_key}", 400)
+            
+            # Validate recipients
+            recipients = sched.get('recipients', [])
+            if not isinstance(recipients, list) or len(recipients) > 50:
+                return error_response(f"recipients must be a list (max 50) for {report_key}", 400)
+            for email in recipients:
+                if not isinstance(email, str) or not EMAIL_RE.match(email):
+                    return error_response(f"Invalid email in recipients for {report_key}", 400)
+            
+            # Validate format
+            fmt = sched.get('format', 'csv')
+            if report_key != 'executive_pdf' and fmt not in ('csv', 'json'):
+                fmt = 'csv'
             
             config_val = {
                 'enabled': bool(sched.get('enabled', False)),
                 'frequency': freq,
-                'time': sched.get('time', '08:00'),
-                'day_of_week': int(sched.get('day_of_week', 1)),
-                'day_of_month': int(sched.get('day_of_month', 1)),
-                'recipients': sched.get('recipients', []),
-                'format': 'pdf' if report_key == 'executive_pdf' else sched.get('format', 'csv'),
+                'time': time_val,
+                'day_of_week': dow,
+                'day_of_month': dom,
+                'recipients': recipients,
+                'format': 'pdf' if report_key == 'executive_pdf' else fmt,
             }
             _set_config(f'report_schedule_{report_key}', json.dumps(config_val))
     
@@ -201,10 +242,12 @@ def send_test_report():
     data = request.get_json() or {}
     
     report_type = data.get('report_type', 'expiring_certificates')
-    recipient = data.get('recipient')
+    if report_type not in SCHEDULABLE_REPORTS:
+        return error_response("Invalid report type", 400)
     
-    if not recipient:
-        return error_response("recipient email is required", 400)
+    recipient = (data.get('recipient') or '').strip()
+    if not recipient or not EMAIL_RE.match(recipient):
+        return error_response("A valid recipient email is required", 400)
     
     try:
         if report_type == 'executive_pdf':
@@ -215,7 +258,7 @@ def send_test_report():
                 [recipient],
                 {'days': 30}
             )
-        return success_response(message=f"Test report sent to {recipient}")
+        return success_response(message="Test report sent successfully")
     except Exception as e:
         logger.error(f'Failed to send test report: {e}')
         return error_response("Failed to send test report", 500)

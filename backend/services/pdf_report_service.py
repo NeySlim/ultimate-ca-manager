@@ -294,7 +294,8 @@ class PDFReportService:
         try:
             for p in ['/opt/ucm/VERSION', os.path.join(os.path.dirname(os.path.dirname(__file__)), 'VERSION')]:
                 if os.path.exists(p):
-                    version = open(p).read().strip()
+                    with open(p, 'r') as f:
+                        version = f.read().strip()
                     break
         except Exception:
             pass

@@ -259,7 +259,6 @@ class ReportService:
         """Generate compliance status report"""
         # Check for policy violations
         items = []
-        issues = []
         
         # Check certificates without proper extensions
         total_active = Certificate.query.filter(
@@ -384,10 +383,11 @@ Ultimate CA Manager
             for recipient in recipients:
                 try:
                     EmailService.send_email(
-                        to=recipient,
+                        recipients=[recipient],
                         subject=subject,
-                        body=body,
-                        html=f"<pre>{body}</pre>",
+                        body_html=f"<pre>{body}</pre>",
+                        body_text=body,
+                        notification_type="report",
                     )
                     logger.info(f"Sent {report_type} report to {recipient}")
                 except Exception as e:
@@ -417,10 +417,11 @@ Ultimate CA Manager
             for recipient in recipients:
                 try:
                     EmailService.send_email(
-                        to=recipient,
+                        recipients=[recipient],
                         subject=subject,
-                        body=body,
-                        html=f"<pre>{body}</pre>",
+                        body_html=f"<pre>{body}</pre>",
+                        body_text=body,
+                        notification_type="report",
                     )
                     logger.info(f"Sent executive PDF report to {recipient}")
                 except Exception as e:
