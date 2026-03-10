@@ -11,6 +11,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.68] - 2026-03-10
+
+### Fixed
+- **ACME Wildcard CSR Mismatch** — Wildcard certificate finalization failed with "CSR does not specify same identifiers as Order" because CN used stripped base domain instead of exact wildcard domain (fixes #34)
+- **ACME Certificate Import** — Let's Encrypt certificates imported with missing metadata (no issuer, SANs, key algorithm, signature algorithm). Now delegates to CertificateService for proper chain splitting, base64 encoding, and full field extraction (fixes #35)
+- **Infinite API Loop on User Click** — Clicking a user in management page triggered endless /certificates requests due to unstable useEffect dependencies; fixed with useRef guard
+- **mTLS Certificate Hover Disappear** — Certificate item disappeared on hover due to native title tooltip; replaced with aria-label
+- **mTLS Generate Missing Name** — API response for mTLS certificate generation was missing the `name` field
+- **Reports Grid Spacing** — Report cards grid had no margin spacing; wrapped in space-y-4
+
+---
+
 ## [2.67] - 2026-03-10
 
 ### Fixed
