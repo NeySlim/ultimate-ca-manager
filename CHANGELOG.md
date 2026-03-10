@@ -11,6 +11,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.67] - 2026-03-10
+
+### Fixed
+- **SSO CA Bundle Round-Trip Bug** — CA certificate PEM content was returned as boolean in API responses, causing PEM to be destroyed on re-save (fixes #33 follow-up)
+- API now returns actual PEM content for ca_bundle fields instead of boolean presence indicator
+- Update endpoint rejects non-string ca_bundle values to prevent data corruption
+
+---
+
 ## [2.66] - 2026-03-09
 
 ### Added

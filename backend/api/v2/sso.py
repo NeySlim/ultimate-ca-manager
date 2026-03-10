@@ -255,7 +255,8 @@ def create_provider():
         provider.saml_sign_requests = data.get('saml_sign_requests', True)
         provider.saml_sp_cert_source = data.get('saml_sp_cert_source', 'https')
         provider.saml_verify_ssl = data.get('saml_verify_ssl', True)
-        provider.saml_ca_bundle = data.get('saml_ca_bundle')
+        ca = data.get('saml_ca_bundle')
+        provider.saml_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
     
     elif data['provider_type'] == 'oauth2':
         provider.oauth2_client_id = data.get('oauth2_client_id')
@@ -265,14 +266,16 @@ def create_provider():
         provider.oauth2_userinfo_url = data.get('oauth2_userinfo_url')
         provider.oauth2_scopes = json.dumps(data.get('oauth2_scopes', ['openid', 'profile', 'email']))
         provider.oauth2_verify_ssl = data.get('oauth2_verify_ssl', True)
-        provider.oauth2_ca_bundle = data.get('oauth2_ca_bundle')
+        ca = data.get('oauth2_ca_bundle')
+        provider.oauth2_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
     
     elif data['provider_type'] == 'ldap':
         provider.ldap_server = data.get('ldap_server')
         provider.ldap_port = data.get('ldap_port', 389)
         provider.ldap_use_ssl = data.get('ldap_use_ssl', False)
         provider.ldap_verify_ssl = data.get('ldap_verify_ssl', True)
-        provider.ldap_ca_bundle = data.get('ldap_ca_bundle')
+        ca = data.get('ldap_ca_bundle')
+        provider.ldap_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
         provider.ldap_bind_dn = data.get('ldap_bind_dn')
         provider.ldap_bind_password = _encrypt_ldap_password(data.get('ldap_bind_password'))
         provider.ldap_base_dn = data.get('ldap_base_dn')
@@ -357,16 +360,22 @@ def update_provider(provider_id=None, provider_type_name=None):
     if provider.provider_type == 'saml':
         for field in ['saml_metadata_url', 'saml_entity_id', 'saml_sso_url', 'saml_slo_url', 
                       'saml_certificate', 'saml_sign_requests', 'saml_sp_cert_source',
-                      'saml_verify_ssl', 'saml_ca_bundle']:
+                      'saml_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
+        # ca_bundle: only update if string PEM content (ignore bool from to_dict round-trip)
+        if 'saml_ca_bundle' in data and isinstance(data['saml_ca_bundle'], str):
+            provider.saml_ca_bundle = data['saml_ca_bundle'] or None
     
     elif provider.provider_type == 'oauth2':
         for field in ['oauth2_client_id', 'oauth2_auth_url', 
                       'oauth2_token_url', 'oauth2_userinfo_url',
-                      'oauth2_verify_ssl', 'oauth2_ca_bundle']:
+                      'oauth2_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
+        # ca_bundle: only update if string PEM content (ignore bool from to_dict round-trip)
+        if 'oauth2_ca_bundle' in data and isinstance(data['oauth2_ca_bundle'], str):
+            provider.oauth2_ca_bundle = data['oauth2_ca_bundle'] or None
         # Only update secret if non-empty (empty = keep existing)
         if data.get('oauth2_client_secret'):
             provider.oauth2_client_secret = data['oauth2_client_secret']
@@ -377,9 +386,12 @@ def update_provider(provider_id=None, provider_type_name=None):
         for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn', 
                       'ldap_base_dn', 'ldap_user_filter',
                       'ldap_group_filter', 'ldap_group_member_attr', 'ldap_username_attr', 'ldap_email_attr', 
-                      'ldap_fullname_attr', 'ldap_verify_ssl', 'ldap_ca_bundle']:
+                      'ldap_fullname_attr', 'ldap_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
+        # ca_bundle: only update if string PEM content (ignore bool from to_dict round-trip)
+        if 'ldap_ca_bundle' in data and isinstance(data['ldap_ca_bundle'], str):
+            provider.ldap_ca_bundle = data['ldap_ca_bundle'] or None
         # Only update password if non-empty (empty = keep existing)
         if data.get('ldap_bind_password'):
             provider.ldap_bind_password = _encrypt_ldap_password(data['ldap_bind_password'])
