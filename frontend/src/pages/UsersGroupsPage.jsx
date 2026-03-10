@@ -5,7 +5,7 @@
  * DESKTOP: Dense table with hover rows, inline slide-over details
  * MOBILE: Card-style list with full-screen details
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { 
@@ -270,13 +270,15 @@ export default function UsersGroupsPage() {
     }
   }, [])
 
+  const casLoadedRef = useRef(false)
   const loadCAsOnce = useCallback(async () => {
-    if (cas.length > 0) return
+    if (casLoadedRef.current) return
+    casLoadedRef.current = true
     try {
       const response = await casService.getAll()
       setCas(response.data?.items || response.data || [])
     } catch {}
-  }, [cas.length])
+  }, [])
 
   // Load mTLS certs when user selected
   useEffect(() => {
@@ -286,7 +288,8 @@ export default function UsersGroupsPage() {
     } else {
       setUserMtlsCerts([])
     }
-  }, [selectedUser?.id, canWrite, loadUserMtlsCerts, loadCAsOnce])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUser?.id])
 
   const handleOpenMtlsModal = () => {
     setMtlsTab('generate')

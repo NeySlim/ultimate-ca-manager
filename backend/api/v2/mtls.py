@@ -242,6 +242,7 @@ def create_mtls_certificate():
 
         return created_response(data={
             'id': cert_obj.id,
+            'name': cert_name,
             'serial': cert_obj.serial_number or '',
             'certificate': cert_pem,
             'private_key': key_pem,

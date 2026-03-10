@@ -393,9 +393,10 @@ export default function ReportsPage() {
           </Button>
         ) : null}
       >
+        <div className="space-y-4">
         {/* Schedule Status */}
         {schedule && (
-          <Card className="mb-4">
+          <Card>
             <div className="p-4">
               <h3 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
                 <CalendarBlank size={16} className="text-accent-primary" />
@@ -532,6 +533,7 @@ export default function ReportsPage() {
             </div>
           </Card>
         )}
+        </div>
       </ResponsiveLayout>
 
       {/* Test Send Modal */}
