@@ -531,9 +531,10 @@ class AcmeClientService:
                 backend=default_backend()
             )
             
-            # Build CSR
+            # Build CSR — CN must match a SAN exactly, otherwise LE treats it
+            # as an extra identifier and rejects the CSR (wildcard bug #34)
             subject = x509.Name([
-                x509.NameAttribute(NameOID.COMMON_NAME, primary_domain.lstrip('*.')),
+                x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
             ])
             
             # Add SANs
@@ -623,7 +624,10 @@ class AcmeClientService:
         source: str = 'acme_client'
     ) -> Optional[int]:
         """
-        Import certificate into UCM store.
+        Import certificate into UCM store using CertificateService.
+        
+        Let's Encrypt returns a full chain (end-entity + intermediates).
+        We split it and pass the chain separately for proper storage.
         
         Returns:
             Certificate ID or None
@@ -631,25 +635,35 @@ class AcmeClientService:
         try:
             from services.cert_service import CertificateService
             
-            # Parse certificate to extract details
-            cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+            # Split PEM chain: first cert = end-entity, rest = chain
+            pem_blocks = []
+            current_block = []
+            for line in cert_pem.strip().splitlines():
+                current_block.append(line)
+                if line.strip() == '-----END CERTIFICATE-----':
+                    pem_blocks.append('\n'.join(current_block))
+                    current_block = []
             
-            # Create certificate record
-            cert_record = Certificate(
-                descr=f"Let's Encrypt: {domains[0]}",
-                subject_cn=domains[0].lstrip('*.'),
-                crt=cert_pem,
-                prv=key_pem,
-                serial_number=format(cert.serial_number, 'x'),
-                valid_from=cert.not_valid_before_utc,
-                valid_to=cert.not_valid_after_utc,
-                refid=secrets.token_hex(8),
+            if not pem_blocks:
+                logger.error("No PEM certificates found in ACME response")
+                return None
+            
+            end_entity_pem = pem_blocks[0]
+            chain_pem = '\n'.join(pem_blocks[1:]) if len(pem_blocks) > 1 else None
+            
+            # Use domain as description (no "Let's Encrypt:" prefix)
+            primary_domain = domains[0]
+            
+            cert_record = CertificateService.import_certificate(
+                descr=primary_domain,
+                cert_pem=end_entity_pem,
+                key_pem=key_pem,
+                chain_pem=chain_pem,
+                username='system',
+                source=source
             )
             
-            db.session.add(cert_record)
-            db.session.commit()
-            
-            return cert_record.id
+            return cert_record.id if cert_record else None
             
         except Exception as e:
             logger.error(f"Certificate import error: {e}")
