@@ -16,7 +16,7 @@ Technical documentation for Ultimate CA Manager.
 
 ## API
 
-- **[API_REFERENCE.md](./API_REFERENCE.md)** — Complete API reference (155+ endpoints)
+- **[API_REFERENCE.md](./API_REFERENCE.md)** — Complete API reference (347+ endpoints)
 
 ## Operations
 

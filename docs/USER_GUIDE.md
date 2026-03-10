@@ -266,6 +266,57 @@ The **Tools** section provides utilities for working with certificates:
 
 ---
 
+## Reports
+
+The **Reports** page provides on-demand and scheduled reporting for your PKI environment.
+
+### Reports Overview
+
+The reports page shows:
+- **Stat cards** — Quick counts for certificates, CAs, expiring soon, and revoked
+- **Report list** — All available report types with generate/download actions
+- **Schedule status** — Which reports are scheduled and their next run time
+
+### Generating On-Demand Reports
+
+1. Go to **Reports** page
+2. Select a report type from the list:
+   - **Expiring Certificates** — Certificates expiring within a configurable number of days
+   - **Revoked Certificates** — All revoked certificates with reason and date
+   - **CA Hierarchy** — Certificate Authority tree with issued certificate counts
+   - **Audit Summary** — Recent audit log activity grouped by action type
+   - **Compliance Status** — Policy compliance overview across all certificates
+   - **Certificate Inventory** — Full inventory of all certificates with status and metadata
+3. Click **Generate** to create the report
+4. Choose output format: **CSV**, **JSON**, or **PDF**
+
+### Executive PDF Report
+
+The executive PDF report provides a comprehensive, downloadable document for management review:
+
+1. Go to **Reports** page
+2. Click **Download Executive PDF**
+3. The PDF includes:
+   - **Cover page** with organization name and generation date
+   - **Executive summary** with key metrics
+   - **Risk assessment** highlighting urgent issues
+   - **Certificate inventory** breakdown by status
+   - **Compliance status** across all policies
+   - **Lifecycle analysis** of certificate age and renewal patterns
+   - **CA infrastructure** overview
+   - **Recommendations** based on current state
+
+### Understanding Report Data
+
+- **Expiring Certificates** — Use the `days` parameter to control the look-ahead window (default: 30 days)
+- **Revoked Certificates** — Includes revocation reason (key compromise, CA compromise, affiliation changed, etc.)
+- **CA Hierarchy** — Shows parent-child relationships and certificate counts per CA
+- **Audit Summary** — Groups actions by type (create, revoke, delete, login, etc.) with counts
+- **Compliance Status** — Shows pass/fail per policy with affected certificate details
+- **Certificate Inventory** — Full list with serial number, CN, issuer, validity dates, and status
+
+---
+
 ## Themes
 
 Change the UI theme:

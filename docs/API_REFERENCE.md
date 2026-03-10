@@ -2999,9 +2999,61 @@ GET /api/v2/approvals/stats
 
 ## Reports
 
+UCM provides 6 built-in report types, an executive PDF report, and a full report scheduler with email delivery.
+
+**Available Report Types:**
+
+| Type Key | Description |
+|----------|-------------|
+| `expiring_certificates` | Certificates expiring within N days |
+| `revoked_certificates` | All revoked certificates with revocation reason |
+| `ca_hierarchy` | CA tree with issued certificate counts |
+| `audit_summary` | Audit log activity grouped by action type |
+| `compliance_status` | Policy compliance across all certificates |
+| `certificate_inventory` | Full certificate inventory with metadata |
+
 ### List Report Types
 ```http
 GET /api/v2/reports/types
+```
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "expiring_certificates",
+      "name": "Expiring Certificates",
+      "description": "Certificates expiring within a specified number of days",
+      "params": ["days"]
+    },
+    {
+      "id": "revoked_certificates",
+      "name": "Revoked Certificates",
+      "description": "All revoked certificates with reason and date"
+    },
+    {
+      "id": "ca_hierarchy",
+      "name": "CA Hierarchy",
+      "description": "Certificate Authority tree with counts"
+    },
+    {
+      "id": "audit_summary",
+      "name": "Audit Summary",
+      "description": "Recent audit log activity by action type"
+    },
+    {
+      "id": "compliance_status",
+      "name": "Compliance Status",
+      "description": "Policy compliance overview"
+    },
+    {
+      "id": "certificate_inventory",
+      "name": "Certificate Inventory",
+      "description": "Full inventory of all certificates"
+    }
+  ]
+}
 ```
 
 ### Generate Report
@@ -3010,21 +3062,78 @@ POST /api/v2/reports/generate
 Content-Type: application/json
 
 {
-  "report_type": "expiry",
+  "report_type": "expiring_certificates",
   "params": {
     "days": 30
   }
 }
 ```
 
-### Download Report
-```http
-GET /api/v2/reports/download/{report_type}?format=pdf&days=30
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `report_type` | string | Yes | One of the 6 report type keys |
+| `params.days` | integer | No | Look-ahead days (for `expiring_certificates`, default: 30) |
+
+**Response:**
+```json
+{
+  "data": {
+    "report_type": "expiring_certificates",
+    "generated_at": "2026-01-15T08:00:00Z",
+    "records": [ ... ],
+    "total": 12
+  }
+}
 ```
 
-### Get Report Schedule
+### Download Executive PDF
+```http
+GET /api/v2/reports/executive-pdf
+```
+
+Returns a downloadable PDF document containing:
+- Cover page with organization name and generation date
+- Executive summary with key metrics
+- Risk assessment
+- Certificate inventory breakdown
+- Compliance status
+- Lifecycle analysis
+- CA infrastructure overview
+- Recommendations
+
+**Response:** `application/pdf` binary (Content-Disposition: attachment)
+
+### Get Report Schedules
 ```http
 GET /api/v2/reports/schedule
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "expiring_certificates": {
+      "enabled": true,
+      "frequency": "weekly",
+      "time": "08:00",
+      "day_of_week": 1,
+      "day_of_month": 1,
+      "recipients": ["admin@example.com"],
+      "format": "csv"
+    },
+    "revoked_certificates": {
+      "enabled": false,
+      "frequency": "monthly",
+      "time": "09:00",
+      "day_of_week": 0,
+      "day_of_month": 1,
+      "recipients": [],
+      "format": "pdf"
+    }
+  }
+}
 ```
 
 ### Update Report Schedule
@@ -3033,16 +3142,31 @@ PUT /api/v2/reports/schedule
 Content-Type: application/json
 
 {
-  "expiry_report": {
+  "report_type": "expiring_certificates",
+  "config": {
     "enabled": true,
     "frequency": "weekly",
-    "recipients": ["admin@example.com"]
-  },
-  "compliance_report": {
-    "enabled": false
+    "time": "08:00",
+    "day_of_week": 1,
+    "day_of_month": 1,
+    "recipients": ["admin@example.com", "security@example.com"],
+    "format": "csv"
   }
 }
 ```
+
+**Schedule Config Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `report_type` | string | Yes | One of the 6 report type keys |
+| `config.enabled` | boolean | Yes | Enable or disable the schedule |
+| `config.frequency` | string | Yes | `daily`, `weekly`, or `monthly` |
+| `config.time` | string | Yes | Execution time in `HH:MM` (24-hour format) |
+| `config.day_of_week` | integer | No | For weekly: `0` (Mon) – `6` (Sun) |
+| `config.day_of_month` | integer | No | For monthly: `1` – `28` |
+| `config.recipients` | array | Yes | Email addresses (max 50) |
+| `config.format` | string | Yes | `csv`, `json`, or `pdf` |
 
 ### Send Test Report
 ```http
@@ -3050,10 +3174,19 @@ POST /api/v2/reports/send-test
 Content-Type: application/json
 
 {
-  "report_type": "expiry",
+  "report_type": "expiring_certificates",
   "recipient": "admin@example.com"
 }
 ```
+
+Generates the report immediately and sends it to the specified recipient. Use this to verify email delivery and report content before enabling a schedule.
+
+**Parameters:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `report_type` | string | Yes | One of the 6 report type keys |
+| `recipient` | string | Yes | Email address to send the test report to |
 
 ---
 

@@ -343,6 +343,68 @@ All actions are logged:
 
 ---
 
+## Report Scheduler
+
+UCM includes a full report scheduler that can automatically generate and email reports on a recurring basis.
+
+> **Prerequisite:** Email delivery must be configured first. Go to **Settings** > **Email** and configure your SMTP server before enabling scheduled reports.
+
+### Available Report Types
+
+| Report Type | Description |
+|-------------|-------------|
+| `expiring_certificates` | Certificates expiring within N days |
+| `revoked_certificates` | All revoked certificates with reason and date |
+| `ca_hierarchy` | CA tree with issued certificate counts |
+| `audit_summary` | Audit log activity grouped by action type |
+| `compliance_status` | Policy compliance across all certificates |
+| `certificate_inventory` | Full certificate inventory with metadata |
+
+### Configuring a Schedule
+
+1. Go to **Reports** page
+2. Click the **schedule icon** next to any report type
+3. Configure:
+   - **Enabled** — Toggle schedule on/off
+   - **Frequency** — `daily`, `weekly`, or `monthly`
+   - **Time** — Execution time in `HH:MM` format (24-hour, server timezone)
+   - **Day of Week** — For weekly: `0` (Monday) through `6` (Sunday)
+   - **Day of Month** — For monthly: `1` through `28`
+   - **Format** — Output format: `csv`, `json`, or `pdf`
+   - **Recipients** — Email addresses to receive the report (max 50)
+4. Click **Save**
+
+### Example Schedule Configuration
+
+A weekly expiring certificates report sent every Monday at 8 AM:
+
+```
+Report Type: Expiring Certificates
+Frequency:   Weekly
+Time:        08:00
+Day of Week: Monday
+Format:      CSV
+Recipients:  admin@example.com, security@example.com
+```
+
+### Testing Scheduled Reports
+
+Before relying on a schedule, send a test report:
+
+1. Configure the schedule as desired
+2. Click **Send Test** on the report row
+3. A one-time report is generated and emailed to all configured recipients
+4. Verify the email arrives and the content is correct
+
+### Troubleshooting Schedules
+
+- **Reports not sending** — Check SMTP configuration in Settings > Email
+- **Empty reports** — Verify the report type has data (e.g., no expiring certs if all are valid)
+- **Wrong timezone** — Report time uses server timezone; check system clock
+- **Recipient limit** — Maximum 50 email addresses per report schedule
+
+---
+
 ## Upgrades
 
 See [UPGRADE.md](../UPGRADE.md) for version-specific migration steps.

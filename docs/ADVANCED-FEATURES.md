@@ -21,6 +21,7 @@ All features are included in UCM as core functionality. There is no separate "Pr
 | Webhooks | Stable | `api/v2/webhooks.py` |
 | Trust Store | Stable | `api/v2/truststore.py` |
 | Advanced Audit Logs | Stable | `api/v2/audit.py` |
+| Reports & Analytics | Stable | `api/v2/reports.py` |
 | Auto-Update (ucm-watcher) | Stable | `services/updates.py` |
 
 > Features marked **Experimental** are functional but may have limited testing. They display an "Experimental" badge in the UI.
