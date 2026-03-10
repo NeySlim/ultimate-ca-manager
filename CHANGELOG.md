@@ -11,6 +11,22 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.69] - 2026-03-10
+
+### Added
+- **Executive PDF Report** — New downloadable PDF with cover page, executive summary, risk assessment, certificate inventory, compliance status, lifecycle analysis, CA infrastructure, and recommendations (~1200 lines, fpdf2/matplotlib)
+- **Full Report Scheduler** — 6 schedulable report types (expiring certs, revoked certs, CA hierarchy, audit summary, compliance status, certificate inventory) with configurable frequency, time, day, format (CSV/JSON/PDF), and email recipients
+- **Reports Page Redesign** — List-based layout matching Dashboard/Certificates style with stat cards, inline schedule status, and mobile-responsive actions
+
+### Fixed
+- **Input Validation & Security Hardening** — Email regex validation, report type allowlist, time format validation, day range checks, max 50 recipients, file handle leak fix, info disclosure removal
+- **EmailService Signature** — Fixed parameter mismatch (`to`→`recipients`, `body`→`body_html`) that prevented scheduled emails from sending
+- **Accessibility** — Added `type="button"` to 18 native buttons, `aria-label` to 9 icon-only buttons across ResponsiveLayout and AppShell
+- **i18n Completeness** — Replaced 7 hardcoded English strings with translation calls, added 8 new keys to all 9 locales
+- **Performance** — Memoized `filteredMobileGroups` in AppShell, fixed N+1 query in CA hierarchy report (batch GROUP BY), replaced in-memory audit log aggregation with DB-level GROUP BY queries
+
+---
+
 ## [2.68] - 2026-03-10
 
 ### Fixed
