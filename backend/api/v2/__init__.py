@@ -46,6 +46,7 @@ from api.v2.policies import bp as policies_bp
 from api.v2.reports import bp as reports_bp
 from api.v2.webhooks import bp as webhooks_bp
 from api.v2.discovery import bp as discovery_bp
+from api.v2.msca import bp as msca_bp
 
 # All API v2 blueprints
 API_V2_BLUEPRINTS = [
@@ -86,6 +87,7 @@ API_V2_BLUEPRINTS = [
     reports_bp,
     webhooks_bp,
     discovery_bp,
+    msca_bp,
 ]
 
 

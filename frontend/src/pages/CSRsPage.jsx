@@ -17,7 +17,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { csrsService, casService, templatesService } from '../services'
+import { csrsService, casService, templatesService, mscaService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
@@ -53,6 +53,12 @@ export default function CSRsPage() {
   const [signCA, setSignCA] = useState('')
   const [signCertType, setSignCertType] = useState('server')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
+  const [signMode, setSignMode] = useState('local') // 'local' or 'msca'
+  const [mscaConnections, setMscaConnections] = useState([])
+  const [selectedMsca, setSelectedMsca] = useState('')
+  const [mscaTemplates, setMscaTemplates] = useState([])
+  const [selectedTemplate, setSelectedTemplate] = useState('')
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
   
   // Generate CSR form state
   const [genCN, setGenCN] = useState('')
@@ -102,14 +108,16 @@ export default function CSRsPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [pendingRes, historyRes, casRes] = await Promise.all([
+      const [pendingRes, historyRes, casRes, mscaRes] = await Promise.all([
         csrsService.getAll(),
         csrsService.getHistory(),
-        casService.getAll()
+        casService.getAll(),
+        mscaService.getEnabled().catch(() => ({ data: [] }))
       ])
       setPendingCSRs(pendingRes.data || [])
       setHistoryCSRs(historyRes.data || [])
       setCAs(casRes.data || casRes.cas || [])
+      setMscaConnections(mscaRes.data || [])
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.csrs'))
     } finally {
@@ -162,18 +170,63 @@ export default function CSRsPage() {
   }
 
   const handleSign = async () => {
-    if (!signCA) {
-      showError(t('common.selectCA'))
-      return
+    if (signMode === 'local') {
+      if (!signCA) {
+        showError(t('common.selectCA'))
+        return
+      }
+      try {
+        await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType)
+        showSuccess(t('messages.success.other.signed'))
+        closeModal('sign')
+        loadData()
+        setSelectedCSR(null)
+      } catch (error) {
+        showError(error.message || t('csrs.signFailed'))
+      }
+    } else {
+      // MS CA signing
+      if (!selectedMsca) {
+        showError(t('msca.selectConnection'))
+        return
+      }
+      if (!selectedTemplate) {
+        showError(t('msca.selectTemplate'))
+        return
+      }
+      try {
+        const result = await mscaService.signCSR(selectedMsca, selectedCSR.id, selectedTemplate)
+        if (result.data?.status === 'issued') {
+          showSuccess(t('messages.success.other.signed'))
+        } else if (result.data?.status === 'pending') {
+          showSuccess(t('msca.pendingMessage'))
+        }
+        closeModal('sign')
+        loadData()
+        setSelectedCSR(null)
+      } catch (error) {
+        showError(error.message || t('csrs.signFailed'))
+      }
     }
+  }
+
+  const handleMscaConnectionChange = async (mscaId) => {
+    setSelectedMsca(mscaId)
+    setSelectedTemplate('')
+    setMscaTemplates([])
+    if (!mscaId) return
+    setLoadingTemplates(true)
     try {
-      await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType)
-      showSuccess(t('messages.success.other.signed'))
-      closeModal('sign')
-      loadData()
-      setSelectedCSR(null)
+      const response = await mscaService.getTemplates(mscaId)
+      setMscaTemplates(response.data || [])
+      const conn = mscaConnections.find(c => String(c.id) === String(mscaId))
+      if (conn?.default_template) {
+        setSelectedTemplate(conn.default_template)
+      }
     } catch (error) {
-      showError(error.message || t('csrs.signFailed'))
+      showError(error.message || t('msca.testFailed'))
+    } finally {
+      setLoadingTemplates(false)
     }
   }
 
@@ -731,48 +784,97 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
       {/* Sign CSR Modal */}
       <Modal
         open={modals.sign}
-        onOpenChange={() => closeModal('sign')}
+        onOpenChange={() => { closeModal('sign'); setSignMode('local'); setSelectedMsca(''); setSelectedTemplate('') }}
         title={t('common.signCSR')}
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
             {t('csrs.signCSRDescription')}
           </p>
-          
-          <Select
-            label={t('common.certificateAuthority')}
-            options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
-            value={signCA}
-            onChange={setSignCA}
-            placeholder={t('csrs.selectCA')}
-          />
 
-          <Select
-            label={t('csrs.certTypeForSign')}
-            options={[
-              { value: 'server', label: t('certificates.certTypes.server') },
-              { value: 'client', label: t('certificates.certTypes.client') },
-              { value: 'combined', label: t('certificates.certTypes.combined') },
-              { value: 'intermediate_ca', label: t('certificates.certTypes.intermediateCA') },
-              { value: 'code_signing', label: t('certificates.certTypes.codeSigning') },
-              { value: 'email', label: t('certificates.certTypes.email') },
-            ]}
-            value={signCertType}
-            onChange={setSignCertType}
-          />
+          {/* Mode toggle — only show if MS CA connections exist */}
+          {mscaConnections.length > 0 && (
+            <div className="flex gap-1 p-1 bg-tertiary-50 rounded-lg">
+              <button
+                type="button"
+                className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${signMode === 'local' ? 'bg-bg-primary text-text-primary shadow-sm font-medium' : 'text-text-secondary hover:text-text-primary'}`}
+                onClick={() => setSignMode('local')}
+              >
+                {t('msca.signLocal')}
+              </button>
+              <button
+                type="button"
+                className={`flex-1 px-3 py-1.5 text-sm rounded-md transition-colors ${signMode === 'msca' ? 'bg-bg-primary text-text-primary shadow-sm font-medium' : 'text-text-secondary hover:text-text-primary'}`}
+                onClick={() => setSignMode('msca')}
+              >
+                {t('msca.signMicrosoft')}
+              </button>
+            </div>
+          )}
 
-          <Input
-            label={t('csrs.validityPeriod')}
-            type="number"
-            value={validityDays}
-            onChange={(e) => setValidityDays(parseInt(e.target.value))}
-            min="1"
-            max="3650"
-          />
+          {signMode === 'local' ? (
+            <>
+              <Select
+                label={t('common.certificateAuthority')}
+                options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
+                value={signCA}
+                onChange={setSignCA}
+                placeholder={t('csrs.selectCA')}
+              />
+
+              <Select
+                label={t('csrs.certTypeForSign')}
+                options={[
+                  { value: 'server', label: t('certificates.certTypes.server') },
+                  { value: 'client', label: t('certificates.certTypes.client') },
+                  { value: 'combined', label: t('certificates.certTypes.combined') },
+                  { value: 'intermediate_ca', label: t('certificates.certTypes.intermediateCA') },
+                  { value: 'code_signing', label: t('certificates.certTypes.codeSigning') },
+                  { value: 'email', label: t('certificates.certTypes.email') },
+                ]}
+                value={signCertType}
+                onChange={setSignCertType}
+              />
+
+              <Input
+                label={t('csrs.validityPeriod')}
+                type="number"
+                value={validityDays}
+                onChange={(e) => setValidityDays(parseInt(e.target.value))}
+                min="1"
+                max="3650"
+              />
+            </>
+          ) : (
+            <>
+              <Select
+                label={t('msca.selectConnection')}
+                options={mscaConnections.map(c => ({ value: String(c.id), label: `${c.name} (${c.server})` }))}
+                value={selectedMsca}
+                onChange={handleMscaConnectionChange}
+                placeholder={t('msca.selectConnection')}
+              />
+
+              {selectedMsca && (
+                <Select
+                  label={t('msca.selectTemplate')}
+                  options={mscaTemplates.map(t => ({ value: t, label: t }))}
+                  value={selectedTemplate}
+                  onChange={setSelectedTemplate}
+                  placeholder={loadingTemplates ? t('msca.loadingTemplates') : t('msca.selectTemplate')}
+                  disabled={loadingTemplates}
+                />
+              )}
+            </>
+          )}
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button type="button" variant="secondary" onClick={() => closeModal('sign')}>{t('common.cancel')}</Button>
-            <Button type="button" onClick={handleSign} disabled={!signCA}>
+            <Button
+              type="button"
+              onClick={handleSign}
+              disabled={signMode === 'local' ? !signCA : (!selectedMsca || !selectedTemplate)}
+            >
               <SignIn size={16} /> {t('common.signCSR')}
             </Button>
           </div>

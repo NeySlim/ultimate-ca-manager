@@ -11,7 +11,8 @@ import {
   Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket,
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
   Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User, GithubLogo,
-  Plugs, UsersThree, UserPlus, TreeStructure, CaretDown, Play
+  Plugs, UsersThree, UserPlus, TreeStructure, CaretDown, Play,
+  WindowsLogo
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -23,7 +24,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import LanguageSelector from '../components/ui/LanguageSelector'
-import { settingsService, systemService, casService, certificatesService, ssoService, mtlsService } from '../services'
+import { settingsService, systemService, casService, certificatesService, ssoService, mtlsService, mscaService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
@@ -48,6 +49,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
+  { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', icon: WindowsLogo, color: 'icon-bg-indigo' },
   { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-sky' },
 ]
 
@@ -1556,6 +1558,172 @@ function WebhookForm({ webhook, onSave, onCancel }) {
   )
 }
 
+function MscaConnectionForm({ connection, onSave, onCancel }) {
+  const { t } = useTranslation()
+  const [formData, setFormData] = useState({
+    name: connection?.name || '',
+    server: connection?.server || '',
+    ca_name: connection?.ca_name || '',
+    auth_method: connection?.auth_method || 'certificate',
+    username: connection?.username || '',
+    password: '',
+    client_cert_pem: connection?.client_cert_pem || '',
+    client_key_pem: '',
+    kerberos_principal: connection?.kerberos_principal || '',
+    kerberos_keytab_path: connection?.kerberos_keytab_path || '',
+    use_ssl: connection?.use_ssl ?? true,
+    verify_ssl: connection?.verify_ssl ?? true,
+    ca_bundle: connection?.ca_bundle || '',
+    default_template: connection?.default_template || 'WebServer',
+    enabled: connection?.enabled ?? true,
+  })
+
+  const updateField = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const data = { ...formData }
+    // Don't send masked password if unchanged
+    if (connection && !data.password) delete data.password
+    if (connection && !data.client_key_pem) delete data.client_key_pem
+    onSave(data)
+  }
+
+  const authMethods = [
+    { value: 'certificate', label: t('msca.authCertificate') },
+    { value: 'kerberos', label: t('msca.authKerberos') },
+    { value: 'basic', label: t('msca.authBasic') },
+  ]
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+      <Input
+        label={`${t('msca.connectionName')} *`}
+        value={formData.name}
+        onChange={(e) => updateField('name', e.target.value)}
+        required
+      />
+      <Input
+        label={`${t('msca.server')} *`}
+        value={formData.server}
+        onChange={(e) => updateField('server', e.target.value)}
+        placeholder={t('msca.serverPlaceholder')}
+        required
+      />
+      <Input
+        label={t('msca.caName')}
+        value={formData.ca_name}
+        onChange={(e) => updateField('ca_name', e.target.value)}
+        placeholder={t('msca.caNamePlaceholder')}
+      />
+
+      <Select
+        label={t('msca.authMethod')}
+        options={authMethods}
+        value={formData.auth_method}
+        onChange={(val) => updateField('auth_method', val)}
+      />
+
+      {/* Auth-specific fields */}
+      {formData.auth_method === 'basic' && (
+        <>
+          <Input
+            label={`${t('msca.username')} *`}
+            value={formData.username}
+            onChange={(e) => updateField('username', e.target.value)}
+          />
+          <Input
+            label={t('msca.password')}
+            type="password"
+            value={formData.password}
+            onChange={(e) => updateField('password', e.target.value)}
+            placeholder={connection ? '••••••••' : ''}
+          />
+        </>
+      )}
+
+      {formData.auth_method === 'certificate' && (
+        <>
+          <Textarea
+            label={t('msca.clientCert')}
+            value={formData.client_cert_pem}
+            onChange={(e) => updateField('client_cert_pem', e.target.value)}
+            rows={4}
+            placeholder="-----BEGIN CERTIFICATE-----"
+            className="font-mono text-xs"
+          />
+          <Textarea
+            label={t('msca.clientKey')}
+            value={formData.client_key_pem}
+            onChange={(e) => updateField('client_key_pem', e.target.value)}
+            rows={4}
+            placeholder={connection ? '••••••••' : '-----BEGIN PRIVATE KEY-----'}
+            className="font-mono text-xs"
+          />
+        </>
+      )}
+
+      {formData.auth_method === 'kerberos' && (
+        <>
+          <Input
+            label={t('msca.kerberosPrincipal')}
+            value={formData.kerberos_principal}
+            onChange={(e) => updateField('kerberos_principal', e.target.value)}
+            placeholder={t('msca.kerberosPrincipalPlaceholder')}
+          />
+          <Input
+            label={t('msca.kerberosKeytab')}
+            value={formData.kerberos_keytab_path}
+            onChange={(e) => updateField('kerberos_keytab_path', e.target.value)}
+            placeholder={t('msca.kerberosKeytabPlaceholder')}
+          />
+        </>
+      )}
+
+      <Input
+        label={t('msca.defaultTemplate')}
+        value={formData.default_template}
+        onChange={(e) => updateField('default_template', e.target.value)}
+        placeholder={t('msca.defaultTemplatePlaceholder')}
+      />
+
+      {/* SSL Settings */}
+      <div className="flex items-center gap-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={formData.use_ssl} onChange={(e) => updateField('use_ssl', e.target.checked)} className="rounded" />
+          {t('msca.useSsl')}
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={formData.verify_ssl} onChange={(e) => updateField('verify_ssl', e.target.checked)} className="rounded" />
+          {t('msca.verifySsl')}
+        </label>
+      </div>
+
+      {!formData.verify_ssl && (
+        <Textarea
+          label={t('msca.caBundle')}
+          value={formData.ca_bundle}
+          onChange={(e) => updateField('ca_bundle', e.target.value)}
+          rows={3}
+          placeholder="-----BEGIN CERTIFICATE-----"
+          className="font-mono text-xs"
+        />
+      )}
+
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="submit">
+          {connection ? t('common.save') : t('common.create')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -1626,6 +1794,14 @@ export default function SettingsPage() {
   const [webhookTesting, setWebhookTesting] = useState(null)
   const [webhookConfirmDelete, setWebhookConfirmDelete] = useState(null)
 
+  // Microsoft CA states
+  const [mscaConnections, setMscaConnections] = useState([])
+  const [mscaLoading, setMscaLoading] = useState(false)
+  const [showMscaModal, setShowMscaModal] = useState(false)
+  const [editingMsca, setEditingMsca] = useState(null)
+  const [mscaTesting, setMscaTesting] = useState(false)
+  const [mscaConfirmDelete, setMscaConfirmDelete] = useState(null)
+
   // Encryption states
   const [encryptionStatus, setEncryptionStatus] = useState(null)
   const [showEnableEncryptionModal, setShowEnableEncryptionModal] = useState(false)
@@ -1660,6 +1836,7 @@ export default function SettingsPage() {
     loadDbStats()
     loadSsoProviders()
     loadWebhooks()
+    loadMscaConnections()
     loadEncryptionStatus()
     loadAnomalies()
     loadExpiryAlerts()
@@ -1841,6 +2018,82 @@ export default function SettingsPage() {
       showError(error.message || t('common.dnsProviderTestFailed'))
     } finally {
       setSsoTesting(false)
+    }
+  }
+
+  // Microsoft CA handlers
+  const loadMscaConnections = async () => {
+    setMscaLoading(true)
+    try {
+      const response = await mscaService.getAll()
+      setMscaConnections(response.data || [])
+    } catch (error) {
+    } finally {
+      setMscaLoading(false)
+    }
+  }
+
+  const handleMscaCreate = () => {
+    setEditingMsca(null)
+    setShowMscaModal(true)
+  }
+
+  const handleMscaEdit = (conn) => {
+    setEditingMsca(conn)
+    setShowMscaModal(true)
+  }
+
+  const handleMscaSave = async (formData) => {
+    try {
+      if (editingMsca) {
+        await mscaService.update(editingMsca.id, formData)
+        showSuccess(t('messages.success.update.settings'))
+      } else {
+        await mscaService.create(formData)
+        showSuccess(t('messages.success.create.settings'))
+      }
+      setShowMscaModal(false)
+      setEditingMsca(null)
+      loadMscaConnections()
+    } catch (error) {
+      showError(error.message)
+    }
+  }
+
+  const handleMscaDelete = async () => {
+    if (!mscaConfirmDelete) return
+    try {
+      await mscaService.delete(mscaConfirmDelete.id)
+      showSuccess(t('messages.success.delete.settings'))
+      setMscaConfirmDelete(null)
+      loadMscaConnections()
+    } catch (error) {
+      showError(error.message)
+    }
+  }
+
+  const handleMscaToggle = async (conn) => {
+    try {
+      await mscaService.update(conn.id, { enabled: !conn.enabled })
+      loadMscaConnections()
+    } catch (error) {
+      showError(error.message)
+    }
+  }
+
+  const handleMscaTest = async (conn) => {
+    setMscaTesting(true)
+    try {
+      const response = await mscaService.test(conn.id)
+      if (response.data?.success) {
+        showSuccess(t('msca.testSuccess'))
+      } else {
+        showError(response.data?.error || t('msca.testFailed'))
+      }
+    } catch (error) {
+      showError(error.message || t('msca.testFailed'))
+    } finally {
+      setMscaTesting(false)
     }
   }
 
@@ -3489,6 +3742,88 @@ export default function SettingsPage() {
           </DetailContent>
         )
 
+      case 'microsoftCA':
+        return (
+          <DetailContent>
+            <DetailHeader
+              icon={WindowsLogo}
+              title={t('msca.title')}
+              subtitle={t('msca.subtitle')}
+            />
+
+            <HelpCard variant="info" title={t('msca.helpTitle')} className="mb-4">
+              {t('msca.helpDescription')}
+            </HelpCard>
+
+            {mscaLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
+              </div>
+            ) : mscaConnections.length === 0 ? (
+              <div className="text-center py-12">
+                <WindowsLogo size={48} className="mx-auto text-text-tertiary mb-3" />
+                <p className="text-text-secondary mb-1">{t('msca.noConnections')}</p>
+                <p className="text-xs text-text-tertiary mb-4">{t('msca.noConnectionsDesc')}</p>
+                {hasPermission('admin:system') && (
+                  <Button type="button" onClick={handleMscaCreate}>
+                    <Plus size={14} /> {t('msca.addConnection')}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {hasPermission('admin:system') && (
+                  <div className="flex justify-end mb-2">
+                    <Button type="button" size="sm" onClick={handleMscaCreate}>
+                      <Plus size={14} /> {t('msca.addConnection')}
+                    </Button>
+                  </div>
+                )}
+                {mscaConnections.map(conn => (
+                  <div key={conn.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center icon-bg-indigo">
+                        <WindowsLogo size={20} weight="bold" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-text-primary">{conn.name}</span>
+                          <Badge variant={conn.enabled ? 'success' : 'secondary'} size="sm">
+                            {conn.enabled ? t('common.enabled') : t('common.disabled')}
+                          </Badge>
+                          <Badge variant="outline" size="sm">{conn.auth_method}</Badge>
+                        </div>
+                        <p className="text-xs text-text-secondary">
+                          {conn.server} {conn.ca_name ? `· ${conn.ca_name}` : ''} · {t('msca.defaultTemplate')}: {conn.default_template}
+                        </p>
+                        {conn.last_test_at && (
+                          <p className="text-xs text-text-tertiary">
+                            {t('msca.testConnection')}: {conn.last_test_result === 'success' ? '✓' : '✗'} {formatDate(conn.last_test_at)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaTest(conn)} disabled={mscaTesting} title={t('msca.testConnection')}>
+                        {mscaTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
+                      </Button>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaToggle(conn)} title={conn.enabled ? t('common.disable') : t('common.enable')}>
+                        <Power size={14} />
+                      </Button>
+                      <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaEdit(conn)} title={t('common.edit')}>
+                        <PencilSimple size={14} />
+                      </Button>
+                      <Button type="button" size="sm" variant="danger" onClick={() => setMscaConfirmDelete(conn)} title={t('common.delete')}>
+                        <Trash size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DetailContent>
+        )
+
       case 'about':
         return <AboutSection />
 
@@ -3566,6 +3901,7 @@ export default function SettingsPage() {
           { labelKey: 'settings.groups.system', tabs: ['general', 'updates', 'database', 'https', 'backup'], color: 'icon-bg-blue' },
           { labelKey: 'settings.groups.security', tabs: ['security', 'sso'], color: 'icon-bg-amber' },
           { labelKey: 'settings.groups.notifications', tabs: ['email', 'webhooks'], color: 'icon-bg-teal' },
+          { labelKey: 'settings.groups.integrations', tabs: ['microsoftCA'], color: 'icon-bg-indigo' },
           { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
           { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-sky' },
         ]}
@@ -3698,6 +4034,31 @@ export default function SettingsPage() {
         onConfirm={handleWebhookDelete}
         title={t('common.confirmDelete')}
         message={t('webhooks.deleteConfirm', { name: webhookConfirmDelete?.name })}
+        confirmText={t('common.delete')}
+        variant="danger"
+      />
+
+      {/* Microsoft CA Connection Modal */}
+      <Modal
+        open={showMscaModal}
+        onClose={() => { setShowMscaModal(false); setEditingMsca(null) }}
+        title={editingMsca ? t('msca.editConnection') : t('msca.addConnection')}
+        size="lg"
+      >
+        <MscaConnectionForm
+          connection={editingMsca}
+          onSave={handleMscaSave}
+          onCancel={() => { setShowMscaModal(false); setEditingMsca(null) }}
+        />
+      </Modal>
+
+      {/* Microsoft CA Delete Confirmation */}
+      <ConfirmModal
+        open={!!mscaConfirmDelete}
+        onClose={() => setMscaConfirmDelete(null)}
+        onConfirm={handleMscaDelete}
+        title={t('common.confirmDelete')}
+        message={t('msca.deleteConfirm')}
         confirmText={t('common.delete')}
         variant="danger"
       />
