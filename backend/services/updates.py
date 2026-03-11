@@ -92,9 +92,14 @@ def invalidate_update_cache():
     _releases_cache['ts'] = 0
 
 
-def check_for_updates(include_prereleases=False, force=False):
+def check_for_updates(include_prereleases=False, include_dev=False, force=False):
     """
     Check GitHub for available updates
+    
+    Args:
+        include_prereleases: Include alpha, beta, rc versions
+        include_dev: Include dev versions (implies include_prereleases)
+        force: Bypass cache
     
     Returns dict with:
         - update_available: bool
@@ -104,6 +109,8 @@ def check_for_updates(include_prereleases=False, force=False):
         - download_url: str
         - published_at: str
     """
+    if include_dev:
+        include_prereleases = True
     repo = get_github_repo()
     current = get_current_version()
     
@@ -145,10 +152,12 @@ def check_for_updates(include_prereleases=False, force=False):
             if release.get('prerelease'):
                 if not include_prereleases:
                     continue
-                # Only include alpha, beta, rc — skip dev and other tags
                 tag = release.get('tag_name', '').lstrip('v')
                 suffix = tag.split('-', 1)[1] if '-' in tag else ''
-                if not any(suffix.startswith(p) for p in ('alpha', 'beta', 'rc')):
+                if suffix.startswith('dev'):
+                    if not include_dev:
+                        continue
+                elif not any(suffix.startswith(p) for p in ('alpha', 'beta', 'rc')):
                     continue
             candidates.append(release)
         

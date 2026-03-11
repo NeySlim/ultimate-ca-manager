@@ -1655,7 +1655,6 @@
     "expiryCheckResult": "Check complete: {{count}} alert(s) sent",
     "theme": "Design",
     "timezone": "Zeitzone",
-    "dateFormat": "Datumsformat",
     "showTime": "Uhrzeit in Datumsangaben anzeigen",
     "dateFormats": {
       "short": "Kurz",
@@ -1754,7 +1753,12 @@
       "saveFailed": "Fehler beim Speichern der mTLS-Einstellungen"
     },
     "sessionTimeoutHelper": "Inaktivitäts-Timeout in Minuten. Sitzungen laufen nach dieser Zeit ohne Aktivität ab.",
-    "sessionDurationHelper": "Maximale Sitzungsdauer in Stunden, unabhängig von Aktivität."
+    "sessionDurationHelper": "Maximale Sitzungsdauer in Stunden, unabhängig von Aktivität.",
+    "updateChannel": "Update-Kanal",
+    "channelStable": "Nur stabile Versionen",
+    "channelPrerelease": "Vorabversionen einschließen (Alpha, Beta, RC)",
+    "channelDev": "Entwicklungsversionen (instabil)",
+    "channelDevWarning": "Entwicklungsversionen können Fehler, unvollständige Funktionen und inkompatible Änderungen enthalten. Nur zu Testzwecken verwenden. Nicht in der Produktion einsetzen."
   },
   "account": {
     "profile": "Profil",

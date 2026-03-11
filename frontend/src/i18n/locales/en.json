@@ -1656,7 +1656,6 @@
     "expiryCheckResult": "Check complete: {{count}} alert(s) sent",
     "theme": "Theme",
     "timezone": "Timezone",
-    "dateFormat": "Date Format",
     "showTime": "Show time in dates",
     "dateFormats": {
       "short": "Short",
@@ -1755,7 +1754,12 @@
       "saveFailed": "Failed to save mTLS settings"
     },
     "sessionTimeoutHelper": "Inactivity timeout in minutes. Sessions expire after this period of no activity.",
-    "sessionDurationHelper": "Maximum session duration in hours, regardless of activity."
+    "sessionDurationHelper": "Maximum session duration in hours, regardless of activity.",
+    "updateChannel": "Update channel",
+    "channelStable": "Stable releases only",
+    "channelPrerelease": "Include pre-releases (alpha, beta, rc)",
+    "channelDev": "Development versions (unstable)",
+    "channelDevWarning": "Development versions may contain bugs, incomplete features, and breaking changes. Use only for testing purposes. Do not use in production."
   },
   "account": {
     "profile": "Profile",

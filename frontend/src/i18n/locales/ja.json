@@ -1655,7 +1655,6 @@
     "expiryCheckResult": "Check complete: {{count}} alert(s) sent",
     "theme": "テーマ",
     "timezone": "タイムゾーン",
-    "dateFormat": "日付形式",
     "showTime": "日付に時刻を表示",
     "dateFormats": {
       "short": "短い",
@@ -1754,7 +1753,12 @@
       "saveFailed": "mTLS設定の保存に失敗しました"
     },
     "sessionTimeoutHelper": "非アクティブタイムアウト（分）。この期間操作がないとセッションが期限切れになります。",
-    "sessionDurationHelper": "セッションの最大持続時間（時間）。アクティビティに関係なく適用されます。"
+    "sessionDurationHelper": "セッションの最大持続時間（時間）。アクティビティに関係なく適用されます。",
+    "updateChannel": "更新チャンネル",
+    "channelStable": "安定版のみ",
+    "channelPrerelease": "プレリリースを含む（alpha、beta、rc）",
+    "channelDev": "開発版（不安定）",
+    "channelDevWarning": "開発版にはバグ、未完成の機能、互換性のない変更が含まれる場合があります。テスト目的でのみ使用してください。本番環境では使用しないでください。"
   },
   "account": {
     "profile": "プロフィール",

@@ -1655,7 +1655,6 @@
     "expiryCheckResult": "Check complete: {{count}} alert(s) sent",
     "theme": "主题",
     "timezone": "时区",
-    "dateFormat": "日期格式",
     "showTime": "在日期中显示时间",
     "dateFormats": {
       "short": "简短",
@@ -1754,7 +1753,12 @@
       "saveFailed": "保存 mTLS 设置失败"
     },
     "sessionTimeoutHelper": "不活动超时（分钟）。在此期间没有活动后，会话将过期。",
-    "sessionDurationHelper": "最大会话持续时间（小时），与活动无关。"
+    "sessionDurationHelper": "最大会话持续时间（小时），与活动无关。",
+    "updateChannel": "更新渠道",
+    "channelStable": "仅稳定版本",
+    "channelPrerelease": "包含预发布版本（alpha、beta、rc）",
+    "channelDev": "开发版本（不稳定）",
+    "channelDevWarning": "开发版本可能包含错误、未完成的功能和不兼容的更改。仅用于测试目的。请勿在生产环境中使用。"
   },
   "account": {
     "profile": "个人资料",

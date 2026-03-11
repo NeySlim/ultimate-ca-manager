@@ -1584,7 +1584,6 @@
       "eu": "Européen",
       "us": "Américain"
     },
-    "dateFormat": "Format de date",
     "theme": "Thème",
     "language": "Langue",
     "smtpPort": "Port SMTP",
@@ -1901,7 +1900,12 @@
       "saveFailed": "Échec de l'enregistrement des paramètres mTLS"
     },
     "sessionTimeoutHelper": "Délai d'inactivité en minutes. Les sessions expirent après cette période sans activité.",
-    "sessionDurationHelper": "Durée maximale de session en heures, indépendamment de l'activité."
+    "sessionDurationHelper": "Durée maximale de session en heures, indépendamment de l'activité.",
+    "updateChannel": "Canal de mise à jour",
+    "channelStable": "Versions stables uniquement",
+    "channelPrerelease": "Inclure les pré-versions (alpha, beta, rc)",
+    "channelDev": "Versions de développement (instables)",
+    "channelDevWarning": "Les versions de développement peuvent contenir des bugs, des fonctionnalités incomplètes et des changements non rétrocompatibles. À utiliser uniquement pour les tests. Ne pas utiliser en production."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

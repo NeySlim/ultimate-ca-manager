@@ -1269,8 +1269,9 @@ def check_updates():
         from services.updates import check_for_updates
         
         include_prereleases = request.args.get('include_prereleases', 'false').lower() == 'true'
+        include_dev = request.args.get('include_dev', 'false').lower() == 'true'
         force = request.args.get('force', 'false').lower() == 'true'
-        result = check_for_updates(include_prereleases=include_prereleases, force=force)
+        result = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev, force=force)
         result['can_auto_update'] = os.getenv('UCM_DOCKER') != '1'
         
         return success_response(data=result)
@@ -1292,7 +1293,8 @@ def install_update():
         
         # Get update info
         include_prereleases = request.json.get('include_prereleases', False)
-        update_info = check_for_updates(include_prereleases=include_prereleases)
+        include_dev = request.json.get('include_dev', False)
+        update_info = check_for_updates(include_prereleases=include_prereleases, include_dev=include_dev)
         
         if not update_info.get('update_available'):
             return error_response("No update available", 400)

@@ -19,6 +19,7 @@ export function UpdateChecker() {
   const [updateInfo, setUpdateInfo] = useState(null)
   const [error, setError] = useState(null)
   const [includePrereleases, setIncludePrereleases] = useState(false)
+  const [includeChannel, setIncludeChannel] = useState('stable')
   const { showSuccess, showError, showConfirm } = useNotification()
   const { reconnecting, status, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
@@ -26,7 +27,8 @@ export function UpdateChecker() {
     setChecking(true)
     setError(null)
     try {
-      const response = await apiClient.get(`/system/updates/check?include_prereleases=${includePrereleases}&force=${force}`)
+      const params = `include_prereleases=${includeChannel !== 'stable'}&include_dev=${includeChannel === 'dev'}&force=${force}`
+      const response = await apiClient.get(`/system/updates/check?${params}`)
       setUpdateInfo(response.data)
       if (showNotification) {
         if (response.data.update_available) {
@@ -58,7 +60,8 @@ export function UpdateChecker() {
     setInstalling(true)
     try {
       await apiClient.post('/system/updates/install', {
-        include_prereleases: includePrereleases
+        include_prereleases: includeChannel !== 'stable',
+        include_dev: includeChannel === 'dev'
       })
       showSuccess(`Update to v${updateInfo.latest_version} initiated...`)
       
@@ -81,7 +84,7 @@ export function UpdateChecker() {
       setUpdateInfo(null)
       checkForUpdates(false, true)
     }
-  }, [includePrereleases])
+  }, [includeChannel])
 
   if (loading) {
     return (
@@ -223,27 +226,39 @@ export function UpdateChecker() {
         </div>
       )}
       
-      {/* Options */}
-      <div className="mt-4 pt-4 border-t border-border-op50 flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={includePrereleases}
-            onChange={(e) => setIncludePrereleases(e.target.checked)}
-            className="rounded border-border"
-          />
-          <span className="text-text-secondary">{t('settings.includePreReleaseVersions')}</span>
-        </label>
+      {/* Update channel */}
+      <div className="mt-4 pt-4 border-t border-border-op50">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-text-secondary whitespace-nowrap">{t('settings.updateChannel')}</label>
+            <select
+              value={includeChannel}
+              onChange={(e) => setIncludeChannel(e.target.value)}
+              className="text-sm bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+            >
+              <option value="stable">{t('settings.channelStable')}</option>
+              <option value="prerelease">{t('settings.channelPrerelease')}</option>
+              <option value="dev">{t('settings.channelDev')}</option>
+            </select>
+          </div>
+          
+          {updateInfo?.html_url && (
+            <a
+              href={updateInfo.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-accent-primary hover:underline"
+            >
+              View on GitHub →
+            </a>
+          )}
+        </div>
         
-        {updateInfo?.html_url && (
-          <a
-            href={updateInfo.html_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-accent-primary hover:underline ml-auto"
-          >
-            View on GitHub →
-          </a>
+        {includeChannel === 'dev' && (
+          <div className="flex items-start gap-2 mt-3 p-2.5 bg-accent-warning-op15 rounded-lg text-xs text-accent-warning">
+            <Warning size={16} className="shrink-0 mt-0.5" />
+            <span>{t('settings.channelDevWarning')}</span>
+          </div>
         )}
       </div>
         </Card>
