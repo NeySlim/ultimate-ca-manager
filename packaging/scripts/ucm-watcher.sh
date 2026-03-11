@@ -29,20 +29,22 @@ if [ -f "$UPDATE_FILE" ]; then
 
     if [[ "$PACKAGE_PATH" == *.deb ]]; then
         log "Installing DEB package..."
-        if dpkg -i "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1; then
-            log "DEB package installed successfully"
-        else
-            log "ERROR: DEB installation failed, attempting fix..."
-            apt-get -f install -y >> "$LOG_FILE" 2>&1 || true
-        fi
+        # Use dpkg to install, then apt to resolve any missing dependencies
+        dpkg -i "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1 || true
+        log "Resolving dependencies..."
+        apt-get -f install -y >> "$LOG_FILE" 2>&1
+        log "DEB package installed successfully"
     elif [[ "$PACKAGE_PATH" == *.rpm ]]; then
         log "Installing RPM package..."
-        if rpm -U --force "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1; then
-            log "RPM package installed successfully"
+        # Use dnf to handle dependencies automatically, fall back to rpm
+        if command -v dnf &>/dev/null; then
+            dnf install -y "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1
+        elif command -v yum &>/dev/null; then
+            yum localinstall -y "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1
         else
-            log "ERROR: RPM installation failed"
-            exit 1
+            rpm -U --force "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1
         fi
+        log "RPM package installed successfully"
     else
         log "ERROR: Unknown package format: $PACKAGE_PATH"
         exit 1
