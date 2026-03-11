@@ -1574,9 +1574,28 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
     use_ssl: connection?.use_ssl ?? true,
     verify_ssl: connection?.verify_ssl ?? true,
     ca_bundle: connection?.ca_bundle || '',
-    default_template: connection?.default_template || 'WebServer',
+    default_template: connection?.default_template || '',
     enabled: connection?.enabled ?? true,
   })
+  const [availableTemplates, setAvailableTemplates] = useState([])
+  const [fetchingTemplates, setFetchingTemplates] = useState(false)
+
+  // Auto-fetch templates for existing connections
+  useEffect(() => {
+    if (connection?.id) {
+      setFetchingTemplates(true)
+      mscaService.getTemplates(connection.id)
+        .then(res => {
+          const tpls = res.data || []
+          setAvailableTemplates(tpls)
+          if (!formData.default_template && tpls.length > 0) {
+            setFormData(prev => ({ ...prev, default_template: tpls[0] }))
+          }
+        })
+        .catch(() => {})
+        .finally(() => setFetchingTemplates(false))
+    }
+  }, [connection?.id])
 
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -1682,12 +1701,29 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
         </>
       )}
 
-      <Input
-        label={t('msca.defaultTemplate')}
-        value={formData.default_template}
-        onChange={(e) => updateField('default_template', e.target.value)}
-        placeholder={t('msca.defaultTemplatePlaceholder')}
-      />
+      {availableTemplates.length > 0 ? (
+        <Select
+          label={t('msca.defaultTemplate')}
+          options={availableTemplates.map(tpl => ({ value: tpl, label: tpl }))}
+          value={formData.default_template}
+          onChange={(val) => updateField('default_template', val)}
+        />
+      ) : (
+        <div className="space-y-1">
+          <Input
+            label={t('msca.defaultTemplate')}
+            value={formData.default_template}
+            onChange={(e) => updateField('default_template', e.target.value)}
+            placeholder={t('msca.defaultTemplatePlaceholder')}
+          />
+          {connection?.id && !fetchingTemplates && (
+            <p className="text-xs text-text-tertiary">{t('msca.templatesFetchHint')}</p>
+          )}
+          {fetchingTemplates && (
+            <p className="text-xs text-text-tertiary">{t('msca.loadingTemplates')}</p>
+          )}
+        </div>
+      )}
 
       {/* SSL Settings */}
       <div className="flex items-center gap-4">
@@ -2086,7 +2122,13 @@ export default function SettingsPage() {
     try {
       const response = await mscaService.test(conn.id)
       if (response.data?.success) {
-        showSuccess(t('msca.testSuccess'))
+        if (response.data.warning) {
+          showWarning(t(`msca.warnings.${response.data.warning}`))
+        } else {
+          const tplCount = response.data.templates?.length || 0
+          showSuccess(t('msca.testSuccessWithTemplates', { count: tplCount }))
+        }
+        loadMscaConnections()
       } else {
         showError(response.data?.error || t('msca.testFailed'))
       }

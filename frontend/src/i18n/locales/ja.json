@@ -3108,7 +3108,13 @@
     "caBundle": "カスタムCAバンドル (PEM)",
     "testConnection": "接続テスト",
     "testSuccess": "接続成功",
+    "testSuccessWithTemplates": "接続成功 — {{count}}個のテンプレートが利用可能",
     "testFailed": "接続テスト失敗",
+    "templatesFetchHint": "接続をテストして利用可能なテンプレートを自動読み込み",
+    "warnings": {
+      "authenticated_but_no_templates": "認証OK、テンプレートなし。CAでのアカウント権限を確認してください。",
+      "authenticated_but_template_access_denied": "認証OK、テンプレート一覧へのアクセス拒否。アカウントに登録権限がない可能性があります。"
+    },
     "noConnections": "Microsoft CA接続が設定されていません",
     "noConnectionsDesc": "Microsoft AD CSで証明書に署名するための接続を追加してください",
     "deleteConfirm": "このMicrosoft CA接続を削除しますか？",
