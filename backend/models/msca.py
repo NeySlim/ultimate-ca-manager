@@ -139,7 +139,7 @@ class MSCARequest(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     msca_id = db.Column(db.Integer, db.ForeignKey('microsoft_cas.id'), nullable=False)
-    csr_id = db.Column(db.Integer, db.ForeignKey('csrs.id'))
+    csr_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
     cert_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
     request_id = db.Column(db.Integer)
     disposition_message = db.Column(db.Text)
