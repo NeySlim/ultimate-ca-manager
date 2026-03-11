@@ -3108,7 +3108,13 @@
     "caBundle": "Bundle CA personalizado (PEM)",
     "testConnection": "Probar conexión",
     "testSuccess": "Conexión exitosa",
+    "testSuccessWithTemplates": "Conexión exitosa — {{count}} plantillas disponibles",
     "testFailed": "Prueba de conexión fallida",
+    "templatesFetchHint": "Pruebe la conexión para cargar automáticamente las plantillas disponibles",
+    "warnings": {
+      "authenticated_but_no_templates": "Autenticación OK pero sin plantillas disponibles. Verifique los permisos de la cuenta en la CA.",
+      "authenticated_but_template_access_denied": "Autenticación OK pero acceso denegado al listar plantillas. La cuenta puede carecer de permisos de inscripción."
+    },
     "noConnections": "No hay conexiones Microsoft CA configuradas",
     "noConnectionsDesc": "Agregue una conexión para firmar certificados con Microsoft AD CS",
     "deleteConfirm": "¿Eliminar esta conexión Microsoft CA?",

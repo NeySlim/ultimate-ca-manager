@@ -3108,7 +3108,13 @@
     "caBundle": "Користувацький CA пакет (PEM)",
     "testConnection": "Тестувати підключення",
     "testSuccess": "Підключення успішне",
+    "testSuccessWithTemplates": "Підключення успішне — {{count}} шаблонів доступно",
     "testFailed": "Тест підключення не вдався",
+    "templatesFetchHint": "Протестуйте підключення для автоматичного завантаження доступних шаблонів",
+    "warnings": {
+      "authenticated_but_no_templates": "Автентифікація OK, але шаблони недоступні. Перевірте дозволи облікового запису на CA.",
+      "authenticated_but_template_access_denied": "Автентифікація OK, але доступ до списку шаблонів заборонено. Обліковий запис може не мати дозволів на реєстрацію."
+    },
     "noConnections": "Підключення Microsoft CA не налаштовані",
     "noConnectionsDesc": "Додайте підключення для підпису сертифікатів через Microsoft AD CS",
     "deleteConfirm": "Видалити це підключення Microsoft CA?",

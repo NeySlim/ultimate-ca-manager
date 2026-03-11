@@ -3111,7 +3111,13 @@
     "caBundle": "Custom CA Bundle (PEM)",
     "testConnection": "Test Connection",
     "testSuccess": "Connection successful",
+    "testSuccessWithTemplates": "Connection successful — {{count}} templates available",
     "testFailed": "Connection test failed",
+    "templatesFetchHint": "Test the connection to auto-load available templates",
+    "warnings": {
+      "authenticated_but_no_templates": "Authentication OK but no templates available. Check account permissions on the CA.",
+      "authenticated_but_template_access_denied": "Authentication OK but permission denied when listing templates. The account may lack enrollment permissions."
+    },
     "noConnections": "No Microsoft CA connections configured",
     "noConnectionsDesc": "Add a connection to sign certificates with Microsoft AD CS",
     "deleteConfirm": "Delete this Microsoft CA connection?",

@@ -3108,7 +3108,13 @@
     "caBundle": "Benutzerdefiniertes CA-Bundle (PEM)",
     "testConnection": "Verbindung testen",
     "testSuccess": "Verbindung erfolgreich",
+    "testSuccessWithTemplates": "Verbindung erfolgreich — {{count}} Vorlagen verfügbar",
     "testFailed": "Verbindungstest fehlgeschlagen",
+    "templatesFetchHint": "Testen Sie die Verbindung, um verfügbare Vorlagen automatisch zu laden",
+    "warnings": {
+      "authenticated_but_no_templates": "Authentifizierung OK, aber keine Vorlagen verfügbar. Überprüfen Sie die Kontoberechtigungen auf der CA.",
+      "authenticated_but_template_access_denied": "Authentifizierung OK, aber Zugriff verweigert beim Auflisten der Vorlagen. Das Konto hat möglicherweise keine Registrierungsberechtigungen."
+    },
     "noConnections": "Keine Microsoft CA-Verbindungen konfiguriert",
     "noConnectionsDesc": "Fügen Sie eine Verbindung hinzu, um Zertifikate mit Microsoft AD CS zu signieren",
     "deleteConfirm": "Diese Microsoft CA-Verbindung löschen?",

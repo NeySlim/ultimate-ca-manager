@@ -3108,7 +3108,13 @@
     "caBundle": "自定义 CA 包 (PEM)",
     "testConnection": "测试连接",
     "testSuccess": "连接成功",
+    "testSuccessWithTemplates": "连接成功 — {{count}}个模板可用",
     "testFailed": "连接测试失败",
+    "templatesFetchHint": "测试连接以自动加载可用模板",
+    "warnings": {
+      "authenticated_but_no_templates": "认证成功但没有可用模板。请检查帐户在CA上的权限。",
+      "authenticated_but_template_access_denied": "认证成功但列出模板时被拒绝访问。帐户可能缺少注册权限。"
+    },
     "noConnections": "未配置 Microsoft CA 连接",
     "noConnectionsDesc": "添加连接以通过 Microsoft AD CS 签署证书",
     "deleteConfirm": "删除此 Microsoft CA 连接？",

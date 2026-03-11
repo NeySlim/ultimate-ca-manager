@@ -3108,7 +3108,13 @@
     "caBundle": "Bundle CA personalizado (PEM)",
     "testConnection": "Testar conexão",
     "testSuccess": "Conexão bem-sucedida",
+    "testSuccessWithTemplates": "Conexão bem-sucedida — {{count}} modelos disponíveis",
     "testFailed": "Teste de conexão falhou",
+    "templatesFetchHint": "Teste a conexão para carregar automaticamente os modelos disponíveis",
+    "warnings": {
+      "authenticated_but_no_templates": "Autenticação OK mas sem modelos disponíveis. Verifique as permissões da conta na CA.",
+      "authenticated_but_template_access_denied": "Autenticação OK mas acesso negado ao listar modelos. A conta pode não ter permissões de inscrição."
+    },
     "noConnections": "Nenhuma conexão Microsoft CA configurada",
     "noConnectionsDesc": "Adicione uma conexão para assinar certificados com Microsoft AD CS",
     "deleteConfirm": "Excluir esta conexão Microsoft CA?",

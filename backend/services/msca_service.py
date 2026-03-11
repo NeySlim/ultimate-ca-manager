@@ -130,7 +130,13 @@ class MicrosoftCAService:
 
     @staticmethod
     def test_connection(msca_id: int) -> dict:
-        """Test connectivity and authentication to MS CA"""
+        """Test connectivity, authentication, and permissions to MS CA.
+        
+        Tests three levels:
+        1. Network connectivity + auth (get CA cert)
+        2. Template listing permissions
+        3. Returns available templates for default selection
+        """
         msca = MicrosoftCA.query.get(msca_id)
         if not msca:
             return {'success': False, 'error': 'Connection not found'}
@@ -138,18 +144,39 @@ class MicrosoftCAService:
         client = None
         try:
             client = MicrosoftCAService._get_client(msca)
-            # Try to get CA info - this validates auth + connectivity
+            # Level 1: connectivity + auth
             ca_cert = client.get_ca_cert()
 
+            # Level 2: template listing permissions
+            templates = []
+            permissions_ok = False
+            permission_warning = None
+            try:
+                templates = client.get_cert_templates()
+                templates = sorted(templates) if templates else []
+                permissions_ok = len(templates) > 0
+                if not permissions_ok:
+                    permission_warning = 'authenticated_but_no_templates'
+            except Exception as tpl_err:
+                permission_warning = 'authenticated_but_template_access_denied'
+                logger.warning(
+                    f"MS CA '{msca.name}': auth OK but template listing failed: {tpl_err}"
+                )
+
             msca.last_test_at = datetime.utcnow()
-            msca.last_test_result = 'success'
+            msca.last_test_result = 'success' if permissions_ok else 'partial'
             db.session.commit()
 
-            return {
+            result = {
                 'success': True,
                 'ca_name': msca.ca_name or msca.server,
                 'ca_cert_available': ca_cert is not None,
+                'templates': templates,
+                'permissions_ok': permissions_ok,
             }
+            if permission_warning:
+                result['warning'] = permission_warning
+            return result
         except Exception as e:
             logger.error(f"MS CA connection test failed for '{msca.name}': {e}")
             msca.last_test_at = datetime.utcnow()
