@@ -748,7 +748,14 @@
     "departmentPlaceholder": "Departamento IT",
     "sansList": "Nombres alternativos del sujeto",
     "certTypeForSign": "Tipo de certificado",
-    "generateFailed": "Error al generar el CSR"
+    "generateFailed": "Error al generar el CSR",
+    "rekey": "Regenerar clave",
+    "rekeyTitle": "Regenerar clave del CSR",
+    "rekeyDescription": "Generar un nuevo par de claves para \"{{cn}}\" manteniendo los mismos campos de sujeto y SANs.",
+    "rekeyAsCSR": "Nuevo CSR",
+    "rekeyAsCert": "Nuevo certificado",
+    "rekeyAsCSRDescription": "Generar un nuevo CSR con los mismos campos DN y SANs pero un nuevo par de claves.",
+    "rekeyAsCertDescription": "Emitir directamente un nuevo certificado con el mismo sujeto, firmado por una CA."
   },
   "templates": {
     "template": "Plantilla",

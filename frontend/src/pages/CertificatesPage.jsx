@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
   CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star, ArrowsLeftRight,
@@ -27,6 +27,7 @@ export default function CertificatesPage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { isMobile } = useMobile()
   const { openWindow } = useWindowManager()
   const { addToHistory } = useRecentHistory('certificates')
@@ -41,6 +42,7 @@ export default function CertificatesPage() {
   // Selection
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
+  const [issueInitialData, setIssueInitialData] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
@@ -87,6 +89,16 @@ export default function CertificatesPage() {
     window.addEventListener('ucm:data-changed', handler)
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [])
+
+  // Handle re-key prefill from CSRs page navigation
+  useEffect(() => {
+    if (location.state?.prefill && location.state?.source === 'rekey') {
+      setIssueInitialData(location.state.prefill)
+      setShowIssueModal(true)
+      // Clear navigation state to prevent re-triggering on refresh
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state])
 
   const loadData = async () => {
     try {
@@ -819,18 +831,20 @@ export default function CertificatesPage() {
       >
         <IssueCertificateForm
           cas={cas}
+          initialData={issueInitialData}
           onSubmit={async (data) => {
             try {
               muteToasts()
               await certificatesService.create(data)
               showSuccess(t('messages.success.create.certificate'))
               setShowIssueModal(false)
+              setIssueInitialData(null)
               loadData()
             } catch (error) {
               showError(error.message || t('common.operationFailed'))
             }
           }}
-          onCancel={() => setShowIssueModal(false)}
+          onCancel={() => { setShowIssueModal(false); setIssueInitialData(null) }}
           t={t}
         />
       </Modal>
@@ -907,7 +921,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
 }
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
-function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
+function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
   const [templates, setTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [showSubject, setShowSubject] = useState(false)
@@ -939,6 +953,28 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       setTemplates(Array.isArray(list) ? list : [])
     }).catch(() => {})
   }, [])
+
+  // Apply re-key initial data
+  useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        cn: initialData.cn || '',
+        organization: initialData.organization || '',
+        organizational_unit: initialData.organizational_unit || '',
+        country: initialData.country || '',
+        state: initialData.state || '',
+        locality: initialData.locality || '',
+        email: initialData.email || '',
+        key_type: initialData.key_type || 'rsa',
+        key_size: initialData.key_size || '2048',
+      }))
+      if (initialData.sans?.length > 0) {
+        setSans(initialData.sans)
+      }
+      setShowSubject(true)
+    }
+  }, [initialData])
 
   // Get selected CA's expiry for max date
   const selectedCa = useMemo(() => 

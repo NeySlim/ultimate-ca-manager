@@ -748,7 +748,14 @@
     "departmentPlaceholder": "IT部門",
     "sansList": "サブジェクト代替名",
     "certTypeForSign": "証明書タイプ",
-    "generateFailed": "CSRの生成に失敗しました"
+    "generateFailed": "CSRの生成に失敗しました",
+    "rekey": "鍵の再生成",
+    "rekeyTitle": "CSR鍵の再生成",
+    "rekeyDescription": "同じサブジェクトフィールドとSANを維持しながら、\"{{cn}}\"の新しい鍵ペアを生成します。",
+    "rekeyAsCSR": "新しいCSR",
+    "rekeyAsCert": "新しい証明書",
+    "rekeyAsCSRDescription": "同じDNフィールドとSANで、新しい鍵ペアを持つ新しいCSRを生成します。",
+    "rekeyAsCertDescription": "同じサブジェクトで、CAが署名した新しい証明書を直接発行します。"
   },
   "templates": {
     "template": "テンプレート",

@@ -748,7 +748,14 @@
     "departmentPlaceholder": "Dipartimento IT",
     "sansList": "Nomi alternativi soggetto",
     "certTypeForSign": "Tipo di certificato",
-    "generateFailed": "Generazione CSR fallita"
+    "generateFailed": "Generazione CSR fallita",
+    "rekey": "Rigenera chiave",
+    "rekeyTitle": "Rigenera chiave CSR",
+    "rekeyDescription": "Genera una nuova coppia di chiavi per \"{{cn}}\" mantenendo gli stessi campi soggetto e SAN.",
+    "rekeyAsCSR": "Nuovo CSR",
+    "rekeyAsCert": "Nuovo certificato",
+    "rekeyAsCSRDescription": "Genera un nuovo CSR con gli stessi campi DN e SAN ma una nuova coppia di chiavi.",
+    "rekeyAsCertDescription": "Emetti direttamente un nuovo certificato con lo stesso soggetto, firmato da una CA."
   },
   "templates": {
     "template": "Modello",

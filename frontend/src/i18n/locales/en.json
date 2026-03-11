@@ -748,7 +748,14 @@
     "departmentPlaceholder": "IT Department",
     "sansList": "Subject Alternative Names",
     "certTypeForSign": "Certificate Type",
-    "generateFailed": "Failed to generate CSR"
+    "generateFailed": "Failed to generate CSR",
+    "rekey": "Re-key",
+    "rekeyTitle": "Re-key CSR",
+    "rekeyDescription": "Generate a new key pair for \"{{cn}}\" while keeping the same subject fields and SANs.",
+    "rekeyAsCSR": "New CSR",
+    "rekeyAsCert": "New Certificate",
+    "rekeyAsCSRDescription": "Generate a new CSR with the same DN fields and SANs but a fresh key pair.",
+    "rekeyAsCertDescription": "Issue a new certificate directly with the same subject, signed by a CA."
   },
   "templates": {
     "template": "Template",

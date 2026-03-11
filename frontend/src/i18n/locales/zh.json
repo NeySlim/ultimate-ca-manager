@@ -748,7 +748,14 @@
     "departmentPlaceholder": "IT部门",
     "sansList": "主题备选名称",
     "certTypeForSign": "证书类型",
-    "generateFailed": "CSR生成失败"
+    "generateFailed": "CSR生成失败",
+    "rekey": "重新生成密钥",
+    "rekeyTitle": "重新生成CSR密钥",
+    "rekeyDescription": "为\"{{cn}}\"生成新的密钥对，同时保留相同的主题字段和SAN。",
+    "rekeyAsCSR": "新建CSR",
+    "rekeyAsCert": "新建证书",
+    "rekeyAsCSRDescription": "使用相同的DN字段和SAN生成新的CSR，但使用新的密钥对。",
+    "rekeyAsCertDescription": "直接颁发具有相同主题的新证书，由CA签名。"
   },
   "templates": {
     "template": "模板",

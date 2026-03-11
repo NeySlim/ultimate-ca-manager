@@ -748,7 +748,14 @@
     "departmentPlaceholder": "Departamento de TI",
     "sansList": "Nomes alternativos do sujeito",
     "certTypeForSign": "Tipo de certificado",
-    "generateFailed": "Falha ao gerar CSR"
+    "generateFailed": "Falha ao gerar CSR",
+    "rekey": "Regerar chave",
+    "rekeyTitle": "Regerar chave do CSR",
+    "rekeyDescription": "Gerar um novo par de chaves para \"{{cn}}\" mantendo os mesmos campos de assunto e SANs.",
+    "rekeyAsCSR": "Novo CSR",
+    "rekeyAsCert": "Novo certificado",
+    "rekeyAsCSRDescription": "Gerar um novo CSR com os mesmos campos DN e SANs mas um novo par de chaves.",
+    "rekeyAsCertDescription": "Emitir diretamente um novo certificado com o mesmo assunto, assinado por uma CA."
   },
   "templates": {
     "template": "Modelo",

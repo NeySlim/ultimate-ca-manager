@@ -748,7 +748,14 @@
     "departmentPlaceholder": "IT-Abteilung",
     "sansList": "Subjektalternativnamen",
     "certTypeForSign": "Zertifikatstyp",
-    "generateFailed": "CSR-Generierung fehlgeschlagen"
+    "generateFailed": "CSR-Generierung fehlgeschlagen",
+    "rekey": "Neuen Schlüssel erstellen",
+    "rekeyTitle": "CSR-Schlüssel erneuern",
+    "rekeyDescription": "Neues Schlüsselpaar für \"{{cn}}\" generieren, wobei die gleichen Subjektfelder und SANs beibehalten werden.",
+    "rekeyAsCSR": "Neuer CSR",
+    "rekeyAsCert": "Neues Zertifikat",
+    "rekeyAsCSRDescription": "Neuen CSR mit denselben DN-Feldern und SANs, aber einem neuen Schlüsselpaar generieren.",
+    "rekeyAsCertDescription": "Direkt ein neues Zertifikat mit demselben Subjekt ausstellen, von einer CA signiert."
   },
   "templates": {
     "template": "Vorlage",

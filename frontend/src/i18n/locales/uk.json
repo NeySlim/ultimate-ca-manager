@@ -748,7 +748,14 @@
     "departmentPlaceholder": "IT відділ",
     "sansList": "Альтернативні імена суб'єкта",
     "certTypeForSign": "Тип сертифіката",
-    "generateFailed": "Не вдалося згенерувати CSR"
+    "generateFailed": "Не вдалося згенерувати CSR",
+    "rekey": "Перегенерувати ключ",
+    "rekeyTitle": "Перегенерувати ключ CSR",
+    "rekeyDescription": "Створити нову пару ключів для \"{{cn}}\", зберігаючи ті самі поля суб'єкта та SAN.",
+    "rekeyAsCSR": "Новий CSR",
+    "rekeyAsCert": "Новий сертифікат",
+    "rekeyAsCSRDescription": "Створити новий CSR з тими самими полями DN та SAN, але новою парою ключів.",
+    "rekeyAsCertDescription": "Безпосередньо видати новий сертифікат з тим самим суб'єктом, підписаний CA."
   },
   "templates": {
     "template": "Шаблон",

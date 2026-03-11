@@ -2,13 +2,13 @@
  * CSRs (Certificate Signing Requests) Page - With Pending/History Tabs
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
   Clock, Key, UploadSimple, CheckCircle, Warning,
   ClockCounterClockwise, Certificate, Stamp, ClipboardText,
-  Plus, X, GlobeSimple, At
+  Plus, X, GlobeSimple, At, ArrowsClockwise
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, FileUpload, Textarea,
@@ -26,6 +26,7 @@ import { VALIDITY } from '../constants/config'
 export default function CSRsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
+  const navigate = useNavigate()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -72,6 +73,10 @@ export default function CSRsPage() {
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [keyPem, setKeyPem] = useState('')
   const [keyPassphrase, setKeyPassphrase] = useState('')
+
+  // Re-key modal
+  const [showRekeyChoice, setShowRekeyChoice] = useState(false)
+  const [rekeyCSR, setRekeyCSR] = useState(null)
 
   // Handle tab change
   const handleTabChange = (tabId) => {
@@ -262,6 +267,65 @@ export default function CSRsPage() {
     }
   }
 
+  // Re-key: extract CSR fields to pre-fill form
+  const parseSansFromCSR = (csr) => {
+    const sans = []
+    const parseSanField = (field, type) => {
+      if (!field) return
+      const arr = typeof field === 'string' ? JSON.parse(field) : field
+      if (Array.isArray(arr)) arr.forEach(v => v && sans.push({ type, value: v }))
+    }
+    parseSanField(csr.san_dns, 'DNS')
+    parseSanField(csr.san_ip, 'IP')
+    parseSanField(csr.san_email, 'Email')
+    parseSanField(csr.san_uri, 'URI')
+    return sans.length > 0 ? sans : [{ type: 'DNS', value: '' }]
+  }
+
+  const mapKeyType = (csr) => {
+    const algo = (csr.key_algorithm || '').toUpperCase()
+    const size = csr.key_size
+    if (algo === 'EC' || algo === 'ECDSA') return `EC P-${size || 256}`
+    return `RSA ${size || 2048}`
+  }
+
+  const handleRekeyAsCSR = (csr) => {
+    setGenCN(csr.common_name || csr.cn || '')
+    setGenOrg(csr.organization || '')
+    setGenOU(csr.organizational_unit || '')
+    setGenCountry(csr.country || '')
+    setGenState(csr.state || '')
+    setGenLocality(csr.locality || '')
+    setGenKeyType(mapKeyType(csr))
+    setGenSans(parseSansFromCSR(csr))
+    setShowRekeyChoice(false)
+    openModal('generate')
+  }
+
+  const handleRekeyAsCert = (csr) => {
+    const algo = (csr.key_algorithm || '').toUpperCase()
+    const size = csr.key_size
+    const prefill = {
+      cn: csr.common_name || csr.cn || '',
+      organization: csr.organization || '',
+      organizational_unit: csr.organizational_unit || '',
+      country: csr.country || '',
+      state: csr.state || '',
+      locality: csr.locality || '',
+      email: csr.email || '',
+      key_type: (algo === 'EC' || algo === 'ECDSA') ? 'ecdsa' : 'rsa',
+      key_size: String(size || 2048),
+      sans: parseSansFromCSR(csr).filter(s => s.value).map(s => ({ type: s.type.toLowerCase(), value: s.value })),
+    }
+    setShowRekeyChoice(false)
+    navigate('/certificates', { state: { prefill, source: 'rekey' } })
+  }
+
+  const handleRekey = (csr) => {
+    setRekeyCSR(csr)
+    setShowRekeyChoice(true)
+  }
+
   // Current data based on tab
   const currentData = activeTab === 'pending' ? pendingCSRs : historyCSRs
 
@@ -413,7 +477,8 @@ export default function CSRsPage() {
   const pendingRowActions = useCallback((row) => [
     { label: t('csrs.downloadCSR'), icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'csr'}.pem`) },
     ...(canWrite('csrs') ? [
-      { label: t('csrs.sign'), icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
+      { label: t('csrs.sign'), icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }},
+      { label: t('csrs.rekey'), icon: ArrowsClockwise, onClick: () => handleRekey(row) }
     ] : []),
     ...(canDelete('csrs') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
@@ -423,8 +488,11 @@ export default function CSRsPage() {
   // Row actions for history
   const historyRowActions = useCallback((row) => [
     { label: t('common.downloadCertificate'), icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'cert'}.pem`) },
-    { label: t('common.viewInCertificates'), icon: Certificate, onClick: () => window.location.href = `/certificates?id=${row.id}` }
-  ], [t])
+    { label: t('common.viewInCertificates'), icon: Certificate, onClick: () => window.location.href = `/certificates?id=${row.id}` },
+    ...(canWrite('csrs') ? [
+      { label: t('csrs.rekey'), icon: ArrowsClockwise, onClick: () => handleRekey(row) }
+    ] : [])
+  ], [canWrite, t])
 
   // Help content
   const helpContent = (
@@ -514,12 +582,14 @@ export default function CSRsPage() {
               onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.pem`)}
               onDelete={() => handleDelete(selectedCSR.id)}
               onUploadKey={() => setShowKeyModal(true)}
+              onRekey={canWrite('csrs') ? () => handleRekey(selectedCSR) : undefined}
               t={t}
             />
           ) : (
             <SignedCSRDetailsPanel 
               cert={selectedCSR}
               onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'cert'}.pem`)}
+              onRekey={canWrite('csrs') ? () => handleRekey(selectedCSR) : undefined}
               t={t}
             />
           )
@@ -886,6 +956,52 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           loadData()
         }}
       />
+
+      {/* Re-key Choice Modal */}
+      <Modal
+        open={showRekeyChoice}
+        onOpenChange={() => setShowRekeyChoice(false)}
+        title={t('csrs.rekeyTitle')}
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">
+            {t('csrs.rekeyDescription', { cn: rekeyCSR?.common_name || rekeyCSR?.cn || '' })}
+          </p>
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              type="button"
+              onClick={() => handleRekeyAsCSR(rekeyCSR)}
+              className="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-accent-primary hover:bg-accent-primary-op5 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
+                <FileText size={20} weight="duotone" />
+              </div>
+              <div>
+                <div className="font-medium text-sm text-text-primary">{t('csrs.rekeyAsCSR')}</div>
+                <div className="text-xs text-text-secondary mt-0.5">{t('csrs.rekeyAsCSRDescription')}</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRekeyAsCert(rekeyCSR)}
+              className="flex items-start gap-3 p-4 rounded-lg border border-border hover:border-accent-primary hover:bg-accent-primary-op5 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
+                <Certificate size={20} weight="duotone" />
+              </div>
+              <div>
+                <div className="font-medium text-sm text-text-primary">{t('csrs.rekeyAsCert')}</div>
+                <div className="text-xs text-text-secondary mt-0.5">{t('csrs.rekeyAsCertDescription')}</div>
+              </div>
+            </button>
+          </div>
+          <div className="flex justify-end pt-2 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => setShowRekeyChoice(false)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }
@@ -894,7 +1010,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
 // CSR DETAILS PANEL (for pending CSRs)
 // =============================================================================
 
-function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete, onUploadKey, t }) {
+function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete, onUploadKey, onRekey, t }) {
   return (
     <div className="p-3 space-y-3">
       {/* Header */}
@@ -930,6 +1046,11 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         {canWrite('csrs') && (
           <Button type="button" size="sm" onClick={onSign}>
             <SignIn size={14} /> {t('csrs.sign')}
+          </Button>
+        )}
+        {canWrite('csrs') && onRekey && (
+          <Button type="button" size="sm" variant="secondary" onClick={onRekey}>
+            <ArrowsClockwise size={14} /> {t('csrs.rekey')}
           </Button>
         )}
         {canDelete('csrs') && (
@@ -989,7 +1110,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
 // SIGNED CSR DETAILS PANEL (for history)
 // =============================================================================
 
-function SignedCSRDetailsPanel({ cert, onDownload, t }) {
+function SignedCSRDetailsPanel({ cert, onDownload, onRekey, t }) {
   const daysRemaining = cert.days_remaining || 0
   const expiryVariant = daysRemaining < 0 ? 'danger' : daysRemaining < 30 ? 'warning' : 'success'
   const isAcme = cert.source === 'acme'
@@ -1019,7 +1140,7 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       ]} />
 
       {/* Actions */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button type="button" size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
           <Download size={14} /> {t('common.download')}
         </Button>
@@ -1030,6 +1151,11 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
         >
           <Certificate size={14} /> {t('common.viewCertificate')}
         </Button>
+        {onRekey && (
+          <Button type="button" size="sm" variant="secondary" onClick={onRekey}>
+            <ArrowsClockwise size={14} /> {t('csrs.rekey')}
+          </Button>
+        )}
       </div>
 
       {/* Signing Information */}

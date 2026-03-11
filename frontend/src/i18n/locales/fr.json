@@ -1021,7 +1021,14 @@
     "departmentPlaceholder": "Département IT",
     "sansList": "Noms alternatifs du sujet",
     "certTypeForSign": "Type de certificat",
-    "generateFailed": "Échec de la génération du CSR"
+    "generateFailed": "Échec de la génération du CSR",
+    "rekey": "Recréer la clé",
+    "rekeyTitle": "Recréer la clé du CSR",
+    "rekeyDescription": "Générer une nouvelle paire de clés pour \"{{cn}}\" en conservant les mêmes champs sujet et SANs.",
+    "rekeyAsCSR": "Nouveau CSR",
+    "rekeyAsCert": "Nouveau certificat",
+    "rekeyAsCSRDescription": "Générer un nouveau CSR avec les mêmes champs DN et SANs mais une nouvelle paire de clés.",
+    "rekeyAsCertDescription": "Émettre directement un nouveau certificat avec le même sujet, signé par une CA."
   },
   "dashboard": {
     "goodMorning": "Bonjour",
