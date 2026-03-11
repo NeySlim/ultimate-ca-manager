@@ -12,7 +12,7 @@ import sys
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
-is_docker = os.path.exists('/.dockerenv')
+is_docker = os.path.exists('/.dockerenv') or os.getenv('UCM_DOCKER') == '1'
 
 # Server socket
 bind = f"0.0.0.0:{os.getenv('HTTPS_PORT', '8443')}"

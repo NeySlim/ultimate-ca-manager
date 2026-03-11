@@ -1,5 +1,6 @@
 # Multi-stage Dockerfile for Ultimate CA Manager
 # Optimized for production with security and minimal size
+# Paths aligned with DEB/RPM packages: /opt/ucm/{backend,frontend,data}
 
 # Stage 1: Builder - Install dependencies and build environment
 FROM python:3.13-slim-bookworm AS builder
@@ -12,9 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Create virtual environment (same path as DEB/RPM)
+RUN python -m venv /opt/ucm/venv
+ENV PATH="/opt/ucm/venv/bin:$PATH"
 
 # Copy only requirements first for better caching
 COPY backend/requirements.txt /tmp/requirements.txt
@@ -40,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
-RUN useradd -r -u 1000 -s /bin/false -d /app ucm && \
+RUN useradd -r -u 1000 -s /bin/false -d /opt/ucm ucm && \
     usermod -aG softhsm ucm
 
 # Prepare SoftHSM token directory
@@ -49,31 +50,30 @@ RUN mkdir -p /var/lib/softhsm/tokens && \
     chmod 1770 /var/lib/softhsm/tokens
 
 # Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/ucm/venv /opt/ucm/venv
 
-# Set working directory
-WORKDIR /app
+# Set working directory (same as DEB/RPM)
+WORKDIR /opt/ucm
 
-# Ensure /app is owned by ucm user
-RUN chown ucm:ucm /app
+# Copy application files with proper ownership (same layout as packages)
+COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
+COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
+COPY --chown=ucm:ucm frontend/ /opt/ucm/frontend/
+COPY --chown=ucm:ucm wsgi.py /opt/ucm/wsgi.py
+COPY --chown=ucm:ucm .env.docker.example /opt/ucm/.env.example
 
-# Copy application files
-# Copy application files with proper ownership
-COPY --chown=ucm:ucm VERSION /app/VERSION
-COPY --chown=ucm:ucm backend/ /app/backend/
-COPY --chown=ucm:ucm frontend/ /app/frontend/
-COPY --chown=ucm:ucm wsgi.py /app/wsgi.py
-COPY --chown=ucm:ucm .env.docker.example /app/.env.example
-
-# Create data directory at unified path (same as DEB/RPM installs)
+# Create data + log directories
 RUN mkdir -p /opt/ucm/data/{ca,certs,private,crl,scep,backups,sessions,logs,temp} && \
-    chown -R ucm:ucm /opt/ucm
+    mkdir -p /var/log/ucm && \
+    mkdir -p /etc/ucm && \
+    chown -R ucm:ucm /opt/ucm /var/log/ucm /etc/ucm
 
 # Set environment variables
-ENV PATH="/opt/venv/bin:$PATH" \
+ENV PATH="/opt/ucm/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     UCM_DOCKER=1 \
+    UCM_BASE_PATH=/opt/ucm \
     DATA_DIR=/opt/ucm/data
 
 # Expose HTTPS port
@@ -93,5 +93,5 @@ USER ucm
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command - Use Gunicorn for production
-CMD ["sh", "-c", "cd /app/backend && UCM_BASE_PATH=/app gunicorn -c gunicorn_config.py wsgi:app"]
+# Default command - Gunicorn from /opt/ucm/backend (same as packages)
+CMD ["sh", "-c", "cd /opt/ucm/backend && gunicorn -c gunicorn_config.py wsgi:app"]

@@ -1125,9 +1125,12 @@ def rotate_secrets():
         # Determine .env path based on environment
         is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
         if is_docker:
-            env_path = Path('/app/backend/.env')
+            env_path = Path('/opt/ucm/.env')
             if not env_path.exists():
+                # Fallback for older Docker images
                 env_path = Path('/app/.env')
+                if not env_path.exists():
+                    env_path = Path('/app/backend/.env')
         else:
             env_path = Path('/etc/ucm/ucm.env')
         
@@ -1410,7 +1413,7 @@ def get_service_status():
         memory_mb = round(mem_info.rss / 1024 / 1024, 1)
         
         # Check if running in Docker
-        is_docker = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
+        is_docker = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv') or os.environ.get('UCM_DOCKER') == '1'
         
         return success_response(data={
             'version': get_current_version(),

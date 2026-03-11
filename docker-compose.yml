@@ -14,7 +14,7 @@ services:
       - ucm-data:/opt/ucm/data
       
       # Optional: Custom configuration
-      # - ./.env:/app/.env.custom:ro
+      # - ./.env:/opt/ucm/.env.custom:ro
       
       # Optional: Custom HTTPS certificates
       # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro

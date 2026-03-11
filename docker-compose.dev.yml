@@ -17,8 +17,8 @@ services:
     
     # Mount source code for hot-reload
     volumes:
-      - ./backend:/app/backend:rw
-      - ./frontend:/app/frontend:rw
+      - ./backend:/opt/ucm/backend:rw
+      - ./frontend:/opt/ucm/frontend:rw
       - ucm-data:/opt/ucm/data
       
       # Don't mount these (keep container versions)
