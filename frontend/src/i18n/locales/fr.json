@@ -3149,6 +3149,7 @@
     "signLocal": "CA locale",
     "signMicrosoft": "Microsoft CA",
     "notConfigured": "Non configuré",
-    "configured": "Configuré"
+    "configured": "Configuré",
+    "kerberosOptionalNote": "Kerberos nécessite le paquet requests-kerberos (pip install requests-kerberos) et la machine doit être jointe au domaine Active Directory ou avoir un keytab Kerberos configuré."
   }
 }

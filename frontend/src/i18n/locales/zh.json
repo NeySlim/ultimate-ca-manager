@@ -3146,6 +3146,7 @@
     "signLocal": "本地 CA",
     "signMicrosoft": "Microsoft CA",
     "notConfigured": "未配置",
-    "configured": "已配置"
+    "configured": "已配置",
+    "kerberosOptionalNote": "Kerberos 需要 requests-kerberos 包（pip install requests-kerberos），且机器必须加入 Active Directory 域或配置 Kerberos keytab。"
   }
 }

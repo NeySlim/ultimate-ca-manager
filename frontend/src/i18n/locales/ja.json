@@ -3146,6 +3146,7 @@
     "signLocal": "ローカルCA",
     "signMicrosoft": "Microsoft CA",
     "notConfigured": "未設定",
-    "configured": "設定済み"
+    "configured": "設定済み",
+    "kerberosOptionalNote": "KerberosにはパッケージRequests-kerberos（pip install requests-kerberos）が必要で、マシンがActive Directoryドメインに参加しているか、Kerberos keytabが設定されている必要があります。"
   }
 }
