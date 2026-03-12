@@ -11,23 +11,30 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [2.70] - 2026-03-11
+## [2.70] - 2026-03-12
 
 ### Added
 - **Microsoft AD CS Integration** (Experimental) — Sign CSRs via Microsoft Certificate Authority through certsrv Web Enrollment. Supports client certificate (mTLS), Kerberos, and Basic Auth over HTTPS. Dynamic template loading, permission detection, pending approval tracking with auto-import
 - **Re-key from CSR** — Create new CSR/certificate from an existing CSR whose private key was lost, preserving subject and SAN fields with a fresh key pair
 - **Update Channel Selector** — Replace checkboxes with a channel selector (Stable / Pre-release / Development) in Settings, with warning banner for unstable channels
 - **Compliance Grade Sorting** — Sort certificates by compliance grade, configurable date format with time display
+- **Precompiled Wheels** — DEB/RPM packages include precompiled Python wheels for x86_64 and aarch64, eliminating compilation at install time (no compiler or dev headers needed)
 
 ### Fixed
+- **SCEP pytz Removal** — Replace deprecated `pytz.UTC` with stdlib `timezone.utc` in SCEP CertRep signing (fixes #38)
+- **MS CA Foreign Key** — Fix `msca_requests.csr_id` FK referencing non-existent `csrs` table → `certificates`
 - **Docker Path Alignment** — Align Docker container paths with DEB/RPM layout (`/app/` → `/opt/ucm/`), backward-compatible data migration for existing users
 - **OCI/Incus Container Startup** — Fix gunicorn crash in non-Docker OCI containers (Incus/LXD) by checking `UCM_DOCKER` env var alongside `/.dockerenv` (fixes #36)
 - **Update Cache Invalidation** — Force-refresh update cache when switching channels or clicking "Check Now"
 - **Package Dependency Resolution** — DEB: always run `apt-get -f install` after dpkg; RPM: use dnf/yum for automatic dependency resolution
-- **CI Build Dependencies** — Add `libkrb5-dev` for requests-kerberos/gssapi compilation in DEB builds
+- **CI Build Dependencies** — Add `libkrb5-dev` for requests-kerberos/gssapi compilation in CI builds
 - **Prerelease Filter** — Accept all non-dev prerelease formats (not just alpha/beta/rc)
 - **Docker Migration Glob Safety** — Skip glob loops on empty directories in entrypoint
 - **Code Review Fixes** — Security hardening for re-key feature (input validation, error handling)
+
+### Changed
+- **Minimum Python 3.12** — Drop Ubuntu 22.04 support, require Python 3.12+ (Ubuntu 24.04+)
+- **No compiler required** — `libkrb5-dev` removed from runtime dependencies, only `libkrb5-3` needed
 
 ---
 
