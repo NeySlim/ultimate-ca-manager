@@ -126,9 +126,6 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 ## Roadmap
 
 - [ ] **RFC 3161 Timestamp Authority (TSA)** — Code signing timestamp server ([#37](https://github.com/NeySlim/ultimate-ca-manager/issues/37))
-- [ ] **EST Protocol** (RFC 7030) — Enrollment over Secure Transport
-- [ ] **Let's Encrypt integration** — Auto-renew public certificates via ACME
-- [ ] **HSM support** — PKCS#11 hardware security module integration
 
 ## Contributing
 
