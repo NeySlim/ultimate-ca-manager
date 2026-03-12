@@ -39,8 +39,8 @@ function PreviewField({ label, value, icon: Icon, mono = false, badge = false })
 function SANPreview({ template }) {
   const sans = []
   if (template?.allow_any_cn) {
-    sans.push('DNS: example.lan.pew.pet')
-    sans.push('DNS: *.example.lan.pew.pet')
+    sans.push('DNS: server.example.com')
+    sans.push('DNS: *.example.com')
   }
   if (template?.san_types?.includes('email') || template?.san_types?.includes('rfc822Name')) {
     sans.push('Email: admin@example.com')

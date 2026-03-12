@@ -222,7 +222,7 @@ class Config:
     _fqdn = get_system_fqdn()
     if _fqdn and _fqdn not in ('localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local'):
         _cors_origins.append(f"https://{_fqdn}:{_https_port}")
-    # Also add short hostname (e.g. "pve" from "pve.lan.pew.pet")
+    # Also add short hostname (e.g. "pve" from "pve.example.com")
     _hostname = os.getenv("HOSTNAME", "") or _fqdn.split(".")[0] if _fqdn else ""
     if _hostname and _hostname not in ('localhost', '127.0.0.1') and f"https://{_hostname}:{_https_port}" not in _cors_origins:
         _cors_origins.append(f"https://{_hostname}:{_https_port}")
