@@ -177,11 +177,23 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False)
         candidates.sort(key=lambda r: parse_version(r.get('tag_name', '')), reverse=True)
         latest_release = candidates[0] if candidates else None
         
+        # Find release matching current version for its notes
+        current_release_notes = ''
+        current_published_at = ''
+        for release in releases:
+            tag = release.get('tag_name', '').lstrip('v')
+            if tag == current and not release.get('draft'):
+                current_release_notes = release.get('body', '')
+                current_published_at = release.get('published_at', '')
+                break
+        
         if not latest_release:
             return {
                 'update_available': False,
                 'current_version': current,
                 'latest_version': current,
+                'current_release_notes': current_release_notes,
+                'current_published_at': current_published_at,
                 'message': 'No applicable releases found'
             }
         
@@ -224,6 +236,8 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False)
             'current_version': current,
             'latest_version': latest_version,
             'release_notes': latest_release.get('body', ''),
+            'current_release_notes': current_release_notes,
+            'current_published_at': current_published_at,
             'download_url': download_url,
             'package_name': package_name,
             'published_at': latest_release.get('published_at'),

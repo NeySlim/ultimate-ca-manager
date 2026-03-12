@@ -1758,7 +1758,9 @@
     "channelStable": "安定版のみ",
     "channelPrerelease": "プレリリースを含む（alpha、beta、rc）",
     "channelDev": "開発版（不安定）",
-    "channelDevWarning": "開発版にはバグ、未完成の機能、互換性のない変更が含まれる場合があります。テスト目的でのみ使用してください。本番環境では使用しないでください。"
+    "channelDevWarning": "開発版にはバグ、未完成の機能、互換性のない変更が含まれる場合があります。テスト目的でのみ使用してください。本番環境では使用しないでください。",
+    "currentReleaseNotes": "リリースノート — v{{version}}",
+    "updateReleaseNotes": "v{{version}} の新機能"
   },
   "account": {
     "profile": "プロフィール",

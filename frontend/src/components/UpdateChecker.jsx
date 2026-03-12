@@ -23,6 +23,8 @@ export function UpdateChecker() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { reconnecting, status, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
+  const markdownClasses = "mt-3 p-3 bg-tertiary-op50 rounded-lg text-sm text-text-secondary max-h-64 overflow-y-auto prose prose-sm prose-invert max-w-none [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-text-primary [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-text-primary [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-text-primary [&_h3]:mt-2 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1 [&_li]:my-0.5 [&_li]:text-text-secondary [&_strong]:text-text-primary [&_strong]:font-semibold [&_code]:text-accent-primary [&_code]:bg-bg-tertiary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_p]:my-1 [&_a]:text-accent-primary [&_a]:underline [&_hr]:border-border [&_hr]:my-2"
+
   const checkForUpdates = async (showNotification = false, force = false) => {
     setChecking(true)
     setError(null)
@@ -199,27 +201,35 @@ export function UpdateChecker() {
         </div>
       </div>
       
-      {/* Release notes */}
-      {updateInfo?.update_available && updateInfo?.release_notes && (
+      {/* Release notes - current version */}
+      {updateInfo?.current_release_notes && (
         <div className="mt-4 pt-4 border-t border-border-op50">
           <details className="group">
             <summary className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer hover:text-text-primary">
               <Info size={14} />
-              {t('settings.viewReleaseNotes')}
+              {t('settings.currentReleaseNotes', { version: updateInfo.current_version })}
+              {updateInfo.current_published_at && (
+                <span className="text-xs text-text-tertiary ml-1">
+                  ({formatRelativeTime(updateInfo.current_published_at)})
+                </span>
+              )}
             </summary>
-            <div className="mt-3 p-3 bg-tertiary-op50 rounded-lg text-sm text-text-secondary max-h-64 overflow-y-auto prose prose-sm prose-invert max-w-none
-              [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-text-primary [&_h1]:mt-3 [&_h1]:mb-1
-              [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-text-primary [&_h2]:mt-3 [&_h2]:mb-1
-              [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-text-primary [&_h3]:mt-2 [&_h3]:mb-1
-              [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1
-              [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1
-              [&_li]:my-0.5 [&_li]:text-text-secondary
-              [&_strong]:text-text-primary [&_strong]:font-semibold
-              [&_code]:text-accent-primary [&_code]:bg-bg-tertiary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs
-              [&_p]:my-1
-              [&_a]:text-accent-primary [&_a]:underline
-              [&_hr]:border-border [&_hr]:my-2
-            ">
+            <div className={markdownClasses}>
+              <ReactMarkdown>{updateInfo.current_release_notes}</ReactMarkdown>
+            </div>
+          </details>
+        </div>
+      )}
+      
+      {/* Release notes - available update */}
+      {updateInfo?.update_available && updateInfo?.release_notes && (
+        <div className="mt-4 pt-4 border-t border-border-op50">
+          <details className="group" open>
+            <summary className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer hover:text-text-primary">
+              <Rocket size={14} className="text-success" />
+              {t('settings.updateReleaseNotes', { version: updateInfo.latest_version })}
+            </summary>
+            <div className={markdownClasses}>
               <ReactMarkdown>{updateInfo.release_notes}</ReactMarkdown>
             </div>
           </details>
