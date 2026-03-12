@@ -1,23 +1,43 @@
 /**
  * SessionWarning Component - Warn user before session expires
- * Shows countdown popup when session is about to expire
+ * Shows countdown popup when session is about to expire.
+ * Uses the actual backend session_timeout (from /auth/verify) instead of a hardcoded value.
+ * Before logging out, verifies with the backend that the session is truly expired.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Timer, ArrowsClockwise } from '@phosphor-icons/react'
 import { Modal, Button } from '../components'
 import { useAuth } from '../contexts'
+import { authService } from '../services'
 
-// Default session timeout from settings (30 minutes)
-const DEFAULT_SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes in ms
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
+const FALLBACK_TIMEOUT = 8 * 60 * 60 * 1000 // 8h fallback (matches backend default)
 
 export function SessionWarning() {
   const { t } = useTranslation()
-  const { user, logout } = useAuth()
+  const { user, logout, checkSession } = useAuth()
   const [showWarning, setShowWarning] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
+  const sessionTimeoutRef = useRef(FALLBACK_TIMEOUT)
+
+  // Fetch actual session timeout from backend on mount
+  useEffect(() => {
+    if (!user) return
+    const fetchTimeout = async () => {
+      try {
+        const response = await authService.getCurrentUser()
+        const data = response.data || response
+        if (data.session_timeout) {
+          sessionTimeoutRef.current = data.session_timeout * 1000 // seconds → ms
+        }
+      } catch {
+        // Keep fallback
+      }
+    }
+    fetchTimeout()
+  }, [user])
 
   // Track user activity
   useEffect(() => {
@@ -36,13 +56,13 @@ export function SessionWarning() {
     if (!user) return
 
     const checkExpiry = () => {
-      const sessionTimeout = DEFAULT_SESSION_TIMEOUT
+      const sessionTimeout = sessionTimeoutRef.current
       const timeSinceActivity = Date.now() - lastActivity
       const timeUntilExpiry = sessionTimeout - timeSinceActivity
 
       if (timeUntilExpiry <= 0) {
-        // Session expired
-        logout()
+        // Verify with backend before logging out — session may still be valid
+        handleExpired()
         return
       }
 
@@ -58,12 +78,28 @@ export function SessionWarning() {
 
     const interval = setInterval(checkExpiry, 1000)
     return () => clearInterval(interval)
-  }, [user, lastActivity, showWarning, logout])
+  }, [user, lastActivity, showWarning])
+
+  // Verify with backend before actually logging out
+  const handleExpired = useCallback(async () => {
+    try {
+      const stillValid = await checkSession()
+      if (stillValid) {
+        // Backend says session is still valid — reset timer
+        setLastActivity(Date.now())
+        setShowWarning(false)
+        return
+      }
+    } catch {
+      // Network error or truly expired
+    }
+    logout()
+  }, [checkSession, logout])
 
   const extendSession = useCallback(async () => {
     try {
-      // Make any authenticated request to refresh session
-      await fetch('/api/v2/auth/verify', { credentials: 'include' })
+      // Make authenticated request to refresh backend session
+      await authService.getCurrentUser()
       setLastActivity(Date.now())
       setShowWarning(false)
     } catch {

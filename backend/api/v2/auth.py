@@ -270,6 +270,10 @@ def verify():
     st_row = SystemConfig.query.filter_by(key='show_time').first()
     app_show_time = st_row.value != 'false' if st_row else True
     
+    # Get session timeout for frontend warning timer
+    from auth.unified import AuthManager
+    session_timeout = AuthManager._get_session_timeout()
+    
     # If authenticated
     return success_response(
         data={
@@ -286,7 +290,8 @@ def verify():
             'csrf_token': csrf_token,
             'timezone': app_timezone,
             'date_format': app_date_format,
-            'show_time': app_show_time
+            'show_time': app_show_time,
+            'session_timeout': session_timeout
         }
     )
 
