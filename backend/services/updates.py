@@ -14,6 +14,20 @@ from config.settings import Config, DATA_DIR
 
 logger = logging.getLogger('ucm.updates')
 
+# Use system CA bundle if certifi's is missing (e.g. incomplete wheel install)
+_ca_bundle = None
+try:
+    import certifi
+    if os.path.isfile(certifi.where()):
+        _ca_bundle = certifi.where()
+except (ImportError, Exception):
+    pass
+if not _ca_bundle:
+    for p in ('/etc/ssl/certs/ca-certificates.crt', '/etc/pki/tls/certs/ca-bundle.crt'):
+        if os.path.isfile(p):
+            _ca_bundle = p
+            break
+
 # GitHub repo
 REPO = "NeySlim/ultimate-ca-manager"
 
@@ -128,7 +142,7 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False)
                 headers['Authorization'] = f'token {github_token}'
             
             try:
-                response = requests.get(url, headers=headers, timeout=10)
+                response = requests.get(url, headers=headers, timeout=10, verify=_ca_bundle or True)
                 response.raise_for_status()
                 releases = response.json()
                 _releases_cache['data'] = releases
@@ -241,7 +255,7 @@ def download_update(download_url, package_name):
     
     try:
         logger.info(f"Auto-update: downloading {download_url} to {file_path}")
-        response = requests.get(download_url, stream=True, timeout=300, allow_redirects=True)
+        response = requests.get(download_url, stream=True, timeout=300, allow_redirects=True, verify=_ca_bundle or True)
         response.raise_for_status()
         
         with open(file_path, 'wb') as f:
