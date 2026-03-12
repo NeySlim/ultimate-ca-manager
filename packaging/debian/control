@@ -16,13 +16,12 @@ Vcs-Git: https://github.com/NeySlim/ultimate-ca-manager.git
 Package: ucm
 Architecture: all
 Depends: ${misc:Depends},
-         python3 (>= 3.10),
+         python3 (>= 3.12),
          python3-venv,
          openssl (>= 1.1.1),
          adduser,
          systemd,
-         libkrb5-3,
-         libkrb5-dev
+         libkrb5-3
 Recommends: softhsm2
 Suggests: ldap-utils
 Description: Ultimate CA Manager - Certificate Authority Management System

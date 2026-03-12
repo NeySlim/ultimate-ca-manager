@@ -8,10 +8,31 @@ export DH_VERBOSE=1
 	dh $@
 
 override_dh_auto_build:
-	# No build needed - pure Python app
+	# Download precompiled Python wheels for offline installation
+	# Supports x86_64 + aarch64, Python 3.12 + 3.13 (Ubuntu 24.04+, Fedora 42+)
+	mkdir -p wheels
+	for PYVER in 312 313; do \
+		python3 -m pip download -r backend/requirements.txt \
+			--only-binary=:all: \
+			--platform manylinux_2_17_x86_64 \
+			--platform manylinux_2_28_x86_64 \
+			--python-version $$PYVER \
+			--implementation cp \
+			--abi cp$$PYVER \
+			-d wheels/ || true; \
+		python3 -m pip download -r backend/requirements.txt \
+			--only-binary=:all: \
+			--platform manylinux_2_17_aarch64 \
+			--platform manylinux_2_28_aarch64 \
+			--python-version $$PYVER \
+			--implementation cp \
+			--abi cp$$PYVER \
+			-d wheels/ || true; \
+	done
+	@echo "Downloaded $$(ls wheels/ | wc -l) wheel files"
 
 override_dh_auto_clean:
-	# No clean needed
+	rm -rf wheels
 
 override_dh_auto_install:
 	
@@ -53,8 +74,10 @@ override_dh_auto_install:
 	install -m 644 packaging/firewall/ucm.xml debian/ucm/usr/lib/firewalld/services/ || true
 	install -m 644 packaging/firewall/ucm-ufw debian/ucm/etc/ufw/applications.d/ucm || true
 	
-	# Install requirements.txt
+	# Install requirements.txt and precompiled wheels
 	install -m 644 backend/requirements.txt debian/ucm/opt/ucm/requirements.txt
+	install -d debian/ucm/opt/ucm/wheels
+	cp wheels/*.whl debian/ucm/opt/ucm/wheels/ 2>/dev/null || true
 	
 	# Copy documentation
 	cp README.md debian/ucm/usr/share/doc/ucm/
