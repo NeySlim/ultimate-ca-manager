@@ -3146,6 +3146,7 @@
     "signLocal": "Локальна CA",
     "signMicrosoft": "Microsoft CA",
     "notConfigured": "Не налаштовано",
-    "configured": "Налаштовано"
+    "configured": "Налаштовано",
+    "kerberosOptionalNote": "Kerberos потребує пакет requests-kerberos (pip install requests-kerberos), а машина має бути приєднана до домену Active Directory або мати налаштований Kerberos keytab."
   }
 }

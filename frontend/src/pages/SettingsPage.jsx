@@ -1613,7 +1613,7 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
 
   const authMethods = [
     { value: 'certificate', label: t('msca.authCertificate') },
-    { value: 'kerberos', label: t('msca.authKerberos') },
+    { value: 'kerberos', label: `${t('msca.authKerberos')} (${t('common.optional')})` },
     { value: 'basic', label: t('msca.authBasic') },
   ]
 
@@ -1687,6 +1687,9 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
 
       {formData.auth_method === 'kerberos' && (
         <>
+          <div className="p-3 rounded-lg bg-warning/10 border border-warning/30 text-sm text-warning">
+            {t('msca.kerberosOptionalNote')}
+          </div>
           <Input
             label={t('msca.kerberosPrincipal')}
             value={formData.kerberos_principal}
