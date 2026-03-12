@@ -1758,7 +1758,9 @@
     "channelStable": "Solo versiones estables",
     "channelPrerelease": "Incluir pre-lanzamientos (alpha, beta, rc)",
     "channelDev": "Versiones de desarrollo (inestables)",
-    "channelDevWarning": "Las versiones de desarrollo pueden contener errores, funciones incompletas y cambios incompatibles. Usar solo para pruebas. No usar en producción."
+    "channelDevWarning": "Las versiones de desarrollo pueden contener errores, funciones incompletas y cambios incompatibles. Usar solo para pruebas. No usar en producción.",
+    "currentReleaseNotes": "Notas de versión — v{{version}}",
+    "updateReleaseNotes": "Novedades en v{{version}}"
   },
   "account": {
     "profile": "Perfil",

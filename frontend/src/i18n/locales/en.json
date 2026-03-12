@@ -1759,7 +1759,9 @@
     "channelStable": "Stable releases only",
     "channelPrerelease": "Include pre-releases (alpha, beta, rc)",
     "channelDev": "Development versions (unstable)",
-    "channelDevWarning": "Development versions may contain bugs, incomplete features, and breaking changes. Use only for testing purposes. Do not use in production."
+    "channelDevWarning": "Development versions may contain bugs, incomplete features, and breaking changes. Use only for testing purposes. Do not use in production.",
+    "currentReleaseNotes": "Release Notes — v{{version}}",
+    "updateReleaseNotes": "What's New in v{{version}}"
   },
   "account": {
     "profile": "Profile",

@@ -1758,7 +1758,9 @@
     "channelStable": "仅稳定版本",
     "channelPrerelease": "包含预发布版本（alpha、beta、rc）",
     "channelDev": "开发版本（不稳定）",
-    "channelDevWarning": "开发版本可能包含错误、未完成的功能和不兼容的更改。仅用于测试目的。请勿在生产环境中使用。"
+    "channelDevWarning": "开发版本可能包含错误、未完成的功能和不兼容的更改。仅用于测试目的。请勿在生产环境中使用。",
+    "currentReleaseNotes": "发行说明 — v{{version}}",
+    "updateReleaseNotes": "v{{version}} 新功能"
   },
   "account": {
     "profile": "个人资料",

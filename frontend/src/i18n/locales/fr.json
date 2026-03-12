@@ -1905,7 +1905,9 @@
     "channelStable": "Versions stables uniquement",
     "channelPrerelease": "Inclure les pré-versions (alpha, beta, rc)",
     "channelDev": "Versions de développement (instables)",
-    "channelDevWarning": "Les versions de développement peuvent contenir des bugs, des fonctionnalités incomplètes et des changements non rétrocompatibles. À utiliser uniquement pour les tests. Ne pas utiliser en production."
+    "channelDevWarning": "Les versions de développement peuvent contenir des bugs, des fonctionnalités incomplètes et des changements non rétrocompatibles. À utiliser uniquement pour les tests. Ne pas utiliser en production.",
+    "currentReleaseNotes": "Notes de version — v{{version}}",
+    "updateReleaseNotes": "Nouveautés de la v{{version}}"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",
