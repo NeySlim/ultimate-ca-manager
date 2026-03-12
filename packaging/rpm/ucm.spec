@@ -13,7 +13,6 @@ AutoReqProv:    no
 Requires:       python3 >= 3.12
 Requires:       systemd
 Requires:       openssl >= 1.1.1
-Requires:       krb5-libs
 Recommends:     softhsm
 Suggests:       openldap-clients
 
@@ -49,10 +48,6 @@ find %{buildroot}%{ucm_home} -name '__pycache__' -type d -exec rm -rf {} + 2>/de
 find %{buildroot}%{ucm_home} -name '*.pyc' -delete
 
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
-
-# Copy precompiled wheels for offline pip install
-install -d %{buildroot}%{ucm_home}/wheels
-cp wheels/*.whl %{buildroot}%{ucm_home}/wheels/ 2>/dev/null || true
 
 install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.sh
 install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
@@ -180,12 +175,12 @@ ENVEOF
     echo "============================================"
 fi
 
-# Create venv and install from precompiled wheels
+# Create venv and install dependencies
 echo "Creating Python virtual environment..."
 rm -rf "$UCM_HOME/venv" 2>/dev/null || true
 python3 -m venv "$UCM_HOME/venv"
 "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
-"$UCM_HOME/venv/bin/pip" install --quiet --find-links="$UCM_HOME/wheels" -r "$UCM_HOME/requirements.txt"
+"$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
 
 # Set permissions
 chown -R %{name}:%{name} $UCM_HOME

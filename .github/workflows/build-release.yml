@@ -65,7 +65,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential debhelper fakeroot devscripts dh-python python3-all libkrb5-dev
+          sudo apt-get install -y build-essential debhelper fakeroot devscripts dh-python python3-all
       
       - name: Update changelog version
         run: |
@@ -151,12 +151,6 @@ jobs:
           cp VERSION /tmp/rpm-build/ucm-${TAR_VERSION}/
           mkdir -p /tmp/rpm-build/ucm-${TAR_VERSION}/frontend
           cp -r frontend/dist /tmp/rpm-build/ucm-${TAR_VERSION}/frontend/
-          
-          # Build precompiled wheels for gssapi/kerberos (C extension)
-          sudo apt-get install -y -qq libkrb5-dev >/dev/null 2>&1
-          mkdir -p /tmp/rpm-build/ucm-${TAR_VERSION}/wheels
-          pip3 wheel --no-deps requests-kerberos gssapi -w /tmp/rpm-build/ucm-${TAR_VERSION}/wheels/ || true
-          echo "Built $(ls /tmp/rpm-build/ucm-${TAR_VERSION}/wheels/*.whl 2>/dev/null | wc -l) wheel files for RPM"
           
           # Create tarball
           tar -C /tmp/rpm-build -czf /tmp/rpm-build/ucm-${TAR_VERSION}.tar.gz ucm-${TAR_VERSION}

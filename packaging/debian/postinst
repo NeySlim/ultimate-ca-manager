@@ -203,12 +203,11 @@ ENVEOF
         
         # Always recreate venv to ensure correct dependencies
         # This handles both fresh install and upgrades
-        # Uses precompiled wheels from /opt/ucm/wheels/ (no compiler needed)
         echo "Creating/updating Python virtual environment..."
         rm -rf "$UCM_HOME/venv" 2>/dev/null || true
         python3 -m venv "$UCM_HOME/venv"
         "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
-        "$UCM_HOME/venv/bin/pip" install --quiet --find-links="$UCM_HOME/wheels" -r "$UCM_HOME/requirements.txt"
+        "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
         
         # Set permissions
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"

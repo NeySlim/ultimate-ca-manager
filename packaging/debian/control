@@ -6,8 +6,7 @@ Build-Depends: debhelper (>= 13),
                dh-python,
                python3-all,
                python3-setuptools,
-               python3-pip,
-               libkrb5-dev
+               python3-pip
 Standards-Version: 4.6.0
 Homepage: https://github.com/NeySlim/ultimate-ca-manager
 Vcs-Browser: https://github.com/NeySlim/ultimate-ca-manager
@@ -20,8 +19,7 @@ Depends: ${misc:Depends},
          python3-venv,
          openssl (>= 1.1.1),
          adduser,
-         systemd,
-         libkrb5-3
+         systemd
 Recommends: softhsm2
 Suggests: ldap-utils
 Description: Ultimate CA Manager - Certificate Authority Management System
@@ -29,8 +27,8 @@ Description: Ultimate CA Manager - Certificate Authority Management System
  management system designed for organizations that need to manage their own PKI
  infrastructure.
  .
- Python dependencies are installed in a virtual environment during setup
- using prebuilt wheels, no compiler required.
+ Python dependencies are installed in a virtual environment during setup,
+ no compiler required. Kerberos auth for MS CA is optional (pip install requests-kerberos).
  .
  Features:
   * Complete CA lifecycle management
