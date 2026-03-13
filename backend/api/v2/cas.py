@@ -31,6 +31,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
+from security.encryption import decrypt_private_key
 
 logger = logging.getLogger(__name__)
 
@@ -564,7 +565,7 @@ def export_ca(ca_id):
         if export_format == 'key':
             if not ca.prv:
                 return error_response('CA has no private key', 400)
-            key_pem = base64.b64decode(ca.prv)
+            key_pem = base64.b64decode(decrypt_private_key(ca.prv))
             if password:
                 private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
                 key_pem = private_key.private_bytes(
@@ -585,7 +586,7 @@ def export_ca(ca_id):
             
             # Include private key if requested
             if include_key and ca.prv:
-                key_pem = base64.b64decode(ca.prv)
+                key_pem = base64.b64decode(decrypt_private_key(ca.prv))
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
@@ -633,7 +634,7 @@ def export_ca(ca_id):
                 return error_response('CA has no private key for PKCS12 export', 400)
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem = base64.b64decode(ca.prv)
+            key_pem = base64.b64decode(decrypt_private_key(ca.prv))
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
             
             # Build parent CA chain if available
@@ -706,7 +707,7 @@ def export_ca(ca_id):
                 return error_response('CA has no private key for PFX export', 400)
             
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem_data = base64.b64decode(ca.prv)
+            key_pem_data = base64.b64decode(decrypt_private_key(ca.prv))
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
             
             p12_bytes = pkcs12.serialize_key_and_certificates(
