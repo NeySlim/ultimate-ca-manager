@@ -11,6 +11,26 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.72] - 2026-03-13
+
+### Added
+- **Microsoft AD CS Setup Guide** — Help panel recommends client certificate (mTLS) auth, documents all three methods with setup steps
+- **Current Version Release Notes** — Settings page shows release notes for the installed version (markdown rendered), respects update channel
+- **Session Timeout from Backend** — Frontend fetches actual session timeout from server instead of using hardcoded 30min value
+
+### Changed
+- **Kerberos Made Optional** — `requests-kerberos` removed from default requirements; users install manually if needed. Eliminates `libkrb5-dev` build dependency and cross-compilation issues
+- **Simplified Packaging** — Removed all precompiled wheels machinery from DEB/RPM/CI; smaller packages (~2MB vs ~5.6MB)
+- **Product Name Unified** — "Ultimate CA Manager" → "Ultimate Certificate Manager" everywhere
+- **Copyright Updated** — © Lionel Alarcon
+
+### Fixed
+- **False Session Expiration** — Frontend timer was 30min while backend defaults to 8h; now synced. Verifies with backend before logging out
+- **Hardcoded Domain Removed** — Replaced `pew.pet` with `example.com` in templates and config
+- **Kerberos UI Clarification** — Marked as "(Optional)" in MS CA auth dropdown with warning banner
+
+---
+
 ## [2.70] - 2026-03-12
 
 ### Added
