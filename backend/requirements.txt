@@ -1,4 +1,4 @@
-# Ultimate CA Manager - Backend Dependencies
+# Ultimate Certificate Manager - Backend Dependencies
 # Updated: 2026-02-21 - Compatible with Python 3.13
 
 # Flask Core

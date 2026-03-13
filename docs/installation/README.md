@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers all installation methods for Ultimate CA Manager.
+This guide covers all installation methods for Ultimate Certificate Manager.
 
 ## System Requirements
 

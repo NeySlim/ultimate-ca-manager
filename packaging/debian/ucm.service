@@ -1,5 +1,5 @@
 [Unit]
-Description=Ultimate CA Manager (UCM)
+Description=Ultimate Certificate Manager (UCM)
 Documentation=https://github.com/NeySlim/ultimate-ca-manager
 After=network.target
 

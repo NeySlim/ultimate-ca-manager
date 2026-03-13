@@ -125,7 +125,7 @@ configure_firewalld() {
 <?xml version="1.0" encoding="utf-8"?>
 <service>
   <short>UCM</short>
-  <description>Ultimate CA Manager - PKI Certificate Management Platform</description>
+  <description>Ultimate Certificate Manager - PKI Certificate Management Platform</description>
   <port protocol="tcp" port="$port"/>
 </service>
 EOF
@@ -157,7 +157,7 @@ configure_ufw() {
     # Install UCM application profile with correct port
     cat > /etc/ufw/applications.d/ucm << EOF
 [UCM]
-title=Ultimate CA Manager
+title=Ultimate Certificate Manager
 description=PKI Certificate Management Platform
 ports=$port/tcp
 EOF

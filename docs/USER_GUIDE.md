@@ -1,6 +1,6 @@
 # UCM User Guide
 
-Quick start guide for using Ultimate CA Manager.
+Quick start guide for using Ultimate Certificate Manager.
 
 ---
 

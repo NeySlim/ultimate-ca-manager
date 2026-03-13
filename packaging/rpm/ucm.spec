@@ -1,7 +1,7 @@
 Name:           ucm
 Version:        0.0.0
 Release:        1%{?dist}
-Summary:        Ultimate CA Manager - Complete PKI Management Platform
+Summary:        Ultimate Certificate Manager - Complete PKI Management Platform
 
 License:        BSD-3-Clause
 URL:            https://github.com/NeySlim/ultimate-ca-manager
@@ -22,7 +22,7 @@ Suggests:       openldap-clients
 %define ucm_data /opt/ucm/data
 
 %description
-Ultimate CA Manager (UCM) is a comprehensive PKI management platform.
+Ultimate Certificate Manager (UCM) is a comprehensive PKI management platform.
 
 %prep
 %setup -q

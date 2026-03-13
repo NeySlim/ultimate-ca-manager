@@ -22,7 +22,7 @@ class HTTPSManager:
         cert_path: Path,
         key_path: Path,
         common_name: Optional[str] = None,
-        organization: str = "Ultimate CA Manager",
+        organization: str = "Ultimate Certificate Manager",
         validity_days: int = 825
     ) -> Tuple[Path, Path]:
         """

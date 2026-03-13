@@ -1,5 +1,5 @@
 """
-Ultimate CA Manager - Configuration Management
+Ultimate Certificate Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
 import os
@@ -91,7 +91,7 @@ class Config:
     """Base configuration - values can be overridden by database settings"""
     
     # Application
-    APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
+    APP_NAME = os.getenv("APP_NAME", "Ultimate Certificate Manager")
     
     # Version - single source of truth: VERSION file at repo/install root
     @staticmethod

@@ -390,7 +390,7 @@ Summary:
 The full report is attached as a CSV file.
 
 --
-Ultimate CA Manager
+Ultimate Certificate Manager
             """
             
             for recipient in recipients:
@@ -424,7 +424,7 @@ Please find the attached PDF executive report with a comprehensive overview
 of your PKI infrastructure, compliance status, and recommendations.
 
 --
-Ultimate CA Manager
+Ultimate Certificate Manager
             """
             
             for recipient in recipients:

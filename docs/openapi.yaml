@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: UCM API
   description: |
-    Ultimate CA Manager API for managing PKI infrastructure.
+    Ultimate Certificate Manager API for managing PKI infrastructure.
     
     ## Authentication
     

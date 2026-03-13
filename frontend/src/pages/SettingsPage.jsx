@@ -259,7 +259,7 @@ function AboutSection() {
         <div className="p-3 bg-tertiary-50 border border-border rounded-lg">
           <p className="text-sm text-text-primary font-medium">MIT License</p>
           <p className="text-xs text-text-secondary mt-1">
-            © 2024-2026 NeySlim — {t('settings.about.licenseDesc')}
+            © 2024-2026 Lionel Alarcon — {t('settings.about.licenseDesc')}
           </p>
         </div>
       </DetailSection>
