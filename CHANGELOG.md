@@ -11,6 +11,27 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.73] - 2026-03-13
+
+### Added
+- **CertificateInput Component** — Unified cert/key input with 3 modes: paste PEM, upload file (auto-detect via SmartImport), select from managed certificates
+- **MS CA File Upload** — Client certificate for MS CA mTLS can now be uploaded or selected from managed certs (not just pasted)
+- **Converter Password Guardrails** — PKCS12 input requires password, PKCS12 output requires password; clear error messages
+
+### Changed
+- **SSL Converter Refactored** — Uses SmartParser (same engine as Smart Import) instead of duplicated parsing logic
+- **Converter UX Improved** — Password field appears when .p12/.pfx uploaded; textarea hidden for binary files; frontend validation before API call
+- **SSO CA Bundle Fields** — Replaced raw HTML textareas with Textarea component for LDAP, OAuth2, SAML CA bundles
+- **Export Modal Simplified** — Password field only shown for PKCS12 format (removed for PEM key export)
+
+### Fixed
+- **MS CA certsrv Client Params** — Fixed cert auth: `username`/`password` = cert/key paths, `cafile` = SSL CA bundle
+- **MS CA SSL Verify** — `session.verify = False` when SSL verification disabled
+- **Dashboard Chart Height** — Fixed `-1` height error with explicit container sizing
+- **CertificateInput Select Import** — Fixed import path for SelectComponent
+
+---
+
 ## [2.72] - 2026-03-13
 
 ### Added
