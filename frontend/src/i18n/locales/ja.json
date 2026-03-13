@@ -3096,7 +3096,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "Microsoft Active Directory証明書サービス接続の管理",
     "helpTitle": "Microsoft CA統合",
-    "helpDescription": "Microsoft AD CSに接続して、Windows証明機関を使用して証明書に署名します。3つの認証方法が利用可能です：\n\n• **クライアント証明書（推奨）** — 最も安全でスタンドアロン。ドメイン参加不要。MS CAでクライアント証明書を生成し、PFXでエクスポートして、証明書とキーをここにアップロードしてください。\n• **Basic認証** — HTTPS経由のシンプルなユーザー名/パスワード。ドメイン参加なしで動作。IISでcertsrvがBasic認証を受け入れるように設定してください。\n• **Kerberos（オプション）** — pip パッケージ requests-kerberos が必要で、マシンがADドメインに参加している（またはkeytabが設定されている）必要があります。他の認証方法がCAで無効な場合のみ。",
+    "helpDescription": "Microsoft AD CSに接続して、Windows証明機関を使用して証明書に署名します。3つの認証方法が利用可能です：\n\n- **クライアント証明書（推奨）** — 最も安全でスタンドアロン。ドメイン参加不要。MS CAでクライアント証明書を生成し、PFXでエクスポートして、証明書とキーをここにアップロードしてください。\n- **Basic認証** — HTTPS経由のシンプルなユーザー名/パスワード。ドメイン参加なしで動作。IISでcertsrvがBasic認証を受け入れるように設定してください。\n- **Kerberos（オプション）** — pip パッケージ requests-kerberos が必要で、マシンがADドメインに参加している（またはkeytabが設定されている）必要があります。他の認証方法がCAで無効な場合のみ。",
     "addConnection": "接続を追加",
     "editConnection": "接続を編集",
     "connectionName": "接続名",
