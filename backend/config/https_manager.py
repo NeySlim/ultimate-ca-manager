@@ -3,7 +3,7 @@ HTTPS Certificate Manager
 Auto-generates self-signed certificates and manages HTTPS configuration
 """
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Tuple, Optional
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
@@ -207,9 +207,9 @@ class HTTPSManager:
                 "subject": cert.subject.rfc4514_string(),
                 "issuer": cert.issuer.rfc4514_string(),
                 "serial_number": cert.serial_number,
-                "not_valid_before": cert.not_valid_before,
-                "not_valid_after": cert.not_valid_after,
-                "is_expired": cert.not_valid_after < datetime.utcnow(),
+                "not_valid_before": cert.not_valid_before_utc,
+                "not_valid_after": cert.not_valid_after_utc,
+                "is_expired": cert.not_valid_after_utc < datetime.now(timezone.utc),
             }
         except Exception:
             return None

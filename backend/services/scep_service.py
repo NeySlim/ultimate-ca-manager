@@ -524,8 +524,8 @@ class SCEPService:
             subject_cn=cn_value,
             issuer=cert.issuer.rfc4514_string(),
             serial_number=str(cert.serial_number),
-            valid_from=cert.not_valid_before,
-            valid_to=cert.not_valid_after,
+            valid_from=cert.not_valid_before_utc,
+            valid_to=cert.not_valid_after_utc,
             # Store extracted SANs
             san_dns=json.dumps(san_dns_list) if san_dns_list else None,
             san_ip=json.dumps(san_ip_list) if san_ip_list else None,
