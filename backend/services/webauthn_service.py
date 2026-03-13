@@ -56,7 +56,7 @@ class WebAuthnService:
     """Service for WebAuthn/FIDO2 operations"""
     
     # Configuration
-    RP_NAME = "Ultimate CA Manager"
+    RP_NAME = "Ultimate Certificate Manager"
     CHALLENGE_TIMEOUT_MINUTES = 5
     
     @staticmethod

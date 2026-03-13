@@ -623,7 +623,7 @@ class PDFReportService:
         now = data['generated_at']
         summary = (
             'This report provides a comprehensive overview of your PKI infrastructure managed by '
-            'Ultimate CA Manager. As of %s, the system manages '
+            'Ultimate Certificate Manager. As of %s, the system manages '
             '%d certificates across %d Certificate Authorities.'
         ) % (now.strftime('%B %d, %Y'), data['total_certs'], data['total_cas'])
         pdf.multi_cell(0, 5, summary)

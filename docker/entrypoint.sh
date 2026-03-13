@@ -20,7 +20,7 @@ UCM_VERSION=$(cat /opt/ucm/VERSION 2>/dev/null || echo "unknown")
 
 # Banner
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║  Ultimate CA Manager - Docker         ║${NC}"
+echo -e "${GREEN}║  Ultimate Certificate Manager - Docker         ║${NC}"
 echo -e "${GREEN}║  Version ${UCM_VERSION}$(printf '%*s' $((25 - ${#UCM_VERSION})) '')║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
@@ -328,7 +328,7 @@ prompt = no
 C = US
 ST = State
 L = City
-O = Ultimate CA Manager
+O = Ultimate Certificate Manager
 OU = IT
 CN = ${UCM_FQDN}
 

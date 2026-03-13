@@ -1,6 +1,6 @@
 # Security Documentation
 
-Ultimate CA Manager implements comprehensive security features to protect your PKI infrastructure.
+Ultimate Certificate Manager implements comprehensive security features to protect your PKI infrastructure.
 
 ## Security Features
 

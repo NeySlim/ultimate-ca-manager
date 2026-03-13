@@ -1,4 +1,4 @@
-# Ultimate CA Manager
+# Ultimate Certificate Manager
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)

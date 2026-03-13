@@ -1,6 +1,6 @@
 import json
 """
-Database Models for Ultimate CA Manager
+Database Models for Ultimate Certificate Manager
 """
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy

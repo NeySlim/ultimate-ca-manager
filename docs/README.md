@@ -1,6 +1,6 @@
 # UCM Documentation
 
-Technical documentation for Ultimate CA Manager.
+Technical documentation for Ultimate Certificate Manager.
 
 ## Guides
 

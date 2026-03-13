@@ -26,7 +26,7 @@ DEFAULT_TEMPLATE = """<!DOCTYPE html>
 <img src="data:image/png;base64,{{logo}}" alt="UCM" width="44" height="44" style="display:block;border:0;border-radius:8px;" />
 </td>
 <td style="vertical-align:middle;">
-<span style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Ultimate CA Manager</span>
+<span style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">Ultimate Certificate Manager</span>
 </td>
 </tr>
 </table>
@@ -54,7 +54,7 @@ DEFAULT_TEMPLATE = """<!DOCTYPE html>
 <tr>
 <td style="font-size:12px;color:#9ca3af;line-height:1.5;">
 Sent at {{datetime}}<br>
-<span style="color:#6b7280;">Ultimate CA Manager</span>
+<span style="color:#6b7280;">Ultimate Certificate Manager</span>
 </td>
 <td align="right" style="font-size:11px;color:#d1d5db;">
 {{instance_url}}
@@ -76,7 +76,7 @@ def get_default_template():
     return DEFAULT_TEMPLATE
 
 
-DEFAULT_TEXT_TEMPLATE = """=== Ultimate CA Manager ===
+DEFAULT_TEXT_TEMPLATE = """=== Ultimate Certificate Manager ===
 
 {{title}}
 
@@ -84,7 +84,7 @@ DEFAULT_TEXT_TEMPLATE = """=== Ultimate CA Manager ===
 
 ---
 Sent at {{datetime}}
-Ultimate CA Manager
+Ultimate Certificate Manager
 {{instance_url}}"""
 
 

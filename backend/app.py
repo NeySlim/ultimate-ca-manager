@@ -1,5 +1,5 @@
 """
-Ultimate CA Manager - Main Application
+Ultimate Certificate Manager - Main Application
 Flask application with HTTPS-only enforcement
 """
 import os

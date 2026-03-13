@@ -1,6 +1,6 @@
 # Docker Installation Guide
 
-Complete guide for installing Ultimate CA Manager using Docker.
+Complete guide for installing Ultimate Certificate Manager using Docker.
 
 ## Prerequisites
 

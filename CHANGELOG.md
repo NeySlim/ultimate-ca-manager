@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Ultimate CA Manager will be documented in this file.
+All notable changes to Ultimate Certificate Manager will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier releases used Semantic Versioning.

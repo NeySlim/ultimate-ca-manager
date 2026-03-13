@@ -224,7 +224,7 @@ def send_expiry_alert(cert: Dict[str, Any], days_left: int, recipients: List[str
             </div>
             
             <div style="padding: 16px; background: #f3f4f6; border-radius: 0 0 8px 8px; text-align: center; font-size: 0.85em; color: #6b7280;">
-                Sent by Ultimate CA Manager<br>
+                Sent by Ultimate Certificate Manager<br>
                 <em>Automated certificate expiry monitoring</em>
             </div>
         </body>
@@ -246,7 +246,7 @@ Action Required:
 Please renew or replace this certificate before it expires to avoid service disruption.
 
 ---
-Sent by Ultimate CA Manager
+Sent by Ultimate Certificate Manager
     """
     
     return EmailService.send_email(

@@ -1,6 +1,6 @@
 # UCM Admin Guide
 
-Administration and configuration guide for Ultimate CA Manager.
+Administration and configuration guide for Ultimate Certificate Manager.
 
 ---
 
