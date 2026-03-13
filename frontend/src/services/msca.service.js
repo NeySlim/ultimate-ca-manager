@@ -24,6 +24,10 @@ const mscaService = {
   test: (id) =>
     apiClient.post(`/microsoft-cas/${id}/test`),
 
+  // Test connection inline (before save)
+  testInline: (data) =>
+    apiClient.post('/microsoft-cas/test', data),
+
   // Templates
   getTemplates: (id) =>
     apiClient.get(`/microsoft-cas/${id}/templates`),

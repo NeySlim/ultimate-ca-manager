@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
@@ -1561,6 +1562,8 @@ function WebhookForm({ webhook, onSave, onCancel }) {
 
 function MscaConnectionForm({ connection, onSave, onCancel }) {
   const { t } = useTranslation()
+  const { showSuccess, showError, showWarning } = useNotification()
+  const [testing, setTesting] = useState(false)
   const [formData, setFormData] = useState({
     name: connection?.name || '',
     server: connection?.server || '',
@@ -1609,6 +1612,33 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
     if (connection && !data.password) delete data.password
     if (connection && !data.client_key_pem) delete data.client_key_pem
     onSave(data)
+  }
+
+  const handleTestConnection = async () => {
+    if (!formData.server) return
+    setTesting(true)
+    try {
+      const testData = { ...formData }
+      let response
+      if (connection?.id) {
+        response = await mscaService.test(connection.id)
+      } else {
+        response = await mscaService.testInline(testData)
+      }
+      if (response.data?.warning) {
+        showWarning(t(`msca.warnings.${response.data.warning}`))
+      } else {
+        const tplCount = response.data?.templates?.length || 0
+        showSuccess(t('msca.testSuccessWithTemplates', { count: tplCount }))
+        if (response.data?.templates?.length) {
+          setAvailableTemplates(response.data.templates)
+        }
+      }
+    } catch (error) {
+      showError(error.message || t('msca.testFailed'))
+    } finally {
+      setTesting(false)
+    }
   }
 
   const authMethods = [
@@ -1752,13 +1782,19 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
         />
       )}
 
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
+      <div className="flex justify-between gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={handleTestConnection} disabled={!formData.server || testing}>
+          <TestTube size={16} />
+          {testing ? t('common.testing') : t('msca.testConnection')}
         </Button>
-        <Button type="submit">
-          {connection ? t('common.save') : t('common.create')}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit">
+            {connection ? t('common.save') : t('common.create')}
+          </Button>
+        </div>
       </div>
     </form>
   )
@@ -3822,7 +3858,9 @@ export default function SettingsPage() {
             />
 
             <HelpCard variant="info" title={t('msca.helpTitle')} className="mb-4">
-              {t('msca.helpDescription')}
+              <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:my-1 [&>ul]:my-1 [&>ul]:pl-4">
+                <ReactMarkdown>{t('msca.helpDescription')}</ReactMarkdown>
+              </div>
             </HelpCard>
 
             {mscaLoading ? (

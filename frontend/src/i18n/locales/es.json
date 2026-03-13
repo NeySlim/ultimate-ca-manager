@@ -3096,7 +3096,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "Gestionar conexiones de Microsoft Active Directory Certificate Services",
     "helpTitle": "Integración Microsoft CA",
-    "helpDescription": "Conecte con Microsoft AD CS para firmar certificados usando su autoridad de certificación Windows. Tres métodos de autenticación disponibles:\n\n• **Certificado de cliente (recomendado)** — El más seguro e independiente. No requiere unirse al dominio. Genere un certificado de cliente en su MS CA, expórtelo como PFX y suba el certificado y la clave aquí.\n• **Auth básica** — Simple usuario/contraseña por HTTPS. Funciona sin unirse al dominio. Asegúrese de que certsrv acepte autenticación básica en IIS.\n• **Kerberos (opcional)** — Requiere el paquete pip requests-kerberos y que la máquina esté unida al dominio AD (o un keytab configurado). Solo si los otros métodos están desactivados en el CA.",
+    "helpDescription": "Conecte con Microsoft AD CS para firmar certificados usando su autoridad de certificación Windows. Tres métodos de autenticación disponibles:\n\n- **Certificado de cliente (recomendado)** — El más seguro e independiente. No requiere unirse al dominio. Genere un certificado de cliente en su MS CA, expórtelo como PFX y suba el certificado y la clave aquí.\n- **Auth básica** — Simple usuario/contraseña por HTTPS. Funciona sin unirse al dominio. Asegúrese de que certsrv acepte autenticación básica en IIS.\n- **Kerberos (opcional)** — Requiere el paquete pip requests-kerberos y que la máquina esté unida al dominio AD (o un keytab configurado). Solo si los otros métodos están desactivados en el CA.",
     "addConnection": "Agregar conexión",
     "editConnection": "Editar conexión",
     "connectionName": "Nombre de conexión",

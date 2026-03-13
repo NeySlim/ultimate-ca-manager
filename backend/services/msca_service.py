@@ -188,6 +188,55 @@ class MicrosoftCAService:
                 MicrosoftCAService._cleanup_client(client)
 
     @staticmethod
+    def test_connection_inline(data: dict) -> dict:
+        """Test connectivity using raw form data (before save).
+        Creates a temporary object to reuse _get_client."""
+        from types import SimpleNamespace
+        fake_msca = SimpleNamespace(
+            server=data.get('server', ''),
+            ca_name=data.get('ca_name', ''),
+            auth_method=data.get('auth_method', 'basic'),
+            username=data.get('username', ''),
+            password=data.get('password', ''),
+            client_cert_pem=data.get('client_cert_pem', ''),
+            client_key_pem=data.get('client_key_pem', ''),
+            kerberos_principal=data.get('kerberos_principal', ''),
+            kerberos_keytab_path=data.get('kerberos_keytab_path', ''),
+            use_ssl=data.get('use_ssl', True),
+            verify_ssl=data.get('verify_ssl', True),
+            ca_bundle=data.get('ca_bundle', ''),
+        )
+        client = None
+        try:
+            client = MicrosoftCAService._get_client(fake_msca)
+            client.get_ca_cert()
+
+            templates = []
+            permission_warning = None
+            try:
+                templates = client.get_cert_templates()
+                templates = sorted(templates) if templates else []
+                if not templates:
+                    permission_warning = 'authenticated_but_no_templates'
+            except Exception:
+                permission_warning = 'authenticated_but_template_access_denied'
+
+            result = {
+                'success': True,
+                'templates': templates,
+                'permissions_ok': len(templates) > 0,
+            }
+            if permission_warning:
+                result['warning'] = permission_warning
+            return result
+        except Exception as e:
+            logger.error(f"MS CA inline test failed: {e}")
+            return {'success': False, 'error': str(e)}
+        finally:
+            if client:
+                MicrosoftCAService._cleanup_client(client)
+
+    @staticmethod
     def list_templates(msca_id: int) -> list:
         """Fetch available certificate templates from MS CA"""
         msca = MicrosoftCA.query.get(msca_id)

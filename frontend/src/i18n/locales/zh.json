@@ -3096,7 +3096,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "管理 Microsoft Active Directory 证书服务连接",
     "helpTitle": "Microsoft CA 集成",
-    "helpDescription": "连接到 Microsoft AD CS，使用您的 Windows 证书颁发机构签发证书。三种认证方式可用：\n\n• **客户端证书（推荐）** — 最安全且独立运行。无需加入域。在 MS CA 上生成客户端证书，导出为 PFX，然后在此上传证书和密钥。\n• **Basic 认证** — 通过 HTTPS 的简单用户名/密码。无需加入域。确保 IIS 中的 certsrv 接受 Basic 认证。\n• **Kerberos（可选）** — 需要 pip 包 requests-kerberos，且机器必须加入 AD 域（或配置 keytab）。仅在 CA 上其他认证方式被禁用时使用。",
+    "helpDescription": "连接到 Microsoft AD CS，使用您的 Windows 证书颁发机构签发证书。三种认证方式可用：\n\n- **客户端证书（推荐）** — 最安全且独立运行。无需加入域。在 MS CA 上生成客户端证书，导出为 PFX，然后在此上传证书和密钥。\n- **Basic 认证** — 通过 HTTPS 的简单用户名/密码。无需加入域。确保 IIS 中的 certsrv 接受 Basic 认证。\n- **Kerberos（可选）** — 需要 pip 包 requests-kerberos，且机器必须加入 AD 域（或配置 keytab）。仅在 CA 上其他认证方式被禁用时使用。",
     "addConnection": "添加连接",
     "editConnection": "编辑连接",
     "connectionName": "连接名称",

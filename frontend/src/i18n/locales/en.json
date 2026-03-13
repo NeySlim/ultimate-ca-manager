@@ -3099,7 +3099,7 @@
     "title": "Microsoft AD CS",
     "subtitle": "Manage Microsoft Active Directory Certificate Services connections",
     "helpTitle": "Microsoft CA Integration",
-    "helpDescription": "Connect to Microsoft AD CS to sign certificates using your Windows Certificate Authority. Three authentication methods available:\n\n• **Client Certificate (recommended)** — Most secure and standalone. No domain join required. Generate a client cert on your MS CA, export as PFX, then upload the cert and key here.\n• **Basic Auth** — Simple username/password over HTTPS. Works without domain join. Ensure the certsrv web enrollment is configured to accept basic authentication in IIS.\n• **Kerberos (optional)** — Requires the requests-kerberos pip package and the machine to be joined to the AD domain (or a keytab configured). Only needed if other auth methods are disabled on the CA.",
+    "helpDescription": "Connect to Microsoft AD CS to sign certificates using your Windows Certificate Authority. Three authentication methods available:\n\n- **Client Certificate (recommended)** — Most secure and standalone. No domain join required. Generate a client cert on your MS CA, export as PFX, then upload the cert and key here.\n- **Basic Auth** — Simple username/password over HTTPS. Works without domain join. Ensure the certsrv web enrollment is configured to accept basic authentication in IIS.\n- **Kerberos (optional)** — Requires the requests-kerberos pip package and the machine to be joined to the AD domain (or a keytab configured). Only needed if other auth methods are disabled on the CA.",
     "addConnection": "Add Connection",
     "editConnection": "Edit Connection",
     "connectionName": "Connection Name",

@@ -202,6 +202,19 @@ def delete_connection(msca_id):
 
 # --- Connection Testing ---
 
+@bp.route('/test', methods=['POST'])
+@require_auth(['write:settings'])
+def test_connection_inline():
+    """Test connectivity using provided connection data (before save)"""
+    data = request.get_json()
+    if not data or not data.get('server'):
+        return error_response("Server hostname is required", 400)
+    result = MicrosoftCAService.test_connection_inline(data)
+    if result.get('success'):
+        return success_response(data=result, message="Connection successful")
+    return error_response(result.get('error', 'Connection test failed'), 400)
+
+
 @bp.route('/<int:msca_id>/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_connection(msca_id):
