@@ -6,6 +6,7 @@ Supports three authentication methods: Client Certificate (mTLS), Kerberos, Basi
 
 import base64
 import logging
+import re
 import tempfile
 import os
 from datetime import datetime
@@ -112,9 +113,9 @@ class MicrosoftCAService:
 
         except Exception:
             # Cleanup temp files on error
-            if isinstance(verify, str):
+            if isinstance(cafile, str):
                 try:
-                    os.unlink(verify)
+                    os.unlink(cafile)
                 except OSError:
                     pass
             raise
@@ -127,6 +128,37 @@ class MicrosoftCAService:
                 os.unlink(f)
             except OSError:
                 pass
+
+    @staticmethod
+    def _get_templates(client) -> list:
+        """Fetch available certificate templates by scraping certrqxt.asp.
+        
+        The certsrv library doesn't expose template listing, so we scrape
+        the Advanced Certificate Request page which has a <select> dropdown.
+        Returns list of template OID/name strings.
+        """
+        url = f"https://{client.server}/certsrv/certrqxt.asp"
+        try:
+            response = client.session.get(url, timeout=client.timeout)
+            response.raise_for_status()
+            html = response.text
+            # Parse <Option Value="TemplateName"> from the lbCertTemplateID select
+            templates = re.findall(
+                r'<Option\s+Value="([^"]+)"',
+                html,
+                re.IGNORECASE
+            )
+            # Deduplicate while preserving order
+            seen = set()
+            unique = []
+            for t in templates:
+                if t not in seen:
+                    seen.add(t)
+                    unique.append(t)
+            return unique
+        except Exception as e:
+            logger.warning(f"Failed to scrape templates from certrqxt.asp: {e}")
+            raise
 
     @staticmethod
     def test_connection(msca_id: int) -> dict:
@@ -152,7 +184,7 @@ class MicrosoftCAService:
             permissions_ok = False
             permission_warning = None
             try:
-                templates = client.get_cert_templates()
+                templates = MicrosoftCAService._get_templates(client)
                 templates = sorted(templates) if templates else []
                 permissions_ok = len(templates) > 0
                 if not permissions_ok:
@@ -214,7 +246,7 @@ class MicrosoftCAService:
             templates = []
             permission_warning = None
             try:
-                templates = client.get_cert_templates()
+                templates = MicrosoftCAService._get_templates(client)
                 templates = sorted(templates) if templates else []
                 if not templates:
                     permission_warning = 'authenticated_but_no_templates'
@@ -246,7 +278,7 @@ class MicrosoftCAService:
         client = None
         try:
             client = MicrosoftCAService._get_client(msca)
-            templates = client.get_cert_templates()
+            templates = MicrosoftCAService._get_templates(client)
             return sorted(templates) if templates else []
         except Exception as e:
             logger.error(f"Failed to list templates for '{msca.name}': {e}")

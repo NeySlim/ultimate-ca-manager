@@ -675,8 +675,8 @@ class TrustStoreService:
             'subject': cert.subject.rfc4514_string(),
             'issuer': cert.issuer.rfc4514_string(),
             'serial_number': str(cert.serial_number),
-            'not_valid_before': cert.not_valid_before,
-            'not_valid_after': cert.not_valid_after,
+            'not_valid_before': cert.not_valid_before_utc,
+            'not_valid_after': cert.not_valid_after_utc,
             'is_ca': False,  # Will be updated if extension found
             'key_usage': [],
             'extended_key_usage': [],
@@ -810,8 +810,8 @@ class TrustStoreService:
             'subject': {},
             'issuer': {},
             'validity': {
-                'not_before': cert.not_valid_before.isoformat(),
-                'not_after': cert.not_valid_after.isoformat()
+                'not_before': cert.not_valid_before_utc.isoformat(),
+                'not_after': cert.not_valid_after_utc.isoformat()
             },
             'extensions': {},
             'public_key': {}
