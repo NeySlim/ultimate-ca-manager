@@ -26,17 +26,16 @@ class MicrosoftCAService:
         import certsrv
 
         server = msca.server
-        ca_name = msca.ca_name or ''
 
-        # SSL verification
-        verify = True
+        # SSL verification — certsrv uses `cafile` param for CA bundle
+        cafile = None
         if not msca.verify_ssl:
-            verify = False
+            cafile = None  # Will disable below via session.verify
         elif msca.ca_bundle:
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pem', mode='w')
             tmp.write(msca.ca_bundle)
             tmp.close()
-            verify = tmp.name
+            cafile = tmp.name
 
         try:
             if msca.auth_method == 'certificate':
@@ -52,14 +51,14 @@ class MicrosoftCAService:
                 key_file.write(msca.client_key_pem or '')
                 key_file.close()
 
+                # certsrv cert auth: username=cert_path, password=key_path
                 client = certsrv.Certsrv(
                     server=server,
-                    cafile=ca_name,
+                    username=cert_file.name,
+                    password=key_file.name,
                     auth_method='cert',
-                    cert=(cert_file.name, key_file.name),
-                    verify=verify,
+                    cafile=cafile,
                 )
-                # Store temp file paths for cleanup
                 client._temp_files = [cert_file.name, key_file.name]
 
             elif msca.auth_method == 'kerberos':
@@ -78,13 +77,11 @@ class MicrosoftCAService:
 
                 client = certsrv.Certsrv(
                     server=server,
-                    cafile=ca_name,
-                    auth_method='ntlm',  # certsrv uses NTLM/Negotiate wrapper
                     username='',
                     password='',
-                    verify=verify,
+                    auth_method='ntlm',
+                    cafile=cafile,
                 )
-                # Override auth with Kerberos
                 client.session.auth = HTTPKerberosAuth(
                     mutual_authentication=OPTIONAL
                 )
@@ -93,20 +90,23 @@ class MicrosoftCAService:
             elif msca.auth_method == 'basic':
                 client = certsrv.Certsrv(
                     server=server,
-                    cafile=ca_name,
-                    auth_method='basic',
                     username=msca.username or '',
                     password=msca.password or '',
-                    verify=verify,
+                    auth_method='basic',
+                    cafile=cafile,
                 )
                 client._temp_files = []
 
             else:
                 raise ValueError(f"Unsupported auth method: {msca.auth_method}")
 
-            # Add CA bundle temp file for cleanup
-            if isinstance(verify, str) and verify != True:
-                client._temp_files.append(verify)
+            # Disable SSL verification if requested
+            if not msca.verify_ssl:
+                client.session.verify = False
+
+            # Track CA bundle temp file for cleanup
+            if cafile:
+                client._temp_files.append(cafile)
 
             return client
 
