@@ -144,7 +144,7 @@ export function CertificateInput({
     if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0])
   }, [handleFile])
 
-  // Select managed cert
+  // Select managed cert — get cert PEM from detail, key PEM from export
   const handleSelectManaged = async (certId) => {
     if (!certId) {
       onChange({ cert_pem: '', key_pem: '' })
@@ -153,21 +153,20 @@ export function CertificateInput({
     try {
       const resp = await certificatesService.getById(certId)
       const cert = resp.data || resp
-      // Get PEM from the cert - might need export
-      let certPem = ''
+      const certPem = cert.pem || ''
+
+      // Try to get private key via export endpoint
       let keyPem = ''
-
-      if (cert.pem) {
-        certPem = cert.pem
-      } else if (cert.crt) {
-        certPem = atob(cert.crt)
+      if (cert.has_private_key) {
+        try {
+          const blob = await certificatesService.export(certId, 'key')
+          keyPem = await blob.text()
+        } catch {
+          // No permission or export failed — that's OK
+        }
       }
 
-      if (cert.prv) {
-        keyPem = atob(cert.prv)
-      }
-
-      onChange({ cert_pem: certPem, key_pem: keyPem })
+      onChange({ cert_pem: certPem.trim(), key_pem: keyPem.trim() })
     } catch {
       onChange({ cert_pem: '', key_pem: '' })
     }
