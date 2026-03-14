@@ -819,7 +819,7 @@ export default function LoginPage() {
               {/* Language dropdown */}
               {langMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setLangMenuOpen(false)} />
+                  <div className="fixed inset-0 z-40" role="presentation" onClick={() => setLangMenuOpen(false)} />
                   <div className="absolute bottom-full mb-2 left-0 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[140px]">
                     {languages.map((lang) => (
                       <button
@@ -857,7 +857,7 @@ export default function LoginPage() {
               {/* Theme dropdown */}
               {themeMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setThemeMenuOpen(false)} />
+                  <div className="fixed inset-0 z-40" role="presentation" onClick={() => setThemeMenuOpen(false)} />
                   <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[160px]">
                     {/* Color Themes */}
                     <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.color')}</div>

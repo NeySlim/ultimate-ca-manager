@@ -586,7 +586,7 @@ export default function DashboardPage() {
                   <div style={{ height: 200 }}>
                     <StatusPieChart 
                       data={{
-                        valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)),
+                        valid: stats?.valid ?? Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)),
                         expiring: stats?.expiring_soon || 0,
                         expired: stats?.expired || 0,
                         revoked: stats?.revoked || 0,
@@ -1023,7 +1023,7 @@ export default function DashboardPage() {
               <Card.Header icon={Certificate} iconColor="violet" title={t('dashboard.statusDistribution')} compact />
               <Card.Body className="!pt-0 !pb-0 !px-2">
                 <div style={{ height: 200 }}>
-                  <StatusPieChart data={{ valid: Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: stats?.expired || 0, revoked: stats?.revoked || 0 }} />
+                  <StatusPieChart data={{ valid: stats?.valid ?? Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: stats?.expired || 0, revoked: stats?.revoked || 0 }} />
                 </div>
               </Card.Body>
             </Card>

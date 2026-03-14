@@ -107,9 +107,12 @@ def get_dashboard_stats():
     except Exception:
         logger.debug("Pending CSRs query failed")
     
+    valid = max(0, total_certs - expired - revoked)
+
     return success_response(data={
         'total_cas': total_cas,
         'total_certificates': total_certs,
+        'valid': valid,
         'expiring_soon': expiring_soon,
         'expired': expired,
         'revoked': revoked,
