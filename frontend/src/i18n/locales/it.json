@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "Password dimenticata?",
     "forgotPasswordDesc": "Inserisci la tua email e ti invieremo un link per reimpostare.",
     "checkYourEmail": "Controlla la tua email",
-    "checkEmailDesc": "Se esiste un account con <strong>{{email}}</strong>, riceverai un link per reimpostare a breve.",
     "checkEmailHint": "Non hai ricevuto l'email? Controlla la cartella spam o riprova.",
     "tryAnotherEmail": "Prova un'altra email",
     "backToLogin": "Torna al login",
@@ -513,7 +512,9 @@
     "invalidResetLink": "Link non valido. Richiedine uno nuovo.",
     "passwordMinLength": "La password deve avere almeno 8 caratteri",
     "resetFailed": "Reimpostazione fallita. Il link potrebbe essere scaduto.",
-    "resetting": "Reimpostazione..."
+    "resetting": "Reimpostazione...",
+    "checkEmailDescBefore": "Se esiste un account con",
+    "checkEmailDescAfter": ", riceverai un link per reimpostare a breve."
   },
   "dashboard": {
     "goodMorning": "Buongiorno",

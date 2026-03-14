@@ -18,7 +18,6 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService } from '../services'
-import { apiClient } from '../services/apiClient'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -263,7 +262,7 @@ export default function UsersGroupsPage() {
 
   const loadUserMtlsCerts = useCallback(async (userId) => {
     try {
-      const response = await apiClient.get(`/users/${userId}/mtls/certificates`)
+      const response = await usersService.getMtlsCertificates(userId)
       setUserMtlsCerts(response.data || [])
     } catch {
       setUserMtlsCerts([])
@@ -310,7 +309,7 @@ export default function UsersGroupsPage() {
     if (!selectedUser) return
     setMtlsCreating(true)
     try {
-      const response = await apiClient.post(`/users/${selectedUser.id}/mtls/certificates`, {
+      const response = await usersService.createMtlsCertificate(selectedUser.id, {
         mode: 'generate',
         name: mtlsForm.name || undefined,
         ca_id: mtlsForm.ca_id || undefined,
@@ -330,7 +329,7 @@ export default function UsersGroupsPage() {
     if (!selectedUser || !mtlsImportForm.pem.trim()) return
     setMtlsCreating(true)
     try {
-      await apiClient.post(`/users/${selectedUser.id}/mtls/certificates`, {
+      await usersService.createMtlsCertificate(selectedUser.id, {
         mode: 'import',
         pem: mtlsImportForm.pem,
         name: mtlsImportForm.name,
@@ -354,7 +353,7 @@ export default function UsersGroupsPage() {
     })
     if (!confirmed) return
     try {
-      await apiClient.delete(`/users/${selectedUser.id}/mtls/certificates/${certId}`)
+      await usersService.deleteMtlsCertificate(selectedUser.id, certId)
       showSuccess(t('users.mtls.deleted'))
       loadUserMtlsCerts(selectedUser.id)
     } catch (error) {
@@ -388,7 +387,7 @@ export default function UsersGroupsPage() {
     if (!selectedUser || !selectedAssignCert) return
     setMtlsCreating(true)
     try {
-      await apiClient.post('/mtls/assign', {
+      await usersService.assignMtlsCertificate({
         cert_id: selectedAssignCert.id,
         user_id: selectedUser.id,
         name: selectedAssignCert.name,
@@ -1168,7 +1167,7 @@ function UserForm({ user, onSubmit, onCancel }) {
   const [customRoles, setCustomRoles] = useState([])
 
   useEffect(() => {
-    apiClient.get('/rbac/roles').then(res => {
+    rolesService.listRoles().then(res => {
       setCustomRoles((res.data || []).filter(r => !r.is_system))
     }).catch(() => {})
   }, [])

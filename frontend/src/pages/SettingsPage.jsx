@@ -35,7 +35,6 @@ import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
 import EmailTemplateWindow from '../components/EmailTemplateWindow'
-import { apiClient } from '../services/apiClient'
 import { getAppTimezone, setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 
@@ -1943,7 +1942,7 @@ export default function SettingsPage() {
 
   const loadExpiryAlerts = async () => {
     try {
-      const res = await apiClient.get('/system/alerts/expiry')
+      const res = await settingsService.getExpiryAlerts()
       setExpiryAlerts(res.data || res)
     } catch (e) {}
   }
@@ -1951,7 +1950,7 @@ export default function SettingsPage() {
   const saveExpiryAlerts = async () => {
     setSaving(true)
     try {
-      await apiClient.put('/system/alerts/expiry', expiryAlerts)
+      await settingsService.updateExpiryAlerts(expiryAlerts)
       showSuccess(t('common.saved'))
     } catch (e) {
       showError(e.message || t('common.saveFailed'))
@@ -1962,7 +1961,7 @@ export default function SettingsPage() {
 
   const triggerExpiryCheck = async () => {
     try {
-      const res = await apiClient.post('/system/alerts/expiry/check')
+      const res = await settingsService.checkExpiryAlerts()
       const data = res.data || res
       showSuccess(t('settings.expiryCheckResult', { count: data.alerts_sent || 0 }))
     } catch (e) {
@@ -2173,7 +2172,7 @@ export default function SettingsPage() {
   const loadWebhooks = async () => {
     setWebhooksLoading(true)
     try {
-      const response = await apiClient.get('/webhooks')
+      const response = await settingsService.getWebhooks()
       setWebhooks(response.data || [])
     } catch (error) {
     } finally {
@@ -2194,10 +2193,10 @@ export default function SettingsPage() {
   const handleWebhookSave = async (formData) => {
     try {
       if (editingWebhook) {
-        await apiClient.put(`/webhooks/${editingWebhook.id}`, formData)
+        await settingsService.updateWebhook(editingWebhook.id, formData)
         showSuccess(t('webhooks.updateSuccess'))
       } else {
-        await apiClient.post('/webhooks', formData)
+        await settingsService.createWebhook(formData)
         showSuccess(t('webhooks.createSuccess'))
       }
       setShowWebhookModal(false)
@@ -2210,7 +2209,7 @@ export default function SettingsPage() {
   const handleWebhookDelete = async () => {
     if (!webhookConfirmDelete) return
     try {
-      await apiClient.delete(`/webhooks/${webhookConfirmDelete.id}`)
+      await settingsService.deleteWebhook(webhookConfirmDelete.id)
       showSuccess(t('webhooks.deleteSuccess'))
       loadWebhooks()
     } catch (error) {
@@ -2222,7 +2221,7 @@ export default function SettingsPage() {
 
   const handleWebhookToggle = async (webhook) => {
     try {
-      await apiClient.post(`/webhooks/${webhook.id}/toggle`)
+      await settingsService.toggleWebhook(webhook.id)
       showSuccess(t('webhooks.toggleSuccess', { action: webhook.enabled ? t('common.disabled').toLowerCase() : t('common.enabled').toLowerCase() }))
       loadWebhooks()
     } catch (error) {
@@ -2233,7 +2232,7 @@ export default function SettingsPage() {
   const handleWebhookTest = async (webhook) => {
     setWebhookTesting(webhook.id)
     try {
-      await apiClient.post(`/webhooks/${webhook.id}/test`)
+      await settingsService.testWebhook(webhook.id)
       showSuccess(t('webhooks.testSuccess'))
     } catch (error) {
       showError(error.message || t('webhooks.testFailed'))
@@ -2258,7 +2257,7 @@ export default function SettingsPage() {
   // Encryption management
   const loadEncryptionStatus = async () => {
     try {
-      const response = await apiClient.get('/system/security/encryption-status')
+      const response = await settingsService.getEncryptionStatus()
       setEncryptionStatus(response.data)
     } catch (error) {
     }
@@ -2267,7 +2266,7 @@ export default function SettingsPage() {
   const handleEnableEncryption = async () => {
     setEncryptionLoading(true)
     try {
-      await apiClient.post('/system/security/enable-encryption')
+      await settingsService.enableEncryption()
       showSuccess(t('settings.encryptionEnabled'))
       setShowEnableEncryptionModal(false)
       setEncryptionConfirmText('')
@@ -2283,7 +2282,7 @@ export default function SettingsPage() {
   const handleDisableEncryption = async () => {
     setEncryptionLoading(true)
     try {
-      await apiClient.post('/system/security/disable-encryption')
+      await settingsService.disableEncryption()
       showSuccess(t('settings.encryptionDisabled'))
       setShowDisableEncryptionModal(false)
       await loadEncryptionStatus()
@@ -2298,7 +2297,7 @@ export default function SettingsPage() {
   const loadAnomalies = async () => {
     setAnomaliesLoading(true)
     try {
-      const response = await apiClient.get('/system/security/anomalies')
+      const response = await settingsService.getSecurityAnomalies()
       setAnomalies(response.data?.anomalies || response.anomalies || [])
     } catch (error) {
     } finally {
@@ -2309,7 +2308,7 @@ export default function SettingsPage() {
   // Syslog config
   const loadSyslogConfig = async () => {
     try {
-      const response = await apiClient.get('/system/audit/syslog')
+      const response = await settingsService.getSyslogConfig()
       setSyslogConfig(response.data || response)
     } catch (error) {
     }
@@ -2318,7 +2317,7 @@ export default function SettingsPage() {
   const handleSaveSyslog = async () => {
     setSyslogSaving(true)
     try {
-      await apiClient.put('/system/audit/syslog', syslogConfig)
+      await settingsService.updateSyslogConfig(syslogConfig)
       showSuccess(t('settings.syslogSaved'))
     } catch (error) {
       showError(error.message || t('settings.syslogSaveFailed'))
@@ -2330,7 +2329,7 @@ export default function SettingsPage() {
   const handleTestSyslog = async () => {
     setSyslogTesting(true)
     try {
-      const response = await apiClient.post('/system/audit/syslog/test')
+      const response = await settingsService.testSyslog()
       showSuccess(response.message || t('settings.syslogTestSuccess'))
     } catch (error) {
       showError(error.message || t('settings.syslogTestFailed'))

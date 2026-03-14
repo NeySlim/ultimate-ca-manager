@@ -17,7 +17,7 @@ import {
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { useNotification, useMobile } from '../contexts'
 import { useModals } from '../hooks'
-import { apiClient } from '../services/apiClient'
+import { rolesService } from '../services'
 // Permission categories for RBAC - aligned with backend
 const PERMISSION_CATEGORIES = {
   certificates: {
@@ -104,7 +104,7 @@ export default function RBACPage() {
   const loadRoles = async () => {
     setLoading(true)
     try {
-      const res = await apiClient.get('/rbac/roles')
+      const res = await rolesService.listRoles()
       setRoles(res.data || [])
     } catch (error) {
       showError(t('messages.errors.loadFailed.roles'))
@@ -115,7 +115,7 @@ export default function RBACPage() {
 
   const handleCreate = async () => {
     try {
-      await apiClient.post('/rbac/roles', formData)
+      await rolesService.createRole(formData)
       showSuccess(t('messages.success.create.role'))
       closeModal('create')
       loadRoles()
@@ -128,7 +128,7 @@ export default function RBACPage() {
   const handleUpdate = async () => {
     if (!selectedRole || selectedRole.is_system) return
     try {
-      await apiClient.put(`/rbac/roles/${selectedRole.id}`, {
+      await rolesService.updateRole(selectedRole.id, {
         ...selectedRole,
         permissions: selectedRole.permissions
       })
@@ -147,7 +147,7 @@ export default function RBACPage() {
     const confirmed = await showConfirm(t('messages.confirm.rbac.deleteRole', { name: role.name }), { variant: 'danger', confirmText: t('common.delete') })
     if (!confirmed) return
     try {
-      await apiClient.delete(`/rbac/roles/${role.id}`)
+      await rolesService.deleteRole(role.id)
       showSuccess(t('messages.success.delete.role'))
       setSelectedRole(null)
       loadRoles()

@@ -19,7 +19,6 @@ import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
-import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket } from '../hooks'
@@ -145,7 +144,7 @@ export default function CAsPage() {
 
     // Load chain repair status (non-blocking, admin/operator only)
     if (canWrite('cas')) {
-      apiClient.get('/system/chain-repair')
+      casService.getChainRepairStatus()
         .then(res => setChainRepair(res.data || null))
         .catch(() => {})
     }
@@ -181,7 +180,7 @@ export default function CAsPage() {
   const runChainRepair = useCallback(async () => {
     setChainRepairRunning(true)
     try {
-      const res = await apiClient.post('/system/chain-repair/run')
+      const res = await casService.runChainRepair()
       setChainRepair(res.data || null)
       loadCAs() // Refresh CAs after repair
     } catch { /* ignore */ }

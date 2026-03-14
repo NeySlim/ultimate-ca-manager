@@ -400,7 +400,6 @@
     "forgotPasswordTitle": "Mot de passe oublié ?",
     "forgotPasswordDesc": "Entrez votre email et nous vous enverrons un lien de réinitialisation.",
     "checkYourEmail": "Vérifiez votre email",
-    "checkEmailDesc": "Si un compte existe avec <strong>{{email}}</strong>, vous recevrez un lien de réinitialisation sous peu.",
     "checkEmailHint": "Vous n'avez pas reçu d'email ? Vérifiez vos spams ou réessayez.",
     "tryAnotherEmail": "Essayer un autre email",
     "backToLogin": "Retour à la connexion",
@@ -418,7 +417,9 @@
     "invalidResetLink": "Lien de réinitialisation invalide. Veuillez en demander un nouveau.",
     "passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères",
     "resetFailed": "Échec de la réinitialisation. Le lien a peut-être expiré.",
-    "resetting": "Réinitialisation..."
+    "resetting": "Réinitialisation...",
+    "checkEmailDescBefore": "Si un compte existe avec",
+    "checkEmailDescAfter": ", vous recevrez un lien de réinitialisation sous peu."
   },
   "cas": {
     "parentCA": "AC parente",

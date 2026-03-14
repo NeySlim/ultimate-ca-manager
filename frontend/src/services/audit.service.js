@@ -51,6 +51,10 @@ const auditService = {
    */
   cleanupLogs: async (retention_days = 90) => {
     return apiClient.post('/audit/cleanup', { retention_days });
+  },
+
+  verifyIntegrity: async () => {
+    return apiClient.get('/audit/verify');
   }
 };
 

@@ -47,7 +47,6 @@ import {
 import { useNotification } from '../contexts';
 import { usePermission } from '../hooks';
 import auditService from '../services/audit.service';
-import { apiClient } from '../services/apiClient';
 import { getAppTimezone } from '../stores/timezoneStore';
 import { formatRelativeTime } from '../lib/ui';
 // Action icons mapping
@@ -221,7 +220,7 @@ export default function AuditLogsPage() {
   const handleVerifyIntegrity = async () => {
     setVerifyingIntegrity(true);
     try {
-      const response = await apiClient.get('/audit/verify');
+      const response = await auditService.verifyIntegrity();
       const data = response.data || response;
       if (data.valid) {
         showSuccess(t('audit.integrityVerified', { count: data.checked }));

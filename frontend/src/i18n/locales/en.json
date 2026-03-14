@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "Forgot Password?",
     "forgotPasswordDesc": "Enter your email and we'll send you a reset link.",
     "checkYourEmail": "Check Your Email",
-    "checkEmailDesc": "If an account exists with <strong>{{email}}</strong>, you'll receive a password reset link shortly.",
     "checkEmailHint": "Didn't receive an email? Check your spam folder or try again.",
     "tryAnotherEmail": "Try Another Email",
     "backToLogin": "Back to Login",
@@ -513,7 +512,9 @@
     "invalidResetLink": "Invalid reset link. Please request a new password reset.",
     "passwordMinLength": "Password must be at least 8 characters",
     "resetFailed": "Failed to reset password. The link may have expired.",
-    "resetting": "Resetting..."
+    "resetting": "Resetting...",
+    "checkEmailDescBefore": "If an account exists with",
+    "checkEmailDescAfter": ", you'll receive a password reset link shortly."
   },
   "dashboard": {
     "goodMorning": "Good morning",

@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Lock, CheckCircle, Warning, ArrowLeft } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo } from '../components'
-import { apiClient } from '../services'
+import { authService } from '../services'
 
 export default function ResetPasswordPage() {
   const { t } = useTranslation()
@@ -42,7 +42,7 @@ export default function ResetPasswordPage() {
 
     setLoading(true)
     try {
-      await apiClient.post('/auth/reset-password', { token, password })
+      await authService.resetPassword(token, password)
       setSuccess(true)
     } catch (err) {
       setError(err.message || t('auth.resetFailed'))

@@ -27,4 +27,20 @@ export const rolesService = {
     const response = await apiClient.get(`/rbac/roles/${role}`)
     return response.data
   },
+
+  async listRoles() {
+    return apiClient.get('/rbac/roles')
+  },
+
+  async createRole(data) {
+    return apiClient.post('/rbac/roles', data)
+  },
+
+  async updateRole(id, data) {
+    return apiClient.put(`/rbac/roles/${id}`, data)
+  },
+
+  async deleteRole(id) {
+    return apiClient.delete(`/rbac/roles/${id}`)
+  }
 }

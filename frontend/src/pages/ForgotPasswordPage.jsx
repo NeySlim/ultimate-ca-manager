@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Envelope, ArrowLeft, CheckCircle } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo } from '../components'
-import { apiClient } from '../services'
+import { authService } from '../services'
 
 export default function ForgotPasswordPage() {
   const { t } = useTranslation()
@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(true)
     try {
-      await apiClient.post('/auth/forgot-password', { email })
+      await authService.forgotPassword(email)
       setSent(true)
     } catch (err) {
       // Always show success to prevent email enumeration
@@ -54,7 +54,9 @@ export default function ForgotPasswordPage() {
               
               <div>
                 <h2 className="text-xl font-semibold text-text-primary">{t('auth.checkYourEmail')}</h2>
-                <p className="text-sm text-text-secondary mt-2" dangerouslySetInnerHTML={{ __html: t('auth.checkEmailDesc', { email }) }} />
+                <p className="text-sm text-text-secondary mt-2">
+                  {t('auth.checkEmailDescBefore')} <strong>{email}</strong>{t('auth.checkEmailDescAfter')}
+                </p>
               </div>
 
               <div className="pt-4 space-y-3">

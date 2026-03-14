@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "忘记密码？",
     "forgotPasswordDesc": "输入您的邮箱，我们将发送重置链接。",
     "checkYourEmail": "请查看邮箱",
-    "checkEmailDesc": "如果存在与 <strong>{{email}}</strong> 关联的账户，您将很快收到密码重置链接。",
     "checkEmailHint": "没有收到邮件？请检查垃圾邮件文件夹或重试。",
     "tryAnotherEmail": "尝试其他邮箱",
     "backToLogin": "返回登录",
@@ -513,7 +512,9 @@
     "invalidResetLink": "无效链接，请重新请求。",
     "passwordMinLength": "密码至少需要8个字符",
     "resetFailed": "重置失败。链接可能已过期。",
-    "resetting": "重置中..."
+    "resetting": "重置中...",
+    "checkEmailDescBefore": "如果存在与",
+    "checkEmailDescAfter": " 关联的账户，您将很快收到密码重置链接。"
   },
   "dashboard": {
     "goodMorning": "早上好",

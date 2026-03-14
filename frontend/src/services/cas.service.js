@@ -56,5 +56,14 @@ export const casService = {
   },
   async bulkExport(ids, format = 'pem') {
     return apiClient.post('/cas/bulk/export', { ids, format }, { responseType: 'blob' })
+  },
+
+  // Chain repair
+  async getChainRepairStatus() {
+    return apiClient.get('/system/chain-repair')
+  },
+
+  async runChainRepair() {
+    return apiClient.post('/system/chain-repair/run')
   }
 }

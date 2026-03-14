@@ -48,12 +48,13 @@ class SyslogForwarder:
         self._port = 514
         self._protocol = 'udp'
         self._tls = False
+        self._tls_verify = True
         self._categories = list(self.ALL_CATEGORIES)  # all enabled by default
         self._socket = None
         self._initialized = True
 
     def configure(self, enabled=False, host='', port=514, protocol='udp',
-                  tls=False, categories=None):
+                  tls=False, tls_verify=True, categories=None):
         """Configure the syslog forwarder."""
         if not self._initialized:
             self._initialize()
@@ -65,6 +66,7 @@ class SyslogForwarder:
         self._port = int(port) if port else 514
         self._protocol = protocol.lower() if protocol else 'udp'
         self._tls = tls and self._protocol == 'tcp'
+        self._tls_verify = tls_verify
         self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
 
         if self._enabled and self._host:
@@ -93,8 +95,9 @@ class SyslogForwarder:
                 sock.settimeout(5)
                 if self._tls:
                     ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
+                    if not self._tls_verify:
+                        ctx.check_hostname = False
+                        ctx.verify_mode = ssl.CERT_NONE
                     sock = ctx.wrap_socket(sock, server_hostname=self._host)
                 sock.connect((self._host, self._port))
                 self._socket = sock

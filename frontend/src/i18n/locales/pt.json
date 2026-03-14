@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "Esqueceu a senha?",
     "forgotPasswordDesc": "Digite seu email e enviaremos um link para redefinir.",
     "checkYourEmail": "Verifique seu email",
-    "checkEmailDesc": "Se existir uma conta com <strong>{{email}}</strong>, você receberá um link para redefinir em breve.",
     "checkEmailHint": "Não recebeu o email? Verifique sua pasta de spam ou tente novamente.",
     "tryAnotherEmail": "Tentar outro email",
     "backToLogin": "Voltar ao login",
@@ -513,7 +512,9 @@
     "invalidResetLink": "Link inválido. Solicite um novo.",
     "passwordMinLength": "A senha deve ter pelo menos 8 caracteres",
     "resetFailed": "Falha ao redefinir. O link pode ter expirado.",
-    "resetting": "Redefinindo..."
+    "resetting": "Redefinindo...",
+    "checkEmailDescBefore": "Se existir uma conta com",
+    "checkEmailDescAfter": ", você receberá um link para redefinir em breve."
   },
   "dashboard": {
     "goodMorning": "Bom dia",

@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "Passwort vergessen?",
     "forgotPasswordDesc": "Geben Sie Ihre E-Mail ein und wir senden Ihnen einen Link zum Zurücksetzen.",
     "checkYourEmail": "Überprüfen Sie Ihre E-Mail",
-    "checkEmailDesc": "Wenn ein Konto mit <strong>{{email}}</strong> existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen.",
     "checkEmailHint": "Keine E-Mail erhalten? Überprüfen Sie Ihren Spam-Ordner oder versuchen Sie es erneut.",
     "tryAnotherEmail": "Andere E-Mail versuchen",
     "backToLogin": "Zurück zur Anmeldung",
@@ -513,7 +512,9 @@
     "invalidResetLink": "Ungültiger Link. Bitte fordern Sie einen neuen an.",
     "passwordMinLength": "Passwort muss mindestens 8 Zeichen lang sein",
     "resetFailed": "Zurücksetzen fehlgeschlagen. Der Link ist möglicherweise abgelaufen.",
-    "resetting": "Zurücksetzen..."
+    "resetting": "Zurücksetzen...",
+    "checkEmailDescBefore": "Wenn ein Konto mit",
+    "checkEmailDescAfter": " existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen."
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",

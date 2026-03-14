@@ -35,5 +35,22 @@ export const usersService = {
   // Bulk operations
   async bulkDelete(ids) {
     return apiClient.post('/users/bulk/delete', { ids })
+  },
+
+  // mTLS certificate management
+  async getMtlsCertificates(userId) {
+    return apiClient.get(`/users/${userId}/mtls/certificates`)
+  },
+
+  async createMtlsCertificate(userId, data) {
+    return apiClient.post(`/users/${userId}/mtls/certificates`, data)
+  },
+
+  async deleteMtlsCertificate(userId, certId) {
+    return apiClient.delete(`/users/${userId}/mtls/certificates/${certId}`)
+  },
+
+  async assignMtlsCertificate(data) {
+    return apiClient.post('/mtls/assign', data)
   }
 }

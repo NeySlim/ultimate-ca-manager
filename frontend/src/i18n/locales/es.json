@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "¿Olvidó su contraseña?",
     "forgotPasswordDesc": "Ingrese su correo y le enviaremos un enlace para restablecer.",
     "checkYourEmail": "Revise su correo",
-    "checkEmailDesc": "Si existe una cuenta con <strong>{{email}}</strong>, recibirá un enlace para restablecer en breve.",
     "checkEmailHint": "¿No recibió un correo? Revise su carpeta de spam o intente de nuevo.",
     "tryAnotherEmail": "Probar otro correo",
     "backToLogin": "Volver al inicio de sesión",
@@ -513,7 +512,9 @@
     "invalidResetLink": "Enlace inválido. Solicite uno nuevo.",
     "passwordMinLength": "La contraseña debe tener al menos 8 caracteres",
     "resetFailed": "Error al restablecer. El enlace puede haber expirado.",
-    "resetting": "Restableciendo..."
+    "resetting": "Restableciendo...",
+    "checkEmailDescBefore": "Si existe una cuenta con",
+    "checkEmailDescAfter": ", recibirá un enlace para restablecer en breve."
   },
   "dashboard": {
     "goodMorning": "Buenos días",

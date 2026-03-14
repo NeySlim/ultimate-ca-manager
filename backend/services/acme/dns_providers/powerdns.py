@@ -28,7 +28,8 @@ class PowerDnsDnsProvider(BaseDnsProvider):
     def _request(self, method: str, path: str, data: Optional[Dict] = None) -> Tuple[bool, Any]:
         url = f"{self.server_url}/api/v1/servers/localhost{path}"
         try:
-            resp = requests.request(method=method, url=url, headers=self._get_headers(), json=data, timeout=30, verify=False)
+            verify_ssl = self.credentials.get('verify_ssl', True)
+            resp = requests.request(method=method, url=url, headers=self._get_headers(), json=data, timeout=30, verify=verify_ssl)
             if resp.status_code >= 400:
                 try:
                     error_msg = resp.json().get('error', resp.reason)

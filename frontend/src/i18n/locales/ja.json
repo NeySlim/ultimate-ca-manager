@@ -495,7 +495,6 @@
     "forgotPasswordTitle": "パスワードをお忘れですか？",
     "forgotPasswordDesc": "メールアドレスを入力すると、リセットリンクをお送りします。",
     "checkYourEmail": "メールを確認してください",
-    "checkEmailDesc": "<strong>{{email}}</strong>のアカウントが存在する場合、パスワードリセットリンクが送信されます。",
     "checkEmailHint": "メールが届きませんか？迷惑メールフォルダを確認するか、再度お試しください。",
     "tryAnotherEmail": "別のメールを試す",
     "backToLogin": "ログインに戻る",
@@ -513,7 +512,9 @@
     "invalidResetLink": "無効なリンクです。新しいリンクをリクエストしてください。",
     "passwordMinLength": "パスワードは8文字以上必要です",
     "resetFailed": "リセットに失敗しました。リンクの期限が切れている可能性があります。",
-    "resetting": "リセット中..."
+    "resetting": "リセット中...",
+    "checkEmailDescBefore": "",
+    "checkEmailDescAfter": "のアカウントが存在する場合、パスワードリセットリンクが送信されます。"
   },
   "dashboard": {
     "goodMorning": "おはようございます",
