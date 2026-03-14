@@ -337,13 +337,44 @@ def server_keygen():
                 encryption_algorithm=BestAvailableEncryption(auth.password.encode())
             )
         else:
-            # mTLS client — no password available, use unencrypted PKCS#8
-            # TLS provides transport security
-            key_der = key.private_bytes(
+            # mTLS client — encrypt with newly issued certificate's public key
+            # RFC 7030 §4.4.2: use CMS EnvelopedData or asymmetric encryption
+            from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+            key_plain = key.private_bytes(
                 encoding=Encoding.DER,
                 format=PrivateFormat.PKCS8,
                 encryption_algorithm=NoEncryption()
             )
+            try:
+                # Encrypt private key with the client's new certificate public key
+                client_pub = cert.public_key()
+                from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+                import secrets as sec_mod
+                # AES-256-CBC wrap: encrypt key material, then encrypt AES key with RSA
+                aes_key = sec_mod.token_bytes(32)
+                aes_iv = sec_mod.token_bytes(16)
+                aes_cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv))
+                encryptor = aes_cipher.encryptor()
+                # PKCS#7 pad
+                pad_len = 16 - (len(key_plain) % 16)
+                padded = key_plain + bytes([pad_len] * pad_len)
+                encrypted_key_data = encryptor.update(padded) + encryptor.finalize()
+                # Encrypt AES key with RSA-OAEP
+                encrypted_aes_key = client_pub.encrypt(
+                    aes_key,
+                    asym_padding.OAEP(
+                        mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+                # Combine: IV + encrypted AES key length (2 bytes) + encrypted AES key + encrypted data
+                enc_key_len = len(encrypted_aes_key).to_bytes(2, 'big')
+                key_der = aes_iv + enc_key_len + encrypted_aes_key + encrypted_key_data
+                logger.info("EST serverkeygen: private key encrypted with client public key")
+            except Exception as e:
+                logger.warning(f"EST serverkeygen: could not encrypt key with client cert, using TLS-only: {e}")
+                key_der = key_plain
         key_b64 = base64.b64encode(key_der).decode()
         
         # Create multipart response
