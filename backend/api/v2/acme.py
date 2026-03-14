@@ -392,7 +392,7 @@ def get_acme_account(account_id):
 
 
 @bp.route('/api/v2/acme/accounts/<int:account_id>', methods=['DELETE'])
-@require_auth(['write:acme'])
+@require_auth(['delete:acme'])
 def delete_acme_account(account_id):
     """Delete an ACME account and its related orders/authorizations/challenges"""
     acc = AcmeAccount.query.get(account_id)

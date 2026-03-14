@@ -456,7 +456,7 @@ def finalize_order(order_id):
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['DELETE'])
-@require_auth(['write:acme'])
+@require_auth(['delete:acme'])
 def cancel_order(order_id):
     """Cancel/delete an order"""
     order = AcmeClientOrder.query.get(order_id)

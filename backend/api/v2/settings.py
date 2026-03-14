@@ -836,7 +836,7 @@ def create_webhook():
 
 
 @bp.route('/api/v2/settings/webhooks/<int:webhook_id>', methods=['DELETE'])
-@require_auth(['write:settings'])
+@require_auth(['delete:settings'])
 def delete_webhook(webhook_id):
     """Delete webhook"""
     webhooks = get_webhooks()

@@ -179,7 +179,7 @@ def update_provider(provider_id):
 
 
 @bp.route('/api/v2/dns-providers/<int:provider_id>', methods=['DELETE'])
-@require_auth(['write:acme'])
+@require_auth(['delete:acme'])
 def delete_provider(provider_id):
     """Delete a DNS provider"""
     provider = DnsProvider.query.get(provider_id)

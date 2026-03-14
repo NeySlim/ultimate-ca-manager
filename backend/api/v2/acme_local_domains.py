@@ -122,7 +122,7 @@ def update_local_domain(domain_id):
 
 
 @bp.route('/api/v2/acme/local-domains/<int:domain_id>', methods=['DELETE'])
-@require_auth(['write:acme'])
+@require_auth(['delete:acme'])
 def delete_local_domain(domain_id):
     """Delete a local domain mapping"""
     domain = AcmeLocalDomain.query.get_or_404(domain_id)
