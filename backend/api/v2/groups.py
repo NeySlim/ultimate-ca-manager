@@ -280,7 +280,7 @@ def add_group_member(group_id):
 
 
 @bp.route('/api/v2/groups/<int:group_id>/members/<int:user_id>', methods=['DELETE'])
-@require_auth(['write:groups'])
+@require_auth(['delete:groups'])
 def remove_group_member(group_id, user_id):
     """Remove a user from a group"""
     if g.current_user.role != 'admin':

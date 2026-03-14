@@ -154,7 +154,7 @@ def update_domain(domain_id):
 
 
 @bp.route('/api/v2/acme/domains/<int:domain_id>', methods=['DELETE'])
-@require_auth(['write:acme'])
+@require_auth(['delete:acme'])
 def delete_domain(domain_id):
     """Delete a domain registration"""
     domain = AcmeDomain.query.get_or_404(domain_id)

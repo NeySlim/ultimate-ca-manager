@@ -102,7 +102,7 @@ def update_webhook(endpoint_id):
 
 
 @bp.route('/api/v2/webhooks/<int:endpoint_id>', methods=['DELETE'])
-@require_auth(['write:settings'])
+@require_auth(['delete:settings'])
 def delete_webhook(endpoint_id):
     """Delete webhook endpoint"""
     endpoint = WebhookEndpoint.query.get_or_404(endpoint_id)
