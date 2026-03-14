@@ -184,7 +184,7 @@ export function DetailHeader({
                 
                 {menuOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                    <div className="fixed inset-0 z-40" role="presentation" onClick={() => setMenuOpen(false)} />
                     <div className="absolute right-0 top-full mt-1 w-40 bg-bg-secondary border border-border rounded-lg shadow-lg z-50 py-1">
                       {actions.map((action, i) => (
                         <button
