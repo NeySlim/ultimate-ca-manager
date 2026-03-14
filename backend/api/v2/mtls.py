@@ -24,6 +24,7 @@ from services.cert_service import CertificateService
 from services.certificate_parser import CertificateParser
 from utils.file_naming import cert_key_path
 from utils.response import success_response, error_response, created_response
+from utils.sanitize import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +363,7 @@ def download_mtls_certificate(cert_id):
         return Response(
             p12_bytes,
             mimetype='application/x-pkcs12',
-            headers={'Content-Disposition': f'attachment; filename="{user.username}-mtls.p12"'},
+            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(user.username)}-mtls.p12"'},
         )
 
     # Default: PEM
@@ -378,7 +379,7 @@ def download_mtls_certificate(cert_id):
     return Response(
         cert_pem,
         mimetype='application/x-pem-file',
-        headers={'Content-Disposition': f'attachment; filename="{user.username}-mtls.pem"'},
+        headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(user.username)}-mtls.pem"'},
     )
 
 

@@ -6,6 +6,7 @@ TrustStore Management Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.sanitize import sanitize_filename
 from models import db
 from models.truststore import TrustedCertificate
 from services.audit_service import AuditService
@@ -493,7 +494,7 @@ def export_trust_bundle():
                 bundle_lines.append('')
             
             bundle = '\n'.join(bundle_lines)
-            filename = f'truststore-{purpose}-bundle.pem'
+            filename = f'truststore-{sanitize_filename(purpose)}-bundle.pem'
             
             return Response(
                 bundle,
@@ -519,7 +520,7 @@ def export_trust_bundle():
             
             p7b_data = pkcs7.serialize_certificates(x509_certs, serialization.Encoding.DER)
             
-            filename = f'truststore-{purpose}-bundle.p7b'
+            filename = f'truststore-{sanitize_filename(purpose)}-bundle.p7b'
             return Response(
                 p7b_data,
                 mimetype='application/x-pkcs7-certificates',

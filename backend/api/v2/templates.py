@@ -8,6 +8,7 @@ import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.file_validation import validate_upload, JSON_EXTENSIONS
+from utils.sanitize import sanitize_filename
 from models import db
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
@@ -429,7 +430,7 @@ def export_template(template_id):
     return Response(
         json.dumps(export_data, indent=2),
         mimetype='application/json',
-        headers={'Content-Disposition': f'attachment; filename="{template.name}.json"'}
+        headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(template.name)}.json"'}
     )
 
 

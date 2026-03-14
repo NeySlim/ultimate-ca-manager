@@ -20,6 +20,7 @@ from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.dn_validation import validate_dn_field
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
+from utils.sanitize import sanitize_filename
 from models import Certificate, CA, db
 from models.truststore import TrustedCertificate
 from models.ocsp import OCSPResponse
@@ -833,13 +834,13 @@ def export_certificate(cert_id):
             return Response(
                 key_pem,
                 mimetype='application/x-pem-file',
-                headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.key"'}
+                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.key"'}
             )
         
         if export_format == 'pem':
             result = cert_pem
             content_type = 'application/x-pem-file'
-            filename = f"{certificate.descr or certificate.refid}.crt"
+            filename = f"{sanitize_filename(certificate.descr or certificate.refid)}.crt"
             
             # Include private key if requested
             if include_key and certificate.prv:
@@ -847,7 +848,7 @@ def export_certificate(cert_id):
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
-                filename = f"{certificate.descr or certificate.refid}_with_key.pem"
+                filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_with_key.pem"
             
             # Include CA chain if requested
             if include_chain and certificate.caref:
@@ -864,9 +865,9 @@ def export_certificate(cert_id):
                     else:
                         break
                 if include_key:
-                    filename = f"{certificate.descr or certificate.refid}_full_chain.pem"
+                    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_full_chain.pem"
                 else:
-                    filename = f"{certificate.descr or certificate.refid}_chain.pem"
+                    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_chain.pem"
             
             return Response(
                 result,
@@ -882,7 +883,7 @@ def export_certificate(cert_id):
             return Response(
                 der_bytes,
                 mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.der"'}
+                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.der"'}
             )
         
         elif export_format == 'pkcs12':
@@ -921,7 +922,7 @@ def export_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.p12"'}
+                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p12"'}
             )
         
         elif export_format == 'pkcs7' or export_format == 'p7b':
@@ -953,7 +954,7 @@ def export_certificate(cert_id):
                 return Response(
                     p7b_output,
                     mimetype='application/x-pkcs7-certificates',
-                    headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.p7b"'}
+                    headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p7b"'}
                 )
             finally:
                 os.unlink(pem_file)
@@ -995,7 +996,7 @@ def export_certificate(cert_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.pfx"'}
+                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.pfx"'}
             )
         
         else:

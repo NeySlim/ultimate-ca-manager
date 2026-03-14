@@ -5,6 +5,7 @@ Endpoints for generating and scheduling reports.
 from flask import Blueprint, request, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.sanitize import sanitize_filename
 from services.report_service import ReportService
 from models import db, SystemConfig
 import json
@@ -99,7 +100,7 @@ def download_report(report_type):
                 report['content'],
                 mimetype='text/csv',
                 headers={
-                    'Content-Disposition': f'attachment; filename=ucm-report-{report_type}.csv'
+                    'Content-Disposition': f'attachment; filename=ucm-report-{sanitize_filename(report_type)}.csv'
                 }
             )
         else:
@@ -107,7 +108,7 @@ def download_report(report_type):
                 report['content'],
                 mimetype='application/json',
                 headers={
-                    'Content-Disposition': f'attachment; filename=ucm-report-{report_type}.json'
+                    'Content-Disposition': f'attachment; filename=ucm-report-{sanitize_filename(report_type)}.json'
                 }
             )
     except Exception as e:

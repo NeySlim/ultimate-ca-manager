@@ -13,6 +13,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.dn_validation import validate_dn_field
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
+from utils.sanitize import sanitize_filename
 from models import db, Certificate, CA
 from services.cert_service import CertificateService
 from services.audit_service import AuditService
@@ -412,7 +413,7 @@ def export_csr(csr_id):
         return Response(
             csr_pem,
             mimetype='application/x-pem-file',
-            headers={'Content-Disposition': f'attachment; filename="{cert.descr or cert.refid}.csr"'}
+            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(cert.descr or cert.refid)}.csr"'}
         )
     except Exception as e:
         logger.error(f"CSR export failed: {e}")

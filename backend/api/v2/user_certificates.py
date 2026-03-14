@@ -18,6 +18,7 @@ from models import CA, AuthCertificate, Certificate, User, db
 from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from utils.response import error_response, no_content_response, success_response
+from utils.sanitize import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +278,7 @@ def export_user_certificate(cert_id):
 
     try:
         cert_pem = base64.b64decode(cert.crt)
-        filename_base = auth_cert.name or cert.descr or cert.refid
+        filename_base = sanitize_filename(auth_cert.name or cert.descr or cert.refid)
 
         if export_format in ('pkcs12', 'p12', 'pfx'):
             if not password or len(password) < 8:
