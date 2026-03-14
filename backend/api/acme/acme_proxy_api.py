@@ -6,10 +6,13 @@ Mirrors the standard ACME API but proxies requests to upstream
 from flask import Blueprint, request, jsonify, make_response
 import json
 import base64
+import logging
 from datetime import datetime
 
 from services.acme.acme_proxy_service import AcmeProxyService
 from services.acme import AcmeService  # For JWS verification helper
+
+logger = logging.getLogger(__name__)
 
 acme_proxy_bp = Blueprint('acme_proxy', __name__, url_prefix='/acme/proxy')
 
@@ -49,7 +52,8 @@ def verify_proxy_jws(request):
         return verify_jws(jws_data, expected_url)
         
     except Exception as e:
-        return False, None, None, str(e)
+        logger.error(f"ACME proxy JWS verification error: {e}")
+        return False, None, None, "JWS verification error"
 
 # --- Endpoints ---
 
@@ -116,9 +120,8 @@ def new_order():
         return resp
         
     except Exception as e:
-        return make_response(jsonify({"type": "serverInternal", "detail": str(e)}), 500)
-
-@acme_proxy_bp.route('/authz/<authz_id>', methods=['POST'])
+        logger.error(f"ACME proxy new-order error: {e}")
+        return make_response(jsonify({"type": "serverInternal", "detail": "Internal server error"}), 500)
 def authz(authz_id):
     svc = get_proxy_service()
     # POST-as-GET
@@ -148,9 +151,8 @@ def challenge(chall_id):
             resp.headers['Link'] = link_header
         return resp
     except Exception as e:
-        return make_response(jsonify({"type": "serverInternal", "detail": str(e)}), 500)
-
-@acme_proxy_bp.route('/order/<order_id>', methods=['POST'])
+        logger.error(f"ACME proxy challenge error: {e}")
+        return make_response(jsonify({"type": "serverInternal", "detail": "Internal server error"}), 500)
 def get_order(order_id):
     """POST-as-GET for order status polling"""
     svc = get_proxy_service()
@@ -165,9 +167,8 @@ def get_order(order_id):
         resp.headers['Location'] = order_url
         return resp
     except Exception as e:
-        return make_response(jsonify({"type": "serverInternal", "detail": str(e)}), 500)
-
-@acme_proxy_bp.route('/order/<order_id>/finalize', methods=['POST'])
+        logger.error(f"ACME proxy get-order error: {e}")
+        return make_response(jsonify({"type": "serverInternal", "detail": "Internal server error"}), 500)
 def finalize(order_id):
     svc = get_proxy_service()
     is_valid, payload, _, err = verify_proxy_jws(request)
@@ -197,9 +198,8 @@ def finalize(order_id):
         resp.headers['Location'] = order_url
         return resp
     except Exception as e:
-        return make_response(jsonify({"type": "serverInternal", "detail": str(e)}), 500)
-
-@acme_proxy_bp.route('/cert/<cert_id>', methods=['POST'])
+        logger.error(f"ACME proxy finalize error: {e}")
+        return make_response(jsonify({"type": "serverInternal", "detail": "Internal server error"}), 500)
 def cert(cert_id):
     svc = get_proxy_service()
     # POST-as-GET

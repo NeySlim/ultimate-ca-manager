@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     if (!token) {
-      setError('Invalid reset link. Please request a new password reset.')
+      setError(t('auth.invalidResetLink'))
     }
   }, [token])
 
@@ -31,12 +31,12 @@ export default function ResetPasswordPage() {
     setError('')
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(t('auth.passwordMinLength'))
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('common.passwordMismatch'))
       return
     }
 
@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
       await apiClient.post('/auth/reset-password', { token, password })
       setSuccess(true)
     } catch (err) {
-      setError(err.message || 'Failed to reset password. The link may have expired.')
+      setError(err.message || t('auth.resetFailed'))
     } finally {
       setLoading(false)
     }
@@ -68,14 +68,14 @@ export default function ResetPasswordPage() {
               </div>
               
               <div>
-                <h2 className="text-xl font-semibold text-text-primary">Password Reset!</h2>
+                <h2 className="text-xl font-semibold text-text-primary">{t('auth.passwordReset')}</h2>
                 <p className="text-sm text-text-secondary mt-2">
-                  Your password has been changed successfully. You can now log in with your new password.
+                  {t('auth.passwordResetSuccess')}
                 </p>
               </div>
 
               <Button type="button" onClick={() => navigate('/login')} className="w-full">
-                Go to Login
+                {t('auth.goToLogin')}
               </Button>
             </div>
           ) : !token ? (
@@ -87,24 +87,24 @@ export default function ResetPasswordPage() {
               </div>
               
               <div>
-                <h2 className="text-xl font-semibold text-text-primary">Invalid Link</h2>
+                <h2 className="text-xl font-semibold text-text-primary">{t('auth.invalidLink')}</h2>
                 <p className="text-sm text-text-secondary mt-2">
-                  This password reset link is invalid or has expired.
+                  {t('auth.invalidLinkDesc')}
                 </p>
               </div>
 
               <Link to="/forgot-password">
                 <Button variant="secondary" className="w-full">
-                  Request New Reset Link
+                  {t('auth.requestNewResetLink')}
                 </Button>
               </Link>
             </div>
           ) : (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold text-text-primary">Reset Password</h2>
+                <h2 className="text-xl font-semibold text-text-primary">{t('auth.resetPasswordTitle')}</h2>
                 <p className="text-sm text-text-secondary mt-1">
-                  Enter your new password below.
+                  {t('auth.resetPasswordDesc')}
                 </p>
               </div>
 
@@ -140,7 +140,7 @@ export default function ResetPasswordPage() {
                 />
 
                 <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Resetting...' : 'Reset Password'}
+                  {loading ? t('auth.resetting') : t('auth.resetPasswordTitle')}
                 </Button>
               </form>
 
@@ -150,7 +150,7 @@ export default function ResetPasswordPage() {
                   className="flex items-center justify-center gap-2 text-sm text-accent-primary hover:underline"
                 >
                   <ArrowLeft size={16} />
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </Link>
               </div>
             </>
@@ -158,7 +158,7 @@ export default function ResetPasswordPage() {
         </Card>
 
         <p className="text-center text-xs text-text-tertiary mt-6">
-          Ultimate Certificate Manager v2
+          {t('common.appName', 'Ultimate Certificate Manager v2')}
         </p>
       </div>
     </div>

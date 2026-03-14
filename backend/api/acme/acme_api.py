@@ -12,6 +12,9 @@ from models import db
 from services.acme import AcmeService
 from models.acme_models import AcmeAccount, AcmeOrder, AcmeChallenge
 from config.settings import Config
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create blueprint
 acme_bp = Blueprint('acme', __name__, url_prefix='/acme')
@@ -212,7 +215,8 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
                         hash_alg
                     )
                 except Exception as e:
-                    return False, None, None, f"Signature verification failed: {str(e)}"
+                    logger.error(f"RSA signature verification failed: {e}")
+                    return False, None, None, "Signature verification failed"
                     
             elif alg.startswith('ES'):  # EC signatures (ES256, ES384, ES512)
                 from cryptography.hazmat.primitives import hashes
@@ -247,7 +251,8 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
                         ec.ECDSA(hash_alg)
                     )
                 except Exception as e:
-                    return False, None, None, f"Signature verification failed: {str(e)}"
+                    logger.error(f"EC signature verification failed: {e}")
+                    return False, None, None, "Signature verification failed"
             else:
                 return False, None, None, f"Unsupported signature algorithm: {alg}"
             
@@ -259,12 +264,15 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             # This allows the system to work without josepy, but with reduced security
             return True, payload, jwk, None
         except Exception as e:
-            return False, None, None, f"Signature verification error: {str(e)}"
+            logger.error(f"Signature verification error: {e}")
+            return False, None, None, "Signature verification error"
         
     except json.JSONDecodeError as e:
-        return False, None, None, f"Invalid JSON in JWS: {str(e)}"
+        logger.error(f"Invalid JSON in JWS: {e}")
+        return False, None, None, "Invalid JSON in JWS"
     except Exception as e:
-        return False, None, None, f"JWS verification error: {str(e)}"
+        logger.error(f"JWS verification error: {e}")
+        return False, None, None, "JWS verification error"
 
 
 # ==================== ACME Directory ====================
@@ -388,7 +396,8 @@ def new_account():
         return response
         
     except Exception as e:
-        return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+        logger.error(f"ACME new-account error: {e}")
+        return acme_error('serverInternal', 'Internal server error', 500)
 
 
 @acme_bp.route('/acct/<account_id>', methods=['POST'])
@@ -532,7 +541,8 @@ def new_order():
         return response
         
     except Exception as e:
-        return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+        logger.error(f"ACME new-order error: {e}")
+        return acme_error('serverInternal', 'Internal server error', 500)
 
 
 @acme_bp.route('/order/<order_id>', methods=['POST'])
@@ -651,7 +661,8 @@ def finalize_order(order_id: str):
         return response
         
     except Exception as e:
-        return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+        logger.error(f"ACME get-order error: {e}")
+        return acme_error('serverInternal', 'Internal server error', 500)
 
 
 # ==================== Authorization & Challenge ====================
@@ -785,7 +796,8 @@ def respond_to_challenge(challenge_id: str):
         return response
         
     except Exception as e:
-        return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+        logger.error(f"ACME challenge error: {e}")
+        return acme_error('serverInternal', 'Internal server error', 500)
 
 
 # ==================== Certificate Download ====================
@@ -924,12 +936,14 @@ def revoke_cert():
                 username='acme'
             )
         except Exception as e:
-            return acme_error('serverInternal', f'Revocation failed: {str(e)}', 500)
+            logger.error(f"ACME revocation failed: {e}")
+            return acme_error('serverInternal', 'Revocation failed', 500)
         
         return make_response('', 200)
         
     except Exception as e:
-        return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+        logger.error(f"ACME revoke-cert error: {e}")
+        return acme_error('serverInternal', 'Internal server error', 500)
 
 
 # ==================== Key Change ====================
@@ -986,7 +1000,8 @@ def key_change():
         return response
         
     except Exception as e:
-        return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+        logger.error(f"ACME key-change error: {e}")
+        return acme_error('serverInternal', 'Internal server error', 500)
 
 
 # ==================== Health Check ====================

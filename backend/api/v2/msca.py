@@ -294,7 +294,8 @@ def sign_csr(msca_id, csr_id):
         return success_response(data=result)
 
     except ValueError as e:
-        return error_response(str(e), 400)
+        logger.error(f"Validation error signing CSR via MS CA: {e}")
+        return error_response("Invalid request data", 400)
     except Exception as e:
         logger.error(f"Failed to sign CSR via MS CA: {e}")
         return error_response("Failed to submit CSR to Microsoft CA", 500)
@@ -320,7 +321,8 @@ def check_request_status(msca_id, request_id):
 
         return success_response(data=result)
     except ValueError as e:
-        return error_response(str(e), 404)
+        logger.error(f"Request not found or invalid: {e}")
+        return error_response("Request not found", 404)
     except Exception as e:
         logger.error(f"Failed to check request status: {e}")
         return error_response("Failed to check request status", 500)

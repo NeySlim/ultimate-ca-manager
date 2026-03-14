@@ -1,10 +1,11 @@
 """
 Global Search API - Search across all entities
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from sqlalchemy import or_
 from auth.unified import require_auth
 from models import Certificate, CA, User, CertificateTemplate
+from utils.response import success_response
 
 bp = Blueprint('search', __name__)
 
@@ -31,7 +32,7 @@ def global_search():
     limit = min(int(request.args.get('limit', 5)), 20)  # Max 20 per category
     
     if len(query) < 2:
-        return jsonify({
+        return success_response(data={
             'certificates': [],
             'cas': [],
             'users': [],
@@ -120,7 +121,7 @@ def global_search():
         'type': 'template'
     } for t in templates]
     
-    return jsonify(results)
+    return success_response(data=results)
 
 
 def _extract_cn(subject):

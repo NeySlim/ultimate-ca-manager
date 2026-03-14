@@ -248,13 +248,10 @@ def verify():
         # Check for mTLS certificate error in request context (set by middleware)
         cert_error = getattr(g, 'cert_error', None)
         
-        return jsonify({
-            'status': 'success',
-            'data': {
+        return success_response(data={
                 'authenticated': False,
                 'cert_error': cert_error
-            }
-        }), 200
+            })
     
     # Generate fresh CSRF token on verify
     csrf_token = None

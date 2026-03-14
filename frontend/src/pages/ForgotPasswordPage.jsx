@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     setError('')
     
     if (!email || !email.includes('@')) {
-      setError('Please enter a valid email address')
+      setError(t('auth.validEmailRequired'))
       return
     }
 
@@ -53,18 +53,16 @@ export default function ForgotPasswordPage() {
               </div>
               
               <div>
-                <h2 className="text-xl font-semibold text-text-primary">Check Your Email</h2>
-                <p className="text-sm text-text-secondary mt-2">
-                  If an account exists with <strong>{email}</strong>, you'll receive a password reset link shortly.
-                </p>
+                <h2 className="text-xl font-semibold text-text-primary">{t('auth.checkYourEmail')}</h2>
+                <p className="text-sm text-text-secondary mt-2" dangerouslySetInnerHTML={{ __html: t('auth.checkEmailDesc', { email }) }} />
               </div>
 
               <div className="pt-4 space-y-3">
                 <p className="text-xs text-text-tertiary">
-                  Didn't receive an email? Check your spam folder or try again.
+                  {t('auth.checkEmailHint')}
                 </p>
                 <Button type="button" variant="secondary" onClick={() => setSent(false)} className="w-full">
-                  Try Another Email
+                  {t('auth.tryAnotherEmail')}
                 </Button>
               </div>
 
@@ -73,15 +71,15 @@ export default function ForgotPasswordPage() {
                 className="flex items-center justify-center gap-2 text-sm text-accent-primary hover:underline pt-2"
               >
                 <ArrowLeft size={16} />
-                Back to Login
+                {t('auth.backToLogin')}
               </Link>
             </div>
           ) : (
             <>
               <div className="text-center mb-6">
-                <h2 className="text-xl font-semibold text-text-primary">Forgot Password?</h2>
+                <h2 className="text-xl font-semibold text-text-primary">{t('auth.forgotPasswordTitle')}</h2>
                 <p className="text-sm text-text-secondary mt-1">
-                  Enter your email and we'll send you a reset link.
+                  {t('auth.forgotPasswordDesc')}
                 </p>
               </div>
 
@@ -99,7 +97,7 @@ export default function ForgotPasswordPage() {
                 />
 
                 <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Sending...' : 'Send Reset Link'}
+                  {loading ? t('auth.sending') : t('auth.sendResetLink')}
                 </Button>
               </form>
 
@@ -109,7 +107,7 @@ export default function ForgotPasswordPage() {
                   className="flex items-center justify-center gap-2 text-sm text-accent-primary hover:underline"
                 >
                   <ArrowLeft size={16} />
-                  Back to Login
+                  {t('auth.backToLogin')}
                 </Link>
               </div>
             </>
@@ -117,7 +115,7 @@ export default function ForgotPasswordPage() {
         </Card>
 
         <p className="text-center text-xs text-text-tertiary mt-6">
-          Ultimate Certificate Manager v2
+          {t('common.appName', 'Ultimate Certificate Manager v2')}
         </p>
       </div>
     </div>
