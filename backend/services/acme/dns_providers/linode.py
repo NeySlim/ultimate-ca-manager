@@ -68,7 +68,7 @@ class LinodeDnsProvider(BaseDnsProvider):
                         error_msg = errors[0].get('reason', str(error))
                     else:
                         error_msg = str(error)
-                except:
+                except Exception:
                     error_msg = response.reason
                 return False, error_msg
             

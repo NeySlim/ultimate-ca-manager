@@ -61,7 +61,7 @@ def is_service_running() -> bool:
                 timeout=5
             )
             return result.returncode == 0
-        except:
+        except Exception:
             return False
 
 
@@ -103,7 +103,7 @@ def get_service_status() -> dict:
                         try:
                             # Convert bytes to MB
                             status['memory'] = f"{int(value) / 1024 / 1024:.1f} MB"
-                        except:
+                        except Exception:
                             pass
     except (FileNotFoundError, subprocess.TimeoutExpired):
         # Fallback for non-systemd systems

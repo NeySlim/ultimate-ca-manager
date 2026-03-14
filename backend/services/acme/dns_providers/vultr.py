@@ -61,7 +61,7 @@ class VultrDnsProvider(BaseDnsProvider):
                 try:
                     error = response.json()
                     error_msg = error.get('error', str(error))
-                except:
+                except Exception:
                     error_msg = response.reason
                 return False, error_msg
             

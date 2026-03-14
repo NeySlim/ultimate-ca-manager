@@ -98,7 +98,7 @@ class KeyEncryption:
             decoded = base64.b64decode(data)
             if decoded.startswith(ENCRYPTED_MARKER):
                 return data
-        except:
+        except Exception:
             pass
         
         try:
@@ -143,7 +143,7 @@ class KeyEncryption:
         try:
             decoded = base64.b64decode(data)
             return decoded.startswith(ENCRYPTED_MARKER)
-        except:
+        except Exception:
             return False
     
     @staticmethod

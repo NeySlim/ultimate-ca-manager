@@ -96,7 +96,7 @@ class AuthManager:
         # Parse permissions from JSON
         try:
             permissions = json.loads(api_key.permissions)
-        except:
+        except Exception:
             permissions = []
         
         return {

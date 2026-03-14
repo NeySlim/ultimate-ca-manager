@@ -68,7 +68,7 @@ class GandiDnsProvider(BaseDnsProvider):
                         error_msg = error.get('message') or error.get('cause') or error.get('error') or response.reason
                     else:
                         error_msg = str(error)
-                except:
+                except Exception:
                     error_msg = response.reason
                 return False, error_msg
             

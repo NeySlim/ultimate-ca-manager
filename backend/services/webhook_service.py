@@ -43,13 +43,13 @@ class WebhookEndpoint(db.Model):
     def get_events(self):
         try:
             return json.loads(self.events) if self.events else []
-        except:
+        except Exception:
             return []
     
     def get_headers(self):
         try:
             return json.loads(self.custom_headers) if self.custom_headers else {}
-        except:
+        except Exception:
             return {}
     
     def to_dict(self):

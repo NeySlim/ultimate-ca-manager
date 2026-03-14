@@ -239,7 +239,7 @@ def get_certificate_trend():
     days = min(max(days, 1), 90)  # clamp 1-90
     
     try:
-        today = datetime.now().date()
+        today = utc_now().date()
         start_date = today - timedelta(days=days - 1)
         start_dt = datetime.combine(start_date, datetime.min.time())
         end_dt = datetime.combine(today, datetime.max.time())

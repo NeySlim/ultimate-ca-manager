@@ -62,7 +62,7 @@ def spa(path):
     if path and '.' in path.split('/')[-1]:
         try:
             return _serve_asset(path)
-        except:
+        except Exception:
             # Hashed asset not found (stale cache after update) → serve index.html
             # Browser will reload with fresh chunk references
             pass

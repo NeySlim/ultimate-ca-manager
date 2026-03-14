@@ -34,7 +34,7 @@ def get_pinned_certs():
         with open(PINS_FILE, 'r') as f:
             data = json.load(f)
             return data.get('pins', {})
-    except:
+    except Exception:
         return {}
 
 

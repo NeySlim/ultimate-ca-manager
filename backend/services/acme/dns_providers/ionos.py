@@ -66,7 +66,7 @@ class IonosDnsProvider(BaseDnsProvider):
                 try:
                     error = response.json()
                     error_msg = error.get('message', response.reason)
-                except:
+                except Exception:
                     error_msg = response.reason
                 return False, error_msg
             

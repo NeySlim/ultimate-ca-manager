@@ -66,7 +66,7 @@ class CertificatePolicy(db.Model):
         """Parse rules JSON"""
         try:
             return json.loads(self.rules) if self.rules else {}
-        except:
+        except Exception:
             return {}
     
     def set_rules(self, rules_dict):
@@ -135,7 +135,7 @@ class ApprovalRequest(db.Model):
     def get_approvals(self):
         try:
             return json.loads(self.approvals) if self.approvals else []
-        except:
+        except Exception:
             return []
     
     def add_approval(self, user_id, username, action, comment=None):

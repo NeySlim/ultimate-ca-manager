@@ -34,7 +34,7 @@ class AcmeAccount(db.Model):
             return []
         try:
             return json.loads(self.contact)
-        except:
+        except Exception:
             return []
     
     def to_dict(self):
@@ -87,7 +87,7 @@ class AcmeOrder(db.Model):
             return []
         try:
             return json.loads(self.identifiers)
-        except:
+        except Exception:
             return []
     
     def set_identifiers_list(self, identifiers):
@@ -264,7 +264,7 @@ class DnsProvider(db.Model):
             return []
         try:
             return json.loads(self.zones)
-        except:
+        except Exception:
             return []
     
     def set_zones_list(self, zones):
@@ -288,7 +288,7 @@ class DnsProvider(db.Model):
             try:
                 creds = json.loads(self.credentials)
                 result['credential_keys'] = list(creds.keys())
-            except:
+            except Exception:
                 result['credential_keys'] = []
         return result
     
@@ -360,7 +360,7 @@ class AcmeClientOrder(db.Model):
             return []
         try:
             return json.loads(self.domains)
-        except:
+        except Exception:
             return []
     
     def set_domains_list(self, domains):
@@ -374,7 +374,7 @@ class AcmeClientOrder(db.Model):
             return {}
         try:
             return json.loads(self.challenges_data)
-        except:
+        except Exception:
             return {}
     
     def set_challenges_dict(self, challenges):

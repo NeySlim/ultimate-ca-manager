@@ -50,7 +50,7 @@ class HTTPSManager:
         if common_name is None:
             try:
                 common_name = socket.getfqdn()
-            except:
+            except Exception:
                 common_name = "localhost"
         
         # Build subject

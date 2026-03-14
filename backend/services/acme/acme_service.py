@@ -6,6 +6,7 @@ import secrets
 import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
+import logging
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
@@ -20,6 +21,8 @@ from models.acme_models import (
     AcmeChallenge, AcmeNonce
 )
 from utils.datetime_utils import utc_now
+
+logger = logging.getLogger(__name__)
 
 
 class AcmeService:
@@ -288,7 +291,7 @@ class AcmeService:
                     return auth
             except Exception as e:
                 # Log but continue with new auth
-                print(f"Error checking auth reuse: {e}")
+                logger.error(f"Error checking auth reuse: {e}")
 
         # No reuse - create new pending authorization
         auth = AcmeAuthorization(
@@ -595,7 +598,7 @@ class AcmeService:
         try:
             cn = csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
             domains.append(cn)
-        except:
+        except Exception:
             pass
         
         # Get SANs
@@ -605,7 +608,7 @@ class AcmeService:
                 if isinstance(name, x509.DNSName):
                     if name.value not in domains:
                         domains.append(name.value)
-        except:
+        except Exception:
             pass
         
         return domains
@@ -709,7 +712,7 @@ class AcmeService:
                         if isinstance(name, x509.DNSName):
                             cn = name.value
                             break
-                except:
+                except Exception:
                     pass
             
             # Use CN as description if found

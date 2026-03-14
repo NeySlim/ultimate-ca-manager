@@ -86,7 +86,7 @@ class SSOProvider(db.Model):
         try:
             from utils.encryption import decrypt_if_needed
             return decrypt_if_needed(self._oauth2_client_secret)
-        except:
+        except Exception:
             return self._oauth2_client_secret
     
     @oauth2_client_secret.setter
@@ -96,7 +96,7 @@ class SSOProvider(db.Model):
             try:
                 from utils.encryption import encrypt_if_needed
                 self._oauth2_client_secret = encrypt_if_needed(value)
-            except:
+            except Exception:
                 self._oauth2_client_secret = value
         else:
             self._oauth2_client_secret = None
@@ -109,7 +109,7 @@ class SSOProvider(db.Model):
         try:
             from utils.encryption import decrypt_if_needed
             return decrypt_if_needed(self._ldap_bind_password)
-        except:
+        except Exception:
             return self._ldap_bind_password
     
     @ldap_bind_password.setter
@@ -119,7 +119,7 @@ class SSOProvider(db.Model):
             try:
                 from utils.encryption import encrypt_if_needed
                 self._ldap_bind_password = encrypt_if_needed(value)
-            except:
+            except Exception:
                 self._ldap_bind_password = value
         else:
             self._ldap_bind_password = None
@@ -191,12 +191,12 @@ class SSOProvider(db.Model):
         # Parse JSON fields
         try:
             data['attribute_mapping'] = json.loads(self.attribute_mapping) if self.attribute_mapping else {}
-        except:
+        except Exception:
             data['attribute_mapping'] = {}
         
         try:
             data['role_mapping'] = json.loads(self.role_mapping) if self.role_mapping else {}
-        except:
+        except Exception:
             data['role_mapping'] = {}
         
         return data

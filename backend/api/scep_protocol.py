@@ -34,7 +34,7 @@ def get_scep_service():
         ca = CA.query.get(int(ca_id))
         if not ca:
             ca = CA.query.filter_by(refid=ca_id).first()
-    except:
+    except (ValueError, TypeError):
         ca = CA.query.filter_by(refid=ca_id).first()
     
     if not ca:
@@ -127,7 +127,7 @@ def handle_get_ca_cert():
         
     except Exception as e:
         current_app.logger.error(f"SCEP GetCACert error: {e}")
-        return make_error_response(str(e), 500)
+        return make_error_response("SCEP server error", 500)
 
 
 def handle_pki_operation():
@@ -167,7 +167,7 @@ def handle_pki_operation():
         
     except Exception as e:
         current_app.logger.error(f"SCEP PKIOperation error: {e}", exc_info=True)
-        return make_error_response(str(e), 500)
+        return make_error_response("SCEP processing error", 500)
 
 
 def make_error_response(message, status_code):

@@ -45,7 +45,7 @@ class CertificateParser:
             return cert
             
         except Exception as e:
-            print(f"Error parsing certificate: {e}")
+            logger.error(f"Error parsing certificate: {e}")
             return None
     
     @staticmethod
@@ -81,7 +81,7 @@ class CertificateParser:
             cn_attrs = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
             if cn_attrs:
                 cn = cn_attrs[0].value
-        except:
+        except Exception:
             pass
         
         # Extract email from SAN or subject
@@ -91,13 +91,13 @@ class CertificateParser:
             emails = san_ext.value.get_values_for_type(x509.RFC822Name)
             if emails:
                 email = emails[0]
-        except:
+        except Exception:
             # Try to get email from subject
             try:
                 email_attrs = cert.subject.get_attributes_for_oid(x509.oid.NameOID.EMAIL_ADDRESS)
                 if email_attrs:
                     email = email_attrs[0].value
-            except:
+            except Exception:
                 pass
         
         return {

@@ -34,7 +34,7 @@ class CoreNetworksDnsProvider(BaseDnsProvider):
                 self._token = resp.json().get('token')
                 return True
             return False
-        except:
+        except Exception:
             return False
     
     def _request(self, method, path, data=None):

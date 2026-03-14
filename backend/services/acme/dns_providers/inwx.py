@@ -105,7 +105,7 @@ class InwxDnsProvider(BaseDnsProvider):
         import base64
         try:
             key = base64.b32decode(secret.upper() + '=' * (8 - len(secret) % 8))
-        except:
+        except Exception:
             key = secret.encode()
         
         # Time-based counter

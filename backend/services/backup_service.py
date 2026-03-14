@@ -216,7 +216,7 @@ class BackupService:
             if isinstance(val, bytes):
                 try:
                     val = val.decode('utf-8')
-                except:
+                except Exception:
                     import base64
                     val = base64.b64encode(val).decode('utf-8')
             
@@ -304,7 +304,7 @@ class BackupService:
                     from security.encryption import decrypt_private_key
                     prv_decrypted = decrypt_private_key(ca.prv)
                     ca_data['_private_key_plaintext'] = base64.b64decode(prv_decrypted).decode()
-                except:
+                except Exception:
                     ca_data['_private_key_plaintext'] = ca.prv
             
             cas.append(ca_data)
@@ -346,7 +346,7 @@ class BackupService:
                     from security.encryption import decrypt_private_key
                     prv_decrypted = decrypt_private_key(cert.prv)
                     cert_data['_private_key_plaintext'] = base64.b64decode(prv_decrypted).decode()
-                except:
+                except Exception:
                     cert_data['_private_key_plaintext'] = cert.prv
             
             certs.append(cert_data)

@@ -293,7 +293,7 @@ class CA(db.Model):
             elif isinstance(public_key, dsa.DSAPublicKey):
                 return f"DSA {public_key.key_size}"
             return "Unknown"
-        except:
+        except Exception:
             return "N/A"
     
     @property
@@ -309,7 +309,7 @@ class CA(db.Model):
             cert_pem = base64.b64decode(self.crt).decode('utf-8')
             cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
             return cert.signature_algorithm_oid._name.upper().replace('SHA', 'SHA-')
-        except:
+        except Exception:
             return "N/A"
     
     def to_dict(self, include_private=False):
@@ -391,7 +391,7 @@ class CA(db.Model):
         try:
             import base64
             return base64.b64decode(encoded).decode('utf-8')
-        except:
+        except Exception:
             return None
 
 
@@ -469,7 +469,7 @@ class Certificate(db.Model):
             return []
         try:
             return json.loads(self.san_dns)
-        except:
+        except Exception:
             return []
     
     @property
@@ -480,7 +480,7 @@ class Certificate(db.Model):
             return []
         try:
             return json.loads(self.san_ip)
-        except:
+        except Exception:
             return []
     
     @property
@@ -491,7 +491,7 @@ class Certificate(db.Model):
             return []
         try:
             return json.loads(self.san_email)
-        except:
+        except Exception:
             return []
     
     @property
@@ -502,7 +502,7 @@ class Certificate(db.Model):
             return []
         try:
             return json.loads(self.san_uri)
-        except:
+        except Exception:
             return []
             
     @property
@@ -730,21 +730,21 @@ class Certificate(db.Model):
                 import json
                 dns_list = json.loads(self.san_dns) if self.san_dns.startswith('[') else [self.san_dns]
                 sans.extend([f"DNS:{d}" for d in dns_list])
-            except:
+            except Exception:
                 sans.append(f"DNS:{self.san_dns}")
         if self.san_ip:
             try:
                 import json
                 ip_list = json.loads(self.san_ip) if self.san_ip.startswith('[') else [self.san_ip]
                 sans.extend([f"IP:{ip}" for ip in ip_list])
-            except:
+            except Exception:
                 sans.append(f"IP:{self.san_ip}")
         if self.san_email:
             try:
                 import json
                 email_list = json.loads(self.san_email) if self.san_email.startswith('[') else [self.san_email]
                 sans.extend([f"Email:{e}" for e in email_list])
-            except:
+            except Exception:
                 sans.append(f"Email:{self.san_email}")
         return ', '.join(sans) if sans else ""
     
@@ -851,7 +851,7 @@ class Certificate(db.Model):
         try:
             import base64
             return base64.b64decode(encoded).decode('utf-8')
-        except:
+        except Exception:
             return None
 
 

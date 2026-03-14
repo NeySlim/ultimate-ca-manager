@@ -35,7 +35,7 @@ def _get_encryption_key() -> bytes:
             with open(path, 'r') as f:
                 machine_id = f.read().strip()
                 break
-        except:
+        except Exception:
             continue
     
     if not machine_id:
@@ -46,7 +46,7 @@ def _get_encryption_key() -> bytes:
             os.makedirs('/opt/ucm/data', exist_ok=True)
             with open('/opt/ucm/data/.machine-key', 'w') as f:
                 f.write(machine_id)
-        except:
+        except Exception:
             pass
     
     # Derive Fernet-compatible key (32 bytes, base64 encoded)
@@ -104,7 +104,7 @@ def is_encrypted(value: str) -> bool:
     try:
         # Fernet tokens start with 'gAAAAA'
         return value.startswith('gAAAAA') and len(value) > 50
-    except:
+    except Exception:
         return False
 
 

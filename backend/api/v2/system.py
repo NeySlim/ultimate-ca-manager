@@ -15,6 +15,7 @@ import shutil
 import werkzeug.utils
 from datetime import datetime, timezone
 import logging
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ def export_db():
         return Response(
             sql_dump.getvalue(),
             mimetype='application/sql',
-            headers={'Content-Disposition': f'attachment; filename=ucm_database_{datetime.now().strftime("%Y%m%d_%H%M%S")}.sql'}
+            headers={'Content-Disposition': f'attachment; filename=ucm_database_{utc_now().strftime("%Y%m%d_%H%M%S")}.sql'}
         )
     except Exception as e:
         logger.error(f"Database export failed: {e}")
@@ -277,7 +278,7 @@ def regenerate_https_cert():
         
         # Backup existing
         if cert_path.exists():
-            backup_suffix = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
             shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
         if key_path.exists():
             shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
@@ -360,7 +361,7 @@ def apply_https_cert():
         
         # Backup existing certs
         if cert_path.exists():
-            backup_suffix = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
             shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
         if key_path.exists():
             shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
@@ -1139,7 +1140,7 @@ def rotate_secrets():
         
         try:
             # Backup current .env
-            backup_path = env_path.with_suffix(f'.env.backup-{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+            backup_path = env_path.with_suffix(f'.env.backup-{utc_now().strftime("%Y%m%d_%H%M%S")}')
             shutil.copy(env_path, backup_path)
             
             # Read and update .env

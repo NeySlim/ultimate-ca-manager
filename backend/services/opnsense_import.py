@@ -7,6 +7,9 @@ import base64
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -353,15 +356,15 @@ class OPNsenseImportService:
             
             sys.stderr.write(f"ERROR get_config_xml: Could not retrieve config.xml via standard methods\n")
             sys.stderr.flush()
-            print("Could not retrieve config.xml via standard methods")
-            print("You may need to:")
-            print("  1. Download config.xml manually from OPNsense")
-            print("  2. Use the /import/upload endpoint to import it")
+            logger.info("Could not retrieve config.xml via standard methods")
+            logger.info("You may need to:")
+            logger.info("  1. Download config.xml manually from OPNsense")
+            logger.info("  2. Use the /import/upload endpoint to import it")
             
             return None
         
         except Exception as e:
-            print(f"Failed to get config.xml: {e}")
+            logger.error(f"Failed to get config.xml: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -457,12 +460,12 @@ class OPNsenseImportService:
                     ca_data['is_root'] = (cert.subject == cert.issuer)
                 
                 except Exception as e:
-                    print(f"Failed to parse CA cert: {e}")
+                    logger.error(f"Failed to parse CA cert: {e}")
             
             return ca_data
         
         except Exception as e:
-            print(f"Failed to parse CA element: {e}")
+            logger.error(f"Failed to parse CA element: {e}")
             return None
     
     def _parse_cert_element(self, cert_elem: ET.Element) -> Optional[Dict]:
@@ -493,12 +496,12 @@ class OPNsenseImportService:
                     cert_data['serial_number'] = str(cert.serial_number)
                 
                 except Exception as e:
-                    print(f"Failed to parse certificate: {e}")
+                    logger.error(f"Failed to parse certificate: {e}")
             
             return cert_data
         
         except Exception as e:
-            print(f"Failed to parse cert element: {e}")
+            logger.error(f"Failed to parse cert element: {e}")
             return None
     
     def import_cas(self, cas_data: List[Dict], skip_existing: bool = True) -> Dict:
@@ -590,7 +593,7 @@ class OPNsenseImportService:
             except Exception as e:
                 stats['failed'] += 1
                 stats['errors'].append(f"CA {ca_data.get('refid', 'unknown')}: {str(e)}")
-                print(f"Failed to import CA: {e}")
+                logger.error(f"Failed to import CA: {e}")
                 import traceback
                 traceback.print_exc()
         
@@ -671,7 +674,7 @@ class OPNsenseImportService:
                                     san_uri_list.append(name.value)
                         except x509.ExtensionNotFound:
                             pass  # No SAN extension
-                    except:
+                    except Exception:
                         pass  # Ignore parsing errors
                 
                 # Create certificate record
@@ -729,7 +732,7 @@ class OPNsenseImportService:
                 stats['errors'].append(
                     f"Cert {cert_data.get('refid', 'unknown')}: {str(e)}"
                 )
-                print(f"Failed to import certificate: {e}")
+                logger.error(f"Failed to import certificate: {e}")
                 import traceback
                 traceback.print_exc()
         

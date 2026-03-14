@@ -8,6 +8,7 @@ import base64
 import time
 import requests
 import secrets
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, Union
 
@@ -17,6 +18,8 @@ from cryptography.hazmat.backends import default_backend
 import josepy as jose
 
 from models import db, SystemConfig, DnsProvider
+
+logger = logging.getLogger(__name__)
 
 class AcmeProxyService:
     # Default upstream (Let's Encrypt Staging for safety by default, user can change)
@@ -541,7 +544,7 @@ class AcmeProxyService:
                     cn = cert_obj.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
                     descr = cn[0].value if cn else "Let's Encrypt Certificate"
                     
-                    print(f"[ACME Proxy] Storing LE certificate: {descr}")
+                    logger.info(f"[ACME Proxy] Storing LE certificate: {descr}")
                     
                     # Import the certificate with source='letsencrypt'
                     stored_cert = CertificateService.import_certificate(
@@ -551,10 +554,10 @@ class AcmeProxyService:
                         source='letsencrypt',
                         username='acme_proxy'
                     )
-                    print(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
+                    logger.info(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
             except Exception as e:
                 # Log but don't fail - cert was obtained
-                print(f"[ACME Proxy] Error storing certificate: {e}")
+                logger.error(f"[ACME Proxy] Error storing certificate: {e}")
                 import traceback
                 traceback.print_exc()
             

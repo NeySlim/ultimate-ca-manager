@@ -64,7 +64,7 @@ class DesecDnsProvider(BaseDnsProvider):
                         error_msg = error.get('detail', str(error))
                     else:
                         error_msg = str(error)
-                except:
+                except Exception:
                     error_msg = response.reason
                 return False, error_msg
             

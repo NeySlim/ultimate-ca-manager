@@ -42,7 +42,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
                 certs = pkcs7.load_pem_pkcs7_certificates(file_data)
                 if certs:
                     cert = certs[0]
-            except:
+            except Exception:
                 pass
         
         if not cert:
@@ -58,7 +58,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
                         password=password.encode() if password else None, 
                         backend=default_backend()
                     )
-                except:
+                except Exception:
                     pass
                 
     elif format_type == 'der':
@@ -71,7 +71,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
                 certs = pkcs7.load_der_pkcs7_certificates(file_data)
                 if certs:
                     cert = certs[0]
-            except:
+            except Exception:
                 raise der_err
         
     elif format_type == 'pkcs12':
@@ -89,7 +89,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
         from cryptography.hazmat.primitives.serialization import pkcs7
         try:
             certs = pkcs7.load_der_pkcs7_certificates(file_data)
-        except:
+        except Exception:
             certs = pkcs7.load_pem_pkcs7_certificates(file_data)
         if certs:
             cert = certs[0]
@@ -120,7 +120,7 @@ def extract_cert_info(cert):
     def get_name_attr(name_obj, oid):
         try:
             return name_obj.get_attributes_for_oid(oid)[0].value
-        except:
+        except Exception:
             return ''
     
     # Get serial number as hex string for comparison

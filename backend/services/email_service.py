@@ -180,7 +180,7 @@ class EmailService:
             
             try:
                 db.session.commit()
-            except:
+            except Exception:
                 pass
             
             return False, f"Failed to send email: {error_msg}"

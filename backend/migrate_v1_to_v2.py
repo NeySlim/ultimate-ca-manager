@@ -411,7 +411,7 @@ def create_v2_tables(conn):
         for m in migrations:
             try:
                 conn.execute("INSERT INTO _migrations (name) VALUES (?)", (m,))
-            except:
+            except Exception:
                 pass
         tables_created.append('_migrations')
     

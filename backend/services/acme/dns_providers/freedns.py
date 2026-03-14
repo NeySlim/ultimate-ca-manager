@@ -239,7 +239,7 @@ class FreeDnsDnsProvider(BaseDnsProvider):
                 unique_domains = len(set(domain_ids))
                 
                 return True, f"Connected successfully. Found {unique_domains} domain(s)"
-            except:
+            except Exception:
                 return True, "Connected successfully"
         return False, f"Connection failed: {msg}"
     
