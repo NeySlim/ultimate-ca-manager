@@ -40,9 +40,9 @@ export function UpdateChecker() {
         }
       }
     } catch (err) {
-      setError(err.message || 'Failed to check for updates')
+      setError(err.message || t('settings.checkFailed', 'Failed to check for updates'))
       if (showNotification) {
-        showError('Failed to check for updates')
+        showError(t('settings.checkFailed', 'Failed to check for updates'))
       }
     } finally {
       setChecking(false)
@@ -65,14 +65,14 @@ export function UpdateChecker() {
         include_prereleases: includeChannel !== 'stable',
         include_dev: includeChannel === 'dev'
       })
-      showSuccess(`Update to v${updateInfo.latest_version} initiated...`)
+      showSuccess(t('settings.updateInitiated', { version: updateInfo.latest_version, defaultValue: `Update to v${updateInfo.latest_version} initiated...` }))
       
       // Show reconnect overlay — countdown then poll until service is back
       waitForRestart({
         expectedVersion: updateInfo.latest_version
       })
     } catch (err) {
-      showError(err.message || 'Failed to install update')
+      showError(err.message || t('settings.installFailed', 'Failed to install update'))
       setInstalling(false)
     }
   }
@@ -196,7 +196,7 @@ export function UpdateChecker() {
             className="gap-1.5"
           >
             <ArrowsClockwise size={16} className={checking ? 'animate-spin' : ''} />
-            {checking ? 'Checking...' : 'Check Now'}
+            {checking ? t('settings.checking', 'Checking...') : t('settings.checkNow', 'Check Now')}
           </Button>
         </div>
       </div>

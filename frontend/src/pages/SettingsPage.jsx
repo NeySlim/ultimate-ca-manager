@@ -1707,7 +1707,7 @@ function MscaConnectionForm({ connection, onSave, onCancel }) {
 
       {formData.auth_method === 'kerberos' && (
         <>
-          <div className="p-3 rounded-lg bg-warning/10 border border-warning/30 text-sm text-warning">
+          <div className="p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30 text-sm status-warning-text">
             {t('msca.kerberosOptionalNote')}
           </div>
           <Input

@@ -1280,10 +1280,10 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
         {autoSans.length > 0 && (
           <div className="space-y-1">
             {autoSans.map((s, idx) => (
-              <div key={`auto-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-accent-primary/8 border border-accent-primary/20 rounded-md">
-                <span className="text-[10px] font-medium uppercase tracking-wider text-accent-primary/70 w-12">{s.type}</span>
+              <div key={`auto-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-accent-primary-op10 border border-accent-primary-op20 rounded-md">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-accent-primary-op60 w-12">{s.type}</span>
                 <span className="text-xs text-text-primary font-mono flex-1">{s.value}</span>
-                <span className="text-[10px] text-accent-primary/60 italic">{t('certificates.autoIncluded')}</span>
+                <span className="text-[10px] text-accent-primary-op60 italic">{t('certificates.autoIncluded')}</span>
               </div>
             ))}
           </div>
@@ -1291,10 +1291,10 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
 
         {/* Wildcard base domain suggestion */}
         {wildcardSuggestion && (
-          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-status-warning/8 border border-status-warning/20 rounded-md">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-status-warning/70 w-12">dns</span>
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-status-warning-op10 border border-status-warning-op20 rounded-md">
+            <span className="text-[10px] font-medium uppercase tracking-wider status-warning-text w-12">dns</span>
             <span className="text-xs text-text-secondary font-mono flex-1">{wildcardSuggestion}</span>
-            <Button type="button" variant="ghost" size="sm" onClick={addWildcardBase} className="text-[10px] text-status-warning hover:text-status-warning/80 !px-1.5 !py-0.5">
+            <Button type="button" variant="ghost" size="sm" onClick={addWildcardBase} className="text-[10px] status-warning-text !px-1.5 !py-0.5">
               <Plus size={10} /> {t('certificates.addBaseDomain')}
             </Button>
           </div>
