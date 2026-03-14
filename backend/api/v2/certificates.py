@@ -297,7 +297,11 @@ def create_certificate():
         san_dns = []
         san_ip = []
         san_email = []
-        raw_sans = [s.strip() for s in re.split(r'[,\n;]+', data['san']) if s.strip()]
+        san_raw = data['san']
+        # Accept both string and array
+        if isinstance(san_raw, list):
+            san_raw = ','.join(str(s) for s in san_raw)
+        raw_sans = [s.strip() for s in re.split(r'[,\n;]+', san_raw) if s.strip()]
         for entry in raw_sans:
             # Remove type prefixes if present (e.g. "DNS:example.com", "IP:1.2.3.4")
             entry_clean = re.sub(r'^(DNS|IP|EMAIL|URI):\s*', '', entry, flags=re.IGNORECASE)
