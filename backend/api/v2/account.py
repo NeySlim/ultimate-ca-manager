@@ -13,6 +13,7 @@ from models import db
 from services.audit_service import AuditService
 from datetime import datetime
 import pyotp
+import re
 import qrcode
 import logging
 
@@ -71,8 +72,10 @@ def update_profile():
     
     # Update allowed fields
     if 'email' in data:
-        # TODO: Validate email format
-        user.email = data['email']
+        email = data['email']
+        if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            return error_response('Invalid email format', 400)
+        user.email = email
     
     if 'full_name' in data:
         user.full_name = data.get('full_name')
@@ -80,8 +83,7 @@ def update_profile():
     if 'timezone' in data:
         user.timezone = data.get('timezone', 'UTC')
     
-    # TODO: Save to database
-    # db.session.commit()
+    db.session.commit()
     
     return success_response(
         data={

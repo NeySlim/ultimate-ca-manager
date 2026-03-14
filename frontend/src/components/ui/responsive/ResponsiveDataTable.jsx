@@ -117,7 +117,7 @@ export function ResponsiveDataTable({
   // Save column widths to localStorage
   useEffect(() => {
     if (columnStorageKey && Object.keys(columnWidths).length > 0) {
-      localStorage.setItem(`${columnStorageKey}-widths`, JSON.stringify(columnWidths))
+      try { localStorage.setItem(`${columnStorageKey}-widths`, JSON.stringify(columnWidths)) } catch {}
     }
   }, [columnWidths, columnStorageKey])
   
@@ -183,7 +183,7 @@ export function ResponsiveDataTable({
   // Save column preferences
   useEffect(() => {
     if (columnStorageKey) {
-      localStorage.setItem(columnStorageKey, JSON.stringify(hiddenColumns))
+      try { localStorage.setItem(columnStorageKey, JSON.stringify(hiddenColumns)) } catch {}
     }
   }, [hiddenColumns, columnStorageKey])
   
@@ -221,7 +221,7 @@ export function ResponsiveDataTable({
   // Save presets to localStorage
   useEffect(() => {
     if (filterPresetsKey) {
-      localStorage.setItem(filterPresetsKey, JSON.stringify(filterPresets))
+      try { localStorage.setItem(filterPresetsKey, JSON.stringify(filterPresets)) } catch {}
     }
   }, [filterPresets, filterPresetsKey])
   

@@ -94,7 +94,7 @@ def _check_database():
         return {'status': 'ok'}
     except Exception as e:
         current_app.logger.error(f"Database health check failed: {e}")
-        return {'status': 'error', 'message': str(e)[:100]}
+        return {'status': 'error', 'message': 'Database connection failed'}
 
 
 def _check_filesystem():
@@ -105,7 +105,7 @@ def _check_filesystem():
             return {'status': 'ok'}
         return {'status': 'error', 'message': 'Data directory not writable'}
     except Exception as e:
-        return {'status': 'error', 'message': str(e)[:100]}
+        return {'status': 'error', 'message': 'Filesystem check failed'}
 
 
 def _check_redis(redis_url):
@@ -119,4 +119,4 @@ def _check_redis(redis_url):
         return {'status': 'skipped', 'message': 'redis library not installed'}
     except Exception as e:
         current_app.logger.error(f"Redis health check failed: {e}")
-        return {'status': 'error', 'message': str(e)[:100]}
+        return {'status': 'error', 'message': 'Redis connection failed'}

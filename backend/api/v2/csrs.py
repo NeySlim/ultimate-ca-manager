@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 @require_auth(['read:csrs'])
 def list_csrs():
     """List all pending CSRs (Certificates with no crt)"""
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     
     # Filter for certificates that have a CSR but no signed certificate yet
     query = Certificate.query.filter(
@@ -69,8 +69,8 @@ def list_csrs():
 def list_csrs_history():
     """List all signed CSRs (Certificates that had a CSR and now have crt)"""
     
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     
     # Filter for certificates that have both CSR and signed certificate
     query = Certificate.query.filter(
@@ -161,9 +161,9 @@ def create_csr():
         key_algo_full = data.get('key_type', 'RSA 2048')
         # Simple parser
         if 'RSA' in key_algo_full:
-            key_type = key_algo_full.replace('RSA', '').strip()
+            key_type = key_algo_full.replace('RSA', '').strip() or '2048'
         elif 'EC' in key_algo_full:
-            key_type = key_algo_full.replace('EC', '').strip()
+            key_type = key_algo_full.replace('EC', '').strip() or 'secp256r1'
         else:
             key_type = '2048'
 
@@ -188,7 +188,7 @@ def create_csr():
             key_type=key_type,
             san_dns=san_dns or None,
             san_ip=san_ip or None,
-            username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin' # TODO: Get real user
+            username=getattr(g, 'current_user', None) and g.current_user.username or 'system'
         )
         
         AuditService.log_action(

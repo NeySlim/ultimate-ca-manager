@@ -331,7 +331,7 @@ def bulk_delete_templates():
             results['success'].append(template_id)
         except Exception as e:
             db.session.rollback()
-            results['failed'].append({'id': template_id, 'error': str(e)})
+            results['failed'].append({'id': template_id, 'error': 'Delete failed'})
 
     AuditService.log_action(
         action='templates_bulk_deleted',

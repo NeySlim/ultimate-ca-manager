@@ -18,6 +18,7 @@ import { languages } from '../i18n'
 import { useAuth, useNotification } from '../contexts'
 import { useTheme } from '../contexts/ThemeContext'
 import { authMethodsService } from '../services/auth-methods.service'
+import { authService } from '../services/auth.service'
 import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'ucm_last_username'
@@ -95,14 +96,13 @@ export default function LoginPage() {
     }
 
     // Check email config
-    fetch('/api/v2/auth/email-configured')
-      .then(res => res.ok ? res.json() : null)
+    authService.isEmailConfigured()
       .then(data => setEmailConfigured(data?.configured || false))
       .catch(() => {})
 
     // Load SSO providers + detect global auth methods in parallel
     Promise.all([
-      fetch('/api/v2/sso/available').then(r => r.ok ? r.json() : null).catch(() => null),
+      authService.getSsoProviders().catch(() => null),
       authMethodsService.detectMethods(null)
     ]).then(([ssoData, methods]) => {
       // SSO providers
@@ -144,8 +144,7 @@ export default function LoginPage() {
     if (ssoComplete) {
       setLoading(true)
       setStatusMessage(t('auth.signingIn'))
-      fetch('/api/v2/auth/verify', { credentials: 'include' })
-        .then(res => res.ok ? res.json() : Promise.reject('Session not established'))
+      authService.verifySession()
         .then(async (data) => {
           const verifyData = data.data || data
           await login(verifyData?.user?.username || 'sso_user', null, verifyData)
@@ -321,17 +320,12 @@ export default function LoginPage() {
     setStatusMessage(t('auth.authenticating'))
 
     try {
-      const response = await fetch('/api/v2/sso/ldap/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, provider_id: selectedLdapProvider?.id })
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || t('auth.invalidCredentials'))
+      const data = await authService.ldapLogin(username, password, selectedLdapProvider?.id)
+      const responseData = data.data || data
 
       saveUsername(username)
       saveAuthMethod('ldap', selectedLdapProvider?.id)
-      await login(username, null, data.data)
+      await login(username, null, responseData)
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
     } catch (error) {

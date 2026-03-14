@@ -217,7 +217,7 @@ def get_https_cert_info():
     except Exception as e:
         return success_response(data={
             'common_name': 'Error reading certificate',
-            'issuer': str(e),
+            'issuer': 'Unknown',
             'valid_from': None,
             'valid_to': None,
             'fingerprint': '-',
@@ -1174,15 +1174,8 @@ def rotate_secrets():
             )
             
             # Restart service
-            import signal
-            if is_docker:
-                os.kill(os.getppid(), signal.SIGTERM)
-            else:
-                try:
-                    import subprocess
-                    subprocess.run(['systemctl', 'restart', 'ucm'], check=True, timeout=30)
-                except Exception:
-                    os.kill(os.getppid(), signal.SIGHUP)
+            from utils.service_manager import restart_service as do_restart
+            do_restart()
             
             return success_response(
                 data={

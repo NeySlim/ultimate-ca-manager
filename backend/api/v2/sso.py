@@ -17,6 +17,7 @@ import secrets as py_secrets
 import traceback
 import urllib.parse
 import requests as http_requests
+from defusedxml.lxml import fromstring as safe_fromstring
 from lxml import etree
 
 import logging
@@ -860,6 +861,22 @@ def fetch_idp_metadata():
     if not metadata_url:
         return error_response("metadata_url is required", 400)
     
+    # Validate URL scheme to prevent SSRF
+    from urllib.parse import urlparse
+    parsed = urlparse(metadata_url)
+    if parsed.scheme not in ('http', 'https'):
+        return error_response("metadata_url must use http or https scheme", 400)
+    if not parsed.hostname:
+        return error_response("metadata_url must include a hostname", 400)
+    # Block loopback/private ranges
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(parsed.hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            return error_response("metadata_url cannot target private/internal addresses", 400)
+    except ValueError:
+        pass  # hostname is a domain name, not an IP — OK
+    
     try:
         # Use provider SSL settings if provider_id provided, otherwise default to True
         provider_id = data.get('provider_id')
@@ -1120,7 +1137,7 @@ def _parse_saml_metadata(xml_text):
         'ds': 'http://www.w3.org/2000/09/xmldsig#',
     }
     
-    root = etree.fromstring(xml_text.encode('utf-8'))
+    root = safe_fromstring(xml_text.encode('utf-8'))
     
     result = {
         'entity_id': None,
@@ -1398,7 +1415,7 @@ def sso_callback(provider_type):
                 logger.warning(f"SAML standard parsing failed, using fallback: {saml_err}")
                 saml_response_b64 = request.form.get('SAMLResponse', '')
                 saml_xml = base64.b64decode(saml_response_b64)
-                root = etree.fromstring(saml_xml)
+                root = safe_fromstring(saml_xml)
                 ns = {'saml': 'urn:oasis:names:tc:SAML:2.0:assertion'}
                 name_id_el = root.find('.//saml:NameID', ns)
                 name_id = name_id_el.text if name_id_el is not None else ''

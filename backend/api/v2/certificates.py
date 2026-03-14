@@ -54,8 +54,8 @@ logger = logging.getLogger(__name__)
 def list_certificates():
     """List certificates"""
     
-    page = request.args.get('page', 1, type=int)
-    per_page = min(request.args.get('per_page', 20, type=int), 100)
+    page = max(1, request.args.get('page', 1, type=int))
+    per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     status = request.args.get('status')  # valid, revoked, expired, expiring
     ca_id = request.args.get('ca_id', type=int)  # Filter by CA
     search = request.args.get('search', '').strip()

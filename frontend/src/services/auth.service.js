@@ -47,6 +47,18 @@ export const authService = {
     return response
   },
 
+  async isEmailConfigured() {
+    return apiClient.get('/auth/email-configured')
+  },
+
+  async ldapLogin(username, password, providerId) {
+    return apiClient.post('/sso/ldap/login', { username, password, provider_id: providerId })
+  },
+
+  async getSsoProviders() {
+    return apiClient.get('/sso/available')
+  },
+
   async forgotPassword(email) {
     return apiClient.post('/auth/forgot-password', { email })
   },

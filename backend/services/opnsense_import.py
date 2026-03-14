@@ -4,7 +4,7 @@ Generic service to import CAs and Certificates from OPNsense Trust module
 Configurable via API for any OPNsense instance
 """
 import base64
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import logging

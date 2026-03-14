@@ -195,6 +195,13 @@ vi.mock('../../services/auth.service', () => ({
     login: vi.fn().mockResolvedValue({ data: {} }),
     logout: vi.fn().mockResolvedValue({ data: {} }),
     verify: vi.fn().mockResolvedValue({ data: { authenticated: true, user: { username: 'admin' } } }),
+    verifySession: vi.fn().mockResolvedValue({ data: { authenticated: true, user: { username: 'admin' } } }),
+    getCurrentUser: vi.fn().mockResolvedValue({ data: { user: { username: 'admin' } } }),
+    isEmailConfigured: vi.fn().mockResolvedValue({ configured: false }),
+    ldapLogin: vi.fn().mockResolvedValue({ data: {} }),
+    getSsoProviders: vi.fn().mockResolvedValue({ data: [] }),
+    forgotPassword: vi.fn().mockResolvedValue({ data: {} }),
+    resetPassword: vi.fn().mockResolvedValue({ data: {} }),
   }
 }))
 vi.mock('../../services/auth-methods.service', () => ({

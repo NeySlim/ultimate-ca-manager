@@ -92,7 +92,7 @@ def get_ca_certs():
         )
     except Exception as e:
         logger.error(f"EST cacerts failed: {e}")
-        return Response(str(e), status=500)
+        return Response("Internal server error", status=500)
 
 
 @bp.route('/simpleenroll', methods=['POST'])
@@ -173,7 +173,7 @@ def simple_enroll():
         
     except Exception as e:
         logger.error(f"EST simpleenroll failed: {e}")
-        return Response(str(e), status=400)
+        return Response("Enrollment failed", status=400)
 
 
 @bp.route('/simplereenroll', methods=['POST'])
@@ -241,7 +241,7 @@ def simple_reenroll():
         
     except Exception as e:
         logger.error(f"EST simplereenroll failed: {e}")
-        return Response(str(e), status=400)
+        return Response("Re-enrollment failed", status=400)
 
 
 @bp.route('/csrattrs', methods=['GET'])
@@ -400,4 +400,4 @@ Content-Transfer-Encoding: base64\r
         
     except Exception as e:
         logger.error(f"EST serverkeygen failed: {e}")
-        return Response(str(e), status=400)
+        return Response("Server key generation failed", status=400)

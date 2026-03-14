@@ -67,12 +67,12 @@ export default function CAsPage() {
   
   // View mode: 'tree' or 'list'
   const [viewMode, setViewMode] = useState(() => {
-    return localStorage.getItem('ucm-ca-view-mode') || 'org'
+    try { return localStorage.getItem('ucm-ca-view-mode') || 'org' } catch { return 'org' }
   })
   
   // Save view mode preference
   useEffect(() => {
-    localStorage.setItem('ucm-ca-view-mode', viewMode)
+    try { localStorage.setItem('ucm-ca-view-mode', viewMode) } catch {}
   }, [viewMode])
 
   useEffect(() => {

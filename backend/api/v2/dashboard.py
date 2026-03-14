@@ -87,11 +87,11 @@ def get_dashboard_stats():
     # Count revoked
     revoked = Certificate.query.filter_by(revoked=True).count()
     
-    # Count pending CSRs (if CSR table exists)
+    # Count pending CSRs (certificates with CSR but no signed cert)
     pending_csrs = 0
     try:
         pending_csrs = db.session.execute(
-            text("SELECT COUNT(*) FROM certificate_requests WHERE status = 'pending'")
+            text("SELECT COUNT(*) FROM certificates WHERE csr IS NOT NULL AND csr != '' AND (crt IS NULL OR crt = '')")
         ).scalar() or 0
     except Exception:
         logger.debug("Pending CSRs query failed")

@@ -4,6 +4,11 @@
 import { apiClient } from './apiClient'
 
 export const systemService = {
+  // Version/Updates
+  async getVersion() {
+    return apiClient.get('/system/updates/version')
+  },
+
   // Backup Management
   async listBackups() {
     return apiClient.get('/system/backups')

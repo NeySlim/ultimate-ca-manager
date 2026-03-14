@@ -19,7 +19,7 @@ import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import { Card, Button, Badge, LoadingSpinner, Modal, Logo } from '../components'
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
-import { dashboardService, certificatesService, acmeService, truststoreService } from '../services'
+import { dashboardService, certificatesService, acmeService, truststoreService, systemService } from '../services'
 import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
@@ -94,7 +94,7 @@ const loadWidgetPrefs = () => {
 }
 
 const saveWidgetPrefs = (widgets) => {
-  localStorage.setItem('ucm-dashboard-widgets-v2', JSON.stringify(widgets.map(w => ({ id: w.id, visible: w.visible }))))
+  try { localStorage.setItem('ucm-dashboard-widgets-v2', JSON.stringify(widgets.map(w => ({ id: w.id, visible: w.visible })))) } catch {}
 }
 
 // Load grid layout from localStorage
@@ -127,7 +127,7 @@ const loadGridLayouts = () => {
 }
 
 const saveGridLayouts = (layouts) => {
-  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(cleanLayoutFlags(layouts)))
+  try { localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(cleanLayoutFlags(layouts))) } catch {}
 }
 
 // Action icons mapping
@@ -307,11 +307,8 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadVersion = async () => {
       try {
-        const response = await fetch('/api/v2/system/updates/version')
-        if (response.ok) {
-          const data = await response.json()
-          setVersionInfo(data.data || { version: '2.0.0', update_available: false })
-        }
+        const data = await systemService.getVersion()
+        setVersionInfo(data.data || data || { version: '2.0.0', update_available: false })
       } catch {}
     }
     loadVersion()
