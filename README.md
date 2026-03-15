@@ -125,7 +125,15 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 
 ## Roadmap
 
+- [ ] **Code Signing** — Issue and manage code signing certificates (Authenticode, JAR, macOS)
 - [ ] **RFC 3161 Timestamp Authority (TSA)** — Code signing timestamp server ([#37](https://github.com/NeySlim/ultimate-ca-manager/issues/37))
+- [ ] **High Availability / Clustering** — Active-passive or active-active HA deployment
+- [ ] **Kubernetes / Helm** — Helm chart and cert-manager integration
+- [ ] **Post-Quantum Cryptography** — ML-DSA, ML-KEM, SLH-DSA key types (NIST FIPS 203/204/205)
+- [ ] **SSH Certificates** — Issue and manage SSH host and user certificates
+- [ ] **CMP Protocol (RFC 4210)** — Certificate Management Protocol support
+- [ ] **Key Archival & Recovery** — Secure key escrow with recovery workflows
+- [ ] **Delta CRL** — Incremental CRL updates for large deployments
 
 ## Contributing
 
