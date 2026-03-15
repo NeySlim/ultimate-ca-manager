@@ -154,6 +154,45 @@ class CRLSchedulerTask:
                 f"skipped={skipped_count}, "
                 f"errors={error_count}"
             )
+            
+            # Check delta CRLs for CAs with delta enabled
+            delta_cas = CA.query.filter_by(
+                has_private_key=True, cdp_enabled=True, delta_crl_enabled=True
+            ).all()
+            
+            delta_count = 0
+            for ca in delta_cas:
+                try:
+                    # Check if delta CRL needs regeneration
+                    latest_delta = CRLService.get_latest_delta_crl(ca.id)
+                    interval_hours = ca.delta_crl_interval or 4
+                    
+                    need_delta = False
+                    if not latest_delta:
+                        # Only generate delta if a base CRL exists
+                        base = CRLService.get_latest_base_crl(ca.id)
+                        if base:
+                            need_delta = True
+                    elif latest_delta.is_stale:
+                        need_delta = True
+                    else:
+                        from utils.datetime_utils import utc_now as _utc_now
+                        age_hours = (_utc_now() - latest_delta.this_update).total_seconds() / 3600
+                        if age_hours >= interval_hours:
+                            need_delta = True
+                    
+                    if need_delta:
+                        CRLService.generate_delta_crl(
+                            ca.id,
+                            validity_hours=interval_hours * 2,
+                            username='scheduler'
+                        )
+                        delta_count += 1
+                except Exception as e:
+                    logger.error(f"Error generating delta CRL for CA {ca.id}: {e}")
+            
+            if delta_count > 0:
+                logger.info(f"Generated {delta_count} delta CRL(s)")
         
         except Exception as e:
             logger.error(f"Error in CRL regeneration task: {e}", exc_info=True)

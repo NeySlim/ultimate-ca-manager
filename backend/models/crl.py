@@ -25,6 +25,10 @@ class CRLMetadata(db.Model):
     crl_pem = db.Column(db.Text, nullable=False)  # PEM encoded CRL
     crl_der = db.Column(db.LargeBinary, nullable=False)  # DER encoded CRL
     
+    # Delta CRL support (RFC 5280 §5.2.4)
+    is_delta = db.Column(db.Boolean, default=False)
+    base_crl_number = db.Column(db.Integer)  # Base CRL number for delta CRLs
+    
     # Statistics
     revoked_count = db.Column(db.Integer, default=0)
     
@@ -68,6 +72,8 @@ class CRLMetadata(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "generated_by": self.generated_by,
+            "is_delta": self.is_delta or False,
+            "base_crl_number": self.base_crl_number,
         }
         if include_crl_data:
             data["crl_pem"] = self.crl_pem

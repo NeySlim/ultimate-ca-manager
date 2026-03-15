@@ -34,6 +34,18 @@ export const crlService = {
     return apiClient.post(`/crl/${caId}/auto-regen`, { enabled })
   },
 
+  async getDeltaCRL(caId) {
+    return apiClient.get(`/crl/${caId}/delta`)
+  },
+
+  async generateDelta(caId) {
+    return apiClient.post(`/crl/${caId}/delta/regenerate`)
+  },
+
+  async configureDelta(caId, config) {
+    return apiClient.post(`/crl/${caId}/delta-config`, config)
+  },
+
   async getOcspStatus() {
     return apiClient.get('/ocsp/status')
   },

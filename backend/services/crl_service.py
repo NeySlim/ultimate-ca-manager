@@ -27,6 +27,20 @@ except ImportError:
     def decrypt_private_key(data):
         return data
 
+# RFC 5280 revocation reason codes
+REASON_MAP = {
+    'unspecified': x509.ReasonFlags.unspecified,
+    'keyCompromise': x509.ReasonFlags.key_compromise,
+    'CACompromise': x509.ReasonFlags.ca_compromise,
+    'affiliationChanged': x509.ReasonFlags.affiliation_changed,
+    'superseded': x509.ReasonFlags.superseded,
+    'cessationOfOperation': x509.ReasonFlags.cessation_of_operation,
+    'certificateHold': x509.ReasonFlags.certificate_hold,
+    'removeFromCRL': x509.ReasonFlags.remove_from_crl,
+    'privilegeWithdrawn': x509.ReasonFlags.privilege_withdrawn,
+    'aACompromise': x509.ReasonFlags.aa_compromise,
+}
+
 
 class CRLService:
     """Service for CRL generation and management"""
@@ -134,19 +148,7 @@ class CRLService:
             
             # Add revocation reason if available
             if cert.revoke_reason:
-                reason_map = {
-                    'unspecified': x509.ReasonFlags.unspecified,
-                    'keyCompromise': x509.ReasonFlags.key_compromise,
-                    'CACompromise': x509.ReasonFlags.ca_compromise,
-                    'affiliationChanged': x509.ReasonFlags.affiliation_changed,
-                    'superseded': x509.ReasonFlags.superseded,
-                    'cessationOfOperation': x509.ReasonFlags.cessation_of_operation,
-                    'certificateHold': x509.ReasonFlags.certificate_hold,
-                    'removeFromCRL': x509.ReasonFlags.remove_from_crl,
-                    'privilegeWithdrawn': x509.ReasonFlags.privilege_withdrawn,
-                    'aACompromise': x509.ReasonFlags.aa_compromise,
-                }
-                reason = reason_map.get(cert.revoke_reason, x509.ReasonFlags.unspecified)
+                reason = REASON_MAP.get(cert.revoke_reason, x509.ReasonFlags.unspecified)
                 revoked_builder = revoked_builder.add_extension(
                     x509.CRLReason(reason),
                     critical=False
@@ -181,6 +183,27 @@ class CRLService:
             except x509.ExtensionNotFound:
                 pass  # Skip if neither AKI nor SKI available
         
+        # Add FreshestCRL extension if delta CRL is enabled (RFC 5280 §5.2.6)
+        if ca.delta_crl_enabled and ca.cdp_url:
+            # Build delta URL from the known CDP route pattern: /cdp/<ca_id>-delta.crl
+            from urllib.parse import urlparse
+            parsed = urlparse(ca.cdp_url.replace('{ca_refid}', ca.refid))
+            delta_url = f"{parsed.scheme}://{parsed.netloc}/cdp/{ca.id}-delta.crl"
+            try:
+                builder = builder.add_extension(
+                    x509.FreshestCRL([
+                        x509.DistributionPoint(
+                            full_name=[x509.UniformResourceIdentifier(delta_url)],
+                            relative_name=None,
+                            reasons=None,
+                            crl_issuer=None
+                        )
+                    ]),
+                    critical=False
+                )
+            except Exception as e:
+                logger.warning(f"Could not add FreshestCRL extension: {e}")
+        
         # Sign CRL
         crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
         
@@ -197,7 +220,9 @@ class CRLService:
             crl_pem=crl_pem,
             crl_der=crl_der,
             revoked_count=len(revoked_certs),
-            generated_by=username
+            generated_by=username,
+            is_delta=False,
+            base_crl_number=None
         )
         
         db.session.add(crl_metadata)
@@ -213,15 +238,17 @@ class CRLService:
     @staticmethod
     def get_latest_crl(ca_id: int) -> Optional[CRLMetadata]:
         """
-        Get the latest CRL for a CA
+        Get the latest base (full) CRL for a CA — excludes delta CRLs.
         
         Args:
             ca_id: CA database ID
             
         Returns:
-            Latest CRLMetadata object or None if no CRL exists
+            Latest base CRLMetadata object or None if no CRL exists
         """
-        return CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
+        return CRLMetadata.query.filter_by(
+            ca_id=ca_id, is_delta=False
+        ).order_by(
             CRLMetadata.crl_number.desc()
         ).first()
     
@@ -305,3 +332,164 @@ class CRLService:
             return None
         
         return CRLService.generate_crl(ca_id, username=username)
+    
+    @staticmethod
+    def generate_delta_crl(
+        ca_id: int,
+        validity_hours: int = 24,
+        username: str = 'system'
+    ) -> CRLMetadata:
+        """Generate a delta CRL containing only changes since the last base CRL (RFC 5280 §5.2.4)"""
+        ca = CA.query.get(ca_id)
+        if not ca:
+            raise ValueError(f"CA with id {ca_id} not found")
+        if not ca.has_private_key:
+            raise ValueError(f"CA {ca.descr} does not have a private key")
+        if not ca.cdp_enabled:
+            raise ValueError("CDP is not enabled for this CA")
+        if not ca.delta_crl_enabled:
+            raise ValueError("Delta CRL is not enabled for this CA")
+        if validity_hours < 1 or validity_hours > 720:
+            raise ValueError("validity_hours must be between 1 and 720")
+        
+        # Get latest base (full) CRL
+        base_crl = CRLMetadata.query.filter_by(
+            ca_id=ca_id, is_delta=False
+        ).order_by(CRLMetadata.crl_number.desc()).first()
+        
+        if not base_crl:
+            raise ValueError(f"No base CRL exists for CA {ca.descr} — generate a full CRL first")
+        
+        # Load CA cert and key
+        ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
+        ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
+        
+        ca_prv_decrypted = decrypt_private_key(ca.prv)
+        ca_key_pem = base64.b64decode(ca_prv_decrypted).decode('utf-8')
+        ca_private_key = serialization.load_pem_private_key(
+            ca_key_pem.encode(), password=None, backend=default_backend()
+        )
+        
+        # Get revocations since base CRL's this_update
+        revoked_certs = Certificate.query.filter(
+            Certificate.caref == ca.refid,
+            Certificate.revoked == True,
+            Certificate.revoked_at > base_crl.this_update
+        ).all()
+        
+        # Determine next CRL number (global sequence, shared with base CRLs)
+        last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
+            CRLMetadata.crl_number.desc()
+        ).first()
+        crl_number = 1 if not last_crl else last_crl.crl_number + 1
+        
+        # Build delta CRL
+        now = utc_now()
+        builder = x509.CertificateRevocationListBuilder()
+        builder = builder.issuer_name(ca_cert.subject)
+        builder = builder.last_update(now)
+        builder = builder.next_update(now + timedelta(hours=validity_hours))
+        
+        # Add only new revocations
+        for cert in revoked_certs:
+            if not cert.serial_number:
+                continue
+            try:
+                serial_int = int(cert.serial_number.replace(':', ''), 16)
+                if serial_int.bit_length() > 159:
+                    serial_int = serial_int & ((1 << 159) - 1)
+            except (ValueError, AttributeError):
+                continue
+            
+            revoked_builder = x509.RevokedCertificateBuilder()
+            revoked_builder = revoked_builder.serial_number(serial_int)
+            revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
+            
+            if cert.revoke_reason:
+                reason = REASON_MAP.get(cert.revoke_reason, x509.ReasonFlags.unspecified)
+                revoked_builder = revoked_builder.add_extension(
+                    x509.CRLReason(reason), critical=False
+                )
+            
+            builder = builder.add_revoked_certificate(revoked_builder.build())
+        
+        # Add CRL Number (RFC 5280 §5.2.3)
+        builder = builder.add_extension(
+            x509.CRLNumber(crl_number), critical=False
+        )
+        
+        # Add Delta CRL Indicator (RFC 5280 §5.2.4) — CRITICAL
+        builder = builder.add_extension(
+            x509.DeltaCRLIndicator(base_crl.crl_number), critical=True
+        )
+        
+        # Add Authority Key Identifier
+        try:
+            aki = ca_cert.extensions.get_extension_for_oid(
+                ExtensionOID.AUTHORITY_KEY_IDENTIFIER
+            ).value
+            builder = builder.add_extension(aki, critical=False)
+        except x509.ExtensionNotFound:
+            try:
+                ski = ca_cert.extensions.get_extension_for_oid(
+                    ExtensionOID.SUBJECT_KEY_IDENTIFIER
+                ).value
+                aki = x509.AuthorityKeyIdentifier(
+                    key_identifier=ski.digest,
+                    authority_cert_issuer=None,
+                    authority_cert_serial_number=None
+                )
+                builder = builder.add_extension(aki, critical=False)
+            except x509.ExtensionNotFound:
+                pass
+        
+        # Sign delta CRL
+        crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
+        
+        crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
+        crl_der = crl.public_bytes(serialization.Encoding.DER)
+        
+        try:
+            crl_metadata = CRLMetadata(
+                ca_id=ca_id,
+                crl_number=crl_number,
+                this_update=now,
+                next_update=now + timedelta(hours=validity_hours),
+                crl_pem=crl_pem,
+                crl_der=crl_der,
+                revoked_count=len(revoked_certs),
+                generated_by=username,
+                is_delta=True,
+                base_crl_number=base_crl.crl_number
+            )
+            
+            db.session.add(crl_metadata)
+            
+            from services.audit_service import AuditService
+            AuditService.log_ca('generate_delta_crl', ca, 
+                f"Generated delta CRL #{crl_number} (base #{base_crl.crl_number}) "
+                f"with {len(revoked_certs)} new revocations")
+            
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        
+        logger.info(f"Generated delta CRL #{crl_number} for CA {ca.descr} "
+                     f"(base #{base_crl.crl_number}, {len(revoked_certs)} entries)")
+        
+        return crl_metadata
+    
+    @staticmethod
+    def get_latest_delta_crl(ca_id: int) -> Optional[CRLMetadata]:
+        """Get the latest delta CRL for a CA"""
+        return CRLMetadata.query.filter_by(
+            ca_id=ca_id, is_delta=True
+        ).order_by(CRLMetadata.crl_number.desc()).first()
+    
+    @staticmethod
+    def get_latest_base_crl(ca_id: int) -> Optional[CRLMetadata]:
+        """Get the latest base (full) CRL for a CA"""
+        return CRLMetadata.query.filter_by(
+            ca_id=ca_id, is_delta=False
+        ).order_by(CRLMetadata.crl_number.desc()).first()

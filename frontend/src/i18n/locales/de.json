@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "Fehler beim Umschalten der automatischen Regenerierung",
     "ocspEnabled": "OCSP aktiviert für {{name}}",
     "ocspDisabled": "OCSP deaktiviert für {{name}}",
-    "toggleOcspFailed": "OCSP-Umschaltung fehlgeschlagen"
+    "toggleOcspFailed": "OCSP-Umschaltung fehlgeschlagen",
+    "deltaCrl": "Delta-CRL",
+    "deltaCrlTitle": "Delta-CRL",
+    "deltaCrlEnabled": "Delta-CRL aktiviert",
+    "deltaCrlDisabled": "Delta-CRL deaktiviert",
+    "deltaCrlToggleFailed": "Delta-CRL-Umschaltung fehlgeschlagen",
+    "deltaCrlGenerated": "Delta-CRL erfolgreich generiert",
+    "deltaCrlGenerateFailed": "Delta-CRL-Generierung fehlgeschlagen",
+    "generateDelta": "Delta generieren",
+    "deltaCrlNumber": "Delta-CRL Nr.",
+    "baseCrlNumber": "Basis-CRL Nr.",
+    "deltaEntries": "Neue Einträge",
+    "deltaNextUpdate": "Nächstes Update",
+    "deltaInterval": "Intervall",
+    "deltaIntervalUpdated": "Delta-CRL-Intervall aktualisiert",
+    "deltaIntervalFailed": "Intervall-Aktualisierung fehlgeschlagen"
   },
   "trustStore": {
     "caTrust": "CA-Vertrauen",

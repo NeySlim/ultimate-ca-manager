@@ -34,6 +34,7 @@ export default function CRLOCSPPage() {
   const [ocspStatus, setOcspStatus] = useState({ enabled: false, running: false })
   const [ocspStats, setOcspStats] = useState({ total_requests: 0, cache_hits: 0 })
   const [regenerating, setRegenerating] = useState(false)
+  const [deltaRegenerating, setDeltaRegenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   
   // Pagination state
@@ -110,6 +111,43 @@ export default function CRLOCSPPage() {
     }
   }
 
+  const handleToggleDeltaCRL = async (ca) => {
+    if (!canWrite('crl')) return
+    try {
+      const newEnabled = !ca.delta_crl_enabled
+      await crlService.configureDelta(ca.id, { enabled: newEnabled })
+      showSuccess(t(newEnabled ? 'crlOcsp.deltaCrlEnabled' : 'crlOcsp.deltaCrlDisabled'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('crlOcsp.deltaCrlToggleFailed'))
+    }
+  }
+
+  const handleGenerateDelta = async (ca) => {
+    if (!canWrite('crl')) return
+    try {
+      setDeltaRegenerating(true)
+      await crlService.generateDelta(ca.id)
+      showSuccess(t('crlOcsp.deltaCrlGenerated'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('crlOcsp.deltaCrlGenerateFailed'))
+    } finally {
+      setDeltaRegenerating(false)
+    }
+  }
+
+  const handleDeltaIntervalChange = async (ca, interval) => {
+    if (!canWrite('crl')) return
+    try {
+      await crlService.configureDelta(ca.id, { interval: parseInt(interval) })
+      showSuccess(t('crlOcsp.deltaIntervalUpdated'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('crlOcsp.deltaIntervalFailed'))
+    }
+  }
+
   const handleToggleOcsp = async (ca) => {
     if (!canWrite('crl')) return
     try {
@@ -159,7 +197,8 @@ export default function CRLOCSPPage() {
         revoked_count: crl?.revoked_count || 0,
         crl_updated: crl?.updated_at,
         crl_next_update: crl?.next_update,
-        has_crl: !!crl
+        has_crl: !!crl,
+        delta_crl: crl?.delta_crl || null
       }
     })
   }, [cas, crls])
@@ -244,6 +283,22 @@ export default function CRLOCSPPage() {
       )
     },
     {
+      key: 'delta_crl_enabled',
+      header: t('crlOcsp.deltaCrl'),
+      priority: 4,
+      hideOnMobile: true,
+      render: (v, row) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ToggleSwitch
+            checked={v || false}
+            onChange={() => handleToggleDeltaCRL(row)}
+            disabled={!row.has_private_key || !row.cdp_enabled || !canWrite('crl')}
+            size="sm"
+          />
+        </div>
+      )
+    },
+    {
       key: 'ocsp_enabled',
       header: 'OCSP',
       priority: 3,
@@ -289,7 +344,7 @@ export default function CRLOCSPPage() {
         </span>
       )
     }
-  ], [canWrite, handleToggleAutoRegen, handleToggleOcsp, t])
+  ], [canWrite, handleToggleAutoRegen, handleToggleDeltaCRL, handleToggleOcsp, t])
 
   // Help content
   const helpContent = (
@@ -470,6 +525,53 @@ export default function CRLOCSPPage() {
           </p>
         </div>
       </CompactSection>
+
+      {/* Delta CRL Section */}
+      {selectedCA?.cdp_enabled && selectedCA?.delta_crl_enabled && (
+        <div className="space-y-3 border-t border-border pt-4 mt-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.deltaCrlTitle')}</h4>
+            {canWrite('crl') && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => handleGenerateDelta(selectedCA)}
+                disabled={deltaRegenerating}
+              >
+                <ArrowsClockwise size={14} className={deltaRegenerating ? 'animate-spin' : ''} />
+                {deltaRegenerating ? t('common.generating') : t('crlOcsp.generateDelta')}
+              </Button>
+            )}
+          </div>
+          
+          {selectedCA?.delta_crl && (
+            <CompactGrid cols={2}>
+              <CompactField autoIcon="crlNumber" label={t('crlOcsp.deltaCrlNumber')} value={`#${selectedCA.delta_crl.crl_number}`} />
+              <CompactField autoIcon="crlNumber" label={t('crlOcsp.baseCrlNumber')} value={`#${selectedCA.delta_crl.base_crl_number}`} />
+              <CompactField autoIcon="revokedCount" label={t('crlOcsp.deltaEntries')} value={selectedCA.delta_crl.revoked_count} />
+              <CompactField autoIcon="nextUpdate" label={t('crlOcsp.deltaNextUpdate')} value={selectedCA.delta_crl.next_update ? formatDate(selectedCA.delta_crl.next_update) : '-'} />
+            </CompactGrid>
+          )}
+          
+          <div className="flex items-center gap-2">
+            <label htmlFor="delta-interval" className="text-xs text-text-secondary">{t('crlOcsp.deltaInterval')}</label>
+            <select
+              id="delta-interval"
+              className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+              value={selectedCA?.delta_crl_interval || 4}
+              onChange={(e) => handleDeltaIntervalChange(selectedCA, e.target.value)}
+            >
+              <option value="1">1h</option>
+              <option value="2">2h</option>
+              <option value="4">4h</option>
+              <option value="8">8h</option>
+              <option value="12">12h</option>
+              <option value="24">24h</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   )
 

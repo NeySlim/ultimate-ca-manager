@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "自動再生成の切り替えに失敗しました",
     "ocspEnabled": "{{name}} の OCSP を有効化しました",
     "ocspDisabled": "{{name}} の OCSP を無効化しました",
-    "toggleOcspFailed": "OCSP の切替に失敗しました"
+    "toggleOcspFailed": "OCSP の切替に失敗しました",
+    "deltaCrl": "デルタCRL",
+    "deltaCrlTitle": "デルタCRL",
+    "deltaCrlEnabled": "デルタCRLが有効になりました",
+    "deltaCrlDisabled": "デルタCRLが無効になりました",
+    "deltaCrlToggleFailed": "デルタCRLの切り替えに失敗しました",
+    "deltaCrlGenerated": "デルタCRLが正常に生成されました",
+    "deltaCrlGenerateFailed": "デルタCRLの生成に失敗しました",
+    "generateDelta": "デルタを生成",
+    "deltaCrlNumber": "デルタCRL番号",
+    "baseCrlNumber": "ベースCRL番号",
+    "deltaEntries": "新しいエントリ",
+    "deltaNextUpdate": "次回更新",
+    "deltaInterval": "間隔",
+    "deltaIntervalUpdated": "デルタCRL間隔が更新されました",
+    "deltaIntervalFailed": "間隔の更新に失敗しました"
   },
   "trustStore": {
     "caTrust": "CAトラスト",

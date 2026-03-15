@@ -48,5 +48,36 @@ def get_crl(ca_id):
         mimetype='application/pkix-crl',
         headers={
             'Content-Disposition': f'attachment; filename="{ca_id}.crl"',
+            'Cache-Control': 'public, max-age=3600, must-revalidate',
+            'Last-Modified': crl_meta.this_update.strftime('%a, %d %b %Y %H:%M:%S GMT'),
+        }
+    )
+
+
+@cdp_bp.route('/<ca_id>-delta.crl')
+def get_delta_crl(ca_id):
+    """Serve delta CRL file from database"""
+    try:
+        ca_id_int = int(ca_id)
+    except (ValueError, TypeError):
+        abort(404)
+    
+    ca = CA.query.get(ca_id_int)
+    if not ca:
+        abort(404)
+    
+    delta_crl = CRLService.get_latest_delta_crl(ca_id_int)
+    
+    if not delta_crl or not delta_crl.crl_der:
+        abort(404)
+    
+    return Response(
+        delta_crl.crl_der,
+        status=200,
+        mimetype='application/pkix-crl',
+        headers={
+            'Content-Disposition': f'attachment; filename="{ca_id}-delta.crl"',
+            'Cache-Control': 'public, max-age=900, must-revalidate',
+            'Last-Modified': delta_crl.this_update.strftime('%a, %d %b %Y %H:%M:%S GMT'),
         }
     )

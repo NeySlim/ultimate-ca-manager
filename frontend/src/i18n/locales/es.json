@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "Error to toggle auto-regeneration",
     "ocspEnabled": "OCSP habilitado para {{name}}",
     "ocspDisabled": "OCSP deshabilitado para {{name}}",
-    "toggleOcspFailed": "Error al cambiar OCSP"
+    "toggleOcspFailed": "Error al cambiar OCSP",
+    "deltaCrl": "CRL Delta",
+    "deltaCrlTitle": "CRL Delta",
+    "deltaCrlEnabled": "CRL Delta habilitada",
+    "deltaCrlDisabled": "CRL Delta deshabilitada",
+    "deltaCrlToggleFailed": "Error al cambiar CRL Delta",
+    "deltaCrlGenerated": "CRL Delta generada exitosamente",
+    "deltaCrlGenerateFailed": "Error al generar CRL Delta",
+    "generateDelta": "Generar Delta",
+    "deltaCrlNumber": "CRL Delta #",
+    "baseCrlNumber": "CRL base #",
+    "deltaEntries": "Nuevas entradas",
+    "deltaNextUpdate": "Próxima actualización",
+    "deltaInterval": "Intervalo",
+    "deltaIntervalUpdated": "Intervalo de CRL Delta actualizado",
+    "deltaIntervalFailed": "Error al actualizar el intervalo"
   },
   "trustStore": {
     "caTrust": "Confianza de CA",

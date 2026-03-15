@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "切换自动生成失败",
     "ocspEnabled": "已为 {{name}} 启用 OCSP",
     "ocspDisabled": "已为 {{name}} 禁用 OCSP",
-    "toggleOcspFailed": "切换 OCSP 失败"
+    "toggleOcspFailed": "切换 OCSP 失败",
+    "deltaCrl": "增量CRL",
+    "deltaCrlTitle": "增量CRL",
+    "deltaCrlEnabled": "增量CRL已启用",
+    "deltaCrlDisabled": "增量CRL已禁用",
+    "deltaCrlToggleFailed": "切换增量CRL失败",
+    "deltaCrlGenerated": "增量CRL生成成功",
+    "deltaCrlGenerateFailed": "生成增量CRL失败",
+    "generateDelta": "生成增量",
+    "deltaCrlNumber": "增量CRL编号",
+    "baseCrlNumber": "基础CRL编号",
+    "deltaEntries": "新条目",
+    "deltaNextUpdate": "下次更新",
+    "deltaInterval": "间隔",
+    "deltaIntervalUpdated": "增量CRL间隔已更新",
+    "deltaIntervalFailed": "更新间隔失败"
   },
   "trustStore": {
     "caTrust": "CA 信任",

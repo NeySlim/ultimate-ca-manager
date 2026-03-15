@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "Impossibile attivare/disattivare la rigenerazione automatica",
     "ocspEnabled": "OCSP abilitato per {{name}}",
     "ocspDisabled": "OCSP disabilitato per {{name}}",
-    "toggleOcspFailed": "Errore nel commutare OCSP"
+    "toggleOcspFailed": "Errore nel commutare OCSP",
+    "deltaCrl": "CRL Delta",
+    "deltaCrlTitle": "CRL Delta",
+    "deltaCrlEnabled": "CRL Delta abilitata",
+    "deltaCrlDisabled": "CRL Delta disabilitata",
+    "deltaCrlToggleFailed": "Impossibile attivare/disattivare CRL Delta",
+    "deltaCrlGenerated": "CRL Delta generata con successo",
+    "deltaCrlGenerateFailed": "Generazione CRL Delta non riuscita",
+    "generateDelta": "Genera Delta",
+    "deltaCrlNumber": "CRL Delta #",
+    "baseCrlNumber": "CRL base #",
+    "deltaEntries": "Nuove voci",
+    "deltaNextUpdate": "Prossimo aggiornamento",
+    "deltaInterval": "Intervallo",
+    "deltaIntervalUpdated": "Intervallo CRL Delta aggiornato",
+    "deltaIntervalFailed": "Aggiornamento intervallo non riuscito"
   },
   "trustStore": {
     "caTrust": "Fiducia CA",

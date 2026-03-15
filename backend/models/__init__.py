@@ -185,6 +185,8 @@ class CA(db.Model):
     # CRL Distribution Points (CDP)
     cdp_enabled = db.Column(db.Boolean, default=False)
     cdp_url = db.Column(db.String(512))  # Ex: http://ucm.local:8443/cdp/{ca_refid}/crl.pem
+    delta_crl_enabled = db.Column(db.Boolean, default=False)
+    delta_crl_interval = db.Column(db.Integer, default=4)  # Hours between delta CRLs
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -370,6 +372,8 @@ class CA(db.Model):
             # CRL/CDP configuration
             "cdp_enabled": self.cdp_enabled,
             "cdp_url": self.cdp_url,
+            "delta_crl_enabled": self.delta_crl_enabled,
+            "delta_crl_interval": self.delta_crl_interval or 4,
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.ocsp_url,

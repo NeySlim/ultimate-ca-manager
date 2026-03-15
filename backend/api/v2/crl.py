@@ -19,14 +19,15 @@ bp = Blueprint('crl_v2', __name__)
 @bp.route('/api/v2/crl', methods=['GET'])
 @require_auth(['read:crl'])
 def list_crls():
-    """List CRLs - returns latest CRL per CA"""
-    # Get latest CRL for each CA using subquery
+    """List CRLs - returns latest base (full) CRL per CA"""
     from sqlalchemy import func
     
-    # Get the latest CRL for each CA
+    # Get the latest base CRL for each CA (exclude delta CRLs)
     subquery = db.session.query(
         CRLMetadata.ca_id,
         func.max(CRLMetadata.crl_number).label('max_crl_number')
+    ).filter(
+        CRLMetadata.is_delta == False
     ).group_by(CRLMetadata.ca_id).subquery()
     
     crls = CRLMetadata.query.join(
@@ -37,12 +38,29 @@ def list_crls():
         )
     ).all()
     
-    # Add caref to each CRL for frontend compatibility
+    # Batch-load delta CRLs to avoid N+1
+    ca_ids = [crl.ca_id for crl in crls]
+    delta_subq = db.session.query(
+        CRLMetadata.ca_id,
+        func.max(CRLMetadata.crl_number).label('max_num')
+    ).filter(
+        CRLMetadata.ca_id.in_(ca_ids),
+        CRLMetadata.is_delta == True
+    ).group_by(CRLMetadata.ca_id).subquery()
+    
+    deltas = CRLMetadata.query.join(delta_subq, db.and_(
+        CRLMetadata.ca_id == delta_subq.c.ca_id,
+        CRLMetadata.crl_number == delta_subq.c.max_num
+    )).all() if ca_ids else []
+    delta_map = {d.ca_id: d for d in deltas}
+    
     result = []
     for crl in crls:
         data = crl.to_dict()
         if crl.ca:
             data['caref'] = crl.ca.refid
+        if crl.ca_id in delta_map:
+            data['delta_crl'] = delta_map[crl.ca_id].to_dict()
         result.append(data)
     
     return success_response(data=result)
@@ -56,7 +74,7 @@ def get_crl(ca_id):
     if not ca:
         return error_response('CA not found', 404)
         
-    crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(CRLMetadata.crl_number.desc()).first()
+    crl = CRLMetadata.query.filter_by(ca_id=ca_id, is_delta=False).order_by(CRLMetadata.crl_number.desc()).first()
     if not crl:
         return success_response(data=None)
     
@@ -145,6 +163,105 @@ def toggle_auto_regen(ca_id):
         db.session.rollback()
         logger.error(f'Failed to update CRL auto-regen setting: {e}')
         return error_response("Failed to update CRL settings", 500)
+
+
+@bp.route('/api/v2/crl/<int:ca_id>/delta', methods=['GET'])
+@require_auth(['read:crl'])
+def get_delta_crl(ca_id):
+    """Get latest delta CRL for a CA"""
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    delta = CRLService.get_latest_delta_crl(ca_id)
+    if not delta:
+        return success_response(data=None)
+    
+    data = delta.to_dict(include_crl_data=True)
+    data['caref'] = ca.refid
+    return success_response(data=data)
+
+
+@bp.route('/api/v2/crl/<int:ca_id>/delta/regenerate', methods=['POST'])
+@require_auth(['write:crl'])
+def regenerate_delta_crl(ca_id):
+    """Force delta CRL generation"""
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    if not ca.has_private_key:
+        return error_response('CA does not have a private key', 400)
+    if not ca.cdp_enabled:
+        return error_response('CDP is not enabled for this CA', 400)
+    if not ca.delta_crl_enabled:
+        return error_response('Delta CRL is not enabled for this CA', 400)
+    
+    try:
+        username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'
+        crl_metadata = CRLService.generate_delta_crl(ca.id, username=username)
+        
+        data = crl_metadata.to_dict() if crl_metadata else None
+        if data:
+            data['caref'] = ca.refid
+        
+        return success_response(data=data, message='Delta CRL generated successfully')
+    except ValueError as e:
+        logger.warning(f'Delta CRL generation rejected for CA {ca_id}: {e}')
+        msg = str(e)
+        if 'not found' in msg:
+            return error_response('CA not found', 404)
+        elif 'private key' in msg:
+            return error_response('CA does not have a private key', 400)
+        elif 'base CRL' in msg:
+            return error_response('No base CRL exists — generate a full CRL first', 400)
+        return error_response('Delta CRL generation failed', 400)
+    except Exception as e:
+        logger.error(f'Failed to generate delta CRL: {e}')
+        return error_response("Failed to generate delta CRL", 500)
+
+
+@bp.route('/api/v2/crl/<int:ca_id>/delta-config', methods=['POST'])
+@require_auth(['write:crl'])
+def configure_delta_crl(ca_id):
+    """Configure delta CRL settings for a CA"""
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    data = request.get_json() or {}
+    
+    try:
+        if 'enabled' in data:
+            ca.delta_crl_enabled = bool(data['enabled'])
+        if 'interval' in data:
+            interval = int(data['interval'])
+            if interval < 1 or interval > 168:  # 1h to 7 days
+                return error_response('Interval must be between 1 and 168 hours', 400)
+            ca.delta_crl_interval = interval
+        
+        username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'
+        AuditService.log_action(
+            action='delta_crl_config',
+            resource_type='ca',
+            resource_id=str(ca.id),
+            resource_name=ca.descr,
+            details=f"Delta CRL config: enabled={ca.delta_crl_enabled}, interval={ca.delta_crl_interval}h",
+            success=True
+        )
+        
+        db.session.commit()
+        
+        return success_response(
+            data={
+                'delta_crl_enabled': ca.delta_crl_enabled,
+                'delta_crl_interval': ca.delta_crl_interval
+            },
+            message='Delta CRL configuration updated'
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to configure delta CRL: {e}')
+        return error_response("Failed to update delta CRL settings", 500)
 
 
 @bp.route('/api/v2/ocsp/status', methods=['GET'])

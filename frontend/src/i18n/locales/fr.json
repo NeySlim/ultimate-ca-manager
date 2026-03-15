@@ -984,7 +984,22 @@
     "toggleAutoRegenFailed": "Échec du basculement de la régénération automatique",
     "ocspEnabled": "OCSP activé pour {{name}}",
     "ocspDisabled": "OCSP désactivé pour {{name}}",
-    "toggleOcspFailed": "Échec du basculement OCSP"
+    "toggleOcspFailed": "Échec du basculement OCSP",
+    "deltaCrl": "CRL Delta",
+    "deltaCrlTitle": "CRL Delta",
+    "deltaCrlEnabled": "CRL Delta activée",
+    "deltaCrlDisabled": "CRL Delta désactivée",
+    "deltaCrlToggleFailed": "Échec du basculement de la CRL Delta",
+    "deltaCrlGenerated": "CRL Delta générée avec succès",
+    "deltaCrlGenerateFailed": "Échec de la génération de la CRL Delta",
+    "generateDelta": "Générer Delta",
+    "deltaCrlNumber": "CRL Delta #",
+    "baseCrlNumber": "CRL de base #",
+    "deltaEntries": "Nouvelles entrées",
+    "deltaNextUpdate": "Prochaine mise à jour",
+    "deltaInterval": "Intervalle",
+    "deltaIntervalUpdated": "Intervalle de la CRL Delta mis à jour",
+    "deltaIntervalFailed": "Échec de la mise à jour de l'intervalle"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",

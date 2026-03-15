@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "Failed to toggle auto-regeneration",
     "ocspEnabled": "OCSP enabled for {{name}}",
     "ocspDisabled": "OCSP disabled for {{name}}",
-    "toggleOcspFailed": "Failed to toggle OCSP"
+    "toggleOcspFailed": "Failed to toggle OCSP",
+    "deltaCrl": "Delta CRL",
+    "deltaCrlTitle": "Delta CRL",
+    "deltaCrlEnabled": "Delta CRL enabled",
+    "deltaCrlDisabled": "Delta CRL disabled",
+    "deltaCrlToggleFailed": "Failed to toggle delta CRL",
+    "deltaCrlGenerated": "Delta CRL generated successfully",
+    "deltaCrlGenerateFailed": "Failed to generate delta CRL",
+    "generateDelta": "Generate Delta",
+    "deltaCrlNumber": "Delta CRL #",
+    "baseCrlNumber": "Base CRL #",
+    "deltaEntries": "New Entries",
+    "deltaNextUpdate": "Next Update",
+    "deltaInterval": "Interval",
+    "deltaIntervalUpdated": "Delta CRL interval updated",
+    "deltaIntervalFailed": "Failed to update interval"
   },
   "trustStore": {
     "caTrust": "CA Trust",

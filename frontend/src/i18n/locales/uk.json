@@ -1193,7 +1193,22 @@
     "toggleAutoRegenFailed": "Невдало to toggle авто-regeneration",
     "ocspEnabled": "OCSP увімкнено для {{name}}",
     "ocspDisabled": "OCSP вимкнено для {{name}}",
-    "toggleOcspFailed": "Не вдалося перемкнути OCSP"
+    "toggleOcspFailed": "Не вдалося перемкнути OCSP",
+    "deltaCrl": "Дельта CRL",
+    "deltaCrlTitle": "Дельта CRL",
+    "deltaCrlEnabled": "Дельта CRL увімкнено",
+    "deltaCrlDisabled": "Дельта CRL вимкнено",
+    "deltaCrlToggleFailed": "Не вдалося перемкнути дельта CRL",
+    "deltaCrlGenerated": "Дельта CRL успішно згенеровано",
+    "deltaCrlGenerateFailed": "Не вдалося згенерувати дельта CRL",
+    "generateDelta": "Згенерувати дельту",
+    "deltaCrlNumber": "Дельта CRL №",
+    "baseCrlNumber": "Базовий CRL №",
+    "deltaEntries": "Нові записи",
+    "deltaNextUpdate": "Наступне оновлення",
+    "deltaInterval": "Інтервал",
+    "deltaIntervalUpdated": "Інтервал дельта CRL оновлено",
+    "deltaIntervalFailed": "Не вдалося оновити інтервал"
   },
   "trustStore": {
     "caTrust": "Довіра CA",
