@@ -26,7 +26,7 @@
 - **SCEP** -- RFC 8894 device auto-enrollment
 - **ACME** -- Let's Encrypt compatible (certbot, acme.sh)
 - **OCSP** -- RFC 6960 real-time certificate status
-- **CRL/CDP** -- Certificate Revocation List distribution
+- **CRL/CDP** -- Certificate Revocation List distribution with Delta CRL support (RFC 5280 §5.2.4)
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
 - **Email Notifications** -- SMTP, customizable HTML/text templates, certificate expiry alerts
 - **SSO** -- LDAP, OAuth2 (Azure/Google/GitHub), SAML single sign-on with role mapping
@@ -133,7 +133,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [ ] **SSH Certificates** — Issue and manage SSH host and user certificates
 - [ ] **CMP Protocol (RFC 4210)** — Certificate Management Protocol support
 - [ ] **Key Archival & Recovery** — Secure key escrow with recovery workflows
-- [ ] **Delta CRL** — Incremental CRL updates for large deployments
+- [x] **Delta CRL** — Incremental CRL updates for large deployments *(v2.75)*
 
 ## Contributing
 
