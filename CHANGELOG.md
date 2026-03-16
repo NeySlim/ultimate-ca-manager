@@ -11,6 +11,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.77] - 2026-03-16
+
+### Added
+- **X.509 Certificate Extensions** — Full extension display in certificate detail view: Basic Constraints, Key Usage, Extended Key Usage, Subject Alternative Names (DNS/IP/Email/URI/UPN/DirName), Subject Key Identifier, Authority Key Identifier, CRL Distribution Points, Authority Information Access, Certificate Policies, Name Constraints
+- **EKU OID Name Mapping** — 18 common Extended Key Usage OIDs resolved to human-readable names (IPsec, Microsoft, Netscape SGC, etc.) instead of "Unknown OID"
+- **Typed SAN Badges** — Subject Alternative Name entries displayed with colored badges per type (DNS, IP, Email, URI, UPN, DirName)
+- **Critical Extension Indicator** — Red badge for extensions marked as critical
+
+---
+
 ## [2.76] - 2026-03-16
 
 ### Fixed
