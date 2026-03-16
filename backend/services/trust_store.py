@@ -524,7 +524,9 @@ class TrustStoreService:
         ca_private_key,
         validity_days: int = 397,
         digest: str = 'sha256',
-        cert_type: str = 'server_cert'
+        cert_type: str = 'server_cert',
+        cdp_url: str = None,
+        ocsp_url: str = None
     ) -> bytes:
         """
         Sign a CSR with a CA
@@ -649,6 +651,38 @@ class TrustStoreService:
                     critical=False,
                 )
         
+        # CRL Distribution Points — embed CA's CDP URL if enabled
+        if cdp_url:
+            try:
+                csr.extensions.get_extension_for_oid(ExtensionOID.CRL_DISTRIBUTION_POINTS)
+            except x509.ExtensionNotFound:
+                builder = builder.add_extension(
+                    x509.CRLDistributionPoints([
+                        x509.DistributionPoint(
+                            full_name=[x509.UniformResourceIdentifier(cdp_url)],
+                            relative_name=None,
+                            reasons=None,
+                            crl_issuer=None
+                        )
+                    ]),
+                    critical=False
+                )
+
+        # Authority Information Access — embed OCSP URI if enabled
+        if ocsp_url:
+            try:
+                csr.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_INFORMATION_ACCESS)
+            except x509.ExtensionNotFound:
+                builder = builder.add_extension(
+                    x509.AuthorityInformationAccess([
+                        x509.AccessDescription(
+                            x509.oid.AuthorityInformationAccessOID.OCSP,
+                            x509.UniformResourceIdentifier(ocsp_url)
+                        )
+                    ]),
+                    critical=False
+                )
+
         # Sign
         hash_algo = TrustStoreService.HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(

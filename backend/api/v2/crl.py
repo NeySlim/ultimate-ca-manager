@@ -140,6 +140,12 @@ def toggle_auto_regen(ca_id):
     try:
         ca.cdp_enabled = enabled
         
+        # Auto-generate CDP URL if enabling and no URL set
+        if enabled and not ca.cdp_url:
+            from flask import request as flask_request
+            base_url = flask_request.host_url.rstrip('/')
+            ca.cdp_url = f"{base_url}/cdp/{ca.id}.crl"
+        
         # Audit log
         username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'
         audit = AuditLog(

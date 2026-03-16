@@ -473,6 +473,31 @@ class SCEPService:
             critical=False
         )
         
+        # CRL Distribution Points — embed CA's CDP URL if enabled
+        if self.ca.cdp_enabled and self.ca.cdp_url:
+            cdp_url = self.ca.cdp_url.replace('{ca_refid}', self.ca.refid)
+            builder = builder.add_extension(
+                x509.CRLDistributionPoints([
+                    x509.DistributionPoint(
+                        full_name=[x509.UniformResourceIdentifier(cdp_url)],
+                        relative_name=None, reasons=None, crl_issuer=None
+                    )
+                ]),
+                critical=False
+            )
+        
+        # Authority Information Access — embed OCSP URI if enabled
+        if self.ca.ocsp_enabled and self.ca.ocsp_url:
+            builder = builder.add_extension(
+                x509.AuthorityInformationAccess([
+                    x509.AccessDescription(
+                        x509.oid.AuthorityInformationAccessOID.OCSP,
+                        x509.UniformResourceIdentifier(self.ca.ocsp_url)
+                    )
+                ]),
+                critical=False
+            )
+        
         # Sign certificate
         cert = builder.sign(self.ca_key, hashes.SHA256(), default_backend())
         

@@ -358,13 +358,17 @@ class CertificateService:
             csr_pem = base64.b64decode(csr_data)
         
         # Sign CSR
+        cdp_url = ca.cdp_url.replace('{ca_refid}', ca.refid) if ca.cdp_enabled and ca.cdp_url else None
+        ocsp_url = ca.ocsp_url if ca.ocsp_enabled and ca.ocsp_url else None
         cert_pem = TrustStoreService.sign_csr(
             csr_pem=csr_pem,
             ca_cert=ca_cert,
             ca_private_key=ca_private_key,
             validity_days=validity_days,
             digest=digest,
-            cert_type=cert_type
+            cert_type=cert_type,
+            cdp_url=cdp_url,
+            ocsp_url=ocsp_url
         )
         
         # Parse signed certificate

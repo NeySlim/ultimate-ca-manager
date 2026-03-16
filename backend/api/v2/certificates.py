@@ -501,6 +501,36 @@ def create_certificate():
             critical=False
         )
         
+        # CRL Distribution Points — embed CA's CDP URL if enabled
+        if ca.cdp_enabled and ca.cdp_url:
+            cdp_url = ca.cdp_url.replace('{ca_refid}', ca.refid)
+            builder = builder.add_extension(
+                x509.CRLDistributionPoints([
+                    x509.DistributionPoint(
+                        full_name=[x509.UniformResourceIdentifier(cdp_url)],
+                        relative_name=None,
+                        reasons=None,
+                        crl_issuer=None
+                    )
+                ]),
+                critical=False
+            )
+        
+        # Authority Information Access — embed OCSP URI if enabled
+        aia_descriptions = []
+        if ca.ocsp_enabled and ca.ocsp_url:
+            aia_descriptions.append(
+                x509.AccessDescription(
+                    x509.oid.AuthorityInformationAccessOID.OCSP,
+                    x509.UniformResourceIdentifier(ca.ocsp_url)
+                )
+            )
+        if aia_descriptions:
+            builder = builder.add_extension(
+                x509.AuthorityInformationAccess(aia_descriptions),
+                critical=False
+            )
+        
         # Sign certificate
         new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
         

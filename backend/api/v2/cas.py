@@ -422,10 +422,16 @@ def update_ca(ca_id):
         ca.descr = data['name']
     if 'ocsp_enabled' in data:
         ca.ocsp_enabled = bool(data['ocsp_enabled'])
+        if ca.ocsp_enabled and not ca.ocsp_url:
+            base_url = request.host_url.rstrip('/')
+            ca.ocsp_url = f"{base_url}/ocsp"
     if 'ocsp_url' in data:
         ca.ocsp_url = data['ocsp_url']
     if 'cdp_enabled' in data:
         ca.cdp_enabled = bool(data['cdp_enabled'])
+        if ca.cdp_enabled and not ca.cdp_url:
+            base_url = request.host_url.rstrip('/')
+            ca.cdp_url = f"{base_url}/cdp/{ca.id}.crl"
     if 'cdp_url' in data:
         ca.cdp_url = data['cdp_url']
     if 'is_active' in data:
