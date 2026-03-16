@@ -1557,6 +1557,8 @@
     "backupSubtitle": "数据备份和恢复选项",
     "baseUrl": "基础 URL",
     "baseUrlHelper": "此 UCM 实例的公开 URL",
+    "protocolBaseUrl": "协议基础URL",
+    "protocolBaseUrlHelper": "CDP/OCSP端点的基础URL。设置为http://以避免TLS验证循环。留空使用主URL。",
     "baseUrlPlaceholder": "https://ucm.example.com",
     "checkUpdates": "检查更新",
     "chooseCertificate": "选择证书...",

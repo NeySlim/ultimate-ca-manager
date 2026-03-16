@@ -1557,6 +1557,8 @@
     "backupSubtitle": "データバックアップと復元オプション",
     "baseUrl": "ベースURL",
     "baseUrlHelper": "このUCMインスタンスの公開URL",
+    "protocolBaseUrl": "プロトコルベースURL",
+    "protocolBaseUrlHelper": "CDP/OCSPエンドポイントのベースURL。TLS検証ループを避けるためhttp://に設定。空のままでメインURLを使用。",
     "baseUrlPlaceholder": "https://ucm.example.com",
     "checkUpdates": "アップデートを確認",
     "chooseCertificate": "証明書を選択...",

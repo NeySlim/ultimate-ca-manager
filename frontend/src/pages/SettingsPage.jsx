@@ -2664,6 +2664,13 @@ export default function SettingsPage() {
                   placeholder={t('settings.baseUrlPlaceholder')}
                   helperText={t('settings.baseUrlHelper')}
                 />
+                <Input
+                  label={t('settings.protocolBaseUrl')}
+                  value={settings.protocol_base_url || ''}
+                  onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
+                  placeholder="http://pki.example.com"
+                  helperText={t('settings.protocolBaseUrlHelper')}
+                />
               </div>
             </DetailSection>
             <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">

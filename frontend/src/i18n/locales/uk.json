@@ -1557,6 +1557,8 @@
     "backupSubtitle": "Параметри резервного копіювання та відновлення даних",
     "baseUrl": "Базова URL-адреса",
     "baseUrlHelper": "Публічна URL-адреса цього екземпляра UCM",
+    "protocolBaseUrl": "Базова URL протоколу",
+    "protocolBaseUrlHelper": "Базова URL для кінцевих точок CDP/OCSP. Встановіть http:// щоб уникнути циклів перевірки TLS. Залиште порожнім для основної URL.",
     "baseUrlPlaceholder": "https://ucm.example.com",
     "checkUpdates": "Перевірити оновлення",
     "chooseCertificate": "Виберіть сертифікат...",

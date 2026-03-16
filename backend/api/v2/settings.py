@@ -47,6 +47,7 @@ def get_general_settings():
         'session_max_lifetime': int(get_config('session_max_lifetime', '86400')),
         'max_login_attempts': int(get_config('max_login_attempts', '5')),
         'lockout_duration': int(get_config('lockout_duration', '300')),
+        'protocol_base_url': get_config('protocol_base_url', ''),
     })
 
 
@@ -60,7 +61,8 @@ def update_general_settings():
     allowed_keys = [
         'site_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
         'backup_retention_days', 'backup_password', 'session_timeout',
-        'session_max_lifetime', 'max_login_attempts', 'lockout_duration'
+        'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
+        'protocol_base_url'
     ]
     
     for key in allowed_keys:

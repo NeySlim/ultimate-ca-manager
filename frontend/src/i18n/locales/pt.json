@@ -1557,6 +1557,8 @@
     "backupSubtitle": "Opções de backup e recuperação de dados",
     "baseUrl": "URL Base",
     "baseUrlHelper": "Public URL de este UCM instance",
+    "protocolBaseUrl": "URL base do protocolo",
+    "protocolBaseUrlHelper": "URL base para endpoints CDP/OCSP. Definir como http:// para evitar loops de verificação TLS. Deixar vazio para usar a URL principal.",
     "baseUrlPlaceholder": "https://ucm.exemplo.com",
     "checkUpdates": "Verificar atualizações",
     "chooseCertificate": "Escolha um certificado...",

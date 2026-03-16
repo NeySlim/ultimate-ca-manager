@@ -1768,6 +1768,8 @@
     "systemNameHelper": "Nom d'affichage du système UCM",
     "baseUrl": "URL de base",
     "baseUrlHelper": "URL publique de cette instance UCM",
+    "protocolBaseUrl": "URL de base protocole",
+    "protocolBaseUrlHelper": "URL de base pour les endpoints CDP/OCSP. Définir en http:// pour éviter les boucles de vérification TLS. Laisser vide pour utiliser l'URL principale.",
     "appearanceModeDesc": "Contrôlez comment la luminosité de l'interface s'adapte",
     "lightMode": "Mode clair",
     "darkMode": "Mode sombre",

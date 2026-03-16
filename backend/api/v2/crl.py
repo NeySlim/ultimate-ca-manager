@@ -5,6 +5,7 @@ CRL & OCSP Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.protocol_url import get_protocol_base_url
 from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
@@ -142,9 +143,8 @@ def toggle_auto_regen(ca_id):
         
         # Auto-generate CDP URL if enabling and no URL set
         if enabled and not ca.cdp_url:
-            from flask import request as flask_request
-            base_url = flask_request.host_url.rstrip('/')
-            ca.cdp_url = f"{base_url}/cdp/{ca.id}.crl"
+            base_url = get_protocol_base_url()
+            ca.cdp_url = f"{base_url}/cdp/{ca.refid}.crl"
         
         # Audit log
         username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'

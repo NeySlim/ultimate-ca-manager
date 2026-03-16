@@ -17,6 +17,7 @@ from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
+from utils.protocol_url import get_protocol_base_url
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
@@ -423,7 +424,7 @@ def update_ca(ca_id):
     if 'ocsp_enabled' in data:
         ca.ocsp_enabled = bool(data['ocsp_enabled'])
         if ca.ocsp_enabled and not ca.ocsp_url:
-            base_url = request.host_url.rstrip('/')
+            base_url = get_protocol_base_url()
             ca.ocsp_url = f"{base_url}/ocsp"
     if 'ocsp_url' in data:
         ca.ocsp_url = data['ocsp_url']
@@ -431,7 +432,7 @@ def update_ca(ca_id):
         ca.cdp_enabled = bool(data['cdp_enabled'])
         if ca.cdp_enabled and not ca.cdp_url:
             base_url = request.host_url.rstrip('/')
-            ca.cdp_url = f"{base_url}/cdp/{ca.id}.crl"
+            ca.cdp_url = f"{base_url}/cdp/{ca.refid}.crl"
     if 'cdp_url' in data:
         ca.cdp_url = data['cdp_url']
     if 'is_active' in data:
