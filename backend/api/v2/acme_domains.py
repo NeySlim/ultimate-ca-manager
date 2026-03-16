@@ -3,11 +3,14 @@ ACME Domains API Routes
 Manages domain-to-DNS-provider mappings for ACME Proxy functionality.
 """
 import json
+import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, AcmeDomain, DnsProvider, CA
 from services.audit_service import AuditService
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('acme_domains', __name__)
 
@@ -160,19 +163,24 @@ def delete_domain(domain_id):
     domain = AcmeDomain.query.get_or_404(domain_id)
     domain_name = domain.domain
     
-    db.session.delete(domain)
-    db.session.commit()
-    
-    AuditService.log_action(
-        action='acme_domain_delete',
-        resource_type='acme_domain',
-        resource_id=str(domain_id),
-        resource_name=domain_name,
-        details=f'Removed ACME domain: {domain_name}',
-        success=True
-    )
-    
-    return success_response(message=f'Domain {domain_name} removed')
+    try:
+        db.session.delete(domain)
+        db.session.commit()
+        
+        AuditService.log_action(
+            action='acme_domain_delete',
+            resource_type='acme_domain',
+            resource_id=str(domain_id),
+            resource_name=domain_name,
+            details=f'Removed ACME domain: {domain_name}',
+            success=True
+        )
+        
+        return success_response(message=f'Domain {domain_name} removed')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete ACME domain {domain_name}: {e}")
+        return error_response('Failed to delete domain', 500)
 
 
 # =============================================================================

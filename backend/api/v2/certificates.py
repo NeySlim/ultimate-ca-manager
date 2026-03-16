@@ -711,29 +711,37 @@ def delete_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
     
-    cert_name = cert.descr or cert.descr or f'Certificate #{cert_id}'
-    
-    # Delete the certificate
-    db.session.delete(cert)
-    db.session.commit()
-    
-    # Audit log
-    AuditService.log_action(
-        action='certificate_deleted',
-        resource_type='certificate',
-        resource_id=cert_id,
-        resource_name=cert_name,
-        details=f'Deleted certificate: {cert_name}',
-        success=True
-    )
+    cert_name = cert.descr or f'Certificate #{cert_id}'
     
     try:
-        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-        on_certificate_deleted(cert_id, cert_name, username)
-    except Exception:
-        pass
-    
-    return no_content_response()
+        # Clean up dependent records
+        from models import ApprovalRequest
+        ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
+        
+        db.session.delete(cert)
+        db.session.commit()
+        
+        # Audit log
+        AuditService.log_action(
+            action='certificate_deleted',
+            resource_type='certificate',
+            resource_id=cert_id,
+            resource_name=cert_name,
+            details=f'Deleted certificate: {cert_name}',
+            success=True
+        )
+        
+        try:
+            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+            on_certificate_deleted(cert_id, cert_name, username)
+        except Exception:
+            pass
+        
+        return no_content_response()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete certificate {cert_name}: {e}")
+        return error_response('Failed to delete certificate', 500)
 
 
 @bp.route('/api/v2/certificates/export', methods=['GET'])
@@ -1799,6 +1807,10 @@ def bulk_delete_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
+            
+            from models import ApprovalRequest
+            ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
+            
             db.session.delete(cert)
             db.session.commit()
             results['success'].append(cert_id)

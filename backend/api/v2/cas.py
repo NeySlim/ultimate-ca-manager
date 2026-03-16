@@ -452,35 +452,66 @@ def update_ca(ca_id):
 @bp.route('/api/v2/cas/<int:ca_id>', methods=['DELETE'])
 @require_auth(['delete:cas'])
 def delete_ca(ca_id):
-    """Delete CA"""
+    """Delete CA and all dependent records (CRLs, OCSP responses, etc.)"""
     
     ca = CA.query.get(ca_id)
     if not ca:
         return error_response('CA not found', 404)
     
-    ca_name = ca.descr or ca.descr or f'CA #{ca_id}'
+    ca_name = ca.descr or f'CA #{ca_id}'
     
-    # Delete the CA
-    db.session.delete(ca)
-    db.session.commit()
+    # Check for child CAs (intermediates signed by this CA)
+    child_cas = CA.query.filter_by(caref=ca.refid).count()
+    if child_cas > 0:
+        return error_response(
+            f'Cannot delete CA: {child_cas} intermediate CA(s) depend on it. Delete them first.',
+            409
+        )
     
-    # Audit log
-    AuditService.log_action(
-        action='ca_deleted',
-        resource_type='ca',
-        resource_id=ca_id,
-        resource_name=ca_name,
-        details=f'Deleted CA: {ca_name}',
-        success=True
-    )
+    # Check for issued certificates
+    from models import Certificate
+    issued_certs = Certificate.query.filter_by(caref=ca.refid).count()
+    if issued_certs > 0:
+        return error_response(
+            f'Cannot delete CA: {issued_certs} certificate(s) were issued by it. Revoke and delete them first.',
+            409
+        )
     
     try:
-        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-        on_ca_deleted(ca_id, ca_name, username)
-    except Exception:
-        pass
-    
-    return no_content_response()
+        # Delete dependent records before deleting CA
+        from models.crl import CRLMetadata
+        from models.ocsp import OCSPResponse
+        
+        crl_count = CRLMetadata.query.filter_by(ca_id=ca_id).delete()
+        ocsp_count = OCSPResponse.query.filter_by(ca_id=ca_id).delete()
+        
+        if crl_count or ocsp_count:
+            logger.info(f"Deleted {crl_count} CRL(s) and {ocsp_count} OCSP response(s) for CA {ca_name}")
+        
+        db.session.delete(ca)
+        db.session.commit()
+        
+        # Audit log
+        AuditService.log_action(
+            action='ca_deleted',
+            resource_type='ca',
+            resource_id=ca_id,
+            resource_name=ca_name,
+            details=f'Deleted CA: {ca_name} (cleaned {crl_count} CRLs, {ocsp_count} OCSP responses)',
+            success=True
+        )
+        
+        try:
+            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+            on_ca_deleted(ca_id, ca_name, username)
+        except Exception:
+            pass
+        
+        return no_content_response()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete CA {ca_name}: {e}")
+        return error_response('Failed to delete CA', 500)
 
 
 @bp.route('/api/v2/cas/export', methods=['GET'])
@@ -789,7 +820,27 @@ def bulk_delete_cas():
             if not ca:
                 results['failed'].append({'id': ca_id, 'error': 'Not found'})
                 continue
+            
             ca_name = ca.descr or f'CA #{ca_id}'
+            
+            # Check for child CAs
+            child_cas = CA.query.filter_by(caref=ca.refid).count()
+            if child_cas > 0:
+                results['failed'].append({'id': ca_id, 'error': f'{child_cas} intermediate CA(s) depend on it'})
+                continue
+            
+            # Check for issued certificates
+            issued_certs = Certificate.query.filter_by(caref=ca.refid).count()
+            if issued_certs > 0:
+                results['failed'].append({'id': ca_id, 'error': f'{issued_certs} certificate(s) issued by it'})
+                continue
+            
+            # Clean up dependent records
+            from models.crl import CRLMetadata
+            from models.ocsp import OCSPResponse
+            CRLMetadata.query.filter_by(ca_id=ca_id).delete()
+            OCSPResponse.query.filter_by(ca_id=ca_id).delete()
+            
             db.session.delete(ca)
             db.session.commit()
             results['success'].append(ca_id)

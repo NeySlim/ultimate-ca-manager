@@ -195,19 +195,24 @@ def delete_provider(provider_id):
         )
     
     provider_name = provider.name
-    db.session.delete(provider)
-    db.session.commit()
-    
-    AuditService.log_action(
-        action='dns_provider_delete',
-        resource_type='dns_provider',
-        resource_id=str(provider_id),
-        resource_name=provider_name,
-        details=f'Deleted DNS provider: {provider_name}',
-        success=True
-    )
-    
-    return success_response(message='DNS provider deleted')
+    try:
+        db.session.delete(provider)
+        db.session.commit()
+        
+        AuditService.log_action(
+            action='dns_provider_delete',
+            resource_type='dns_provider',
+            resource_id=str(provider_id),
+            resource_name=provider_name,
+            details=f'Deleted DNS provider: {provider_name}',
+            success=True
+        )
+        
+        return success_response(message='DNS provider deleted')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete DNS provider {provider_name}: {e}")
+        return error_response('Failed to delete DNS provider', 500)
 
 
 @bp.route('/api/v2/dns-providers/<int:provider_id>/test', methods=['POST'])

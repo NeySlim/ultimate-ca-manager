@@ -9,6 +9,9 @@ from models import db
 from models.policy import CertificatePolicy, ApprovalRequest
 from datetime import datetime, timedelta
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('policies_pro', __name__)
 
@@ -129,10 +132,18 @@ def delete_policy(policy_id):
     if pending > 0:
         return error_response(f"Cannot delete policy with {pending} pending approval requests", 400)
     
-    db.session.delete(policy)
-    db.session.commit()
-    
-    return success_response(message="Policy deleted")
+    try:
+        # Clean up completed/rejected approval requests
+        ApprovalRequest.query.filter_by(policy_id=policy_id).delete()
+        
+        db.session.delete(policy)
+        db.session.commit()
+        
+        return success_response(message="Policy deleted")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to delete policy {policy_id}: {e}")
+        return error_response('Failed to delete policy', 500)
 
 
 @bp.route('/api/v2/policies/<int:policy_id>/toggle', methods=['POST'])
@@ -141,10 +152,14 @@ def toggle_policy(policy_id):
     """Enable/disable policy"""
     policy = CertificatePolicy.query.get_or_404(policy_id)
     policy.is_active = not policy.is_active
-    db.session.commit()
-    
-    status = "enabled" if policy.is_active else "disabled"
-    return success_response(data=policy.to_dict(), message=f"Policy {status}")
+    try:
+        db.session.commit()
+        status = "enabled" if policy.is_active else "disabled"
+        return success_response(data=policy.to_dict(), message=f"Policy {status}")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to toggle policy {policy_id}: {e}")
+        return error_response('Failed to update policy', 500)
 
 
 # ============ Approval Requests ============

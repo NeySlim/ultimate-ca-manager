@@ -566,7 +566,7 @@ def create_app(config_name=None):
     @app.before_request
     def redirect_to_fqdn():
         # Skip for health checks and static files
-        if request.path in ['/api/v2/health', '/api/health', '/health', '/api/auth/verify', '/api/v2/auth/verify'] or request.path.startswith('/static/') or request.path.startswith('/assets/'):
+        if request.path in ['/api/v2/health', '/api/health', '/health', '/api/auth/verify', '/api/v2/auth/verify'] or request.path.startswith(('/static/', '/assets/', '/cdp/', '/ocsp/', '/scep/', '/acme/', '/.well-known/')):
             return None
         
         # Get configured FQDN - check both UCM_FQDN (Docker) and FQDN env vars
@@ -609,6 +609,9 @@ def create_app(config_name=None):
         @app.before_request
         def enforce_https():
             if not request.is_secure and request.url.startswith('http://'):
+                # Skip protocol endpoints — CRL/OCSP/SCEP/ACME/EST clients often can't follow redirects
+                if request.path.startswith(('/cdp/', '/ocsp', '/scep/', '/acme/', '/.well-known/')):
+                    return None
                 url = request.url.replace('http://', 'https://', 1)
                 url = url.replace(f':{config.HTTPS_PORT}', f':{config.HTTPS_PORT}')
                 return redirect(url, code=301)
@@ -619,13 +622,15 @@ def create_app(config_name=None):
         if not app.config.get('SAFE_MODE'):
             return None
         
-        # Allow health, auth, static, and frontend routes
+        # Allow health, auth, static, frontend, and protocol routes
         allowed_prefixes = (
             '/api/v2/health', '/api/health', '/health',
             '/api/v2/auth/', '/api/auth/',
             '/api/v2/system/security/encryption-status',
             '/static/', '/assets/', '/favicon',
             '/socket.io/',
+            # Protocol endpoints must remain available (revocation, enrollment)
+            '/cdp/', '/ocsp', '/scep/', '/acme/', '/.well-known/',
         )
         if request.path.startswith(allowed_prefixes):
             return None
