@@ -520,3 +520,154 @@ class CAService:
         details['has_private_key'] = bool(ca.prv and len(ca.prv) > 0)
         
         return details
+
+    @staticmethod
+    def get_certificate_chain(refid: str) -> List[str]:
+        """
+        Get CA certificate chain by refid.
+        
+        Args:
+            refid: CA reference ID
+            
+        Returns:
+            List of PEM strings (leaf to root)
+        """
+        ca = CA.query.filter_by(refid=refid).first()
+        if not ca:
+            raise ValueError(f"CA not found: {refid}")
+        
+        chain_bytes = CAService.get_ca_chain(ca.id)
+        return [pem.decode('utf-8') if isinstance(pem, bytes) else pem
+                for pem in chain_bytes]
+
+    @staticmethod
+    def sign_csr_from_crypto(
+        ca: 'CA',
+        csr: x509.CertificateSigningRequest,
+        validity_days: int = 365,
+        source: str = 'manual'
+    ) -> Tuple[str, str]:
+        """
+        Sign a CSR (x509 object) using a CA.
+        Bridge between EST/auto-renewal and TrustStoreService.sign_csr().
+        
+        Args:
+            ca: CA model instance
+            csr: x509 CertificateSigningRequest object
+            validity_days: Certificate validity in days
+            source: Origin of the request (est, auto-renewal, etc.)
+            
+        Returns:
+            Tuple of (cert_pem_string, serial_number_string)
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Convert CSR object to PEM bytes
+        csr_pem = csr.public_bytes(serialization.Encoding.PEM)
+        
+        # Load CA cert and key
+        ca_cert_pem = base64.b64decode(ca.crt)
+        ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
+        
+        ca_key_pem = decrypt_private_key(base64.b64decode(ca.prv))
+        ca_private_key = serialization.load_pem_private_key(
+            ca_key_pem, password=None, backend=default_backend()
+        )
+        
+        # Resolve CDP/OCSP URLs
+        cdp_url = None
+        ocsp_url = None
+        if ca.cdp_enabled and ca.cdp_url:
+            cdp_url = ca.cdp_url.replace('{ca_refid}', ca.refid or '')
+        if ca.ocsp_enabled and ca.ocsp_url:
+            ocsp_url = ca.ocsp_url.replace('{ca_refid}', ca.refid or '')
+        
+        # Sign via TrustStoreService
+        cert_pem_bytes = TrustStoreService.sign_csr(
+            csr_pem=csr_pem,
+            ca_cert=ca_cert,
+            ca_private_key=ca_private_key,
+            validity_days=validity_days,
+            digest='sha256',
+            cdp_url=cdp_url,
+            ocsp_url=ocsp_url
+        )
+        
+        # Extract serial number
+        cert_obj = x509.load_pem_x509_certificate(
+            cert_pem_bytes if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes.encode(),
+            default_backend()
+        )
+        serial = format(cert_obj.serial_number, 'X')
+        
+        # Store certificate in database
+        cert_pem_str = cert_pem_bytes.decode('utf-8') if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes
+        
+        cn = ''
+        try:
+            cn = csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+        except (IndexError, Exception):
+            cn = csr.subject.rfc4514_string()
+        
+        cert_pem_raw = cert_pem_bytes if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes.encode()
+        
+        # Extract AKI/SKI
+        cert_aki = ''
+        cert_ski = ''
+        try:
+            aki_ext = cert_obj.extensions.get_extension_for_oid(x509.oid.ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+            if aki_ext.value.key_identifier:
+                cert_aki = ':'.join(f'{b:02x}' for b in aki_ext.value.key_identifier)
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            ski_ext = cert_obj.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+            if ski_ext.value.digest:
+                cert_ski = ':'.join(f'{b:02x}' for b in ski_ext.value.digest)
+        except x509.ExtensionNotFound:
+            pass
+        
+        # Extract SANs
+        import json
+        san_dns, san_ip, san_email = [], [], []
+        try:
+            san_ext = cert_obj.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            san_dns = [n.value for n in san_ext.value.get_values_for_type(x509.DNSName)]
+            san_ip = [str(n) for n in san_ext.value.get_values_for_type(x509.IPAddress)]
+            san_email = [n.value for n in san_ext.value.get_values_for_type(x509.RFC822Name)]
+        except x509.ExtensionNotFound:
+            pass
+        
+        not_before = cert_obj.not_valid_before_utc if hasattr(cert_obj, 'not_valid_before_utc') else cert_obj.not_valid_before
+        not_after = cert_obj.not_valid_after_utc if hasattr(cert_obj, 'not_valid_after_utc') else cert_obj.not_valid_after
+        
+        new_cert = Certificate(
+            refid=str(uuid.uuid4())[:8],
+            descr=cn,
+            caref=ca.refid,
+            crt=base64.b64encode(cert_pem_raw).decode(),
+            csr=base64.b64encode(csr_pem).decode(),
+            cert_type='server',
+            subject=cert_obj.subject.rfc4514_string(),
+            subject_cn=cn,
+            issuer=cert_obj.issuer.rfc4514_string(),
+            serial_number=serial,
+            aki=cert_aki,
+            ski=cert_ski,
+            valid_from=not_before,
+            valid_to=not_after,
+            san_dns=json.dumps(san_dns) if san_dns else None,
+            san_ip=json.dumps(san_ip) if san_ip else None,
+            san_email=json.dumps(san_email) if san_email else None,
+            source=source,
+        )
+        db.session.add(new_cert)
+        
+        # Increment CA serial
+        ca.serial = (ca.serial or 0) + 1
+        db.session.commit()
+        
+        logger.info(f"Signed CSR via {source}: CN={cn}, serial={serial}, CA={ca.descr}")
+        
+        return cert_pem_str, serial
