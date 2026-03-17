@@ -11,6 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.87] - 2026-03-17
+
+### Fixed
+- **ADCS cert import "Incorrect padding"** — Handle certsrv base64-encoded DER (missing padding), full PEM, and PEM-wrapping fallback; robust cert parsing for all ADCS return formats
+
+---
+
 ## [2.86] - 2026-03-17
 
 ### Fixed
