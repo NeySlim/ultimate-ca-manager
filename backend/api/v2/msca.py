@@ -355,28 +355,52 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
     """Import a signed certificate from MS CA into UCM's certificate store"""
     from models import Certificate
     import base64
-    from datetime import datetime
 
     try:
         from cryptography import x509 as cx509
-        cert_der = base64.b64decode(cert_pem) if cert_pem else None
-        if not cert_der:
+        from cryptography.hazmat.primitives.serialization import Encoding
+
+        if not cert_pem:
+            logger.error("No certificate data to import")
             return
 
-        # Try PEM first, then DER
-        try:
-            cert_obj = cx509.load_pem_x509_certificate(cert_pem.encode() if isinstance(cert_pem, str) else cert_pem)
-        except Exception:
-            cert_obj = cx509.load_der_x509_certificate(cert_der)
+        # Ensure string
+        if isinstance(cert_pem, bytes):
+            cert_pem = cert_pem.decode('utf-8', errors='replace')
+
+        cert_obj = None
+
+        # Case 1: Full PEM with headers
+        if '-----BEGIN CERTIFICATE-----' in cert_pem:
+            cert_obj = cx509.load_pem_x509_certificate(cert_pem.encode('utf-8'))
+
+        else:
+            # Case 2: Base64-encoded DER (certsrv b64 format) — may lack padding
+            clean_b64 = cert_pem.replace('\r', '').replace('\n', '').replace(' ', '')
+            # Fix padding
+            padding = 4 - len(clean_b64) % 4
+            if padding != 4:
+                clean_b64 += '=' * padding
+            try:
+                cert_der = base64.b64decode(clean_b64)
+                cert_obj = cx509.load_der_x509_certificate(cert_der)
+            except Exception:
+                # Last resort: wrap as PEM and try
+                pem_wrapped = (
+                    '-----BEGIN CERTIFICATE-----\n'
+                    + cert_pem.strip()
+                    + '\n-----END CERTIFICATE-----\n'
+                )
+                cert_obj = cx509.load_pem_x509_certificate(pem_wrapped.encode('utf-8'))
 
         # Extract subject fields
         subject = cert_obj.subject
         cn = subject.get_attributes_for_oid(cx509.oid.NameOID.COMMON_NAME)
         org = subject.get_attributes_for_oid(cx509.oid.NameOID.ORGANIZATION_NAME)
 
-        cert_pem_b64 = base64.b64encode(
-            cert_obj.public_bytes(encoding=__import__('cryptography.hazmat.primitives.serialization', fromlist=['Encoding']).Encoding.PEM)
-        ).decode('utf-8')
+        # Store as base64-encoded PEM (UCM standard format)
+        cert_pem_bytes = cert_obj.public_bytes(encoding=Encoding.PEM)
+        cert_pem_b64 = base64.b64encode(cert_pem_bytes).decode('utf-8')
 
         cert = Certificate(
             cn=cn[0].value if cn else 'Unknown',
