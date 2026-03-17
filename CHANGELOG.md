@@ -11,6 +11,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.85] - 2026-03-17
+
+### Fixed
+- **ADCS CSR signing crash** — Fixed `ImportError: cannot import name 'CSR' from 'models'`; CSRs use the `Certificate` model (no separate CSR class exists)
+- **ADCS request status check** — Same CSR→Certificate fix for pending request polling
+
+---
+
 ## [2.84] - 2026-03-17
 
 ### Fixed
