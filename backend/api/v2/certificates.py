@@ -82,9 +82,13 @@ def list_certificates():
     
     query = Certificate.query
     
-    # Apply CA filter
+    # Apply CA filter (Certificate stores caref=CA.refid, not ca_id)
     if ca_id:
-        query = query.filter_by(ca_id=ca_id)
+        ca = CA.query.get(ca_id)
+        if ca:
+            query = query.filter_by(caref=ca.refid)
+        else:
+            query = query.filter(Certificate.id < 0)  # No results for invalid CA
     
     # Apply status filter
     if status == 'revoked':
