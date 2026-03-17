@@ -250,14 +250,14 @@ def list_templates(msca_id):
 @require_auth(['write:certificates'])
 def sign_csr(msca_id, csr_id):
     """Submit a CSR to Microsoft CA for signing"""
-    from models import CSR
+    from models import Certificate
 
     msca = MicrosoftCA.query.get(msca_id)
     if not msca:
         return error_response("Microsoft CA connection not found", 404)
 
-    csr = CSR.query.get(csr_id)
-    if not csr:
+    csr = Certificate.query.get(csr_id)
+    if not csr or not csr.csr:
         return error_response("CSR not found", 404)
 
     data = request.get_json() or {}
@@ -324,8 +324,8 @@ def check_request_status(msca_id, request_id):
         if result.get('status') == 'issued' and result.get('cert_pem'):
             req = MSCARequest.query.get(request_id)
             if req and req.csr_id and not req.cert_id:
-                from models import CSR
-                csr = CSR.query.get(req.csr_id)
+                from models import Certificate
+                csr = Certificate.query.get(req.csr_id)
                 msca = MicrosoftCA.query.get(msca_id)
                 if csr and msca:
                     _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
