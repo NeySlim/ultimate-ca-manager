@@ -502,9 +502,9 @@ export default function CRLOCSPPage() {
             <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.cdp')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
-                {`${window.location.origin}/cdp/${selectedCA.id}.crl`}
+                {selectedCA.cdp_url || `${window.location.origin}/cdp/${selectedCA.refid || selectedCA.id}.crl`}
               </code>
-              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/cdp/${selectedCA.id}.crl`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.cdp_url || `${window.location.origin}/cdp/${selectedCA.refid || selectedCA.id}.crl`)}>
                 <Copy size={14} />
               </Button>
             </div>
@@ -513,9 +513,9 @@ export default function CRLOCSPPage() {
             <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.aia')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
-                {`${window.location.origin}/ocsp`}
+                {selectedCA.ocsp_url || `${window.location.origin}/ocsp`}
               </code>
-              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/ocsp`)}>
+              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.ocsp_url || `${window.location.origin}/ocsp`)}>
                 <Copy size={14} />
               </Button>
             </div>

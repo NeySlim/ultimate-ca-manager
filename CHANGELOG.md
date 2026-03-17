@@ -11,6 +11,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.82] - 2026-03-17
+
+### Fixed
+- **CDP URLs now use HTTP protocol** — CDP URL generation in CA API was hardcoded to HTTPS (`request.host_url`), now uses `get_protocol_base_url()` which respects HTTP protocol port configuration
+- **CRL/OCSP page shows actual URLs** — Distribution Points section now displays the real CDP/OCSP URLs stored on the CA (with HTTP protocol) instead of hardcoded `window.location.origin` (HTTPS)
+- **Migration updates existing CA URLs** — Existing CAs with HTTPS CDP/OCSP URLs are automatically migrated to HTTP when HTTP protocol port is enabled
+
+---
+
 ## [2.81] - 2026-03-17
 
 ### Added

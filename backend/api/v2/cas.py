@@ -431,7 +431,7 @@ def update_ca(ca_id):
     if 'cdp_enabled' in data:
         ca.cdp_enabled = bool(data['cdp_enabled'])
         if ca.cdp_enabled and not ca.cdp_url:
-            base_url = request.host_url.rstrip('/')
+            base_url = get_protocol_base_url()
             ca.cdp_url = f"{base_url}/cdp/{ca.refid}.crl"
     if 'cdp_url' in data:
         ca.cdp_url = data['cdp_url']
