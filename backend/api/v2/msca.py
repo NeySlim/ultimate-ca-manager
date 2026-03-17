@@ -355,6 +355,8 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
     """Import a signed certificate from MS CA into UCM's certificate store"""
     from models import Certificate
     import base64
+    import uuid
+    import json
 
     try:
         from cryptography import x509 as cx509
@@ -373,11 +375,9 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         # Case 1: Full PEM with headers
         if '-----BEGIN CERTIFICATE-----' in cert_pem:
             cert_obj = cx509.load_pem_x509_certificate(cert_pem.encode('utf-8'))
-
         else:
             # Case 2: Base64-encoded DER (certsrv b64 format) — may lack padding
             clean_b64 = cert_pem.replace('\r', '').replace('\n', '').replace(' ', '')
-            # Fix padding
             padding = 4 - len(clean_b64) % 4
             if padding != 4:
                 clean_b64 += '=' * padding
@@ -385,7 +385,6 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
                 cert_der = base64.b64decode(clean_b64)
                 cert_obj = cx509.load_der_x509_certificate(cert_der)
             except Exception:
-                # Last resort: wrap as PEM and try
                 pem_wrapped = (
                     '-----BEGIN CERTIFICATE-----\n'
                     + cert_pem.strip()
@@ -395,23 +394,57 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
 
         # Extract subject fields
         subject = cert_obj.subject
-        cn = subject.get_attributes_for_oid(cx509.oid.NameOID.COMMON_NAME)
-        org = subject.get_attributes_for_oid(cx509.oid.NameOID.ORGANIZATION_NAME)
+        cn_attrs = subject.get_attributes_for_oid(cx509.oid.NameOID.COMMON_NAME)
+        cn = cn_attrs[0].value if cn_attrs else 'Unknown'
+
+        # Extract SANs
+        san_dns, san_ip, san_email = [], [], []
+        try:
+            san_ext = cert_obj.extensions.get_extension_for_class(cx509.SubjectAlternativeName)
+            san_dns = [str(n) for n in san_ext.value.get_values_for_type(cx509.DNSName)]
+            san_ip = [str(n) for n in san_ext.value.get_values_for_type(cx509.IPAddress)]
+            san_email = [str(n) for n in san_ext.value.get_values_for_type(cx509.RFC822Name)]
+        except cx509.ExtensionNotFound:
+            pass
+
+        # Extract AKI/SKI
+        cert_aki, cert_ski = None, None
+        try:
+            aki_ext = cert_obj.extensions.get_extension_for_class(cx509.AuthorityKeyIdentifier)
+            if aki_ext.value.key_identifier:
+                cert_aki = ':'.join(f'{b:02x}' for b in aki_ext.value.key_identifier)
+        except cx509.ExtensionNotFound:
+            pass
+        try:
+            ski_ext = cert_obj.extensions.get_extension_for_class(cx509.SubjectKeyIdentifier)
+            if ski_ext.value.digest:
+                cert_ski = ':'.join(f'{b:02x}' for b in ski_ext.value.digest)
+        except cx509.ExtensionNotFound:
+            pass
 
         # Store as base64-encoded PEM (UCM standard format)
         cert_pem_bytes = cert_obj.public_bytes(encoding=Encoding.PEM)
         cert_pem_b64 = base64.b64encode(cert_pem_bytes).decode('utf-8')
 
         cert = Certificate(
-            cn=cn[0].value if cn else 'Unknown',
-            org=org[0].value if org else None,
+            refid=str(uuid.uuid4())[:8],
+            descr=f"MSCA: {cn} ({template})",
             crt=cert_pem_b64,
-            status='valid',
             cert_type='server',
-            issuer_cn=f"MSCA: {msca.name}",
-            not_before=cert_obj.not_valid_before_utc,
-            not_after=cert_obj.not_valid_after_utc,
+            subject=cert_obj.subject.rfc4514_string(),
+            subject_cn=cn,
+            issuer=cert_obj.issuer.rfc4514_string(),
             serial_number=format(cert_obj.serial_number, 'x'),
+            aki=cert_aki,
+            ski=cert_ski,
+            valid_from=cert_obj.not_valid_before_utc,
+            valid_to=cert_obj.not_valid_after_utc,
+            san_dns=json.dumps(san_dns) if san_dns else None,
+            san_ip=json.dumps(san_ip) if san_ip else None,
+            san_email=json.dumps(san_email) if san_email else None,
+            source='msca',
+            imported_from=f"msca:{msca.name}",
+            created_by='system',
         )
         db.session.add(cert)
         db.session.flush()
@@ -423,13 +456,19 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
             msca_req.status = 'issued'
             msca_req.issued_at = utc_now()
 
-        # Update CSR status
-        csr.status = 'signed'
-        csr.cert_id = cert.id
+        # Update the original CSR record: populate crt field (CSR → full Certificate)
+        if csr and not csr.crt:
+            csr.crt = cert_pem_b64
+            csr.subject = cert_obj.subject.rfc4514_string()
+            csr.subject_cn = cn
+            csr.issuer = cert_obj.issuer.rfc4514_string()
+            csr.serial_number = format(cert_obj.serial_number, 'x')
+            csr.valid_from = cert_obj.not_valid_before_utc
+            csr.valid_to = cert_obj.not_valid_after_utc
 
         db.session.commit()
-        logger.info(f"Imported MS CA signed certificate: {cert.cn} (id={cert.id})")
+        logger.info(f"Imported MS CA signed certificate: {cn} (id={cert.id})")
 
     except Exception as e:
-        logger.error(f"Failed to import MS CA signed certificate: {e}")
+        logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)
         db.session.rollback()

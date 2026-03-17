@@ -11,6 +11,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.88] - 2026-03-17
+
+### Fixed
+- **ADCS cert import completely rewritten** — Previous code used 6 non-existent Certificate model fields (`cn`, `org`, `status`, `issuer_cn`, `not_before`, `not_after`, `cert_id`); now uses correct columns (`refid`, `descr`, `subject`, `subject_cn`, `issuer`, `valid_from`, `valid_to`, `source`, etc.)
+- **ADCS cert import extracts SANs, AKI, SKI** — Full certificate metadata parsed and stored, matching UCM standard cert creation pattern
+- **ADCS CSR update** — Populates `crt` field on original CSR record (converts CSR → full cert) instead of setting non-existent `status`/`cert_id` fields
+
+---
+
 ## [2.87] - 2026-03-17
 
 ### Fixed
