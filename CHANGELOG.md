@@ -11,6 +11,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.84] - 2026-03-17
+
+### Fixed
+- **ADCS CSR signing robustness** — certsrv import in exception handler no longer masks real errors; string-based error classification runs first, typed exceptions used only if available
+- **ADCS error visibility** — 500 responses now return actual error message instead of generic "Internal server error"; all error paths log with full stack trace (`exc_info=True`)
+- **ADCS DB resilience** — All `db.session.commit()` calls wrapped in try/except with rollback to prevent cascading failures
+- **CSR validation** — Empty CSR data and bytes-vs-string mismatches now caught before submission
+
+---
+
 ## [2.83] - 2026-03-17
 
 ### Fixed
