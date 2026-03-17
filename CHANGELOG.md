@@ -11,6 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.86] - 2026-03-17
+
+### Fixed
+- **ADCS cert bytes serialization** — `certsrv` returns `bytes` from `get_cert()`, `get_existing_cert()`, `get_ca_cert()`; now decoded to `str` for JSON responses and DB storage
+
+---
+
 ## [2.85] - 2026-03-17
 
 ### Fixed
