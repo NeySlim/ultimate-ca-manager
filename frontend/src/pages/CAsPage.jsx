@@ -564,15 +564,15 @@ export default function CAsPage() {
             <h3 className="text-sm font-semibold text-text-primary">{t('cas.subjectInfo')}</h3>
             <Input name="commonName" label={t('common.commonName') + ' (CN)'} placeholder={t('cas.cnPlaceholder')} required />
             <div className="grid grid-cols-2 gap-4">
-              <Input name="organization" label={t('common.organization') + ' (O)'} placeholder={t('cas.orgPlaceholder')} />
-              <Input name="organizationalUnit" label={t('common.orgUnit') + ' (OU)'} placeholder={t('csrs.departmentPlaceholder')} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <Input name="country" label={t('common.country') + ' (C)'} placeholder={t('common.countryPlaceholder')} maxLength={2} />
               <Input name="state" label={t('common.stateProvince') + ' (ST)'} placeholder={t('common.statePlaceholder')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Input name="locality" label={t('cas.locality') + ' (L)'} placeholder={t('cas.localityPlaceholder')} />
+              <Input name="organization" label={t('common.organization') + ' (O)'} placeholder={t('cas.orgPlaceholder')} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input name="organizationalUnit" label={t('common.orgUnit') + ' (OU)'} placeholder={t('csrs.departmentPlaceholder')} />
               <Input name="description" label={t('common.description')} placeholder={t('cas.descriptionPlaceholder')} />
             </div>
           </div>

@@ -1228,20 +1228,6 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
         </button>
         {showSubject && (
           <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label={t('common.organization')}
-                placeholder={t('certificates.orgPlaceholder')}
-                value={formData.organization}
-                onChange={(e) => update('organization', e.target.value)}
-              />
-              <Input
-                label={'OU'}
-                placeholder={t('certificates.ouPlaceholder')}
-                value={formData.organizational_unit}
-                onChange={(e) => update('organizational_unit', e.target.value)}
-              />
-            </div>
             <div className="grid grid-cols-3 gap-3">
               <Input
                 label={t('common.country')}
@@ -1261,6 +1247,20 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
                 placeholder="City"
                 value={formData.locality}
                 onChange={(e) => update('locality', e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label={t('common.organization')}
+                placeholder={t('certificates.orgPlaceholder')}
+                value={formData.organization}
+                onChange={(e) => update('organization', e.target.value)}
+              />
+              <Input
+                label={'OU'}
+                placeholder={t('certificates.ouPlaceholder')}
+                value={formData.organizational_unit}
+                onChange={(e) => update('organizational_unit', e.target.value)}
               />
             </div>
             <Input

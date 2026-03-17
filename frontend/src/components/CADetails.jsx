@@ -175,11 +175,11 @@ export function CADetails({
       <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
           <CompactField icon={Globe} label={t('common.commonName')} value={ca.common_name} />
+          <CompactField autoIcon="country" label={t('common.country')} value={ca.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={ca.state} />
+          <CompactField icon={MapPin} label={t('common.locality')} value={ca.locality} />
           <CompactField icon={Buildings} label={t('common.organization')} value={ca.organization} />
           <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={ca.organizational_unit} />
-          <CompactField icon={MapPin} label={t('common.locality')} value={ca.locality} />
-          <CompactField autoIcon="state" label={t('common.state')} value={ca.state} />
-          <CompactField autoIcon="country" label={t('common.country')} value={ca.country} />
           <CompactField icon={Envelope} label={t('common.email')} value={ca.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>

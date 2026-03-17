@@ -922,18 +922,6 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             </summary>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <Input
-                label={t('common.organization')}
-                value={genOrg}
-                onChange={(e) => setGenOrg(e.target.value)}
-                placeholder={t('certificates.orgPlaceholder')}
-              />
-              <Input
-                label={t('csrs.department')}
-                value={genOU}
-                onChange={(e) => setGenOU(e.target.value)}
-                placeholder={t('csrs.departmentPlaceholder')}
-              />
-              <Input
                 label={t('common.country')}
                 value={genCountry}
                 onChange={(e) => setGenCountry(e.target.value)}
@@ -951,6 +939,18 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                 value={genLocality}
                 onChange={(e) => setGenLocality(e.target.value)}
                 placeholder={t('certificates.localityPlaceholder')}
+              />
+              <Input
+                label={t('common.organization')}
+                value={genOrg}
+                onChange={(e) => setGenOrg(e.target.value)}
+                placeholder={t('certificates.orgPlaceholder')}
+              />
+              <Input
+                label={t('csrs.department')}
+                value={genOU}
+                onChange={(e) => setGenOU(e.target.value)}
+                placeholder={t('csrs.departmentPlaceholder')}
               />
             </div>
           </details>

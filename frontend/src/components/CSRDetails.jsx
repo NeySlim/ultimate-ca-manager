@@ -133,11 +133,11 @@ export function CSRDetails({
       <CompactSection title={t('common.subject')}>
         <CompactGrid>
           <CompactField icon={Globe} label={t('common.commonName')} value={csr.common_name || csr.cn} />
+          <CompactField autoIcon="country" label={t('common.country')} value={csr.country || csr.c} />
+          <CompactField autoIcon="state" label={t('common.state')} value={csr.state || csr.st} />
+          <CompactField icon={MapPin} label={t('common.locality')} value={csr.locality || csr.l} />
           <CompactField icon={Buildings} label={t('common.organization')} value={csr.organization || csr.o} />
           <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={csr.organizational_unit || csr.ou} />
-          <CompactField icon={MapPin} label={t('common.locality')} value={csr.locality || csr.l} />
-          <CompactField autoIcon="state" label={t('common.state')} value={csr.state || csr.st} />
-          <CompactField autoIcon="country" label={t('common.country')} value={csr.country || csr.c} />
           <CompactField icon={Envelope} label={t('common.email')} value={csr.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>

@@ -210,11 +210,11 @@ export function TrustCertDetails({
       <CompactSection title={t('common.subject')} icon={Globe}>
         <CompactGrid>
           <CompactField label={t('common.commonName')} value={cert.common_name} icon={Globe} />
+          <CompactField label={t('common.country')} value={cert.country} autoIcon="country" />
+          <CompactField label={t('common.stateProvince')} value={cert.state} autoIcon="state" />
+          <CompactField label={t('common.locality')} value={cert.locality} icon={MapPin} />
           <CompactField label={t('common.organization')} value={cert.organization} icon={Buildings} />
           <CompactField label={t('common.orgUnit')} value={cert.organizational_unit} autoIcon="orgUnit" />
-          <CompactField label={t('common.locality')} value={cert.locality} icon={MapPin} />
-          <CompactField label={t('common.stateProvince')} value={cert.state} autoIcon="state" />
-          <CompactField label={t('common.country')} value={cert.country} autoIcon="country" />
         </CompactGrid>
       </CompactSection>
       

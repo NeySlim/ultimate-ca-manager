@@ -256,11 +256,11 @@ export function CertificateDetails({
       <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
           <CompactField icon={Globe} label={t('common.commonName')} value={cert.cn || cert.common_name} />
+          <CompactField autoIcon="country" label={t('common.country')} value={cert.country} />
+          <CompactField autoIcon="state" label={t('common.state')} value={cert.state} />
+          <CompactField icon={MapPin} label={t('common.locality')} value={cert.locality} />
           <CompactField icon={Buildings} label={t('common.organization')} value={cert.organization} />
           <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={cert.organizational_unit} />
-          <CompactField icon={MapPin} label={t('common.locality')} value={cert.locality} />
-          <CompactField autoIcon="state" label={t('common.state')} value={cert.state} />
-          <CompactField autoIcon="country" label={t('common.country')} value={cert.country} />
           <CompactField icon={Envelope} label={t('common.email')} value={cert.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
