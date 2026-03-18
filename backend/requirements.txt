@@ -13,7 +13,7 @@ Flask-Session==0.8.0
 
 # Cryptography & OpenSSL
 cryptography==46.0.5
-pyOpenSSL==25.3.0
+pyOpenSSL==26.0.0
 asn1crypto==1.5.1
 
 # WebAuthn/FIDO2 Support
@@ -27,7 +27,7 @@ Pillow>=10.0.0
 
 # SCEP Support
 pycryptodome==3.23.0
-pyasn1==0.6.2
+pyasn1==0.6.3
 pyasn1-modules==0.4.2
 
 # ACME Support
