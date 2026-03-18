@@ -387,6 +387,8 @@ Click a CSR to view:
 
 ## Signing a CSR
 
+### Local CA Signing
+
 1. Select a pending CSR
 2. Click **Sign**
 3. Choose the **Signing CA** (must have a private key)
@@ -396,6 +398,29 @@ Click a CSR to view:
 6. Click **Sign**
 
 The resulting certificate appears in the Certificates page.
+
+### Microsoft CA Signing
+
+If Microsoft CA connections are configured, a **Microsoft CA** tab appears in the sign modal:
+
+1. Select a pending CSR and click **Sign**
+2. Switch to the **Microsoft CA** tab
+3. Select the **MS CA connection**
+4. Select the **certificate template** (auto-loaded from the CA)
+5. Click **Sign**
+
+If the template requires manager approval, UCM tracks the pending request. Check its status from the CSR detail panel.
+
+### Enroll on Behalf Of (EOBO)
+
+When signing via Microsoft CA, you can enroll on behalf of another user:
+
+1. Select the MS CA connection and template
+2. Check **Enroll on Behalf Of (EOBO)**
+3. The **Enrollee DN** and **Enrollee UPN** fields auto-fill from the CSR subject and SAN email
+4. Adjust the values if needed and click **Sign**
+
+> ⚠️ EOBO requires an enrollment agent certificate configured on the AD CS server, and the template must allow enrollment on behalf of other users.
 
 ## Adding a Private Key
 
@@ -2089,6 +2114,103 @@ Before enabling schedules, use the ✈️ button on any report row to send a tes
 - **write:settings** — Configure report schedules
 
 > 💡 Schedule the expiry report first — it's the most operationally valuable and helps prevent certificate-related outages.
+`
+  },
+
+  // ===================================================================
+  msca: {
+    title: 'Microsoft AD CS Integration',
+    content: `
+## Overview
+
+UCM integrates with Microsoft Active Directory Certificate Services (AD CS) to sign CSRs using your existing Windows PKI infrastructure. This bridges your internal CA with UCM's certificate lifecycle management.
+
+## Setting Up a Connection
+
+1. Go to **Settings → Microsoft CA**
+2. Click **Add Connection**
+3. Enter the **Connection Name** and **CA Server Hostname**
+4. Optionally enter the **CA Common Name** (auto-detected if empty)
+5. Select the **Authentication Method**
+6. Enter the credentials for your chosen method
+7. Click **Test Connection** to verify
+8. Set a **Default Template** and click **Save**
+
+## Authentication Methods
+
+| Method | Requirements | Best For |
+|--------|-------------|----------|
+| **Client Certificate (mTLS)** | Client cert/key PEM from the CA | Production — no domain join needed |
+| **Basic Auth** | Username + password, HTTPS | Simple setups — enable basic auth in IIS certsrv |
+| **Kerberos** | Domain-joined machine + keytab | Enterprise AD environments |
+
+### Client Certificate Setup (Recommended)
+
+1. On your Windows CA, create a certificate for the UCM service account
+2. Export as PFX, then convert to PEM:
+   \`\`\`bash
+   openssl pkcs12 -in client.pfx -out client-cert.pem -clcerts -nokeys
+   openssl pkcs12 -in client.pfx -out client-key.pem -nocerts -nodes
+   \`\`\`
+3. Paste the cert and key PEM content into the UCM connection form
+
+## Signing CSRs via Microsoft CA
+
+1. Navigate to **CSRs → Pending**
+2. Select a CSR and click **Sign**
+3. Switch to the **Microsoft CA** tab
+4. Select the connection and certificate template
+5. Click **Sign**
+
+### Auto-Approved Templates
+The certificate is returned immediately and imported into UCM.
+
+### Manager Approval Templates
+UCM saves the request as **Pending** and tracks the MS CA request ID. Once approved on the Windows CA, check the status from the CSR detail panel to import the certificate.
+
+## Enroll on Behalf Of (EOBO)
+
+EOBO allows an enrollment agent to request certificates on behalf of other users. This is common in enterprise environments where a PKI administrator manages certificates for end users.
+
+### Prerequisites
+
+- The UCM service account needs an **enrollment agent certificate** issued by the CA
+- The certificate template must have **"Enroll on behalf of other users"** permission enabled
+- The template's security tab must grant the enrollment agent the right to enroll
+
+### Using EOBO in UCM
+
+1. In the sign modal, select the Microsoft CA connection and template
+2. Check the **Enroll on Behalf Of (EOBO)** checkbox
+3. The fields auto-populate from the CSR:
+   - **Enrollee DN** — from the CSR subject (e.g., CN=John Doe,OU=Users,DC=corp,DC=local)
+   - **Enrollee UPN** — from the CSR SAN email (e.g., john.doe@corp.local)
+4. Adjust the values if needed
+5. Click **Sign**
+
+UCM passes these as ADCS request attributes:
+- EnrolleeObjectName:<DN> — identifies the target user in AD
+- EnrolleePrincipalName:<UPN> — the user's login name
+
+### EOBO vs Direct Enrollment
+
+| Feature | Direct Enrollment | EOBO |
+|---------|-------------------|------|
+| Who signs | User themselves | Enrollment agent on behalf |
+| Private key | User's machine | Can be on UCM (CSR model) |
+| Template permission | Standard enroll | Requires enrollment agent rights |
+| Use case | Self-service | Centralized PKI management |
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Connection test fails | Verify hostname, port 443, and that certsrv is accessible |
+| No templates found | Check that the UCM account has enrollment permissions on the CA |
+| EOBO denied | Verify enrollment agent certificate and template permissions |
+| Request stuck pending | Approve on the Windows CA console, then refresh status in UCM |
+
+> 💡 Use the **Test Connection** button to verify authentication and discover available templates before signing.
 `
   },
 }

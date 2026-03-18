@@ -9,7 +9,8 @@ import {
   TreeStructure, Certificate, FileText, ClockCounterClockwise,
   ShieldCheck, Key, Users, Gear, Database, Lock, Globe,
   ListChecks, CloudArrowUp, HardDrive, UsersFour, Fingerprint,
-  ArrowClockwise, Wrench, Stack, Robot, Gavel, CalendarBlank, FilePdf
+  ArrowClockwise, Wrench, Stack, Robot, Gavel, CalendarBlank, FilePdf,
+  WindowsLogo, UserSwitch
 } from '@phosphor-icons/react'
 
 export const helpContent = {
@@ -207,8 +208,9 @@ export const helpContent = {
     tips: [
       'CSRs preserve the requester\'s private key — it never leaves their system',
       'You can add a private key to a CSR after signing if needed for PKCS#12 export',
+      'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
     ],
-    related: ['Certificates', 'CAs', 'Templates']
+    related: ['Certificates', 'CAs', 'Templates', 'Microsoft CA']
   },
 
   // ===== TEMPLATES =====
@@ -1001,6 +1003,54 @@ export const helpContent = {
       'Use the test send feature to verify email delivery before enabling schedules.',
     ],
     related: ['Policies', 'Certificates', 'Audit Logs', 'Settings']
+  },
+
+  // ===== MICROSOFT CA =====
+  msca: {
+    title: 'Microsoft AD CS Integration',
+    subtitle: 'Sign certificates with Microsoft Certificate Authority',
+    overview: 'Connect UCM to Microsoft Active Directory Certificate Services (AD CS) to sign CSRs using your Windows PKI infrastructure. Supports certificate (mTLS), Kerberos, and Basic authentication methods.',
+    sections: [
+      {
+        title: 'Authentication Methods',
+        icon: Key,
+        items: [
+          { label: 'Client Certificate (mTLS)', text: 'Most secure. Generate a client cert on your MS CA, export as PFX, upload cert and key PEM.' },
+          { label: 'Basic Auth', text: 'Username/password over HTTPS. Works without domain join. Enable basic auth in IIS certsrv.' },
+          { label: 'Kerberos', text: 'Requires requests-kerberos package and domain-joined machine or keytab configured.' },
+        ]
+      },
+      {
+        title: 'Signing CSRs',
+        icon: Certificate,
+        items: [
+          { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
+          { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
+          { label: 'Manager Approval', text: 'Some templates require manager approval — UCM tracks the pending request' },
+          { label: 'Status Polling', text: 'Check pending request status from the CSR detail panel' },
+        ]
+      },
+      {
+        title: 'Enroll on Behalf Of (EOBO)',
+        icon: UserSwitch,
+        items: [
+          { label: 'Overview', text: 'Submit CSR on behalf of another user using enrollment agent certificates' },
+          { label: 'Enrollee DN', text: 'Distinguished Name of the target user (auto-filled from CSR subject)' },
+          { label: 'Enrollee UPN', text: 'User Principal Name of the target user (auto-filled from CSR SAN email)' },
+          { label: 'Requirements', text: 'CA template must allow enrollment on behalf of others. UCM service account needs an enrollment agent certificate.' },
+        ]
+      },
+    ],
+    tips: [
+      'Test the connection first to verify authentication and discover available templates.',
+      'Enable EOBO by checking the checkbox in the sign modal — fields auto-fill from CSR data.',
+      'Client certificate authentication is recommended for production — it doesn\'t require domain join.',
+    ],
+    warnings: [
+      'Kerberos requires the machine to be domain-joined or a keytab configured — not available in Docker.',
+      'EOBO requires an enrollment agent certificate configured on the AD CS server.',
+    ],
+    related: ['CSRs', 'Certificates', 'Settings']
   },
 }
 
