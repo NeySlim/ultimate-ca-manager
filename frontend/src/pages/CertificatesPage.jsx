@@ -430,6 +430,8 @@ export default function CertificatesPage() {
           {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>LOCAL ACME</Badge>}
           {row.source === 'letsencrypt' && <Badge variant="green" size="sm" dot>LET'S ENCRYPT</Badge>}
           {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
+          {row.source === 'msca' && <Badge variant="purple" size="sm" dot>ADCS</Badge>}
+          {row.source === 'est' && <Badge variant="yellow" size="sm" dot>EST</Badge>}
         </div>
       ),
       // Mobile: Icon + CN left + status badge right
@@ -541,6 +543,8 @@ export default function CertificatesPage() {
           {row.source === 'acme' && <Badge variant="cyan" size="xs" dot>LOCAL ACME</Badge>}
           {row.source === 'letsencrypt' && <Badge variant="green" size="xs" dot>LET'S ENCRYPT</Badge>}
           {row.source === 'scep' && <Badge variant="orange" size="xs" dot>SCEP</Badge>}
+          {row.source === 'msca' && <Badge variant="purple" size="xs" dot>ADCS</Badge>}
+          {row.source === 'est' && <Badge variant="yellow" size="xs" dot>EST</Badge>}
         </div>
       )
     },
