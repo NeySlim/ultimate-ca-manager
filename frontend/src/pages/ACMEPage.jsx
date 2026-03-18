@@ -68,6 +68,7 @@ export default function ACMEPage() {
   const [selectedLocalDomain, setSelectedLocalDomain] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [revokeSuperseded, setRevokeSuperseded] = useState(false)
+  const [eabHmacInput, setEabHmacInput] = useState(null)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
   const [proxyEmail, setProxyEmail] = useState('')
   
@@ -105,6 +106,7 @@ export default function ACMEPage() {
       setHistory(historyRes.data || [])
       setClientOrders(clientOrdersRes.data || [])
       setClientSettings(clientSettingsRes.data || {})
+      setEabHmacInput(null)
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
       setAcmeDomains(domainsRes.data || [])
@@ -1174,10 +1176,15 @@ export default function ACMEPage() {
           <Input
             label={t('acme.eabHmacKey')}
             type="password"
-            value={clientSettings.eab_hmac_key_set ? '••••••••' : ''}
+            value={eabHmacInput !== null ? eabHmacInput : (clientSettings.eab_hmac_key_set ? '••••••••' : '')}
             onChange={(e) => {
-              if (e.target.value !== '••••••••') {
-                handleUpdateClientSetting('eab_hmac_key', e.target.value)
+              const val = e.target.value
+              setEabHmacInput(val)
+              handleUpdateClientSetting('eab_hmac_key', val)
+            }}
+            onFocus={() => {
+              if (eabHmacInput === null && clientSettings.eab_hmac_key_set) {
+                setEabHmacInput('')
               }
             }}
             disabled={!canWrite('acme')}
