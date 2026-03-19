@@ -331,8 +331,8 @@ export default function CertificatesPage() {
 
   // Count orphans for stats
   const orphanCount = useMemo(() => {
-    const caIds = new Set(cas.map(ca => ca.id))
-    return certificates.filter(c => c.ca_id && !caIds.has(c.ca_id) && !caIds.has(Number(c.ca_id))).length
+    const caRefIds = new Set(cas.map(ca => ca.refid))
+    return certificates.filter(c => c.caref && !caRefIds.has(c.caref)).length
   }, [certificates, cas])
 
   // Stats - from backend API for accurate counts

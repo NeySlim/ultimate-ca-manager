@@ -150,6 +150,15 @@ export default function CAsPage() {
     }
   }
 
+  const getParentName = (ca) => {
+    if (ca.is_root) return t('common.rootCA')
+    if (ca.parent_id) {
+      const parent = cas.find(c => c.id === ca.parent_id)
+      if (parent) return parent.common_name || parent.descr
+    }
+    return t('common.intermediate')
+  }
+
   const loadCADetails = async (ca) => {
     // Desktop: open floating window
     if (!isMobile) {
@@ -157,7 +166,7 @@ export default function CAsPage() {
       addToHistory({
         id: ca.id,
         name: ca.common_name || ca.descr || `CA ${ca.id}`,
-        subtitle: ca.is_root ? t('common.rootCA') : (ca.parent_name || t('common.intermediate'))
+        subtitle: getParentName(ca)
       })
       return
     }
@@ -170,7 +179,7 @@ export default function CAsPage() {
       addToHistory({
         id: fullCA.id,
         name: fullCA.common_name || fullCA.descr || `CA ${fullCA.id}`,
-        subtitle: fullCA.is_root ? t('common.rootCA') : (fullCA.parent_name || t('common.intermediate'))
+        subtitle: getParentName(fullCA)
       })
     } catch {
       setSelectedCA(ca)

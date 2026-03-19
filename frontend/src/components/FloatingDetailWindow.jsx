@@ -12,6 +12,7 @@ import { CertificateDetails } from './CertificateDetails'
 import { CADetails } from './CADetails'
 import { TrustCertDetails } from './TrustCertDetails'
 import { certificatesService, casService, truststoreService, userCertificatesService } from '../services'
+import { extractCN } from '../lib/utils'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
@@ -27,7 +28,7 @@ const ENTITY_CONFIG = {
     service: () => certificatesService,
     fetchById: (id) => certificatesService.getById(id),
     getTitle: (data) => data?.common_name || data?.subject || `Certificate #${data?.id}`,
-    getSubtitle: (data) => data?.issuer_cn || '',
+    getSubtitle: (data) => data?.issuer ? extractCN(data.issuer) : '',
   },
   ca: {
     icon: ShieldCheck,

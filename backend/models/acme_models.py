@@ -106,7 +106,7 @@ class AcmeOrder(db.Model):
             'identifiers': self.identifiers_list,
             'authorizations': self.authorization_urls,
             'finalize': f'/acme/order/{self.order_id}/finalize',
-            'expires': self.expires_at.isoformat() + 'Z' if self.expires_at else None
+            'expires': self.expires.isoformat() + 'Z' if self.expires else None
         }
         
         if self.not_before:

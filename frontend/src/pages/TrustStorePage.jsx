@@ -396,7 +396,7 @@ export default function TrustStorePage() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-text-primary truncate">
-                {selectedCert.name || selectedCert.subject_cn || t('common.certificate')}
+                {selectedCert.name || t('common.certificate')}
               </h3>
               <Badge variant={isExpired ? 'danger' : isExpiring ? 'warning' : 'success'} size="sm">
                 {isExpired ? t('common.expired') : isExpiring ? t('common.detailsExpiring') : t('common.valid')}
@@ -472,14 +472,13 @@ export default function TrustStorePage() {
         {/* Subject Section */}
         <CompactSection title={t('common.subject')} icon={Globe}>
           <CompactGrid>
-            <CompactField icon={Globe} label={t('common.commonName')} value={selectedCert.subject_cn || selectedCert.name} />
-            <CompactField icon={Buildings} label={t('common.organization')} value={selectedCert.organization} />
+            <CompactField icon={Globe} label={t('common.subject')} value={selectedCert.subject || selectedCert.name} mono />
           </CompactGrid>
         </CompactSection>
 
         {/* Issuer Section */}
         <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
-          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer || selectedCert.issuer_cn} mono />
+          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer} mono />
         </CompactSection>
 
         {/* Validity Section */}
@@ -562,7 +561,7 @@ export default function TrustStorePage() {
           selectedId={selectedCert?.id}
           searchable
           searchPlaceholder={t('common.searchCertificates')}
-          searchKeys={['name', 'subject_cn', 'issuer_cn', 'purpose']}
+          searchKeys={['name', 'subject', 'issuer', 'purpose']}
           toolbarFilters={[
             {
               key: 'purpose',
