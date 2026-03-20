@@ -6,7 +6,7 @@
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
 ![Tests](https://img.shields.io/badge/tests-1814%20passing-brightgreen)
 
-**Ultimate Certificate Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and certificate lifecycle management.
+**Ultimate Certificate Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (ACME, SCEP, EST, OCSP, CRL/CDP), Microsoft ADCS integration, multi-factor authentication, and certificate lifecycle management.
 
 > 🚀 **UCM is a young and actively developed project.** Feedback, bug reports, and feature requests are very welcome! Feel free to [open an issue](https://github.com/NeySlim/ultimate-ca-manager/issues) — every report helps make UCM better.
 
@@ -16,28 +16,50 @@
 
 ## Features
 
+### PKI Core
 - **CA Management** -- Root and intermediate CAs, hierarchy view, import/export
-- **Certificate Lifecycle** -- Issue, sign, revoke, renew, export (PEM, DER, PKCS#12)
+- **Certificate Lifecycle** -- Issue, sign, revoke, renew, export (PEM, DER, PKCS#12), bulk operations
 - **CSR Management** -- Create, import, sign Certificate Signing Requests
 - **Certificate Templates** -- Predefined profiles for server, client, code signing, email
-- **Certificate Toolbox** -- SSL checker, CSR/cert decoder, key matcher, format converter
-- **Trust Store** -- Manage trusted root CA certificates
+- **Certificate Discovery** -- Network scanning, scan profiles, scheduled scans, certificate import
+- **Trust Store** -- Manage trusted root CA certificates with expiry alerts
 - **Chain Repair** -- AKI/SKI-based chain validation with automatic repair scheduler
-- **SCEP** -- RFC 8894 device auto-enrollment
-- **ACME** -- Let's Encrypt compatible (certbot, acme.sh)
+
+### Protocols
+- **ACME** -- RFC 8555, auto-enrollment, auto-renewal, DNS-01/HTTP-01 challenges, wildcard support
+- **SCEP** -- RFC 8894 device auto-enrollment with approval workflows
+- **EST** -- RFC 7030 Enrollment over Secure Transport
 - **OCSP** -- RFC 6960 real-time certificate status
 - **CRL/CDP** -- Certificate Revocation List distribution with Delta CRL support (RFC 5280 §5.2.4)
+
+### Integrations
+- **Microsoft ADCS** -- Certificate signing via AD CS, template discovery, EOBO (Enroll On Behalf Of)
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
-- **Email Notifications** -- SMTP, customizable HTML/text templates, certificate expiry alerts
-- **SSO** -- LDAP, OAuth2 (Azure/Google/GitHub), SAML single sign-on with role mapping
+- **DNS Providers** -- Cloudflare, Route53, Azure DNS and more for ACME DNS-01 challenges
+- **Webhooks** -- Event-driven notifications for certificate lifecycle events (15+ event types)
+
+### Security & Access
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
+- **SSO** -- LDAP, OAuth2 (Azure/Google/GitHub), SAML single sign-on with role mapping
+- **RBAC** -- 4 built-in roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions
+- **Policies & Approvals** -- Certificate issuance policies with approval workflows
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
-- **Reports & Governance** -- Scheduled reports, certificate policies, approval workflows
-- **RBAC** -- 4 system roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions
+
+### Operations & Monitoring
+- **Dashboard** -- Customizable drag-and-drop widgets, real-time stats, certificate trends
+- **Reports** -- Scheduled PDF reports, executive summaries, custom templates
+- **Certificate Toolbox** -- SSL checker, CSR/cert decoder, key matcher, format converter
+- **Email Notifications** -- SMTP, customizable HTML/text templates, certificate expiry alerts
+- **Backup & Restore** -- Manual and scheduled backups with retention policies
+- **Software Updates** -- In-app update checker with one-click install
+- **Global Search** -- Cross-resource search and command palette (Ctrl+K)
+
+### Platform
 - **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) × Light/Dark
 - **i18n** -- 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
-- **Responsive UI** -- React 18 + Radix UI, mobile-friendly, command palette (Ctrl+K)
+- **Responsive UI** -- React 18 + Radix UI, mobile-friendly
 - **Real-time** -- WebSocket live updates
+- **Multi-platform** -- Docker, Debian/Ubuntu (.deb), RHEL/Rocky/Fedora (.rpm)
 
 ---
 
