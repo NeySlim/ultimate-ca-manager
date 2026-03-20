@@ -11,6 +11,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.98] - 2026-03-20
+
+### Fixed
+- **Security: socket.io-parser CVE-2026-33151** — Updated to 4.2.6, also fixed ajv ReDoS, flatted DoS, minimatch ReDoS, rollup path traversal (0 npm audit issues)
+
+### Changed
+- **Docker: HTTP port 8080** — Added missing HTTP port mapping for CRL/CDP and OCSP public endpoints to all Docker examples (docker-compose.hsm.yml, README, DockerHub, quickstart, installation docs)
+- **Documentation** — Complete rewrite of features section across README, DockerHub README, and ucm.tools website to reflect all actual features (EST, ADCS, Discovery, Backup/Restore, Policies, Webhooks, etc.)
+- **Website screenshots** — Updated all screenshots to dark mode with realistic data
+
+---
+
 ## [2.97] - 2026-03-19
 
 ### Fixed
