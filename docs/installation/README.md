@@ -34,6 +34,7 @@ See: [Docker Installation Guide](docker.md)
 docker run -d \
   --name ucm \
   -p 8443:8443 \
+  -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
   neyslim/ultimate-ca-manager:latest
 ```

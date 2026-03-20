@@ -27,6 +27,7 @@ docker pull neyslim/ultimate-ca-manager:latest
 docker run -d \
   --name ucm \
   -p 8443:8443 \
+  -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
   neyslim/ultimate-ca-manager:latest
@@ -53,6 +54,7 @@ services:
     restart: unless-stopped
     ports:
       - "8443:8443"
+      - "8080:8080"   # HTTP — CRL/CDP and OCSP public endpoints
     volumes:
       - ucm-data:/opt/ucm/data
     environment:
@@ -81,6 +83,7 @@ services:
 
     ports:
       - "8443:8443"
+      - "8080:8080"   # HTTP — CRL/CDP and OCSP public endpoints
 
     volumes:
       # Persistent data
@@ -226,6 +229,7 @@ docker rm ucm
 docker run -d \
   --name ucm \
   -p 8443:8443 \
+  -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
   --restart unless-stopped \
   neyslim/ultimate-ca-manager:latest

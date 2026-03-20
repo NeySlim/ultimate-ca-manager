@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     ports:
       - "8443:8443"
+      - "8080:8080"   # HTTP — required for CRL/CDP and OCSP public endpoints
     environment:
       # HSM auto-init: creates a default SoftHSM token on first start
       HSM_AUTO_INIT: "true"
