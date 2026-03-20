@@ -3014,8 +3014,11 @@
       "pemWithChain": "PEM + CA-Kette",
       "fullBundle": "Vollständiges Bundle (Zert + Schlüssel + Kette)",
       "derBinary": "DER (Binär)",
-      "pkcs12": "PKCS#12 (.p12)"
-    }
+      "pkcs12": "PKCS#12 (.p12)",
+      "jks": "JKS (Java KeyStore)"
+    },
+    "formatJksDesc": "Java KeyStore, Zertifikat + Schlüssel",
+    "jksNote": "JKS enthält immer den privaten Schlüssel"
   },
   "userCertificates": {
     "title": "Benutzerzertifikate",

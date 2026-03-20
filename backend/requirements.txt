@@ -90,3 +90,4 @@ matplotlib>=3.8
 certsrv>=2.1.0
 # requests-kerberos is optional: only needed for Kerberos auth to MS CA
 # Install manually if needed: pip install requests-kerberos
+pyjks==20.0.0

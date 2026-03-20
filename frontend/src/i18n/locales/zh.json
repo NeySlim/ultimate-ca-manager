@@ -3014,8 +3014,11 @@
       "pemWithChain": "PEM + CA链",
       "fullBundle": "完整包（证书 + 密钥 + 链）",
       "derBinary": "DER（二进制）",
-      "pkcs12": "PKCS#12 (.p12)"
-    }
+      "pkcs12": "PKCS#12 (.p12)",
+      "jks": "JKS (Java KeyStore)"
+    },
+    "formatJksDesc": "Java KeyStore，证书 + 密钥",
+    "jksNote": "JKS 始终包含私钥"
   },
   "userCertificates": {
     "title": "用户证书",

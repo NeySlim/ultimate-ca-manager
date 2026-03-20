@@ -3014,8 +3014,11 @@
       "pemWithChain": "PEM + Ланцюг ЦС",
       "fullBundle": "Повний пакет (Серт + Ключ + Ланцюг)",
       "derBinary": "DER (Бінарний)",
-      "pkcs12": "PKCS#12 (.p12)"
-    }
+      "pkcs12": "PKCS#12 (.p12)",
+      "jks": "JKS (Java KeyStore)"
+    },
+    "formatJksDesc": "Java KeyStore, сертифікат + ключ",
+    "jksNote": "JKS завжди включає приватний ключ"
   },
   "userCertificates": {
     "title": "Сертифікати користувачів",

@@ -27,6 +27,7 @@ const FORMATS = [
   { key: 'der', label: 'DER', description: 'export.formatDerDesc', ext: '.der' },
   { key: 'pkcs7', label: 'P7B / PKCS#7', description: 'export.formatP7bDesc', ext: '.p7b' },
   { key: 'pkcs12', label: 'P12 / PKCS#12', description: 'export.formatP12Desc', ext: '.p12', requiresKey: true },
+  { key: 'jks', label: 'JKS', description: 'export.formatJksDesc', ext: '.jks', requiresKey: true },
   { key: 'key', labelKey: 'export.formats.privateKey', description: 'export.formatKeyDesc', ext: '.key', requiresKey: true, keyOnly: true },
 ]
 
@@ -59,10 +60,11 @@ export function ExportModal({
 
   // PKCS12 always includes key — sync state
   const isPkcs12 = format === 'pkcs12'
+  const isJks = format === 'jks'
   const isKeyOnly = format === 'key'
-  const effectiveIncludeKey = (isPkcs12 || isKeyOnly) ? true : includeKey
-  const needsPassword = isPkcs12
-  const showPasswordField = isPkcs12
+  const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey
+  const needsPassword = isPkcs12 || isJks
+  const showPasswordField = isPkcs12 || isJks
 
   // Available formats: hide PKCS12 if no key or no permission
   const availableFormats = FORMATS.filter(f => {
@@ -77,7 +79,7 @@ export function ExportModal({
       await onExport(format, {
         includeChain,
         includeKey: effectiveIncludeKey,
-        password: isPkcs12 ? password : undefined,
+        password: (isPkcs12 || isJks) ? password : undefined,
       })
       onClose()
     } catch {
@@ -160,7 +162,7 @@ export function ExportModal({
           </label>
 
           {/* Include private key — only if key exists AND user has permission */}
-          {hasPrivateKey && canExportKey && !isPkcs12 && (
+          {hasPrivateKey && canExportKey && !isPkcs12 && !isJks && (
             <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
               <input
                 type="checkbox"
@@ -176,10 +178,12 @@ export function ExportModal({
           )}
 
           {/* PKCS12 note */}
-          {isPkcs12 && (
+          {(isPkcs12 || isJks) && (
             <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-text-secondary">
               <Lock size={14} className="shrink-0" />
-              {t('export.pkcs12Note', 'PKCS#12 always includes the private key')}
+              {isPkcs12
+                ? t('export.pkcs12Note', 'PKCS#12 always includes the private key')
+                : t('export.jksNote', 'JKS always includes the private key')}
             </div>
           )}
 

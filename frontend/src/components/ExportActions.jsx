@@ -18,6 +18,7 @@ const FORMATS = [
   { key: 'der', label: 'DER', needsKey: false, needsPassword: false },
   { key: 'pkcs7', label: 'P7B', needsKey: false, needsPassword: false },
   { key: 'pkcs12', label: 'P12', needsKey: true, needsPassword: true },
+  { key: 'jks', label: 'JKS', needsKey: true, needsPassword: true },
 ]
 
 export function ExportActions({ 
@@ -29,6 +30,7 @@ export function ExportActions({
 }) {
   const { t } = useTranslation()
   const [passwordMode, setPasswordMode] = useState(false)
+  const [passwordFormat, setPasswordFormat] = useState(null)
   const [password, setPassword] = useState('')
   const inputRef = useRef(null)
 
@@ -41,6 +43,7 @@ export function ExportActions({
   const handleFormatClick = (format) => {
     if (format.needsPassword) {
       setPasswordMode(true)
+      setPasswordFormat(format.key)
       setPassword('')
       return
     }
@@ -49,13 +52,15 @@ export function ExportActions({
 
   const handlePasswordExport = () => {
     if (password.length < 4) return
-    onExport('pkcs12', { password })
+    onExport(passwordFormat, { password, includeChain: true })
     setPasswordMode(false)
+    setPasswordFormat(null)
     setPassword('')
   }
 
   const handleCancel = () => {
     setPasswordMode(false)
+    setPasswordFormat(null)
     setPassword('')
   }
 
@@ -90,7 +95,7 @@ export function ExportActions({
           disabled={password.length < 4}
           className="!h-6 !px-2 !text-xs"
         >
-          <Download size={12} /> P12
+          <Download size={12} /> {passwordFormat === 'jks' ? 'JKS' : 'P12'}
         </Button>
         <button
           onClick={handleCancel}

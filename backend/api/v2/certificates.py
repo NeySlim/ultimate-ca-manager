@@ -898,10 +898,10 @@ def export_certificate(cert_id):
     Export certificate in various formats
     
     Query params:
-        format: pem (default), der, pkcs12
+        format: pem (default), der, pkcs12, jks
         include_key: bool - Include private key (PEM only)
         include_chain: bool - Include CA chain (PEM only)
-        password: string - Required for PKCS12
+        password: string - Required for PKCS12 and JKS
     """
     
     certificate = Certificate.query.get(cert_id)
@@ -917,7 +917,7 @@ def export_certificate(cert_id):
     password = request.args.get('password')
     
     # Private key export requires write permission (operator+)
-    if include_key or export_format in ('pkcs12', 'pfx', 'key'):
+    if include_key or export_format in ('pkcs12', 'pfx', 'key', 'jks'):
         if not has_permission('write:certificates', g.permissions):
             return error_response('Private key export requires write:certificates permission', 403)
     
@@ -1104,6 +1104,58 @@ def export_certificate(cert_id):
                 headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.pfx"'}
             )
         
+        elif export_format == 'jks':
+            if not password:
+                return error_response('Password required for JKS export', 400)
+            if not certificate.prv:
+                return error_response('Certificate has no private key for JKS export', 400)
+
+            import jks as pyjks
+            import time
+
+            cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            key_pem_data = base64.b64decode(decrypt_private_key(certificate.prv))
+            private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
+
+            cert_der = cert_obj.public_bytes(serialization.Encoding.DER)
+            key_pkcs8 = private_key.private_bytes(
+                serialization.Encoding.DER,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption()
+            )
+
+            cert_chain = [("X.509", cert_der)]
+
+            if include_chain and certificate.caref:
+                ca = CA.query.filter_by(refid=certificate.caref).first()
+                while ca:
+                    if ca.crt:
+                        ca_cert = x509.load_pem_x509_certificate(
+                            base64.b64decode(ca.crt), default_backend()
+                        )
+                        cert_chain.append(("X.509", ca_cert.public_bytes(serialization.Encoding.DER)))
+                    if ca.caref:
+                        ca = CA.query.filter_by(refid=ca.caref).first()
+                    else:
+                        break
+
+            ts = int(time.time() * 1000)
+            pke = pyjks.PrivateKeyEntry(
+                alias=(certificate.descr or certificate.refid).lower().replace(' ', '-'),
+                cert_chain=cert_chain,
+                pkey_pkcs8=key_pkcs8,
+                timestamp=ts,
+            )
+
+            keystore = pyjks.KeyStore.new("jks", [pke])
+            jks_bytes = keystore.saves(password)
+
+            return Response(
+                jks_bytes,
+                mimetype='application/x-java-keystore',
+                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.jks"'}
+            )
+
         else:
             return error_response(f'Unsupported format: {export_format}', 400)
     

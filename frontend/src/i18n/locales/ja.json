@@ -3014,8 +3014,11 @@
       "pemWithChain": "PEM + CAチェーン",
       "fullBundle": "フルバンドル（証明書 + 鍵 + チェーン）",
       "derBinary": "DER（バイナリ）",
-      "pkcs12": "PKCS#12 (.p12)"
-    }
+      "pkcs12": "PKCS#12 (.p12)",
+      "jks": "JKS (Java KeyStore)"
+    },
+    "formatJksDesc": "Java KeyStore、証明書 + 鍵",
+    "jksNote": "JKSには常に秘密鍵が含まれます"
   },
   "userCertificates": {
     "title": "ユーザー証明書",

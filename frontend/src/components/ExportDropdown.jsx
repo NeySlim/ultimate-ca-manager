@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 export function ExportDropdown({ 
   onExport, 
   disabled = false, 
-  formats = ['pem', 'pem-key', 'pem-chain', 'pem-full', 'der', 'pkcs12'],
+  formats = ['pem', 'pem-key', 'pem-chain', 'pem-full', 'der', 'pkcs12', 'jks'],
   hasPrivateKey = true 
 }) {
   const { showPrompt } = useNotification()
@@ -54,6 +54,13 @@ export function ExportDropdown({
       icon: <Lock size={16} />,
       format: 'pkcs12',
       options: { password: true }, // Will prompt for password
+      requiresKey: true
+    },
+    'jks': { 
+      labelKey: 'export.formatOptions.jks', 
+      icon: <Lock size={16} />,
+      format: 'jks',
+      options: { password: true, includeChain: true },
       requiresKey: true
     }
   }
