@@ -268,7 +268,7 @@ export const helpContent = {
         icon: Globe,
         items: [
           { label: 'Status', text: 'Indicates whether the OCSP responder is active for each CA' },
-          { label: 'AIA URL', text: 'Authority Information Access URL for certificates' },
+          { label: 'AIA URL', text: 'Authority Information Access URLs — OCSP responder and CA Issuers certificate download endpoints embedded in issued certificates' },
           { label: 'Cache', text: 'Response cache with automatic daily cleanup of expired entries' },
           { label: 'Total Queries', text: 'Number of OCSP requests processed' },
         ]
@@ -276,7 +276,7 @@ export const helpContent = {
     ],
     tips: [
       'Enable auto-regeneration to keep CRLs fresh after certificate revocations',
-      'Copy CDP and AIA URLs to embed them in your certificate profiles',
+      'Copy CDP, OCSP, and AIA CA Issuers URLs to embed them in your certificate profiles',
       'OCSP provides real-time revocation checking and is preferred over CRL',
     ],
     related: ['Certificates', 'CAs']

@@ -31,6 +31,7 @@
 - **EST** -- RFC 7030 Enrollment over Secure Transport
 - **OCSP** -- RFC 6960 real-time certificate status
 - **CRL/CDP** -- Certificate Revocation List distribution with Delta CRL support (RFC 5280 §5.2.4)
+- **AIA CA Issuers** -- Authority Information Access CA certificate download (RFC 5280 §4.2.2.1)
 
 ### Integrations
 - **Microsoft ADCS** -- Certificate signing via AD CS, template discovery, EOBO (Enroll On Behalf Of)

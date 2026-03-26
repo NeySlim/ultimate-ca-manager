@@ -558,12 +558,21 @@ UCM caches OCSP responses for performance. The cache is:
 - **Invalidated on revocation** — When a certificate is revoked, its cached OCSP response is immediately cleared
 - **Invalidated on unhold** — When a Certificate Hold is removed, the OCSP cache is updated
 
-### AIA URL
-The Authority Information Access (AIA) URL is embedded in certificates to tell clients where the OCSP responder is located.
+### AIA URLs
+The Authority Information Access (AIA) extension is embedded in certificates to tell clients where to find:
 
+**OCSP Responder** — real-time revocation checking:
 \`\`\`
-https://your-server:8443/ocsp
+http://your-server:8080/ocsp
 \`\`\`
+
+**CA Issuers** (RFC 5280 §4.2.2.1) — download the issuing CA certificate for chain building:
+\`\`\`
+http://your-server:8080/ca/{ca_refid}.cer   (DER format)
+http://your-server:8080/ca/{ca_refid}.pem   (PEM format)
+\`\`\`
+
+Enable CA Issuers per CA in the **AIA CA Issuers** section of the detail panel. The URL is automatically generated using the HTTP protocol server.
 
 ### OCSP vs CRL
 

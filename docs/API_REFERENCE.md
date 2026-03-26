@@ -1317,6 +1317,54 @@ GET /api/v2/ocsp/stats
 
 ---
 
+## AIA CA Issuers
+
+Public endpoints for downloading CA certificates (RFC 5280 §4.2.2.1). No authentication required.
+
+### Download CA Certificate (DER)
+```http
+GET /ca/{ca_refid}.cer
+```
+
+**Response**: `application/pkix-cert` — DER-encoded X.509 certificate
+
+Also accepts legacy numeric CA ID: `GET /ca/{ca_id}.cer`
+
+```bash
+curl http://your-server:8080/ca/550e8400-e29b-41d4-a716-446655440000.cer -o ca.cer
+openssl x509 -in ca.cer -inform DER -text -noout
+```
+
+### Download CA Certificate (PEM)
+```http
+GET /ca/{ca_refid}.pem
+```
+
+**Response**: `application/x-pem-file` — PEM-encoded X.509 certificate
+
+```bash
+curl http://your-server:8080/ca/550e8400-e29b-41d4-a716-446655440000.pem -o ca.pem
+```
+
+### AIA CA Issuers Configuration
+
+Per-CA toggle available via the CRL/OCSP management page or API:
+
+```http
+GET /api/v2/cas/{ca_id}          # Returns aia_ca_issuers_enabled, aia_ca_issuers_url
+PUT /api/v2/cas/{ca_id}          # Set aia_ca_issuers_enabled: true/false
+```
+
+When enabled, issued certificates include the CA Issuers URL in their Authority Information Access extension:
+
+```
+Authority Information Access:
+    OCSP - URI:http://your-server:8080/ocsp
+    CA Issuers - URI:http://your-server:8080/ca/{ca_refid}.cer
+```
+
+---
+
 ## Users
 
 ### List Users
