@@ -11,6 +11,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.103] - 2026-03-27
+
+### Fixed
+- **Protocol URL regression** — OCSP and AIA CA Issuers URLs were incorrectly generated with `https://host:8443/...` instead of `http://host:8080/...` when enabling features; now uses configured FQDN and HTTP protocol port
+- **Protocol URL auto-repair** — Toggling OCSP/CDP/AIA on now automatically regenerates any URL that incorrectly uses `https://`; migration 013 fixes existing bad URLs on upgrade
+- **Localhost protection** — Protocol URL generation returns an error instead of generating unusable `localhost` URLs; FQDN or Protocol Base URL must be configured first
+
+### Changed
+- **CRL/OCSP page** — Removed `window.location.origin` fallbacks; URLs only shown when properly configured by backend; shows "URL not configured" message when enabled but no URL available
+- **Help guides** — CDP and AIA sections now mention FQDN/Protocol Base URL prerequisite
+
+---
+
 ## [2.102] - 2026-03-27
 
 ### Fixed
