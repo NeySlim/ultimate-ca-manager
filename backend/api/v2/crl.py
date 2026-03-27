@@ -141,9 +141,11 @@ def toggle_auto_regen(ca_id):
     try:
         ca.cdp_enabled = enabled
         
-        # Auto-generate CDP URL if enabling and no URL set
-        if enabled and not ca.cdp_url:
+        # Auto-generate CDP URL if enabling and URL is empty or uses https://
+        if enabled and (not ca.cdp_url or ca.cdp_url.startswith('https://')):
             base_url = get_protocol_base_url()
+            if not base_url:
+                return error_response('Cannot auto-generate CDP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.cdp_url = f"{base_url}/cdp/{ca.refid}.crl"
         
         # Audit log
@@ -162,7 +164,7 @@ def toggle_auto_regen(ca_id):
         db.session.commit()
         
         return success_response(
-            data={'cdp_enabled': ca.cdp_enabled},
+            data=ca.to_dict(),
             message=f"Automatic CRL regeneration {'enabled' if enabled else 'disabled'}"
         )
     except Exception as e:

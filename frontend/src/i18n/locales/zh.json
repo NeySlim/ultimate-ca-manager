@@ -1268,7 +1268,8 @@
     "aiaIssuersUrl": "CA Issuers URL",
     "aiaIssuersEnabled": "{{name}}的AIA CA Issuers已启用",
     "aiaIssuersDisabled": "{{name}}的AIA CA Issuers已禁用",
-    "toggleAiaFailed": "切换AIA CA Issuers失败"
+    "toggleAiaFailed": "切换AIA CA Issuers失败",
+    "urlNotConfigured": "URL未配置 — 请在设置中配置FQDN或协议基础URL"
   },
   "trustStore": {
     "caTrust": "CA 信任",

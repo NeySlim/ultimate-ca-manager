@@ -534,8 +534,10 @@ Enable auto-regeneration to automatically rebuild the CRL whenever a certificate
 The CDP URL is embedded in certificates so clients know where to download the CRL. Copy the URL from the CRL details.
 
 \`\`\`
-https://your-server:8443/cdp/{ca_id}.crl
+http://your-server:8080/cdp/{ca_refid}.crl
 \`\`\`
+
+> ⚠️ **Important**: URLs are auto-generated using the HTTP protocol port and server FQDN. If you access UCM via \`localhost\`, the URL cannot be generated. Configure your **FQDN** or **Protocol Base URL** in Settings → General first.
 
 ### Downloading CRLs
 Download CRLs in DER or PEM format for distribution to clients or integration with other systems.
@@ -572,7 +574,9 @@ http://your-server:8080/ca/{ca_refid}.cer   (DER format)
 http://your-server:8080/ca/{ca_refid}.pem   (PEM format)
 \`\`\`
 
-Enable CA Issuers per CA in the **AIA CA Issuers** section of the detail panel. The URL is automatically generated using the HTTP protocol server.
+Enable CA Issuers per CA in the **AIA CA Issuers** section of the detail panel. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
+
+> ⚠️ **Prerequisite**: Protocol URLs (CDP, OCSP, AIA) require a valid **FQDN** or a configured **Protocol Base URL** in Settings → General. If you access UCM via \`localhost\`, enabling these features will fail — set the FQDN first.
 
 ### OCSP vs CRL
 

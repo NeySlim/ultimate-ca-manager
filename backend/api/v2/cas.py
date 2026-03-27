@@ -37,6 +37,16 @@ from security.encryption import decrypt_private_key
 
 logger = logging.getLogger(__name__)
 
+
+def _needs_protocol_url(current_url):
+    """Check if a protocol URL needs (re)generation.
+    Returns True if URL is empty or uses https:// (protocol URLs must be http://).
+    """
+    if not current_url:
+        return True
+    return current_url.startswith('https://')
+
+
 bp = Blueprint('cas_v2', __name__)
 
 
@@ -423,22 +433,28 @@ def update_ca(ca_id):
         ca.descr = data['name']
     if 'ocsp_enabled' in data:
         ca.ocsp_enabled = bool(data['ocsp_enabled'])
-        if ca.ocsp_enabled and not ca.ocsp_url:
+        if ca.ocsp_enabled and _needs_protocol_url(ca.ocsp_url):
             base_url = get_protocol_base_url()
+            if not base_url:
+                return error_response('Cannot auto-generate OCSP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.ocsp_url = f"{base_url}/ocsp"
     if 'ocsp_url' in data:
         ca.ocsp_url = data['ocsp_url']
     if 'cdp_enabled' in data:
         ca.cdp_enabled = bool(data['cdp_enabled'])
-        if ca.cdp_enabled and not ca.cdp_url:
+        if ca.cdp_enabled and _needs_protocol_url(ca.cdp_url):
             base_url = get_protocol_base_url()
+            if not base_url:
+                return error_response('Cannot auto-generate CDP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.cdp_url = f"{base_url}/cdp/{ca.refid}.crl"
     if 'cdp_url' in data:
         ca.cdp_url = data['cdp_url']
     if 'aia_ca_issuers_enabled' in data:
         ca.aia_ca_issuers_enabled = bool(data['aia_ca_issuers_enabled'])
-        if ca.aia_ca_issuers_enabled and not ca.aia_ca_issuers_url:
+        if ca.aia_ca_issuers_enabled and _needs_protocol_url(ca.aia_ca_issuers_url):
             base_url = get_protocol_base_url()
+            if not base_url:
+                return error_response('Cannot auto-generate AIA URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.aia_ca_issuers_url = f"{base_url}/ca/{ca.refid}.cer"
     if 'aia_ca_issuers_url' in data:
         ca.aia_ca_issuers_url = data['aia_ca_issuers_url']

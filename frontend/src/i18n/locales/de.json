@@ -1268,7 +1268,8 @@
     "aiaIssuersUrl": "CA Issuers URL",
     "aiaIssuersEnabled": "AIA CA Issuers aktiviert für {{name}}",
     "aiaIssuersDisabled": "AIA CA Issuers deaktiviert für {{name}}",
-    "toggleAiaFailed": "AIA CA Issuers konnte nicht umgeschaltet werden"
+    "toggleAiaFailed": "AIA CA Issuers konnte nicht umgeschaltet werden",
+    "urlNotConfigured": "URL nicht konfiguriert — FQDN oder Protokoll-Basis-URL in Einstellungen festlegen"
   },
   "trustStore": {
     "caTrust": "CA-Vertrauen",

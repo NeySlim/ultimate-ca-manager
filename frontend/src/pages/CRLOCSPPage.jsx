@@ -100,11 +100,11 @@ export default function CRLOCSPPage() {
     if (!canWrite('crl')) return
     try {
       const result = await crlService.toggleAutoRegen(ca.id, !ca.cdp_enabled)
-      showSuccess(t(result.data.cdp_enabled ? 'crlOcsp.autoRegenEnabled' : 'crlOcsp.autoRegenDisabled', { name: ca.descr }))
-      // Update local state
-      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, cdp_enabled: result.data.cdp_enabled } : c))
+      const updated = result.data || result
+      showSuccess(t(updated.cdp_enabled ? 'crlOcsp.autoRegenEnabled' : 'crlOcsp.autoRegenDisabled', { name: ca.descr }))
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ...updated } : c))
       if (selectedCA?.id === ca.id) {
-        setSelectedCA(prev => ({ ...prev, cdp_enabled: result.data.cdp_enabled }))
+        setSelectedCA(prev => ({ ...prev, ...updated }))
       }
     } catch (error) {
       showError(error.message || t('crlOcsp.toggleAutoRegenFailed'))
@@ -152,11 +152,12 @@ export default function CRLOCSPPage() {
     if (!canWrite('crl')) return
     try {
       const newVal = !ca.ocsp_enabled
-      await casService.update(ca.id, { ocsp_enabled: newVal })
+      const result = await casService.update(ca.id, { ocsp_enabled: newVal })
+      const updated = result.data || result
       showSuccess(t(newVal ? 'crlOcsp.ocspEnabled' : 'crlOcsp.ocspDisabled', { name: ca.descr }))
-      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ocsp_enabled: newVal } : c))
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ...updated } : c))
       if (selectedCA?.id === ca.id) {
-        setSelectedCA(prev => ({ ...prev, ocsp_enabled: newVal }))
+        setSelectedCA(prev => ({ ...prev, ...updated }))
       }
       loadData()
     } catch (error) {
@@ -168,11 +169,12 @@ export default function CRLOCSPPage() {
     if (!canWrite('crl')) return
     try {
       const newVal = !ca.aia_ca_issuers_enabled
-      await casService.update(ca.id, { aia_ca_issuers_enabled: newVal })
+      const result = await casService.update(ca.id, { aia_ca_issuers_enabled: newVal })
+      const updated = result.data || result
       showSuccess(t(newVal ? 'crlOcsp.aiaIssuersEnabled' : 'crlOcsp.aiaIssuersDisabled', { name: ca.descr }))
-      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, aia_ca_issuers_enabled: newVal } : c))
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ...updated } : c))
       if (selectedCA?.id === ca.id) {
-        setSelectedCA(prev => ({ ...prev, aia_ca_issuers_enabled: newVal }))
+        setSelectedCA(prev => ({ ...prev, ...updated }))
       }
       loadData()
     } catch (error) {
@@ -543,39 +545,51 @@ export default function CRLOCSPPage() {
       {/* Distribution Points */}
       <CompactSection title={t('crlOcsp.cdpNote')} icon={LinkIcon}>
         <div className="space-y-3">
-          <div>
-            <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.cdp')}</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
-                {selectedCA.cdp_url || `${window.location.origin}/cdp/${selectedCA.refid || selectedCA.id}.crl`}
-              </code>
-              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.cdp_url || `${window.location.origin}/cdp/${selectedCA.refid || selectedCA.id}.crl`)}>
-                <Copy size={14} />
-              </Button>
+          {selectedCA.cdp_url ? (
+            <div>
+              <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.cdp')}</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
+                  {selectedCA.cdp_url}
+                </code>
+                <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.cdp_url)}>
+                  <Copy size={14} />
+                </Button>
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.aia')} (OCSP)</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
-                {selectedCA.ocsp_url || `${window.location.origin}/ocsp`}
-              </code>
-              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.ocsp_url || `${window.location.origin}/ocsp`)}>
-                <Copy size={14} />
-              </Button>
+          ) : selectedCA.cdp_enabled && (
+            <p className="text-xs text-text-tertiary italic">{t('crlOcsp.urlNotConfigured')}</p>
+          )}
+          {selectedCA.ocsp_url ? (
+            <div>
+              <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.aia')} (OCSP)</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
+                  {selectedCA.ocsp_url}
+                </code>
+                <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.ocsp_url)}>
+                  <Copy size={14} />
+                </Button>
+              </div>
             </div>
-          </div>
-          <div>
-            <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.aia')} ({t('crlOcsp.aiaIssuers')})</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
-                {selectedCA.aia_ca_issuers_url || `${window.location.origin}/ca/${selectedCA.refid || selectedCA.id}.cer`}
-              </code>
-              <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.aia_ca_issuers_url || `${window.location.origin}/ca/${selectedCA.refid || selectedCA.id}.cer`)}>
-                <Copy size={14} />
-              </Button>
+          ) : selectedCA.ocsp_enabled && (
+            <p className="text-xs text-text-tertiary italic">{t('crlOcsp.urlNotConfigured')}</p>
+          )}
+          {selectedCA.aia_ca_issuers_url ? (
+            <div>
+              <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.aia')} ({t('crlOcsp.aiaIssuers')})</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
+                  {selectedCA.aia_ca_issuers_url}
+                </code>
+                <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.aia_ca_issuers_url)}>
+                  <Copy size={14} />
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : selectedCA.aia_ca_issuers_enabled && (
+            <p className="text-xs text-text-tertiary italic">{t('crlOcsp.urlNotConfigured')}</p>
+          )}
           <p className="text-xs text-text-tertiary">
             {t('crlOcsp.includeURLsNote')}
           </p>

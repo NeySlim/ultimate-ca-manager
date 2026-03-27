@@ -1268,7 +1268,8 @@
     "aiaIssuersUrl": "CA Issuers URL",
     "aiaIssuersEnabled": "{{name}}のAIA CA Issuersを有効にしました",
     "aiaIssuersDisabled": "{{name}}のAIA CA Issuersを無効にしました",
-    "toggleAiaFailed": "AIA CA Issuersの切り替えに失敗しました"
+    "toggleAiaFailed": "AIA CA Issuersの切り替えに失敗しました",
+    "urlNotConfigured": "URL未設定 — 設定でFQDNまたはプロトコルベースURLを設定してください"
   },
   "trustStore": {
     "caTrust": "CAトラスト",
