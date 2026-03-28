@@ -38,6 +38,7 @@ def get_general_settings():
     """Get general settings from database"""
     return success_response(data={
         'site_name': get_config('site_name', 'UCM'),
+        'system_name': get_config('system_name', get_config('site_name', 'UCM')),
         'timezone': get_config('timezone', 'UTC'),
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
@@ -49,6 +50,9 @@ def get_general_settings():
         'lockout_duration': int(get_config('lockout_duration', '300')),
         'protocol_base_url': get_config('protocol_base_url', ''),
         'http_protocol_port': int(get_config('http_protocol_port', '8080')),
+        'base_url': get_config('base_url', ''),
+        'date_format': get_config('date_format', 'short'),
+        'show_time': get_config('show_time', 'true') == 'true',
     })
 
 
@@ -60,10 +64,10 @@ def update_general_settings():
     
     # List of allowed settings
     allowed_keys = [
-        'site_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
+        'site_name', 'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
         'backup_retention_days', 'backup_password', 'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
-        'protocol_base_url', 'http_protocol_port'
+        'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time'
     ]
 
     # Validate http_protocol_port if provided
