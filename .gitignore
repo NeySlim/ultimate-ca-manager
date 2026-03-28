@@ -99,5 +99,7 @@ logs/
 /migrate_*.py
 data/
 !frontend/src/data/
+frontend/node_modules
+frontend/dist
 CLAUDE.md
 backend/static/
