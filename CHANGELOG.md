@@ -11,6 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.104] - 2026-03-28
+
+### Fixed
+- **Settings API** — `system_name`, `base_url`, `date_format`, `show_time` were missing from the GET response and PATCH allowed keys; frontend fields now properly persist (credit: f1lint, PR #47)
+
+---
+
 ## [2.103] - 2026-03-27
 
 ### Fixed
