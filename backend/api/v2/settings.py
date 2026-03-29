@@ -68,7 +68,6 @@ def update_general_settings():
         'backup_retention_days', 'backup_password', 'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time'
-
     ]
 
     # Validate http_protocol_port if provided
