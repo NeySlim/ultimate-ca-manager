@@ -389,7 +389,9 @@ def get_ca(ca_id):
             'country': details.get('subject', {}).get('C', ''),
             'keyAlgo': details.get('public_key', {}).get('algorithm', 'RSA'),
             'keySize': details.get('public_key', {}).get('size', 2048),
-            'fingerprint': details.get('fingerprints', {}).get('sha256', ''),
+             #? 'fingerprint': details.get('fingerprints', {}).get('sha256', ''),
+            'thumbprint_sha256': details.get('fingerprints', {}).get('sha256', ca_data.get('thumbprint_sha256', '')),
+            'thumbprint_sha1': details.get('fingerprints', {}).get('sha1', ca_data.get('thumbprint_sha1', '')),
             'crlStatus': crl_status,
             'nextCrlUpdate': next_crl_update
         })
