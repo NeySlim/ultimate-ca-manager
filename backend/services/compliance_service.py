@@ -77,17 +77,25 @@ def _score_key_strength(cert_dict):
         key_algo = key_type
 
     # Normalize
-    if 'EC' in key_algo or 'ECDSA' in key_algo or 'P-' in key_algo:
+    if 'EC' in key_algo or 'ECDSA' in key_algo or 'P-' in key_algo or 'PRIME256V1' in key_type or 'PRIME384V1' in key_type or 'PRIME521V1' in key_type:
         algo_family = 'EC'
-        # Extract curve size from key_algo or key_type
-        if 'P-521' in key_algo or 'SECP521' in key_algo or key_size >= 521:
+        key_info = key_algo + ' ' + key_type
+        if 'P-521' in key_info or 'SECP521' in key_info or 'SECP521R1' in key_info or 'PRIME521V1' in key_info or key_size >= 521:
             score, reason = max_points, 'ECDSA P-521'
-        elif 'P-384' in key_algo or 'SECP384' in key_algo or key_size >= 384:
+        elif 'P-384' in key_info or 'SECP384' in key_info or 'SECP384R1' in key_info or 'PRIME384V1' in key_info or key_size >= 384:
             score, reason = max_points, 'ECDSA P-384'
-        elif 'P-256' in key_algo or 'SECP256' in key_algo or key_size >= 256:
+        elif 'P-256' in key_info or 'SECP256' in key_info or 'SECP256R1' in key_info or 'PRIME256V1' in key_info or key_size >= 256:
             score, reason = 25, 'ECDSA P-256'
         else:
-            score, reason = 15, f'ECDSA ({key_size}-bit)'
+            curve_name = 'unknown'
+            if key_type:
+                parts = key_type.split()
+                if len(parts) >= 2:
+                    curve_name = parts[-1]
+            if key_size and key_size > 0:
+                score, reason = 15, f'ECDSA {key_size}-bit'
+            else:
+                score, reason = 15, f'ECDSA ({curve_name})'
     elif 'ED25519' in key_algo or 'ED448' in key_algo:
         score, reason = max_points, key_algo.strip()
     elif 'RSA' in key_algo:
