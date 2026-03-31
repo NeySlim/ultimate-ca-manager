@@ -12,13 +12,13 @@ Flask-Caching==2.3.1
 Flask-Session==0.8.0
 
 # Cryptography & OpenSSL
-cryptography==46.0.5
+cryptography==46.0.6
 pyOpenSSL==26.0.0
 asn1crypto==1.5.1
 
 # WebAuthn/FIDO2 Support
 webauthn==2.7.1
-cbor2==5.8.0
+cbor2==5.9.0
 
 # TOTP/2FA Support
 pyotp>=2.9.0
@@ -35,7 +35,7 @@ josepy>=2.2.0
 dnspython==2.8.0
 
 # HTTP & Utils
-requests==2.32.5
+requests==2.33.1
 python-dotenv==1.2.1
 python-dateutil==2.9.0.post0
 marshmallow==4.2.2
