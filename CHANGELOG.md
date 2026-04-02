@@ -15,6 +15,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.107] - 2026-04-02
+
+### Fixed
+- **SoftHSM Status** — Fix HSM providers always showing "Disabled" in the UI: backend returned `status` string but frontend expected `enabled` boolean; add `enabled` field to `HsmProvider.to_dict()` (Discussion #26)
+- **Key Encryption (Docker)** — Ensure `/etc/ucm/` directory exists with correct ownership in Docker entrypoint; improve error message with Docker-specific hints when permission denied writing master.key (Discussion #26)
+
+### Added
+- **CDP Auto-Enable** — Automatically enable CRL Distribution Point (CDP) on newly created CAs when a Protocol Base URL or HTTP protocol server is configured; users no longer need to manually enable CDP per CA (Discussion #26)
+- **SoftHSM Auto-Register** — Automatically create an `SoftHSM-Default` HSM provider in the database when Docker entrypoint initializes a SoftHSM token; the provider appears immediately in the HSM page (Discussion #26)
+
+---
+
 ## [2.106] - 2026-04-01
 
 ### Fixed
