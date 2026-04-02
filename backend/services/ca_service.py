@@ -3,6 +3,7 @@ CA Service - Certificate Authority Management
 Handles CA creation, import, export, and operations
 """
 import base64
+import logging
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
@@ -16,6 +17,8 @@ from models import db, CA, Certificate, AuditLog
 from services.trust_store import TrustStoreService
 from config.settings import Config
 from utils.file_naming import ca_cert_path, ca_key_path, cleanup_old_files
+
+logger = logging.getLogger(__name__)
 
 # Import key encryption (optional - fallback if not available)
 try:
@@ -152,6 +155,17 @@ class CAService:
         
         db.session.add(ca)
         db.session.commit()
+        
+        # Auto-enable CDP if protocol base URL is configured
+        try:
+            from utils.protocol_url import get_protocol_base_url
+            base_url = get_protocol_base_url()
+            if base_url:
+                ca.cdp_enabled = True
+                ca.cdp_url = f"{base_url}/cdp/{ca.refid}.crl"
+                db.session.commit()
+        except Exception:
+            pass  # Non-critical — user can enable CDP manually
         
         # Audit log
         from services.audit_service import AuditService
@@ -569,8 +583,6 @@ class CAService:
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
         """
-        import logging
-        logger = logging.getLogger(__name__)
         
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)

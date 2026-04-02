@@ -530,3 +530,45 @@ class HsmService:
         except Exception as e:
             logger.exception(f"Failed to sync HSM keys for {provider.name}")
             raise HsmOperationError(f"Failed to sync keys: {str(e)}")
+
+    @staticmethod
+    def auto_register_softhsm():
+        """
+        Auto-register SoftHSM provider from Docker entrypoint env vars.
+        Called at app startup — creates an HsmProvider record if:
+          - HSM_DEFAULT_PIN env var is set (entrypoint initialized a token)
+          - No provider named 'SoftHSM-Default' already exists
+          - SoftHSM library is available on disk
+        """
+        import os
+        pin = os.environ.get('HSM_DEFAULT_PIN')
+        if not pin:
+            return
+
+        existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
+        if existing:
+            return
+
+        from utils.hsm_check import _find_softhsm
+        lib_path = _find_softhsm()
+        if not lib_path:
+            logger.debug("HSM_DEFAULT_PIN set but SoftHSM library not found — skipping auto-register")
+            return
+
+        try:
+            provider = HsmProvider(
+                name='SoftHSM-Default',
+                type='pkcs11',
+                config=json.dumps({
+                    'library_path': lib_path,
+                    'token_label': 'UCM-Default',
+                    'pin': pin,
+                }),
+                status='connected',
+            )
+            db.session.add(provider)
+            db.session.commit()
+            logger.info("Auto-registered SoftHSM provider 'SoftHSM-Default'")
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f"Failed to auto-register SoftHSM provider: {e}")

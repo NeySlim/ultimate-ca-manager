@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Roadmap
+- **Environment Variables** — Sync Docker env vars (SMTP, HSM, etc.) to database at startup; track `managed_by` source; mark UI fields as read-only when sourced from environment
+- **Policy Enforcement on Protocols** — Apply certificate policies to ACME, SCEP, and EST protocol handlers (currently only enforced on REST API); add CA issuance restriction flags to prevent direct issuance from root/intermediate CAs
+
 ---
 
 ## [2.106] - 2026-04-01

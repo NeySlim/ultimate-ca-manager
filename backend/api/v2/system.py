@@ -724,9 +724,16 @@ def enable_encryption():
         )
         
     except PermissionError:
+        is_docker = os.path.exists('/.dockerenv')
+        hint = (
+            " In Docker, mount a volume to /etc/ucm/ or ensure the container "
+            "runs with write access (e.g. --user root or chown 1000:1000 /etc/ucm)."
+            if is_docker else
+            " Check that the UCM service user owns /etc/ucm/ "
+            "(sudo mkdir -p /etc/ucm && sudo chown ucm:ucm /etc/ucm)."
+        )
         return error_response(
-            "Permission denied: cannot write to /etc/ucm/master.key. "
-            "Ensure the UCM process has write access to /etc/ucm/.", 403
+            f"Permission denied: cannot write to /etc/ucm/master.key.{hint}", 403
         )
     except Exception as e:
         logger.error(f"Failed to enable encryption: {e}")

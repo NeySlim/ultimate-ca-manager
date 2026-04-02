@@ -61,6 +61,7 @@ class HsmProvider(db.Model if db else object):
             'name': self.name,
             'type': self.type,
             'status': self.status,
+            'enabled': self.status == 'connected',
             'last_tested_at': self.last_tested_at.isoformat() if self.last_tested_at else None,
             'error_message': self.error_message,
             'created_at': self.created_at.isoformat() if self.created_at else None,

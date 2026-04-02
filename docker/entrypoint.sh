@@ -201,6 +201,7 @@ done
 # Create necessary directories (must match backend/config/settings.py)
 mkdir -p "$DATA_PATH"/{ca,certs,private,crl,scep,backups,sessions,logs,temp} 2>/dev/null || true
 mkdir -p /var/log/ucm 2>/dev/null || true
+mkdir -p /etc/ucm 2>/dev/null || true
 chmod 755 "$DATA_PATH" 2>/dev/null || true
 chmod 700 "$DATA_PATH"/{ca,certs,private,backups} 2>/dev/null || true
 
@@ -209,6 +210,7 @@ echo -e "${BLUE}🔧 Checking file permissions...${NC}"
 # Only try chown if running as root (UID 0)
 if [ "$(id -u)" = "0" ] && [ -d "$DATA_PATH" ]; then
     chown -R 1000:1000 "$DATA_PATH" 2>/dev/null || true
+    chown -R 1000:1000 /etc/ucm 2>/dev/null || true
 fi
 
 # Check data directory permissions

@@ -513,6 +513,14 @@ def create_app(config_name=None):
         log_hsm_warning()
     except Exception as e:
         app.logger.debug(f"HSM check skipped: {e}")
+
+    # Auto-register SoftHSM provider if Docker entrypoint initialized a token
+    try:
+        with app.app_context():
+            from services.hsm.hsm_service import HsmService
+            HsmService.auto_register_softhsm()
+    except Exception as e:
+        app.logger.debug(f"SoftHSM auto-register skipped: {e}")
     
     # Load syslog forwarder config
     try:
