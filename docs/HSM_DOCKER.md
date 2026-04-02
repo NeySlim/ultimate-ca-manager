@@ -10,6 +10,8 @@ docker compose -f docker-compose.hsm.yml up -d
 
 On first start, a default SoftHSM token (`UCM-Default`) is automatically initialized. The PIN is printed in the container logs.
 
+**Auto-registration:** UCM automatically creates an `SoftHSM-Default` provider in the database when it detects the Docker entrypoint initialized a token (`HSM_DEFAULT_PIN` env var). The provider appears immediately in the HSM page — no manual setup needed.
+
 ## Persistent Tokens
 
 Mount a volume for `/var/lib/softhsm/tokens` to keep HSM keys across container restarts:

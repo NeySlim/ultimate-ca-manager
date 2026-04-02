@@ -537,6 +537,8 @@ The CDP URL is embedded in certificates so clients know where to download the CR
 http://your-server:8080/cdp/{ca_refid}.crl
 \`\`\`
 
+> 💡 **Auto-enabled**: When you create a new CA, CDP is automatically enabled if a Protocol Base URL or HTTP protocol server is configured. The CDP URL is auto-generated — no manual steps needed.
+
 > ⚠️ **Important**: URLs are auto-generated using the HTTP protocol port and server FQDN. If you access UCM via \`localhost\`, the URL cannot be generated. Configure your **FQDN** or **Protocol Base URL** in Settings → General first.
 
 ### Downloading CRLs
@@ -1674,6 +1676,8 @@ The industry standard HSM interface. Supported devices:
 - **Entrust nShield**
 - **SoftHSM** (software-based, for testing)
 - Any PKCS#11-compliant device
+
+> 💡 **Docker**: SoftHSM is pre-installed in the Docker image. On first start, a default token is auto-initialized and registered as the \`SoftHSM-Default\` provider — ready to use immediately.
 
 Configuration:
 - **Library Path** — Path to the PKCS#11 shared library (.so/.dll)
