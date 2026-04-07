@@ -131,7 +131,7 @@ export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
 // =============================================================================
 
 function DesktopPanel({ quickContent, guideContent, onClose, t }) {
-  const title = quickContent?.title || guideContent?.title || 'Help'
+  const title = quickContent?.title || guideContent?.title || t('common.help')
   const subtitle = quickContent?.subtitle || ''
 
   const defaultPos = {
@@ -989,7 +989,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  const title = quickContent?.title || guideContent?.title || 'Help'
+  const title = quickContent?.title || guideContent?.title || t('common.help')
   const subtitle = quickContent?.subtitle || ''
 
   return (

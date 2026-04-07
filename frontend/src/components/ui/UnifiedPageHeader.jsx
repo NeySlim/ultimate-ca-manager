@@ -14,6 +14,7 @@ import { cn } from '../../lib/utils'
 import { Question, Funnel } from '@phosphor-icons/react'
 import { Badge } from '../Badge'
 import { FilterSelect } from './Select'
+import { useTranslation } from 'react-i18next'
 
 export function UnifiedPageHeader({
   // Title section
@@ -44,6 +45,7 @@ export function UnifiedPageHeader({
   // Custom className
   className
 }) {
+  const { t } = useTranslation()
   const hasTabs = tabs && tabs.length > 0
   const hasFilters = filters && filters.length > 0
 
@@ -160,7 +162,7 @@ export function UnifiedPageHeader({
                 )}
               >
                 <Question size={14} weight="bold" />
-                <span className="hidden sm:inline">Help</span>
+                <span className="hidden sm:inline">{t('common.help')}</span>
               </button>
             )
           )}
