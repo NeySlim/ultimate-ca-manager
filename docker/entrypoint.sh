@@ -488,7 +488,7 @@ if command -v softhsm2-util >/dev/null 2>&1; then
         HSM_SO_PIN="${HSM_SO_PIN:-$(openssl rand -hex 8)}"
         softhsm2-util --init-token --free --label "UCM-Default" \
             --pin "$HSM_PIN" --so-pin "$HSM_SO_PIN" 2>/dev/null && \
-        echo -e "${GREEN}   ✅ SoftHSM token 'UCM-Default' initialized (PIN: $HSM_PIN)${NC}" || \
+        echo -e "${GREEN}   ✅ SoftHSM token 'UCM-Default' initialized${NC}" || \
         echo -e "${YELLOW}   ⚠️  SoftHSM token init skipped (may already exist)${NC}"
         export HSM_DEFAULT_PIN="$HSM_PIN"
     else

@@ -5,9 +5,13 @@ Endpoints for managing webhook configurations.
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.ssrf_protection import validate_url_not_private
 from models import db
 from services.webhook_service import WebhookEndpoint, WebhookService
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 import secrets
 
 bp = Blueprint('webhooks', __name__)
@@ -45,6 +49,13 @@ def create_webhook():
     if not url.startswith(('http://', 'https://')):
         return error_response("URL must start with http:// or https://", 400)
     
+    # SSRF protection: prevent webhooks pointing to internal services
+    try:
+        validate_url_not_private(url)
+    except ValueError as e:
+        logger.warning(f"Webhook SSRF blocked: {e}")
+        return error_response("Webhook URL must not point to private/internal addresses", 400)
+    
     events = data.get('events', ['*'])
     if not isinstance(events, list):
         return error_response('Events must be an array', 400)
@@ -81,6 +92,11 @@ def update_webhook(endpoint_id):
         url = data['url']
         if not url.startswith(('http://', 'https://')):
             return error_response("URL must start with http:// or https://", 400)
+        try:
+            validate_url_not_private(url)
+        except ValueError as e:
+            logger.warning(f"Webhook SSRF blocked: {e}")
+            return error_response("Webhook URL must not point to private/internal addresses", 400)
         endpoint.url = url
     if 'secret' in data:
         endpoint.secret = data['secret']

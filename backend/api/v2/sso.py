@@ -1711,7 +1711,16 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 user.email = email
             if fullname:
                 user.full_name = fullname
-            user.role = _resolve_role(provider, external_data)
+            new_role = _resolve_role(provider, external_data)
+            if user.role != new_role:
+                logger.info(f"SSO auto-update: user {username} role changed {user.role} → {new_role}")
+                from services.audit_service import AuditService
+                AuditService.log_action(
+                    'role_change', username,
+                    details=f"SSO auto-update: role changed from {user.role} to {new_role}",
+                    status='success'
+                )
+                user.role = new_role
             user.last_login = utc_now()
             db.session.commit()
         return user, None

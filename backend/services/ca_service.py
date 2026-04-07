@@ -624,7 +624,7 @@ class CAService:
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         
-        ca_key_pem = decrypt_private_key(base64.b64decode(ca.prv))
+        ca_key_pem = base64.b64decode(decrypt_private_key(ca.prv))
         ca_private_key = serialization.load_pem_private_key(
             ca_key_pem, password=None, backend=default_backend()
         )

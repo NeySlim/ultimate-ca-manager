@@ -107,12 +107,7 @@ def login():
     POST /api/auth/login
     Body: {"username": "admin", "password": "xxx"}
     """
-    # Apply rate limiting if available
-    if HAS_LIMITER:
-        try:
-            limiter.limit("5 per minute")(lambda: None)()
-        except Exception:
-            pass  # Rate limit exceeded handled by limiter
+    # Rate limiting handled by account lockout below (User.locked_until)
     
     data = request.json
     

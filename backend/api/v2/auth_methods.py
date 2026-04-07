@@ -47,7 +47,10 @@ def _get_display_settings():
 
 bp = Blueprint('auth_methods', __name__)
 
-# In-memory 2FA/WebAuthn brute-force tracking (per-session, cleared on success)
+# 2FA/WebAuthn brute-force tracking
+# Uses in-memory dict with per-user lockout. Acceptable for UCM's single-worker
+# deployment model. Resets on restart, but combined with User.locked_until for
+# password attempts provides adequate protection.
 _2fa_failed_attempts = {}  # key: pending_user_id, value: {'count': int, 'locked_until': datetime}
 _WEBAUTHN_FAILED = {}      # key: username, value: {'count': int, 'locked_until': datetime}
 _MAX_2FA_ATTEMPTS = 5
@@ -541,14 +544,12 @@ def webauthn_start():
     # Find user
     user = User.query.filter_by(username=username).first()
     if not user or not user.active:
-        # Don't reveal if user exists
-        return error_response('Invalid username', 401)
+        return error_response('WebAuthn authentication not available', 401)
     
     # Check if user has WebAuthn credentials
     from models.webauthn import WebAuthnCredential
     creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
     if not creds:
-        # SEC-05: Don't reveal whether user exists or has credentials
         return error_response('WebAuthn authentication not available', 401)
     
     # Generate authentication options

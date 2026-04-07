@@ -7,6 +7,7 @@ and code signing verification. Uses asn1crypto for proper CMS/PKCS7 encoding.
 import hashlib
 import logging
 import os
+import uuid
 from typing import Optional, Tuple
 
 from cryptography import x509
@@ -38,7 +39,6 @@ class TSAService:
         self.tsa_cert = tsa_cert
         self.tsa_key = tsa_key
         self.policy_oid = policy_oid
-        self._serial_counter = int.from_bytes(os.urandom(8), 'big')
 
     def process_request(self, tsp_request_der: bytes) -> Tuple[bytes, int]:
         """Process a TimeStampReq and return a TimeStampResp."""
@@ -71,7 +71,7 @@ class TSAService:
     def _build_tst_info(self, hash_oid: str, digest: bytes,
                         nonce: Optional[int] = None) -> tsp.TSTInfo:
         """Build TSTInfo (RFC 3161 §2.4.2)"""
-        self._serial_counter += 1
+        serial = uuid.uuid4().int >> 64  # Unique serial, no collision across workers
         now = datetime.now(timezone.utc)
 
         info = tsp.TSTInfo({
@@ -81,7 +81,7 @@ class TSAService:
                 'hash_algorithm': {'algorithm': hash_oid},
                 'hashed_message': digest,
             },
-            'serial_number': self._serial_counter,
+            'serial_number': serial,
             'gen_time': now,
         })
 

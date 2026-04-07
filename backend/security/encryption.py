@@ -48,6 +48,14 @@ class KeyEncryption:
         # Priority 1: master.key file
         if MASTER_KEY_PATH.exists():
             try:
+                # Validate file permissions (should be 0600 or stricter)
+                file_mode = MASTER_KEY_PATH.stat().st_mode & 0o777
+                if file_mode & 0o077:
+                    logger.warning(
+                        f"⚠️ {MASTER_KEY_PATH} has insecure permissions {oct(file_mode)} — "
+                        f"should be 0600. Fixing..."
+                    )
+                    MASTER_KEY_PATH.chmod(0o600)
                 key = MASTER_KEY_PATH.read_text().strip()
                 self._key_source = 'file'
                 logger.info(f"🔑 Encryption key loaded from {MASTER_KEY_PATH}")
@@ -108,7 +116,7 @@ class KeyEncryption:
             return base64.b64encode(marked).decode('utf-8')
         except Exception as e:
             logger.error(f"Encryption failed: {e}")
-            return data
+            raise RuntimeError(f"Failed to encrypt private key data: {e}")
     
     def decrypt(self, data: str) -> str:
         if not data:

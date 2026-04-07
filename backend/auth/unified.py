@@ -254,6 +254,8 @@ def create_session_for_user(user):
         dict: {'user': dict}
     """
     now = utc_now()
+    # Regenerate session ID to prevent session fixation
+    session.clear()
     session['user_id'] = user.id
     session['username'] = user.username
     session['login_time'] = now.isoformat()

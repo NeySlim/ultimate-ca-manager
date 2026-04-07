@@ -202,13 +202,17 @@ class SCEPService:
                         logger.warning("SCEP client using 3DES encryption — deprecated, prefer AES")
                         cipher = DES3.new(content_encryption_key, DES3.MODE_CBC, iv)
                         csr_data = cipher.decrypt(encrypted_content_bytes)
-                        # Remove PKCS#7 padding
+                        # Validate and remove PKCS#7 padding
                         pad_len = csr_data[-1]
+                        if pad_len < 1 or pad_len > DES3.block_size or not all(b == pad_len for b in csr_data[-pad_len:]):
+                            raise ValueError("Invalid PKCS#7 padding in SCEP message")
                         csr_data = csr_data[:-pad_len]
                     elif '2.16.840.1.101.3.4.1' in alg_oid:  # AES (any variant)
                         cipher = AES.new(content_encryption_key, AES.MODE_CBC, iv)
                         csr_data = cipher.decrypt(encrypted_content_bytes)
                         pad_len = csr_data[-1]
+                        if pad_len < 1 or pad_len > AES.block_size or not all(b == pad_len for b in csr_data[-pad_len:]):
+                            raise ValueError("Invalid PKCS#7 padding in SCEP message")
                         csr_data = csr_data[:-pad_len]
                     else:
                         raise ValueError(f"Unsupported encryption algorithm: {alg_oid}")

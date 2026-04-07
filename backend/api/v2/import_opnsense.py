@@ -8,6 +8,7 @@ import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.safe_requests import create_session
+from utils.ssrf_protection import validate_host_not_private
 from services.audit_service import AuditService
 
 # Setup logging
@@ -65,6 +66,13 @@ def test_connection():
     if not all([host, api_key, api_secret]):
         logger.warning(f"OpnSense test failed: missing required fields")
         return error_response("Missing required fields: host, api_key, api_secret", 400)
+    
+    # SSRF protection: prevent connecting to internal services
+    try:
+        validate_host_not_private(host)
+    except ValueError as e:
+        logger.warning(f"OPNsense SSRF blocked: {e}")
+        return error_response("OPNsense host must not be a private/internal address", 400)
     
     base_url = f"https://{host}:{port}"
     
@@ -189,6 +197,13 @@ def import_items():
     if not all([host, api_key, api_secret]):
         logger.warning("OpnSense import failed: missing required fields")
         return error_response("Missing required fields", 400)
+    
+    # SSRF protection
+    try:
+        validate_host_not_private(host)
+    except ValueError as e:
+        logger.warning(f"OPNsense SSRF blocked: {e}")
+        return error_response("OPNsense host must not be a private/internal address", 400)
     
     # Allow empty items array to import all
     if items is None:
