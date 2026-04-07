@@ -171,12 +171,13 @@ class TestChangePassword:
         })
         assert_success(r)
 
-        # Restore original password
-        r = post_json(c, '/api/v2/account/password', {
-            'current_password': 'NewSecure456!',
-            'new_password': 'changeme123',
-        })
-        assert_success(r)
+        # Restore password hash directly (bypasses complexity check for test password)
+        from werkzeug.security import generate_password_hash
+        with app.app_context():
+            from models import User, db
+            user = User.query.filter_by(username='admin').first()
+            user.password_hash = generate_password_hash('changeme123')
+            db.session.commit()
 
 
 # ============================================================================

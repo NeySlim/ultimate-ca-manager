@@ -18,7 +18,7 @@ from models import User, db
 from services.mtls_auth_service import MTLSAuthService
 from services.webauthn_service import WebAuthnService
 from services.certificate_parser import CertificateParser
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from utils.datetime_utils import utc_now
 
