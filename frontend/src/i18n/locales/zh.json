@@ -705,7 +705,8 @@
       "ca": "CA",
       "selfSigned": "自签名"
     },
-    "approvalRequired": "证书请求已提交审批（策略：{{policy}}）"
+    "approvalRequired": "证书请求已提交审批（策略：{{policy}}）",
+    "ocspMustStaple": "OCSP Must-Staple (RFC 6066)"
   },
   "cas": {
     "parentCA": "父CA",
@@ -753,7 +754,18 @@
     "certificateCount": "{{count}}个证书",
     "daysLeft": "剩余{{count}}天",
     "daysLeft_one": "{{count}} day left",
-    "descriptionPlaceholder": "此CA的可选描述"
+    "descriptionPlaceholder": "此CA的可选描述",
+    "advancedConstraints": "高级约束 (RFC 5280)",
+    "pathLength": "路径长度约束",
+    "pathLengthPlaceholder": "空 = 无限制，0 = 仅叶CA",
+    "pathLengthLeafOnly": "0 (仅叶CA)",
+    "rfc5280Constraints": "RFC 5280 约束",
+    "nameConstraintsPermitted": "名称约束 (允许)",
+    "nameConstraintsExcluded": "名称约束 (排除)",
+    "policyConstraintsRequire": "要求显式策略",
+    "policyConstraintsInhibit": "禁止策略映射",
+    "inhibitAnyPolicy": "禁止任何策略",
+    "siaUrls": "主体信息访问"
   },
   "csrs": {
     "uploadCSR": "上传CSR",

@@ -705,7 +705,8 @@
       "ca": "CA",
       "selfSigned": "Autoassinado"
     },
-    "approvalRequired": "Solicitação de certificado enviada para aprovação (política: {{policy}})"
+    "approvalRequired": "Solicitação de certificado enviada para aprovação (política: {{policy}})",
+    "ocspMustStaple": "OCSP Must-Staple (RFC 6066)"
   },
   "cas": {
     "parentCA": "CA pai",
@@ -753,7 +754,18 @@
     "certificateCount": "{{count}} certificados",
     "daysLeft": "{{count}} dias restantes",
     "daysLeft_one": "{{count}} dia restante",
-    "descriptionPlaceholder": "Descrição opcional para esta CA"
+    "descriptionPlaceholder": "Descrição opcional para esta CA",
+    "advancedConstraints": "Restrições avançadas (RFC 5280)",
+    "pathLength": "Restrição de comprimento do caminho",
+    "pathLengthPlaceholder": "Vazio = ilimitado, 0 = apenas CA folha",
+    "pathLengthLeafOnly": "0 (Apenas CA folha)",
+    "rfc5280Constraints": "Restrições RFC 5280",
+    "nameConstraintsPermitted": "Restrições de nome (Permitidos)",
+    "nameConstraintsExcluded": "Restrições de nome (Excluídos)",
+    "policyConstraintsRequire": "Exigir política explícita",
+    "policyConstraintsInhibit": "Inibir mapeamento de política",
+    "inhibitAnyPolicy": "Inibir qualquer política",
+    "siaUrls": "Acesso à informação do sujeito"
   },
   "csrs": {
     "uploadCSR": "Carregar CSR",

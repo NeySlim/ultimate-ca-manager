@@ -705,7 +705,8 @@
       "ca": "CA",
       "selfSigned": "自己署名"
     },
-    "approvalRequired": "証明書リクエストが承認待ちです（ポリシー: {{policy}}）"
+    "approvalRequired": "証明書リクエストが承認待ちです（ポリシー: {{policy}}）",
+    "ocspMustStaple": "OCSP Must-Staple (RFC 6066)"
   },
   "cas": {
     "parentCA": "親CA",
@@ -753,7 +754,18 @@
     "certificateCount": "{{count}}個の証明書",
     "daysLeft": "残り{{count}}日",
     "daysLeft_one": "{{count}} day left",
-    "descriptionPlaceholder": "このCAの任意の説明"
+    "descriptionPlaceholder": "このCAの任意の説明",
+    "advancedConstraints": "高度な制約 (RFC 5280)",
+    "pathLength": "パス長制約",
+    "pathLengthPlaceholder": "空 = 無制限、0 = リーフCAのみ",
+    "pathLengthLeafOnly": "0 (リーフCAのみ)",
+    "rfc5280Constraints": "RFC 5280 制約",
+    "nameConstraintsPermitted": "名前制約 (許可)",
+    "nameConstraintsExcluded": "名前制約 (除外)",
+    "policyConstraintsRequire": "明示的ポリシー必須",
+    "policyConstraintsInhibit": "ポリシーマッピング禁止",
+    "inhibitAnyPolicy": "任意ポリシー禁止",
+    "siaUrls": "サブジェクト情報アクセス"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

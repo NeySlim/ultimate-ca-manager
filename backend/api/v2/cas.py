@@ -180,7 +180,14 @@ def create_ca():
             key_type=key_type,
             validity_days=int(data.get('validityYears') or 10) * 365,
             caref=caref,
-            username=username
+            username=username,
+            path_length=data.get('pathLength'),
+            name_constraints_permitted=data.get('nameConstraintsPermitted'),
+            name_constraints_excluded=data.get('nameConstraintsExcluded'),
+            policy_constraints_require=data.get('policyConstraintsRequire'),
+            policy_constraints_inhibit=data.get('policyConstraintsInhibit'),
+            inhibit_any_policy=data.get('inhibitAnyPolicy'),
+            sia_urls=data.get('siaUrls'),
         )
         
         # Send notification for CA creation

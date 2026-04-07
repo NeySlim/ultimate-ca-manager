@@ -65,7 +65,8 @@ class CertificateService:
         ocsp_uri: Optional[str] = None,
         private_key_location: str = 'stored',
         template_id: Optional[int] = None,
-        username: str = 'system'
+        username: str = 'system',
+        ocsp_must_staple: bool = False,
     ) -> Certificate:
         """
         Create a certificate signed by a CA
@@ -181,6 +182,7 @@ class CertificateService:
             aia_ca_issuers_urls=aia_ca_issuers_urls,
             cps_uri=cps_uri,
             cps_oid=cps_oid,
+            ocsp_must_staple=ocsp_must_staple,
         )
         
         # Parse certificate
@@ -216,6 +218,7 @@ class CertificateService:
             san_uri=json.dumps(san_uri) if san_uri else None,
             # OCSP and key location
             ocsp_uri=ocsp_uri,
+            ocsp_must_staple=ocsp_must_staple,
             private_key_location=private_key_location,
             # Template reference
             template_id=template_id,
@@ -401,6 +404,7 @@ class CertificateService:
             aia_ca_issuers_urls=aia_ca_issuers_urls,
             cps_uri=cps_uri,
             cps_oid=cps_oid,
+            ocsp_must_staple=getattr(certificate, 'ocsp_must_staple', False) or False,
         )
         
         # Parse signed certificate

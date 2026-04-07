@@ -610,6 +610,13 @@ def create_certificate():
                 critical=False
             )
         
+        # OCSP Must-Staple / TLS Feature (RFC 6066)
+        if data.get('ocsp_must_staple'):
+            builder = builder.add_extension(
+                x509.TLSFeature([x509.TLSFeatureType.status_request]),
+                critical=False,
+            )
+        
         # Sign certificate
         new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
         
@@ -655,6 +662,7 @@ def create_certificate():
             san_ip=json.dumps(data.get('san_ip', [])),
             san_email=json.dumps(data.get('san_email', [])),
             san_uri=json.dumps(data.get('san_uri', [])),
+            ocsp_must_staple=bool(data.get('ocsp_must_staple')),
             created_by=g.current_user.username if hasattr(g, 'current_user') else None
         )
         

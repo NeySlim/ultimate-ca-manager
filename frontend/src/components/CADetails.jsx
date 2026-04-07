@@ -210,6 +210,35 @@ export function CADetails({
           <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
+
+      {/* RFC 5280 Constraints */}
+      {(ca.path_length !== null && ca.path_length !== undefined || ca.name_constraints_permitted?.length || ca.name_constraints_excluded?.length || ca.policy_constraints_require !== null || ca.inhibit_any_policy !== null || ca.sia_enabled) && (
+        <CompactSection title={t('cas.rfc5280Constraints')} icon={ShieldCheck} iconClass="icon-bg-amber" collapsible defaultOpen={false}>
+          <CompactGrid cols={1}>
+            {(ca.path_length !== null && ca.path_length !== undefined) && (
+              <CompactField icon={TreeStructure} label={t('cas.pathLength')} value={ca.path_length === 0 ? t('cas.pathLengthLeafOnly') : String(ca.path_length)} />
+            )}
+            {ca.name_constraints_permitted?.length > 0 && (
+              <CompactField icon={ShieldCheck} label={t('cas.nameConstraintsPermitted')} value={ca.name_constraints_permitted.map(c => `${c.type}:${c.value}`).join(', ')} mono />
+            )}
+            {ca.name_constraints_excluded?.length > 0 && (
+              <CompactField icon={ShieldCheck} label={t('cas.nameConstraintsExcluded')} value={ca.name_constraints_excluded.map(c => `${c.type}:${c.value}`).join(', ')} mono />
+            )}
+            {ca.policy_constraints_require !== null && ca.policy_constraints_require !== undefined && (
+              <CompactField icon={ShieldCheck} label={t('cas.policyConstraintsRequire')} value={String(ca.policy_constraints_require)} />
+            )}
+            {ca.policy_constraints_inhibit !== null && ca.policy_constraints_inhibit !== undefined && (
+              <CompactField icon={ShieldCheck} label={t('cas.policyConstraintsInhibit')} value={String(ca.policy_constraints_inhibit)} />
+            )}
+            {ca.inhibit_any_policy !== null && ca.inhibit_any_policy !== undefined && (
+              <CompactField icon={ShieldCheck} label={t('cas.inhibitAnyPolicy')} value={String(ca.inhibit_any_policy)} />
+            )}
+            {ca.sia_enabled && ca.sia_urls?.length > 0 && (
+              <CompactField icon={Link} label={t('cas.siaUrls')} value={ca.sia_urls.join(', ')} mono />
+            )}
+          </CompactGrid>
+        </CompactSection>
+      )}
       
       {/* CRL/OCSP Configuration */}
       {(ca.cdp_enabled || ca.ocsp_enabled) && (

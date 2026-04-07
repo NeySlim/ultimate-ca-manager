@@ -48,6 +48,9 @@ export default function CAsPage() {
   const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState('RSA')
   const [createFormKeySize, setCreateFormKeySize] = useState('2048')
   const [createFormValidity, setCreateFormValidity] = useState('10')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [createFormPathLength, setCreateFormPathLength] = useState('')
+  const [createFormOcspMustStaple, setCreateFormOcspMustStaple] = useState(false)
   
   // Filter state
   const [filterType, setFilterType] = useState('')
@@ -247,7 +250,8 @@ export default function CAsPage() {
       keySize: createFormKeyAlgo === 'ECDSA' ? createFormKeySize : parseInt(createFormKeySize),
       validityYears: parseInt(createFormValidity),
       type: createFormType,
-      parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null
+      parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null,
+      ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
     }
     
     try {
@@ -655,6 +659,30 @@ export default function CAsPage() {
                 onChange={(value) => setCreateFormParentCAId(value)}
                 required
               />
+            )}
+          </div>
+
+          {/* Advanced Constraints (RFC 5280) */}
+          <div className="space-y-4">
+            <button
+              type="button"
+              className="flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              {showAdvanced ? <CaretDown size={14} /> : <CaretRight size={14} />}
+              {t('cas.advancedConstraints')}
+            </button>
+            {showAdvanced && (
+              <div className="space-y-4 pl-2 border-l-2 border-border">
+                <Input
+                  label={t('cas.pathLength')}
+                  type="number"
+                  min="0"
+                  value={createFormPathLength}
+                  onChange={(e) => setCreateFormPathLength(e.target.value)}
+                  placeholder={t('cas.pathLengthPlaceholder')}
+                />
+              </div>
             )}
           </div>
 

@@ -201,6 +201,24 @@ class CA(db.Model):
     cps_uri = db.Column(db.Text)  # CPS URI (e.g., http://ca.example.com/cps.pdf)
     cps_oid = db.Column(db.Text, default='2.5.29.32.0')  # Policy OID (default: anyPolicy)
     
+    # RFC 5280 §4.2.1.9 — BasicConstraints pathLenConstraint
+    path_length = db.Column(db.Integer, nullable=True)  # None = unlimited
+    
+    # RFC 5280 §4.2.1.10 — NameConstraints (permitted/excluded subtrees)
+    name_constraints_permitted = db.Column(db.Text)  # JSON: [{"type":"dns","value":".example.com"}]
+    name_constraints_excluded = db.Column(db.Text)   # JSON: [{"type":"dns","value":".evil.com"}]
+    
+    # RFC 5280 §4.2.1.11 — PolicyConstraints
+    policy_constraints_require = db.Column(db.Integer, nullable=True)  # requireExplicitPolicy skip certs
+    policy_constraints_inhibit = db.Column(db.Integer, nullable=True)  # inhibitPolicyMapping skip certs
+    
+    # RFC 5280 §4.2.1.11 — InhibitAnyPolicy
+    inhibit_any_policy = db.Column(db.Integer, nullable=True)  # skip certs
+    
+    # RFC 5280 §4.2.2.2 — Subject Information Access
+    sia_enabled = db.Column(db.Boolean, default=False)
+    sia_urls = db.Column(db.Text)  # JSON array of caRepository URLs
+    
     # HSM Support - private key stored in Hardware Security Module
     hsm_key_id = db.Column(db.Integer, db.ForeignKey('hsm_keys.id'), nullable=True)
     hsm_key = db.relationship('HsmKey', backref='cas')
@@ -379,6 +397,39 @@ class CA(db.Model):
     def set_aia_urls(self, urls):
         self.aia_ca_issuers_url = self._encode_urls(urls)
     
+    # SIA URL helpers (same pattern as CDP/OCSP/AIA)
+    def get_sia_urls(self):
+        return self._get_urls(self.sia_urls)
+    
+    def get_primary_sia_url(self):
+        return self._get_primary_url(self.sia_urls)
+    
+    def set_sia_urls(self, urls):
+        self.sia_urls = self._encode_urls(urls)
+    
+    # NameConstraints helpers
+    def get_name_constraints_permitted(self):
+        if not self.name_constraints_permitted:
+            return []
+        try:
+            return json.loads(self.name_constraints_permitted)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    
+    def get_name_constraints_excluded(self):
+        if not self.name_constraints_excluded:
+            return []
+        try:
+            return json.loads(self.name_constraints_excluded)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    
+    def set_name_constraints_permitted(self, constraints):
+        self.name_constraints_permitted = json.dumps(constraints) if constraints else None
+    
+    def set_name_constraints_excluded(self, constraints):
+        self.name_constraints_excluded = json.dumps(constraints) if constraints else None
+    
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
         # Determine CA type (lowercase for frontend)
@@ -452,6 +503,15 @@ class CA(db.Model):
             "cps_enabled": self.cps_enabled,
             "cps_uri": self.cps_uri,
             "cps_oid": self.cps_oid or '2.5.29.32.0',
+            # RFC 5280 constraints
+            "path_length": self.path_length,
+            "name_constraints_permitted": self.get_name_constraints_permitted(),
+            "name_constraints_excluded": self.get_name_constraints_excluded(),
+            "policy_constraints_require": self.policy_constraints_require,
+            "policy_constraints_inhibit": self.policy_constraints_inhibit,
+            "inhibit_any_policy": self.inhibit_any_policy,
+            "sia_enabled": self.sia_enabled,
+            "sia_urls": self.get_sia_urls(),
             # Ownership (Pro feature)
             "owner_group_id": self.owner_group_id,
             "owner_group_name": self.owner_group.name if self.owner_group else None,
@@ -506,6 +566,9 @@ class Certificate(db.Model):
     
     # OCSP
     ocsp_uri = db.Column(db.String(255))
+    
+    # RFC 6066 — OCSP Must-Staple (TLS Feature extension)
+    ocsp_must_staple = db.Column(db.Boolean, default=False)
     
     # Private key management
     private_key_location = db.Column(db.String(20), default='stored')  # 'stored' or 'download_only'
@@ -886,6 +949,7 @@ class Certificate(db.Model):
             "san_uri": self.san_uri,
             # OCSP
             "ocsp_uri": self.ocsp_uri,
+            "ocsp_must_staple": self.ocsp_must_staple,
             # Computed properties for display
             "common_name": self.common_name,
             "cn": self.common_name,  # Alias

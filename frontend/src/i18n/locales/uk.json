@@ -705,7 +705,8 @@
       "ca": "ЦС",
       "selfSigned": "Самопідписаний"
     },
-    "approvalRequired": "Запит на сертифікат надіслано на затвердження (політика: {{policy}})"
+    "approvalRequired": "Запит на сертифікат надіслано на затвердження (політика: {{policy}})",
+    "ocspMustStaple": "OCSP Must-Staple (RFC 6066)"
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
@@ -753,7 +754,18 @@
     "certificateCount": "{{count}} сертифікатів",
     "daysLeft": "{{count}} днів залишилось",
     "daysLeft_one": "{{count}} день залишився",
-    "descriptionPlaceholder": "Необов'язковий опис для цього ЦС"
+    "descriptionPlaceholder": "Необов'язковий опис для цього ЦС",
+    "advancedConstraints": "Розширені обмеження (RFC 5280)",
+    "pathLength": "Обмеження довжини шляху",
+    "pathLengthPlaceholder": "Порожнє = необмежено, 0 = лише листова CA",
+    "pathLengthLeafOnly": "0 (Лише листова CA)",
+    "rfc5280Constraints": "Обмеження RFC 5280",
+    "nameConstraintsPermitted": "Обмеження імен (Дозволені)",
+    "nameConstraintsExcluded": "Обмеження імен (Виключені)",
+    "policyConstraintsRequire": "Вимагати явну політику",
+    "policyConstraintsInhibit": "Заборонити відображення політик",
+    "inhibitAnyPolicy": "Заборонити будь-яку політику",
+    "siaUrls": "Доступ до інформації суб'єкта"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",

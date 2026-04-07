@@ -485,7 +485,18 @@
     "certificateCount": "{{count}} certificats",
     "daysLeft": "{{count}} jours restants",
     "daysLeft_one": "{{count}} jour restant",
-    "descriptionPlaceholder": "Description optionnelle pour cette AC"
+    "descriptionPlaceholder": "Description optionnelle pour cette AC",
+    "advancedConstraints": "Contraintes avancées (RFC 5280)",
+    "pathLength": "Contrainte de longueur de chemin",
+    "pathLengthPlaceholder": "Vide = illimité, 0 = CA feuille uniquement",
+    "pathLengthLeafOnly": "0 (CA feuille uniquement)",
+    "rfc5280Constraints": "Contraintes RFC 5280",
+    "nameConstraintsPermitted": "Contraintes de nom (Autorisées)",
+    "nameConstraintsExcluded": "Contraintes de nom (Exclues)",
+    "policyConstraintsRequire": "Exiger une politique explicite",
+    "policyConstraintsInhibit": "Interdire le mappage de politique",
+    "inhibitAnyPolicy": "Interdire toute politique",
+    "siaUrls": "Accès aux informations du sujet"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -578,7 +589,8 @@
       "ca": "AC",
       "selfSigned": "Auto-signé"
     },
-    "approvalRequired": "Demande de certificat soumise pour approbation (politique : {{policy}})"
+    "approvalRequired": "Demande de certificat soumise pour approbation (politique : {{policy}})",
+    "ocspMustStaple": "OCSP Must-Staple (RFC 6066)"
   },
   "common": {
     "saved": "Paramètres enregistrés",

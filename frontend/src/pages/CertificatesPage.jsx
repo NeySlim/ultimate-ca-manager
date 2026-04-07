@@ -952,6 +952,7 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
     key_size: '2048',
     validity_days: '365',
     expiry_date: '',
+    ocsp_must_staple: false,
   })
 
   const [sans, setSans] = useState([{ type: 'dns', value: '' }])
@@ -1152,6 +1153,7 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
       ...(san_email.length && { san_email }),
       ...(san_uri.length && { san_uri }),
       ...(selectedTemplate && { template_id: parseInt(selectedTemplate) }),
+      ...(formData.ocsp_must_staple && { ocsp_must_staple: true }),
     }
     onSubmit(payload)
   }
@@ -1413,6 +1415,20 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
             {t('certificates.maxValidityCa', { date: caExpiryDate })}
           </p>
         )}
+      </div>
+
+      {/* OCSP Must-Staple */}
+      <div className="flex items-center gap-3 py-2">
+        <input
+          type="checkbox"
+          id="ocsp_must_staple"
+          checked={formData.ocsp_must_staple}
+          onChange={(e) => update('ocsp_must_staple', e.target.checked)}
+          className="w-4 h-4 rounded border-border accent-accent-primary"
+        />
+        <label htmlFor="ocsp_must_staple" className="text-sm text-text-secondary cursor-pointer">
+          {t('certificates.ocspMustStaple')}
+        </label>
       </div>
 
       {/* Actions */}

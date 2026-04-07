@@ -44,7 +44,14 @@ class CAService:
         digest: str = 'sha256',
         caref: Optional[str] = None,
         ocsp_uri: Optional[str] = None,
-        username: str = 'system'
+        username: str = 'system',
+        path_length: Optional[int] = None,
+        name_constraints_permitted: Optional[list] = None,
+        name_constraints_excluded: Optional[list] = None,
+        policy_constraints_require: Optional[int] = None,
+        policy_constraints_inhibit: Optional[int] = None,
+        inhibit_any_policy: Optional[int] = None,
+        sia_urls: Optional[list] = None,
     ) -> CA:
         """
         Create an internal Certificate Authority
@@ -120,6 +127,13 @@ class CAService:
             cdp_urls=parent_cdp_urls,
             cps_uri=parent_cps_uri,
             cps_oid=parent_cps_oid,
+            path_length=path_length,
+            name_constraints_permitted=name_constraints_permitted,
+            name_constraints_excluded=name_constraints_excluded,
+            policy_constraints_require=policy_constraints_require,
+            policy_constraints_inhibit=policy_constraints_inhibit,
+            inhibit_any_policy=inhibit_any_policy,
+            sia_urls=sia_urls,
         )
         
         # Parse certificate for details
@@ -157,8 +171,20 @@ class CAService:
             valid_from=cert.not_valid_before_utc,
             valid_to=cert.not_valid_after_utc,
             imported_from='generated',
-            created_by=username
+            created_by=username,
+            path_length=path_length,
+            policy_constraints_require=policy_constraints_require,
+            policy_constraints_inhibit=policy_constraints_inhibit,
+            inhibit_any_policy=inhibit_any_policy,
         )
+        # Store JSON-serialized constraints
+        if name_constraints_permitted:
+            ca.set_name_constraints_permitted(name_constraints_permitted)
+        if name_constraints_excluded:
+            ca.set_name_constraints_excluded(name_constraints_excluded)
+        if sia_urls:
+            ca.sia_enabled = True
+            ca.set_sia_urls(sia_urls)
         
         db.session.add(ca)
         db.session.commit()

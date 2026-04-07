@@ -42,6 +42,32 @@ class TrustStoreService:
     }
     
     @staticmethod
+    def _build_general_subtrees(constraints):
+        """Build GeneralSubtree list from constraint dicts for NameConstraints.
+        
+        Args:
+            constraints: List of {"type": "dns"|"ip"|"email", "value": "..."} dicts
+            
+        Returns:
+            List of x509.GeneralName or None if empty
+        """
+        if not constraints:
+            return None
+        subtrees = []
+        for c in constraints:
+            ctype = c.get('type', '').lower()
+            value = c.get('value', '')
+            if not value:
+                continue
+            if ctype == 'dns':
+                subtrees.append(x509.DNSName(value))
+            elif ctype == 'ip':
+                subtrees.append(x509.IPAddress(ipaddress.ip_network(value)))
+            elif ctype == 'email':
+                subtrees.append(x509.RFC822Name(value))
+        return subtrees if subtrees else None
+    
+    @staticmethod
     def generate_private_key(key_type: str):
         """
         Generate a private key
@@ -117,7 +143,14 @@ class TrustStoreService:
         cdp_urls: Optional[List[str]] = None,
         cps_uri: Optional[str] = None,
         cps_oid: Optional[str] = None,
-        serial: Optional[int] = None
+        serial: Optional[int] = None,
+        path_length: Optional[int] = None,
+        name_constraints_permitted: Optional[List[dict]] = None,
+        name_constraints_excluded: Optional[List[dict]] = None,
+        policy_constraints_require: Optional[int] = None,
+        policy_constraints_inhibit: Optional[int] = None,
+        inhibit_any_policy: Optional[int] = None,
+        sia_urls: Optional[List[str]] = None,
     ) -> Tuple[bytes, bytes]:
         """
         Create a CA certificate
@@ -136,6 +169,13 @@ class TrustStoreService:
             cps_uri: Optional CPS URI for Certificate Policies extension
             cps_oid: Optional Policy OID (default: anyPolicy 2.5.29.32.0)
             serial: Optional serial number
+            path_length: Optional pathLenConstraint for BasicConstraints (None=unlimited)
+            name_constraints_permitted: Optional permitted subtrees [{"type":"dns","value":".example.com"}]
+            name_constraints_excluded: Optional excluded subtrees [{"type":"dns","value":".evil.com"}]
+            policy_constraints_require: Optional requireExplicitPolicy skip certs
+            policy_constraints_inhibit: Optional inhibitPolicyMapping skip certs
+            inhibit_any_policy: Optional inhibitAnyPolicy skip certs
+            sia_urls: Optional SIA caRepository URLs
             
         Returns:
             Tuple of (certificate PEM bytes, private key PEM bytes)
@@ -161,9 +201,9 @@ class TrustStoreService:
             utc_now() + timedelta(days=validity_days)
         )
         
-        # CA extensions
+        # CA extensions — BasicConstraints with configurable pathLenConstraint
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=True, path_length=None),
+            x509.BasicConstraints(ca=True, path_length=path_length),
             critical=True,
         )
         
@@ -240,6 +280,49 @@ class TrustStoreService:
                 critical=False,
             )
         
+        # NameConstraints (RFC 5280 §4.2.1.10) — restrict namespaces for SubCAs
+        nc_permitted = TrustStoreService._build_general_subtrees(name_constraints_permitted)
+        nc_excluded = TrustStoreService._build_general_subtrees(name_constraints_excluded)
+        if nc_permitted or nc_excluded:
+            builder = builder.add_extension(
+                x509.NameConstraints(
+                    permitted_subtrees=nc_permitted or None,
+                    excluded_subtrees=nc_excluded or None,
+                ),
+                critical=True,
+            )
+        
+        # PolicyConstraints (RFC 5280 §4.2.1.11)
+        if policy_constraints_require is not None or policy_constraints_inhibit is not None:
+            builder = builder.add_extension(
+                x509.PolicyConstraints(
+                    require_explicit_policy=policy_constraints_require,
+                    inhibit_policy_mapping=policy_constraints_inhibit,
+                ),
+                critical=True,
+            )
+        
+        # InhibitAnyPolicy (RFC 5280 §4.2.1.11)
+        if inhibit_any_policy is not None:
+            builder = builder.add_extension(
+                x509.InhibitAnyPolicy(skip_certs=inhibit_any_policy),
+                critical=True,
+            )
+        
+        # Subject Information Access (RFC 5280 §4.2.2.2) — caRepository
+        if sia_urls:
+            sia_descriptions = [
+                x509.AccessDescription(
+                    x509.oid.SubjectInformationAccessOID.CA_REPOSITORY,
+                    x509.UniformResourceIdentifier(url)
+                )
+                for url in sia_urls
+            ]
+            builder = builder.add_extension(
+                x509.SubjectInformationAccess(sia_descriptions),
+                critical=False,
+            )
+        
         # Sign certificate
         hash_algo = TrustStoreService.HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
@@ -281,6 +364,7 @@ class TrustStoreService:
         aia_ca_issuers_urls: Optional[List[str]] = None,
         cps_uri: Optional[str] = None,
         cps_oid: Optional[str] = None,
+        ocsp_must_staple: bool = False,
     ) -> Tuple[bytes, bytes]:
         """
         Create a certificate signed by a CA
@@ -522,13 +606,14 @@ class TrustStoreService:
                 critical=False,
             )
         
+        # OCSP Must-Staple / TLS Feature (RFC 6066)
+        if ocsp_must_staple:
+            builder = builder.add_extension(
+                x509.TLSFeature([x509.TLSFeatureType.status_request]),
+                critical=False,
+            )
+        
         # Sign
-        hash_algo = TrustStoreService.HASH_ALGORITHMS.get(digest, hashes.SHA256())
-        certificate = builder.sign(
-            private_key=ca_private_key,
-            algorithm=hash_algo,
-            backend=default_backend()
-        )
         
         # Serialize
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
@@ -621,6 +706,7 @@ class TrustStoreService:
         aia_ca_issuers_urls: Optional[List[str]] = None,
         cps_uri: Optional[str] = None,
         cps_oid: Optional[str] = None,
+        ocsp_must_staple: bool = False,
     ) -> bytes:
         """
         Sign a CSR with a CA
@@ -824,6 +910,13 @@ class TrustStoreService:
             builder = builder.add_extension(
                 x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key()),
                 critical=False
+            )
+
+        # OCSP Must-Staple / TLS Feature (RFC 6066)
+        if ocsp_must_staple:
+            builder = builder.add_extension(
+                x509.TLSFeature([x509.TLSFeatureType.status_request]),
+                critical=False,
             )
 
         # Sign
