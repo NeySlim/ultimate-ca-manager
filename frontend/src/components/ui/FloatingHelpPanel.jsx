@@ -15,8 +15,8 @@ import {
 import { cn } from '../../lib/utils'
 import { useMobile } from '../../contexts/MobileContext'
 import { useTranslation } from 'react-i18next'
-import { helpContent as helpData } from '../../data/helpContent'
-import { helpGuides } from '../../data/helpGuides'
+import { helpContent as defaultHelpData } from '../../data/helpContent'
+import { helpGuides as defaultHelpGuides } from '../../data/helpGuides'
 import { FloatingWindow } from './FloatingWindow'
 
 const STORAGE_KEY = 'ucm-help-panel'
@@ -42,11 +42,82 @@ const CONTRAST_MODES = [
 ]
 const SOFT_MAX_W = 600
 
+// Merge English help structure (with icons) with translated text
+function mergeHelpContent(en, tr) {
+  if (!tr) return en
+  return {
+    ...en,
+    title: tr.title || en.title,
+    subtitle: tr.subtitle || en.subtitle,
+    overview: tr.overview || en.overview,
+    sections: en.sections?.map((sec, i) => ({
+      ...sec,
+      title: tr.sections?.[i]?.title || sec.title,
+      content: tr.sections?.[i]?.content ?? sec.content,
+      items: sec.items?.map((item, j) => {
+        const trItem = tr.sections?.[i]?.items?.[j]
+        if (!trItem) return item
+        if (typeof item === 'string') return trItem
+        return { ...item, label: trItem?.label || item.label, text: trItem?.text || item.text }
+      }),
+      definitions: sec.definitions?.map((def, j) => ({
+        ...def,
+        term: tr.sections?.[i]?.definitions?.[j]?.term || def.term,
+        description: tr.sections?.[i]?.definitions?.[j]?.description || def.description,
+      })),
+      example: tr.sections?.[i]?.example ?? sec.example,
+    })),
+    tips: tr.tips || en.tips,
+    warnings: tr.warnings || en.warnings,
+    related: en.related,
+  }
+}
+
+// Dynamic translation loader — per-section per-language
+const sectionCache = {}
+function useHelpTranslation(lang, pageKey) {
+  const [translation, setTranslation] = useState(null)
+  const langKey = lang?.substring(0, 2)
+
+  useEffect(() => {
+    if (!langKey || langKey === 'en' || !pageKey) {
+      setTranslation(null)
+      return
+    }
+    const cacheKey = `${langKey}/${pageKey}`
+    if (sectionCache[cacheKey]) {
+      setTranslation(sectionCache[cacheKey])
+      return
+    }
+    import(`../../data/help/${langKey}/${pageKey}.js`)
+      .then(mod => {
+        sectionCache[cacheKey] = mod.default
+        setTranslation(mod.default)
+      })
+      .catch(() => setTranslation(null))
+  }, [langKey, pageKey])
+
+  return translation
+}
+
 export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { isMobile } = useMobile()
-  const quickContent = pageKey ? helpData[pageKey] : null
-  const guideContent = pageKey ? helpGuides[pageKey] : null
+  const translation = useHelpTranslation(i18n.language, pageKey)
+
+  const quickContent = useMemo(() => {
+    const en = pageKey ? defaultHelpData[pageKey] : null
+    if (!en) return null
+    return mergeHelpContent(en, translation?.helpContent)
+  }, [pageKey, translation])
+
+  const guideContent = useMemo(() => {
+    const en = pageKey ? defaultHelpGuides[pageKey] : null
+    if (!en) return null
+    const tr = translation?.helpGuides
+    if (!tr) return en
+    return { ...en, title: tr.title || en.title, content: tr.content || en.content }
+  }, [pageKey, translation])
 
   if (!isOpen || (!quickContent && !guideContent)) return null
 
