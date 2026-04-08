@@ -3916,18 +3916,6 @@ export default function SettingsPage() {
             ) : (
               <DetailSection title={t('settings.ct')} icon={Eye} iconClass="icon-bg-cyan">
                 <div className="space-y-4">
-                  <ToggleSwitch
-                    label={t('settings.ctEnabled')}
-                    checked={ctSettings.enabled}
-                    onChange={(val) => setCtSettings(prev => ({ ...prev, enabled: val }))}
-                  />
-
-                  <ToggleSwitch
-                    label={t('settings.ctAutoSubmit')}
-                    checked={ctSettings.auto_submit}
-                    onChange={(val) => setCtSettings(prev => ({ ...prev, auto_submit: val }))}
-                  />
-
                   <div>
                     <label className="text-sm font-medium text-text-primary mb-2 block">{t('settings.ctLogUrls')}</label>
                     {ctSettings.log_urls?.length > 0 && (
@@ -3956,6 +3944,18 @@ export default function SettingsPage() {
                       </Button>
                     </div>
                   </div>
+
+                  <ToggleSwitch
+                    label={t('settings.ctAutoSubmit')}
+                    checked={ctSettings.auto_submit}
+                    onChange={(val) => setCtSettings(prev => ({ ...prev, auto_submit: val }))}
+                  />
+
+                  <ToggleSwitch
+                    label={t('settings.ctEnabled')}
+                    checked={ctSettings.enabled}
+                    onChange={(val) => setCtSettings(prev => ({ ...prev, enabled: val }))}
+                  />
 
                   <div className="flex justify-end pt-4 border-t border-border">
                     <Button type="button" onClick={handleCtSave} disabled={ctSaving}>
