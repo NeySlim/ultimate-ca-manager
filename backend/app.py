@@ -1061,21 +1061,7 @@ def init_database(app):
                     }),
                     "is_system": True
                 },
-                {
-                    "name": "Certificate Authority",
-                    "description": "Certificate Authority (CA) for signing other certificates",
-                    "template_type": "ca",
-                    "key_type": "RSA-4096",
-                    "validity_days": 3650,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{ca_name}", "O": "Organization"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["keyCertSign", "cRLSign"],
-                        "basic_constraints": {"ca": True, "path_length": 0},
-                        "san_types": []
-                    }),
-                    "is_system": True
-                },
+                # CA template removed — CAs are created from the CAs page, not via templates
                 {
                     "name": "Code Signing",
                     "description": "Code signing certificate for software/drivers",

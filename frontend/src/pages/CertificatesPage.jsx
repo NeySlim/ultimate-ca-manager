@@ -957,11 +957,11 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
 
   const [sans, setSans] = useState([{ type: 'dns', value: '' }])
 
-  // Load templates on mount
+  // Load templates on mount (exclude CA templates — CAs are created from the CAs page)
   useEffect(() => {
     templatesService.getAll().then(res => {
       const list = res?.data || res || []
-      setTemplates(Array.isArray(list) ? list : [])
+      setTemplates(Array.isArray(list) ? list.filter(t => t.template_type !== 'ca') : [])
     }).catch(() => {})
   }, [])
 
