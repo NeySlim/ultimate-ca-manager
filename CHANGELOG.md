@@ -15,6 +15,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.110] - 2026-04-09
+
+### Added
+- **ACME Auto-Supersede** — Automatically revoke previous certificates with reason 'superseded' when a new certificate is issued via ACME finalize (controlled by `revoke_on_renewal` setting)
+
+### Fixed
+- **DER File Upload Detection** — All file upload handlers (SmartImport, Cert Tools, mTLS) now detect PEM vs DER by content (`-----BEGIN` header) instead of file extension; fixes corrupted DER uploads for `.crt`/`.cer` files
+- **CA Template in Certificates Page** — Remove incorrect "Certificate Authority" template from Certificates page template dropdown; CAs should only be created from the CAs page
+
+---
+
 ## [2.109] - 2026-04-08
 
 ### Added
