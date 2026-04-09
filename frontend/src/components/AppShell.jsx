@@ -71,14 +71,18 @@ export function AppShell() {
   const activePage = pageIdMap[rawPage] || rawPage
   
   // Map URL paths to helpContent keys
+  // Use full path for nested routes (e.g. /ssh/cas → sshCas)
+  const fullPath = location.pathname.replace(/^\//, '').replace(/\/$/, '')
   const helpPageKeyMap = {
     '': 'dashboard',
     'audit': 'auditLogs',
     'crl-ocsp': 'crlocsp',
     'users': 'usersGroups',
-    'tools': 'certTools'
+    'tools': 'certTools',
+    'ssh/cas': 'sshCas',
+    'ssh/certificates': 'sshCertificates'
   }
-  const helpPageKey = helpPageKeyMap[activePage] || activePage
+  const helpPageKey = helpPageKeyMap[fullPath] || helpPageKeyMap[activePage] || activePage
   
   // Pages that have contextual help
   const pagesWithHelp = [
@@ -87,7 +91,9 @@ export function AppShell() {
     'acme', 'scep', 'est', 'tsa', 'settings', 'truststore', 'crl-ocsp', 
     'tools', 'audit', 'account', 'operations',
     // Pro pages
-    'rbac', 'hsm'
+    'rbac', 'hsm',
+    // SSH pages
+    'ssh'
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
 

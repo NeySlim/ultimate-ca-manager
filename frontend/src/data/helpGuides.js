@@ -2353,6 +2353,266 @@ UCM passes these as ADCS request attributes:
 > 💡 Use the **Test Connection** button to verify authentication and discover available templates before signing.
 `
   },
+
+  // ===== SSH CAS =====
+  sshCas: {
+    title: 'SSH Certificate Authorities',
+    content: `
+## Overview
+
+SSH Certificate Authorities (CAs) are the foundation of SSH certificate-based authentication. Instead of distributing individual public keys to every server, you create a CA and configure servers to trust it. Any certificate signed by the CA is then automatically accepted.
+
+UCM supports the OpenSSH certificate format (RFC 4253 + OpenSSH extensions), which is natively understood by OpenSSH 5.4+ — no additional software needed on servers or clients.
+
+## CA Types
+
+### User CA
+A User CA signs certificates that authenticate **users to servers**. When a server trusts a User CA, any user presenting a valid certificate signed by that CA is allowed to log in (subject to principal matching).
+
+**Server configuration:**
+\`\`\`
+# /etc/ssh/sshd_config
+TrustedUserCAKeys /etc/ssh/user_ca.pub
+\`\`\`
+
+### Host CA
+A Host CA signs certificates that authenticate **servers to clients**. When a client trusts a Host CA, it can verify that the server it connects to is legitimate — eliminating "trust on first use" (TOFU) warnings.
+
+**Client configuration:**
+\`\`\`
+# ~/.ssh/known_hosts
+@cert-authority *.example.com ssh-ed25519 AAAA...
+\`\`\`
+
+## Creating a CA
+
+1. Click **Create SSH CA**
+2. Enter a descriptive name (e.g., "Production User CA")
+3. Select the CA type: **User** or **Host**
+4. Choose the key algorithm:
+   - **Ed25519** — Recommended. Fast, small keys, modern security.
+   - **ECDSA P-256/P-384** — Good compatibility and security.
+   - **RSA 2048/4096** — Broadest compatibility, larger keys.
+5. Optionally set max validity and default extensions
+6. Click **Create**
+
+> 💡 Use separate CAs for user and host certificates. Never use one CA for both purposes.
+
+## Server Setup
+
+### Automatic Setup Script
+
+UCM generates a POSIX shell script that automatically configures your server:
+
+1. Open the CA detail panel
+2. Click **Download Setup Script**
+3. Transfer the script to your server
+4. Run it:
+
+\`\`\`bash
+chmod +x setup-ssh-ca.sh
+sudo ./setup-ssh-ca.sh
+\`\`\`
+
+The script:
+- Detects your OS and init system
+- Backs up sshd_config before any changes
+- Installs the CA public key
+- Adds TrustedUserCAKeys (user CA) or HostCertificate (host CA)
+- Validates the config with \`sshd -t\`
+- Restarts sshd only if validation passes
+- Supports \`--dry-run\` to preview changes
+
+### Manual Setup
+
+#### User CA
+\`\`\`bash
+# Copy the CA public key to the server
+echo "ssh-ed25519 AAAA... user-ca" | sudo tee /etc/ssh/user_ca.pub
+
+# Add to sshd_config
+echo "TrustedUserCAKeys /etc/ssh/user_ca.pub" | sudo tee -a /etc/ssh/sshd_config
+
+# Restart sshd
+sudo systemctl restart sshd
+\`\`\`
+
+#### Host CA
+\`\`\`bash
+# Sign the server's host key
+# Then add to sshd_config:
+echo "HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub" | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart sshd
+\`\`\`
+
+## Key Revocation Lists (KRL)
+
+SSH CAs support Key Revocation Lists to invalidate compromised certificates:
+
+1. Revoke certificates from the SSH Certificates page
+2. Download the updated KRL from the CA detail panel
+3. Deploy the KRL file to servers:
+
+\`\`\`bash
+# Add to sshd_config
+RevokedKeys /etc/ssh/revoked_keys
+\`\`\`
+
+> ⚠ Servers must be configured to check the KRL. Revocation does not take effect until the KRL is deployed.
+
+## Best Practices
+
+| Practice | Recommendation |
+|----------|---------------|
+| Separate CAs | Use distinct CAs for user and host certificates |
+| Key algorithm | Ed25519 for new deployments, RSA 4096 for legacy compatibility |
+| CA lifetime | Keep CAs long-lived; use short-lived certificates instead |
+| Backup | Export and securely store the CA private key |
+| Principal mapping | Map principals to specific usernames, not wildcards |
+`
+  },
+
+  // ===== SSH CERTIFICATES =====
+  sshCertificates: {
+    title: 'SSH Certificates',
+    content: `
+## Overview
+
+SSH certificates are signed SSH public keys with metadata: identity, validity period, permitted principals, and extensions. They replace the traditional \`authorized_keys\` approach with centralized, time-limited, auditable access control.
+
+UCM issues OpenSSH-format certificates compatible with OpenSSH 5.4+ on any platform.
+
+## Issuance Modes
+
+### Sign Mode (Recommended)
+The user generates their own key pair and provides only the **public key** to UCM. The private key never leaves the user's machine.
+
+**User workflow:**
+\`\`\`bash
+# 1. Generate a key pair (user's machine)
+ssh-keygen -t ed25519 -f ~/.ssh/id_work -C "jdoe@example.com"
+
+# 2. Copy the public key content
+cat ~/.ssh/id_work.pub
+
+# 3. Paste into UCM's sign form
+# 4. Download the signed certificate
+# 5. Save as ~/.ssh/id_work-cert.pub
+
+# 6. Connect
+ssh -i ~/.ssh/id_work user@server
+\`\`\`
+
+### Generate Mode
+UCM generates both the key pair and the certificate. Use this when you need to provision credentials centrally.
+
+> ⚠ **Download the private key immediately** — it is not stored in UCM and cannot be recovered.
+
+**Workflow:**
+1. Select a CA and fill in the certificate details
+2. Choose "Generate" mode
+3. Click **Issue**
+4. Download all three files:
+   - Private key (\`keyid\`) — **Save securely!**
+   - Certificate (\`keyid-cert.pub\`)
+   - Public key (\`keyid.pub\`)
+
+## Certificate Fields
+
+### Key ID
+A unique identifier embedded in the certificate. It appears in SSH server logs when the certificate is used, making it essential for auditing.
+
+**Good key IDs:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
+
+### Principals
+Principals define **who** (user certs) or **what** (host certs) the certificate is valid for:
+
+- **User certificates**: list of usernames the holder can log in as (e.g., \`deploy\`, \`admin\`)
+- **Host certificates**: list of hostnames/IPs the server is known by (e.g., \`web01.example.com\`, \`10.0.1.5\`)
+
+> 💡 If no principals are specified, the certificate works for any principal — which is usually too permissive.
+
+### Validity
+
+Choose a preset or set custom duration:
+
+| Preset | Use Case |
+|--------|----------|
+| 1 hour | CI/CD pipelines, one-time tasks |
+| 8 hours | Standard workday access |
+| 24 hours | Extended access |
+| 7 days | Sprint-based access |
+| 30 days | Monthly rotation |
+| 365 days | Long-lived service accounts |
+
+Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
+
+### Extensions (User Certificates Only)
+
+| Extension | Description |
+|-----------|-------------|
+| permit-pty | Allow interactive terminal sessions |
+| permit-agent-forwarding | Allow SSH agent forwarding |
+| permit-X11-forwarding | Allow X11 display forwarding |
+| permit-port-forwarding | Allow TCP port forwarding |
+| permit-user-rc | Allow execution of ~/.ssh/rc on login |
+
+### Critical Options
+
+| Option | Description |
+|--------|-------------|
+| force-command | Restrict the certificate to a single command |
+| source-address | Restrict to specific source IP addresses/CIDRs |
+
+**Example:** A certificate with \`force-command=ls\` and \`source-address=10.0.0.0/8\` can only run \`ls\` and only from the 10.x.x.x network.
+
+## Using Certificates
+
+### User Certificate
+\`\`\`bash
+# Place certificate alongside the private key
+# If key is ~/.ssh/id_work, certificate must be ~/.ssh/id_work-cert.pub
+cp downloaded-cert.pub ~/.ssh/id_work-cert.pub
+
+# SSH automatically uses the certificate
+ssh user@server
+\`\`\`
+
+### Host Certificate
+\`\`\`bash
+# On the server: place the host certificate
+sudo cp host-cert.pub /etc/ssh/ssh_host_ed25519_key-cert.pub
+
+# Add to sshd_config
+echo "HostCertificate /etc/ssh/ssh_host_ed25519_key-cert.pub" | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart sshd
+\`\`\`
+
+On clients, add the Host CA to known_hosts:
+\`\`\`
+@cert-authority *.example.com ssh-ed25519 AAAA...
+\`\`\`
+
+## Revocation
+
+1. Select a certificate in the table
+2. Click **Revoke** in the detail panel
+3. The certificate is added to the CA's Key Revocation List (KRL)
+4. Download and deploy the updated KRL to servers (from SSH CAs page)
+
+> ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Permission denied (publickey) | Verify the CA is trusted on the server (TrustedUserCAKeys) |
+| Certificate not used | Ensure the cert file is named \`<key>-cert.pub\` next to the private key |
+| Principal mismatch | The username you SSH as must be listed in the certificate's principals |
+| Certificate expired | Issue a new certificate with appropriate validity |
+| Host verification failed | Add the Host CA to known_hosts with @cert-authority |
+`
+  },
 }
 
 export default helpGuides

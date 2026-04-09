@@ -3595,6 +3595,8 @@
     "publicKey": "Public Key",
     "downloadPublicKey": "Download Public Key",
     "downloadKrl": "Download KRL",
+    "downloadSetupScript": "Download Setup Script",
+    "setupScriptDescription": "Download a shell script to configure your SSH server to trust this CA",
     "copyPublicKey": "Copy Public Key",
     "publicKeyCopied": "Public key copied to clipboard",
     "noData": "No SSH CAs",

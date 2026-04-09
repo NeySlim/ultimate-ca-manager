@@ -1098,6 +1098,113 @@ export const helpContent = {
     ],
     related: ['CSRs', 'Certificates', 'Settings']
   },
+
+  // ===== SSH CAS =====
+  sshCas: {
+    title: 'SSH Certificate Authorities',
+    subtitle: 'Manage SSH CAs for user and host authentication',
+    overview: 'Create and manage SSH Certificate Authorities following OpenSSH standards. SSH CAs eliminate the need to distribute individual public keys — instead, servers and users trust the CA, and the CA signs certificates that grant access.',
+    sections: [
+      {
+        title: 'CA Types',
+        icon: Key,
+        items: [
+          { label: 'User CA', text: 'Signs user certificates for SSH login. Servers trust this CA and accept any certificate it signs.' },
+          { label: 'Host CA', text: 'Signs host certificates to prove server identity. Clients trust this CA to verify they are connecting to the right server.' },
+        ]
+      },
+      {
+        title: 'Key Algorithms',
+        icon: ShieldCheck,
+        items: [
+          { label: 'Ed25519', text: 'Modern, fast, small keys (256-bit). Recommended for new deployments.' },
+          { label: 'ECDSA P-256 / P-384', text: 'Elliptic curve keys, widely supported. Good balance of security and compatibility.' },
+          { label: 'RSA 2048 / 4096', text: 'Traditional algorithm. Use 4096-bit for long-lived CAs. Broadest compatibility with older systems.' },
+        ]
+      },
+      {
+        title: 'Server Configuration',
+        icon: HardDrive,
+        items: [
+          { label: 'Setup Script', text: 'Download a POSIX shell script that auto-configures sshd to trust this CA. Supports all major Linux distributions.' },
+          { label: 'Manual Setup', text: 'Copy the CA public key and add TrustedUserCAKeys (user CA) or HostCertificate (host CA) to sshd_config.' },
+        ]
+      },
+      {
+        title: 'Key Revocation',
+        icon: Lock,
+        items: [
+          { label: 'KRL (Key Revocation List)', text: 'Compact binary format to revoke individual certificates. Configured via RevokedKeys in sshd_config.' },
+          { label: 'Download KRL', text: 'Download the current KRL file from the CA detail panel.' },
+        ]
+      },
+    ],
+    tips: [
+      'Use separate CAs for user and host certificates — never mix them.',
+      'Ed25519 is recommended for new deployments due to speed and security.',
+      'Download the setup script for easy server configuration — it handles backup and validation automatically.',
+    ],
+    warnings: [
+      'Deleting a CA does not revoke certificates it has signed — revoke them first or update server trust.',
+      'If the CA private key is compromised, all certificates signed by it must be considered untrusted.',
+    ],
+    related: ['SSH Certificates', 'Settings']
+  },
+
+  // ===== SSH CERTIFICATES =====
+  sshCertificates: {
+    title: 'SSH Certificates',
+    subtitle: 'Issue and manage OpenSSH certificates',
+    overview: 'Issue SSH certificates signed by your SSH CAs. Certificates replace manual authorized_keys management by providing time-limited, principal-scoped access with automatic expiry. Both user and host certificates are supported.',
+    sections: [
+      {
+        title: 'Issuance Modes',
+        icon: Certificate,
+        items: [
+          { label: 'Sign Mode', text: 'Paste an existing SSH public key to sign it. The private key stays on the user\'s machine — UCM never sees it.' },
+          { label: 'Generate Mode', text: 'UCM generates a new key pair and signs the certificate. Download the private key immediately — it cannot be retrieved later.' },
+        ]
+      },
+      {
+        title: 'Certificate Fields',
+        icon: FileText,
+        items: [
+          { label: 'Key ID', text: 'Unique identifier for the certificate. Appears in SSH logs for auditing.' },
+          { label: 'Principals', text: 'Usernames (user cert) or hostnames (host cert) this certificate is valid for. Comma-separated.' },
+          { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds.' },
+          { label: 'Extensions', text: 'SSH extensions like permit-pty, permit-agent-forwarding. Only applicable to user certificates.' },
+          { label: 'Critical Options', text: 'Restrictions like force-command or source-address to limit certificate usage.' },
+        ]
+      },
+      {
+        title: 'Certificate Types',
+        icon: Users,
+        items: [
+          { label: 'User Certificate', text: 'Authenticates a user to a server. The server must trust the signing CA via TrustedUserCAKeys.' },
+          { label: 'Host Certificate', text: 'Authenticates a server to clients. Clients trust the CA via @cert-authority in known_hosts.' },
+        ]
+      },
+      {
+        title: 'Management',
+        icon: ArrowClockwise,
+        items: [
+          { label: 'Revoke', text: 'Add a certificate to the CA\'s Key Revocation List (KRL). Servers must be configured to check the KRL.' },
+          { label: 'Download', text: 'Download the certificate, public key, or private key (generate mode only).' },
+        ]
+      },
+    ],
+    tips: [
+      'Use short-lived certificates (8h–24h) for user access to minimize the impact of key compromise.',
+      'Sign mode is preferred — the user\'s private key never leaves their machine.',
+      'Key IDs should be descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
+      'For host certificates, the principal must match the hostname clients use to connect.',
+    ],
+    warnings: [
+      'In generate mode, download the private key immediately — it is not stored and cannot be recovered.',
+      'Revoking a certificate only works if servers are configured to check the CA\'s KRL file.',
+    ],
+    related: ['SSH CAs', 'Audit Logs']
+  },
 }
 
 export default helpContent
