@@ -10,7 +10,7 @@ import {
   SignOut, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
   UsersThree, Shield, Lock, FileX, Vault, Wrench, Globe, CaretRight,
   Gavel, Stamp, ChartBar, Stack, Broadcast, CaretDown, MagnifyingGlass,
-  Clock
+  Clock, Terminal
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -35,6 +35,15 @@ const navGroups = [
       { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
       { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
       { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },
+    ]
+  },
+  {
+    id: 'ssh',
+    icon: Terminal,
+    labelKey: 'common.navSsh',
+    children: [
+      { id: 'ssh-cas', icon: Key, labelKey: 'common.sshCas', path: '/ssh/cas', permission: 'read:ssh' },
+      { id: 'ssh-certificates', icon: Certificate, labelKey: 'common.sshCertificates', path: '/ssh/certificates', permission: 'read:ssh' },
     ]
   },
   {

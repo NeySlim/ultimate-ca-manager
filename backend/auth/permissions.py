@@ -17,6 +17,7 @@ ROLE_PERMISSIONS = {
         'read:scep',
         'read:est',
         'read:hsm',
+        'read:ssh', 'write:ssh',
         'read:policies', 'read:approvals', 'write:approvals',
         'read:audit',
         'read:settings', 'write:settings',
@@ -34,6 +35,7 @@ ROLE_PERMISSIONS = {
         'read:scep',
         'read:est',
         'read:hsm',
+        'read:ssh',
         'read:policies', 'read:approvals',
         'read:audit',
         'read:groups',
@@ -45,6 +47,7 @@ ROLE_PERMISSIONS = {
         'read:csrs',
         'read:templates',
         'read:truststore',
+        'read:ssh',
     ]
 }
 

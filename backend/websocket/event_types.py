@@ -57,6 +57,14 @@ class EventType(str, Enum):
     DISCOVERY_NEW_CERT = 'discovery.new_certificate'
     DISCOVERY_CERT_CHANGED = 'discovery.cert_changed'
 
+    # SSH Certificate events
+    SSH_CA_CREATED = 'ssh_ca.created'
+    SSH_CA_UPDATED = 'ssh_ca.updated'
+    SSH_CA_DELETED = 'ssh_ca.deleted'
+    SSH_CERTIFICATE_ISSUED = 'ssh_certificate.issued'
+    SSH_CERTIFICATE_REVOKED = 'ssh_certificate.revoked'
+    SSH_CERTIFICATE_DELETED = 'ssh_certificate.deleted'
+
 
 # Event metadata for documentation
 EVENT_DESCRIPTIONS = {

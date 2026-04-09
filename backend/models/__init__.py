@@ -23,6 +23,7 @@ from models.hsm import HsmProvider, HsmKey
 from models.rbac import CustomRole, RolePermission
 from models.sso import SSOProvider, SSOSession
 from models.policy import CertificatePolicy, ApprovalRequest
+from models.ssh import SSHCertificateAuthority, SSHCertificate
 from utils.datetime_utils import utc_now
 
 
@@ -1124,5 +1125,6 @@ __all__ = [
     "AuditLog", "CRLMetadata", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce",
     "DnsProvider", "AcmeClientOrder", "AcmeDomain", "AcmeLocalDomain", "HsmProvider", "HsmKey",
-    "ScanProfile", "ScanRun", "DiscoveredCertificate"
+    "ScanProfile", "ScanRun", "DiscoveredCertificate",
+    "SSHCertificateAuthority", "SSHCertificate"
 ]

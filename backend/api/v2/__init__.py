@@ -48,6 +48,8 @@ from api.v2.reports import bp as reports_bp
 from api.v2.webhooks import bp as webhooks_bp
 from api.v2.discovery import bp as discovery_bp
 from api.v2.msca import bp as msca_bp
+from api.v2.ssh_cas import bp as ssh_cas_bp
+from api.v2.ssh_certificates import bp as ssh_certificates_bp
 
 # All API v2 blueprints
 API_V2_BLUEPRINTS = [
@@ -90,6 +92,8 @@ API_V2_BLUEPRINTS = [
     webhooks_bp,
     discovery_bp,
     msca_bp,
+    ssh_cas_bp,
+    ssh_certificates_bp,
 ]
 
 

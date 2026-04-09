@@ -273,3 +273,53 @@ def on_discovery_cert_changed(target: str, port: int, old_subject: str, new_subj
         'old_cn': _extract_cn(old_subject),
         'new_cn': _extract_cn(new_subject),
     })
+
+
+# ==================== SSH Certificate Events ====================
+
+def on_ssh_ca_created(ca_id: int, name: str, ca_type: str, created_by: str):
+    """Emit event when an SSH CA is created."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.SSH_CA_CREATED, {
+        'id': ca_id, 'name': name, 'ca_type': ca_type, 'created_by': created_by,
+    })
+
+
+def on_ssh_ca_updated(ca_id: int, name: str, updated_by: str):
+    """Emit event when an SSH CA is updated."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.SSH_CA_UPDATED, {
+        'id': ca_id, 'name': name, 'updated_by': updated_by,
+    })
+
+
+def on_ssh_ca_deleted(ca_id: int, name: str, deleted_by: str):
+    """Emit event when an SSH CA is deleted."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.SSH_CA_DELETED, {
+        'id': ca_id, 'name': name, 'deleted_by': deleted_by,
+    })
+
+
+def on_ssh_certificate_issued(cert_id: int, key_id: str, ca_id: int, cert_type: str):
+    """Emit event when an SSH certificate is issued."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.SSH_CERTIFICATE_ISSUED, {
+        'id': cert_id, 'key_id': key_id, 'ca_id': ca_id, 'cert_type': cert_type,
+    })
+
+
+def on_ssh_certificate_revoked(cert_id: int, key_id: str, reason: str, revoked_by: str):
+    """Emit event when an SSH certificate is revoked."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.SSH_CERTIFICATE_REVOKED, {
+        'id': cert_id, 'key_id': key_id, 'reason': reason, 'revoked_by': revoked_by,
+    })
+
+
+def on_ssh_certificate_deleted(cert_id: int, key_id: str, deleted_by: str):
+    """Emit event when an SSH certificate is deleted."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.SSH_CERTIFICATE_DELETED, {
+        'id': cert_id, 'key_id': key_id, 'deleted_by': deleted_by,
+    })

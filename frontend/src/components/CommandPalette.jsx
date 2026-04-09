@@ -8,7 +8,7 @@ import {
   MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
   User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
   UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star,
-  Spinner, Database, Wrench, Lightning, Gavel, Stamp, ChartBar, Globe
+  Spinner, Database, Wrench, Lightning, Gavel, Stamp, ChartBar, Globe, Terminal
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
@@ -40,6 +40,10 @@ const COMMANDS = [
   { id: 'policies', labelKey: 'commands.nav.policies', icon: Gavel, path: '/policies', categoryKey: 'commands.categories.governance' },
   { id: 'approvals', labelKey: 'commands.nav.approvals', icon: Stamp, path: '/approvals', categoryKey: 'commands.categories.governance' },
   { id: 'reports', labelKey: 'commands.nav.reports', icon: ChartBar, path: '/reports', categoryKey: 'commands.categories.governance' },
+  
+  // SSH
+  { id: 'ssh-cas', labelKey: 'commands.nav.sshCas', icon: Terminal, path: '/ssh/cas', categoryKey: 'commands.categories.navigation' },
+  { id: 'ssh-certificates', labelKey: 'commands.nav.sshCertificates', icon: Terminal, path: '/ssh/certificates', categoryKey: 'commands.categories.navigation' },
   
   // Actions
   { id: 'new-cert', labelKey: 'commands.actions.newCertificate', icon: Certificate, path: '/certificates', action: 'new', categoryKey: 'commands.categories.actions' },

@@ -403,7 +403,11 @@
     "enable": "有効にする",
     "disable": "無効にする",
     "digest": "ダイジェスト",
-    "tsa": "TSA"
+    "tsa": "TSA",
+    "sshCas": "SSH CAs",
+    "sshCertificates": "SSH Certificates",
+    "navSsh": "SSH",
+    "ssh": "SSH"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -2070,7 +2074,8 @@
       "auditLogs": "監査ログ",
       "trustStore": "トラストストア",
       "hsmManagement": "HSM管理",
-      "singleSignOn": "シングルサインオン"
+      "singleSignOn": "シングルサインオン",
+      "ssh": "SSH Certificates"
     },
     "subtitle_one": "{{count}} 件のロール",
     "subtitle_other": "{{count}} 件のロール",
@@ -2085,7 +2090,12 @@
     "writeAccess": "書き込みアクセス",
     "deleteAccess": "削除アクセス",
     "noDescription": "説明なし",
-    "roleDetails": "ロール詳細"
+    "roleDetails": "ロール詳細",
+    "permissions": {
+      "readSsh": "View SSH CAs & certificates",
+      "writeSsh": "Create & manage SSH CAs & certificates",
+      "deleteSsh": "Delete SSH CAs & certificates"
+    }
   },
   "hsm": {
     "statusUnavailable": "HSM機能は利用できません",
@@ -2651,7 +2661,8 @@
         "group": "このグループを削除してもよろしいですか？",
         "template": "このテンプレートを削除してもよろしいですか？",
         "truststore": "この証明書をトラストストアから削除しますか？",
-        "user": "このユーザーを削除してもよろしいですか？"
+        "user": "このユーザーを削除してもよろしいですか？",
+        "sshCa": "Are you sure you want to delete this SSH CA? This action cannot be undone."
       },
       "hsm": {
         "deleteKey": "鍵「{{name}}」を破棄しますか？この操作は元に戻せません。",
@@ -2684,7 +2695,9 @@
         "provider": "プロバイダーの保存に失敗しました",
         "role": "ロールの作成に失敗しました",
         "template": "テンプレートの作成に失敗しました",
-        "user": "ユーザーの作成に失敗しました"
+        "user": "ユーザーの作成に失敗しました",
+        "sshCa": "Failed to create SSH CA",
+        "sshCertificate": "Failed to issue SSH certificate"
       },
       "database": {
         "exportFailed": "データベースのエクスポートに失敗しました",
@@ -2705,7 +2718,9 @@
         "role": "ロールの削除に失敗しました",
         "template": "テンプレートの削除に失敗しました",
         "truststore": "トラストストアからの証明書の削除に失敗しました",
-        "user": "ユーザーの削除に失敗しました"
+        "user": "ユーザーの削除に失敗しました",
+        "sshCa": "Failed to delete SSH CA",
+        "sshCertificate": "Failed to delete SSH certificate"
       },
       "duplicateFailed": {
         "generic": "複製に失敗しました",
@@ -2753,7 +2768,9 @@
         "truststore": "トラストストアの読み込みに失敗しました",
         "users": "ユーザーの読み込みに失敗しました",
         "est": "ESTデータの読み込みに失敗しました",
-        "tsa": "TSA設定の読み込みに失敗しました"
+        "tsa": "TSA設定の読み込みに失敗しました",
+        "sshCas": "Failed to load SSH CAs",
+        "sshCertificates": "Failed to load SSH certificates"
       },
       "revokeFailed": {
         "certificate": "証明書の失効に失敗しました"
@@ -2774,7 +2791,8 @@
         "role": "ロールの更新に失敗しました",
         "settings": "設定の保存に失敗しました",
         "template": "テンプレートの更新に失敗しました",
-        "user": "ユーザーの更新に失敗しました"
+        "user": "ユーザーの更新に失敗しました",
+        "sshCa": "Failed to update SSH CA"
       },
       "validation": {
         "requiredField": "この項目は必須です"
@@ -2798,7 +2816,9 @@
         "provider": "プロバイダーが作成されました",
         "role": "ロールが作成されました",
         "template": "テンプレートが作成されました",
-        "user": "ユーザーが作成されました"
+        "user": "ユーザーが作成されました",
+        "sshCa": "SSH CA created successfully",
+        "sshCertificate": "SSH certificate issued successfully"
       },
       "crl": {
         "generated": "CRLが再生成されました"
@@ -2820,7 +2840,9 @@
         "role": "ロールが削除されました",
         "template": "テンプレートが削除されました",
         "truststore": "証明書がトラストストアから削除されました",
-        "user": "ユーザーが削除されました"
+        "user": "ユーザーが削除されました",
+        "sshCa": "SSH CA deleted successfully",
+        "sshCertificate": "SSH certificate deleted successfully"
       },
       "duplicate": {
         "template": "テンプレートが複製されました"
@@ -2856,7 +2878,8 @@
         "revoked": "証明書が失効されました",
         "signed": "CSRが署名されました",
         "twoFactorDisabled": "二要素認証が無効化されました",
-        "twoFactorEnabled": "2FAが有効化されました！バックアップコードを保存してください。"
+        "twoFactorEnabled": "2FAが有効化されました！バックアップコードを保存してください。",
+        "sshCertificateRevoked": "SSH certificate revoked successfully"
       },
       "sso": {
         "connectionOk": "接続に成功しました"
@@ -2870,7 +2893,8 @@
         "role": "ロールが更新されました",
         "settings": "設定が保存されました",
         "template": "テンプレートが更新されました",
-        "user": "ユーザーが更新されました"
+        "user": "ユーザーが更新されました",
+        "sshCa": "SSH CA updated successfully"
       }
     }
   },
@@ -3485,7 +3509,9 @@
       "reports": "レポートへ",
       "discovery": "ディスカバリーへ",
       "crlOcsp": "CRL/OCSPへ",
-      "msca": "MS CAへ"
+      "msca": "MS CAへ",
+      "sshCas": "SSH CAs",
+      "sshCertificates": "SSH Certificates"
     },
     "actions": {
       "newCertificate": "新しい証明書を発行",
@@ -3542,5 +3568,131 @@
       "settings": "設定",
       "info": "情報"
     }
+  },
+  "sshCas": {
+    "title": "SSH Certificate Authorities",
+    "subtitle_one": "{{count}} SSH CA",
+    "subtitle_other": "{{count}} SSH CAs",
+    "createCA": "Create SSH CA",
+    "editCA": "Edit SSH CA",
+    "deleteCA": "Delete SSH CA",
+    "description": "Description",
+    "caType": "CA Type",
+    "keyType": "Key Type",
+    "keyAlgorithm": "Key Algorithm",
+    "keySize": "Key Size",
+    "fingerprint": "Fingerprint",
+    "serialCounter": "Serial Counter",
+    "typeUser": "User",
+    "typeHost": "Host",
+    "defaultTtl": "Default TTL",
+    "maxTtl": "Max TTL",
+    "defaultExtensions": "Default Extensions",
+    "allowedPrincipals": "Allowed Principals",
+    "publicKey": "Public Key",
+    "downloadPublicKey": "Download Public Key",
+    "downloadKrl": "Download KRL",
+    "copyPublicKey": "Copy Public Key",
+    "publicKeyCopied": "Public key copied to clipboard",
+    "noData": "No SSH CAs",
+    "noDataDescription": "Create an SSH Certificate Authority to start issuing SSH certificates",
+    "selectCA": "Select a CA to view details",
+    "caInformation": "CA Information",
+    "configuration": "Configuration",
+    "noPrincipals": "No restrictions",
+    "noExtensions": "None",
+    "certCount": "Certificates",
+    "extensions": {
+      "permitPty": "permit-pty",
+      "permitAgentForwarding": "permit-agent-forwarding",
+      "permitX11Forwarding": "permit-X11-forwarding",
+      "permitPortForwarding": "permit-port-forwarding",
+      "permitUserRc": "permit-user-rc"
+    },
+    "stats": {
+      "total": "Total CAs",
+      "userCas": "User CAs",
+      "hostCas": "Host CAs",
+      "certificates": "Certificates"
+    },
+    "modal": {
+      "descriptionPlaceholder": "e.g. Production User CA",
+      "ttlPlaceholder": "e.g. 24h, 7d, 365d",
+      "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)",
+      "keySizeLabel": "Key Size (RSA only)"
+    }
+  },
+  "sshCertificates": {
+    "title": "SSH Certificates",
+    "subtitle_one": "{{count}} certificate",
+    "subtitle_other": "{{count}} certificates",
+    "issueCertificate": "Issue Certificate",
+    "signPublicKey": "Sign Public Key",
+    "generateKeyPair": "Generate Key Pair",
+    "revokeCertificate": "Revoke Certificate",
+    "deleteCertificate": "Delete Certificate",
+    "keyId": "Key ID",
+    "certType": "Type",
+    "typeUser": "User",
+    "typeHost": "Host",
+    "principals": "Principals",
+    "validFrom": "Valid From",
+    "validTo": "Valid To",
+    "serial": "Serial",
+    "fingerprint": "Fingerprint",
+    "statusValid": "Valid",
+    "statusExpired": "Expired",
+    "statusRevoked": "Revoked",
+    "extensions": "Extensions",
+    "criticalOptions": "Critical Options",
+    "forceCommand": "Force Command",
+    "sourceAddress": "Source Address",
+    "certificate": "Certificate",
+    "certificateText": "Certificate Data",
+    "publicKey": "Public Key",
+    "caName": "CA Name",
+    "caFingerprint": "CA Fingerprint",
+    "validity": "Validity",
+    "validityPreset": "Validity Period",
+    "validityCustom": "Custom Validity",
+    "noData": "No SSH Certificates",
+    "noDataDescription": "Issue an SSH certificate by signing a public key or generating a key pair",
+    "revokeReason": "Revocation Reason",
+    "revokeReasonPlaceholder": "Reason for revoking this certificate",
+    "revokeConfirm": "Are you sure you want to revoke this SSH certificate?",
+    "deleteConfirm": "Are you sure you want to delete this SSH certificate?",
+    "certInformation": "Certificate Information",
+    "validityInfo": "Validity",
+    "caInfo": "CA Information",
+    "selectCa": "Select SSH CA",
+    "issueMode": "Issue Mode",
+    "presets": {
+      "1h": "1 Hour",
+      "8h": "8 Hours",
+      "24h": "24 Hours",
+      "7d": "7 Days",
+      "30d": "30 Days",
+      "90d": "90 Days",
+      "365d": "365 Days",
+      "custom": "Custom"
+    },
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "modal": {
+      "keyIdPlaceholder": "e.g. user@hostname",
+      "publicKeyPlaceholder": "Paste OpenSSH public key (ssh-ed25519 AAAA...)",
+      "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)"
+    },
+    "export": {
+      "filename": "ssh-certificate",
+      "success": "Certificate exported successfully"
+    },
+    "privateKeyWarning": "Save this private key now — it cannot be retrieved later",
+    "generatedPrivateKey": "Generated Private Key",
+    "generatedCertificate": "Generated Certificate"
   }
 }

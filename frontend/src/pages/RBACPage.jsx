@@ -71,6 +71,10 @@ const PERMISSION_CATEGORIES = {
   templates: {
     labelKey: 'rbac.categories.templates',
     permissions: ['read:templates', 'write:templates', 'delete:templates']
+  },
+  ssh: {
+    labelKey: 'rbac.categories.ssh',
+    permissions: ['read:ssh', 'write:ssh', 'delete:ssh']
   }
 }
 

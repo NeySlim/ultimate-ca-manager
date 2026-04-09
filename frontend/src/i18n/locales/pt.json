@@ -403,7 +403,11 @@
     "enable": "Ativar",
     "disable": "Desativar",
     "digest": "Algoritmo de hash",
-    "tsa": "TSA"
+    "tsa": "TSA",
+    "sshCas": "SSH CAs",
+    "sshCertificates": "SSH Certificates",
+    "navSsh": "SSH",
+    "ssh": "SSH"
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",
@@ -2070,7 +2074,8 @@
       "auditLogs": "Registos de auditoria",
       "trustStore": "Armazém de confiança",
       "hsmManagement": "Gestão de HSM",
-      "singleSignOn": "Início de sessão único"
+      "singleSignOn": "Início de sessão único",
+      "ssh": "SSH Certificates"
     },
     "subtitle_one": "{{count}} função",
     "subtitle_other": "{{count}} funções",
@@ -2085,7 +2090,12 @@
     "writeAccess": "Acesso de escrita",
     "deleteAccess": "Acesso de eliminação",
     "noDescription": "Sem descrição",
-    "roleDetails": "Detalhes da função"
+    "roleDetails": "Detalhes da função",
+    "permissions": {
+      "readSsh": "View SSH CAs & certificates",
+      "writeSsh": "Create & manage SSH CAs & certificates",
+      "deleteSsh": "Delete SSH CAs & certificates"
+    }
   },
   "hsm": {
     "statusUnavailable": "Funcionalidades HSM não estão disponíveis",
@@ -2651,7 +2661,8 @@
         "group": "Tem certeza de que deseja excluir este grupo?",
         "template": "Tem certeza de que deseja excluir este template?",
         "truststore": "Remover este certificado do trust store?",
-        "user": "Tem certeza de que deseja excluir este usuário?"
+        "user": "Tem certeza de que deseja excluir este usuário?",
+        "sshCa": "Are you sure you want to delete this SSH CA? This action cannot be undone."
       },
       "hsm": {
         "deleteKey": "Destruir chave \"{{name}}\"? Esta ação não pode ser desfeita.",
@@ -2684,7 +2695,9 @@
         "provider": "Falha ao salvar provedor",
         "role": "Falha ao criar função",
         "template": "Falha ao criar template",
-        "user": "Falha ao criar usuário"
+        "user": "Falha ao criar usuário",
+        "sshCa": "Failed to create SSH CA",
+        "sshCertificate": "Failed to issue SSH certificate"
       },
       "database": {
         "exportFailed": "Falha ao exportar banco de dados",
@@ -2705,7 +2718,9 @@
         "role": "Falha ao excluir função",
         "template": "Falha ao excluir template",
         "truststore": "Falha ao remover certificado do trust store",
-        "user": "Falha ao excluir usuário"
+        "user": "Falha ao excluir usuário",
+        "sshCa": "Failed to delete SSH CA",
+        "sshCertificate": "Failed to delete SSH certificate"
       },
       "duplicateFailed": {
         "generic": "Falha ao duplicar",
@@ -2753,7 +2768,9 @@
         "truststore": "Falha ao carregar trust store",
         "users": "Falha ao carregar usuários",
         "est": "Falha ao carregar dados EST",
-        "tsa": "Falha ao carregar configuração TSA"
+        "tsa": "Falha ao carregar configuração TSA",
+        "sshCas": "Failed to load SSH CAs",
+        "sshCertificates": "Failed to load SSH certificates"
       },
       "revokeFailed": {
         "certificate": "Falha ao revogar certificado"
@@ -2774,7 +2791,8 @@
         "role": "Falha ao atualizar função",
         "settings": "Falha ao salvar configurações",
         "template": "Falha ao atualizar template",
-        "user": "Falha ao atualizar usuário"
+        "user": "Falha ao atualizar usuário",
+        "sshCa": "Failed to update SSH CA"
       },
       "validation": {
         "requiredField": "Este campo é obrigatório"
@@ -2798,7 +2816,9 @@
         "provider": "Provedor criado",
         "role": "Função criada",
         "template": "Template criado com sucesso",
-        "user": "Usuário criado com sucesso"
+        "user": "Usuário criado com sucesso",
+        "sshCa": "SSH CA created successfully",
+        "sshCertificate": "SSH certificate issued successfully"
       },
       "crl": {
         "generated": "CRL regenerada com sucesso"
@@ -2820,7 +2840,9 @@
         "role": "Função excluída",
         "template": "Template excluído com sucesso",
         "truststore": "Certificado removido do trust store",
-        "user": "Usuário excluído com sucesso"
+        "user": "Usuário excluído com sucesso",
+        "sshCa": "SSH CA deleted successfully",
+        "sshCertificate": "SSH certificate deleted successfully"
       },
       "duplicate": {
         "template": "Template duplicado com sucesso"
@@ -2856,7 +2878,8 @@
         "revoked": "Certificado revogado com sucesso",
         "signed": "CSR assinado com sucesso",
         "twoFactorDisabled": "Autenticação de dois fatores desativada",
-        "twoFactorEnabled": "2FA ativado com sucesso! Salve seus códigos de recuperação."
+        "twoFactorEnabled": "2FA ativado com sucesso! Salve seus códigos de recuperação.",
+        "sshCertificateRevoked": "SSH certificate revoked successfully"
       },
       "sso": {
         "connectionOk": "Conexão bem-sucedida"
@@ -2870,7 +2893,8 @@
         "role": "Função atualizada",
         "settings": "Configurações salvas com sucesso",
         "template": "Template atualizado com sucesso",
-        "user": "Usuário atualizado com sucesso"
+        "user": "Usuário atualizado com sucesso",
+        "sshCa": "SSH CA updated successfully"
       }
     }
   },
@@ -3485,7 +3509,9 @@
       "reports": "Ir para Relatórios",
       "discovery": "Ir para Descoberta",
       "crlOcsp": "Ir para CRL/OCSP",
-      "msca": "Ir para MS CA"
+      "msca": "Ir para MS CA",
+      "sshCas": "SSH CAs",
+      "sshCertificates": "SSH Certificates"
     },
     "actions": {
       "newCertificate": "Emitir novo certificado",
@@ -3542,5 +3568,131 @@
       "settings": "Configurações",
       "info": "Informações"
     }
+  },
+  "sshCas": {
+    "title": "SSH Certificate Authorities",
+    "subtitle_one": "{{count}} SSH CA",
+    "subtitle_other": "{{count}} SSH CAs",
+    "createCA": "Create SSH CA",
+    "editCA": "Edit SSH CA",
+    "deleteCA": "Delete SSH CA",
+    "description": "Description",
+    "caType": "CA Type",
+    "keyType": "Key Type",
+    "keyAlgorithm": "Key Algorithm",
+    "keySize": "Key Size",
+    "fingerprint": "Fingerprint",
+    "serialCounter": "Serial Counter",
+    "typeUser": "User",
+    "typeHost": "Host",
+    "defaultTtl": "Default TTL",
+    "maxTtl": "Max TTL",
+    "defaultExtensions": "Default Extensions",
+    "allowedPrincipals": "Allowed Principals",
+    "publicKey": "Public Key",
+    "downloadPublicKey": "Download Public Key",
+    "downloadKrl": "Download KRL",
+    "copyPublicKey": "Copy Public Key",
+    "publicKeyCopied": "Public key copied to clipboard",
+    "noData": "No SSH CAs",
+    "noDataDescription": "Create an SSH Certificate Authority to start issuing SSH certificates",
+    "selectCA": "Select a CA to view details",
+    "caInformation": "CA Information",
+    "configuration": "Configuration",
+    "noPrincipals": "No restrictions",
+    "noExtensions": "None",
+    "certCount": "Certificates",
+    "extensions": {
+      "permitPty": "permit-pty",
+      "permitAgentForwarding": "permit-agent-forwarding",
+      "permitX11Forwarding": "permit-X11-forwarding",
+      "permitPortForwarding": "permit-port-forwarding",
+      "permitUserRc": "permit-user-rc"
+    },
+    "stats": {
+      "total": "Total CAs",
+      "userCas": "User CAs",
+      "hostCas": "Host CAs",
+      "certificates": "Certificates"
+    },
+    "modal": {
+      "descriptionPlaceholder": "e.g. Production User CA",
+      "ttlPlaceholder": "e.g. 24h, 7d, 365d",
+      "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)",
+      "keySizeLabel": "Key Size (RSA only)"
+    }
+  },
+  "sshCertificates": {
+    "title": "SSH Certificates",
+    "subtitle_one": "{{count}} certificate",
+    "subtitle_other": "{{count}} certificates",
+    "issueCertificate": "Issue Certificate",
+    "signPublicKey": "Sign Public Key",
+    "generateKeyPair": "Generate Key Pair",
+    "revokeCertificate": "Revoke Certificate",
+    "deleteCertificate": "Delete Certificate",
+    "keyId": "Key ID",
+    "certType": "Type",
+    "typeUser": "User",
+    "typeHost": "Host",
+    "principals": "Principals",
+    "validFrom": "Valid From",
+    "validTo": "Valid To",
+    "serial": "Serial",
+    "fingerprint": "Fingerprint",
+    "statusValid": "Valid",
+    "statusExpired": "Expired",
+    "statusRevoked": "Revoked",
+    "extensions": "Extensions",
+    "criticalOptions": "Critical Options",
+    "forceCommand": "Force Command",
+    "sourceAddress": "Source Address",
+    "certificate": "Certificate",
+    "certificateText": "Certificate Data",
+    "publicKey": "Public Key",
+    "caName": "CA Name",
+    "caFingerprint": "CA Fingerprint",
+    "validity": "Validity",
+    "validityPreset": "Validity Period",
+    "validityCustom": "Custom Validity",
+    "noData": "No SSH Certificates",
+    "noDataDescription": "Issue an SSH certificate by signing a public key or generating a key pair",
+    "revokeReason": "Revocation Reason",
+    "revokeReasonPlaceholder": "Reason for revoking this certificate",
+    "revokeConfirm": "Are you sure you want to revoke this SSH certificate?",
+    "deleteConfirm": "Are you sure you want to delete this SSH certificate?",
+    "certInformation": "Certificate Information",
+    "validityInfo": "Validity",
+    "caInfo": "CA Information",
+    "selectCa": "Select SSH CA",
+    "issueMode": "Issue Mode",
+    "presets": {
+      "1h": "1 Hour",
+      "8h": "8 Hours",
+      "24h": "24 Hours",
+      "7d": "7 Days",
+      "30d": "30 Days",
+      "90d": "90 Days",
+      "365d": "365 Days",
+      "custom": "Custom"
+    },
+    "stats": {
+      "total": "Total",
+      "active": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "modal": {
+      "keyIdPlaceholder": "e.g. user@hostname",
+      "publicKeyPlaceholder": "Paste OpenSSH public key (ssh-ed25519 AAAA...)",
+      "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)"
+    },
+    "export": {
+      "filename": "ssh-certificate",
+      "success": "Certificate exported successfully"
+    },
+    "privateKeyWarning": "Save this private key now — it cannot be retrieved later",
+    "generatedPrivateKey": "Generated Private Key",
+    "generatedCertificate": "Generated Certificate"
   }
 }
