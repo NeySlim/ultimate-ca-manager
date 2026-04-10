@@ -1120,7 +1120,7 @@ def set_ocsp_responder(ca_id):
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/ocsp-responder', methods=['DELETE'])
-@require_auth(['write:cas'])
+@require_auth(['delete:cas'])
 def delete_ocsp_responder(ca_id):
     """Remove the delegated OCSP responder for a CA."""
     ca = CA.query.get(ca_id)

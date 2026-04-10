@@ -1665,7 +1665,7 @@ export default function ACMEPage() {
         icon: Key,
         title: t('acme.noAccounts'),
         description: searchQuery ? t('acme.noMatchingAccounts') : t('acme.noAccountsDesc'),
-        action: !searchQuery && (
+        action: !searchQuery && canWrite('acme') && (
           <Button type="button" onClick={() => setShowCreateModal(true)}>
             <Plus size={14} />
             {t('acme.createAccount')}
