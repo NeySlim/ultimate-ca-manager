@@ -3634,7 +3634,11 @@
     "setupScriptDescription": "Завантажте shell-скрипт для налаштування вашого SSH-сервера на довіру цьому CA",
     "quickInstall": "Швидке встановлення",
     "quickInstallDescription": "Виконайте цю команду на сервері, щоб довіряти цій CA:",
-    "curlCopied": "Команду встановлення скопійовано до буфера обміну"
+    "curlCopied": "Команду встановлення скопійовано до буфера обміну",
+    "importCA": "Імпортувати SSH CA",
+    "privateKey": "Приватний ключ",
+    "privateKeyPlaceholder": "Вставте ваш SSH приватний ключ у форматі OpenSSH PEM",
+    "importCADescription": "Імпортувати існуючу SSH CA, надавши її приватний ключ"
   },
   "sshCertificates": {
     "title": "SSH-сертифікати",
@@ -3710,6 +3714,9 @@
     "generatedCertificate": "Згенерований сертифікат",
     "certificateIssued": "SSH-сертифікат успішно видано",
     "downloadSetupScript": "Завантажити скрипт налаштування",
-    "setupScriptDescription": "Завантажте shell-скрипт для налаштування вашого SSH-сервера на довіру цьому CA"
+    "setupScriptDescription": "Завантажте shell-скрипт для налаштування вашого SSH-сервера на довіру цьому CA",
+    "importCertificate": "Імпортувати сертифікат",
+    "importCertDescription": "Імпортувати існуючий SSH сертифікат у форматі OpenSSH",
+    "certificateDataPlaceholder": "Вставте дані SSH сертифіката"
   }
 }

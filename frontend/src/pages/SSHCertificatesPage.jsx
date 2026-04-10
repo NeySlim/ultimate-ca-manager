@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Certificate, Key, Terminal, User, ShieldCheck,
-  Plus, Trash, Warning, Download, Copy,
+  Plus, Trash, Warning, Download, Copy, Upload,
   Clock, CheckCircle, XCircle,
   CaretDown, CaretUp, Info
 } from '@phosphor-icons/react'
@@ -82,6 +82,8 @@ export default function SSHCertificatesPage() {
   const [showIssueModal, setShowIssueModal] = useState(false)
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const [revokingCert, setRevokingCert] = useState(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importCertData, setImportCertData] = useState('')
 
   // Pagination & Sort
   const [page, setPage] = useState(1)
@@ -254,6 +256,24 @@ export default function SSHCertificatesPage() {
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
       throw error
+    }
+  }
+
+  const handleImportCert = async (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    try {
+      muteToasts()
+      await sshCertificatesService.importCertificate({
+        certificate: importCertData,
+        descr: formData.get('descr'),
+      })
+      showSuccess(t('messages.success.create.sshCertificate'))
+      setShowImportModal(false)
+      setImportCertData('')
+      loadData()
+    } catch (error) {
+      showError(error.message || t('common.operationFailed'))
     }
   }
 
@@ -644,14 +664,25 @@ export default function SSHCertificatesPage() {
           ]}
           toolbarActions={canWrite('ssh') && (
             isMobile ? (
-              <Button type="button" size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0" variant="secondary">
+                  <Upload size={22} weight="bold" />
+                </Button>
+                <Button type="button" size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+              </div>
             ) : (
-              <Button type="button" size="sm" onClick={() => setShowIssueModal(true)}>
-                <Plus size={14} weight="bold" />
-                {t('sshCertificates.issueCertificate')}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                  <Upload size={14} weight="bold" />
+                  {t('common.import')}
+                </Button>
+                <Button type="button" size="sm" onClick={() => setShowIssueModal(true)}>
+                  <Plus size={14} weight="bold" />
+                  {t('sshCertificates.issueCertificate')}
+                </Button>
+              </div>
             )
           )}
           sortable
@@ -689,6 +720,28 @@ export default function SSHCertificatesPage() {
           onSubmit={handleIssueSubmit}
           onCancel={() => setShowIssueModal(false)}
         />
+      </Modal>
+
+      {/* Import Certificate Modal */}
+      <Modal open={showImportModal} onOpenChange={setShowImportModal} title={t('sshCertificates.importCertificate')} size="lg">
+        <form onSubmit={handleImportCert} className="p-4 space-y-4">
+          <p className="text-sm text-secondary">{t('sshCertificates.importCertDescription')}</p>
+          <Textarea
+            label={t('sshCertificates.certificateText')}
+            value={importCertData}
+            onChange={(e) => setImportCertData(e.target.value)}
+            placeholder={t('sshCertificates.certificateDataPlaceholder')}
+            rows={8}
+            required
+          />
+          <Input label={t('sshCas.description')} name="descr" />
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => setShowImportModal(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit">{t('common.import')}</Button>
+          </div>
+        </form>
       </Modal>
 
       {/* Revoke Certificate Modal */}

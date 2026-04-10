@@ -3637,7 +3637,11 @@
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",
     "quickInstallDescription": "Run this command on any server to trust this CA:",
-    "curlCopied": "Install command copied to clipboard"
+    "curlCopied": "Install command copied to clipboard",
+    "importCA": "Import SSH CA",
+    "privateKey": "Private Key",
+    "privateKeyPlaceholder": "Paste your SSH private key in OpenSSH PEM format",
+    "importCADescription": "Import an existing SSH CA by providing its private key"
   },
   "sshCertificates": {
     "title": "SSH Certificates",
@@ -3713,6 +3717,9 @@
     "generatedCertificate": "Generated Certificate",
     "certificateIssued": "SSH certificate issued successfully",
     "downloadSetupScript": "Download Setup Script",
-    "setupScriptDescription": "Download a shell script to configure your SSH server to trust this CA"
+    "setupScriptDescription": "Download a shell script to configure your SSH server to trust this CA",
+    "importCertificate": "Import Certificate",
+    "importCertDescription": "Import an existing SSH certificate in OpenSSH format",
+    "certificateDataPlaceholder": "Paste the SSH certificate data"
   }
 }

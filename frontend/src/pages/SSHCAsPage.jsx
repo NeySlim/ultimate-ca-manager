@@ -8,12 +8,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Key, Plus, Trash, PencilSimple, Download, Copy,
+  Key, Plus, Trash, PencilSimple, Download, Copy, Upload,
   ShieldCheck, User, Clock, Fingerprint, Terminal, Check
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Input, Select,
-  FormModal,
+  FormModal, Modal, Textarea,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { sshCasService } from '../services'
@@ -58,6 +58,9 @@ export default function SSHCAsPage() {
   // Modals
   const [showModal, setShowModal] = useState(false)
   const [editingCA, setEditingCA] = useState(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importCaType, setImportCaType] = useState('user')
+  const [importPrivateKey, setImportPrivateKey] = useState('')
 
   // Pagination
   const [page, setPage] = useState(1)
@@ -113,6 +116,26 @@ export default function SSHCAsPage() {
       }
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.sshCa'))
+    }
+  }
+
+  const handleImportCA = async (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    try {
+      await sshCasService.importCA({
+        descr: formData.get('descr'),
+        ca_type: importCaType,
+        private_key: importPrivateKey,
+        comment: formData.get('comment'),
+      })
+      showSuccess(t('messages.success.create.sshCa'))
+      setShowImportModal(false)
+      setImportCaType('user')
+      setImportPrivateKey('')
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.createFailed.sshCa'))
     }
   }
 
@@ -552,14 +575,25 @@ export default function SSHCAsPage() {
           ]}
           toolbarActions={canWrite('ssh') && (
             isMobile ? (
-              <Button type="button" size="lg" onClick={() => { setEditingCA(null); setShowModal(true) }} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0" variant="secondary">
+                  <Upload size={22} weight="bold" />
+                </Button>
+                <Button type="button" size="lg" onClick={() => { setEditingCA(null); setShowModal(true) }} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+              </div>
             ) : (
-              <Button type="button" size="sm" onClick={() => { setEditingCA(null); setShowModal(true) }}>
-                <Plus size={14} weight="bold" />
-                {t('sshCas.createCA')}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                  <Upload size={14} weight="bold" />
+                  {t('common.import')}
+                </Button>
+                <Button type="button" size="sm" onClick={() => { setEditingCA(null); setShowModal(true) }}>
+                  <Plus size={14} weight="bold" />
+                  {t('sshCas.createCA')}
+                </Button>
+              </div>
             )
           )}
           rowActions={rowActions}
@@ -591,6 +625,38 @@ export default function SSHCAsPage() {
           onClose={() => { setShowModal(false); setEditingCA(null) }}
         />
       )}
+
+      {/* Import CA Modal */}
+      <Modal open={showImportModal} onOpenChange={setShowImportModal} title={t('sshCas.importCA')} size="lg">
+        <form onSubmit={handleImportCA} className="p-4 space-y-4">
+          <p className="text-sm text-secondary">{t('sshCas.importCADescription')}</p>
+          <Input label={t('sshCas.description')} name="descr" required />
+          <Select
+            label={t('sshCas.caType')}
+            value={importCaType}
+            onChange={setImportCaType}
+            options={[
+              { value: 'user', label: t('sshCas.typeUser') },
+              { value: 'host', label: t('sshCas.typeHost') },
+            ]}
+          />
+          <Textarea
+            label={t('sshCas.privateKey')}
+            value={importPrivateKey}
+            onChange={(e) => setImportPrivateKey(e.target.value)}
+            placeholder={t('sshCas.privateKeyPlaceholder')}
+            rows={8}
+            required
+          />
+          <Input label={t('sshCas.configuration')} name="comment" />
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => setShowImportModal(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit">{t('common.import')}</Button>
+          </div>
+        </form>
+      </Modal>
     </>
   )
 }

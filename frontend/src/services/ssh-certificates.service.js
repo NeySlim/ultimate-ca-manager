@@ -39,4 +39,8 @@ export const sshCertificatesService = {
   async getStats() {
     return apiClient.get('/ssh/stats')
   },
+
+  async importCertificate(data) {
+    return apiClient.post('/ssh/certificates/import', data)
+  },
 }

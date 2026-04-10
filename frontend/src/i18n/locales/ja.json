@@ -3634,7 +3634,11 @@
     "setupScriptDescription": "このCAを信頼するようにSSHサーバーを構成するシェルスクリプトをダウンロード",
     "quickInstall": "クイックインストール",
     "quickInstallDescription": "サーバーでこのコマンドを実行して、このCAを信頼します：",
-    "curlCopied": "インストールコマンドをクリップボードにコピーしました"
+    "curlCopied": "インストールコマンドをクリップボードにコピーしました",
+    "importCA": "SSH CAをインポート",
+    "privateKey": "秘密鍵",
+    "privateKeyPlaceholder": "OpenSSH PEM形式のSSH秘密鍵を貼り付け",
+    "importCADescription": "秘密鍵を提供して既存のSSH CAをインポート"
   },
   "sshCertificates": {
     "title": "SSH証明書",
@@ -3710,6 +3714,9 @@
     "generatedCertificate": "生成された証明書",
     "certificateIssued": "SSH証明書が正常に発行されました",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",
-    "setupScriptDescription": "このCAを信頼するようにSSHサーバーを構成するシェルスクリプトをダウンロード"
+    "setupScriptDescription": "このCAを信頼するようにSSHサーバーを構成するシェルスクリプトをダウンロード",
+    "importCertificate": "証明書をインポート",
+    "importCertDescription": "OpenSSH形式の既存SSH証明書をインポート",
+    "certificateDataPlaceholder": "SSH証明書データを貼り付け"
   }
 }

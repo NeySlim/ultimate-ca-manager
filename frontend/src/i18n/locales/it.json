@@ -3634,7 +3634,11 @@
     "setupScriptDescription": "Scarica uno script shell per configurare il tuo server SSH a fidarsi di questa CA",
     "quickInstall": "Installazione rapida",
     "quickInstallDescription": "Esegui questo comando su un server per fidarti di questa CA:",
-    "curlCopied": "Comando di installazione copiato negli appunti"
+    "curlCopied": "Comando di installazione copiato negli appunti",
+    "importCA": "Importa CA SSH",
+    "privateKey": "Chiave privata",
+    "privateKeyPlaceholder": "Incolla la tua chiave privata SSH in formato OpenSSH PEM",
+    "importCADescription": "Importa una CA SSH esistente fornendo la sua chiave privata"
   },
   "sshCertificates": {
     "title": "Certificati SSH",
@@ -3710,6 +3714,9 @@
     "generatedCertificate": "Certificato generato",
     "certificateIssued": "Certificato SSH emesso con successo",
     "downloadSetupScript": "Scarica script di configurazione",
-    "setupScriptDescription": "Scarica uno script shell per configurare il tuo server SSH a fidarsi di questa CA"
+    "setupScriptDescription": "Scarica uno script shell per configurare il tuo server SSH a fidarsi di questa CA",
+    "importCertificate": "Importa certificato",
+    "importCertDescription": "Importa un certificato SSH esistente in formato OpenSSH",
+    "certificateDataPlaceholder": "Incolla i dati del certificato SSH"
   }
 }

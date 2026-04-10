@@ -3634,7 +3634,11 @@
     "setupScriptDescription": "下载 shell 脚本来配置您的 SSH 服务器信任此 CA",
     "quickInstall": "快速安装",
     "quickInstallDescription": "在服务器上运行此命令以信任此CA：",
-    "curlCopied": "安装命令已复制到剪贴板"
+    "curlCopied": "安装命令已复制到剪贴板",
+    "importCA": "导入SSH CA",
+    "privateKey": "私钥",
+    "privateKeyPlaceholder": "粘贴OpenSSH PEM格式的SSH私钥",
+    "importCADescription": "通过提供私钥导入现有SSH CA"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -3710,6 +3714,9 @@
     "generatedCertificate": "生成的证书",
     "certificateIssued": "SSH 证书签发成功",
     "downloadSetupScript": "下载配置脚本",
-    "setupScriptDescription": "下载 shell 脚本来配置您的 SSH 服务器信任此 CA"
+    "setupScriptDescription": "下载 shell 脚本来配置您的 SSH 服务器信任此 CA",
+    "importCertificate": "导入证书",
+    "importCertDescription": "导入OpenSSH格式的现有SSH证书",
+    "certificateDataPlaceholder": "粘贴SSH证书数据"
   }
 }

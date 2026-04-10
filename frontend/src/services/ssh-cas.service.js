@@ -35,4 +35,8 @@ export const sshCasService = {
   async getSetupScript(id) {
     return apiClient.get(`/ssh/cas/${id}/setup-script`, { responseType: 'blob' })
   },
+
+  async importCA(data) {
+    return apiClient.post('/ssh/cas/import', data)
+  },
 }
