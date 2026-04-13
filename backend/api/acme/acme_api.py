@@ -161,11 +161,11 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
                 else:
                     # KID provided — look up account to get key
                     try:
-                        # Extract account ID from KID URL
+                        # Extract account ID from KID URL (account_id is a string token, not numeric)
                         acct_id = kid.rstrip('/').split('/')[-1]
-                        account = AcmeAccount.query.filter_by(id=int(acct_id)).first()
+                        account = AcmeAccount.query.filter_by(account_id=acct_id).first()
                         if account and account.status == 'valid':
-                            key_to_verify = json.loads(account.public_key) if isinstance(account.public_key, str) else account.public_key
+                            key_to_verify = json.loads(account.jwk) if isinstance(account.jwk, str) else account.jwk
                         else:
                             return False, None, None, "Account not found or deactivated"
                     except (ValueError, TypeError):
