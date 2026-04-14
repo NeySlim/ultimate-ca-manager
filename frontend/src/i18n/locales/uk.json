@@ -991,6 +991,8 @@
     "enableLetsEncryptProxy": "Увімкнути Let's Encrypt Proxy",
     "enableLetsEncryptProxyDesc": "Forward requests to Let's Encrypt with audit logging",
     "proxyEndpoint": "Proxy Endpoint",
+    "proxyUpstreamUrl": "Upstream URL каталогу",
+    "proxyUpstreamUrlHelper": "URL каталогу upstream ACME-сервера. За замовчуванням Let's Encrypt staging, якщо порожньо.",
     "proxyUsage": "Використання з certbot:",
     "proxyUsageNote": "UCM автоmatically creates and cleans up DNS TXT records - no certbot DNS plugin needed!",
     "proxyRegistered": "Proxy зареєстровано",

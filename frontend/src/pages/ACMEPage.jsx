@@ -72,6 +72,12 @@ export default function ACMEPage() {
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
   const [proxyEmail, setProxyEmail] = useState('')
   
+  // Local state for text inputs (saved on blur, not on every keystroke)
+  const [localContactEmail, setLocalContactEmail] = useState('')
+  const [localDirectoryUrl, setLocalDirectoryUrl] = useState('')
+  const [localEabKid, setLocalEabKid] = useState('')
+  const [localProxyUpstreamUrl, setLocalProxyUpstreamUrl] = useState('')
+  
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
@@ -107,6 +113,14 @@ export default function ACMEPage() {
       setClientOrders(clientOrdersRes.data || [])
       setClientSettings(clientSettingsRes.data || {})
       setEabHmacInput(null)
+      
+      // Sync local text input state from loaded settings
+      const cs = clientSettingsRes.data || {}
+      setLocalContactEmail(cs.email || '')
+      setLocalDirectoryUrl(cs.directory_url || '')
+      setLocalEabKid(cs.eab_kid || '')
+      setLocalProxyUpstreamUrl(cs.proxy_upstream_url || '')
+      
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
       setAcmeDomains(domainsRes.data || [])
@@ -195,6 +209,20 @@ export default function ACMEPage() {
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
       loadData() // Revert on error
+    }
+  }
+
+  // Save text input on blur (avoids saving on every keystroke)
+  const handleBlurSave = async (key, value, localSetter) => {
+    // Only save if value actually changed
+    if (value === (clientSettings[key] || '')) return
+    try {
+      await acmeService.updateClientSettings({ [key]: value })
+      setClientSettings(prev => ({ ...prev, [key]: value }))
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+      // Revert local state on error
+      localSetter(clientSettings[key] || '')
     }
   }
 
@@ -1108,8 +1136,9 @@ export default function ACMEPage() {
           <Input
             label={t('acme.contactEmail')}
             type="email"
-            value={clientSettings.contact_email || ''}
-            onChange={(e) => handleUpdateClientSetting('contact_email', e.target.value)}
+            value={localContactEmail}
+            onChange={(e) => setLocalContactEmail(e.target.value)}
+            onBlur={() => handleBlurSave('email', localContactEmail, setLocalContactEmail)}
             disabled={!canWrite('acme')}
             helperText={t('acme.contactEmailHelper')}
           />
@@ -1157,8 +1186,9 @@ export default function ACMEPage() {
           <Input
             label={t('acme.directoryUrl')}
             type="url"
-            value={clientSettings.directory_url || ''}
-            onChange={(e) => handleUpdateClientSetting('directory_url', e.target.value)}
+            value={localDirectoryUrl}
+            onChange={(e) => setLocalDirectoryUrl(e.target.value)}
+            onBlur={() => handleBlurSave('directory_url', localDirectoryUrl, setLocalDirectoryUrl)}
             disabled={!canWrite('acme')}
             placeholder="https://acme-v02.api.letsencrypt.org/directory"
             helperText={t('acme.directoryUrlHelper')}
@@ -1166,8 +1196,9 @@ export default function ACMEPage() {
           
           <Input
             label={t('acme.eabKid')}
-            value={clientSettings.eab_kid || ''}
-            onChange={(e) => handleUpdateClientSetting('eab_kid', e.target.value)}
+            value={localEabKid}
+            onChange={(e) => setLocalEabKid(e.target.value)}
+            onBlur={() => handleBlurSave('eab_kid', localEabKid, setLocalEabKid)}
             disabled={!canWrite('acme')}
             placeholder="key-id-from-ca"
             helperText={t('acme.eabKidHelper')}
@@ -1177,10 +1208,11 @@ export default function ACMEPage() {
             label={t('acme.eabHmacKey')}
             type="password"
             value={eabHmacInput !== null ? eabHmacInput : (clientSettings.eab_hmac_key_set ? '••••••••' : '')}
-            onChange={(e) => {
-              const val = e.target.value
-              setEabHmacInput(val)
-              handleUpdateClientSetting('eab_hmac_key', val)
+            onChange={(e) => setEabHmacInput(e.target.value)}
+            onBlur={() => {
+              if (eabHmacInput !== null && eabHmacInput !== '') {
+                handleUpdateClientSetting('eab_hmac_key', eabHmacInput)
+              }
             }}
             onFocus={() => {
               if (eabHmacInput === null && clientSettings.eab_hmac_key_set) {
@@ -1216,6 +1248,17 @@ export default function ACMEPage() {
                   copyable
                 />
               </CompactGrid>
+              
+              <Input
+                label={t('acme.proxyUpstreamUrl')}
+                type="url"
+                value={localProxyUpstreamUrl}
+                onChange={(e) => setLocalProxyUpstreamUrl(e.target.value)}
+                onBlur={() => handleBlurSave('proxy_upstream_url', localProxyUpstreamUrl, setLocalProxyUpstreamUrl)}
+                disabled={!canWrite('acme')}
+                placeholder="https://acme-staging-v02.api.letsencrypt.org/directory"
+                helperText={t('acme.proxyUpstreamUrlHelper')}
+              />
               
               <div className="p-3 bg-tertiary-op50 rounded-lg space-y-2">
                 <p className="text-xs font-medium text-text-secondary">{t('acme.proxyUsage')}</p>

@@ -53,6 +53,9 @@ def get_settings():
     key_type_cfg = SystemConfig.query.filter_by(key='acme.client.key_type').first()
     acct_key_type_cfg = SystemConfig.query.filter_by(key='acme.client.account_key_type').first()
     
+    # Proxy upstream URL
+    proxy_upstream_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
+    
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
         'environment': env_cfg.value if env_cfg else 'staging',
@@ -63,6 +66,7 @@ def get_settings():
         'proxy_enabled': proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False,
         'proxy_email': proxy_email_cfg.value if proxy_email_cfg else None,
         'proxy_registered': bool(proxy_email_cfg),
+        'proxy_upstream_url': proxy_upstream_cfg.value if proxy_upstream_cfg else None,
         'directory_url': directory_cfg.value if directory_cfg else None,
         'eab_kid': eab_kid_cfg.value if eab_kid_cfg else None,
         'eab_hmac_key_set': bool(eab_hmac_cfg and eab_hmac_cfg.value),
@@ -138,6 +142,13 @@ def update_settings():
             return error_response(f'Account key type must be one of: {", ".join(valid_acct_types)}', 400)
         _set_config('acme.client.account_key_type', data['account_key_type'], 'Account key algorithm')
         updates.append('account_key_type')
+    
+    if 'proxy_upstream_url' in data:
+        url_val = (data['proxy_upstream_url'] or '').strip()
+        if url_val and not url_val.startswith('https://'):
+            return error_response('Proxy upstream URL must use HTTPS', 400)
+        _set_config('acme.proxy.upstream_url', url_val, 'ACME proxy upstream directory URL')
+        updates.append('proxy_upstream_url')
     
     db.session.commit()
     

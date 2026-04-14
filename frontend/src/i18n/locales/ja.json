@@ -991,6 +991,8 @@
     "enableLetsEncryptProxy": "Let's Encryptプロキシを有効にする",
     "enableLetsEncryptProxyDesc": "Forward requests to Let's Encrypt with audit logging",
     "proxyEndpoint": "Proxy Endpoint",
+    "proxyUpstreamUrl": "アップストリームディレクトリURL",
+    "proxyUpstreamUrlHelper": "アップストリームACMEサーバーのディレクトリURL。空の場合、Let's Encrypt ステージングがデフォルトです。",
     "proxyUsage": "certbotでの使用方法：",
     "proxyUsageNote": "UCMはDNS TXTレコードを自動的に作成およびクリーンアップします - certbot DNSプラグインは不要です！",
     "proxyRegistered": "プロキシ登録済み",

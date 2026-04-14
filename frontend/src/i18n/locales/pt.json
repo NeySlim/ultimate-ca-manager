@@ -991,6 +991,8 @@
     "enableLetsEncryptProxy": "Activar Let's Encrypt Proxy",
     "enableLetsEncryptProxyDesc": "Forward requests to Let's Encrypt with audit logging",
     "proxyEndpoint": "Proxy Endpoint",
+    "proxyUpstreamUrl": "URL do diretório upstream",
+    "proxyUpstreamUrlHelper": "A URL do diretório do servidor ACME upstream. Padrão para Let's Encrypt staging se vazio.",
     "proxyUsage": "Utilização com certbot:",
     "proxyUsageNote": "UCM automatically creates e cleans up DNS TXT records - no certbot DNS plugin needed!",
     "proxyRegistered": "Proxy Registado",

@@ -433,6 +433,30 @@ class TestAcmeClientSettings:
                        {'proxy_enabled': True})
         assert_success(r)
 
+    def test_patch_client_settings_proxy_upstream_url(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_upstream_url': 'https://acme-v02.api.letsencrypt.org/directory'})
+        data = assert_success(r)
+        # Verify the value persists
+        r2 = auth_client.get('/api/v2/acme/client/settings')
+        data2 = assert_success(r2)
+        assert data2['proxy_upstream_url'] == 'https://acme-v02.api.letsencrypt.org/directory'
+
+    def test_patch_client_settings_proxy_upstream_url_rejects_http(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_upstream_url': 'http://insecure.example.com/directory'})
+        assert_error(r, 400)
+
+    def test_patch_client_settings_proxy_upstream_url_accepts_empty(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_upstream_url': ''})
+        assert_success(r)
+
+    def test_get_client_settings_has_proxy_upstream_url(self, auth_client):
+        r = auth_client.get('/api/v2/acme/client/settings')
+        data = assert_success(r)
+        assert 'proxy_upstream_url' in data
+
 
 # ============================================================
 # ACME Client — Proxy

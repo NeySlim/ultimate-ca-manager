@@ -991,6 +991,8 @@
     "enableLetsEncryptProxy": "启用 Let's Encrypt 代理",
     "enableLetsEncryptProxyDesc": "Forward requests to Let's Encrypt with audit logging",
     "proxyEndpoint": "Proxy Endpoint",
+    "proxyUpstreamUrl": "上游目录 URL",
+    "proxyUpstreamUrlHelper": "上游 ACME 服务器的目录 URL。如果为空，默认使用 Let's Encrypt staging。",
     "proxyUsage": "certbot 使用方法：",
     "proxyUsageNote": "UCM 自动创建和清理 DNS TXT 记录 - 无需 certbot DNS 插件！",
     "proxyRegistered": "代理已注册",
