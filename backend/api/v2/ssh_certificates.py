@@ -12,9 +12,9 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from services.ssh_cert_service import SSHCertificateService
 from services.audit_service import AuditService
+from sqlalchemy import or_, and_
 from models.ssh import SSHCertificate, SSHCertificateAuthority
 from utils.datetime_utils import utc_now
-from sqlalchemy import or_
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,6 @@ def list_ssh_certificates():
     # Status filtering (supports multiple statuses with OR)
     now = utc_now()
     if statuses:
-        from sqlalchemy import or_, and_
         conditions = []
         for s in statuses:
             if s == 'valid':
