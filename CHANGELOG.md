@@ -15,6 +15,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.115] - 2026-04-14
+
+### Fixed
+- **ACME settings: text inputs saved on every keystroke** — Directory URL, contact email, and EAB fields fired an API call on each keystroke, causing validation errors mid-typing (e.g., "h" rejected as non-HTTPS). Text inputs now save on blur instead (issue #56).
+
+### Added
+- **ACME proxy upstream URL** — New UI field and API endpoint to configure the upstream ACME directory URL for the Let's Encrypt proxy. Previously only configurable via database.
+- **4 new backend tests** for proxy upstream URL PATCH/GET validation.
+
+---
+
 ## [2.114] - 2026-04-14
 
 ### Fixed
