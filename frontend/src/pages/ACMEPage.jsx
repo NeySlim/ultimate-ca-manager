@@ -205,8 +205,9 @@ export default function ACMEPage() {
 
   const handleProxyModeChange = async (mode) => {
     try {
-      setClientSettings(prev => ({ ...prev, proxy_upstream_mode: mode, proxy_account_registered: false, proxy_account_url: null }))
+      setClientSettings(prev => ({ ...prev, proxy_upstream_mode: mode, proxy_account_registered: false, proxy_account_url: null, proxy_upstream_url: '' }))
       setConnectionResult(null)
+      setLocalProxyUpstreamUrl('')
       await acmeService.updateClientSettings({ proxy_upstream_mode: mode })
       loadData()
     } catch (error) {

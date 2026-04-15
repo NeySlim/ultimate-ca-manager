@@ -209,6 +209,14 @@ def update_settings():
                         db.session.delete(stale)
                 logger.info(f"Cleared proxy account credentials due to mode change to {mode}")
             _set_config('acme.proxy.upstream_url', new_url, 'ACME proxy upstream directory URL')
+        elif mode == 'custom':
+            # Clear stale URL from previous staging/production mode
+            _set_config('acme.proxy.upstream_url', '', 'ACME proxy upstream directory URL')
+            for stale_key in ['acme.proxy.account_url', 'acme.proxy.account_key']:
+                stale = SystemConfig.query.filter_by(key=stale_key).first()
+                if stale:
+                    db.session.delete(stale)
+            logger.info("Cleared proxy upstream URL and account for custom mode")
         updates.append('proxy_upstream_mode')
     
     if 'reset_proxy_account' in data and data['reset_proxy_account']:
