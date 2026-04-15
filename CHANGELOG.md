@@ -15,6 +15,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.117] - 2026-04-15
+
+### Added
+- **OpenBao HSM provider** — Native Transit Secrets Engine integration for OpenBao/HashiCorp Vault; supports RSA, ECDSA, AES key types with full key lifecycle management (#60)
+- **ACME proxy EAB support** — External Account Binding fields for upstream ACME proxy connections (#61)
+
+### Fixed
+- **ACME proxy authorization URL rewriting** — `get_order` and `finalize_order` now correctly proxy authorization URLs, preventing stateless clients from bypassing the proxy (#62)
+
+---
+
 ## [2.116] - 2026-04-15
 
 ### Added
