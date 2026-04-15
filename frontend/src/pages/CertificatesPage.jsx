@@ -757,30 +757,7 @@ export default function CertificatesPage() {
           onApplyFilterPreset={handleApplyFilterPreset}
           exportEnabled
           exportFilename="certificates"
-          toolbarFilters={[
-            {
-              key: 'status',
-              value: filterStatus,
-              onChange: setFilterStatus,
-              placeholder: t('common.allStatus'),
-              options: [
-                { value: 'valid', label: t('common.valid') },
-                { value: 'expiring', label: t('common.expiring') },
-                { value: 'expired', label: t('common.expired') },
-                { value: 'revoked', label: t('common.revoked') }
-              ]
-            },
-            {
-              key: 'ca',
-              value: filterCA,
-              onChange: setFilterCA,
-              placeholder: t('common.allCAs'),
-              options: cas.map(ca => ({ 
-                value: String(ca.id), 
-                label: ca.descr || ca.common_name 
-              }))
-            }
-          ]}
+          toolbarFilters={filters}
           toolbarActions={
             <div className="flex items-center gap-2">
               {!isMobile && (
