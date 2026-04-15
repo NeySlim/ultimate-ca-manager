@@ -1204,7 +1204,12 @@
     "eabKidHelper": "CAからの外部アカウントバインディングキー識別子",
     "eabHmacKey": "EAB HMACキー",
     "eabHmacKeyHelper": "外部アカウントバインディングHMACキー（base64urlエンコード）",
-    "eabHmacKeyPlaceholder": "CAからのHMACキーを入力"
+    "eabHmacKeyPlaceholder": "CAからのHMACキーを入力",
+    "proxyEabKid": "プロキシ EAB キー ID",
+    "proxyEabKidHelper": "アップストリーム ACME CA の External Account Binding キー ID (例: ZeroSSL, Google Trust)",
+    "proxyEabHmacKey": "プロキシ EAB HMAC キー",
+    "proxyEabHmacKeyHelper": "アップストリーム CA の EAB HMAC キー (base64url エンコード)",
+    "proxyEabHmacKeyPlaceholder": "アップストリーム CA の HMAC キーを入力"
   },
   "scep": {
     "title": "SCEPプロトコル",

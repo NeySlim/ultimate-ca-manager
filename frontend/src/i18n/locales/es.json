@@ -1204,7 +1204,12 @@
     "eabKidHelper": "Identificador de clave de enlace de cuenta externa de su CA",
     "eabHmacKey": "Clave HMAC EAB",
     "eabHmacKeyHelper": "Clave HMAC de enlace de cuenta externa (codificada base64url)",
-    "eabHmacKeyPlaceholder": "Ingrese la clave HMAC de la CA"
+    "eabHmacKeyPlaceholder": "Ingrese la clave HMAC de la CA",
+    "proxyEabKid": "ID de clave EAB del proxy",
+    "proxyEabKidHelper": "Identificador de clave EAB para la CA ACME upstream (ej. ZeroSSL, Google Trust)",
+    "proxyEabHmacKey": "Clave HMAC EAB del proxy",
+    "proxyEabHmacKeyHelper": "Clave HMAC EAB de la CA upstream (codificada en base64url)",
+    "proxyEabHmacKeyPlaceholder": "Ingrese la clave HMAC de la CA upstream"
   },
   "scep": {
     "title": "Protocolo SCEP",

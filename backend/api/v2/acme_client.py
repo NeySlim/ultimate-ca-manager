@@ -56,6 +56,10 @@ def get_settings():
     # Proxy upstream URL
     proxy_upstream_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
     
+    # Proxy EAB settings (separate from client EAB — these are for the upstream CA)
+    proxy_eab_kid_cfg = SystemConfig.query.filter_by(key='acme.proxy.eab_kid').first()
+    proxy_eab_hmac_cfg = SystemConfig.query.filter_by(key='acme.proxy.eab_hmac_key').first()
+    
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
         'environment': env_cfg.value if env_cfg else 'staging',
@@ -67,6 +71,8 @@ def get_settings():
         'proxy_email': proxy_email_cfg.value if proxy_email_cfg else None,
         'proxy_registered': bool(proxy_email_cfg),
         'proxy_upstream_url': proxy_upstream_cfg.value if proxy_upstream_cfg else None,
+        'proxy_eab_kid': proxy_eab_kid_cfg.value if proxy_eab_kid_cfg else None,
+        'proxy_eab_hmac_key_set': bool(proxy_eab_hmac_cfg and proxy_eab_hmac_cfg.value),
         'directory_url': directory_cfg.value if directory_cfg else None,
         'eab_kid': eab_kid_cfg.value if eab_kid_cfg else None,
         'eab_hmac_key_set': bool(eab_hmac_cfg and eab_hmac_cfg.value),
@@ -149,6 +155,14 @@ def update_settings():
             return error_response('Proxy upstream URL must use HTTPS', 400)
         _set_config('acme.proxy.upstream_url', url_val, 'ACME proxy upstream directory URL')
         updates.append('proxy_upstream_url')
+    
+    if 'proxy_eab_kid' in data:
+        _set_config('acme.proxy.eab_kid', data['proxy_eab_kid'] or '', 'ACME proxy EAB Key ID')
+        updates.append('proxy_eab_kid')
+    
+    if 'proxy_eab_hmac_key' in data:
+        _set_config('acme.proxy.eab_hmac_key', data['proxy_eab_hmac_key'] or '', 'ACME proxy EAB HMAC Key')
+        updates.append('proxy_eab_hmac_key')
     
     db.session.commit()
     

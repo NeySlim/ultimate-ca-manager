@@ -78,6 +78,8 @@ export default function ACMEPage() {
   const [localDirectoryUrl, setLocalDirectoryUrl] = useState('')
   const [localEabKid, setLocalEabKid] = useState('')
   const [localProxyUpstreamUrl, setLocalProxyUpstreamUrl] = useState('')
+  const [localProxyEabKid, setLocalProxyEabKid] = useState('')
+  const [proxyEabHmacInput, setProxyEabHmacInput] = useState(null)
   
   // Pagination state
   const [page, setPage] = useState(1)
@@ -121,6 +123,7 @@ export default function ACMEPage() {
       setLocalDirectoryUrl(cs.directory_url || '')
       setLocalEabKid(cs.eab_kid || '')
       setLocalProxyUpstreamUrl(cs.proxy_upstream_url || '')
+      setLocalProxyEabKid(cs.proxy_eab_kid || '')
       
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
@@ -1269,6 +1272,36 @@ export default function ACMEPage() {
                 disabled={!canWrite('acme')}
                 placeholder="https://acme-staging-v02.api.letsencrypt.org/directory"
                 helperText={t('acme.proxyUpstreamUrlHelper')}
+              />
+              
+              <Input
+                label={t('acme.proxyEabKid')}
+                value={localProxyEabKid}
+                onChange={(e) => setLocalProxyEabKid(e.target.value)}
+                onBlur={() => handleBlurSave('proxy_eab_kid', localProxyEabKid, setLocalProxyEabKid)}
+                disabled={!canWrite('acme')}
+                placeholder="key-id-from-upstream-ca"
+                helperText={t('acme.proxyEabKidHelper')}
+              />
+              
+              <Input
+                label={t('acme.proxyEabHmacKey')}
+                type="password"
+                value={proxyEabHmacInput !== null ? proxyEabHmacInput : (clientSettings.proxy_eab_hmac_key_set ? '••••••••' : '')}
+                onChange={(e) => setProxyEabHmacInput(e.target.value)}
+                onBlur={() => {
+                  if (proxyEabHmacInput !== null && proxyEabHmacInput !== '') {
+                    handleUpdateClientSetting('proxy_eab_hmac_key', proxyEabHmacInput)
+                  }
+                }}
+                onFocus={() => {
+                  if (proxyEabHmacInput === null && clientSettings.proxy_eab_hmac_key_set) {
+                    setProxyEabHmacInput('')
+                  }
+                }}
+                disabled={!canWrite('acme')}
+                placeholder={t('acme.proxyEabHmacKeyPlaceholder')}
+                helperText={t('acme.proxyEabHmacKeyHelper')}
               />
               
               <div className="p-3 bg-tertiary-op50 rounded-lg space-y-2">

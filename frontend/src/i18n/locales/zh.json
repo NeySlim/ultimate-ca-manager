@@ -1204,7 +1204,12 @@
     "eabKidHelper": "来自CA的外部账户绑定密钥标识符",
     "eabHmacKey": "EAB HMAC密钥",
     "eabHmacKeyHelper": "外部账户绑定HMAC密钥（base64url编码）",
-    "eabHmacKeyPlaceholder": "输入来自CA的HMAC密钥"
+    "eabHmacKeyPlaceholder": "输入来自CA的HMAC密钥",
+    "proxyEabKid": "代理 EAB 密钥 ID",
+    "proxyEabKidHelper": "上游 ACME CA 的外部账户绑定密钥 ID（例如 ZeroSSL、Google Trust）",
+    "proxyEabHmacKey": "代理 EAB HMAC 密钥",
+    "proxyEabHmacKeyHelper": "上游 CA 的 EAB HMAC 密钥（base64url 编码）",
+    "proxyEabHmacKeyPlaceholder": "输入上游 CA 的 HMAC 密钥"
   },
   "scep": {
     "title": "SCEP协议",

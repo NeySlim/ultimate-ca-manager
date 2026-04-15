@@ -1204,7 +1204,12 @@
     "eabKidHelper": "Ідентифікатор ключа прив'язки зовнішнього облікового запису від вашого CA",
     "eabHmacKey": "Ключ HMAC EAB",
     "eabHmacKeyHelper": "Ключ HMAC прив'язки зовнішнього облікового запису (кодування base64url)",
-    "eabHmacKeyPlaceholder": "Введіть ключ HMAC від CA"
+    "eabHmacKeyPlaceholder": "Введіть ключ HMAC від CA",
+    "proxyEabKid": "Проксі EAB Key ID",
+    "proxyEabKidHelper": "Ідентифікатор ключа зовнішнього облікового запису для вищестоячого ACME CA (напр. ZeroSSL, Google Trust)",
+    "proxyEabHmacKey": "Проксі EAB HMAC ключ",
+    "proxyEabHmacKeyHelper": "EAB HMAC ключ від вищестоячого CA (кодування base64url)",
+    "proxyEabHmacKeyPlaceholder": "Введіть HMAC ключ від вищестоячого CA"
   },
   "scep": {
     "title": "Протокол SCEP",

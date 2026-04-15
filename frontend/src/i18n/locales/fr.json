@@ -329,7 +329,12 @@
     "eabKidHelper": "Identifiant de clé de liaison de compte externe de votre CA",
     "eabHmacKey": "Clé HMAC EAB",
     "eabHmacKeyHelper": "Clé HMAC de liaison de compte externe (encodée base64url)",
-    "eabHmacKeyPlaceholder": "Entrez la clé HMAC de la CA"
+    "eabHmacKeyPlaceholder": "Entrez la clé HMAC de la CA",
+    "proxyEabKid": "EAB Key ID du proxy",
+    "proxyEabKidHelper": "Identifiant de clé EAB pour le CA ACME en amont (ex. ZeroSSL, Google Trust)",
+    "proxyEabHmacKey": "Clé HMAC EAB du proxy",
+    "proxyEabHmacKeyHelper": "Clé HMAC EAB du CA en amont (encodée en base64url)",
+    "proxyEabHmacKeyPlaceholder": "Entrer la clé HMAC du CA en amont"
   },
   "audit": {
     "event": "Événement",

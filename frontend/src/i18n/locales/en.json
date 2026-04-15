@@ -1204,7 +1204,12 @@
     "eabKidHelper": "External Account Binding Key Identifier from your CA",
     "eabHmacKey": "EAB HMAC Key",
     "eabHmacKeyHelper": "External Account Binding HMAC key (base64url encoded)",
-    "eabHmacKeyPlaceholder": "Enter HMAC key from CA"
+    "eabHmacKeyPlaceholder": "Enter HMAC key from CA",
+    "proxyEabKid": "Proxy EAB Key ID",
+    "proxyEabKidHelper": "External Account Binding Key ID for the upstream ACME CA (e.g. ZeroSSL, Google Trust)",
+    "proxyEabHmacKey": "Proxy EAB HMAC Key",
+    "proxyEabHmacKeyHelper": "EAB HMAC key from the upstream CA (base64url encoded)",
+    "proxyEabHmacKeyPlaceholder": "Enter HMAC key from upstream CA"
   },
   "scep": {
     "title": "SCEP Protocol",

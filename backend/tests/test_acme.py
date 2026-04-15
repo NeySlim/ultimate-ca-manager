@@ -460,6 +460,39 @@ class TestAcmeClientSettings:
         data = assert_success(r)
         assert 'proxy_upstream_url' in data
 
+    def test_patch_proxy_eab_kid(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_eab_kid': 'test-kid-123'})
+        assert_success(r)
+        r2 = auth_client.get('/api/v2/acme/client/settings')
+        data2 = assert_success(r2)
+        assert data2['proxy_eab_kid'] == 'test-kid-123'
+
+    def test_patch_proxy_eab_hmac_key(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_eab_hmac_key': 'dGVzdC1obWFjLWtleQ'})
+        assert_success(r)
+        r2 = auth_client.get('/api/v2/acme/client/settings')
+        data2 = assert_success(r2)
+        assert data2['proxy_eab_hmac_key_set'] is True
+
+    def test_patch_proxy_eab_clear(self, auth_client):
+        patch_json(auth_client, '/api/v2/acme/client/settings',
+                   {'proxy_eab_kid': 'temp-kid', 'proxy_eab_hmac_key': 'temp-hmac'})
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_eab_kid': '', 'proxy_eab_hmac_key': ''})
+        assert_success(r)
+        r2 = auth_client.get('/api/v2/acme/client/settings')
+        data2 = assert_success(r2)
+        assert data2['proxy_eab_kid'] == ''
+        assert data2['proxy_eab_hmac_key_set'] is False
+
+    def test_get_client_settings_has_proxy_eab_fields(self, auth_client):
+        r = auth_client.get('/api/v2/acme/client/settings')
+        data = assert_success(r)
+        assert 'proxy_eab_kid' in data
+        assert 'proxy_eab_hmac_key_set' in data
+
 
 # ============================================================
 # ACME Client — Proxy
