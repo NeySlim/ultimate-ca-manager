@@ -13,7 +13,7 @@ import {
 import {
   Badge, Button, Modal, Input, Select, LoadingSpinner,
   CompactSection, CompactGrid, CompactField, CompactStats,
-  FilterSelect, CATypeIcon
+  CATypeIcon, MultiSelectFilter
 } from '../components'
 import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
@@ -53,8 +53,8 @@ export default function CAsPage() {
   const [createFormOcspMustStaple, setCreateFormOcspMustStaple] = useState(false)
   
   // Filter state
-  const [filterType, setFilterType] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterType, setFilterType] = useState([])
+  const [filterStatus, setFilterStatus] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
 
   // Chain repair state
@@ -315,9 +315,9 @@ export default function CAsPage() {
     }
     
     // Apply type filter
-    if (filterType) {
+    if (filterType.length > 0) {
       const filterByType = (nodes) => nodes.filter(node => {
-        if (node.type === filterType) return true
+        if (filterType.includes(node.type)) return true
         if (node.children?.length) {
           node.children = filterByType(node.children)
           return node.children.length > 0
@@ -327,8 +327,21 @@ export default function CAsPage() {
       result = filterByType([...result])
     }
     
+    // Apply status filter (map: Active/Expired from API)
+    if (filterStatus.length > 0) {
+      const filterByStatus = (nodes) => nodes.filter(node => {
+        if (filterStatus.includes(node.status)) return true
+        if (node.children?.length) {
+          node.children = filterByStatus(node.children)
+          return node.children.length > 0
+        }
+        return false
+      })
+      result = filterByStatus([...result])
+    }
+    
     return result
-  }, [treeData, searchQuery, filterType])
+  }, [treeData, searchQuery, filterType, filterStatus])
 
   // Stats
   const stats = useMemo(() => {
@@ -350,7 +363,7 @@ export default function CAsPage() {
     {
       key: 'type',
       label: t('common.type'),
-      type: 'select',
+      type: 'multiSelect',
       value: filterType,
       onChange: setFilterType,
       placeholder: t('common.allTypes'),
@@ -358,10 +371,22 @@ export default function CAsPage() {
         { value: 'root', label: t('common.rootCA') },
         { value: 'intermediate', label: t('common.intermediateCA') }
       ]
+    },
+    {
+      key: 'status',
+      label: t('common.status'),
+      type: 'multiSelect',
+      value: filterStatus,
+      onChange: setFilterStatus,
+      placeholder: t('common.allStatus'),
+      options: [
+        { value: 'Active', label: t('common.active') },
+        { value: 'Expired', label: t('common.expired') },
+      ]
     }
-  ], [filterType, t])
+  ], [filterType, filterStatus, t])
 
-  const activeFiltersCount = (filterType ? 1 : 0)
+  const activeFiltersCount = (filterType.length > 0 ? 1 : 0) + (filterStatus.length > 0 ? 1 : 0)
 
   // Toggle tree node
   const toggleNode = (id) => {
@@ -456,7 +481,7 @@ export default function CAsPage() {
                   
                   <div className="w-px h-5 bg-border-op50" />
                   
-                  <FilterSelect
+                  <MultiSelectFilter
                     value={filterType}
                     onChange={setFilterType}
                     placeholder={t('common.allTypes')}
@@ -464,18 +489,15 @@ export default function CAsPage() {
                       { value: 'root', label: t('common.rootCA') },
                       { value: 'intermediate', label: t('common.intermediateCA') },
                     ]}
-                    size="sm"
                   />
-                  <FilterSelect
+                  <MultiSelectFilter
                     value={filterStatus}
                     onChange={setFilterStatus}
                     placeholder={t('common.allStatus')}
                     options={[
-                      { value: 'valid', label: t('common.valid') },
-                      { value: 'expiring', label: t('common.expiring') },
-                      { value: 'expired', label: t('common.expired') },
+                      { value: 'Active', label: t('common.active') },
+                      { value: 'Expired', label: t('common.expired') },
                     ]}
-                    size="sm"
                   />
                 </>
               )}
@@ -549,7 +571,8 @@ export default function CAsPage() {
                             !(ca.common_name || '').toLowerCase().includes(q) &&
                             !(ca.subject || '').toLowerCase().includes(q)) return false
                       }
-                      if (filterType && ca.type !== filterType) return false
+                      if (filterType.length > 0 && !filterType.includes(ca.type)) return false
+                      if (filterStatus.length > 0 && !filterStatus.includes(ca.status)) return false
                       return true
                     })}
                     allCAs={cas}
