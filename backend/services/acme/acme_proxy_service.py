@@ -311,12 +311,15 @@ class AcmeProxyService:
         return upstream_order, order_id
 
     def get_authz(self, authz_id_b64):
-        """Proxy authz fetch — only exposes dns-01 challenges.
+        """Proxy authz fetch — only exposes dns-01 challenges and triggers automation.
         
         The proxy can only handle dns-01 validation (via DNS provider).
         http-01 and tls-alpn-01 require the upstream CA to reach the client
         directly, which doesn't work through a proxy.
         """
+        from api.v2.acme_domains import find_provider_for_domain
+        from models import AcmeClientOrder
+        
         # Fix padding
         authz_id_b64 += '=' * (4 - len(authz_id_b64) % 4)
         authz_url = base64.urlsafe_b64decode(authz_id_b64).decode()
@@ -331,6 +334,13 @@ class AcmeProxyService:
         
         # Extract identifier (domain)
         identifier = authz.get('identifier', {})
+        domain = identifier.get('value', '').lstrip('*.')
+        
+        # Find the proxy order that contains this authz URL
+        order = AcmeClientOrder.query.filter(
+            AcmeClientOrder.is_proxy_order == True,
+            AcmeClientOrder.upstream_authz_urls.contains(authz_url)
+        ).first()
         
         # Filter to dns-01 only — the proxy handles DNS record creation
         # automatically. http-01/tls-alpn-01 cannot work through a proxy
@@ -339,8 +349,45 @@ class AcmeProxyService:
         for chall in authz.get('challenges', []):
             if chall.get('type') != 'dns-01':
                 continue
+            
             chall_url = chall['url']
             chall_id = base64.urlsafe_b64encode(chall_url.encode()).rstrip(b'=').decode()
+            
+            # Check if we should trigger automation for this challenge
+            # We trigger it as soon as the client fetches the authorization
+            if order and chall.get('status') == 'pending':
+                challenges_data = order.challenges_dict
+                if chall_url not in challenges_data or challenges_data[chall_url].get('status') != 'initiated':
+                    # Trigger automation in background
+                    token = chall.get('token')
+                    jwk_thumbprint = self._get_account_thumbprint()
+                    key_authz = f"{token}.{jwk_thumbprint}"
+                    
+                    # Ensure DNS provider exists
+                    provider_info = find_provider_for_domain(domain)
+                    if provider_info:
+                        import threading
+                        from flask import current_app
+                        app = current_app._get_current_object()
+                        
+                        thread = threading.Thread(
+                            target=self._bg_respond_challenge,
+                            args=(app, chall_url, key_authz, domain, order.id)
+                        )
+                        thread.name = f"ACMEProxy-AutoDNS-{domain}"
+                        thread.daemon = True
+                        
+                        # Mark as initiated to avoid redundant threads
+                        challenges_data[chall_url] = {'status': 'initiated', 'started_at': datetime.now().isoformat()}
+                        order.set_challenges_dict(challenges_data)
+                        try:
+                            db.session.commit()
+                            thread.start()
+                            logger.info(f"[ACME Proxy] Triggered auto-DNS for {domain} via authz fetch")
+                        except Exception as e:
+                            db.session.rollback()
+                            logger.error(f"Failed to start auto-DNS thread: {e}")
+            
             chall['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id}"
             proxy_challenges.append(chall)
         
@@ -358,15 +405,14 @@ class AcmeProxyService:
         return authz, identifier
 
     def respond_challenge(self, chall_id_b64):
-        """Proxy challenge response with asynchronous automatic DNS setup"""
-        import hashlib
+        """Proxy challenge response. If automation is already running/done, just return status."""
         from api.v2.acme_domains import find_provider_for_domain
         from models import AcmeClientOrder
         
         chall_id_b64_padded = chall_id_b64 + '=' * (4 - len(chall_id_b64) % 4)
         chall_url = base64.urlsafe_b64decode(chall_id_b64_padded).decode()
         
-        # Fetch the challenge to get token and type
+        # Fetch the challenge to get token and status
         resp = self._post_jws(chall_url, "", kid=self.account_url)
         if resp.status_code != 200:
             raise RuntimeError(f"Failed to fetch challenge: {resp.text}")
@@ -374,6 +420,7 @@ class AcmeProxyService:
         challenge_data = resp.json()
         token = challenge_data.get('token')
         challenge_type = challenge_data.get('type')
+        status = challenge_data.get('status')
         
         if challenge_type != 'dns-01':
             raise RuntimeError(
@@ -381,57 +428,65 @@ class AcmeProxyService:
                 "The ACME proxy only supports dns-01 validation."
             )
         
+        if status != 'pending':
+            # Already processing or finished
+            challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
+            return challenge_data, self._get_authz_link(resp.headers.get('Link'))
+
+        # If still pending, check if we already triggered automation in get_authz
+        order = self._find_order_for_challenge(chall_url, AcmeClientOrder)
+        if order:
+            challenges_data = order.challenges_dict
+            if chall_url in challenges_data and challenges_data[chall_url].get('status') == 'initiated':
+                # Already triggered, just return 'processing'
+                challenge_data['status'] = 'processing'
+                challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
+                return challenge_data, self._get_authz_link(resp.headers.get('Link'))
+
+        # Fallback: Trigger if not already triggered (should be rare now)
         if not token:
             raise RuntimeError("Challenge has no token")
         
-        # Calculate key authorization using PROXY's account thumbprint
-        # (the proxy's account is what the upstream CA knows about)
-        jwk_thumbprint = self._get_account_thumbprint()
-        key_authz = f"{token}.{jwk_thumbprint}"
-        
-        # Find the proxy order that contains this challenge's authz URL
-        order = self._find_order_for_challenge(chall_url, AcmeClientOrder)
-        if not order:
-            raise RuntimeError("No pending proxy order found for this challenge.")
-
-        domain = order.domains_list[0].lstrip('*.')
-        
-        # Verify DNS provider exists BEFORE going background
+        domain = order.domains_list[0].lstrip('*.') if order else "unknown"
         provider_info = find_provider_for_domain(domain)
         if not provider_info:
             raise RuntimeError(f"No DNS provider configured for domain: {domain}")
 
-        # Move blocking DNS setup and upstream validation to background thread
+        jwk_thumbprint = self._get_account_thumbprint()
+        key_authz = f"{token}.{jwk_thumbprint}"
+        
         import threading
         from flask import current_app
-        # We need to pass required info to the background thread
         app = current_app._get_current_object()
         
         thread = threading.Thread(
             target=self._bg_respond_challenge,
-            args=(app, chall_url, key_authz, domain, order.id)
+            args=(app, chall_url, key_authz, domain, order.id if order else None)
         )
         thread.name = f"ACMEProxy-DNS-{domain}"
         thread.daemon = True
         thread.start()
         
-        # Return immediate "processing" status (RFC 8555 allows returning the challenge 
-        # as it is while it's being processed)
         challenge_data['status'] = 'processing'
         challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
         
-        # Build Link header for the response
-        link_header = None
-        upstream_link = resp.headers.get('Link')
-        if upstream_link:
-            import re
+        return challenge_data, self._get_authz_link(resp.headers.get('Link'))
+
+    def _get_authz_link(self, upstream_link):
+        """Extract and rewrite authz Link header from upstream response"""
+        if not upstream_link:
+            return None
+        import re
+        match = re.search(r'<([^>]+)>;\s*rel="up"', upstream_link)
+        if not match:
+            # Try without rel="up" just in case
             match = re.search(r'<([^>]+)>', upstream_link)
-            if match:
-                authz_url = match.group(1)
-                authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
-                link_header = f'<{self.base_url}/acme/proxy/authz/{authz_id}>;rel="up"'
-        
-        return challenge_data, link_header
+            
+        if match:
+            authz_url = match.group(1)
+            authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
+            return f'<{self.base_url}/acme/proxy/authz/{authz_id}>;rel="up"'
+        return None
 
     def _bg_respond_challenge(self, app, chall_url, key_authz, domain, order_id):
         """Background task for DNS setup and upstream validation trigger"""
