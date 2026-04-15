@@ -430,17 +430,21 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               {!editMode ? (
                 <>
-                  <Button type="button" size="sm" onClick={() => navigate('/certificates?action=create')}>
-                    <Plus size={14} weight="bold" />
-                    {t('common.cert')}
-                  </Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
-                    <Plus size={14} weight="bold" />
-                    {t('common.ca')}
-                  </Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/csrs')} className="hidden md:flex">
-                    <ListChecks size={14} weight="bold" />
-                    {t('common.csr')}
+                  {canWrite('certificates') && (
+                    <Button type="button" size="sm" onClick={() => navigate('/certificates?action=create')}>
+                      <Plus size={14} weight="bold" />
+                      {t('common.cert')}
+                    </Button>
+                  )}
+                  {canWrite('cas') && (
+                    <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
+                      <Plus size={14} weight="bold" />
+                      {t('common.ca')}
+                    </Button>
+                  )}
+                  <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/discovery?action=scan')} className="hidden md:flex">
+                    <MagnifyingGlass size={14} />
+                    {t('dashboard.quickActions.scanNetwork')}
                   </Button>
                   <div className="hidden md:flex items-center gap-1 ml-1 border-l border-border-op40 pl-2">
                     <Button type="button" size="sm" variant="ghost" onClick={loadDashboard} title={t('common.refresh')}>
@@ -477,24 +481,6 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-
-        {/* Quick Actions */}
-        {!editMode && canWrite('certificates') && (
-          <div className="shrink-0 flex items-center gap-2 flex-wrap mb-1.5">
-            <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/certificates?action=create')}>
-              <Plus size={14} />
-              {t('dashboard.quickActions.issueCert')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/discovery?action=scan')}>
-              <MagnifyingGlass size={14} />
-              {t('dashboard.quickActions.scanNetwork')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/reports')}>
-              <FileText size={14} />
-              {t('dashboard.quickActions.generateReport')}
-            </Button>
-          </div>
-        )}
 
         {/* Grid Layout — flex-1 fills remaining space on desktop, natural flow on mobile */}
         <div ref={gridContainerRef} className={isDesktopGrid ? 'flex-1 min-h-0' : ''}>
