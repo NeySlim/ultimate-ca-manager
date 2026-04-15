@@ -594,7 +594,15 @@ class AcmeProxyService:
             cert_url = order['certificate']
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
             order['certificate'] = f"{self.base_url}/acme/proxy/cert/{cert_id}"
-
+        
+        # Rewrite authorization URLs
+        if 'authorizations' in order:
+            proxy_authzs = []
+            for authz_url in order['authorizations']:
+                authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
+                proxy_authzs.append(f"{self.base_url}/acme/proxy/authz/{authz_id}")
+            order['authorizations'] = proxy_authzs
+            
         return order
 
     def finalize_order(self, order_id_b64, csr_pem):
@@ -645,6 +653,14 @@ class AcmeProxyService:
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
             order['certificate'] = f"{self.base_url}/acme/proxy/cert/{cert_id}"
             
+        # Rewrite authorization URLs
+        if 'authorizations' in order:
+            proxy_authzs = []
+            for authz_url in order['authorizations']:
+                authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
+                proxy_authzs.append(f"{self.base_url}/acme/proxy/authz/{authz_id}")
+            order['authorizations'] = proxy_authzs
+
         return order
 
     def get_certificate(self, cert_id_b64):
