@@ -908,9 +908,9 @@ function SearchBar({
                   <MultiSelectFilter
                     key={filter.key}
                     options={filter.options || []}
-                    selected={filter.value || []}
+                    value={filter.value || []}
                     onChange={filter.onChange}
-                    label={filter.placeholder || t('common.all')}
+                    placeholder={filter.placeholder || t('common.all')}
                   />
                 )
               }
