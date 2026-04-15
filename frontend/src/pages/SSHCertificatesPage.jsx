@@ -717,6 +717,8 @@ export default function SSHCertificatesPage() {
               <Plus size={16} /> {t('sshCertificates.issueCertificate')}
             </Button>
           )}
+          filterPresetsKey="ucm-ssh-certs-presets"
+          densityStorageKey="ucm-ssh-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
         />
       </ResponsiveLayout>

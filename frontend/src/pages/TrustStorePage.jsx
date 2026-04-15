@@ -3,7 +3,7 @@
  * Manage trusted CA certificates for chain validation
  * Uses ResponsiveLayout for unified UI
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -143,6 +143,13 @@ export default function TrustStorePage() {
       setLoadingCAs(false)
     }
   }
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.purpose) setFilterPurpose(Array.isArray(filters.purpose) ? filters.purpose : [filters.purpose])
+    else setFilterPurpose([])
+    if (filters._expiry_status) setFilterExpiryStatus(Array.isArray(filters._expiry_status) ? filters._expiry_status : [filters._expiry_status])
+    else setFilterExpiryStatus([])
+  }, [])
 
   const handleOpenAddModal = () => {
     setSelectedCAIds([])
@@ -606,6 +613,9 @@ export default function TrustStorePage() {
               ]
             }
           ]}
+          filterPresetsKey="ucm-truststore-presets"
+          densityStorageKey="ucm-truststore-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={toolbarActions}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}

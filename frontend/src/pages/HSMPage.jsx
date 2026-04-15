@@ -4,7 +4,7 @@
  * 
  * Migrated to ResponsiveLayout for consistent UX
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, PencilSimple, CheckCircle, XCircle, TestTube,
@@ -88,6 +88,13 @@ export default function HSMPage() {
       setKeys(response.data || [])
     } catch { /* non-critical */ }
   }
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.enabled) setFilterStatus(Array.isArray(filters.enabled) ? filters.enabled : [filters.enabled])
+    else setFilterStatus([])
+    if (filters.provider_type) setFilterType(Array.isArray(filters.provider_type) ? filters.provider_type : [filters.provider_type])
+    else setFilterType([])
+  }, [])
 
   const handleCreate = () => {
     setSelectedProvider(null)
@@ -510,6 +517,9 @@ export default function HSMPage() {
                 options: PROVIDER_TYPES.map(t => ({ value: t.value, label: t.label.split(' ')[0] }))
               }
             ]}
+            filterPresetsKey="ucm-hsm-presets"
+            densityStorageKey="ucm-hsm-density"
+            onApplyFilterPreset={handleApplyFilterPreset}
             toolbarActions={canWrite('hsm') ? (
               isMobile ? (
                 <Button type="button" size="lg" onClick={handleCreate} className="w-11 h-11 p-0">

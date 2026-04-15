@@ -297,7 +297,12 @@ export default function TemplatesPage() {
   ], [t])
 
   // ============= ROW ACTIONS =============
-  
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
+    else setFilterType([])
+  }, [])
+
   const rowActions = useCallback((row) => [
     { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingTemplate(row); setShowTemplateModal(true) } },
     { label: t('templates.duplicateTemplate'), icon: Copy, onClick: () => handleDuplicateTemplate(row) },
@@ -486,6 +491,9 @@ export default function TemplatesPage() {
               ]
             }
           ]}
+          filterPresetsKey="ucm-templates-presets"
+          densityStorageKey="ucm-templates-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={canWrite('templates') && (
             isMobile ? (
               <Button type="button" size="lg" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }} className="w-11 h-11 p-0">

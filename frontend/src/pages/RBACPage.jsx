@@ -4,7 +4,7 @@
  * 
  * Migrated to ResponsiveLayout for consistent UX
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Shield, Plus, Trash, Lock, CheckCircle, XCircle, Warning, UsersThree
@@ -103,6 +103,11 @@ export default function RBACPage() {
 
   useEffect(() => {
     loadRoles()
+  }, [])
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.is_system) setFilterType(Array.isArray(filters.is_system) ? filters.is_system : [filters.is_system])
+    else setFilterType([])
   }, [])
 
   const loadRoles = async () => {
@@ -471,6 +476,9 @@ export default function RBACPage() {
                 ]
               }
             ]}
+            filterPresetsKey="ucm-rbac-presets"
+            densityStorageKey="ucm-rbac-density"
+            onApplyFilterPreset={handleApplyFilterPreset}
             toolbarActions={
               isMobile ? (
                 <Button type="button" size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">

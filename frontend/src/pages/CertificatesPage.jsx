@@ -753,6 +753,7 @@ export default function CertificatesPage() {
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
           columnStorageKey="ucm-certs-columns"
           filterPresetsKey="ucm-certs-presets"
+          densityStorageKey="ucm-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
           exportEnabled
           exportFilename="certificates"

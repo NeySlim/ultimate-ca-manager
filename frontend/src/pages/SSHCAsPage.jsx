@@ -90,7 +90,12 @@ export default function SSHCAsPage() {
     }
   }
 
-  // ============= ACTIONS =============
+    const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.ca_type) setFilterType(Array.isArray(filters.ca_type) ? filters.ca_type : [filters.ca_type])
+    else setFilterType([])
+  }, [])
+
+// ============= ACTIONS =============
 
   const handleCreate = async (data) => {
     try {
@@ -576,6 +581,9 @@ export default function SSHCAsPage() {
               ]
             }
           ]}
+          filterPresetsKey="ucm-ssh-cas-presets"
+          densityStorageKey="ucm-ssh-cas-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={canWrite('ssh') && (
             isMobile ? (
               <div className="flex gap-2">

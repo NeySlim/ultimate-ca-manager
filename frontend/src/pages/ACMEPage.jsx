@@ -2116,6 +2116,16 @@ export default function ACMEPage() {
     </div>
   )
   
+  // Handle applying filter preset for history table
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.source) setHistoryFilterSource(filters.source)
+    else setHistoryFilterSource('')
+    if (filters.status) setHistoryFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
+    else setHistoryFilterStatus([])
+    if (filters.ca) setHistoryFilterCA(filters.ca)
+    else setHistoryFilterCA('')
+  }, [])
+
   // Filter history data
   const filteredHistory = useMemo(() => {
     let filtered = history
@@ -2187,6 +2197,9 @@ export default function ACMEPage() {
           options: historyCAs
         }
       ]}
+      filterPresetsKey="ucm-acme-presets"
+      densityStorageKey="ucm-acme-density"
+      onApplyFilterPreset={handleApplyFilterPreset}
       emptyState={{
         icon: ClockCounterClockwise,
         title: t('acme.noCertificates'),

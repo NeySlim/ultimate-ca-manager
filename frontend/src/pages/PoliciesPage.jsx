@@ -459,6 +459,13 @@ export default function PoliciesPage() {
     </div>
   ) : null
 
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
+    else setFilterType([])
+    if (filters.status) setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
+    else setFilterStatus([])
+  }, [])
+
   // Toolbar filters
   const toolbarFilters = [
     {
@@ -529,6 +536,9 @@ export default function PoliciesPage() {
           sortable
           defaultSort={{ key: 'priority', direction: 'asc' }}
           toolbarFilters={toolbarFilters}
+          filterPresetsKey="ucm-policies-presets"
+          densityStorageKey="ucm-policies-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           emptyIcon={Gavel}
           emptyTitle={t('policies.noPolicies')}
           emptyDescription={t('policies.noPoliciesDesc')}

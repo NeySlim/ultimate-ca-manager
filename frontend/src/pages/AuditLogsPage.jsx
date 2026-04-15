@@ -244,6 +244,16 @@ export default function AuditLogsPage() {
     setPage(1);
   }, []);
 
+  const handleApplyFilterPreset = useCallback((filters) => {
+    setPage(1);
+    if (filters.action) setFilterAction(Array.isArray(filters.action) ? filters.action : [filters.action]);
+    else setFilterAction([]);
+    if (filters.status) setFilterSuccess(filters.status);
+    else setFilterSuccess('');
+    if (filters.username) setFilterUsername(filters.username);
+    else setFilterUsername('');
+  }, []);
+
   // Format timestamp — use shared utility for relative time, with UTC-safe parsing
   const formatTime = (timestamp) => {
     return formatRelativeTime(timestamp, t);
@@ -769,6 +779,9 @@ export default function AuditLogsPage() {
               options: uniqueUsernames.map(u => ({ value: u, label: u }))
             }
           ]}
+          filterPresetsKey="ucm-audit-presets"
+          densityStorageKey="ucm-audit-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={headerActions}
           selectedId={selectedLog?.id}
           onRowClick={setSelectedLog}

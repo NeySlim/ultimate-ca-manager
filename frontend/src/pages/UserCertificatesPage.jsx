@@ -375,6 +375,7 @@ export default function UserCertificatesPage() {
         searchKeys={['name', 'cert_subject', 'owner', 'cert_serial']}
         columnStorageKey="ucm-user-certs-columns"
         filterPresetsKey="ucm-user-certs-presets"
+        densityStorageKey="ucm-user-certs-density"
         onApplyFilterPreset={handleApplyFilterPreset}
         toolbarFilters={[{
           key: 'status',

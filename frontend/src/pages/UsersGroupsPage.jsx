@@ -868,6 +868,13 @@ export default function UsersGroupsPage() {
     }
   }
 
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.role) setFilterRole(Array.isArray(filters.role) ? filters.role : [filters.role])
+    else setFilterRole([])
+    if (filters.status) setFilterStatus(filters.status)
+    else setFilterStatus('')
+  }, [])
+
   const handleOpenCreateModal = () => {
     if (activeTab === 'users') {
       setEditingUser(null)
@@ -949,6 +956,9 @@ export default function UsersGroupsPage() {
               ]
             }
           ] : []}
+          filterPresetsKey="ucm-users-presets"
+          densityStorageKey="ucm-users-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={canWrite('users') && (
             isMobile ? (
               <Button type="button" size="lg" onClick={handleOpenCreateModal} className="w-11 h-11 p-0">
