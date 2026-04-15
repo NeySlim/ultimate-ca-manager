@@ -356,7 +356,13 @@
     "eabRequired": "EAB requis",
     "connectionFailed": "Échec de la connexion",
     "proxyEabCredentials": "Identifiants EAB",
-    "yourProxyUrl": "URL de votre répertoire proxy"
+    "yourProxyUrl": "URL de votre répertoire proxy",
+    "clientSettings": "Paramètres du client ACME",
+    "customDirectoryOverride": "Répertoire ACME personnalisé",
+    "customDirectoryOverrideHelper": "Remplacer le répertoire Let's Encrypt par défaut pour utiliser une autre CA ACME (ex: ZeroSSL, Buypass, Google Trust). Laisser vide pour Let's Encrypt.",
+    "accountMismatch": "Incohérence compte/CA",
+    "accountMismatchHelper": "Le compte enregistré ne correspond pas à la CA amont sélectionnée. Réinitialisez le compte pour vous réinscrire auprès de la bonne CA.",
+    "noUpstreamUrl": "Aucune URL amont configurée"
   },
   "audit": {
     "event": "Événement",

@@ -1231,7 +1231,13 @@
     "eabRequired": "EAB обов'язковий",
     "connectionFailed": "З'єднання не вдалося",
     "proxyEabCredentials": "Облікові дані EAB",
-    "yourProxyUrl": "URL вашого проксі-каталогу"
+    "yourProxyUrl": "URL вашого проксі-каталогу",
+    "clientSettings": "Налаштування клієнта ACME",
+    "customDirectoryOverride": "Власний каталог ACME",
+    "customDirectoryOverrideHelper": "Замінити стандартний каталог Let's Encrypt для використання іншого ACME CA (напр., ZeroSSL, Buypass, Google Trust). Залиште порожнім для Let's Encrypt.",
+    "accountMismatch": "Невідповідність облікового запису/CA",
+    "accountMismatchHelper": "Зареєстрований обліковий запис не відповідає вибраному вищестоящому CA. Скиньте обліковий запис для повторної реєстрації у правильному CA.",
+    "noUpstreamUrl": "URL вищестоящого CA не налаштовано"
   },
   "scep": {
     "title": "Протокол SCEP",

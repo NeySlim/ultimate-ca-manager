@@ -1231,7 +1231,13 @@
     "eabRequired": "EAB必須",
     "connectionFailed": "接続失敗",
     "proxyEabCredentials": "EAB認証情報",
-    "yourProxyUrl": "プロキシディレクトリURL"
+    "yourProxyUrl": "プロキシディレクトリURL",
+    "clientSettings": "ACMEクライアント設定",
+    "customDirectoryOverride": "カスタムACMEディレクトリ",
+    "customDirectoryOverrideHelper": "デフォルトのLet's Encryptディレクトリをオーバーライドして、別のACME CA（ZeroSSL、Buypass、Google Trustなど）を使用します。Let's Encryptを使用する場合は空にしてください。",
+    "accountMismatch": "アカウント/CA不一致",
+    "accountMismatchHelper": "登録済みアカウントが選択されたアップストリームCAと一致しません。正しいCAに再登録するにはアカウントをリセットしてください。",
+    "noUpstreamUrl": "アップストリームURLが未設定"
   },
   "scep": {
     "title": "SCEPプロトコル",

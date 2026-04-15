@@ -231,7 +231,8 @@ export default function ACMEPage() {
     setTestingConnection(true)
     setConnectionResult(null)
     try {
-      const res = await acmeService.testProxyConnection()
+      const url = clientSettings.proxy_upstream_url || localProxyUpstreamUrl
+      const res = await acmeService.testProxyConnection(url || undefined)
       setConnectionResult(res.data || res)
     } catch (error) {
       setConnectionResult({ connected: false, error: error.message })
@@ -1172,7 +1173,7 @@ export default function ACMEPage() {
       </CompactSection>
       
       {/* Client Settings */}
-      <CompactSection title={t('common.settings')} icon={Gear}>
+      <CompactSection title={t('acme.clientSettings')} icon={Gear}>
         <div className="space-y-3">
           <Select
             label={t('acme.defaultEnvironment')}
@@ -1230,52 +1231,60 @@ export default function ACMEPage() {
             ]}
             helperText={t('acme.accountKeyTypeHelper')}
           />
-        </div>
-      </CompactSection>
-      
-      {/* Custom ACME Server */}
-      <CompactSection title={t('acme.customServer')} icon={Globe}>
-        <div className="space-y-3">
-          <Input
-            label={t('acme.directoryUrl')}
-            type="url"
-            value={localDirectoryUrl}
-            onChange={(e) => setLocalDirectoryUrl(e.target.value)}
-            onBlur={() => handleBlurSave('directory_url', localDirectoryUrl, setLocalDirectoryUrl)}
-            disabled={!canWrite('acme')}
-            placeholder="https://acme-v02.api.letsencrypt.org/directory"
-            helperText={t('acme.directoryUrlHelper')}
-          />
-          
-          <Input
-            label={t('acme.eabKid')}
-            value={localEabKid}
-            onChange={(e) => setLocalEabKid(e.target.value)}
-            onBlur={() => handleBlurSave('eab_kid', localEabKid, setLocalEabKid)}
-            disabled={!canWrite('acme')}
-            placeholder="key-id-from-ca"
-            helperText={t('acme.eabKidHelper')}
-          />
-          
-          <Input
-            label={t('acme.eabHmacKey')}
-            type="password"
-            value={eabHmacInput !== null ? eabHmacInput : (clientSettings.eab_hmac_key_set ? '••••••••' : '')}
-            onChange={(e) => setEabHmacInput(e.target.value)}
-            onBlur={() => {
-              if (eabHmacInput !== null && eabHmacInput !== '') {
-                handleUpdateClientSetting('eab_hmac_key', eabHmacInput)
-              }
-            }}
-            onFocus={() => {
-              if (eabHmacInput === null && clientSettings.eab_hmac_key_set) {
-                setEabHmacInput('')
-              }
-            }}
-            disabled={!canWrite('acme')}
-            placeholder={t('acme.eabHmacKeyPlaceholder')}
-            helperText={t('acme.eabHmacKeyHelper')}
-          />
+
+          {/* Custom ACME Directory — collapsed advanced option */}
+          <details className="group">
+            <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none">
+              <Globe size={14} />
+              {t('acme.customDirectoryOverride')}
+              {localDirectoryUrl && (
+                <Badge variant="outline" size="sm">{t('common.configured')}</Badge>
+              )}
+            </summary>
+            <div className="mt-2 space-y-3 pl-1">
+              <p className="text-xs text-text-tertiary">{t('acme.customDirectoryOverrideHelper')}</p>
+              <Input
+                label={t('acme.directoryUrl')}
+                type="url"
+                value={localDirectoryUrl}
+                onChange={(e) => setLocalDirectoryUrl(e.target.value)}
+                onBlur={() => handleBlurSave('directory_url', localDirectoryUrl, setLocalDirectoryUrl)}
+                disabled={!canWrite('acme')}
+                placeholder="https://acme.zerossl.com/v2/DV90"
+                helperText={t('acme.directoryUrlHelper')}
+              />
+              
+              <Input
+                label={t('acme.eabKid')}
+                value={localEabKid}
+                onChange={(e) => setLocalEabKid(e.target.value)}
+                onBlur={() => handleBlurSave('eab_kid', localEabKid, setLocalEabKid)}
+                disabled={!canWrite('acme')}
+                placeholder="key-id-from-ca"
+                helperText={t('acme.eabKidHelper')}
+              />
+              
+              <Input
+                label={t('acme.eabHmacKey')}
+                type="password"
+                value={eabHmacInput !== null ? eabHmacInput : (clientSettings.eab_hmac_key_set ? '••••••••' : '')}
+                onChange={(e) => setEabHmacInput(e.target.value)}
+                onBlur={() => {
+                  if (eabHmacInput !== null && eabHmacInput !== '') {
+                    handleUpdateClientSetting('eab_hmac_key', eabHmacInput)
+                  }
+                }}
+                onFocus={() => {
+                  if (eabHmacInput === null && clientSettings.eab_hmac_key_set) {
+                    setEabHmacInput('')
+                  }
+                }}
+                disabled={!canWrite('acme')}
+                placeholder={t('acme.eabHmacKeyPlaceholder')}
+                helperText={t('acme.eabHmacKeyHelper')}
+              />
+            </div>
+          </details>
         </div>
       </CompactSection>
 
@@ -1321,35 +1330,55 @@ export default function ACMEPage() {
               )}
 
               {/* Account Registration Status */}
-              {clientSettings.proxy_account_registered ? (
-                <div className="p-3 rounded-lg status-success-bg status-success-border border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="status-success-text" weight="fill" />
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">{t('acme.upstreamAccountRegistered')}</p>
-                        <p className="text-xs text-text-secondary font-mono">
-                          {clientSettings.proxy_account_url
-                            ? `...${clientSettings.proxy_account_url.slice(-30)}`
-                            : t('acme.accountRegistered')}
-                        </p>
+              {clientSettings.proxy_account_registered ? (() => {
+                // Detect mismatch: account registered with different CA than selected mode
+                const accountUrl = clientSettings.proxy_account_url || ''
+                const isLEAccount = accountUrl.includes('letsencrypt.org')
+                const mode = clientSettings.proxy_upstream_mode || 'staging'
+                const isMismatch = (mode === 'custom' && isLEAccount) || 
+                  (mode !== 'custom' && !isLEAccount && accountUrl)
+                
+                return (
+                  <div className={cn(
+                    'p-3 rounded-lg border',
+                    isMismatch 
+                      ? 'status-warning-bg status-warning-border' 
+                      : 'status-success-bg status-success-border'
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isMismatch 
+                          ? <Warning size={18} className="status-warning-text" weight="fill" />
+                          : <CheckCircle size={18} className="status-success-text" weight="fill" />
+                        }
+                        <div>
+                          <p className="text-sm font-medium text-text-primary">
+                            {isMismatch ? t('acme.accountMismatch') : t('acme.upstreamAccountRegistered')}
+                          </p>
+                          <p className="text-xs text-text-secondary font-mono">
+                            {accountUrl ? `...${accountUrl.slice(-30)}` : t('acme.accountRegistered')}
+                          </p>
+                          {isMismatch && (
+                            <p className="text-xs status-warning-text mt-1">{t('acme.accountMismatchHelper')}</p>
+                          )}
+                        </div>
                       </div>
+                      {canWrite('acme') && (
+                        <Button 
+                          type="button"
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleResetProxyAccount}
+                          title={t('acme.resetAccount')}
+                          className="status-danger-text hover:status-danger-bg"
+                        >
+                          <ArrowsClockwise size={14} />
+                        </Button>
+                      )}
                     </div>
-                    {canWrite('acme') && (
-                      <Button 
-                        type="button"
-                        variant="ghost" 
-                        size="sm"
-                        onClick={handleResetProxyAccount}
-                        title={t('acme.resetAccount')}
-                        className="status-danger-text hover:status-danger-bg"
-                      >
-                        <ArrowsClockwise size={14} />
-                      </Button>
-                    )}
                   </div>
-                </div>
-              ) : (
+                )
+              })() : (
                 <div className="p-3 rounded-lg bg-tertiary-op30 border border-border">
                   <div className="flex items-center gap-2">
                     <Warning size={18} className="text-text-tertiary" />
@@ -1368,7 +1397,7 @@ export default function ACMEPage() {
                   variant="secondary"
                   size="sm"
                   onClick={handleTestConnection}
-                  disabled={testingConnection}
+                  disabled={testingConnection || (clientSettings.proxy_upstream_mode === 'custom' && !localProxyUpstreamUrl && !clientSettings.proxy_upstream_url)}
                 >
                   {testingConnection ? <ArrowsClockwise size={14} className="animate-spin" /> : <PlugsConnected size={14} />}
                   {t('acme.testConnection')}
@@ -1432,11 +1461,11 @@ export default function ACMEPage() {
                     <Copy size={12} />
                   </Button>
                 </div>
-                <code className="block text-xs text-accent-primary font-mono bg-bg-secondary p-2 rounded">
+                <code className="block text-xs text-accent-primary font-mono bg-bg-secondary p-2 rounded break-all">
                   {window.location.origin}/acme/proxy/directory
                 </code>
                 <p className="text-xs font-medium text-text-secondary mt-3">{t('acme.proxyUsage')}</p>
-                <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono">
+                <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono whitespace-pre-wrap break-all">
 {`certbot certonly \\
   --server ${window.location.origin}/acme/proxy/directory \\
   --preferred-challenges dns \\

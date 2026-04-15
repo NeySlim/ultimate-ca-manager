@@ -1231,7 +1231,13 @@
     "eabRequired": "需要 EAB",
     "connectionFailed": "连接失败",
     "proxyEabCredentials": "EAB 凭据",
-    "yourProxyUrl": "您的代理目录 URL"
+    "yourProxyUrl": "您的代理目录 URL",
+    "clientSettings": "ACME客户端设置",
+    "customDirectoryOverride": "自定义ACME目录",
+    "customDirectoryOverrideHelper": "覆盖默认的Let's Encrypt目录以使用其他ACME CA（如ZeroSSL、Buypass、Google Trust）。留空则使用Let's Encrypt。",
+    "accountMismatch": "账户/CA不匹配",
+    "accountMismatchHelper": "注册的账户与所选的上游CA不匹配。请重置账户以重新注册到正确的CA。",
+    "noUpstreamUrl": "未配置上游URL"
   },
   "scep": {
     "title": "SCEP协议",

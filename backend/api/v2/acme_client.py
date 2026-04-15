@@ -267,7 +267,18 @@ def test_proxy_connection():
     if not url:
         # Use configured upstream URL
         cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
-        url = cfg.value if cfg else 'https://acme-staging-v02.api.letsencrypt.org/directory'
+        url = (cfg.value if cfg else '').strip()
+    
+    if not url:
+        # Also check mode — auto-resolve for staging/production
+        mode_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_mode').first()
+        mode = mode_cfg.value if mode_cfg else 'staging'
+        if mode == 'production':
+            url = 'https://acme-v02.api.letsencrypt.org/directory'
+        elif mode == 'staging':
+            url = 'https://acme-staging-v02.api.letsencrypt.org/directory'
+        else:
+            return error_response('No upstream URL configured', 400)
     
     if not url.startswith('https://'):
         return error_response('URL must use HTTPS', 400)

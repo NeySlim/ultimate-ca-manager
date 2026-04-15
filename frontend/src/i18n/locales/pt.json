@@ -1231,7 +1231,13 @@
     "eabRequired": "EAB necessário",
     "connectionFailed": "Conexão falhou",
     "proxyEabCredentials": "Credenciais EAB",
-    "yourProxyUrl": "URL do diretório proxy"
+    "yourProxyUrl": "URL do diretório proxy",
+    "clientSettings": "Configurações do cliente ACME",
+    "customDirectoryOverride": "Diretório ACME personalizado",
+    "customDirectoryOverrideHelper": "Substituir o diretório padrão do Let's Encrypt para usar outra CA ACME (ex: ZeroSSL, Buypass, Google Trust). Deixar vazio para Let's Encrypt.",
+    "accountMismatch": "Incompatibilidade conta/CA",
+    "accountMismatchHelper": "A conta registrada não corresponde à CA upstream selecionada. Redefina a conta para se registrar novamente na CA correta.",
+    "noUpstreamUrl": "Nenhuma URL upstream configurada"
   },
   "scep": {
     "title": "Protocolo SCEP",
