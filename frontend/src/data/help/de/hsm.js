@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Hardware-Sicherheitsmodule',
     subtitle: 'Externe Schlüsselspeicherung',
-    overview: 'Integration mit Hardware-Sicherheitsmodulen für sichere Speicherung privater Schlüssel. Unterstützung für PKCS#11, AWS CloudHSM, Azure Key Vault und Google Cloud KMS.',
+    overview: 'Integration mit Hardware-Sicherheitsmodulen für sichere Speicherung privater Schlüssel. Unterstützung für PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS und OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Unterstützte Anbieter',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'Amazon Web Services Cloud-basiertes HSM' },
           { term: 'Azure Key Vault', description: 'Microsoft Azure verwalteter Schlüsselspeicher' },
           { term: 'Google KMS', description: 'Google Cloud Key Management Service' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBao- oder Vault-Transit-Secrets-Engine für Schlüsselverwaltung als Dienst' },
         ]
       },
       {
@@ -74,6 +75,23 @@ Google Cloud Key Management Service:
 - **Standort** — KMS-Schlüsselring-Standort
 - **Schlüsselring** — Name des Schlüsselrings
 - **Anmeldedaten** — Dienstkonto-JSON-Schlüssel
+
+### OpenBao / Vault Transit
+OpenBao- oder HashiCorp Vault Transit Secrets Engine. Schlüssel werden remote über die Transit-API verwaltet — keine PKCS#11-Bibliothek erforderlich.
+
+Konfiguration:
+- **URL** — Serveradresse (z.B. \`https://openbao.example.com:8200\`)
+- **Token** — Authentifizierungstoken
+- **Mount-Pfad** — Transit-Engine-Mountpoint (Standard: \`transit\`)
+- **Namespace** — Optionaler Namespace für Multi-Tenant-Setups
+- **TLS-Überprüfung überspringen** — TLS-Zertifikatsprüfung überspringen (für selbstsignierte Zertifikate)
+
+Unterstützte Schlüsseltypen:
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (symmetrisch)
+
+> 💡 OpenBao ist ein Community-Fork von HashiCorp Vault. UCM funktioniert mit beiden.
 
 ## Anbieter verwalten
 

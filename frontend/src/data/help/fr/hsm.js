@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Modules de sécurité matériels',
     subtitle: 'Protection des clés cryptographiques',
-    overview: 'Intégrez des HSM pour le stockage inviolable des clés privées. Les clés stockées sur un HSM ne quittent jamais le matériel, offrant le plus haut niveau de protection. Prend en charge PKCS#11, AWS CloudHSM, Azure Key Vault et Google Cloud KMS.',
+    overview: 'Intégrez des HSM pour le stockage inviolable des clés privées. Les clés stockées sur un HSM ne quittent jamais le matériel, offrant le plus haut niveau de protection. Prend en charge PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS et OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Fournisseurs pris en charge',
@@ -11,6 +11,7 @@ export default {
           { label: 'AWS CloudHSM', text: 'HSM basé sur le cloud avec identifiants AWS' },
           { label: 'Azure Key Vault', text: 'Stockage de clés géré Microsoft Azure' },
           { label: 'Google Cloud KMS', text: 'Service de gestion des clés Google Cloud' },
+          { label: 'OpenBao / Vault Transit', text: 'Moteur de secrets Transit OpenBao ou Vault pour la gestion des clés en tant que service' },
         ]
       },
       {
@@ -73,6 +74,23 @@ Service de gestion des clés Google Cloud :
 - **Emplacement** — Emplacement de l'anneau de clés KMS
 - **Anneau de clés** — Nom de l'anneau de clés
 - **Identifiants** — Clé JSON du compte de service
+
+### OpenBao / Vault Transit
+Moteur de secrets Transit OpenBao ou HashiCorp Vault. Les clés sont gérées à distance via l'API Transit — aucune bibliothèque PKCS#11 requise.
+
+Configuration :
+- **URL** — Adresse du serveur (ex. \`https://openbao.example.com:8200\`)
+- **Token** — Jeton d'authentification
+- **Chemin de montage** — Point de montage du moteur Transit (par défaut : \`transit\`)
+- **Espace de noms** — Espace de noms optionnel pour les configurations multi-locataires
+- **Ignorer la vérification TLS** — Ignorer la vérification du certificat TLS (pour les certificats auto-signés)
+
+Types de clés pris en charge :
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (symétrique)
+
+> 💡 OpenBao est un fork communautaire de HashiCorp Vault. UCM fonctionne avec les deux.
 
 ## Gérer les fournisseurs
 

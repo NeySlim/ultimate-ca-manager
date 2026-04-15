@@ -742,6 +742,40 @@ Map your domains to DNS providers. When requesting a certificate for a domain, U
 
 > 💡 Wildcard certificates (\`*.example.com\`) require DNS-01 validation.
 
+## ACME Proxy Mode
+
+ACME Proxy lets internal clients request certificates from a public CA (Let's Encrypt, ZeroSSL, etc.) through UCM, without direct internet access. UCM acts as an intermediary, handling DNS-01 challenges and forwarding requests to the upstream CA.
+
+### When to Use Proxy Mode
+- Internal servers that cannot reach the internet directly
+- Centralized DNS-01 challenge handling through UCM's configured DNS providers
+- Audit and tracking of all public certificate issuance
+
+### Configuration
+1. Go to **ACME** → **Client Settings**
+2. Enable **Proxy Mode**
+3. Set the **Upstream URL** — the ACME directory URL of the target CA
+4. If the upstream CA requires EAB, enter the **Proxy EAB Key ID** and **HMAC Key**
+5. Click **Register** to create an account at the upstream CA
+
+### Using the Proxy
+Point your internal ACME clients to the proxy directory:
+\`\`\`
+https://your-ucm-server:8443/acme/proxy/directory
+\`\`\`
+
+Example with certbot:
+\`\`\`
+certbot certonly \\
+  --server https://your-ucm-server:8443/acme/proxy/directory \\
+  --preferred-challenges dns \\
+  -d example.com
+\`\`\`
+
+> 💡 Proxy EAB credentials are separate from client EAB — they authenticate UCM with the upstream CA, not your clients with UCM.
+
+> ⚠ Proxy mode requires at least one DNS provider configured in UCM for challenge resolution.
+
 ## Local ACME Server
 
 ### Configuration
@@ -1825,6 +1859,25 @@ Google Cloud Key Management Service:
 - **Location** — KMS key ring location
 - **Key Ring** — Name of the key ring
 - **Credentials** — Service account JSON key
+
+### OpenBao / Vault Transit
+OpenBao or HashiCorp Vault Transit Secrets Engine. Keys are managed remotely via the Transit API — no PKCS#11 library required.
+
+Configuration:
+- **URL** — Server address (e.g., \`https://openbao.example.com:8200\`)
+- **Token** — Authentication token
+- **Mount Path** — Transit engine mount point (default: \`transit\`)
+- **Namespace** — Optional namespace for multi-tenant setups
+- **TLS Skip Verify** — Skip TLS certificate verification (for self-signed certs)
+
+Supported key types:
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (symmetric)
+
+> 💡 OpenBao is a community-maintained fork of HashiCorp Vault. UCM works with both OpenBao and Vault.
+
+> 💡 For development, run OpenBao in dev mode: \`docker run -d -p 8200:8200 -e BAO_DEV_ROOT_TOKEN_ID=test-token quay.io/openbao/openbao:latest server -dev\`
 
 ## Managing Providers
 

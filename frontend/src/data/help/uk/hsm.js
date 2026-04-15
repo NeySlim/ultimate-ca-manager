@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Апаратні модулі безпеки',
     subtitle: 'Зовнішнє зберігання ключів',
-    overview: 'Інтеграція з апаратними модулями безпеки для безпечного зберігання приватних ключів. Підтримка PKCS#11, AWS CloudHSM, Azure Key Vault та Google Cloud KMS.',
+    overview: 'Інтеграція з апаратними модулями безпеки для безпечного зберігання приватних ключів. Підтримка PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS та OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Підтримувані провайдери',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'Хмарний HSM Amazon Web Services' },
           { term: 'Azure Key Vault', description: 'Кероване сховище ключів Microsoft Azure' },
           { term: 'Google KMS', description: 'Служба керування ключами Google Cloud' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBao або Vault Transit Secrets Engine для керування ключами як послуга' },
         ]
       },
       {
@@ -74,6 +75,23 @@ export default {
 - **Розташування** — Розташування кільця ключів KMS
 - **Кільце ключів** — Назва кільця ключів
 - **Облікові дані** — JSON-ключ сервісного облікового запису
+
+### OpenBao / Vault Transit
+OpenBao або HashiCorp Vault Transit Secrets Engine. Ключі керуються віддалено через Transit API — бібліотека PKCS#11 не потрібна.
+
+Конфігурація:
+- **URL** — Адреса сервера (напр. \`https://openbao.example.com:8200\`)
+- **Токен** — Токен автентифікації
+- **Шлях монтування** — Точка монтування Transit-движка (за замовчуванням: \`transit\`)
+- **Простір імен** — Необов'язковий простір імен для мультитенантних налаштувань
+- **Пропустити перевірку TLS** — Пропустити перевірку сертифіката TLS (для самопідписаних сертифікатів)
+
+Підтримувані типи ключів:
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (симетричний)
+
+> 💡 OpenBao — це форк HashiCorp Vault від спільноти. UCM працює з обома.
 
 ## Керування провайдерами
 

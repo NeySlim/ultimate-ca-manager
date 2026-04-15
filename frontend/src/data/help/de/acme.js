@@ -26,6 +26,15 @@ export default {
         ]
       },
       {
+        title: 'ACME-Proxy',
+        items: [
+          { label: 'Proxy-Modus', text: 'ACME-Anfragen an eine vorgelagerte CA (Let\'s Encrypt, ZeroSSL usw.) über UCM für zentrale Verwaltung weiterleiten' },
+          { label: 'Upstream-URL', text: 'Die ACME-Verzeichnis-URL der vorgelagerten CA, an die Anfragen weitergeleitet werden' },
+          { label: 'Proxy-EAB', text: 'EAB-Anmeldedaten für die Verbindung zur vorgelagerten CA (getrennt von Client-EAB)' },
+          { label: 'DNS-Challenges', text: 'UCM übernimmt DNS-01-Challenges im Auftrag der Clients mit konfigurierten DNS-Anbietern' },
+        ]
+      },
+      {
         title: 'Multi-CA-Auflösung',
         content: 'Wenn ein ACME-Client ein Zertifikat anfordert, löst UCM die signierende CA in dieser Reihenfolge auf:',
         items: [
@@ -123,6 +132,34 @@ Ordnen Sie Ihre Domänen DNS-Anbietern zu. Beim Anfordern eines Zertifikats für
 4. Klicken Sie auf **Speichern**
 
 > 💡 Wildcard-Zertifikate (\`*.example.com\`) erfordern DNS-01-Validierung.
+
+
+## ACME-Proxy-Modus
+
+Der ACME-Proxy ermöglicht es internen Clients, Zertifikate von einer öffentlichen CA (Let's Encrypt, ZeroSSL usw.) über UCM anzufordern, ohne direkten Internetzugang. UCM fungiert als Vermittler, verwaltet DNS-01-Challenges und leitet Anfragen an die vorgelagerte CA weiter.
+
+### Wann den Proxy-Modus verwenden
+- Interne Clients haben keinen direkten Internetzugang
+- Sie möchten die Verwaltung öffentlicher Zertifikate zentralisieren
+- Sie müssen alle Zertifikatsausstellungen über einen einzigen Punkt auditieren
+- Netzwerkrichtlinien verbieten direkte Verbindungen zu öffentlichen CAs
+
+### Konfiguration
+1. Gehen Sie zu **ACME** → **Einstellungen**
+2. Aktivieren Sie den **Proxy-Modus**
+3. Geben Sie die **Upstream-ACME-URL** ein (z.B. \`https://acme-v02.api.letsencrypt.org/directory\`)
+4. Falls die vorgelagerte CA EAB erfordert, geben Sie die **Proxy-EAB-Key-ID** und den **HMAC-Schlüssel** ein
+5. Klicken Sie auf **Speichern**
+
+### Proxy verwenden
+Richten Sie Ihre internen ACME-Clients auf das Proxy-Verzeichnis:
+\`\`\`
+https://ihr-ucm-server:8443/acme/proxy/directory
+\`\`\`
+
+> 💡 Proxy-EAB-Anmeldedaten sind getrennt von Client-EAB — sie authentifizieren UCM bei der vorgelagerten CA, nicht Ihre Clients bei UCM.
+
+> ⚠ Der Proxy-Modus erfordert mindestens einen konfigurierten DNS-Anbieter in UCM für die Challenge-Auflösung.
 
 ## Lokaler ACME-Server
 

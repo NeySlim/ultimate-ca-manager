@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: '硬件安全模块',
     subtitle: '外部密钥存储',
-    overview: '与硬件安全模块集成实现安全的私钥存储。支持 PKCS#11、AWS CloudHSM、Azure Key Vault 和 Google Cloud KMS。',
+    overview: '与硬件安全模块集成实现安全的私钥存储。支持 PKCS#11、AWS CloudHSM、Azure Key Vault、Google Cloud KMS 和 OpenBao/Vault Transit。',
     sections: [
       {
         title: '支持的提供商',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'Amazon Web Services 基于云的 HSM' },
           { term: 'Azure Key Vault', description: 'Microsoft Azure 托管密钥存储' },
           { term: 'Google KMS', description: 'Google Cloud 密钥管理服务' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBao 或 Vault Transit 密钥引擎，提供密钥管理即服务' },
         ]
       },
       {
@@ -74,6 +75,23 @@ Google Cloud 密钥管理服务：
 - **位置** — KMS 密钥环位置
 - **密钥环** — 密钥环名称
 - **凭据** — 服务账户 JSON 密钥
+
+### OpenBao / Vault Transit
+OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API 远程管理 — 无需 PKCS#11 库。
+
+配置：
+- **URL** — 服务器地址（例如 \`https://openbao.example.com:8200\`）
+- **令牌** — 认证令牌
+- **挂载路径** — Transit 引擎挂载点（默认：\`transit\`）
+- **命名空间** — 可选的多租户命名空间
+- **跳过 TLS 验证** — 跳过 TLS 证书验证（用于自签名证书）
+
+支持的密钥类型：
+- RSA 2048、3072、4096
+- ECDSA P-256、P-384、P-521
+- AES-256-GCM（对称）
+
+> 💡 OpenBao 是 HashiCorp Vault 的社区分支。UCM 两者都支持。
 
 ## 管理提供商
 

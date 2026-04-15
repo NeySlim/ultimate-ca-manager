@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Módulos de Seguridad de Hardware',
     subtitle: 'Almacenamiento externo de claves',
-    overview: 'Integre con Módulos de Seguridad de Hardware para el almacenamiento seguro de claves privadas. Soporte para PKCS#11, AWS CloudHSM, Azure Key Vault y Google Cloud KMS.',
+    overview: 'Integre con Módulos de Seguridad de Hardware para el almacenamiento seguro de claves privadas. Soporte para PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS y OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Proveedores compatibles',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'HSM basado en la nube de Amazon Web Services' },
           { term: 'Azure Key Vault', description: 'Almacenamiento de claves gestionado de Microsoft Azure' },
           { term: 'Google KMS', description: 'Servicio de gestión de claves de Google Cloud' },
+          { term: 'OpenBao / Vault Transit', description: 'Motor de secretos Transit de OpenBao o Vault para gestión de claves como servicio' },
         ]
       },
       {
@@ -74,6 +75,23 @@ Servicio de gestión de claves de Google Cloud:
 - **Ubicación** — Ubicación del anillo de claves KMS
 - **Anillo de claves** — Nombre del anillo de claves
 - **Credenciales** — Clave JSON de la cuenta de servicio
+
+### OpenBao / Vault Transit
+Motor de secretos Transit de OpenBao o HashiCorp Vault. Las claves se gestionan remotamente a través de la API Transit — no se requiere biblioteca PKCS#11.
+
+Configuración:
+- **URL** — Dirección del servidor (ej. \`https://openbao.example.com:8200\`)
+- **Token** — Token de autenticación
+- **Ruta de montaje** — Punto de montaje del motor Transit (predeterminado: \`transit\`)
+- **Espacio de nombres** — Espacio de nombres opcional para configuraciones multi-inquilino
+- **Omitir verificación TLS** — Omitir verificación de certificado TLS (para certificados autofirmados)
+
+Tipos de claves soportados:
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (simétrico)
+
+> 💡 OpenBao es un fork comunitario de HashiCorp Vault. UCM funciona con ambos.
 
 ## Gestión de proveedores
 

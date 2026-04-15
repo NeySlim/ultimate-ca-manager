@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'ハードウェアセキュリティモジュール',
     subtitle: '外部鍵ストレージ',
-    overview: 'HSMと統合して秘密鍵を安全に保管します。PKCS#11、AWS CloudHSM、Azure Key Vault、Google Cloud KMSをサポートしています。',
+    overview: 'HSMと統合して秘密鍵を安全に保管します。PKCS#11、AWS CloudHSM、Azure Key Vault、Google Cloud KMS、OpenBao/Vault Transitをサポートしています。',
     sections: [
       {
         title: '対応プロバイダー',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'Amazon Web Servicesクラウドベースのhsm' },
           { term: 'Azure Key Vault', description: 'Microsoft Azureマネージドキーストレージ' },
           { term: 'Google KMS', description: 'Google Cloud鍵管理サービス' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBaoまたはVault Transit Secrets Engineによるサービスとしての鍵管理' },
         ]
       },
       {
@@ -74,6 +75,23 @@ Google Cloud鍵管理サービス：
 - **ロケーション** — KMSキーリングのロケーション
 - **キーリング** — キーリングの名前
 - **資格情報** — サービスアカウントのJSONキー
+
+### OpenBao / Vault Transit
+OpenBaoまたはHashiCorp Vault Transit Secrets Engine。鍵はTransit APIを介してリモートで管理されます — PKCS#11ライブラリは不要です。
+
+設定：
+- **URL** — サーバーアドレス（例：\`https://openbao.example.com:8200\`）
+- **トークン** — 認証トークン
+- **マウントパス** — Transitエンジンのマウントポイント（デフォルト：\`transit\`）
+- **名前空間** — マルチテナント設定用のオプション名前空間
+- **TLS検証をスキップ** — TLS証明書の検証をスキップ（自己署名証明書用）
+
+サポートされている鍵タイプ：
+- RSA 2048、3072、4096
+- ECDSA P-256、P-384、P-521
+- AES-256-GCM（対称）
+
+> 💡 OpenBaoはHashiCorp Vaultのコミュニティフォークです。UCMは両方で動作します。
 
 ## プロバイダーの管理
 

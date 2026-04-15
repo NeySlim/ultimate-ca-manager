@@ -124,6 +124,34 @@ Mapeie seus domínios para provedores DNS. Ao solicitar um certificado para um d
 
 > 💡 Certificados curinga (\`*.example.com\`) requerem validação DNS-01.
 
+
+## Modo Proxy ACME
+
+O proxy ACME permite que clientes internos solicitem certificados de um CA público (Let's Encrypt, ZeroSSL, etc.) através do UCM, sem acesso direto à Internet. O UCM atua como intermediário, gerenciando os desafios DNS-01 e encaminhando as solicitações ao CA upstream.
+
+### Quando usar o modo proxy
+- Clientes internos não têm acesso direto à Internet
+- Você deseja centralizar o gerenciamento de certificados públicos
+- Precisa auditar todas as emissões de certificados em um único ponto
+- As políticas de rede proíbem conexões diretas a CAs públicos
+
+### Configuração
+1. Vá para **ACME** → **Configurações**
+2. Ative o **Modo proxy**
+3. Insira a **URL ACME upstream** (ex. \`https://acme-v02.api.letsencrypt.org/directory\`)
+4. Se o CA upstream requer EAB, insira o **ID da chave EAB do proxy** e a **Chave HMAC**
+5. Clique em **Salvar**
+
+### Uso do proxy
+Direcione seus clientes ACME internos para o diretório do proxy:
+\`\`\`
+https://seu-servidor-ucm:8443/acme/proxy/directory
+\`\`\`
+
+> 💡 As credenciais EAB do proxy são separadas do EAB do cliente — elas autenticam o UCM junto ao CA upstream, não seus clientes junto ao UCM.
+
+> ⚠ O modo proxy requer pelo menos um provedor DNS configurado no UCM para a resolução dos desafios.
+
 ## Servidor ACME Local
 
 ### Configuração

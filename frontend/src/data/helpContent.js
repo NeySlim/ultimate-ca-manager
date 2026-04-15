@@ -442,6 +442,16 @@ export const helpContent = {
         ]
       },
       {
+        title: 'ACME Proxy',
+        icon: Globe,
+        items: [
+          { label: 'Proxy Mode', text: 'Forward ACME requests to an upstream CA (Let\'s Encrypt, ZeroSSL, etc.) through UCM for centralized management' },
+          { label: 'Upstream URL', text: 'The ACME directory URL of the upstream CA to proxy requests to' },
+          { label: 'Proxy EAB', text: 'EAB credentials for the upstream CA connection (separate from client EAB)' },
+          { label: 'DNS Challenges', text: 'UCM handles DNS-01 challenges on behalf of clients using configured DNS providers' },
+        ]
+      },
+      {
         title: 'Multi-CA Resolution',
         icon: TreeStructure,
         content: 'When an ACME client requests a certificate, UCM resolves the signing CA in this order:',
@@ -815,7 +825,7 @@ export const helpContent = {
   hsm: {
     title: 'Hardware Security Modules',
     subtitle: 'External key storage',
-    overview: 'Integrate with Hardware Security Modules for secure private key storage. Support for PKCS#11, AWS CloudHSM, Azure Key Vault, and Google Cloud KMS.',
+    overview: 'Integrate with Hardware Security Modules for secure private key storage. Support for PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS, and OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Supported Providers',
@@ -825,6 +835,7 @@ export const helpContent = {
           { term: 'AWS CloudHSM', description: 'Amazon Web Services cloud-based HSM' },
           { term: 'Azure Key Vault', description: 'Microsoft Azure managed key storage' },
           { term: 'Google KMS', description: 'Google Cloud Key Management Service' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBao or HashiCorp Vault Transit Secrets Engine for encryption-as-a-service key management' },
         ]
       },
       {

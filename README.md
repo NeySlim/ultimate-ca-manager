@@ -27,7 +27,7 @@
 - **SSH Certificates** -- SSH Certificate Authority management, sign host/user certificates, import CAs and certs, curl-friendly setup scripts
 
 ### Protocols
-- **ACME** -- RFC 8555, auto-enrollment, auto-renewal, DNS-01/HTTP-01 challenges, wildcard support
+- **ACME** -- RFC 8555, auto-enrollment, auto-renewal, DNS-01/HTTP-01 challenges, wildcard support, EAB, proxy mode
 - **SCEP** -- RFC 8894 device auto-enrollment with approval workflows
 - **EST** -- RFC 7030 Enrollment over Secure Transport
 - **OCSP** -- RFC 6960 real-time certificate status
@@ -36,7 +36,7 @@
 
 ### Integrations
 - **Microsoft ADCS** -- Certificate signing via AD CS, template discovery, EOBO (Enroll On Behalf Of)
-- **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS
+- **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit
 - **DNS Providers** -- Cloudflare, Route53, Azure DNS and more for ACME DNS-01 challenges
 - **Webhooks** -- Event-driven notifications for certificate lifecycle events (15+ event types)
 

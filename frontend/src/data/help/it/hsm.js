@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Moduli di sicurezza hardware',
     subtitle: 'Archiviazione esterna delle chiavi',
-    overview: 'Integrazione con moduli di sicurezza hardware per l\'archiviazione sicura delle chiavi private. Supporto per PKCS#11, AWS CloudHSM, Azure Key Vault e Google Cloud KMS.',
+    overview: 'Integrazione con moduli di sicurezza hardware per l\'archiviazione sicura delle chiavi private. Supporto per PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS e OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Provider supportati',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'HSM basato su cloud di Amazon Web Services' },
           { term: 'Azure Key Vault', description: 'Archiviazione chiavi gestita di Microsoft Azure' },
           { term: 'Google KMS', description: 'Servizio di gestione chiavi di Google Cloud' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBao o Vault Transit Secrets Engine per la gestione delle chiavi come servizio' },
         ]
       },
       {
@@ -74,6 +75,23 @@ Servizio di gestione chiavi di Google Cloud:
 - **Posizione** — Posizione del key ring KMS
 - **Key Ring** — Nome del key ring
 - **Credenziali** — File JSON della chiave del service account
+
+### OpenBao / Vault Transit
+OpenBao o HashiCorp Vault Transit Secrets Engine. Le chiavi sono gestite da remoto tramite l'API Transit — nessuna libreria PKCS#11 richiesta.
+
+Configurazione:
+- **URL** — Indirizzo del server (es. \`https://openbao.example.com:8200\`)
+- **Token** — Token di autenticazione
+- **Percorso di montaggio** — Punto di montaggio del motore Transit (predefinito: \`transit\`)
+- **Namespace** — Namespace opzionale per configurazioni multi-tenant
+- **Ignora verifica TLS** — Ignora la verifica del certificato TLS (per certificati autofirmati)
+
+Tipi di chiave supportati:
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (simmetrico)
+
+> 💡 OpenBao è un fork comunitario di HashiCorp Vault. UCM funziona con entrambi.
 
 ## Gestione dei provider
 

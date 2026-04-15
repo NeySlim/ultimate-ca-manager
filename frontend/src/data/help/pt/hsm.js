@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'Módulos de Segurança de Hardware',
     subtitle: 'Armazenamento externo de chaves',
-    overview: 'Integre com Módulos de Segurança de Hardware para armazenamento seguro de chaves privadas. Suporte para PKCS#11, AWS CloudHSM, Azure Key Vault e Google Cloud KMS.',
+    overview: 'Integre com Módulos de Segurança de Hardware para armazenamento seguro de chaves privadas. Suporte para PKCS#11, AWS CloudHSM, Azure Key Vault, Google Cloud KMS e OpenBao/Vault Transit.',
     sections: [
       {
         title: 'Provedores Suportados',
@@ -11,6 +11,7 @@ export default {
           { term: 'AWS CloudHSM', description: 'HSM baseado em nuvem da Amazon Web Services' },
           { term: 'Azure Key Vault', description: 'Armazenamento gerenciado de chaves do Microsoft Azure' },
           { term: 'Google KMS', description: 'Google Cloud Key Management Service' },
+          { term: 'OpenBao / Vault Transit', description: 'OpenBao ou Vault Transit Secrets Engine para gerenciamento de chaves como serviço' },
         ]
       },
       {
@@ -74,6 +75,23 @@ Google Cloud Key Management Service:
 - **Localização** — Localização do key ring KMS
 - **Key Ring** — Nome do key ring
 - **Credenciais** — Chave JSON da conta de serviço
+
+### OpenBao / Vault Transit
+OpenBao ou HashiCorp Vault Transit Secrets Engine. As chaves são gerenciadas remotamente via API Transit — nenhuma biblioteca PKCS#11 necessária.
+
+Configuração:
+- **URL** — Endereço do servidor (ex. \`https://openbao.example.com:8200\`)
+- **Token** — Token de autenticação
+- **Caminho de montagem** — Ponto de montagem do motor Transit (padrão: \`transit\`)
+- **Namespace** — Namespace opcional para configurações multi-tenant
+- **Ignorar verificação TLS** — Ignorar verificação de certificado TLS (para certificados autoassinados)
+
+Tipos de chave suportados:
+- RSA 2048, 3072, 4096
+- ECDSA P-256, P-384, P-521
+- AES-256-GCM (simétrico)
+
+> 💡 OpenBao é um fork comunitário do HashiCorp Vault. O UCM funciona com ambos.
 
 ## Gerenciando Provedores
 

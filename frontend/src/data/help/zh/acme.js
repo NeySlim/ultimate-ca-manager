@@ -26,6 +26,15 @@ export default {
         ]
       },
       {
+        title: 'ACME 代理',
+        items: [
+          { label: '代理模式', text: '通过 UCM 将 ACME 请求转发到上游 CA（Let\'s Encrypt、ZeroSSL 等），实现集中管理' },
+          { label: '上游 URL', text: '要转发请求的上游 CA 的 ACME 目录 URL' },
+          { label: '代理 EAB', text: '上游 CA 连接的 EAB 凭据（与客户端 EAB 分开）' },
+          { label: 'DNS 挑战', text: 'UCM 使用已配置的 DNS 提供商代表客户端处理 DNS-01 挑战' },
+        ]
+      },
+      {
         title: '多 CA 解析',
         content: '当 ACME 客户端请求证书时，UCM 按以下顺序解析签名 CA：',
         items: [
@@ -123,6 +132,34 @@ ECDSA 密钥推荐用于现代部署——更小、更快且同样安全。
 4. 点击**保存**
 
 > 💡 通配符证书（\`*.example.com\`）需要 DNS-01 验证。
+
+
+## ACME 代理模式
+
+ACME 代理允许内部客户端通过 UCM 从公共 CA（Let's Encrypt、ZeroSSL 等）请求证书，无需直接访问互联网。UCM 充当中间人，处理 DNS-01 挑战并将请求转发到上游 CA。
+
+### 何时使用代理模式
+- 内部客户端无法直接访问互联网
+- 希望集中管理公共证书
+- 需要通过单一点审计所有证书签发
+- 网络策略禁止直接连接到公共 CA
+
+### 配置
+1. 前往 **ACME** → **设置**
+2. 启用 **代理模式**
+3. 输入 **上游 ACME URL**（例如 \`https://acme-v02.api.letsencrypt.org/directory\`）
+4. 如果上游 CA 需要 EAB，输入 **代理 EAB 密钥 ID** 和 **HMAC 密钥**
+5. 点击 **保存**
+
+### 使用代理
+将内部 ACME 客户端指向代理目录：
+\`\`\`
+https://your-ucm-server:8443/acme/proxy/directory
+\`\`\`
+
+> 💡 代理 EAB 凭据与客户端 EAB 分开 — 它们用于向上游 CA 验证 UCM，而非向 UCM 验证您的客户端。
+
+> ⚠ 代理模式需要在 UCM 中至少配置一个 DNS 提供商用于挑战解析。
 
 ## 本地 ACME 服务器
 

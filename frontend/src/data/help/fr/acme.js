@@ -26,6 +26,15 @@ export default {
         ]
       },
       {
+        title: 'Proxy ACME',
+        items: [
+          { label: 'Mode proxy', text: 'Transférer les requêtes ACME vers un CA en amont (Let\'s Encrypt, ZeroSSL, etc.) via UCM pour une gestion centralisée' },
+          { label: 'URL en amont', text: 'L\'URL du répertoire ACME du CA en amont vers lequel les requêtes sont transférées' },
+          { label: 'EAB proxy', text: 'Identifiants EAB pour la connexion au CA en amont (distincts de l\'EAB client)' },
+          { label: 'Défis DNS', text: 'UCM gère les défis DNS-01 pour le compte des clients en utilisant les fournisseurs DNS configurés' },
+        ]
+      },
+      {
         title: 'Résolution multi-CA',
         content: 'Lorsqu\'un client ACME demande un certificat, UCM résout la CA de signature dans cet ordre :',
         items: [
@@ -123,6 +132,34 @@ Associez vos domaines aux fournisseurs DNS. Lors de la demande d'un certificat p
 4. Cliquez sur **Enregistrer**
 
 > 💡 Les certificats génériques (\`*.exemple.com\`) nécessitent la validation DNS-01.
+
+
+## Mode Proxy ACME
+
+Le proxy ACME permet aux clients internes de demander des certificats à un CA public (Let's Encrypt, ZeroSSL, etc.) via UCM, sans accès direct à Internet. UCM agit comme intermédiaire, gérant les défis DNS-01 et transférant les requêtes au CA en amont.
+
+### Quand utiliser le mode proxy
+- Les clients internes n'ont pas d'accès Internet direct
+- Vous souhaitez centraliser la gestion des certificats publics
+- Vous devez auditer toutes les émissions de certificats à travers un point unique
+- Les politiques réseau interdisent les connexions directes aux CA publics
+
+### Configuration
+1. Allez dans **ACME** → **Paramètres**
+2. Activez le **Mode proxy**
+3. Entrez l'**URL ACME en amont** (ex. \`https://acme-v02.api.letsencrypt.org/directory\`)
+4. Si le CA en amont nécessite un EAB, entrez le **Key ID EAB proxy** et la **Clé HMAC**
+5. Cliquez sur **Enregistrer**
+
+### Utilisation du proxy
+Dirigez vos clients ACME internes vers le répertoire proxy :
+\`\`\`
+https://votre-serveur-ucm:8443/acme/proxy/directory
+\`\`\`
+
+> 💡 Les identifiants EAB proxy sont distincts de l'EAB client — ils authentifient UCM auprès du CA en amont, pas vos clients auprès de UCM.
+
+> ⚠ Le mode proxy nécessite au moins un fournisseur DNS configuré dans UCM pour la résolution des défis.
 
 ## Serveur ACME local
 
