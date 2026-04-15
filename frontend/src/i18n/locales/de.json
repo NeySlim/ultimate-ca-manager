@@ -2205,7 +2205,14 @@
     "subtitle_one": "{{count}} Anbieter",
     "subtitle_other": "{{count}} Anbieter",
     "subtitle": "{{count}} HSM-Anbieter",
-    "providerDetails": "Anbieterdetails"
+    "providerDetails": "Anbieterdetails",
+    "openbaoConfig": {
+      "url": "Server-URL",
+      "token": "Authentifizierungs-Token",
+      "mountPath": "Transit-Einhängepfad",
+      "namespace": "Namespace",
+      "tlsSkipVerify": "TLS-Überprüfung überspringen"
+    }
   },
   "sso": {
     "subtitle": "Konfigurieren Sie LDAP, OAuth2 oder SAML-Anbieter für zentrale Authentifizierung",

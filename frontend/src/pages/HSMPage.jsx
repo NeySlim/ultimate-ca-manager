@@ -25,6 +25,7 @@ const PROVIDER_TYPES = [
   { value: 'aws-cloudhsm', label: 'AWS CloudHSM', icon: Cloud },
   { value: 'azure-keyvault', label: 'Azure Key Vault', icon: Cloud },
   { value: 'google-kms', label: 'Google Cloud KMS', icon: Cloud },
+  { value: 'openbao', label: 'OpenBao / Vault Transit', icon: Lock },
 ]
 
 const PROVIDER_ICONS = {
@@ -32,6 +33,7 @@ const PROVIDER_ICONS = {
   'aws-cloudhsm': Cloud,
   'azure-keyvault': Cloud,
   'google-kms': Cloud,
+  'openbao': Lock,
 }
 
 export default function HSMPage() {
@@ -423,6 +425,15 @@ export default function HSMPage() {
               <CompactField autoIcon="keyRing" label={t('hsm.gcpConfig.keyRing')} value={provider.gcp_keyring} copyable />
             </CompactGrid>
           )}
+          {provider.provider_type === 'openbao' && (
+            <CompactGrid>
+              <CompactField autoIcon="url" label={t('hsm.openbaoConfig.url')} value={provider.openbao_url} copyable />
+              <CompactField autoIcon="mountPath" label={t('hsm.openbaoConfig.mountPath')} value={provider.openbao_mount_path || 'transit'} copyable />
+              {provider.openbao_namespace && (
+                <CompactField autoIcon="namespace" label={t('hsm.openbaoConfig.namespace')} value={provider.openbao_namespace} copyable />
+              )}
+            </CompactGrid>
+          )}
         </CompactSection>
 
         <CompactSection title={t('hsm.hsmKeys')}>
@@ -612,6 +623,11 @@ function ProviderModal({ provider, onSave, onClose }) {
     gcp_location: provider?.gcp_location || 'global',
     gcp_keyring: provider?.gcp_keyring || '',
     gcp_credentials_json: '',
+    openbao_url: provider?.openbao_url || '',
+    openbao_token: '',
+    openbao_mount_path: provider?.openbao_mount_path || 'transit',
+    openbao_namespace: provider?.openbao_namespace || '',
+    openbao_tls_skip_verify: provider?.openbao_tls_skip_verify ?? false,
   })
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
@@ -637,6 +653,12 @@ function ProviderModal({ provider, onSave, onClose }) {
       config.project_id = formData.gcp_project_id
       config.location = formData.gcp_location
       config.key_ring = formData.gcp_keyring
+    } else if (formData.provider_type === 'openbao') {
+      config.url = formData.openbao_url
+      config.token = formData.openbao_token
+      config.mount_path = formData.openbao_mount_path || 'transit'
+      if (formData.openbao_namespace) config.namespace = formData.openbao_namespace
+      config.tls_skip_verify = formData.openbao_tls_skip_verify
     }
     return { name: formData.name, type: formData.provider_type, config }
   }
@@ -703,6 +725,22 @@ function ProviderModal({ provider, onSave, onClose }) {
             <Input label={t('hsm.gcpConfig.location')} value={formData.gcp_location} onChange={e => handleChange('gcp_location', e.target.value)} />
           </div>
           <Input label={t('hsm.gcpConfig.keyRing')} value={formData.gcp_keyring} onChange={e => handleChange('gcp_keyring', e.target.value)} />
+        </div>
+      )}
+
+      {formData.provider_type === 'openbao' && (
+        <div className="space-y-4">
+          <Input label={t('hsm.openbaoConfig.url')} value={formData.openbao_url} onChange={e => handleChange('openbao_url', e.target.value)} placeholder="https://openbao.example.com:8200" required />
+          <Input label={t('hsm.openbaoConfig.token')} type="password" noAutofill value={formData.openbao_token === '***' ? '' : (formData.openbao_token || '')} onChange={e => handleChange('openbao_token', e.target.value)} hasExistingValue={provider?.openbao_token === '***'} />
+          <div className="grid grid-cols-2 gap-4">
+            <Input label={t('hsm.openbaoConfig.mountPath')} value={formData.openbao_mount_path} onChange={e => handleChange('openbao_mount_path', e.target.value)} placeholder="transit" />
+            <Input label={t('hsm.openbaoConfig.namespace')} value={formData.openbao_namespace} onChange={e => handleChange('openbao_namespace', e.target.value)} placeholder={t('common.optional')} />
+          </div>
+          <ToggleSwitch
+            checked={formData.openbao_tls_skip_verify}
+            onChange={(val) => handleChange('openbao_tls_skip_verify', val)}
+            label={t('hsm.openbaoConfig.tlsSkipVerify')}
+          />
         </div>
       )}
 

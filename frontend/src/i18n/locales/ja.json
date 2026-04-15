@@ -2205,7 +2205,14 @@
     "subtitle_one": "{{count}} 件のプロバイダー",
     "subtitle_other": "{{count}} 件のプロバイダー",
     "subtitle": "{{count}} 件の HSM プロバイダー",
-    "providerDetails": "プロバイダー詳細"
+    "providerDetails": "プロバイダー詳細",
+    "openbaoConfig": {
+      "url": "サーバーURL",
+      "token": "認証トークン",
+      "mountPath": "Transitマウントパス",
+      "namespace": "名前空間",
+      "tlsSkipVerify": "TLS検証をスキップ"
+    }
   },
   "sso": {
     "subtitle": "LDAP、OAuth2、SAMLプロバイダーを設定して一元認証",

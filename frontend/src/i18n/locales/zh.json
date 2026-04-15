@@ -2205,7 +2205,14 @@
     "subtitle_one": "{{count}} 个提供者",
     "subtitle_other": "{{count}} 个提供者",
     "subtitle": "{{count}} 个 HSM 提供商",
-    "providerDetails": "提供商详情"
+    "providerDetails": "提供商详情",
+    "openbaoConfig": {
+      "url": "服务器URL",
+      "token": "认证令牌",
+      "mountPath": "Transit挂载路径",
+      "namespace": "命名空间",
+      "tlsSkipVerify": "跳过TLS验证"
+    }
   },
   "sso": {
     "subtitle": "配置LDAP、OAuth2或SAML提供商进行集中认证",

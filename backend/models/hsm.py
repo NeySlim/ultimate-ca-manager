@@ -46,7 +46,7 @@ class HsmProvider(db.Model if db else object):
     creator = db.relationship('User', foreign_keys=[created_by])
     
     # Valid provider types
-    VALID_TYPES = ['pkcs11', 'aws-cloudhsm', 'azure-keyvault', 'google-kms']
+    VALID_TYPES = ['pkcs11', 'aws-cloudhsm', 'azure-keyvault', 'google-kms', 'openbao']
     
     # Valid statuses
     VALID_STATUSES = ['connected', 'disconnected', 'error', 'unknown']

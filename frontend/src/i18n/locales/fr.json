@@ -1440,7 +1440,14 @@
     "subtitle_one": "{{count}} fournisseur",
     "subtitle_other": "{{count}} fournisseurs",
     "subtitle": "{{count}} fournisseurs HSM",
-    "providerDetails": "Détails du fournisseur"
+    "providerDetails": "Détails du fournisseur",
+    "openbaoConfig": {
+      "url": "URL du serveur",
+      "token": "Jeton d'authentification",
+      "mountPath": "Chemin de montage Transit",
+      "namespace": "Espace de noms",
+      "tlsSkipVerify": "Ignorer la vérification TLS"
+    }
   },
   "import": {
     "smartImport": "Import intelligent",

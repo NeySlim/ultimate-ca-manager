@@ -418,3 +418,111 @@ class TestKeyOperations:
             'algorithm': 'INVALID-ALGO',
         })
         assert_error(r, 400)
+
+
+# =============================================================================
+# OpenBao Provider Tests
+# =============================================================================
+
+class TestOpenBaoProvider:
+    """Tests for OpenBao Transit Secrets Engine provider"""
+
+    def test_create_openbao_provider(self, auth_client):
+        r = post_json(auth_client, f'{HSM_BASE}/providers', {
+            'name': 'OpenBao Test',
+            'type': 'openbao',
+            'config': {
+                'url': 'http://openbao.example.com:8200',
+                'token': 'test-token',
+                'mount_path': 'transit',
+            },
+        })
+        data = assert_success(r, status=201)
+        assert data['name'] == 'OpenBao Test'
+        assert data['type'] == 'openbao'
+
+    def test_create_openbao_provider_with_namespace(self, auth_client):
+        r = post_json(auth_client, f'{HSM_BASE}/providers', {
+            'name': 'OpenBao NS',
+            'type': 'openbao',
+            'config': {
+                'url': 'https://vault.example.com:8200',
+                'token': 'ns-token',
+                'mount_path': 'pki-transit',
+                'namespace': 'engineering',
+                'tls_skip_verify': True,
+            },
+        })
+        data = assert_success(r, status=201)
+        assert data['type'] == 'openbao'
+
+    def test_create_openbao_missing_url(self, auth_client):
+        r = post_json(auth_client, f'{HSM_BASE}/providers', {
+            'name': 'OpenBao NoURL',
+            'type': 'openbao',
+            'config': {
+                'token': 'test-token',
+            },
+        })
+        # Provider creation stores config as-is; connection test will fail
+        # But the API should still accept it (validation at connect time)
+        assert r.status_code in (201, 400)
+
+    def test_create_openbao_missing_token(self, auth_client):
+        r = post_json(auth_client, f'{HSM_BASE}/providers', {
+            'name': 'OpenBao NoToken',
+            'type': 'openbao',
+            'config': {
+                'url': 'http://openbao:8200',
+            },
+        })
+        assert r.status_code in (201, 400)
+
+    def test_openbao_in_provider_types(self, auth_client):
+        r = auth_client.get(f'{HSM_BASE}/provider-types')
+        data = assert_success(r)
+        types = [t['type'] for t in data]
+        assert 'openbao' in types
+        openbao = next(t for t in data if t['type'] == 'openbao')
+        assert openbao['label'] == 'OpenBao / Vault Transit'
+        assert 'url' in openbao['config_schema']
+        assert 'token' in openbao['config_schema']
+        assert openbao['config_schema']['token']['type'] == 'password'
+
+    def test_openbao_in_dependencies(self, auth_client):
+        r = auth_client.get(f'{HSM_BASE}/dependencies')
+        data = assert_success(r)
+        deps = data['dependencies']
+        openbao_dep = next((d for d in deps if d['provider'] == 'openbao'), None)
+        assert openbao_dep is not None
+        assert openbao_dep['installed'] is True
+
+    def test_openbao_valid_type_in_model(self):
+        from models.hsm import HsmProvider
+        assert 'openbao' in HsmProvider.VALID_TYPES
+
+    def test_openbao_provider_registered(self):
+        from services.hsm import HsmService
+        available = HsmService.get_available_providers()
+        assert 'openbao' in available
+
+    def test_openbao_provider_key_mapping(self):
+        from services.hsm.openbao_provider import ALGORITHM_TO_TRANSIT, TRANSIT_TO_ALGORITHM
+        # Verify RSA mappings
+        assert ALGORITHM_TO_TRANSIT['RSA-2048'] == ('rsa-2048', 'asymmetric')
+        assert ALGORITHM_TO_TRANSIT['RSA-4096'] == ('rsa-4096', 'asymmetric')
+        # Verify EC mappings
+        assert ALGORITHM_TO_TRANSIT['EC-P256'] == ('ecdsa-p256', 'asymmetric')
+        assert ALGORITHM_TO_TRANSIT['EC-P384'] == ('ecdsa-p384', 'asymmetric')
+        # Verify reverse
+        assert TRANSIT_TO_ALGORITHM['rsa-2048'] == 'RSA-2048'
+        assert TRANSIT_TO_ALGORITHM['ecdsa-p256'] == 'EC-P256'
+
+    def test_openbao_provider_config_error(self):
+        from services.hsm.openbao_provider import OpenBaoProvider
+        from services.hsm.base_provider import HsmConfigError
+        import pytest
+        with pytest.raises(HsmConfigError):
+            OpenBaoProvider({'token': 'test'})  # Missing URL
+        with pytest.raises(HsmConfigError):
+            OpenBaoProvider({'url': 'http://localhost:8200'})  # Missing token

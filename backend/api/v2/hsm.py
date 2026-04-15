@@ -556,6 +556,19 @@ def get_provider_types():
                 'key_ring': {'type': 'string', 'required': True, 'description': 'Key ring name'},
                 'service_account_json': {'type': 'textarea', 'required': True, 'description': 'Service account JSON key'}
             }
+        },
+        {
+            'type': 'openbao',
+            'label': 'OpenBao / Vault Transit',
+            'description': 'OpenBao or HashiCorp Vault Transit Secrets Engine',
+            'available': 'openbao' in available,
+            'config_schema': {
+                'url': {'type': 'string', 'required': True, 'description': 'Server URL (e.g., https://openbao:8200)'},
+                'token': {'type': 'password', 'required': True, 'description': 'Authentication token'},
+                'mount_path': {'type': 'string', 'required': False, 'description': 'Transit engine mount path (default: transit)'},
+                'namespace': {'type': 'string', 'required': False, 'description': 'Namespace (optional)'},
+                'tls_skip_verify': {'type': 'boolean', 'required': False, 'description': 'Skip TLS certificate verification'}
+            }
         }
     ]
     
@@ -624,6 +637,15 @@ def get_dependencies_status():
         'installed': gcp_installed,
         'packages': ['google-cloud-kms>=2.21.0'],
         'install_command': 'pip install google-cloud-kms'
+    })
+    
+    # OpenBao / Vault — uses requests (always available)
+    dependencies.append({
+        'provider': 'openbao',
+        'label': 'OpenBao / Vault Transit',
+        'installed': True,
+        'packages': ['requests (built-in)'],
+        'install_command': 'No additional packages required'
     })
     
     return success_response(data={

@@ -2205,7 +2205,14 @@
     "subtitle_one": "{{count}} fornitore",
     "subtitle_other": "{{count}} fornitori",
     "subtitle": "{{count}} provider HSM",
-    "providerDetails": "Dettagli del fornitore"
+    "providerDetails": "Dettagli del fornitore",
+    "openbaoConfig": {
+      "url": "URL del server",
+      "token": "Token di autenticazione",
+      "mountPath": "Percorso di montaggio Transit",
+      "namespace": "Namespace",
+      "tlsSkipVerify": "Ignora verifica TLS"
+    }
   },
   "sso": {
     "subtitle": "Configura provider LDAP, OAuth2 o SAML per autenticazione centralizzata",

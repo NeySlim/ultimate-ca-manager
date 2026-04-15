@@ -42,6 +42,14 @@ def _register_providers():
             HsmService.register_provider('google-kms', GcpKmsProvider)
     except ImportError:
         pass
+    
+    # OpenBao / Vault Transit Provider
+    try:
+        from .openbao_provider import OpenBaoProvider, is_available
+        if is_available():
+            HsmService.register_provider('openbao', OpenBaoProvider)
+    except ImportError:
+        pass
 
 
 # Register providers on import

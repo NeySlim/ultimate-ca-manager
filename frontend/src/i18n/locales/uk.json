@@ -2205,7 +2205,14 @@
     "subtitle_one": "{{count}} постачальник",
     "subtitle_other": "{{count}} постачальників",
     "subtitle": "{{count}} постачальників HSM",
-    "providerDetails": "Деталі провайдера"
+    "providerDetails": "Деталі провайдера",
+    "openbaoConfig": {
+      "url": "URL сервера",
+      "token": "Токен автентифікації",
+      "mountPath": "Шлях монтування Transit",
+      "namespace": "Простір імен",
+      "tlsSkipVerify": "Пропустити перевірку TLS"
+    }
   },
   "sso": {
     "subtitle": "Налаштуйте провайдерів LDAP, OAuth2 або SAML для централізованої автентифікації",
