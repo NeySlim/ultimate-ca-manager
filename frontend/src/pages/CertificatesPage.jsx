@@ -61,7 +61,7 @@ export default function CertificatesPage() {
   
   // Filters
   const [filterStatus, setFilterStatus] = useState([])
-  const [filterCA, setFilterCA] = useState('')
+  const [filterCA, setFilterCA] = useState([])
   
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
@@ -71,8 +71,8 @@ export default function CertificatesPage() {
     } else {
       setFilterStatus([])
     }
-    if (filters.ca) setFilterCA(filters.ca)
-    else setFilterCA('')
+    if (filters.ca) setFilterCA(Array.isArray(filters.ca) ? filters.ca : [filters.ca])
+    else setFilterCA([])
   }, [])
   
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -83,7 +83,7 @@ export default function CertificatesPage() {
   useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(filterStatus), filterCA, sortBy, sortOrder])
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), sortBy, sortOrder])
 
   // Reload when floating window actions change data
   useEffect(() => {
@@ -120,7 +120,7 @@ export default function CertificatesPage() {
       if (filterStatus.length > 0 && !filterStatus.includes('orphan')) {
         params.status = filterStatus
       }
-      if (filterCA) {
+      if (filterCA.length > 0) {
         params.ca_id = filterCA
       }
       
@@ -620,7 +620,7 @@ export default function CertificatesPage() {
     {
       key: 'ca',
       label: t('common.issuer'),
-      type: 'select',
+      type: 'multiSelect',
       value: filterCA,
       onChange: (val) => { setPage(1); setFilterCA(val) },
       placeholder: t('common.allCAs'),
@@ -631,7 +631,7 @@ export default function CertificatesPage() {
     }
   ], [filterStatus, filterCA, cas, t])
 
-  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA ? 1 : 0)
+  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0)
 
   // Help content
   const helpContent = (

@@ -57,7 +57,7 @@ def list_certificates():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     status_list = request.args.getlist('status')  # supports multi-select: ?status=valid&status=expired
-    ca_id = request.args.get('ca_id', type=int)  # Filter by CA
+    ca_id_list = request.args.getlist('ca_id', type=int)  # supports multi-select: ?ca_id=1&ca_id=2
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
@@ -83,12 +83,16 @@ def list_certificates():
     query = Certificate.query
     
     # Apply CA filter (Certificate stores caref=CA.refid, not ca_id)
-    if ca_id:
-        ca = CA.query.get(ca_id)
-        if ca:
-            query = query.filter_by(caref=ca.refid)
+    if ca_id_list:
+        ca_refs = []
+        for cid in ca_id_list:
+            ca = CA.query.get(cid)
+            if ca:
+                ca_refs.append(ca.refid)
+        if ca_refs:
+            query = query.filter(Certificate.caref.in_(ca_refs))
         else:
-            query = query.filter(Certificate.id < 0)  # No results for invalid CA
+            query = query.filter(Certificate.id < 0)  # No results for invalid CAs
     
     # Apply status filter (supports multi-select)
     if status_list:

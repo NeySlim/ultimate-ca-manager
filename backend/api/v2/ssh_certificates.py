@@ -30,12 +30,12 @@ def list_ssh_certificates():
     search = request.args.get('search', '').strip()
     statuses = request.args.getlist('status')
     cert_types = request.args.getlist('type')
-    ca_id = request.args.get('ca_id', type=int)
+    ca_ids = request.args.getlist('ca_id', type=int)
 
     query = SSHCertificate.query
 
-    if ca_id:
-        query = query.filter_by(ssh_ca_id=ca_id)
+    if ca_ids:
+        query = query.filter(SSHCertificate.ssh_ca_id.in_(ca_ids))
 
     if cert_types:
         valid = [t for t in cert_types if t in SSHCertificate.VALID_CERT_TYPES]

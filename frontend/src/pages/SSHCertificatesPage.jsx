@@ -99,13 +99,13 @@ export default function SSHCertificatesPage() {
   // Filters
   const [filterStatus, setFilterStatus] = useState([])
   const [filterType, setFilterType] = useState([])
-  const [filterCA, setFilterCA] = useState('')
+  const [filterCA, setFilterCA] = useState([])
 
   // ============= DATA LOADING =============
 
   useEffect(() => {
     loadData()
-  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), filterCA])
+  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA)])
 
   const loadData = async () => {
     try {
@@ -118,7 +118,7 @@ export default function SSHCertificatesPage() {
       }
       if (filterStatus.length > 0) params.status = filterStatus
       if (filterType.length > 0) params.type = filterType
-      if (filterCA) params.ca_id = filterCA
+      if (filterCA.length > 0) params.ca_id = filterCA
 
       const [certsRes, casRes, statsRes] = await Promise.all([
         sshCertificatesService.getAll(params),
@@ -672,6 +672,7 @@ export default function SSHCertificatesPage() {
             },
             ...(cas.length > 0 ? [{
               key: 'ca',
+              type: 'multiSelect',
               value: filterCA,
               onChange: (v) => { setFilterCA(v); setPage(1) },
               placeholder: t('common.allCAs'),
