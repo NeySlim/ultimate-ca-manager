@@ -52,9 +52,12 @@ const DEFAULT_EXTENSIONS = [
 // ============= STATUS HELPER =============
 
 function getStatus(cert, t) {
-  if (cert.revoked) return { key: 'revoked', label: t('sshCertificates.statusRevoked'), variant: 'danger', icon: XCircle }
-  const now = Date.now() / 1000
-  if (cert.valid_to && now > cert.valid_to) return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  if (cert.revoked || cert.status === 'revoked') return { key: 'revoked', label: t('sshCertificates.statusRevoked'), variant: 'danger', icon: XCircle }
+  if (cert.status === 'expired') return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  if (cert.valid_to) {
+    const validTo = new Date(cert.valid_to).getTime()
+    if (!isNaN(validTo) && Date.now() > validTo) return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  }
   return { key: 'valid', label: t('sshCertificates.statusValid'), variant: 'success', icon: CheckCircle }
 }
 
@@ -125,7 +128,7 @@ export default function SSHCertificatesPage() {
 
       setCertificates(certsRes.data || [])
       setCas(casRes.data || [])
-      setCertStats(statsRes.data || { valid: 0, expired: 0, revoked: 0, total: 0 })
+      setCertStats(statsRes.data?.certificates || { valid: 0, expired: 0, revoked: 0, total: 0 })
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || (certsRes.data || []).length)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.sshCertificates'))
