@@ -358,11 +358,10 @@ class AcmeProxyService:
         return authz, identifier
 
     def respond_challenge(self, chall_id_b64):
-        """Proxy challenge response with automatic DNS setup"""
+        """Proxy challenge response with asynchronous automatic DNS setup"""
         import hashlib
         from api.v2.acme_domains import find_provider_for_domain
-        from services.acme.dns_providers import create_provider
-        from models import DnsProvider, AcmeClientOrder
+        from models import AcmeClientOrder
         
         chall_id_b64_padded = chall_id_b64 + '=' * (4 - len(chall_id_b64) % 4)
         chall_url = base64.urlsafe_b64decode(chall_id_b64_padded).decode()
@@ -390,79 +389,112 @@ class AcmeProxyService:
         jwk_thumbprint = self._get_account_thumbprint()
         key_authz = f"{token}.{jwk_thumbprint}"
         
-        # TXT record value = base64url(sha256(key_authz))
-        digest = hashlib.sha256(key_authz.encode()).digest()
-        txt_value = base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
-        
         # Find the proxy order that contains this challenge's authz URL
         order = self._find_order_for_challenge(chall_url, AcmeClientOrder)
-        
-        if not order or not order.domains_list:
-            raise RuntimeError(
-                "No pending proxy order found for this challenge. "
-                "The order may have expired or been completed."
-            )
-        
+        if not order:
+            raise RuntimeError("No pending proxy order found for this challenge.")
+
         domain = order.domains_list[0].lstrip('*.')
         
-        # Find DNS provider for this domain
+        # Verify DNS provider exists BEFORE going background
         provider_info = find_provider_for_domain(domain)
         if not provider_info:
-            raise RuntimeError(
-                f"No DNS provider configured for domain: {domain}. "
-                "Configure a DNS provider in ACME > Domains before requesting certificates."
-            )
+            raise RuntimeError(f"No DNS provider configured for domain: {domain}")
+
+        # Move blocking DNS setup and upstream validation to background thread
+        import threading
+        from flask import current_app
+        # We need to pass required info to the background thread
+        app = current_app._get_current_object()
         
-        provider_model = provider_info['provider']
-        try:
-            credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
-            provider = create_provider(provider_model.provider_type, credentials)
-            
-            record_name = f"_acme-challenge.{domain}"
-            logger.info(f"Creating DNS TXT record: {record_name} = {txt_value[:20]}...")
-            provider.create_txt_record(domain, record_name, txt_value)
-            
-            # Wait for DNS propagation
-            time.sleep(30)
-            
-            # Store record info for cleanup
-            records = json.loads(order.dns_records_created) if order.dns_records_created else []
-            records.append({
-                'domain': domain,
-                'record_name': record_name,
-                'value': txt_value,
-                'provider_id': provider_model.id
-            })
-            order.dns_records_created = json.dumps(records)
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Failed to save DNS record info: {e}")
-        except Exception as e:
-            db.session.rollback()
-            raise RuntimeError(f"Failed to create DNS record for {domain}: {e}")
+        thread = threading.Thread(
+            target=self._bg_respond_challenge,
+            args=(app, chall_url, key_authz, domain, order.id)
+        )
+        thread.name = f"ACMEProxy-DNS-{domain}"
+        thread.daemon = True
+        thread.start()
         
-        # Trigger upstream validation
-        resp = self._post_jws(chall_url, {}, kid=self.account_url)
+        # Return immediate "processing" status (RFC 8555 allows returning the challenge 
+        # as it is while it's being processed)
+        challenge_data['status'] = 'processing'
+        challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
         
-        if resp.status_code != 200:
-            raise RuntimeError(f"Upstream challenge validation error: {resp.text}")
-             
-        chall = resp.json()
-        chall['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
-        
-        # Get Link header from upstream and rewrite authz URL
-        link_header = resp.headers.get('Link')
-        if link_header:
+        # Build Link header for the response
+        link_header = None
+        upstream_link = resp.headers.get('Link')
+        if upstream_link:
             import re
-            match = re.search(r'<([^>]+)>', link_header)
+            match = re.search(r'<([^>]+)>', upstream_link)
             if match:
                 authz_url = match.group(1)
                 authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
                 link_header = f'<{self.base_url}/acme/proxy/authz/{authz_id}>;rel="up"'
         
-        return chall, link_header
+        return challenge_data, link_header
+
+    def _bg_respond_challenge(self, app, chall_url, key_authz, domain, order_id):
+        """Background task for DNS setup and upstream validation trigger"""
+        import hashlib
+        import time
+        from api.v2.acme_domains import find_provider_for_domain
+        from services.acme.dns_providers import create_provider
+        from models import AcmeClientOrder
+        
+        with app.app_context():
+            try:
+                # Calculate TXT value
+                digest = hashlib.sha256(key_authz.encode()).digest()
+                txt_value = base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+                
+                # Get fresh order and provider
+                order = AcmeClientOrder.query.get(order_id)
+                provider_info = find_provider_for_domain(domain)
+                if not order or not provider_info:
+                    logger.error(f"[ACME Proxy BG] Order {order_id} or provider for {domain} not found")
+                    return
+                
+                provider_model = provider_info['provider']
+                credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                provider = create_provider(provider_model.provider_type, credentials)
+                
+                # Find the best zone for this domain
+                zone = provider.get_zone_for_domain(domain)
+                full_record_name = provider.get_acme_challenge_name(domain)
+                
+                logger.info(f"[ACME Proxy BG] Creating DNS TXT record for {domain} in zone {zone}: {full_record_name}")
+                provider.create_txt_record(zone, full_record_name, txt_value)
+                
+                # Wait for DNS propagation
+                logger.info(f"[ACME Proxy BG] Waiting 30s for propagation for {domain}...")
+                time.sleep(30)
+                
+                # Store record info for cleanup
+                records = json.loads(order.dns_records_created) if order.dns_records_created else []
+                records.append({
+                    'domain': zone,
+                    'record_name': full_record_name,
+                    'value': txt_value,
+                    'provider_id': provider_model.id
+                })
+                order.dns_records_created = json.dumps(records)
+                db.session.commit()
+                
+                # Trigger upstream validation
+                logger.info(f"[ACME Proxy BG] Triggering upstream validation for {domain}")
+                payload = {}
+                resp = self._post_jws(chall_url, payload, kid=self.account_url)
+                
+                if resp.status_code != 200:
+                    logger.error(f"[ACME Proxy BG] Upstream challenge validation error: {resp.text}")
+                else:
+                    logger.info(f"[ACME Proxy BG] Upstream challenge validation triggered successfully for {domain}")
+                    
+            except Exception as e:
+                logger.error(f"[ACME Proxy BG] Error in background challenge setup: {e}", exc_info=True)
+                db.session.rollback()
+            finally:
+                db.session.remove()
     
     def _find_order_for_challenge(self, chall_url, AcmeClientOrder):
         """Find the proxy order associated with a challenge URL."""
@@ -562,7 +594,7 @@ class AcmeProxyService:
             cert_url = order['certificate']
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
             order['certificate'] = f"{self.base_url}/acme/proxy/cert/{cert_id}"
-            
+
         return order
 
     def finalize_order(self, order_id_b64, csr_pem):
@@ -666,6 +698,7 @@ class AcmeProxyService:
                 logger.error(f"[ACME Proxy] Error storing certificate: {e}")
             
             # Cleanup DNS records and link certificate to order
+            from models import AcmeClientOrder, DnsProvider
             order = AcmeClientOrder.query.filter(
                 AcmeClientOrder.is_proxy_order == True,
                 AcmeClientOrder.status == 'pending'
@@ -686,6 +719,7 @@ class AcmeProxyService:
                                 credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
                                 provider = create_provider(provider_model.provider_type, credentials)
                                 try:
+                                    logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
                                     provider.delete_txt_record(record['domain'], record['record_name'])
                                 except Exception as e:
                                     logger.warning(f"Failed to cleanup DNS record {record.get('record_name')}: {e}")
