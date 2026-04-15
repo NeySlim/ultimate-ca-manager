@@ -117,7 +117,7 @@ def list_user_certificates():
     per_page = min(per_page, 100)
 
     # Filters
-    status_filter = request.args.get('status')
+    status_filters = request.args.getlist('status')
     user_filter = request.args.get('user_id', type=int)
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'created_at')
@@ -168,18 +168,22 @@ def list_user_certificates():
         cert = _get_certificate_for_auth_cert(ac)
 
         # Status filter (post-query since status is computed)
-        if status_filter and cert:
+        if status_filters and cert:
             now = utc_now()
-            if status_filter == 'revoked' and not cert.revoked:
+            matches = False
+            for sf in status_filters:
+                if sf == 'revoked' and cert.revoked:
+                    matches = True
+                elif sf == 'expired' and cert.valid_to and cert.valid_to <= now and not cert.revoked:
+                    matches = True
+                elif sf == 'valid' and cert.valid_to and cert.valid_to > now and not cert.revoked:
+                    matches = True
+                elif sf == 'expiring':
+                    threshold = now + timedelta(days=30)
+                    if cert.valid_to and now < cert.valid_to <= threshold and not cert.revoked:
+                        matches = True
+            if not matches:
                 continue
-            if status_filter == 'expired' and not (cert.valid_to and cert.valid_to <= now and not cert.revoked):
-                continue
-            if status_filter == 'valid' and not (cert.valid_to and cert.valid_to > now and not cert.revoked):
-                continue
-            if status_filter == 'expiring':
-                threshold = now + timedelta(days=30)
-                if not (cert.valid_to and now < cert.valid_to <= threshold and not cert.revoked):
-                    continue
 
         # Cache user lookup
         if ac.user_id not in user_cache:

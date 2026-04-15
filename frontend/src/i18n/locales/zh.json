@@ -408,7 +408,24 @@
     "sshCertificates": "SSH 证书",
     "navSsh": "SSH",
     "ssh": "SSH",
-    "showingOf": "显示 {{count}} / {{total}}"
+    "showingOf": "显示 {{count}} / {{total}}",
+    "clearAll": "全部清除",
+    "selected": "已选择",
+    "nSelected": "已选择 {{count}} 项",
+    "passwordStrength": "密码强度",
+    "weak": "弱",
+    "fair": "一般",
+    "good": "好",
+    "strong": "强",
+    "preview": "预览",
+    "send": "发送",
+    "clone": "克隆",
+    "quickActions": "快速操作",
+    "issueCertificate": "签发证书",
+    "scanNetwork": "扫描网络",
+    "generateReport": "生成报告",
+    "healthStatus": "健康状态",
+    "remove": "移除"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -620,7 +637,13 @@
     "noTrustStoreExpiring": "没有即将过期的证书",
     "loading": "加载仪表板...",
     "sshCertificates": "SSH证书",
-    "sshCasCount": "{{count}} 个SSH CA"
+    "sshCasCount": "{{count}} 个SSH CA",
+    "quickActions": {
+      "issueCert": "签发证书",
+      "scanNetwork": "扫描网络",
+      "generateReport": "生成报告"
+    },
+    "expiresInDays": "{{count}} 天后到期"
   },
   "certificates": {
     "createCertificate": "创建证书",
@@ -2613,7 +2636,12 @@
     "exportData": "导出数据",
     "exportItems": "导出{{count}}项",
     "exportCSV": "导出为CSV",
-    "exportJSON": "导出为JSON"
+    "exportJSON": "导出为JSON",
+    "activeFilters": "活动筛选器",
+    "density": "密度",
+    "compact": "紧凑",
+    "default": "默认",
+    "comfortable": "舒适"
   },
   "reconnect": {
     "countdown": "服务正在重启...",
@@ -3725,5 +3753,12 @@
     "importCertificate": "导入证书",
     "importCertDescription": "导入OpenSSH格式的现有SSH证书",
     "certificateDataPlaceholder": "粘贴SSH证书数据"
+  },
+  "filters": {
+    "persistEnabled": "筛选器将被保存",
+    "persistCleared": "已保存的筛选器已清除",
+    "preset": "预设",
+    "savePreset": "保存预设",
+    "managePresets": "管理预设"
   }
 }

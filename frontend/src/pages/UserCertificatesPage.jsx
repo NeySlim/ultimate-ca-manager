@@ -40,7 +40,7 @@ export default function UserCertificatesPage() {
   const [total, setTotal] = useState(0)
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterStatus, setFilterStatus] = useState([])
 
   // Export modal
   const [showExportModal, setShowExportModal] = useState(false)
@@ -54,7 +54,7 @@ export default function UserCertificatesPage() {
     setLoading(true)
     try {
       const params = { page, per_page: perPage }
-      if (filterStatus) params.status = filterStatus
+      if (filterStatus.length > 0) params.status = filterStatus
 
       const [certRes, statsRes] = await Promise.all([
         userCertificatesService.getAll(params),
@@ -69,7 +69,7 @@ export default function UserCertificatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, perPage, filterStatus, showError, t])
+  }, [page, perPage, JSON.stringify(filterStatus), showError, t])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -94,7 +94,16 @@ export default function UserCertificatesPage() {
   // Stat click → filter
   const handleStatClick = useCallback((filterValue) => {
     setPage(1)
-    setFilterStatus(prev => prev === filterValue ? '' : filterValue)
+    if (filterValue === '') {
+      setFilterStatus([])
+    } else {
+      setFilterStatus(prev => {
+        if (prev.includes(filterValue)) {
+          return prev.filter(v => v !== filterValue)
+        }
+        return [...prev, filterValue]
+      })
+    }
   }, [])
 
   // Row click → open floating window (desktop) or slide-over (mobile)
@@ -293,7 +302,7 @@ export default function UserCertificatesPage() {
   // Filter presets callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1)
-    setFilterStatus(filters.status || '')
+    setFilterStatus(filters.status ? (Array.isArray(filters.status) ? filters.status : [filters.status]) : [])
   }, [])
 
   // Mobile slide-over content
@@ -366,9 +375,12 @@ export default function UserCertificatesPage() {
         searchKeys={['name', 'cert_subject', 'owner', 'cert_serial']}
         columnStorageKey="ucm-user-certs-columns"
         filterPresetsKey="ucm-user-certs-presets"
+        densityStorageKey="ucm-user-certs-density"
         onApplyFilterPreset={handleApplyFilterPreset}
         toolbarFilters={[{
           key: 'status',
+          label: t('common.status'),
+          type: 'multiSelect',
           value: filterStatus,
           onChange: (v) => { setFilterStatus(v); setPage(1) },
           placeholder: t('common.allStatus'),

@@ -211,17 +211,17 @@ export function CertificateDetails({
           )}
           {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
-            <Button type="button" size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')}>
+            <Button type="button" size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')} aria-label={t('certificates.renewCertificate')}>
               <ArrowsClockwise size={14} />
             </Button>
           )}
           {onRevoke && canWrite && !cert.revoked && (
-            <Button type="button" size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')}>
+            <Button type="button" size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')} aria-label={t('certificates.revokeCertificate')}>
               <X size={14} />
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button type="button" size="xs" variant="danger-soft" onClick={onDelete} title={t('common.delete')}>
+            <Button type="button" size="xs" variant="danger-soft" onClick={onDelete} title={t('common.delete')} aria-label={t('common.delete')}>
               <Trash size={14} />
             </Button>
           )}

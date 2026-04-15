@@ -3,7 +3,7 @@
  * Manage trusted CA certificates for chain validation
  * Uses ResponsiveLayout for unified UI
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -39,6 +39,8 @@ export default function TrustStorePage() {
   const [selectedCert, setSelectedCert] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [filterPurpose, setFilterPurpose] = useState([])
+  const [filterExpiryStatus, setFilterExpiryStatus] = useState([])
   
   // Add from managed CAs modal state
   const [managedCAs, setManagedCAs] = useState([])
@@ -86,6 +88,17 @@ export default function TrustStorePage() {
     }
   }
 
+  const filteredCertificates = useMemo(() => {
+    let result = certificates
+    if (filterPurpose.length > 0) {
+      result = result.filter(c => filterPurpose.includes(c.purpose))
+    }
+    if (filterExpiryStatus.length > 0) {
+      result = result.filter(c => filterExpiryStatus.includes(c._expiry_status))
+    }
+    return result
+  }, [certificates, filterPurpose, filterExpiryStatus])
+
   const handleSelectCert = async (cert) => {
     // Desktop: floating window
     if (!isMobile) {
@@ -130,6 +143,13 @@ export default function TrustStorePage() {
       setLoadingCAs(false)
     }
   }
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.purpose) setFilterPurpose(Array.isArray(filters.purpose) ? filters.purpose : [filters.purpose])
+    else setFilterPurpose([])
+    if (filters._expiry_status) setFilterExpiryStatus(Array.isArray(filters._expiry_status) ? filters._expiry_status : [filters._expiry_status])
+    else setFilterExpiryStatus([])
+  }, [])
 
   const handleOpenAddModal = () => {
     setSelectedCAIds([])
@@ -254,7 +274,7 @@ export default function TrustStorePage() {
   const toolbarActions = (
     <div className="flex gap-2">
       {certificates.length > 0 && (
-        <Button type="button" size="sm" variant="ghost" onClick={() => handleExportBundle('pem')} title={t('trustStore.exportBundle')}>
+        <Button type="button" size="sm" variant="ghost" onClick={() => handleExportBundle('pem')} title={t('trustStore.exportBundle')} aria-label={t('trustStore.exportBundle')}>
           <Download size={14} />
           <span className="hidden sm:inline">{t('trustStore.exportBundle')}</span>
         </Button>
@@ -554,7 +574,7 @@ export default function TrustStorePage() {
         onSlideOverClose={() => setSelectedCert(null)}
       >
         <ResponsiveDataTable
-          data={certificates}
+          data={filteredCertificates}
           columns={columns}
           loading={loading}
           onRowClick={handleSelectCert}
@@ -565,6 +585,10 @@ export default function TrustStorePage() {
           toolbarFilters={[
             {
               key: 'purpose',
+              label: t('common.type'),
+              type: 'multiSelect',
+              value: filterPurpose,
+              onChange: setFilterPurpose,
               placeholder: t('trustStore.allPurposes'),
               options: [
                 { value: 'root_ca', label: t('common.rootCA') },
@@ -577,6 +601,10 @@ export default function TrustStorePage() {
             },
             {
               key: '_expiry_status',
+              label: t('common.status'),
+              type: 'multiSelect',
+              value: filterExpiryStatus,
+              onChange: setFilterExpiryStatus,
               placeholder: t('trustStore.allStatuses'),
               options: [
                 { value: 'valid', label: t('common.valid') },
@@ -585,6 +613,9 @@ export default function TrustStorePage() {
               ]
             }
           ]}
+          filterPresetsKey="ucm-truststore-presets"
+          densityStorageKey="ucm-truststore-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={toolbarActions}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}

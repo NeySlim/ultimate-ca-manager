@@ -617,7 +617,7 @@ export default function SCEPPage() {
                         </code>
                       </div>
                       {ca.scep_challenge && (
-                        <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(ca.scep_challenge)}>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(ca.scep_challenge)} aria-label={t('common.copy')}>
                           <Copy size={14} />
                         </Button>
                       )}

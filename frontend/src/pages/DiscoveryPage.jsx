@@ -73,7 +73,7 @@ export default function DiscoveryPage() {
   const [perPage, setPerPage] = useState(25)
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState(null)   // null = all, 'managed', 'unmanaged', 'error'
+  const [statusFilter, setStatusFilter] = useState([])   // [] = all, ['managed', 'unmanaged', 'error']
   const [profileFilter, setProfileFilter] = useState(null)  // null = all, profile id
 
   // ── Data loaders ──────────────────────────────────────
@@ -94,7 +94,7 @@ export default function DiscoveryPage() {
   const loadDiscovered = useCallback(async () => {
     try {
       const params = { limit: perPage, offset: (page - 1) * perPage }
-      if (statusFilter) params.status = statusFilter
+      if (statusFilter.length > 0) params.status = statusFilter
       if (profileFilter) params.profile_id = profileFilter
       const res = await discoveryService.getAll(params)
       const data = res.data ?? res
@@ -106,7 +106,7 @@ export default function DiscoveryPage() {
         setDiscoveredTotal(data.total ?? data.items?.length ?? 0)
       }
     } catch { /* silent */ }
-  }, [page, perPage, statusFilter, profileFilter])
+  }, [page, perPage, JSON.stringify(statusFilter), profileFilter])
 
   const loadRuns = useCallback(async () => {
     try {
@@ -159,21 +159,24 @@ export default function DiscoveryPage() {
     setSelectedItem(null)
     setPage(1)
     if (tabId !== 'discovered') {
-      setStatusFilter(null)
+      setStatusFilter([])
     }
     setSearchParams({ tab: tabId, ...(profileFilter ? { profile: profileFilter } : {}) })
   }
 
   // Filter helpers
   const handleStatusFilter = (status) => {
-    setStatusFilter(prev => prev === status ? null : status)
+    setStatusFilter(prev => {
+      if (prev.includes(status)) return prev.filter(v => v !== status)
+      return [...prev, status]
+    })
     setPage(1)
   }
 
   const handleProfileFilter = (id) => {
     setProfileFilter(prev => prev === id ? null : id)
     setPage(1)
-    setStatusFilter(null)
+    setStatusFilter([])
   }
 
   const handleRetryScan = async (target, port) => {
@@ -624,6 +627,7 @@ export default function DiscoveryPage() {
             searchPlaceholder={t('discovery.searchDiscovered')}
             searchKeys={['subject', 'target', 'issuer', 'serial_number']}
             columnStorageKey="ucm-discovery-columns"
+            densityStorageKey="ucm-discovery-density"
             sortable
             defaultSort={{ key: 'cn', direction: 'asc' }}
             pagination={{
@@ -1417,10 +1421,19 @@ function DiscoveryFilterBar({ statusFilter, setStatusFilter, profileFilter, prof
           <button
             key={f.id ?? 'all'}
             type="button"
-            onClick={() => { setStatusFilter(f.id); setPage(1) }}
+            onClick={() => {
+              if (f.id === null) { setStatusFilter([]); setPage(1) }
+              else {
+                setStatusFilter(prev => {
+                  if (prev.includes(f.id)) return prev.filter(v => v !== f.id)
+                  return [...prev, f.id]
+                })
+                setPage(1)
+              }
+            }}
             className={cn(
               'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all',
-              statusFilter === f.id
+              (f.id === null && statusFilter.length === 0) || (f.id !== null && statusFilter.includes(f.id))
                 ? 'bg-accent-primary text-white shadow-sm'
                 : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
             )}
@@ -1447,12 +1460,12 @@ function DiscoveryFilterBar({ statusFilter, setStatusFilter, profileFilter, prof
         </>
       )}
 
-      {(statusFilter || profileFilter) && (
+      {(statusFilter.length > 0 || profileFilter) && (
         <>
           <div className="w-px h-5 bg-border mx-1" />
           <button
             type="button"
-            onClick={() => { setStatusFilter(null); handleProfileFilter(null); setPage(1) }}
+            onClick={() => { setStatusFilter([]); handleProfileFilter(null); setPage(1) }}
             className="flex items-center gap-1 px-2 py-1 rounded-full text-xs text-accent-primary hover:bg-accent-op10 transition-colors"
           >
             <XCircle size={12} />

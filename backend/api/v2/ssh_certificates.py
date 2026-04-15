@@ -12,9 +12,9 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from services.ssh_cert_service import SSHCertificateService
 from services.audit_service import AuditService
+from sqlalchemy import or_, and_
 from models.ssh import SSHCertificate, SSHCertificateAuthority
 from utils.datetime_utils import utc_now
-from sqlalchemy import or_
 
 logger = logging.getLogger(__name__)
 
@@ -28,33 +28,36 @@ def list_ssh_certificates():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     search = request.args.get('search', '').strip()
-    status = request.args.get('status', '').strip()
-    cert_type = request.args.get('type', '').strip()
-    ca_id = request.args.get('ca_id', type=int)
+    statuses = request.args.getlist('status')
+    cert_types = request.args.getlist('type')
+    ca_ids = request.args.getlist('ca_id', type=int)
 
     query = SSHCertificate.query
 
-    if ca_id:
-        query = query.filter_by(ssh_ca_id=ca_id)
+    if ca_ids:
+        query = query.filter(SSHCertificate.ssh_ca_id.in_(ca_ids))
 
-    if cert_type and cert_type in SSHCertificate.VALID_CERT_TYPES:
-        query = query.filter_by(cert_type=cert_type)
+    if cert_types:
+        valid = [t for t in cert_types if t in SSHCertificate.VALID_CERT_TYPES]
+        if valid:
+            query = query.filter(SSHCertificate.cert_type.in_(valid))
 
-    # Status filtering
+    # Status filtering (supports multiple statuses with OR)
     now = utc_now()
-    if status == 'valid':
-        query = query.filter_by(revoked=False)
-        query = query.filter(SSHCertificate.valid_to > now)
-    elif status == 'revoked':
-        query = query.filter_by(revoked=True)
-    elif status == 'expired':
-        query = query.filter_by(revoked=False)
-        query = query.filter(SSHCertificate.valid_to <= now)
-    elif status == 'expiring':
-        threshold = now + timedelta(days=7)
-        query = query.filter_by(revoked=False)
-        query = query.filter(SSHCertificate.valid_to <= threshold)
-        query = query.filter(SSHCertificate.valid_to > now)
+    if statuses:
+        conditions = []
+        for s in statuses:
+            if s == 'valid':
+                conditions.append(and_(SSHCertificate.revoked == False, SSHCertificate.valid_to > now))
+            elif s == 'revoked':
+                conditions.append(SSHCertificate.revoked == True)
+            elif s == 'expired':
+                conditions.append(and_(SSHCertificate.revoked == False, SSHCertificate.valid_to <= now))
+            elif s == 'expiring':
+                threshold = now + timedelta(days=7)
+                conditions.append(and_(SSHCertificate.revoked == False, SSHCertificate.valid_to <= threshold, SSHCertificate.valid_to > now))
+        if conditions:
+            query = query.filter(or_(*conditions))
 
     if search:
         safe = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')

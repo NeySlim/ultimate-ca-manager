@@ -2845,3 +2845,20 @@ input:focus, select:focus, textarea:focus {
   background-color: #fbbf24;
   color: #1a1a1a;
 }
+
+/* Keyboard shortcut indicator */
+.kbd-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  padding: 0 0.25rem;
+  height: 1.125rem;
+  font-size: 0.625rem;
+  font-family: inherit;
+  line-height: 1;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-tertiary);
+}

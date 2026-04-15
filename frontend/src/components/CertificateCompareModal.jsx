@@ -90,7 +90,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
               <p className="text-xs text-text-secondary">{t('compare.subtitle')}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary">
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary" aria-label={t('common.close')}>
             <X size={18} />
           </button>
         </div>

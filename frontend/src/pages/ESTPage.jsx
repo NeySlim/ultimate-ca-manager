@@ -261,7 +261,7 @@ export default function ESTPage() {
                       <p className="text-sm font-medium text-text-primary">{t(`est.${ep.key}`)}</p>
                       <p className="text-xs text-text-secondary">{t(`est.${ep.key}Desc`)}</p>
                     </div>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${baseUrl}${ep.path}`)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${baseUrl}${ep.path}`)} aria-label={t('common.copy')}>
                       <Copy size={14} />
                     </Button>
                   </div>

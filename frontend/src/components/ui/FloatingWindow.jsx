@@ -75,6 +75,7 @@ export function FloatingWindow({
   return (
     <div
       ref={panelRef}
+      data-testid="floating-detail-window"
       className={cn(
         'fixed flex flex-col',
         'bg-bg-secondary rounded-xl',

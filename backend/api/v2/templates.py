@@ -33,14 +33,14 @@ def list_templates():
     - active: Filter by is_active (true/false)
     - search: Search name, description
     """
-    template_type = request.args.get('type')
+    type_list = request.args.getlist('type')
     active_str = request.args.get('active')
     search = request.args.get('search', '').strip()
     
     query = CertificateTemplate.query
     
-    if template_type:
-        query = query.filter_by(template_type=template_type)
+    if type_list:
+        query = query.filter(CertificateTemplate.template_type.in_(type_list))
     
     if active_str:
         active = active_str.lower() == 'true'

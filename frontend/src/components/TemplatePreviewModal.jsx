@@ -79,7 +79,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
               <p className="text-xs text-text-secondary">{t('templates.previewFor')}: <strong>{template.name}</strong></p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary">
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary" aria-label={t('common.close')}>
             <X size={18} />
           </button>
         </div>

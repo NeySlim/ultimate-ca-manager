@@ -408,7 +408,24 @@
     "sshCertificates": "SSH Certificates",
     "navSsh": "SSH",
     "ssh": "SSH",
-    "showingOf": "Showing {{count}} of {{total}}"
+    "showingOf": "Showing {{count}} of {{total}}",
+    "clearAll": "Clear all",
+    "selected": "selected",
+    "nSelected": "{{count}} selected",
+    "passwordStrength": "Password strength",
+    "weak": "Weak",
+    "fair": "Fair",
+    "good": "Good",
+    "strong": "Strong",
+    "preview": "Preview",
+    "send": "Send",
+    "clone": "Clone",
+    "quickActions": "Quick actions",
+    "issueCertificate": "Issue certificate",
+    "scanNetwork": "Scan network",
+    "generateReport": "Generate report",
+    "healthStatus": "Health status",
+    "remove": "Remove"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -620,7 +637,13 @@
     "noTrustStoreExpiring": "All trusted certificates are valid",
     "loading": "Loading dashboard...",
     "sshCertificates": "SSH Certificates",
-    "sshCasCount": "{{count}} SSH CAs"
+    "sshCasCount": "{{count}} SSH CAs",
+    "quickActions": {
+      "issueCert": "Issue Certificate",
+      "scanNetwork": "Scan Network",
+      "generateReport": "Generate Report"
+    },
+    "expiresInDays": "Expires in {{count}} days"
   },
   "certificates": {
     "createCertificate": "Create Certificate",
@@ -2616,7 +2639,12 @@
     "exportData": "Export data",
     "exportItems": "Export {{count}} items",
     "exportCSV": "Export as CSV",
-    "exportJSON": "Export as JSON"
+    "exportJSON": "Export as JSON",
+    "activeFilters": "Active filters",
+    "density": "Density",
+    "compact": "Compact",
+    "default": "Default",
+    "comfortable": "Comfortable"
   },
   "policies": {
     "title": "Certificate Policies",
@@ -3728,5 +3756,12 @@
     "importCertificate": "Import Certificate",
     "importCertDescription": "Import an existing SSH certificate in OpenSSH format",
     "certificateDataPlaceholder": "Paste the SSH certificate data"
+  },
+  "filters": {
+    "persistEnabled": "Filters will be saved",
+    "persistCleared": "Saved filters cleared",
+    "preset": "Preset",
+    "savePreset": "Save preset",
+    "managePresets": "Manage presets"
   }
 }

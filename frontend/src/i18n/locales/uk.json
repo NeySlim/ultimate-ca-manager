@@ -408,7 +408,24 @@
     "sshCertificates": "SSH сертифікати",
     "navSsh": "SSH",
     "ssh": "SSH",
-    "showingOf": "Показано {{count}} з {{total}}"
+    "showingOf": "Показано {{count}} з {{total}}",
+    "clearAll": "Очистити все",
+    "selected": "вибрано",
+    "nSelected": "{{count}} вибрано",
+    "passwordStrength": "Надійність пароля",
+    "weak": "Слабкий",
+    "fair": "Середній",
+    "good": "Хороший",
+    "strong": "Сильний",
+    "preview": "Попередній перегляд",
+    "send": "Надіслати",
+    "clone": "Клонувати",
+    "quickActions": "Швидкі дії",
+    "issueCertificate": "Видати сертифікат",
+    "scanNetwork": "Сканувати мережу",
+    "generateReport": "Згенерувати звіт",
+    "healthStatus": "Стан здоров'я",
+    "remove": "Видалити"
   },
   "commandPalette": {
     "searchPlaceholder": "Пошук команд, сертифікатів, ЦС, користувачів...",
@@ -620,7 +637,13 @@
     "noTrustStoreExpiring": "Немає сертифікатів з терміном дії, що спливає",
     "loading": "Завантаження панелі...",
     "sshCertificates": "Сертифікати SSH",
-    "sshCasCount": "{{count}} SSH ЦС"
+    "sshCasCount": "{{count}} SSH ЦС",
+    "quickActions": {
+      "issueCert": "Видати сертифікат",
+      "scanNetwork": "Сканувати мережу",
+      "generateReport": "Згенерувати звіт"
+    },
+    "expiresInDays": "Закінчується через {{count}} днів"
   },
   "certificates": {
     "createCertificate": "Створити сертифікат",
@@ -2613,7 +2636,12 @@
     "exportData": "Експортувати дані",
     "exportItems": "Експортувати {{count}} записів",
     "exportCSV": "Експортувати як CSV",
-    "exportJSON": "Експортувати як JSON"
+    "exportJSON": "Експортувати як JSON",
+    "activeFilters": "Активні фільтри",
+    "density": "Щільність",
+    "compact": "Компактний",
+    "default": "За замовчуванням",
+    "comfortable": "Комфортний"
   },
   "reconnect": {
     "countdown": "Сервіс перезапускається...",
@@ -3725,5 +3753,12 @@
     "importCertificate": "Імпортувати сертифікат",
     "importCertDescription": "Імпортувати існуючий SSH сертифікат у форматі OpenSSH",
     "certificateDataPlaceholder": "Вставте дані SSH сертифіката"
+  },
+  "filters": {
+    "persistEnabled": "Фільтри будуть збережені",
+    "persistCleared": "Збережені фільтри очищено",
+    "preset": "Пресет",
+    "savePreset": "Зберегти пресет",
+    "managePresets": "Керувати пресетами"
   }
 }

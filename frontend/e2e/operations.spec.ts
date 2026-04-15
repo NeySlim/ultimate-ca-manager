@@ -50,8 +50,13 @@ test.describe('Operations', () => {
   })
 
   test('import tab: OPNsense has API key and secret inputs', async ({ page }) => {
-    const passwordInput = page.locator('input[type="password"]')
-    await expect(passwordInput.first()).toBeVisible()
+    // Scroll to OPNsense section first
+    const opnsenseSection = page.getByText(/OPNsense/i).first()
+    await opnsenseSection.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(300)
+    // API Secret uses noAutofill (renders as text with CSS masking, not type=password)
+    const apiSecret = page.getByRole('textbox', { name: /API Secret/i })
+    await expect(apiSecret.first()).toBeVisible({ timeout: 5000 })
   })
 
   // --- Export Tab ---

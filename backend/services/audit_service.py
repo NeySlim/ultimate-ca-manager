@@ -287,8 +287,8 @@ class AuditService:
         page: int = 1,
         per_page: int = 50,
         username: Optional[str] = None,
-        action: Optional[str] = None,
-        resource_type: Optional[str] = None,
+        action = None,
+        resource_type = None,
         success: Optional[bool] = None,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
@@ -296,7 +296,8 @@ class AuditService:
         category: Optional[str] = None
     ) -> tuple:
         """
-        Get audit logs with filtering and pagination
+        Get audit logs with filtering and pagination.
+        action and resource_type can be str or list[str] for multi-select.
         
         Returns:
             (logs, total_count, total_pages)
@@ -308,13 +309,19 @@ class AuditService:
             query = query.filter(AuditLog.username.ilike(f'%{username}%'))
         
         if action:
-            query = query.filter(AuditLog.action == action)
+            if isinstance(action, list):
+                query = query.filter(AuditLog.action.in_(action))
+            else:
+                query = query.filter(AuditLog.action == action)
         
         if category and category in AuditService.CATEGORIES:
             query = query.filter(AuditLog.action.in_(AuditService.CATEGORIES[category]))
         
         if resource_type:
-            query = query.filter(AuditLog.resource_type == resource_type)
+            if isinstance(resource_type, list):
+                query = query.filter(AuditLog.resource_type.in_(resource_type))
+            else:
+                query = query.filter(AuditLog.resource_type == resource_type)
         
         if success is not None:
             query = query.filter(AuditLog.success == success)

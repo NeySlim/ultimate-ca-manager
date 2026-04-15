@@ -408,7 +408,24 @@
     "sshCertificates": "SSH証明書",
     "navSsh": "SSH",
     "ssh": "SSH",
-    "showingOf": "{{total}}件中{{count}}件を表示"
+    "showingOf": "{{total}}件中{{count}}件を表示",
+    "clearAll": "すべてクリア",
+    "selected": "選択済み",
+    "nSelected": "{{count}}件選択",
+    "passwordStrength": "パスワード強度",
+    "weak": "弱い",
+    "fair": "普通",
+    "good": "良い",
+    "strong": "強い",
+    "preview": "プレビュー",
+    "send": "送信",
+    "clone": "クローン",
+    "quickActions": "クイックアクション",
+    "issueCertificate": "証明書を発行",
+    "scanNetwork": "ネットワークスキャン",
+    "generateReport": "レポート生成",
+    "healthStatus": "ヘルスステータス",
+    "remove": "削除"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -620,7 +637,13 @@
     "noTrustStoreExpiring": "期限切れ間近の証明書はありません",
     "loading": "ダッシュボードを読み込み中...",
     "sshCertificates": "SSH証明書",
-    "sshCasCount": "{{count}} SSH CA"
+    "sshCasCount": "{{count}} SSH CA",
+    "quickActions": {
+      "issueCert": "証明書を発行",
+      "scanNetwork": "ネットワークスキャン",
+      "generateReport": "レポートを生成"
+    },
+    "expiresInDays": "{{count}} 日後に期限切れ"
   },
   "certificates": {
     "createCertificate": "証明書を作成",
@@ -2613,7 +2636,12 @@
     "exportData": "データをエクスポート",
     "exportItems": "{{count}}件をエクスポート",
     "exportCSV": "CSVでエクスポート",
-    "exportJSON": "JSONでエクスポート"
+    "exportJSON": "JSONでエクスポート",
+    "activeFilters": "アクティブフィルター",
+    "density": "密度",
+    "compact": "コンパクト",
+    "default": "デフォルト",
+    "comfortable": "快適"
   },
   "reconnect": {
     "countdown": "サービスを再起動中...",
@@ -3725,5 +3753,12 @@
     "importCertificate": "証明書をインポート",
     "importCertDescription": "OpenSSH形式の既存SSH証明書をインポート",
     "certificateDataPlaceholder": "SSH証明書データを貼り付け"
+  },
+  "filters": {
+    "persistEnabled": "フィルターが保存されます",
+    "persistCleared": "保存済みフィルターをクリア",
+    "preset": "プリセット",
+    "savePreset": "プリセットを保存",
+    "managePresets": "プリセットを管理"
   }
 }

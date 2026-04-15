@@ -51,7 +51,7 @@ test.describe('HSM', () => {
     if (await rows.count() > 0) {
       await rows.first().click()
       await page.waitForTimeout(500)
-      const detail = page.locator('[class*="slide"], [class*="panel"], [class*="detail"]')
+      const detail = page.locator('[data-testid="floating-detail-window"], [class*="slide"], [class*="panel"], [class*="detail"]')
       expect(await detail.count()).toBeGreaterThan(0)
     }
   })

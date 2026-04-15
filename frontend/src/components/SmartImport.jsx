@@ -482,7 +482,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
                     {file.ext.toUpperCase().slice(1)}
                   </Badge>
                   <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>
-                  <button onClick={() => removeFile(i)} className="text-status-danger hover:text-status-danger">
+                  <button onClick={() => removeFile(i)} className="text-status-danger hover:text-status-danger" aria-label={t('common.remove')}>
                     <Trash size={14} />
                   </button>
                 </div>

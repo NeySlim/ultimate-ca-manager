@@ -734,13 +734,18 @@ class DiscoveryService:
         return {'total': len(certs), 'updated': updated}
 
     def get_all(self, limit: int = 200, offset: int = 0,
-                profile_id: int = None, status: str = None) -> Tuple[List[Dict], int]:
-        """Return discovered certificates with pagination. Returns (items, total)."""
+                profile_id: int = None, status = None) -> Tuple[List[Dict], int]:
+        """Return discovered certificates with pagination. Returns (items, total).
+        status can be str or list[str] for multi-select.
+        """
         query = DiscoveredCertificate.query
         if profile_id:
             query = query.filter_by(scan_profile_id=profile_id)
         if status:
-            query = query.filter_by(status=status)
+            if isinstance(status, list):
+                query = query.filter(DiscoveredCertificate.status.in_(status))
+            else:
+                query = query.filter_by(status=status)
         total = query.count()
         rows = query.order_by(DiscoveredCertificate.last_seen.desc()
                               ).offset(offset).limit(limit).all()

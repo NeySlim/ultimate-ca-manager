@@ -634,7 +634,9 @@ function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
     return (
       <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-none border-b border-border-op30 bg-secondary-op20">
         {stats.map((stat, i) => {
-          const isActive = activeStatFilter && stat.filterValue === activeStatFilter
+          const isActive = Array.isArray(activeStatFilter)
+            ? activeStatFilter.includes(stat.filterValue)
+            : (activeStatFilter && stat.filterValue === activeStatFilter)
           const isClickable = onStatClick && stat.filterValue !== undefined
           const displayLabel = stat.shortLabel || stat.label
           
@@ -677,7 +679,9 @@ function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
       {stats.map((stat, i) => {
         const Icon = stat.icon
         const iconClass = iconVariants[stat.variant] || iconVariants.primary
-        const isActive = activeStatFilter && stat.filterValue === activeStatFilter
+        const isActive = Array.isArray(activeStatFilter)
+            ? activeStatFilter.includes(stat.filterValue)
+            : (activeStatFilter && stat.filterValue === activeStatFilter)
         const isClickable = onStatClick && stat.filterValue !== undefined
         
         return (

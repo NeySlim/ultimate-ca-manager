@@ -328,7 +328,7 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
 
       {/* Delete — right-aligned */}
       {onDelete && (
-        <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10')}>
+        <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10')} aria-label={t('common.delete')}>
           <Trash size={14} weight="duotone" />
         </button>
       )}

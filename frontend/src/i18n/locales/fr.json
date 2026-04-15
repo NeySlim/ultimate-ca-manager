@@ -1009,7 +1009,24 @@
     "sshCertificates": "Certificats SSH",
     "navSsh": "SSH",
     "ssh": "SSH",
-    "showingOf": "Affichage de {{count}} sur {{total}}"
+    "showingOf": "Affichage de {{count}} sur {{total}}",
+    "clearAll": "Tout effacer",
+    "selected": "sélectionné(s)",
+    "nSelected": "{{count}} sélectionné(s)",
+    "passwordStrength": "Force du mot de passe",
+    "weak": "Faible",
+    "fair": "Moyen",
+    "good": "Bon",
+    "strong": "Fort",
+    "preview": "Aperçu",
+    "send": "Envoyer",
+    "clone": "Cloner",
+    "quickActions": "Actions rapides",
+    "issueCertificate": "Émettre un certificat",
+    "scanNetwork": "Scanner le réseau",
+    "generateReport": "Générer un rapport",
+    "healthStatus": "État de santé",
+    "remove": "Supprimer"
   },
   "compare": {
     "title": "Comparer les certificats",
@@ -1240,7 +1257,13 @@
     "noTrustStoreExpiring": "Tous les certificats de confiance sont valides",
     "loading": "Chargement du tableau de bord...",
     "sshCertificates": "Certificats SSH",
-    "sshCasCount": "{{count}} CA SSH"
+    "sshCasCount": "{{count}} CA SSH",
+    "quickActions": {
+      "issueCert": "Émettre un certificat",
+      "scanNetwork": "Scanner le réseau",
+      "generateReport": "Générer un rapport"
+    },
+    "expiresInDays": "Expire dans {{count}} jours"
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -2616,7 +2639,12 @@
     "exportData": "Exporter les données",
     "exportItems": "Exporter {{count}} éléments",
     "exportCSV": "Exporter en CSV",
-    "exportJSON": "Exporter en JSON"
+    "exportJSON": "Exporter en JSON",
+    "activeFilters": "Filtres actifs",
+    "density": "Densité",
+    "compact": "Compact",
+    "default": "Défaut",
+    "comfortable": "Confortable"
   },
   "reconnect": {
     "countdown": "Le service redémarre...",
@@ -3728,5 +3756,12 @@
     "importCertificate": "Importer un certificat",
     "importCertDescription": "Importer un certificat SSH existant au format OpenSSH",
     "certificateDataPlaceholder": "Collez les données du certificat SSH"
+  },
+  "filters": {
+    "persistEnabled": "Les filtres seront sauvegardés",
+    "persistCleared": "Filtres sauvegardés effacés",
+    "preset": "Préréglage",
+    "savePreset": "Sauvegarder le préréglage",
+    "managePresets": "Gérer les préréglages"
   }
 }

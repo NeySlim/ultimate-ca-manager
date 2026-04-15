@@ -33,13 +33,13 @@ def get_logs():
         search: Search in username, action, details
     """
     try:
-        # Parse query params
+        # Parse query params (support multi-select: ?action=create&action=delete)
         page = request.args.get('page', 1, type=int)
         per_page = min(request.args.get('per_page', 50, type=int), 100)
         username = request.args.get('username')
-        action = request.args.get('action')
+        action_list = request.args.getlist('action')
         category = request.args.get('category')
-        resource_type = request.args.get('resource_type')
+        resource_type_list = request.args.getlist('resource_type')
         search = request.args.get('search')
         
         # Parse success filter
@@ -67,9 +67,9 @@ def get_logs():
             page=page,
             per_page=per_page,
             username=username,
-            action=action,
+            action=action_list if action_list else None,
             category=category,
-            resource_type=resource_type,
+            resource_type=resource_type_list if resource_type_list else None,
             success=success,
             date_from=date_from,
             date_to=date_to,

@@ -45,7 +45,7 @@ export default function TemplatesPage() {
   const [perPage, setPerPage] = useState(25)
   
   // Filters
-  const [filterType, setFilterType] = useState('')
+  const [filterType, setFilterType] = useState([])
   
   // Import state
   const [importFile, setImportFile] = useState(null)
@@ -184,8 +184,8 @@ export default function TemplatesPage() {
       ...t,
       type: getTemplateType(t)
     }))
-    if (filterType) {
-      result = result.filter(t => t.type === filterType)
+    if (filterType.length > 0) {
+      result = result.filter(t => filterType.includes(t.type))
     }
     return result
   }, [templates, filterType, getTemplateType])
@@ -297,7 +297,12 @@ export default function TemplatesPage() {
   ], [t])
 
   // ============= ROW ACTIONS =============
-  
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
+    else setFilterType([])
+  }, [])
+
   const rowActions = useCallback((row) => [
     { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingTemplate(row); setShowTemplateModal(true) } },
     { label: t('templates.duplicateTemplate'), icon: Copy, onClick: () => handleDuplicateTemplate(row) },
@@ -475,6 +480,8 @@ export default function TemplatesPage() {
           toolbarFilters={[
             {
               key: 'type',
+              type: 'multiSelect',
+              label: t('common.type'),
               value: filterType,
               onChange: setFilterType,
               placeholder: t('common.allTypes'),
@@ -484,6 +491,9 @@ export default function TemplatesPage() {
               ]
             }
           ]}
+          filterPresetsKey="ucm-templates-presets"
+          densityStorageKey="ucm-templates-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={canWrite('templates') && (
             isMobile ? (
               <Button type="button" size="lg" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }} className="w-11 h-11 p-0">

@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 const KEY_ALGORITHM_OPTIONS = [
@@ -47,6 +47,7 @@ export default function SSHCAsPage() {
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { copy: clipboardCopy, isCopied } = useClipboard()
 
   // Data
   const [sshCas, setSSHCAs] = useState([])
@@ -67,11 +68,9 @@ export default function SSHCAsPage() {
   const [perPage, setPerPage] = useState(25)
 
   // Filters
-  const [filterType, setFilterType] = useState('')
+  const [filterType, setFilterType] = useState([])
 
-  // Copy state
-  const [copied, setCopied] = useState(false)
-  const [curlCopied, setCurlCopied] = useState(false)
+  // Copy state — managed by useClipboard hook
 
   // Load data
   useEffect(() => {
@@ -90,7 +89,12 @@ export default function SSHCAsPage() {
     }
   }
 
-  // ============= ACTIONS =============
+    const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.ca_type) setFilterType(Array.isArray(filters.ca_type) ? filters.ca_type : [filters.ca_type])
+    else setFilterType([])
+  }, [])
+
+// ============= ACTIONS =============
 
   const handleCreate = async (data) => {
     try {
@@ -205,10 +209,8 @@ export default function SSHCAsPage() {
     try {
       const res = await sshCasService.getPublicKey(ca.id)
       const publicKey = res.data?.public_key || res.data
-      await navigator.clipboard.writeText(typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey))
-      setCopied(true)
+      await clipboardCopy(typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey), 'publicKey')
       showSuccess(t('sshCas.publicKeyCopied'))
-      setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
@@ -221,10 +223,8 @@ export default function SSHCAsPage() {
 
   const handleCopyCurlCommand = async (ca) => {
     try {
-      await navigator.clipboard.writeText(getCurlCommand(ca))
-      setCurlCopied(true)
+      await clipboardCopy(getCurlCommand(ca), 'curl')
       showSuccess(t('sshCas.curlCopied'))
-      setTimeout(() => setCurlCopied(false), 2000)
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
@@ -233,8 +233,8 @@ export default function SSHCAsPage() {
   // ============= FILTERED DATA =============
 
   const filteredCAs = useMemo(() => {
-    if (!filterType) return sshCas
-    return sshCas.filter(ca => ca.ca_type === filterType)
+    if (filterType.length === 0) return sshCas
+    return sshCas.filter(ca => filterType.includes(ca.ca_type))
   }, [sshCas, filterType])
 
   // ============= STATS =============
@@ -393,8 +393,8 @@ export default function SSHCAsPage() {
           <Download size={14} /> {t('sshCas.downloadKrl')}
         </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyPublicKey(selectedCA)}>
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
+          {isCopied('publicKey') ? <Check size={14} /> : <Copy size={14} />}
+          {isCopied('publicKey') ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
         </Button>
         <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA)}>
           <Terminal size={14} /> {t('sshCertificates.downloadSetupScript')}
@@ -419,7 +419,7 @@ export default function SSHCAsPage() {
             {getCurlCommand(selectedCA)}
           </code>
           <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyCurlCommand(selectedCA)}>
-            {curlCopied ? <Check size={14} /> : <Copy size={14} />}
+            {isCopied('curl') ? <Check size={14} /> : <Copy size={14} />}
           </Button>
         </div>
       </CompactSection>
@@ -520,7 +520,7 @@ export default function SSHCAsPage() {
               className="absolute top-1 right-1"
               onClick={() => handleCopyPublicKey(selectedCA)}
             >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {isCopied('publicKey') ? <Check size={12} /> : <Copy size={12} />}
             </Button>
           </div>
         </CompactSection>
@@ -565,6 +565,8 @@ export default function SSHCAsPage() {
           toolbarFilters={[
             {
               key: 'ca_type',
+              label: t('common.type'),
+              type: 'multiSelect',
               value: filterType,
               onChange: setFilterType,
               placeholder: t('common.allTypes'),
@@ -574,6 +576,9 @@ export default function SSHCAsPage() {
               ]
             }
           ]}
+          filterPresetsKey="ucm-ssh-cas-presets"
+          densityStorageKey="ucm-ssh-cas-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={canWrite('ssh') && (
             isMobile ? (
               <div className="flex gap-2">

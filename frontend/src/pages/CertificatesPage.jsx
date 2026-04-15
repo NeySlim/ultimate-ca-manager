@@ -60,16 +60,19 @@ export default function CertificatesPage() {
   const [sortOrder, setSortOrder] = useState('asc')
   
   // Filters
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterCA, setFilterCA] = useState('')
+  const [filterStatus, setFilterStatus] = useState([])
+  const [filterCA, setFilterCA] = useState([])
   
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1) // Reset to first page when applying preset
-    if (filters.status) setFilterStatus(filters.status)
-    else setFilterStatus('')
-    if (filters.ca) setFilterCA(filters.ca)
-    else setFilterCA('')
+    if (filters.status) {
+      setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
+    } else {
+      setFilterStatus([])
+    }
+    if (filters.ca) setFilterCA(Array.isArray(filters.ca) ? filters.ca : [filters.ca])
+    else setFilterCA([])
   }, [])
   
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -79,7 +82,8 @@ export default function CertificatesPage() {
   // Load data - reload when filters or sort change
   useEffect(() => {
     loadData()
-  }, [page, perPage, filterStatus, filterCA, sortBy, sortOrder])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), sortBy, sortOrder])
 
   // Reload when floating window actions change data
   useEffect(() => {
@@ -113,10 +117,10 @@ export default function CertificatesPage() {
         sort_by: sortBy,
         sort_order: sortOrder
       }
-      if (filterStatus && filterStatus !== 'orphan') {
+      if (filterStatus.length > 0 && !filterStatus.includes('orphan')) {
         params.status = filterStatus
       }
-      if (filterCA) {
+      if (filterCA.length > 0) {
         params.ca_id = filterCA
       }
       
@@ -128,7 +132,7 @@ export default function CertificatesPage() {
       let certs = certsRes.data || []
       
       // Handle orphan filter client-side (no CA or CA not in our list)
-      if (filterStatus === 'orphan' && cas.length > 0) {
+      if (filterStatus.includes('orphan') && cas.length > 0) {
         const caRefIds = new Set(cas.map(ca => ca.refid))
         certs = certs.filter(c => c.caref && !caRefIds.has(c.caref))
       }
@@ -322,8 +326,8 @@ export default function CertificatesPage() {
       isOrphan: cert.caref && !caRefIds.has(cert.caref)
     }))
     
-    if (filterStatus) {
-      result = result.filter(c => c.status === filterStatus)
+    if (filterStatus.length > 0) {
+      result = result.filter(c => filterStatus.includes(c.status))
     }
     
     return result
@@ -355,12 +359,17 @@ export default function CertificatesPage() {
   // Handle stat click to filter
   const handleStatClick = useCallback((filterValue) => {
     setPage(1) // Reset to first page when filtering
-    if (filterValue === filterStatus) {
-      setFilterStatus('') // Toggle off if same
+    if (filterValue === '') {
+      setFilterStatus([]) // "Total" clears all
     } else {
-      setFilterStatus(filterValue)
+      setFilterStatus(prev => {
+        if (prev.includes(filterValue)) {
+          return prev.filter(v => v !== filterValue)
+        }
+        return [...prev, filterValue]
+      })
     }
-  }, [filterStatus])
+  }, [])
   
   // Handle sort change (server-side)
   const handleSortChange = useCallback((newSort) => {
@@ -597,9 +606,9 @@ export default function CertificatesPage() {
     {
       key: 'status',
       label: t('common.status'),
-      type: 'select',
+      type: 'multiSelect',
       value: filterStatus,
-      onChange: setFilterStatus,
+      onChange: (val) => { setPage(1); setFilterStatus(val) },
       placeholder: t('common.allStatus'),
       options: [
         { value: 'valid', label: t('common.valid') },
@@ -611,9 +620,9 @@ export default function CertificatesPage() {
     {
       key: 'ca',
       label: t('common.issuer'),
-      type: 'select',
+      type: 'multiSelect',
       value: filterCA,
-      onChange: setFilterCA,
+      onChange: (val) => { setPage(1); setFilterCA(val) },
       placeholder: t('common.allCAs'),
       options: cas.map(ca => ({ 
         value: String(ca.id), 
@@ -622,7 +631,7 @@ export default function CertificatesPage() {
     }
   ], [filterStatus, filterCA, cas, t])
 
-  const activeFilters = (filterStatus ? 1 : 0) + (filterCA ? 1 : 0)
+  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0)
 
   // Help content
   const helpContent = (
@@ -744,33 +753,11 @@ export default function CertificatesPage() {
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
           columnStorageKey="ucm-certs-columns"
           filterPresetsKey="ucm-certs-presets"
+          densityStorageKey="ucm-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
           exportEnabled
           exportFilename="certificates"
-          toolbarFilters={[
-            {
-              key: 'status',
-              value: filterStatus,
-              onChange: setFilterStatus,
-              placeholder: t('common.allStatus'),
-              options: [
-                { value: 'valid', label: t('common.valid') },
-                { value: 'expiring', label: t('common.expiring') },
-                { value: 'expired', label: t('common.expired') },
-                { value: 'revoked', label: t('common.revoked') }
-              ]
-            },
-            {
-              key: 'ca',
-              value: filterCA,
-              onChange: setFilterCA,
-              placeholder: t('common.allCAs'),
-              options: cas.map(ca => ({ 
-                value: String(ca.id), 
-                label: ca.descr || ca.common_name 
-              }))
-            }
-          ]}
+          toolbarFilters={filters}
           toolbarActions={
             <div className="flex items-center gap-2">
               {!isMobile && (

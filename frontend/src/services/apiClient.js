@@ -271,7 +271,15 @@ export function buildQueryString(params) {
   if (!params) return ''
   const qs = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value === undefined || value === null || value === '') return
+    // Array support: append each value separately for multi-select filters
+    if (Array.isArray(value)) {
+      value.forEach(v => {
+        if (v !== undefined && v !== null && v !== '') {
+          qs.append(key, String(v))
+        }
+      })
+    } else {
       qs.append(key, String(value))
     }
   })

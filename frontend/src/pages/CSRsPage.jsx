@@ -674,6 +674,7 @@ export default function CSRsPage() {
           searchPlaceholder={activeTab === 'pending' ? t('csrs.searchPending') : t('csrs.searchSigned')}
           searchKeys={['cn', 'common_name', 'subject', 'organization', 'signed_by']}
           columnStorageKey={`ucm-csrs-${activeTab}-columns`}
+          densityStorageKey="ucm-csrs-density"
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
               <div className="flex gap-2">

@@ -13,7 +13,7 @@ import {
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple, MagnifyingGlass
+  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple, MagnifyingGlass, Copy
 } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import {
@@ -25,7 +25,7 @@ import {
 } from '../components'
 import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
 
@@ -33,6 +33,7 @@ export default function ACMEPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { copy } = useClipboard()
   
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
@@ -83,7 +84,7 @@ export default function ACMEPage() {
   const [perPage, setPerPage] = useState(25)
   
   // History filters
-  const [historyFilterStatus, setHistoryFilterStatus] = useState('')
+  const [historyFilterStatus, setHistoryFilterStatus] = useState([])
   const [historyFilterCA, setHistoryFilterCA] = useState('')
   const [historyFilterSource, setHistoryFilterSource] = useState('')
 
@@ -830,7 +831,7 @@ export default function ACMEPage() {
         <div className="space-y-3">
           <CompactSection title={t('common.accountInformation')}>
             <CompactGrid>
-              <CompactField autoIcon="email" label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
+              <CompactField autoIcon="email" label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} copyable />
               <CompactField autoIcon="status" label={t('common.status')}>
                 <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
                   {selectedAccount.status}
@@ -842,9 +843,19 @@ export default function ACMEPage() {
           </CompactSection>
 
           <CompactSection title={t('acme.accountId')} collapsible defaultOpen={false}>
-            <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded">
-              {selectedAccount.account_id}
-            </p>
+            <div className="relative group">
+              <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded pr-8">
+                {selectedAccount.account_id}
+              </p>
+              <button
+                type="button"
+                onClick={() => { copy(selectedAccount.account_id); showSuccess(t('common.copied')) }}
+                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
+                aria-label={t('common.copy')}
+              >
+                <Copy size={14} />
+              </button>
+            </div>
           </CompactSection>
 
           <CompactSection title={t('acme.termsOfService')}>
@@ -2116,13 +2127,25 @@ export default function ACMEPage() {
     </div>
   )
   
+  // Handle applying filter preset for history table
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.source) setHistoryFilterSource(filters.source)
+    else setHistoryFilterSource('')
+    if (filters.status) setHistoryFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
+    else setHistoryFilterStatus([])
+    if (filters.ca) setHistoryFilterCA(filters.ca)
+    else setHistoryFilterCA('')
+  }, [])
+
   // Filter history data
   const filteredHistory = useMemo(() => {
     let filtered = history
-    if (historyFilterStatus) {
-      filtered = filtered.filter(cert => 
-        historyFilterStatus === 'revoked' ? cert.revoked : !cert.revoked
-      )
+    if (historyFilterStatus.length > 0) {
+      filtered = filtered.filter(cert => {
+        if (historyFilterStatus.includes('revoked') && cert.revoked) return true
+        if (historyFilterStatus.includes('valid') && !cert.revoked) return true
+        return false
+      })
     }
     if (historyFilterCA) {
       filtered = filtered.filter(cert => cert.issuer === historyFilterCA)
@@ -2167,6 +2190,8 @@ export default function ACMEPage() {
         },
         {
           key: 'status',
+          label: t('common.status'),
+          type: 'multiSelect',
           value: historyFilterStatus,
           onChange: setHistoryFilterStatus,
           placeholder: t('common.allStatus'),
@@ -2183,6 +2208,9 @@ export default function ACMEPage() {
           options: historyCAs
         }
       ]}
+      filterPresetsKey="ucm-acme-presets"
+      densityStorageKey="ucm-acme-density"
+      onApplyFilterPreset={handleApplyFilterPreset}
       emptyState={{
         icon: ClockCounterClockwise,
         title: t('acme.noCertificates'),

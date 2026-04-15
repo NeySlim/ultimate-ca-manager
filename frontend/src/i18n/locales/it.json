@@ -408,7 +408,24 @@
     "sshCertificates": "Certificati SSH",
     "navSsh": "SSH",
     "ssh": "SSH",
-    "showingOf": "Visualizzazione di {{count}} su {{total}}"
+    "showingOf": "Visualizzazione di {{count}} su {{total}}",
+    "clearAll": "Cancella tutto",
+    "selected": "selezionato/i",
+    "nSelected": "{{count}} selezionato/i",
+    "passwordStrength": "Sicurezza della password",
+    "weak": "Debole",
+    "fair": "Discreta",
+    "good": "Buona",
+    "strong": "Forte",
+    "preview": "Anteprima",
+    "send": "Invia",
+    "clone": "Clona",
+    "quickActions": "Azioni rapide",
+    "issueCertificate": "Emetti certificato",
+    "scanNetwork": "Scansiona rete",
+    "generateReport": "Genera report",
+    "healthStatus": "Stato di salute",
+    "remove": "Rimuovi"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -620,7 +637,13 @@
     "noTrustStoreExpiring": "Nessun certificato in scadenza",
     "loading": "Caricamento dashboard...",
     "sshCertificates": "Certificati SSH",
-    "sshCasCount": "{{count}} CA SSH"
+    "sshCasCount": "{{count}} CA SSH",
+    "quickActions": {
+      "issueCert": "Emetti certificato",
+      "scanNetwork": "Scansiona rete",
+      "generateReport": "Genera rapporto"
+    },
+    "expiresInDays": "Scade tra {{count}} giorni"
   },
   "certificates": {
     "createCertificate": "Crea certificato",
@@ -2613,7 +2636,12 @@
     "exportData": "Esporta dati",
     "exportItems": "Esporta {{count}} elementi",
     "exportCSV": "Esporta come CSV",
-    "exportJSON": "Esporta come JSON"
+    "exportJSON": "Esporta come JSON",
+    "activeFilters": "Filtri attivi",
+    "density": "Densità",
+    "compact": "Compatto",
+    "default": "Predefinito",
+    "comfortable": "Comodo"
   },
   "reconnect": {
     "countdown": "Il servizio si sta riavviando...",
@@ -3725,5 +3753,12 @@
     "importCertificate": "Importa certificato",
     "importCertDescription": "Importa un certificato SSH esistente in formato OpenSSH",
     "certificateDataPlaceholder": "Incolla i dati del certificato SSH"
+  },
+  "filters": {
+    "persistEnabled": "I filtri verranno salvati",
+    "persistCleared": "Filtri salvati cancellati",
+    "preset": "Preimpostazione",
+    "savePreset": "Salva preimpostazione",
+    "managePresets": "Gestisci preimpostazioni"
   }
 }

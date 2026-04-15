@@ -102,7 +102,14 @@ test.describe('Navigation', () => {
   test('navigate to users', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    await page.locator('a[href="/users"]').first().click()
+    // Users is under the collapsible "Administration" section
+    const adminSection = page.locator('button[title="Administration"]')
+    if (await adminSection.count() > 0) {
+      await adminSection.click()
+      await page.waitForTimeout(300)
+    }
+    const link = page.locator('a[href="/users"]').first()
+    await link.click()
     await expect(page).toHaveURL(/\/users/)
     await expect(page.locator('h1')).toBeVisible()
   })

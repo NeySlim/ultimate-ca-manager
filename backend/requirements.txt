@@ -73,7 +73,7 @@ google-cloud-kms>=2.21.0
 # redis>=5.0.0
 
 # Development & Testing
-pytest==9.0.2
+pytest==9.0.3
 pytest-cov==7.0.0
 black==26.3.1
 flake8==7.3.0

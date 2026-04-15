@@ -15,6 +15,29 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.116] - 2026-04-15
+
+### Added
+- **Multi-select filters with chips** — All page filters now support multi-select with visual chips across certificates, CAs, SSH, discovery, audit, users, operations, CSRs, reports, and policies pages (#58)
+- **CA multi-select filters** — CA type and status filters on CAs page now support multi-select with proper filtering logic
+- **Copy-to-clipboard** — Detail panels across pages now include clipboard copy buttons for key fields
+- **Keyboard shortcut tooltips** — Toolbar buttons show keyboard shortcuts on hover
+- **Table density toggle** — Configurable row density with persistent storage per page
+- **Filter presets** — Tables support filter preset keys for quick filter switching
+- **Accessibility** — Added aria-labels to all icon-only buttons across the frontend
+
+### Fixed
+- **CAs page status filter was dead code** — Filter dropdown was rendered but completely ignored in filtering logic; now properly filters Active/Expired CAs
+- **Dashboard duplicate quick actions** — Quick action buttons were duplicated in header and below header; consolidated into single header bar with RBAC guards
+- **SSH status display and stats** — Corrected status field reading and statistics computation on SSH certificates page
+- **MultiSelectFilter prop mismatch** — Fixed prop names (`filterType` vs `type`) causing filters to silently fail in ResponsiveDataTable
+- **ACME proxy async DNS setup** — `respond_challenge` refactored to use background thread for DNS propagation, preventing Traefik timeouts on slow DNS providers (PR #59, @C0DEbrained)
+
+### Security
+- **pytest bump 9.0.2 → 9.0.3** — Fixes CVE-2025-71176
+
+---
+
 ## [2.115] - 2026-04-14
 
 ### Fixed

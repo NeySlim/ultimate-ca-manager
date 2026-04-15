@@ -15,7 +15,7 @@ import os
 import traceback
 from datetime import datetime, timedelta
 from ipaddress import ip_address
-from sqlalchemy import or_, case, func
+from sqlalchemy import or_, and_, case, func
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.dn_validation import validate_dn_field
@@ -56,8 +56,8 @@ def list_certificates():
     
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
-    status = request.args.get('status')  # valid, revoked, expired, expiring
-    ca_id = request.args.get('ca_id', type=int)  # Filter by CA
+    status_list = request.args.getlist('status')  # supports multi-select: ?status=valid&status=expired
+    ca_id_list = request.args.getlist('ca_id', type=int)  # supports multi-select: ?ca_id=1&ca_id=2
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
@@ -83,27 +83,40 @@ def list_certificates():
     query = Certificate.query
     
     # Apply CA filter (Certificate stores caref=CA.refid, not ca_id)
-    if ca_id:
-        ca = CA.query.get(ca_id)
-        if ca:
-            query = query.filter_by(caref=ca.refid)
+    if ca_id_list:
+        ca_refs = []
+        for cid in ca_id_list:
+            ca = CA.query.get(cid)
+            if ca:
+                ca_refs.append(ca.refid)
+        if ca_refs:
+            query = query.filter(Certificate.caref.in_(ca_refs))
         else:
-            query = query.filter(Certificate.id < 0)  # No results for invalid CA
+            query = query.filter(Certificate.id < 0)  # No results for invalid CAs
     
-    # Apply status filter
-    if status == 'revoked':
-        query = query.filter_by(revoked=True)
-    elif status == 'valid':
-        query = query.filter_by(revoked=False)
-        query = query.filter(Certificate.valid_to > utc_now())
-    elif status == 'expired':
-        query = query.filter(Certificate.valid_to <= utc_now())
-    elif status == 'expiring':
-        # Expiring in next 30 days
-        expiry_threshold = utc_now() + timedelta(days=30)
-        query = query.filter(Certificate.valid_to <= expiry_threshold)
-        query = query.filter(Certificate.valid_to > utc_now())
-        query = query.filter_by(revoked=False)
+    # Apply status filter (supports multi-select)
+    if status_list:
+        status_conditions = []
+        for status in status_list:
+            if status == 'revoked':
+                status_conditions.append(Certificate.revoked == True)
+            elif status == 'valid':
+                status_conditions.append(
+                    and_(Certificate.revoked == False, Certificate.valid_to > utc_now())
+                )
+            elif status == 'expired':
+                status_conditions.append(Certificate.valid_to <= utc_now())
+            elif status == 'expiring':
+                expiry_threshold = utc_now() + timedelta(days=30)
+                status_conditions.append(
+                    and_(
+                        Certificate.valid_to <= expiry_threshold,
+                        Certificate.valid_to > utc_now(),
+                        Certificate.revoked == False
+                    )
+                )
+        if status_conditions:
+            query = query.filter(or_(*status_conditions))
     
     # Apply search filter (escape LIKE wildcards)
     if search:

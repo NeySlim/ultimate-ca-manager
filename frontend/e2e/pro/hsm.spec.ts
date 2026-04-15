@@ -24,9 +24,11 @@ test.describe('HSM (Pro)', () => {
   })
 
   test('has content area', async ({ page }) => {
-    // HSM uses div-based layout, not <table>
-    const content = page.locator('[class*="table"], [class*="grid"], [class*="list"], [class*="data"], [class*="provider"]').first()
-    await expect(content).toBeVisible({ timeout: 10000 })
+    // HSM page renders a table or empty state message
+    const content = page.locator('table, [role="table"]').first()
+    const emptyState = page.getByText(/no.*provider/i).first()
+    // Either a table with data or an empty state message
+    await expect(content.or(emptyState)).toBeVisible({ timeout: 10000 })
   })
 
   test('new provider button opens dialog', async ({ page }) => {

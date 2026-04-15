@@ -255,10 +255,11 @@ def list_discovered():
     limit = _safe_int(request.args.get('limit', 50), 50, lo=1, hi=200)
     offset = _safe_int(request.args.get('offset', 0), 0, lo=0)
     profile_id = request.args.get('profile_id', type=int)
-    status = request.args.get('status')
+    status_list = request.args.getlist('status')
     svc = _get_service()
     items, total = svc.get_all(limit=limit, offset=offset,
-                               profile_id=profile_id, status=status)
+                               profile_id=profile_id,
+                               status=status_list if status_list else None)
     return success_response(data={'items': items, 'total': total})
 
 

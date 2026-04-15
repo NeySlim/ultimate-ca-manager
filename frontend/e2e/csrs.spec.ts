@@ -57,8 +57,8 @@ test.describe('CSRs', () => {
     if (await rows.count() > 0) {
       await rows.first().click()
       await page.waitForTimeout(500)
-      // Detail panel should appear
-      const detail = page.locator('[class*="slide"], [class*="panel"], [class*="detail"]')
+      // Detail panel or floating window should appear
+      const detail = page.locator('[data-testid="floating-detail-window"], h3:has-text("Details"), h3:has-text("CSR")')
       expect(await detail.count()).toBeGreaterThan(0)
     }
   })

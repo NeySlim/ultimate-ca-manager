@@ -668,7 +668,8 @@ function ReaderToolbar({
               className="bg-transparent text-xs text-text-primary outline-none w-[100px] py-0.5"
             />
             <button onClick={() => { setSearchOpen(false); setSearchQuery('') }}
-              className="text-text-tertiary hover:text-text-primary">
+              className="text-text-tertiary hover:text-text-primary"
+              aria-label={t('common.clear')}>
               <X size={11} />
             </button>
           </div>
@@ -1017,7 +1018,8 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
               </div>
             </div>
             <button onClick={onClose}
-              className="w-9 h-9 rounded-lg flex items-center justify-center text-text-secondary hover:bg-bg-tertiary">
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-text-secondary hover:bg-bg-tertiary"
+              aria-label={t('common.close')}>
               <X size={18} />
             </button>
           </div>

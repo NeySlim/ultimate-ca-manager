@@ -112,7 +112,7 @@ export default function AuditLogsPage() {
   // Search & Filters
   const [search, setSearch] = useState('');
   const [filterUsername, setFilterUsername] = useState('');
-  const [filterAction, setFilterAction] = useState('');
+  const [filterAction, setFilterAction] = useState([]);
   const [filterSuccess, setFilterSuccess] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -135,7 +135,7 @@ export default function AuditLogsPage() {
   // Reload logs when filters or page change
   useEffect(() => {
     loadLogs();
-  }, [page, perPage, filterUsername, filterAction, filterSuccess, filterDateFrom, filterDateTo, search]);
+  }, [page, perPage, filterUsername, JSON.stringify(filterAction), filterSuccess, filterDateFrom, filterDateTo, search]);
 
   const loadData = async () => {
     try {
@@ -164,7 +164,7 @@ export default function AuditLogsPage() {
         per_page: perPage,
         search: search || undefined,
         username: filterUsername || undefined,
-        action: filterAction || undefined,
+        action: filterAction.length > 0 ? filterAction : undefined,
         success: filterSuccess !== '' ? filterSuccess : undefined,
         date_from: filterDateFrom || undefined,
         date_to: filterDateTo || undefined
@@ -237,11 +237,21 @@ export default function AuditLogsPage() {
   const clearFilters = useCallback(() => {
     setSearch('');
     setFilterUsername('');
-    setFilterAction('');
+    setFilterAction([]);
     setFilterSuccess('');
     setFilterDateFrom('');
     setFilterDateTo('');
     setPage(1);
+  }, []);
+
+  const handleApplyFilterPreset = useCallback((filters) => {
+    setPage(1);
+    if (filters.action) setFilterAction(Array.isArray(filters.action) ? filters.action : [filters.action]);
+    else setFilterAction([]);
+    if (filters.status) setFilterSuccess(filters.status);
+    else setFilterSuccess('');
+    if (filters.username) setFilterUsername(filters.username);
+    else setFilterUsername('');
   }, []);
 
   // Format timestamp — use shared utility for relative time, with UTC-safe parsing
@@ -394,7 +404,7 @@ export default function AuditLogsPage() {
     {
       key: 'action',
       label: t('audit.action'),
-      type: 'select',
+      type: 'multiSelect',
       value: filterAction,
       onChange: (v) => { setFilterAction(v); setPage(1); },
       placeholder: t('common.allActions'),
@@ -426,7 +436,7 @@ export default function AuditLogsPage() {
   // Count active filters
   const activeFilters = useMemo(() => {
     let count = 0;
-    if (filterAction) count++;
+    if (filterAction.length > 0) count++;
     if (filterSuccess) count++;
     if (filterUsername) count++;
     if (filterDateFrom) count++;
@@ -526,19 +536,19 @@ export default function AuditLogsPage() {
         </h4>
         <div className="space-y-2">
           <Button 
-            variant={filterAction === 'login_failure' ? 'primary' : 'ghost'} 
+            variant={filterAction.includes('login_failure') ? 'primary' : 'ghost'} 
             size="sm" 
             className="w-full justify-start"
-            onClick={() => { setFilterAction('login_failure'); setShowDateFilters(false); setPage(1); }}
+            onClick={() => { setFilterAction(['login_failure']); setShowDateFilters(false); setPage(1); }}
           >
             <XCircle size={14} />
             {t('common.failedLogins')}
           </Button>
           <Button 
-            variant={filterSuccess === 'false' && !filterAction ? 'primary' : 'ghost'} 
+            variant={filterSuccess === 'false' && filterAction.length === 0 ? 'primary' : 'ghost'} 
             size="sm" 
             className="w-full justify-start"
-            onClick={() => { setFilterSuccess('false'); setFilterAction(''); setShowDateFilters(false); setPage(1); }}
+            onClick={() => { setFilterSuccess('false'); setFilterAction([]); setShowDateFilters(false); setPage(1); }}
           >
             <Warning size={14} />
             {t('common.allFailures')}
@@ -744,6 +754,8 @@ export default function AuditLogsPage() {
           toolbarFilters={[
             {
               key: 'action',
+              type: 'multiSelect',
+              label: t('audit.action'),
               value: filterAction,
               onChange: (v) => { setFilterAction(v); setPage(1); },
               placeholder: t('common.allActions'),
@@ -767,6 +779,9 @@ export default function AuditLogsPage() {
               options: uniqueUsernames.map(u => ({ value: u, label: u }))
             }
           ]}
+          filterPresetsKey="ucm-audit-presets"
+          densityStorageKey="ucm-audit-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={headerActions}
           selectedId={selectedLog?.id}
           onRowClick={setSelectedLog}

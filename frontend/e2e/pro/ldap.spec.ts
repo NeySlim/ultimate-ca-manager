@@ -21,12 +21,17 @@ test.describe('LDAP Integration (Pro)', () => {
   test('can click SSO section button', async ({ page }) => {
     await page.goto('/settings')
     await page.waitForLoadState('networkidle')
-    // Click through section buttons to find SSO (which contains LDAP)
-    const buttons = page.locator('button')
-    const count = await buttons.count()
-    // SSO is typically one of the later section buttons
-    for (let i = Math.max(0, count - 5); i < count; i++) {
-      await buttons.nth(i).click()
+    // Click SSO section button by label
+    const ssoButton = page.getByRole('button', { name: /SSO|LDAP|Single Sign/i })
+    if (await ssoButton.count() > 0) {
+      await ssoButton.first().scrollIntoViewIfNeeded()
+      await ssoButton.first().click()
+      await page.waitForTimeout(500)
+    } else {
+      // SSO might be in a navigation link
+      const ssoLink = page.getByText(/SSO|LDAP|Single Sign/i).first()
+      await ssoLink.scrollIntoViewIfNeeded()
+      await ssoLink.click()
       await page.waitForTimeout(500)
     }
   })

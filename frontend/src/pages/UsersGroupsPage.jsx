@@ -68,7 +68,7 @@ export default function UsersGroupsPage() {
   const [perPage, setPerPage] = useState(25)
   
   // Filters
-  const [filterRole, setFilterRole] = useState('')
+  const [filterRole, setFilterRole] = useState([])
   const [filterStatus, setFilterStatus] = useState('')
 
   // Tab change
@@ -412,7 +412,7 @@ export default function UsersGroupsPage() {
   
   const filteredUsers = useMemo(() => {
     let result = [...users]
-    if (filterRole) result = result.filter(u => u.role === filterRole)
+    if (filterRole.length > 0) result = result.filter(u => filterRole.includes(u.role))
     if (filterStatus === 'active') result = result.filter(u => u.active)
     if (filterStatus === 'disabled') result = result.filter(u => !u.active)
     return result
@@ -746,7 +746,7 @@ export default function UsersGroupsPage() {
                       <Badge variant={cert.enabled ? 'success' : 'warning'} size="xs">
                         {cert.enabled ? t('common.active') : t('common.disabled')}
                       </Badge>
-                      <Button type="button" size="xs" variant="ghost" onClick={() => handleDeleteUserMtls(cert.id)}>
+                      <Button type="button" size="xs" variant="ghost" onClick={() => handleDeleteUserMtls(cert.id)} aria-label={t('common.delete')}>
                         <Trash size={14} className="text-status-danger" />
                       </Button>
                     </div>
@@ -868,6 +868,13 @@ export default function UsersGroupsPage() {
     }
   }
 
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.role) setFilterRole(Array.isArray(filters.role) ? filters.role : [filters.role])
+    else setFilterRole([])
+    if (filters.status) setFilterStatus(filters.status)
+    else setFilterStatus('')
+  }, [])
+
   const handleOpenCreateModal = () => {
     if (activeTab === 'users') {
       setEditingUser(null)
@@ -926,6 +933,8 @@ export default function UsersGroupsPage() {
           toolbarFilters={activeTab === 'users' ? [
             {
               key: 'role',
+              type: 'multiSelect',
+              label: t('common.role'),
               value: filterRole,
               onChange: setFilterRole,
               placeholder: t('common.allRoles'),
@@ -947,6 +956,9 @@ export default function UsersGroupsPage() {
               ]
             }
           ] : []}
+          filterPresetsKey="ucm-users-presets"
+          densityStorageKey="ucm-users-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarActions={canWrite('users') && (
             isMobile ? (
               <Button type="button" size="lg" onClick={handleOpenCreateModal} className="w-11 h-11 p-0">

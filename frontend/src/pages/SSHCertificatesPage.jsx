@@ -19,7 +19,7 @@ import {
 } from '../components'
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useWebSocket } from '../hooks'
+import { usePermission, useWebSocket, useClipboard } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 // ============= CONSTANTS =============
@@ -52,9 +52,12 @@ const DEFAULT_EXTENSIONS = [
 // ============= STATUS HELPER =============
 
 function getStatus(cert, t) {
-  if (cert.revoked) return { key: 'revoked', label: t('sshCertificates.statusRevoked'), variant: 'danger', icon: XCircle }
-  const now = Date.now() / 1000
-  if (cert.valid_to && now > cert.valid_to) return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  if (cert.revoked || cert.status === 'revoked') return { key: 'revoked', label: t('sshCertificates.statusRevoked'), variant: 'danger', icon: XCircle }
+  if (cert.status === 'expired') return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  if (cert.valid_to) {
+    const validTo = new Date(cert.valid_to).getTime()
+    if (!isNaN(validTo) && Date.now() > validTo) return { key: 'expired', label: t('sshCertificates.statusExpired'), variant: 'warning', icon: Clock }
+  }
   return { key: 'valid', label: t('sshCertificates.statusValid'), variant: 'success', icon: CheckCircle }
 }
 
@@ -67,6 +70,7 @@ export default function SSHCertificatesPage() {
   const { id: urlCertId } = useParams()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { copy: clipboardCopy } = useClipboard()
   const { muteToasts } = useWebSocket()
 
   // Data
@@ -93,15 +97,15 @@ export default function SSHCertificatesPage() {
   const [sortOrder, setSortOrder] = useState('desc')
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterType, setFilterType] = useState('')
-  const [filterCA, setFilterCA] = useState('')
+  const [filterStatus, setFilterStatus] = useState([])
+  const [filterType, setFilterType] = useState([])
+  const [filterCA, setFilterCA] = useState([])
 
   // ============= DATA LOADING =============
 
   useEffect(() => {
     loadData()
-  }, [page, perPage, sortBy, sortOrder, filterStatus, filterType, filterCA])
+  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA)])
 
   const loadData = async () => {
     try {
@@ -112,9 +116,9 @@ export default function SSHCertificatesPage() {
         sort_by: sortBy,
         sort_order: sortOrder,
       }
-      if (filterStatus) params.status = filterStatus
-      if (filterType) params.type = filterType
-      if (filterCA) params.ca_id = filterCA
+      if (filterStatus.length > 0) params.status = filterStatus
+      if (filterType.length > 0) params.type = filterType
+      if (filterCA.length > 0) params.ca_id = filterCA
 
       const [certsRes, casRes, statsRes] = await Promise.all([
         sshCertificatesService.getAll(params),
@@ -124,7 +128,7 @@ export default function SSHCertificatesPage() {
 
       setCertificates(certsRes.data || [])
       setCas(casRes.data || [])
-      setCertStats(statsRes.data || { valid: 0, expired: 0, revoked: 0, total: 0 })
+      setCertStats(statsRes.data?.certificates || { valid: 0, expired: 0, revoked: 0, total: 0 })
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || (certsRes.data || []).length)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.sshCertificates'))
@@ -165,8 +169,17 @@ export default function SSHCertificatesPage() {
 
   const handleStatClick = useCallback((filterValue) => {
     setPage(1)
-    setFilterStatus(filterValue === filterStatus ? '' : filterValue)
-  }, [filterStatus])
+    if (filterValue === '') {
+      setFilterStatus([])
+    } else {
+      setFilterStatus(prev => {
+        if (prev.includes(filterValue)) {
+          return prev.filter(v => v !== filterValue)
+        }
+        return [...prev, filterValue]
+      })
+    }
+  }, [])
 
   // ============= ACTIONS =============
 
@@ -235,10 +248,9 @@ export default function SSHCertificatesPage() {
   }
 
   const handleCopyText = useCallback((text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      showSuccess(t('common.copy') + ' ✓')
-    }).catch(() => {})
-  }, [showSuccess, t])
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
+  }, [clipboardCopy, showSuccess, t])
 
   const handleIssueSubmit = async (data) => {
     try {
@@ -294,8 +306,8 @@ export default function SSHCertificatesPage() {
 
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1)
-    setFilterStatus(filters.status || '')
-    setFilterType(filters.type || '')
+    setFilterStatus(filters.status ? (Array.isArray(filters.status) ? filters.status : [filters.status]) : [])
+    setFilterType(filters.type ? (Array.isArray(filters.type) ? filters.type : [filters.type]) : [])
     setFilterCA(filters.ca || '')
   }, [])
 
@@ -479,8 +491,8 @@ export default function SSHCertificatesPage() {
           <CompactField autoIcon="type" label={t('sshCertificates.certType')} value={
             selectedCert.cert_type === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser')
           } />
-          <CompactField autoIcon="serial" label={t('sshCertificates.serial')} value={selectedCert.serial || '—'} mono />
-          <CompactField autoIcon="key" label={t('sshCertificates.keyId')} value={selectedCert.key_id || '—'} />
+          <CompactField autoIcon="serial" label={t('sshCertificates.serial')} value={selectedCert.serial || '—'} mono copyable />
+          <CompactField autoIcon="key" label={t('sshCertificates.keyId')} value={selectedCert.key_id || '—'} copyable />
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedCert.key_type || '—'} />
         </CompactGrid>
         {selectedCert.fingerprint && (
@@ -518,7 +530,7 @@ export default function SSHCertificatesPage() {
         <CompactGrid columns={1}>
           <CompactField autoIcon="ca" label={t('sshCertificates.caName')} value={selectedCert.ca_name || '—'} />
           {selectedCert.ca_fingerprint && (
-            <CompactField autoIcon="fingerprint" label={t('sshCertificates.caFingerprint')} value={selectedCert.ca_fingerprint} mono />
+            <CompactField autoIcon="fingerprint" label={t('sshCertificates.caFingerprint')} value={selectedCert.ca_fingerprint} mono copyable />
           )}
         </CompactGrid>
       </CompactSection>
@@ -635,6 +647,8 @@ export default function SSHCertificatesPage() {
           toolbarFilters={[
             {
               key: 'type',
+              label: t('common.type'),
+              type: 'multiSelect',
               value: filterType,
               onChange: (v) => { setFilterType(v); setPage(1) },
               placeholder: t('common.allTypes'),
@@ -645,6 +659,8 @@ export default function SSHCertificatesPage() {
             },
             {
               key: 'status',
+              label: t('common.status'),
+              type: 'multiSelect',
               value: filterStatus,
               onChange: (v) => { setFilterStatus(v); setPage(1) },
               placeholder: t('common.allStatus'),
@@ -656,6 +672,7 @@ export default function SSHCertificatesPage() {
             },
             ...(cas.length > 0 ? [{
               key: 'ca',
+              type: 'multiSelect',
               value: filterCA,
               onChange: (v) => { setFilterCA(v); setPage(1) },
               placeholder: t('common.allCAs'),
@@ -704,6 +721,8 @@ export default function SSHCertificatesPage() {
               <Plus size={16} /> {t('sshCertificates.issueCertificate')}
             </Button>
           )}
+          filterPresetsKey="ucm-ssh-certs-presets"
+          densityStorageKey="ucm-ssh-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
         />
       </ResponsiveLayout>
@@ -1107,12 +1126,12 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
 function GeneratedResultView({ result, onClose }) {
   const { t } = useTranslation()
   const { showSuccess } = useNotification()
+  const { copy: clipboardCopy } = useClipboard()
   const isGenerated = result._mode === 'generate'
 
   const handleCopy = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      showSuccess(t('common.copy') + ' ✓')
-    }).catch(() => {})
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
   }
 
   const handleDownload = (content, filename) => {

@@ -21,12 +21,13 @@ import {
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showInfo } = useNotification()
   const { canWrite } = usePermission()
+  const { copy: clipboardCopy } = useClipboard()
   
   const [loading, setLoading] = useState(true)
   const [cas, setCas] = useState([])
@@ -255,8 +256,8 @@ export default function CRLOCSPPage() {
   }
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-    showInfo(t('common.copied'))
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
   }
 
   // URL management (multi-URL support)
@@ -763,11 +764,11 @@ export default function CRLOCSPPage() {
                     <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1.5 rounded break-all">
                       {url}
                     </code>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(url)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(url)} aria-label={t('common.copy')}>
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('cdp', idx)} disabled={savingUrls}>
+                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('cdp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -814,11 +815,11 @@ export default function CRLOCSPPage() {
                     <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1.5 rounded break-all">
                       {url}
                     </code>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(url)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(url)} aria-label={t('common.copy')}>
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('ocsp', idx)} disabled={savingUrls}>
+                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('ocsp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -865,11 +866,11 @@ export default function CRLOCSPPage() {
                     <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1.5 rounded break-all">
                       {url}
                     </code>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(url)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(url)} aria-label={t('common.copy')}>
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('aia', idx)} disabled={savingUrls}>
+                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('aia', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -948,7 +949,7 @@ export default function CRLOCSPPage() {
                     disabled={!canWrite('crl')}
                   />
                   {selectedCA.cps_uri && (
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.cps_uri)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(selectedCA.cps_uri)} aria-label={t('common.copy')}>
                       <Copy size={14} />
                     </Button>
                   )}
@@ -1087,6 +1088,7 @@ export default function CRLOCSPPage() {
         selectedId={selectedCA?.id}
         onRowClick={handleSelectCA}
         sortable
+        densityStorageKey="ucm-crlocsp-density"
         pagination={{
           page,
           total: filteredCAs.length,

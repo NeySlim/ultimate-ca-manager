@@ -9,11 +9,13 @@ import { useTranslation } from 'react-i18next'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
   CaretLeft, CaretRight, X, Columns, Check,
-  BookmarkSimple, FloppyDisk, Trash, Export
+  BookmarkSimple, FloppyDisk, Trash, Export, Rows
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn, exportToCSV, exportToJSON } from '../../../lib/utils'
 import { FilterSelect } from '../Select'
+import { MultiSelectFilter } from '../MultiSelectFilter'
+import { FilterChips } from '../FilterChips'
 
 export function ResponsiveDataTable({
   // Data
@@ -79,13 +81,34 @@ export function ResponsiveDataTable({
   // 'compact': Dense rows (py-1, gap-2) - default for tables
   // 'default': Standard rows (py-1.5, gap-3)
   // 'comfortable': Spacious rows (py-2, gap-4)
-  density = 'compact',
+  density: densityProp = 'compact',
+  
+  // Density toggle - when provided, enables density toggle button
+  densityStorageKey, // localStorage key for density preference (e.g. 'ucm-certs-density')
   
   // Custom class
   className
 }) {
   const { isMobile, isDesktop, isTouch } = useMobile()
   const { t } = useTranslation()
+  
+  // Density state (persisted if key provided)
+  const [density, setDensity] = useState(() => {
+    if (densityStorageKey) {
+      try {
+        return localStorage.getItem(densityStorageKey) || densityProp
+      } catch { return densityProp }
+    }
+    return densityProp
+  })
+  
+  const cycleDensity = useCallback(() => {
+    const next = density === 'compact' ? 'default' : density === 'default' ? 'comfortable' : 'compact'
+    setDensity(next)
+    if (densityStorageKey) {
+      try { localStorage.setItem(densityStorageKey, next) } catch {}
+    }
+  }, [density, densityStorageKey])
   
   // Support both individual props and emptyState object
   const EmptyIcon = emptyState?.icon || EmptyIconProp
@@ -245,10 +268,65 @@ export function ResponsiveDataTable({
   const hasActiveFilters = useMemo(() => {
     if (searchValue) return true
     if (!toolbarFilters) return false
-    return toolbarFilters.some(f => 
-      f.type === 'dateRange' ? (f.from || f.to) : f.value
-    )
+    return toolbarFilters.some(f => {
+      if (f.type === 'dateRange') return f.from || f.to
+      if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
+      return f.value
+    })
   }, [toolbarFilters, searchValue])
+
+  // Build filter chips from active toolbar filters
+  const filterChipsArray = useMemo(() => {
+    if (!toolbarFilters) return []
+    return toolbarFilters
+      .filter(f => {
+        if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
+        if (f.type === 'dateRange') return f.from || f.to
+        return f.value !== '' && f.value !== null && f.value !== undefined
+      })
+      .map(f => {
+        const optMap = {}
+        ;(f.options || []).forEach(o => { optMap[o.value] = o.label })
+        return {
+          key: f.key,
+          label: f.label || f.placeholder || f.key,
+          value: f.value,
+          options: optMap
+        }
+      })
+  }, [toolbarFilters])
+
+  const handleRemoveChip = useCallback((key, value) => {
+    if (!toolbarFilters) return
+    const filter = toolbarFilters.find(f => {
+      if (f.type === 'dateRange') return key === `${f.key}_from` || key === `${f.key}_to`
+      return f.key === key
+    })
+    if (!filter) return
+    if (filter.type === 'dateRange') {
+      if (key.endsWith('_from')) filter.onFromChange?.('')
+      else filter.onToChange?.('')
+    } else if (filter.type === 'multiSelect' && Array.isArray(filter.value)) {
+      filter.onChange(filter.value.filter(v => v !== value))
+    } else {
+      filter.onChange('')
+    }
+  }, [toolbarFilters])
+
+  const handleClearAllChips = useCallback(() => {
+    setSearchValue('')
+    toolbarFilters?.forEach(f => {
+      if (f.type === 'dateRange') {
+        f.onFromChange?.('')
+        f.onToChange?.('')
+      } else if (f.type === 'multiSelect') {
+        f.onChange([])
+      } else {
+        f.onChange('')
+      }
+    })
+  }, [toolbarFilters])
+
   
   // Save current filters as preset
   const savePreset = () => {
@@ -542,11 +620,13 @@ export function ResponsiveDataTable({
               onClick={() => {
                 setSearchValue('')
                 toolbarFilters?.forEach(f => {
-                  f.onChange?.('')
-                  // Clear date range filters
                   if (f.type === 'dateRange') {
                     f.onFromChange?.('')
                     f.onToChange?.('')
+                  } else if (f.type === 'multiSelect') {
+                    f.onChange?.([])
+                  } else {
+                    f.onChange?.('')
                   }
                 })
               }}
@@ -600,7 +680,21 @@ export function ResponsiveDataTable({
           handleExportCSV={handleExportCSV}
           handleExportJSON={handleExportJSON}
           dataCount={sortedData.length}
+          densityStorageKey={densityStorageKey}
+          density={density}
+          cycleDensity={cycleDensity}
         />
+      )}
+
+      {/* ACTIVE FILTER CHIPS */}
+      {hasActiveFilters && filterChipsArray.length > 0 && (
+        <div className="px-1 pb-1">
+          <FilterChips
+            filters={filterChipsArray}
+            onRemove={handleRemoveChip}
+            onClearAll={handleClearAllChips}
+          />
+        </div>
       )}
       
       {/* BULK ACTION BAR */}
@@ -714,7 +808,11 @@ function SearchBar({
   exportMenuRef,
   handleExportCSV,
   handleExportJSON,
-  dataCount
+  dataCount,
+  // Density toggle
+  densityStorageKey,
+  density,
+  cycleDensity
 }) {
   const { t } = useTranslation()
   return (
@@ -804,6 +902,18 @@ function SearchBar({
                   </div>
                 )
               }
+              // Multi-select filter
+              if (filter.type === 'multiSelect') {
+                return (
+                  <MultiSelectFilter
+                    key={filter.key}
+                    options={filter.options || []}
+                    value={filter.value || []}
+                    onChange={filter.onChange}
+                    placeholder={filter.placeholder || t('common.all')}
+                  />
+                )
+              }
               // Default: FilterSelect
               return (
                 <FilterSelect
@@ -882,6 +992,22 @@ function SearchBar({
               </div>
             )}
           </div>
+        )}
+        
+        {/* Density toggle (desktop only) */}
+        {!isMobile && densityStorageKey && (
+          <button
+            type="button"
+            onClick={cycleDensity}
+            aria-label={t('table.density')}
+            className={cn(
+              'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors shrink-0',
+              'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
+            )}
+            title={`${t('table.density')}: ${t(`table.${density}`)}`}
+          >
+            <Rows size={14} weight={density === 'comfortable' ? 'fill' : density === 'default' ? 'duotone' : 'regular'} />
+          </button>
         )}
         
         {/* Filter Presets (desktop only) */}

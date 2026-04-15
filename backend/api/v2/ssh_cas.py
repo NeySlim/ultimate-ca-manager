@@ -27,12 +27,14 @@ def list_ssh_cas():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     search = request.args.get('search', '').strip()
-    ca_type = request.args.get('type', '').strip()
+    ca_types = request.args.getlist('type')
 
     query = SSHCertificateAuthority.query
 
-    if ca_type and ca_type in SSHCertificateAuthority.VALID_CA_TYPES:
-        query = query.filter_by(ca_type=ca_type)
+    if ca_types:
+        valid = [t for t in ca_types if t in SSHCertificateAuthority.VALID_CA_TYPES]
+        if valid:
+            query = query.filter(SSHCertificateAuthority.ca_type.in_(valid))
 
     if search:
         safe = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')

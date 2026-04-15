@@ -451,6 +451,9 @@ class TestAcmeClientSettings:
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
                        {'proxy_upstream_url': ''})
         assert_success(r)
+        # Restore a valid URL so downstream proxy protocol tests don't break
+        patch_json(auth_client, '/api/v2/acme/client/settings',
+                   {'proxy_upstream_url': 'https://acme-staging-v02.api.letsencrypt.org/directory'})
 
     def test_get_client_settings_has_proxy_upstream_url(self, auth_client):
         r = auth_client.get('/api/v2/acme/client/settings')

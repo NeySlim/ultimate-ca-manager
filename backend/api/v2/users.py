@@ -133,15 +133,15 @@ def list_users():
         # Non-admins can only see themselves
         return success_response(data=[g.current_user.to_dict()])
     
-    # Filters
-    role = request.args.get('role')
+    # Filters (support multi-select: ?role=admin&role=operator)
+    role_list = request.args.getlist('role')
     active_str = request.args.get('active')
     search = request.args.get('search', '').strip()
     
     query = User.query
     
-    if role:
-        query = query.filter_by(role=role)
+    if role_list:
+        query = query.filter(User.role.in_(role_list))
     
     if active_str:
         active = active_str.lower() == 'true'

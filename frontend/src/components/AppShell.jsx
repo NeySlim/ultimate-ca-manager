@@ -17,6 +17,7 @@ import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
 import { StatusFooter } from './ui/StatusFooter'
+import { TooltipComponent } from './Tooltip'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 import { useTheme } from '../contexts/ThemeContext'
@@ -152,6 +153,18 @@ export function AppShell() {
     onCommandPalette: () => setCommandPaletteOpen(true)
   })
 
+  // ? key opens help panel (when not typing in an input)
+  useEffect(() => {
+    const handleHelpKey = (e) => {
+      if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && !e.target.isContentEditable) {
+        e.preventDefault()
+        setHelpModalOpen(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleHelpKey)
+    return () => window.removeEventListener('keydown', handleHelpKey)
+  }, [])
+
   // Mobile nav groups filtered by permissions
   const filteredMobileGroups = useMemo(() => navGroups.map(group => ({
     ...group,
@@ -199,35 +212,41 @@ export function AppShell() {
           
           {/* Help button - only if page has help */}
           {hasHelp && (
-            <button
-              type="button"
-              onClick={() => setHelpModalOpen(true)}
-              aria-label={t('common.help')}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
-            >
-              <Question size={16} />
-            </button>
+            <TooltipComponent content={<span className="flex items-center gap-1.5">{t('common.help')} <kbd className="kbd-shortcut">?</kbd></span>} side="bottom">
+              <button
+                type="button"
+                onClick={() => setHelpModalOpen(true)}
+                aria-label={t('common.help')}
+                className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+              >
+                <Question size={16} />
+              </button>
+            </TooltipComponent>
           )}
           
           {/* Search button (global) */}
-          <button
-            type="button"
-            onClick={() => setCommandPaletteOpen(true)}
-            aria-label={t('common.search')}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
-          >
-            <MagnifyingGlass size={16} />
-          </button>
+          <TooltipComponent content={<span className="flex items-center gap-1.5">{t('common.search')} <kbd className="kbd-shortcut">⌘K</kbd></span>} side="bottom">
+            <button
+              type="button"
+              onClick={() => setCommandPaletteOpen(true)}
+              aria-label={t('common.search')}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+            >
+              <MagnifyingGlass size={16} />
+            </button>
+          </TooltipComponent>
           
           {/* Theme button */}
-          <button
-            type="button"
-            onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-            aria-label={t('common.theme')}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
-          >
-            <Palette size={16} />
-          </button>
+          <TooltipComponent content={t('common.theme')} side="bottom">
+            <button
+              type="button"
+              onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+              aria-label={t('common.theme')}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+            >
+              <Palette size={16} />
+            </button>
+          </TooltipComponent>
           
           {/* WebSocket indicator */}
           <WebSocketIndicator className="ml-0.5 scale-90" />

@@ -86,8 +86,8 @@ export default function PoliciesPage() {
   const [selectedPolicy, setSelectedPolicy] = useState(null)
 
   // Filters
-  const [filterType, setFilterType] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterType, setFilterType] = useState([])
+  const [filterStatus, setFilterStatus] = useState([])
 
   const loadData = useCallback(async () => {
     try {
@@ -112,9 +112,14 @@ export default function PoliciesPage() {
   // Filtered policies
   const filteredPolicies = useMemo(() => {
     let result = policies
-    if (filterType) result = result.filter(p => p.policy_type === filterType)
-    if (filterStatus === 'active') result = result.filter(p => p.is_active)
-    if (filterStatus === 'inactive') result = result.filter(p => !p.is_active)
+    if (filterType.length > 0) result = result.filter(p => filterType.includes(p.policy_type))
+    if (filterStatus.length > 0) {
+      result = result.filter(p => {
+        if (p.is_active && filterStatus.includes('active')) return true
+        if (!p.is_active && filterStatus.includes('inactive')) return true
+        return false
+      })
+    }
     return result
   }, [policies, filterType, filterStatus])
 
@@ -454,25 +459,32 @@ export default function PoliciesPage() {
     </div>
   ) : null
 
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
+    else setFilterType([])
+    if (filters.status) setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
+    else setFilterStatus([])
+  }, [])
+
   // Toolbar filters
   const toolbarFilters = [
     {
       key: 'type',
+      label: t('common.type'),
+      type: 'multiSelect',
       value: filterType,
       onChange: setFilterType,
       placeholder: t('policies.allTypes'),
-      options: [
-        { value: '', label: t('policies.allTypes') },
-        ...policyTypeOptions,
-      ],
+      options: policyTypeOptions,
     },
     {
       key: 'status',
+      label: t('common.status'),
+      type: 'multiSelect',
       value: filterStatus,
       onChange: setFilterStatus,
       placeholder: t('policies.allStatuses'),
       options: [
-        { value: '', label: t('policies.allStatuses') },
         { value: 'active', label: t('policies.active') },
         { value: 'inactive', label: t('policies.inactive') },
       ],
@@ -487,7 +499,18 @@ export default function PoliciesPage() {
         icon={Gavel}
         stats={stats}
         activeStatFilter={filterStatus}
-        onStatClick={(stat) => setFilterStatus(prev => prev === stat.filterValue ? '' : stat.filterValue)}
+        onStatClick={(stat) => {
+          if (!stat.filterValue) {
+            setFilterStatus([])
+          } else {
+            setFilterStatus(prev => {
+              if (prev.includes(stat.filterValue)) {
+                return prev.filter(v => v !== stat.filterValue)
+              }
+              return [...prev, stat.filterValue]
+            })
+          }
+        }}
         helpPageKey="policies"
         actions={canWrite('policies') ? (
           <Button type="button" onClick={openCreateModal}>
@@ -513,6 +536,9 @@ export default function PoliciesPage() {
           sortable
           defaultSort={{ key: 'priority', direction: 'asc' }}
           toolbarFilters={toolbarFilters}
+          filterPresetsKey="ucm-policies-presets"
+          densityStorageKey="ucm-policies-density"
+          onApplyFilterPreset={handleApplyFilterPreset}
           emptyIcon={Gavel}
           emptyTitle={t('policies.noPolicies')}
           emptyDescription={t('policies.noPoliciesDesc')}
