@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, PencilSimple, CheckCircle, XCircle, TestTube,
-  Cloud, HardDrive, ArrowsClockwise, Lock, Warning
+  Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy
 } from '@phosphor-icons/react'
 import { 
   Badge, Button, FormModal, Input, Select, ExperimentalBadge,
@@ -16,7 +16,7 @@ import {
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
@@ -37,6 +37,7 @@ const PROVIDER_ICONS = {
 export default function HSMPage() {
   const { t } = useTranslation()
   const { canWrite, canDelete } = usePermission()
+  const { copy } = useClipboard()
   const [providers, setProviders] = useState([])
   const [keys, setKeys] = useState([])
   const [selectedProvider, setSelectedProvider] = useState(null)
@@ -359,43 +360,67 @@ export default function HSMPage() {
           {provider.provider_type === 'pkcs11' && (
             <>
               <CompactGrid>
-                <CompactField autoIcon="slotId" label={t('hsm.pkcs11Config.slotId')} value={provider.pkcs11_slot_id ?? 'Auto'} />
-                <CompactField autoIcon="token" label={t('hsm.pkcs11Config.token')} value={provider.pkcs11_token_label || '-'} />
+                <CompactField autoIcon="slotId" label={t('hsm.pkcs11Config.slotId')} value={provider.pkcs11_slot_id ?? 'Auto'} copyable />
+                <CompactField autoIcon="token" label={t('hsm.pkcs11Config.token')} value={provider.pkcs11_token_label || '-'} copyable />
               </CompactGrid>
               <div className="mt-2 text-xs">
                 <span className="text-text-tertiary block mb-0.5">{t('hsm.pkcs11Config.libraryPath')}:</span>
-                <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded">
-                  {provider.pkcs11_library_path || '-'}
-                </p>
+                <div className="relative group">
+                  <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded pr-7">
+                    {provider.pkcs11_library_path || '-'}
+                  </p>
+                  {provider.pkcs11_library_path && (
+                    <button
+                      type="button"
+                      onClick={() => { copy(provider.pkcs11_library_path); showSuccess(t('common.copied')) }}
+                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
+                      aria-label={t('common.copy')}
+                    >
+                      <Copy size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           )}
           {provider.provider_type === 'aws-cloudhsm' && (
             <CompactGrid>
-              <CompactField autoIcon="clusterId" label={t('hsm.awsConfig.clusterId')} value={provider.aws_cluster_id} mono />
-              <CompactField autoIcon="region" label={t('hsm.awsConfig.region')} value={provider.aws_region} />
-              <CompactField autoIcon="cryptoUser" label={t('hsm.awsConfig.cryptoUser')} value={provider.aws_crypto_user} />
+              <CompactField autoIcon="clusterId" label={t('hsm.awsConfig.clusterId')} value={provider.aws_cluster_id} mono copyable />
+              <CompactField autoIcon="region" label={t('hsm.awsConfig.region')} value={provider.aws_region} copyable />
+              <CompactField autoIcon="cryptoUser" label={t('hsm.awsConfig.cryptoUser')} value={provider.aws_crypto_user} copyable />
             </CompactGrid>
           )}
           {provider.provider_type === 'azure-keyvault' && (
             <>
               <div className="text-xs mb-2">
                 <span className="text-text-tertiary block mb-0.5">{t('hsm.azureConfig.vaultUrl')}:</span>
-                <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded">
-                  {provider.azure_vault_url || '-'}
-                </p>
+                <div className="relative group">
+                  <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-1.5 rounded pr-7">
+                    {provider.azure_vault_url || '-'}
+                  </p>
+                  {provider.azure_vault_url && (
+                    <button
+                      type="button"
+                      onClick={() => { copy(provider.azure_vault_url); showSuccess(t('common.copied')) }}
+                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
+                      aria-label={t('common.copy')}
+                    >
+                      <Copy size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
               <CompactGrid>
-                <CompactField autoIcon="tenant" label={t('hsm.azureConfig.tenant')} value={provider.azure_tenant_id} mono />
-                <CompactField autoIcon="client" label={t('hsm.azureConfig.client')} value={provider.azure_client_id} mono />
+                <CompactField autoIcon="tenant" label={t('hsm.azureConfig.tenant')} value={provider.azure_tenant_id} mono copyable />
+                <CompactField autoIcon="client" label={t('hsm.azureConfig.client')} value={provider.azure_client_id} mono copyable />
               </CompactGrid>
             </>
           )}
           {provider.provider_type === 'google-kms' && (
             <CompactGrid>
-              <CompactField autoIcon="project" label={t('hsm.gcpConfig.project')} value={provider.gcp_project_id} />
-              <CompactField autoIcon="location" label={t('hsm.gcpConfig.location')} value={provider.gcp_location} />
-              <CompactField autoIcon="keyRing" label={t('hsm.gcpConfig.keyRing')} value={provider.gcp_keyring} />
+              <CompactField autoIcon="project" label={t('hsm.gcpConfig.project')} value={provider.gcp_project_id} copyable />
+              <CompactField autoIcon="location" label={t('hsm.gcpConfig.location')} value={provider.gcp_location} copyable />
+              <CompactField autoIcon="keyRing" label={t('hsm.gcpConfig.keyRing')} value={provider.gcp_keyring} copyable />
             </CompactGrid>
           )}
         </CompactSection>

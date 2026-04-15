@@ -1262,7 +1262,7 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
       <CompactSection title={t('common.subject')}>
         <CompactGrid>
           <CompactField autoIcon="commonName" label={t('common.commonName')} value={ca.common_name} copyable className="col-span-2" />
-          <CompactField autoIcon="organization" label={t('common.organization')} value={ca.organization} />
+          <CompactField autoIcon="organization" label={t('common.organization')} value={ca.organization} copyable />
           <CompactField autoIcon="country" label={t('common.country')} value={ca.country} />
           <CompactField autoIcon="stateProvince" label={t('common.stateProvince')} value={ca.state} />
           <CompactField autoIcon="locality" label={t('cas.locality')} value={ca.locality} />

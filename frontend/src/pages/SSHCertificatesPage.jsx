@@ -19,7 +19,7 @@ import {
 } from '../components'
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useWebSocket } from '../hooks'
+import { usePermission, useWebSocket, useClipboard } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 // ============= CONSTANTS =============
@@ -67,6 +67,7 @@ export default function SSHCertificatesPage() {
   const { id: urlCertId } = useParams()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { copy: clipboardCopy } = useClipboard()
   const { muteToasts } = useWebSocket()
 
   // Data
@@ -244,10 +245,9 @@ export default function SSHCertificatesPage() {
   }
 
   const handleCopyText = useCallback((text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      showSuccess(t('common.copy') + ' ✓')
-    }).catch(() => {})
-  }, [showSuccess, t])
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
+  }, [clipboardCopy, showSuccess, t])
 
   const handleIssueSubmit = async (data) => {
     try {
@@ -488,8 +488,8 @@ export default function SSHCertificatesPage() {
           <CompactField autoIcon="type" label={t('sshCertificates.certType')} value={
             selectedCert.cert_type === 'host' ? t('sshCertificates.typeHost') : t('sshCertificates.typeUser')
           } />
-          <CompactField autoIcon="serial" label={t('sshCertificates.serial')} value={selectedCert.serial || '—'} mono />
-          <CompactField autoIcon="key" label={t('sshCertificates.keyId')} value={selectedCert.key_id || '—'} />
+          <CompactField autoIcon="serial" label={t('sshCertificates.serial')} value={selectedCert.serial || '—'} mono copyable />
+          <CompactField autoIcon="key" label={t('sshCertificates.keyId')} value={selectedCert.key_id || '—'} copyable />
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedCert.key_type || '—'} />
         </CompactGrid>
         {selectedCert.fingerprint && (
@@ -527,7 +527,7 @@ export default function SSHCertificatesPage() {
         <CompactGrid columns={1}>
           <CompactField autoIcon="ca" label={t('sshCertificates.caName')} value={selectedCert.ca_name || '—'} />
           {selectedCert.ca_fingerprint && (
-            <CompactField autoIcon="fingerprint" label={t('sshCertificates.caFingerprint')} value={selectedCert.ca_fingerprint} mono />
+            <CompactField autoIcon="fingerprint" label={t('sshCertificates.caFingerprint')} value={selectedCert.ca_fingerprint} mono copyable />
           )}
         </CompactGrid>
       </CompactSection>
@@ -1122,12 +1122,12 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
 function GeneratedResultView({ result, onClose }) {
   const { t } = useTranslation()
   const { showSuccess } = useNotification()
+  const { copy: clipboardCopy } = useClipboard()
   const isGenerated = result._mode === 'generate'
 
   const handleCopy = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      showSuccess(t('common.copy') + ' ✓')
-    }).catch(() => {})
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
   }
 
   const handleDownload = (content, filename) => {

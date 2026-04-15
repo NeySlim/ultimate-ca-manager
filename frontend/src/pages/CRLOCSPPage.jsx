@@ -21,12 +21,13 @@ import {
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showInfo } = useNotification()
   const { canWrite } = usePermission()
+  const { copy: clipboardCopy } = useClipboard()
   
   const [loading, setLoading] = useState(true)
   const [cas, setCas] = useState([])
@@ -255,8 +256,8 @@ export default function CRLOCSPPage() {
   }
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-    showInfo(t('common.copied'))
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
   }
 
   // URL management (multi-URL support)

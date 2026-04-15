@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 const KEY_ALGORITHM_OPTIONS = [
@@ -47,6 +47,7 @@ export default function SSHCAsPage() {
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { copy: clipboardCopy, isCopied } = useClipboard()
 
   // Data
   const [sshCas, setSSHCAs] = useState([])
@@ -69,9 +70,7 @@ export default function SSHCAsPage() {
   // Filters
   const [filterType, setFilterType] = useState([])
 
-  // Copy state
-  const [copied, setCopied] = useState(false)
-  const [curlCopied, setCurlCopied] = useState(false)
+  // Copy state — managed by useClipboard hook
 
   // Load data
   useEffect(() => {
@@ -210,10 +209,8 @@ export default function SSHCAsPage() {
     try {
       const res = await sshCasService.getPublicKey(ca.id)
       const publicKey = res.data?.public_key || res.data
-      await navigator.clipboard.writeText(typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey))
-      setCopied(true)
+      await clipboardCopy(typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey), 'publicKey')
       showSuccess(t('sshCas.publicKeyCopied'))
-      setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
@@ -226,10 +223,8 @@ export default function SSHCAsPage() {
 
   const handleCopyCurlCommand = async (ca) => {
     try {
-      await navigator.clipboard.writeText(getCurlCommand(ca))
-      setCurlCopied(true)
+      await clipboardCopy(getCurlCommand(ca), 'curl')
       showSuccess(t('sshCas.curlCopied'))
-      setTimeout(() => setCurlCopied(false), 2000)
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
@@ -398,8 +393,8 @@ export default function SSHCAsPage() {
           <Download size={14} /> {t('sshCas.downloadKrl')}
         </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyPublicKey(selectedCA)}>
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
+          {isCopied('publicKey') ? <Check size={14} /> : <Copy size={14} />}
+          {isCopied('publicKey') ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
         </Button>
         <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA)}>
           <Terminal size={14} /> {t('sshCertificates.downloadSetupScript')}
@@ -424,7 +419,7 @@ export default function SSHCAsPage() {
             {getCurlCommand(selectedCA)}
           </code>
           <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyCurlCommand(selectedCA)}>
-            {curlCopied ? <Check size={14} /> : <Copy size={14} />}
+            {isCopied('curl') ? <Check size={14} /> : <Copy size={14} />}
           </Button>
         </div>
       </CompactSection>
@@ -525,7 +520,7 @@ export default function SSHCAsPage() {
               className="absolute top-1 right-1"
               onClick={() => handleCopyPublicKey(selectedCA)}
             >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {isCopied('publicKey') ? <Check size={12} /> : <Copy size={12} />}
             </Button>
           </div>
         </CompactSection>

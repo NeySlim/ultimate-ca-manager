@@ -17,6 +17,7 @@ import {
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { toolsService } from '../services'
 import { useNotification } from '../contexts'
+import { useClipboard } from '../hooks'
 import { cn, formatDate } from '../lib/utils'
 
 // Tool definitions with tab-compatible format for sidebar layout
@@ -66,6 +67,7 @@ const TOOLS = [
 export default function CertificateToolsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
+  const { copy: clipboardCopy } = useClipboard()
   const [activeTool, setActiveTool] = useState('ssl-checker')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
@@ -276,8 +278,8 @@ export default function CertificateToolsPage() {
   }
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-    showSuccess(t('common.copiedToClipboard'))
+    clipboardCopy(text)
+    showSuccess(t('common.copied'))
   }
 
   // Read file content (PEM as text, binary as base64)

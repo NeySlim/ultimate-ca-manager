@@ -13,7 +13,7 @@ import {
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple, MagnifyingGlass
+  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple, MagnifyingGlass, Copy
 } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import {
@@ -25,7 +25,7 @@ import {
 } from '../components'
 import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
 
@@ -33,6 +33,7 @@ export default function ACMEPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { copy } = useClipboard()
   
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
@@ -830,7 +831,7 @@ export default function ACMEPage() {
         <div className="space-y-3">
           <CompactSection title={t('common.accountInformation')}>
             <CompactGrid>
-              <CompactField autoIcon="email" label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
+              <CompactField autoIcon="email" label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} copyable />
               <CompactField autoIcon="status" label={t('common.status')}>
                 <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
                   {selectedAccount.status}
@@ -842,9 +843,19 @@ export default function ACMEPage() {
           </CompactSection>
 
           <CompactSection title={t('acme.accountId')} collapsible defaultOpen={false}>
-            <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded">
-              {selectedAccount.account_id}
-            </p>
+            <div className="relative group">
+              <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded pr-8">
+                {selectedAccount.account_id}
+              </p>
+              <button
+                type="button"
+                onClick={() => { copy(selectedAccount.account_id); showSuccess(t('common.copied')) }}
+                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
+                aria-label={t('common.copy')}
+              >
+                <Copy size={14} />
+              </button>
+            </div>
           </CompactSection>
 
           <CompactSection title={t('acme.termsOfService')}>

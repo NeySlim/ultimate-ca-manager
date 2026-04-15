@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   User, Key, FloppyDisk, Fingerprint, Certificate, 
-  PencilSimple, Trash, Plus, Warning, ShieldCheck, Download
+  PencilSimple, Trash, Plus, Warning, ShieldCheck, Download, Copy
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -16,6 +16,7 @@ import {
 } from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
+import { useClipboard } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 export default function AccountPage() {
@@ -23,6 +24,7 @@ export default function AccountPage() {
   const { user } = useAuth()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { copy } = useClipboard()
 
   // Tab configuration - inside component to use translations
   const TABS = [
@@ -725,7 +727,17 @@ export default function AccountPage() {
                       <p className="text-sm font-medium text-text-primary">{key.name}</p>
                       {!key.is_active && <Badge variant="secondary" size="xs">{t('common.inactive')}</Badge>}
                     </div>
-                    <p className="text-xs text-text-tertiary font-mono">{key.key_prefix}...</p>
+                    <p className="text-xs text-text-tertiary font-mono inline-flex items-center gap-1">
+                      {key.key_prefix}...
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); copy(key.key_prefix); showSuccess(t('common.copied')) }}
+                        className="inline-flex items-center p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                        aria-label={t('common.copy')}
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </p>
                     <p className="text-xs text-text-tertiary">
                       {key.permissions && (
                         <span className="font-mono">
