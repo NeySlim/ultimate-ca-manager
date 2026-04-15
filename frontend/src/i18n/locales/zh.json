@@ -637,7 +637,13 @@
     "noTrustStoreExpiring": "没有即将过期的证书",
     "loading": "加载仪表板...",
     "sshCertificates": "SSH证书",
-    "sshCasCount": "{{count}} 个SSH CA"
+    "sshCasCount": "{{count}} 个SSH CA",
+    "quickActions": {
+      "issueCert": "签发证书",
+      "scanNetwork": "扫描网络",
+      "generateReport": "生成报告"
+    },
+    "expiresInDays": "{{count}} 天后到期"
   },
   "certificates": {
     "createCertificate": "创建证书",

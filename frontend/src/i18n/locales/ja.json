@@ -637,7 +637,13 @@
     "noTrustStoreExpiring": "期限切れ間近の証明書はありません",
     "loading": "ダッシュボードを読み込み中...",
     "sshCertificates": "SSH証明書",
-    "sshCasCount": "{{count}} SSH CA"
+    "sshCasCount": "{{count}} SSH CA",
+    "quickActions": {
+      "issueCert": "証明書を発行",
+      "scanNetwork": "ネットワークスキャン",
+      "generateReport": "レポートを生成"
+    },
+    "expiresInDays": "{{count}} 日後に期限切れ"
   },
   "certificates": {
     "createCertificate": "証明書を作成",

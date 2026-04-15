@@ -12,7 +12,8 @@ import {
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
   UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning,
   SlidersHorizontal, Eye, EyeSlash, X, DotsSixVertical,
-  PencilSimpleLine, ArrowCounterClockwise, Timer, Check
+  PencilSimpleLine, ArrowCounterClockwise, Timer, Check,
+  MagnifyingGlass, FileText
 } from '@phosphor-icons/react'
 import { Responsive } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -21,7 +22,7 @@ import { Card, Button, Badge, LoadingSpinner, Modal, Logo } from '../components'
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
 import { dashboardService, certificatesService, acmeService, truststoreService, systemService } from '../services'
 import { useNotification } from '../contexts'
-import { useWebSocket, EventType } from '../hooks'
+import { useWebSocket, EventType, usePermission } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
 
 // Default widgets configuration
@@ -149,6 +150,7 @@ export default function DashboardPage() {
   const { t } = useTranslation()
   const { showError } = useNotification()
   const navigate = useNavigate()
+  const { canWrite } = usePermission()
   
   const [stats, setStats] = useState(null)
   const [recentCerts, setRecentCerts] = useState([])
@@ -476,6 +478,24 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* Quick Actions */}
+        {!editMode && canWrite('certificates') && (
+          <div className="shrink-0 flex items-center gap-2 flex-wrap mb-1.5">
+            <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/certificates?action=create')}>
+              <Plus size={14} />
+              {t('dashboard.quickActions.issueCert')}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/discovery?action=scan')}>
+              <MagnifyingGlass size={14} />
+              {t('dashboard.quickActions.scanNetwork')}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/reports')}>
+              <FileText size={14} />
+              {t('dashboard.quickActions.generateReport')}
+            </Button>
+          </div>
+        )}
+
         {/* Grid Layout — flex-1 fills remaining space on desktop, natural flow on mobile */}
         <div ref={gridContainerRef} className={isDesktopGrid ? 'flex-1 min-h-0' : ''}>
         {gridMounted && isDesktopGrid && (
@@ -603,6 +623,7 @@ export default function DashboardPage() {
                         expired: stats?.expired || 0,
                         revoked: stats?.revoked || 0,
                       }}
+                      onSegmentClick={(statusKey) => navigate(`/certificates?status=${statusKey}`)}
                     />
                   </div>
                 </Card.Body>
@@ -662,13 +683,19 @@ export default function DashboardPage() {
                               <span className="text-xs font-medium text-text-primary truncate flex-1 group-hover:text-accent-primary transition-colors">
                                 {cert.common_name || cert.descr || cert.subject || '—'}
                               </span>
-                              <span className={`text-[10px] font-semibold whitespace-nowrap ${
-                                urgency === 'danger' ? 'status-danger-text' 
-                                : urgency === 'warning' ? 'status-warning-text' 
-                                : 'text-text-secondary'
-                              }`}>
-                                {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
-                              </span>
+                              {daysLeft !== null && daysLeft <= 30 ? (
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
+                                  daysLeft <= 7
+                                    ? 'bg-status-warning text-status-warning-foreground'
+                                    : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                                }`}>
+                                  {t('dashboard.expiresInDays', { count: daysLeft })}
+                                </span>
+                              ) : (
+                                <span className={`text-[10px] font-semibold whitespace-nowrap text-text-secondary`}>
+                                  {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
+                                </span>
+                              )}
                             </div>
                             <div className="h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
                               <div 
@@ -1038,7 +1065,7 @@ export default function DashboardPage() {
               <Card.Header icon={Certificate} iconColor="violet" title={t('dashboard.statusDistribution')} compact />
               <Card.Body className="!pt-0 !pb-0 !px-2">
                 <div style={{ height: 200 }}>
-                  <StatusPieChart data={{ valid: stats?.valid ?? Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: stats?.expired || 0, revoked: stats?.revoked || 0 }} />
+                  <StatusPieChart data={{ valid: stats?.valid ?? Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)), expiring: stats?.expiring_soon || 0, expired: stats?.expired || 0, revoked: stats?.revoked || 0 }} onSegmentClick={(statusKey) => navigate(`/certificates?status=${statusKey}`)} />
                 </div>
               </Card.Body>
             </Card>
@@ -1062,9 +1089,19 @@ export default function DashboardPage() {
                         <div key={cert.id || i} onClick={() => navigate(`/certificates/${cert.id}`)} className="p-2 rounded-lg hover:bg-tertiary-op50 cursor-pointer transition-colors">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="text-xs font-medium text-text-primary truncate flex-1">{cert.common_name || cert.descr || cert.subject || '—'}</span>
-                            <span className={`text-[10px] font-semibold whitespace-nowrap ${urgency === 'danger' ? 'status-danger-text' : urgency === 'warning' ? 'status-warning-text' : 'text-text-secondary'}`}>
-                              {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
-                            </span>
+                            {daysLeft !== null && daysLeft <= 30 ? (
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
+                                daysLeft <= 7
+                                  ? 'bg-status-warning text-status-warning-foreground'
+                                  : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                              }`}>
+                                {t('dashboard.expiresInDays', { count: daysLeft })}
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] font-semibold whitespace-nowrap text-text-secondary`}>
+                                {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
+                              </span>
+                            )}
                           </div>
                           <div className="h-1.5 rounded-full bg-bg-tertiary overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(3, progress)}%`, backgroundColor: barColor }} />

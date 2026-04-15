@@ -637,7 +637,13 @@
     "noTrustStoreExpiring": "Keine bald ablaufenden Zertifikate",
     "loading": "Dashboard wird geladen...",
     "sshCertificates": "SSH-Zertifikate",
-    "sshCasCount": "{{count}} SSH-CAs"
+    "sshCasCount": "{{count}} SSH-CAs",
+    "quickActions": {
+      "issueCert": "Zertifikat ausstellen",
+      "scanNetwork": "Netzwerk scannen",
+      "generateReport": "Bericht erstellen"
+    },
+    "expiresInDays": "Läuft in {{count}} Tagen ab"
   },
   "certificates": {
     "createCertificate": "Zertifikat erstellen",

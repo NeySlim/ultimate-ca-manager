@@ -282,7 +282,9 @@ export default function OperationsPage() {
   const [testItems, setTestItems] = useState([])
 
   // ===== BULK STATE =====
-  const [bulkResourceType, setBulkResourceType] = useState('certificates')
+  const [bulkResourceType, setBulkResourceType] = useState(() => {
+    try { return localStorage.getItem('ucm-ops-resource-type') || 'certificates' } catch { return 'certificates' }
+  })
   const [bulkData, setBulkData] = useState([])
   const [bulkLoading, setBulkLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -884,7 +886,7 @@ export default function OperationsPage() {
           <div className="relative">
             <select
               value={bulkResourceType}
-              onChange={(e) => { setBulkResourceType(e.target.value); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
+              onChange={(e) => { const v = e.target.value; setBulkResourceType(v); try { localStorage.setItem('ucm-ops-resource-type', v) } catch {}; setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
               className="w-full appearance-none px-3 py-2.5 pr-10 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-medium focus:ring-2 focus:ring-accent-primary-op30 focus:border-accent-primary"
             >
               {Object.entries(RESOURCE_TYPES).map(([key, config]) => {
@@ -909,7 +911,7 @@ export default function OperationsPage() {
                 return (
                   <button
                     key={key}
-                    onClick={() => { setBulkResourceType(key); setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
+                    onClick={() => { setBulkResourceType(key); try { localStorage.setItem('ucm-ops-resource-type', key) } catch {}; setStatusFilter(''); setCaFilter(''); setSelectedIds(new Set()); setBulkSearch('') }}
                     className={cn(
                       "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all border",
                       isActive

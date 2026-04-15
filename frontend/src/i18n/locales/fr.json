@@ -1257,7 +1257,13 @@
     "noTrustStoreExpiring": "Tous les certificats de confiance sont valides",
     "loading": "Chargement du tableau de bord...",
     "sshCertificates": "Certificats SSH",
-    "sshCasCount": "{{count}} CA SSH"
+    "sshCasCount": "{{count}} CA SSH",
+    "quickActions": {
+      "issueCert": "Émettre un certificat",
+      "scanNetwork": "Scanner le réseau",
+      "generateReport": "Générer un rapport"
+    },
+    "expiresInDays": "Expire dans {{count}} jours"
   },
   "details": {
     "pemCertificate": "Certificat PEM",

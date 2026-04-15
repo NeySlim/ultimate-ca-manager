@@ -138,17 +138,17 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
 }
 
 // Status distribution pie chart
-export function StatusPieChart({ data = {}, height = '100%' }) {
+export function StatusPieChart({ data = {}, height = '100%', onSegmentClick }) {
   const { t } = useTranslation()
   const colors = useChartColors()
   
   const chartData = useMemo(() => {
     const { valid = 0, expiring = 0, expired = 0, revoked = 0 } = data
     return [
-      { name: t('common.valid'), value: valid, color: colors.success },
-      { name: t('common.expiring'), value: expiring, color: colors.warning },
-      { name: t('common.expired'), value: expired, color: colors.danger },
-      { name: t('common.revoked'), value: revoked, color: colors.pro },
+      { name: t('common.valid'), value: valid, color: colors.success, statusKey: 'valid' },
+      { name: t('common.expiring'), value: expiring, color: colors.warning, statusKey: 'expiring' },
+      { name: t('common.expired'), value: expired, color: colors.danger, statusKey: 'expired' },
+      { name: t('common.revoked'), value: revoked, color: colors.pro, statusKey: 'revoked' },
     ].filter(d => d.value > 0)
   }, [data, colors, t])
   
@@ -188,7 +188,12 @@ export function StatusPieChart({ data = {}, height = '100%' }) {
           cornerRadius={3}
         >
           {chartData.map((entry, i) => (
-            <Cell key={i} fill={`url(#donut-grad-${i})`} />
+            <Cell 
+              key={i} 
+              fill={`url(#donut-grad-${i})`} 
+              style={onSegmentClick ? { cursor: 'pointer' } : undefined}
+              onClick={onSegmentClick ? () => onSegmentClick(entry.statusKey) : undefined}
+            />
           ))}
         </Pie>
         <Tooltip content={<CustomTooltip />} />

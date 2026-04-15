@@ -637,7 +637,13 @@
     "noTrustStoreExpiring": "Немає сертифікатів з терміном дії, що спливає",
     "loading": "Завантаження панелі...",
     "sshCertificates": "Сертифікати SSH",
-    "sshCasCount": "{{count}} SSH ЦС"
+    "sshCasCount": "{{count}} SSH ЦС",
+    "quickActions": {
+      "issueCert": "Видати сертифікат",
+      "scanNetwork": "Сканувати мережу",
+      "generateReport": "Згенерувати звіт"
+    },
+    "expiresInDays": "Закінчується через {{count}} днів"
   },
   "certificates": {
     "createCertificate": "Створити сертифікат",

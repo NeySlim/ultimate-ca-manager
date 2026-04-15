@@ -637,7 +637,13 @@
     "noTrustStoreExpiring": "All trusted certificates are valid",
     "loading": "Loading dashboard...",
     "sshCertificates": "SSH Certificates",
-    "sshCasCount": "{{count}} SSH CAs"
+    "sshCasCount": "{{count}} SSH CAs",
+    "quickActions": {
+      "issueCert": "Issue Certificate",
+      "scanNetwork": "Scan Network",
+      "generateReport": "Generate Report"
+    },
+    "expiresInDays": "Expires in {{count}} days"
   },
   "certificates": {
     "createCertificate": "Create Certificate",

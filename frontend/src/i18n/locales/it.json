@@ -637,7 +637,13 @@
     "noTrustStoreExpiring": "Nessun certificato in scadenza",
     "loading": "Caricamento dashboard...",
     "sshCertificates": "Certificati SSH",
-    "sshCasCount": "{{count}} CA SSH"
+    "sshCasCount": "{{count}} CA SSH",
+    "quickActions": {
+      "issueCert": "Emetti certificato",
+      "scanNetwork": "Scansiona rete",
+      "generateReport": "Genera rapporto"
+    },
+    "expiresInDays": "Scade tra {{count}} giorni"
   },
   "certificates": {
     "createCertificate": "Crea certificato",
