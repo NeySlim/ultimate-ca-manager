@@ -66,7 +66,7 @@ def scheduled_acme_renewal():
         logger.error(f"ACME auto-renewal task failed: {e}")
 
 
-def renew_certificate(order) -> bool:
+def renew_certificate(order) -> tuple:
     """
     Renew a single certificate order.
     
@@ -74,7 +74,7 @@ def renew_certificate(order) -> bool:
         order: AcmeClientOrder to renew
         
     Returns:
-        True if renewal succeeded
+        Tuple of (success: bool, message: str)
     """
     from models import db
     from models.acme_models import DnsProvider
@@ -207,4 +207,4 @@ def renew_certificate(order) -> bool:
         except Exception as e:
             logger.warning(f"Failed to revoke old certificate {old_certificate_id}: {e}")
     
-    return True
+    return True, f"Successfully renewed (new certificate ID: {cert_id})"

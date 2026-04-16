@@ -488,6 +488,20 @@ class AcmeService:
         url = f"http://{domain}/.well-known/acme-challenge/{challenge.token}"
         
         try:
+            # SSRF protection: reject domains resolving to private/loopback IPs
+            from utils.ssrf_protection import validate_host_not_private
+            try:
+                validate_host_not_private(domain)
+            except ValueError as ssrf_err:
+                challenge.status = "invalid"
+                challenge.error = json.dumps({
+                    "type": "urn:ietf:params:acme:error:rejectedIdentifier",
+                    "detail": "Domain resolves to a non-public address"
+                })
+                db.session.commit()
+                logger.warning(f"HTTP-01 SSRF blocked for {domain}: {ssrf_err}")
+                return False
+            
             response = requests.get(url, timeout=10, allow_redirects=False)
             response.raise_for_status()
             
@@ -562,7 +576,19 @@ class AcmeService:
             answers = dns.resolver.resolve(txt_record, 'TXT')
             
             for rdata in answers:
-                if txt_value in str(rdata):
+                # RFC 8555 §8.4: TXT record content must EQUAL the key authorization hash.
+                # dnspython TXT records expose .strings as a list of bytes per quoted-string segment.
+                matched = False
+                try:
+                    for s in rdata.strings:
+                        if s.decode('utf-8', errors='replace') == txt_value:
+                            matched = True
+                            break
+                except AttributeError:
+                    # Fallback (non-TXT or unusual rdata): exact string compare
+                    matched = (str(rdata).strip('"') == txt_value)
+                
+                if matched:
                     challenge.status = "valid"
                     challenge.validated = utc_now()
                     
@@ -628,6 +654,20 @@ class AcmeService:
         expected_hash = hashlib.sha256(key_authz.encode()).digest()
         
         try:
+            # SSRF protection: reject domains resolving to private/loopback IPs
+            from utils.ssrf_protection import validate_host_not_private
+            try:
+                validate_host_not_private(domain)
+            except ValueError as ssrf_err:
+                challenge.status = "invalid"
+                challenge.error = json.dumps({
+                    "type": "urn:ietf:params:acme:error:rejectedIdentifier",
+                    "detail": "Domain resolves to a non-public address"
+                })
+                db.session.commit()
+                logger.warning(f"TLS-ALPN-01 SSRF blocked for {domain}: {ssrf_err}")
+                return False
+            
             # Create SSL context with acme-tls/1 ALPN
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             ctx.check_hostname = False
@@ -1171,11 +1211,15 @@ class AcmeService:
             
             # Mark key as used (one-time use)
             eab_keys.pop(kid, None)
-            SystemConfig.set('acme_eab_keys', json.dumps(eab_keys))
             try:
+                if eab_config:
+                    eab_config.value = json.dumps(eab_keys)
+                else:
+                    db.session.add(SystemConfig(key='acme_eab_keys', value=json.dumps(eab_keys)))
                 db.session.commit()
-            except Exception:
+            except Exception as commit_err:
                 db.session.rollback()
+                logger.error(f"Failed to persist EAB key consumption: {commit_err}")
             
             return True, None
             

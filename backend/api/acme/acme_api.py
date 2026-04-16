@@ -20,21 +20,20 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 acme_bp = Blueprint('acme', __name__, url_prefix='/acme')
 
-# Initialize ACME service
-# Base URL will be set from request context
-acme_service = None
+# Note: ACME service is instantiated per-request (see get_acme_service)
+# to avoid stale base_url issues behind reverse proxies or multi-hostname access.
 
 
 def get_acme_service() -> AcmeService:
-    """Get or create ACME service instance with current base URL"""
-    global acme_service
+    """Get ACME service instance with per-request base URL.
     
-    if acme_service is None:
-        # Construct base URL from request
-        base_url = f"{request.scheme}://{request.host}"
-        acme_service = AcmeService(base_url=base_url)
-    
-    return acme_service
+    A new instance is created per call so base_url reflects the current
+    request scheme/host. The service itself is stateless (DB-backed),
+    so this is cheap and avoids stale base_url issues behind proxies
+    or with multi-hostname access.
+    """
+    base_url = f"{request.scheme}://{request.host}"
+    return AcmeService(base_url=base_url)
 
 
 def acme_response(data: Dict[str, Any], status_code: int = 200) -> Any:
@@ -700,6 +699,7 @@ def order_info(order_id: str):
     
     # Verify JWS (POST-as-GET: empty payload)
     jws_data = request.get_json()
+    request_account_id = None
     if jws_data:
         expected_url = f"{service.base_url}/acme/order/{order_id}"
         is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
@@ -708,11 +708,22 @@ def order_info(order_id: str):
         # RFC 8555 §6.3: POST-as-GET payload must be empty
         if payload:
             return acme_error('malformed', 'POST-as-GET must have empty payload')
+        # Extract account from kid for ownership check (RFC 8555 §7.4)
+        try:
+            protected = json.loads(base64.urlsafe_b64decode(jws_data['protected'] + '=='))
+            kid = protected.get('kid', '')
+            request_account_id = kid.rstrip('/').split('/')[-1] if kid else None
+        except Exception:
+            pass
     
     order = service.get_order(order_id)
     
     if not order:
         return acme_error('orderDoesNotExist', 'Order not found', 404)
+    
+    # RFC 8555 §7.4: Server MUST verify the account owns the order
+    if request_account_id and order.account_id != request_account_id:
+        return acme_error('unauthorized', 'Order does not belong to this account', 403)
     
     order_url = f"{service.base_url}/acme/order/{order.order_id}"
     
@@ -827,6 +838,7 @@ def authorization_info(authorization_id: str):
     
     # Verify JWS (POST-as-GET: empty payload)
     jws_data = request.get_json()
+    request_account_id = None
     if jws_data:
         expected_url = f"{service.base_url}/acme/authz/{authorization_id}"
         is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
@@ -835,6 +847,13 @@ def authorization_info(authorization_id: str):
         # RFC 8555 §6.3: POST-as-GET payload must be empty
         if payload:
             return acme_error('malformed', 'POST-as-GET must have empty payload')
+        # Extract account from kid for ownership check
+        try:
+            protected = json.loads(base64.urlsafe_b64decode(jws_data['protected'] + '=='))
+            kid = protected.get('kid', '')
+            request_account_id = kid.rstrip('/').split('/')[-1] if kid else None
+        except Exception:
+            pass
     
     auth = AcmeAuthorization.query.filter_by(
         authorization_id=authorization_id
@@ -842,6 +861,12 @@ def authorization_info(authorization_id: str):
     
     if not auth:
         return acme_error('authzDoesNotExist', 'Authorization not found', 404)
+    
+    # RFC 8555 §7.5: verify account ownership (direct field or via parent order)
+    if request_account_id:
+        auth_account = auth.account_id or (auth.order.account_id if auth.order else None)
+        if auth_account and auth_account != request_account_id:
+            return acme_error('unauthorized', 'Authorization does not belong to this account', 403)
     
     # Build challenges list
     challenges = []
@@ -1128,23 +1153,74 @@ def key_change():
             return acme_error('malformed', 'Request body must be JWS')
         
         expected_url = f"{service.base_url}/acme/key-change"
-        is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
+        # Outer JWS: signed with old key, identified by kid
+        is_valid, outer_payload, _outer_jwk, error = verify_jws(jws_data, expected_url)
         
         if not is_valid:
             return acme_error('malformed', f'Invalid JWS: {error}')
         
-        if not payload:
-            return acme_error('malformed', 'Payload required')
+        if not outer_payload or not isinstance(outer_payload, dict):
+            return acme_error('malformed', 'Payload required (must be inner JWS)')
         
-        # Extract inner JWS (key change is double-wrapped)
-        # The outer JWS is signed with the old key, inner with the new key
-        # For now, extract account and new key from payload
-        account_url = payload.get('account', '')
-        old_key = payload.get('oldKey', {})
+        # RFC 8555 §7.3.5: outer JWS payload IS an inner JWS object
+        # {protected, payload, signature}, signed with the NEW key.
+        if not all(k in outer_payload for k in ('protected', 'payload', 'signature')):
+            return acme_error('malformed', 'Inner JWS missing required fields')
         
-        account_id = account_url.split('/')[-1] if account_url else None
+        # Decode inner protected header to get the new JWK
+        try:
+            inner_protected_b64 = outer_payload['protected']
+            inner_protected_b64_padded = inner_protected_b64 + '=' * (4 - len(inner_protected_b64) % 4)
+            inner_protected = json.loads(base64.urlsafe_b64decode(inner_protected_b64_padded))
+        except Exception as e:
+            return acme_error('malformed', f'Invalid inner JWS protected header: {e}')
+        
+        new_jwk = inner_protected.get('jwk')
+        if not new_jwk:
+            return acme_error('malformed', 'Inner JWS must contain jwk (new key)')
+        
+        # Inner JWS url must match outer (RFC 8555 §7.3.5)
+        if inner_protected.get('url') != expected_url:
+            return acme_error('malformed', 'Inner JWS url does not match outer')
+        
+        # Verify the inner JWS signature using the new key
+        # Pass an empty expected_url marker — we already validated; reuse verify_jws would
+        # consume nonce again, so do crypto verification only.
+        try:
+            import josepy as jose
+            inner_payload_b64 = outer_payload['payload']
+            inner_signature = outer_payload['signature']
+            signing_input = f"{inner_protected_b64}.{inner_payload_b64}".encode('ascii')
+            
+            jwk_obj = jose.JWK.from_json(new_jwk)
+            sig_bytes = base64.urlsafe_b64decode(inner_signature + '=' * (4 - len(inner_signature) % 4))
+            alg = jose.JWASignature.from_json(inner_protected.get('alg', 'RS256'))
+            if not alg.verify(jwk_obj.key, signing_input, sig_bytes):
+                return acme_error('malformed', 'Inner JWS signature invalid')
+        except Exception as e:
+            logger.error(f"key-change inner JWS verification failed: {e}")
+            return acme_error('malformed', f'Inner JWS verification failed: {e}')
+        
+        # Decode inner payload — contains {"account": "...", "oldKey": {...}}
+        try:
+            inner_payload_b64_padded = inner_payload_b64 + '=' * (4 - len(inner_payload_b64) % 4)
+            inner_payload = json.loads(base64.urlsafe_b64decode(inner_payload_b64_padded))
+        except Exception as e:
+            return acme_error('malformed', f'Invalid inner JWS payload: {e}')
+        
+        account_url = inner_payload.get('account', '')
+        old_key = inner_payload.get('oldKey', {})
+        
+        account_id = account_url.rstrip('/').split('/')[-1] if account_url else None
         if not account_id:
-            return acme_error('malformed', 'Account URL required')
+            return acme_error('malformed', 'Inner payload missing account URL')
+        
+        # Verify the account in inner payload matches the kid in outer JWS
+        outer_protected = json.loads(base64.urlsafe_b64decode(jws_data['protected'] + '=='))
+        outer_kid = outer_protected.get('kid', '')
+        outer_account_id = outer_kid.rstrip('/').split('/')[-1] if outer_kid else None
+        if outer_account_id != account_id:
+            return acme_error('unauthorized', 'Account mismatch between outer kid and inner payload', 401)
         
         account = service.get_account_by_kid(account_id)
         if not account:
@@ -1156,19 +1232,18 @@ def key_change():
             return acme_error('malformed', 'Old key does not match account key')
         
         # Verify new key differs from old key
-        if jwk == current_jwk:
+        if new_jwk == current_jwk:
             return acme_error('malformed', 'New key must differ from old key')
         
         # Update account JWK
-        if jwk:
-            try:
-                account.jwk = json.dumps(jwk)
-                account.jwk_thumbprint = service._compute_jwk_thumbprint(jwk)
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Failed to update account key: {e}")
-                return acme_error('serverInternal', 'Failed to update account key', 500)
+        try:
+            account.jwk = json.dumps(new_jwk)
+            account.jwk_thumbprint = service._compute_jwk_thumbprint(new_jwk)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to update account key: {e}")
+            return acme_error('serverInternal', 'Failed to update account key', 500)
         
         account_url_full = f"{service.base_url}/acme/acct/{account.account_id}"
         response_data = {
