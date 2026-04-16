@@ -5,6 +5,7 @@
 ![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
 ![Tests](https://img.shields.io/badge/tests-1817%20passing-brightgreen)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20UCM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/neyslim)
 
 **Ultimate Certificate Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (ACME, SCEP, EST, OCSP, CRL/CDP), Microsoft ADCS integration, multi-factor authentication, and certificate lifecycle management.
 
@@ -188,4 +189,8 @@ BSD 3-Clause License with Commons Clause -- see [LICENSE](LICENSE).
 
 - [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - [GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
+
+If you find UCM useful, consider supporting its development:
+
+<a href="https://ko-fi.com/neyslim"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support on Ko-fi" /></a>
 
