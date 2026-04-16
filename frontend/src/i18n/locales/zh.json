@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=张三,OU=用户,DC=corp,DC=local",
       "enrolleeUpn": "注册对象UPN",
       "enrolleeUpnPlaceholder": "zhangsan@corp.local",
+      "upnRequired": "启用代理注册时，UPN 为必填项",
       "hint": "需要在CA上配置注册代理证书。模板必须允许代理其他用户进行注册。"
     }
   },

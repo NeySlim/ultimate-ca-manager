@@ -3548,6 +3548,7 @@
       "enrolleeNamePlaceholder": "CN=Jean Dupont,OU=Utilisateurs,DC=corp,DC=local",
       "enrolleeUpn": "UPN du bénéficiaire",
       "enrolleeUpnPlaceholder": "jean.dupont@corp.local",
+      "upnRequired": "Le UPN est requis lorsque l'inscription au nom de est activée",
       "hint": "Nécessite un certificat d'agent d'inscription configuré sur la CA. Le modèle doit autoriser l'inscription pour le compte d'autres utilisateurs."
     }
   },

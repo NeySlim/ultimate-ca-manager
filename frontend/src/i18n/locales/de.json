@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=Max Mustermann,OU=Benutzer,DC=corp,DC=local",
       "enrolleeUpn": "UPN des Antragstellers",
       "enrolleeUpnPlaceholder": "max.mustermann@corp.local",
+      "upnRequired": "UPN ist erforderlich, wenn die Registrierung im Auftrag aktiviert ist",
       "hint": "Erfordert ein auf der CA konfiguriertes Registrierungsagenten-Zertifikat. Die Vorlage muss die Registrierung im Auftrag anderer Benutzer zulassen."
     }
   },

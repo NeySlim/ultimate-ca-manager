@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=Juan García,OU=Usuarios,DC=corp,DC=local",
       "enrolleeUpn": "UPN del inscrito",
       "enrolleeUpnPlaceholder": "juan.garcia@corp.local",
+      "upnRequired": "El UPN es requerido cuando la inscripción en nombre de está habilitada",
       "hint": "Requiere un certificado de agente de inscripción configurado en la CA. La plantilla debe permitir la inscripción en nombre de otros usuarios."
     }
   },

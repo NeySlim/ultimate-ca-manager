@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=João Silva,OU=Utilizadores,DC=corp,DC=local",
       "enrolleeUpn": "UPN do inscrito",
       "enrolleeUpnPlaceholder": "joao.silva@corp.local",
+      "upnRequired": "O UPN é obrigatório quando a inscrição em nome de está ativada",
       "hint": "Requer um certificado de agente de inscrição configurado na CA. O modelo deve permitir a inscrição em nome de outros utilizadores."
     }
   },

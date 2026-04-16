@@ -197,6 +197,10 @@ export default function CSRsPage() {
         showError(t('msca.selectTemplate'))
         return
       }
+      if (eoboEnabled && !enrolleeUpn?.trim()) {
+        showError(t('msca.eobo.upnRequired'))
+        return
+      }
       try {
         const signData = { template: selectedTemplate }
         if (eoboEnabled) {
@@ -888,15 +892,26 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                           if (!enrolleeName && selectedCSR.subject) {
                             setEnrolleeName(selectedCSR.subject)
                           }
-                          if (!enrolleeUpn && selectedCSR.san_email) {
-                            try {
-                              const emails = typeof selectedCSR.san_email === 'string'
-                                ? JSON.parse(selectedCSR.san_email)
-                                : selectedCSR.san_email
-                              if (Array.isArray(emails) && emails.length > 0) {
-                                setEnrolleeUpn(emails[0])
-                              }
-                            } catch { /* ignore parse errors */ }
+                          if (!enrolleeUpn) {
+                            // Try SAN email first
+                            let foundUpn = ''
+                            if (selectedCSR.san_email) {
+                              try {
+                                const emails = typeof selectedCSR.san_email === 'string'
+                                  ? JSON.parse(selectedCSR.san_email)
+                                  : selectedCSR.san_email
+                                if (Array.isArray(emails) && emails.length > 0) {
+                                  foundUpn = emails[0]
+                                }
+                              } catch { /* ignore parse errors */ }
+                            }
+                            // Fall back to subject emailAddress
+                            if (!foundUpn && selectedCSR.email) {
+                              foundUpn = selectedCSR.email
+                            }
+                            if (foundUpn) {
+                              setEnrolleeUpn(foundUpn)
+                            }
                           }
                         }
                       }}
@@ -918,6 +933,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                         value={enrolleeUpn}
                         onChange={(e) => setEnrolleeUpn(e.target.value)}
                         placeholder={t('msca.eobo.enrolleeUpnPlaceholder')}
+                        required
                       />
                       <p className="text-xs text-text-tertiary">
                         {t('msca.eobo.hint')}

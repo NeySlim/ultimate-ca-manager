@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=山田太郎,OU=ユーザー,DC=corp,DC=local",
       "enrolleeUpn": "登録対象者のUPN",
       "enrolleeUpnPlaceholder": "taro.yamada@corp.local",
+      "upnRequired": "代理登録が有効な場合、UPNは必須です",
       "hint": "CAに構成された登録エージェント証明書が必要です。テンプレートは他のユーザーの代理登録を許可する必要があります。"
     }
   },

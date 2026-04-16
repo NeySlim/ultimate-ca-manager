@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=Mario Rossi,OU=Utenti,DC=corp,DC=local",
       "enrolleeUpn": "UPN del beneficiario",
       "enrolleeUpnPlaceholder": "mario.rossi@corp.local",
+      "upnRequired": "L'UPN è richiesto quando l'iscrizione per conto di è abilitata",
       "hint": "Richiede un certificato dell'agente di iscrizione configurato sulla CA. Il modello deve consentire l'iscrizione per conto di altri utenti."
     }
   },

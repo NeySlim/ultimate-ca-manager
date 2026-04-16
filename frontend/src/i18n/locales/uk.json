@@ -3545,6 +3545,7 @@
       "enrolleeNamePlaceholder": "CN=Іван Петренко,OU=Користувачі,DC=corp,DC=local",
       "enrolleeUpn": "UPN отримувача",
       "enrolleeUpnPlaceholder": "ivan.petrenko@corp.local",
+      "upnRequired": "UPN обов'язковий, коли увімкнено реєстрацію від імені",
       "hint": "Потрібен сертифікат агента реєстрації, налаштований на ЦС. Шаблон повинен дозволяти реєстрацію від імені інших користувачів."
     }
   },

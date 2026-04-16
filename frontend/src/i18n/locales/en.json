@@ -3548,6 +3548,7 @@
       "enrolleeNamePlaceholder": "CN=John Doe,OU=Users,DC=corp,DC=local",
       "enrolleeUpn": "Enrollee UPN",
       "enrolleeUpnPlaceholder": "john.doe@corp.local",
+      "upnRequired": "UPN is required when Enroll on Behalf Of is enabled",
       "hint": "Requires an enrollment agent certificate configured on the CA. The template must allow enrollment on behalf of other users."
     }
   },

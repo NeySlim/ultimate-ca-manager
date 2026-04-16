@@ -903,6 +903,38 @@ class TrustStoreService:
         for extension in csr.extensions:
             builder = builder.add_extension(extension.value, extension.critical)
         
+        # Auto-add SAN from CN if CSR has no SAN extension (required by modern browsers)
+        try:
+            csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+        except x509.ExtensionNotFound:
+            san_names = []
+            # Extract CN from subject
+            for attr in subject:
+                if attr.oid == NameOID.COMMON_NAME:
+                    cn_val = attr.value
+                    # Determine if CN looks like an IP, email, or DNS name
+                    import ipaddress
+                    try:
+                        ip = ipaddress.ip_address(cn_val)
+                        san_names.append(x509.IPAddress(ip))
+                    except ValueError:
+                        if '@' in cn_val:
+                            san_names.append(x509.RFC822Name(cn_val))
+                        else:
+                            san_names.append(x509.DNSName(cn_val))
+                    break
+            # Also add emailAddress from subject as RFC822Name
+            for attr in subject:
+                if attr.oid == NameOID.EMAIL_ADDRESS:
+                    email_val = attr.value
+                    if not any(isinstance(n, x509.RFC822Name) and n.value == email_val for n in san_names):
+                        san_names.append(x509.RFC822Name(email_val))
+            if san_names:
+                builder = builder.add_extension(
+                    x509.SubjectAlternativeName(san_names),
+                    critical=False,
+                )
+        
         # Add basic extensions if not in CSR
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
