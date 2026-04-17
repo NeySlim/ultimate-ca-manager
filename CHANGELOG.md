@@ -19,6 +19,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **`auto_approve` defaults flipped to `False`** — Historically the column defaulted to `True`, which had no effect because the flag was unused. Now that the flag is honored, existing rows with `auto_approve=True` would silently start skipping challenge validation on upgrade. Migration `019_acme_auto_approve_safe_default` resets every existing `AcmeDomain` and `AcmeLocalDomain` row to `False`. Model defaults and API create defaults are also `False`. Administrators must explicitly opt in per domain after upgrading. A UI warning banner is shown when the toggle is enabled.
 
 ### Roadmap
+- **PostgreSQL support** — Abstract the data layer so deployments can back UCM with PostgreSQL instead of SQLite, for multi-instance HA and larger certificate inventories
 - **Environment Variables** — Sync Docker env vars (SMTP, HSM, etc.) to database at startup; track `managed_by` source; mark UI fields as read-only when sourced from environment
 - **Policy Enforcement on Protocols** — Apply certificate policies to ACME, SCEP, and EST protocol handlers (currently only enforced on REST API); add CA issuance restriction flags to prevent direct issuance from root/intermediate CAs
 
