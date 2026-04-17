@@ -285,8 +285,9 @@ def test_domain_access():
         )
         
     except Exception as e:
+        logger.error(f"DNS access test failed for domain {domain}: {e}", exc_info=True)
         return error_response(
-            f'DNS access test failed: {str(e)}',
+            'DNS access test failed. Check DNS provider credentials and network connectivity.',
             400
         )
 

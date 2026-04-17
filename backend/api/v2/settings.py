@@ -869,8 +869,8 @@ def create_webhook():
     # SSRF protection: reject private/loopback/metadata addresses
     try:
         validate_url_not_private(data['url'])
-    except ValueError as e:
-        return error_response(f'Invalid webhook URL: {e}', 400)
+    except ValueError:
+        return error_response('Webhook URL must not target private or loopback addresses', 400)
 
     if not data.get('events'):
         return error_response('At least one event required', 400)

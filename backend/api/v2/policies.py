@@ -244,7 +244,7 @@ def create_policy():
         notify_on_violation=data.get('notify_on_violation', True),
         is_active=data.get('is_active', True),
         priority=data.get('priority', 100),
-        created_by=request.current_user.get('username') if hasattr(request, 'current_user') else None
+        created_by=g.current_user.username if hasattr(g, 'current_user') and g.current_user else None
     )
     
     if data.get('rules'):
@@ -415,15 +415,17 @@ def approve_request(request_id):
         return error_response(f"Request is already {approval.status}", 400)
     
     data = request.get_json() or {}
-    user = request.current_user if hasattr(request, 'current_user') else {}
-    
+    user = g.current_user if hasattr(g, 'current_user') else None
+    user_id = getattr(user, 'id', None)
+    username = getattr(user, 'username', None) or 'system'
+
     # Prevent self-approval
-    if user.get('id') and approval.requester_id == user.get('id'):
+    if user_id and approval.requester_id == user_id:
         return error_response("Cannot approve your own request", 403)
-    
+
     approval.add_approval(
-        user_id=user.get('id'),
-        username=user.get('username', 'system'),
+        user_id=user_id,
+        username=username,
         action='approve',
         comment=data.get('comment')
     )
@@ -458,14 +460,16 @@ def reject_request(request_id):
         return error_response(f"Request is already {approval.status}", 400)
     
     data = request.get_json() or {}
-    user = request.current_user if hasattr(request, 'current_user') else {}
-    
+    user = g.current_user if hasattr(g, 'current_user') else None
+    user_id = getattr(user, 'id', None)
+    username = getattr(user, 'username', None) or 'system'
+
     if not data.get('comment'):
         return error_response("Rejection reason is required", 400)
-    
+
     approval.add_approval(
-        user_id=user.get('id'),
-        username=user.get('username', 'system'),
+        user_id=user_id,
+        username=username,
         action='reject',
         comment=data.get('comment')
     )

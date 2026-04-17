@@ -15,6 +15,21 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [2.123] - 2026-04-18
+
+### Security (Phase 2 — unified SSRF + error hygiene)
+- **ACME directory URL SSRF** — `PATCH /api/v2/acme/client/settings` now validates `directory_url` and `proxy_upstream_url` against cloud-metadata endpoints (AWS `169.254.169.254`, GCP `metadata.google.internal`, Alibaba `100.100.100.200`) and loopback addresses. RFC1918 private ranges remain allowed so internal ACME CAs keep working.
+- **OAuth2 discovery SSRF** — `_test_oauth2_connection()` now guards the well-known endpoint URL before issuing the HEAD request, with the same narrow cloud-metadata + loopback policy.
+- **SAML metadata SSRF consistency** — `fetch_idp_metadata()` replaced the literal-IP-only filter (trivially bypassed via hostnames) with a unified resolver-aware check. Internal IdPs on private networks remain fetchable; only cloud metadata + loopback are blocked.
+- **Error message hygiene** — removed `str(e)` / stack-trace leaks in MSCA CSR submission, SSH CA KRL generation, webhook URL validation, and ACME DNS access testing. Exceptions are now logged server-side and clients receive generic messages.
+
+### Fixed
+- **Policy approval self-check bypassed (HIGH)** — `approve_request()` read `request.current_user` (which is always None; Flask's `request` has no such attribute), so the "creator cannot approve own request" guard never triggered. Now uses `g.current_user`.
+- **Policy audit trail wrong actor** — `reject_request()` always logged `'system'` as the rejector for the same reason; now logs the real username.
+- **Policy `created_by` always null** — `create_policy()` set `created_by = request.current_user` (always None). Now reads from `g.current_user`.
+
+---
+
 ## [2.122] - 2026-04-17
 
 

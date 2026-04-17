@@ -908,7 +908,8 @@ def get_ssh_ca_krl(ca_id):
     except ValueError as e:
         return error_response(str(e), 404)
     except RuntimeError as e:
-        return error_response(str(e), 500)
+        logger.error(f"Failed to generate KRL for CA {ca_id}: {e}")
+        return error_response('Failed to generate KRL', 500)
     except Exception as e:
         logger.error(f"Failed to generate KRL: {e}")
         return error_response('Failed to generate KRL', 500)

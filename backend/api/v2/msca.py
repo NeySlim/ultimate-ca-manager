@@ -316,7 +316,7 @@ def sign_csr(msca_id, csr_id):
         return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"Failed to sign CSR via MS CA: {e}", exc_info=True)
-        return error_response(f"Failed to submit CSR to Microsoft CA: {e}", 500)
+        return error_response("Failed to submit CSR to Microsoft CA", 500)
 
 
 @bp.route('/<int:msca_id>/requests/<int:request_id>', methods=['GET'])

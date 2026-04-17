@@ -6,6 +6,7 @@ SAML, OAuth2, LDAP authentication providers
 from flask import Blueprint, request, redirect, session, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db, User, Certificate
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
@@ -685,6 +686,13 @@ def _ldap_authenticate_user(provider, username, password):
 def _test_oauth2_connection(provider):
     """Test OAuth2 configuration (checks URLs are reachable)"""
     verify = _get_ssl_verify(provider, 'oauth2')
+    # Narrow SSRF guard — admins legitimately point at internal Keycloak/IdP
+    # on RFC1918 networks, so only block cloud metadata + loopback.
+    try:
+        validate_url_not_cloud_metadata(provider.oauth2_auth_url)
+    except ValueError:
+        _cleanup_ssl_verify(verify)
+        return error_response("Authorization URL cannot target cloud metadata or loopback", 400)
     try:
         response = http_requests.head(provider.oauth2_auth_url, timeout=5, allow_redirects=True, verify=verify)
         
@@ -882,14 +890,14 @@ def fetch_idp_metadata():
         return error_response("metadata_url must use http or https scheme", 400)
     if not parsed.hostname:
         return error_response("metadata_url must include a hostname", 400)
-    # Block loopback/private ranges
-    import ipaddress
+    # Narrow SSRF guard — internal Keycloak/IdP on RFC1918 is legitimate,
+    # but cloud metadata + loopback must always be blocked (and the old
+    # literal-IP check silently accepted any hostname, even ones that
+    # resolve to cloud metadata IPs).
     try:
-        ip = ipaddress.ip_address(parsed.hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
-            return error_response("metadata_url cannot target private/internal addresses", 400)
+        validate_url_not_cloud_metadata(metadata_url)
     except ValueError:
-        pass  # hostname is a domain name, not an IP — OK
+        return error_response("metadata_url cannot target cloud metadata or loopback", 400)
     
     try:
         # Use provider SSL settings if provider_id provided, otherwise default to True

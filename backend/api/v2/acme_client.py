@@ -6,6 +6,7 @@ import json
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import AcmeClientService
 from services.audit_service import AuditService
@@ -135,6 +136,11 @@ def update_settings():
         url_val = (data['directory_url'] or '').strip()
         if url_val and not url_val.startswith('https://'):
             return error_response('Directory URL must use HTTPS', 400)
+        if url_val:
+            try:
+                validate_url_not_cloud_metadata(url_val)
+            except ValueError:
+                return error_response('Directory URL cannot target cloud metadata or loopback', 400)
         # Clear stale client account credentials when CA changes
         old_dir = SystemConfig.query.filter_by(key='acme.client.directory_url').first()
         old_val = old_dir.value if old_dir else ''
@@ -176,6 +182,11 @@ def update_settings():
         url_val = (data['proxy_upstream_url'] or '').strip()
         if url_val and not url_val.startswith('https://'):
             return error_response('Proxy upstream URL must use HTTPS', 400)
+        if url_val:
+            try:
+                validate_url_not_cloud_metadata(url_val)
+            except ValueError:
+                return error_response('Proxy upstream URL cannot target cloud metadata or loopback', 400)
         # Clear stale proxy account credentials when upstream CA changes
         old_upstream = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
         old_val = old_upstream.value if old_upstream else ''
