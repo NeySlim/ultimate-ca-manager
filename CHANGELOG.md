@@ -9,6 +9,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **ACME proxy badNonce retry (#70)** — The proxy did not implement RFC 8555 §6.5 nonce retry. Lenient upstream CAs (Let's Encrypt staging/production) accepted stale nonces silently, but strict implementations (Pebble, HARICA, and any CA with strict anti-replay) rejected them with `urn:ietf:params:acme:error:badNonce`, leaving orders stuck pending while authz fetches returned 400. The proxy now detects `badNonce`, extracts the fresh nonce from the error response's `Replay-Nonce` header, and retries the signed request once. Verified end-to-end with Pebble + EAB (custom upstream mode).
+
 ### Changed
 - **ACME domain `auto_approve` is now functional (#69)** — Previously the toggle on ACME Domains and Local Domains was stored in the database and exposed in the UI but never consulted by the ACME service, so every order still required full challenge validation. When `auto_approve=True` is now set on a matching domain entry (exact match or any parent domain, wildcard prefixes stripped), UCM skips HTTP-01/DNS-01/TLS-ALPN-01 validation: authorizations are created directly in the `valid` state, orders move straight to `ready`, and an `acme_auto_approve` audit event is logged. This applies to both order-driven authorizations and RFC 8555 pre-authorizations (`newAuthz`). Only affects local UCM issuance, not the ACME proxy.
 

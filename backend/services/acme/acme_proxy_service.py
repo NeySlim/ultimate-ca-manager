@@ -228,47 +228,67 @@ class AcmeProxyService:
         resp = requests.head(self.directory['newNonce'], timeout=15)
         return resp.headers['Replay-Nonce']
 
-    def _post_jws(self, url: str, payload: Union[Dict, str], kid: str = None) -> requests.Response:
-        """Sign and post JWS to upstream"""
-        nonce = self._get_nonce()
-        
-        # Prepare JWS header
+    def _sign_and_post(self, url: str, payload, nonce: str, kid: str = None) -> requests.Response:
+        """Build a JWS with the given nonce and POST it once."""
         if kid:
             protected = {"alg": "RS256", "kid": kid, "nonce": nonce, "url": url}
         else:
-            # New account uses JWK
             protected = {"alg": "RS256", "jwk": self.account_key.to_json(), "nonce": nonce, "url": url}
-            
+
         if payload == "":
             payload_json = b""
         else:
             payload_json = json.dumps(payload).encode('utf-8')
-            
+
         protected_json = json.dumps(protected).encode('utf-8')
-        
-        # Sign
+
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import padding
-        
+
         payload_b64 = base64.urlsafe_b64encode(payload_json).rstrip(b'=').decode('utf-8')
         protected_b64 = base64.urlsafe_b64encode(protected_json).rstrip(b'=').decode('utf-8')
-        
+
         signing_input = f"{protected_b64}.{payload_b64}".encode('utf-8')
-        
+
         sig = self.private_key.sign(
             signing_input,
             padding.PKCS1v15(),
             hashes.SHA256()
         )
-        
+
         data = {
             "protected": protected_b64,
             "payload": payload_b64,
             "signature": base64.urlsafe_b64encode(sig).rstrip(b'=').decode('utf-8')
         }
-        
+
         headers = {"Content-Type": "application/jose+json"}
         return requests.post(url, json=data, headers=headers, timeout=30)
+
+    def _post_jws(self, url: str, payload: Union[Dict, str], kid: str = None) -> requests.Response:
+        """Sign and post JWS to upstream, with automatic badNonce retry (RFC 8555 §6.5).
+
+        Some upstream CAs (Pebble, HARICA, strict implementations) reject
+        nonces that LE staging would accept. On badNonce, the server MUST
+        return a fresh nonce in Replay-Nonce and the client MUST retry.
+        """
+        nonce = self._get_nonce()
+        resp = self._sign_and_post(url, payload, nonce, kid=kid)
+
+        # RFC 8555 §6.5: retry once on badNonce using the fresh nonce
+        # returned in the error response's Replay-Nonce header.
+        if resp.status_code == 400:
+            try:
+                err = resp.json()
+                if err.get('type') == 'urn:ietf:params:acme:error:badNonce':
+                    fresh_nonce = resp.headers.get('Replay-Nonce')
+                    if fresh_nonce:
+                        logger.warning(f"Upstream rejected nonce on {url}, retrying with fresh nonce")
+                        resp = self._sign_and_post(url, payload, fresh_nonce, kid=kid)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        return resp
 
     def _post_with_account(self, url: str, payload) -> requests.Response:
         """Post JWS with account KID, auto-re-registering if account is stale.
