@@ -128,7 +128,7 @@ See [Installation Guide](docs/installation/README.md) for all methods including 
 |-----------|------------|
 | Frontend | React 18, Vite, Radix UI, Recharts |
 | Backend | Python 3.11+, Flask, SQLAlchemy |
-| Database | SQLite (PostgreSQL supported) |
+| Database | SQLite |
 | Server | Gunicorn + gevent WebSocket |
 | Crypto | pyOpenSSL, cryptography |
 | Auth | Session cookies, WebAuthn/FIDO2, TOTP, mTLS |

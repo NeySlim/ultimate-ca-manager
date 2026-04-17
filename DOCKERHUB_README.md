@@ -90,7 +90,7 @@ volumes:
 |-----------|------------|
 | Frontend | React 18, Vite, Radix UI |
 | Backend | Python 3.11+, Flask, SQLAlchemy |
-| Database | SQLite (PostgreSQL supported) |
+| Database | SQLite |
 | Server | Gunicorn + gevent WebSocket |
 | Auth | Session cookies, WebAuthn/FIDO2, TOTP, mTLS |
 
