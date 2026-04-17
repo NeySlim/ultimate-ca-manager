@@ -502,11 +502,17 @@ class TestAcmeClientProxy:
     """POST /api/v2/acme/client/proxy/register|unregister"""
 
     def test_proxy_register(self, auth_client):
-        r = post_json(auth_client, '/api/v2/acme/client/proxy/register',
-                      {'email': 'proxy@example.com'})
-        data = assert_success(r)
-        assert data['registered'] is True
-        assert data['email'] == 'proxy@example.com'
+        from unittest.mock import patch, PropertyMock
+        with patch('services.acme.acme_proxy_service.AcmeProxyService.account_url',
+                   new_callable=PropertyMock, return_value='https://example.com/acct/1'), \
+             patch('services.acme.acme_proxy_service.AcmeProxyService._load_or_create_account_key',
+                   return_value=(None, None)):
+            r = post_json(auth_client, '/api/v2/acme/client/proxy/register',
+                          {'email': 'proxy@example.com'})
+            data = assert_success(r)
+            assert data['registered'] is True
+            assert data['email'] == 'proxy@example.com'
+            assert 'account_url' in data
 
     def test_proxy_register_missing_email(self, auth_client):
         r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {})
@@ -516,10 +522,29 @@ class TestAcmeClientProxy:
         r = post_json(auth_client, '/api/v2/acme/client/proxy/register', {'email': ''})
         assert_error(r, 400)
 
+    def test_proxy_register_rejects_invalid_email_format(self, auth_client):
+        r = post_json(auth_client, '/api/v2/acme/client/proxy/register',
+                      {'email': 'not-an-email'})
+        assert_error(r, 400)
+
+    def test_proxy_register_rejects_local_tld(self, auth_client):
+        """Issue #68: .local/.lan/.internal TLDs are not in Public Suffix List
+        — Let's Encrypt rejects them. Block server-side to give immediate feedback."""
+        for bad in ['admin@server.local', 'admin@host.lan', 'admin@app.internal',
+                    'admin@ucm.home', 'admin@test.corp']:
+            r = post_json(auth_client, '/api/v2/acme/client/proxy/register',
+                          {'email': bad})
+            assert_error(r, 400)
+
     def test_proxy_unregister(self, auth_client):
-        # Register first, then unregister
-        post_json(auth_client, '/api/v2/acme/client/proxy/register',
-                  {'email': 'unreg@example.com'})
+        # Register first, then unregister (mock upstream call)
+        from unittest.mock import patch, PropertyMock
+        with patch('services.acme.acme_proxy_service.AcmeProxyService.account_url',
+                   new_callable=PropertyMock, return_value='https://example.com/acct/2'), \
+             patch('services.acme.acme_proxy_service.AcmeProxyService._load_or_create_account_key',
+                   return_value=(None, None)):
+            post_json(auth_client, '/api/v2/acme/client/proxy/register',
+                      {'email': 'unreg@example.com'})
         r = post_json(auth_client, '/api/v2/acme/client/proxy/unregister', {})
         data = assert_success(r)
         assert data['registered'] is False
@@ -529,6 +554,27 @@ class TestAcmeClientProxy:
         post_json(auth_client, '/api/v2/acme/client/proxy/unregister', {})
         r = post_json(auth_client, '/api/v2/acme/client/proxy/unregister', {})
         assert_success(r)
+
+
+class TestAcmeProxyEmailValidation:
+    """Unit tests for AcmeProxyService email / contact resolution (issue #68)"""
+
+    def test_public_email_accepted(self):
+        from services.acme.acme_proxy_service import AcmeProxyService
+        assert AcmeProxyService._is_public_email_domain('admin@example.com') is True
+        assert AcmeProxyService._is_public_email_domain('foo@bar.co.uk') is True
+
+    def test_private_tlds_rejected(self):
+        from services.acme.acme_proxy_service import AcmeProxyService
+        for bad in ['admin@host.local', 'admin@host.lan', 'admin@host.internal',
+                    'admin@host.home', 'admin@host.corp', 'admin@host.localhost',
+                    'admin@host.test', 'admin@host.invalid']:
+            assert AcmeProxyService._is_public_email_domain(bad) is False, bad
+
+    def test_malformed_email_rejected(self):
+        from services.acme.acme_proxy_service import AcmeProxyService
+        for bad in ['', 'no-at-sign', '@nodomain', 'no-tld@host', None]:
+            assert AcmeProxyService._is_public_email_domain(bad) is False
 
 
 # ============================================================

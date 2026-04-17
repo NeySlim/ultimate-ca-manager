@@ -101,19 +101,50 @@ class AcmeProxyService:
         # Register if not exists or empty
         return self._register_upstream_account()
 
+    @staticmethod
+    def _is_public_email_domain(email: str) -> bool:
+        """Best-effort check: reject obviously non-public TLDs that will be rejected by
+        Let's Encrypt's Public Suffix List check. Not a full PSL — rejects common
+        internal/dev TLDs. Real PSL validation happens upstream anyway."""
+        if not email or '@' not in email:
+            return False
+        domain = email.rsplit('@', 1)[-1].strip().lower()
+        if '.' not in domain:
+            return False
+        private_tlds = {'local', 'lan', 'home', 'internal', 'intranet',
+                        'corp', 'localdomain', 'localhost', 'example', 'test',
+                        'invalid', 'onion'}
+        tld = domain.rsplit('.', 1)[-1]
+        return tld not in private_tlds
+
+    def _resolve_contact_email(self) -> Optional[str]:
+        """Resolve the contact email to use for upstream account registration.
+        Priority:
+          1. Admin-configured acme.proxy_email (validated)
+          2. None — caller must handle (LE accepts registration without contact)
+        Never synthesizes admin@<fqdn> because internal FQDNs (.lan/.local)
+        fail the upstream Public Suffix List check.
+        """
+        cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
+        if cfg and cfg.value:
+            email = cfg.value.strip()
+            if self._is_public_email_domain(email):
+                return email
+            logger.warning(
+                "Configured acme.proxy_email '%s' has non-public TLD; "
+                "registering without contact email.", email
+            )
+        return None
+
     def _register_upstream_account(self):
         """Register account with upstream, with optional EAB support"""
         self._ensure_directory()
         new_account_url = self.directory['newAccount']
-        
-        from config.settings import get_config
-        conf = get_config()
-        fqdn = conf.FQDN or "ucm.local"
-        
-        payload = {
-            "termsOfServiceAgreed": True,
-            "contact": [f"mailto:admin@{fqdn}"] 
-        }
+
+        contact_email = self._resolve_contact_email()
+        payload = {"termsOfServiceAgreed": True}
+        if contact_email:
+            payload["contact"] = [f"mailto:{contact_email}"]
         
         # Add External Account Binding if configured (required by HARICA, etc.)
         eab_kid_config = SystemConfig.query.filter_by(key='acme.proxy.eab_kid').first()
@@ -157,7 +188,19 @@ class AcmeProxyService:
                 raise
             return loc
         else:
-            raise RuntimeError(f"Failed to register upstream account: {resp.text}")
+            logger.error(
+                "Failed to register upstream account (HTTP %s): %s",
+                resp.status_code, resp.text[:500]
+            )
+            # Surface the upstream 'detail' if available; otherwise a generic message.
+            detail = None
+            try:
+                detail = resp.json().get('detail')
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"Failed to register upstream ACME account: {detail or 'upstream error'}"
+            )
 
     def _ensure_directory(self):
         """Fetch upstream directory"""
@@ -182,7 +225,7 @@ class AcmeProxyService:
     def _get_nonce(self):
         """Get nonce from upstream"""
         self._ensure_directory()
-        resp = requests.head(self.directory['newNonce'])
+        resp = requests.head(self.directory['newNonce'], timeout=15)
         return resp.headers['Replay-Nonce']
 
     def _post_jws(self, url: str, payload: Union[Dict, str], kid: str = None) -> requests.Response:
@@ -225,7 +268,7 @@ class AcmeProxyService:
         }
         
         headers = {"Content-Type": "application/jose+json"}
-        return requests.post(url, json=data, headers=headers)
+        return requests.post(url, json=data, headers=headers, timeout=30)
 
     def _post_with_account(self, url: str, payload) -> requests.Response:
         """Post JWS with account KID, auto-re-registering if account is stale.
@@ -312,8 +355,8 @@ class AcmeProxyService:
         # Verify each domain has a DNS provider configured
         domain_providers = {}
         for domain in domains:
-            # Remove wildcard prefix for lookup
-            lookup_domain = domain.lstrip('*.')
+            # Remove wildcard prefix for lookup (removeprefix not lstrip — chars vs prefix)
+            lookup_domain = domain[2:] if domain.startswith('*.') else domain
             provider = find_provider_for_domain(lookup_domain)
             if not provider:
                 raise Exception(f"No DNS provider configured for domain: {domain}. Configure it in ACME > Domains.")

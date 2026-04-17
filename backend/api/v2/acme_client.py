@@ -341,27 +341,76 @@ def test_proxy_connection():
 @bp.route('/api/v2/acme/client/proxy/register', methods=['POST'])
 @require_auth(['write:acme'])
 def register_proxy_account():
-    """Register Let's Encrypt proxy account"""
-    data = request.json
-    
-    if not data or not data.get('email'):
+    """Register ACME proxy account with configured upstream CA.
+
+    Stores the admin contact email AND triggers actual upstream registration
+    so errors (invalid email domain, EAB required, unreachable CA) surface
+    immediately rather than on the first client order.
+    """
+    import re
+    from services.acme.acme_proxy_service import AcmeProxyService
+
+    data = request.json or {}
+    email = (data.get('email') or '').strip()
+
+    if not email:
         return error_response('Email is required', 400)
-    
-    email = data['email']
-    
-    _set_config('acme.proxy_email', email, 'Let\'s Encrypt proxy account email')
-    db.session.commit()
-    
+
+    # RFC-ish email format validation
+    if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+        return error_response('Invalid email format', 400)
+
+    # Reject obviously private/internal TLDs — LE rejects them at the PSL check
+    if not AcmeProxyService._is_public_email_domain(email):
+        return error_response(
+            'Email domain is not a public domain (LetsEncrypt requires a public TLD). '
+            'Use a public email (e.g. @example.com), not .local/.lan/.internal.',
+            400
+        )
+
+    _set_config('acme.proxy_email', email, "Upstream ACME proxy contact email")
+
+    # Clear any stale account so re-registration uses the new email
+    for stale_key in ['acme.proxy.account_url']:
+        cfg = SystemConfig.query.filter_by(key=stale_key).first()
+        if cfg:
+            db.session.delete(cfg)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to persist proxy email: {e}")
+        return error_response('Failed to save proxy email', 500)
+
+    # Trigger actual upstream registration so errors surface now
+    try:
+        base_url = request.host_url.rstrip('/')
+        svc = AcmeProxyService(base_url)
+        account_url = svc.account_url  # Lazy — triggers _register_upstream_account
+    except RuntimeError as e:
+        logger.error(f"Upstream account registration failed: {e}")
+        AuditService.log_action(
+            action='acme_proxy_register',
+            resource_type='acme_client',
+            resource_name='ACME Proxy',
+            details=f'Upstream registration failed: {e}',
+            success=False
+        )
+        return error_response(str(e), 502)
+    except Exception as e:
+        logger.error(f"Unexpected error during proxy registration: {e}")
+        return error_response('Registration failed', 500)
+
     AuditService.log_action(
-        action='le_proxy_register',
+        action='acme_proxy_register',
         resource_type='acme_client',
-        resource_name='LE Proxy',
-        details=f'Registered Let\'s Encrypt proxy account: {email}',
+        resource_name='ACME Proxy',
+        details=f'Registered ACME proxy account: {email} ({account_url})',
         success=True
     )
-    
+
     return success_response(
-        data={'registered': True, 'email': email},
+        data={'registered': True, 'email': email, 'account_url': account_url},
         message='Proxy account registered'
     )
 
@@ -369,20 +418,26 @@ def register_proxy_account():
 @bp.route('/api/v2/acme/client/proxy/unregister', methods=['POST'])
 @require_auth(['write:acme'])
 def unregister_proxy_account():
-    """Unregister Let's Encrypt proxy account"""
-    proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
-    if proxy_cfg:
-        db.session.delete(proxy_cfg)
+    """Unregister ACME proxy account — clears email AND stale account URL/key."""
+    for key in ['acme.proxy_email', 'acme.proxy.account_url']:
+        cfg = SystemConfig.query.filter_by(key=key).first()
+        if cfg:
+            db.session.delete(cfg)
+    try:
         db.session.commit()
-    
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to clear proxy account: {e}")
+        return error_response('Failed to unregister', 500)
+
     AuditService.log_action(
-        action='le_proxy_unregister',
+        action='acme_proxy_unregister',
         resource_type='acme_client',
-        resource_name='LE Proxy',
-        details='Unregistered Let\'s Encrypt proxy account',
+        resource_name='ACME Proxy',
+        details='Unregistered ACME proxy account',
         success=True
     )
-    
+
     return success_response(
         data={'registered': False},
         message='Proxy account unregistered'
