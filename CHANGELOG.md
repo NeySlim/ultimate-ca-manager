@@ -9,6 +9,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.125] - 2026-04-17
+
 ### Security
 - **Backup format v2 (encrypted container, magic header, Argon2id KDF)** — The backup system now emits a versioned binary container with `UCMB` magic bytes, explicit format version byte, feature flags (gzip on by default), and KDF identifier. Key derivation uses Argon2id (`time_cost=3`, `memory_cost=64 MiB`, `parallelism=4`, 32‑byte output) instead of PBKDF2‑HMAC‑SHA256 at 100k iterations, providing memory‑hard resistance against GPU/ASIC brute force. Ciphertext is AES‑256‑GCM with a 12‑byte random nonce, and the magic prefix is bound as additional authenticated data so a tampered header fails decryption. If Argon2id is unavailable at runtime, v2 falls back to PBKDF2‑HMAC‑SHA256 at 600 000 iterations (6× previous). v1 backups remain fully restorable for backward compatibility; restore auto‑detects the format.
 - **Backup passwords must be ≥ 12 characters** — Enforced server‑side via `_validate_password`.
