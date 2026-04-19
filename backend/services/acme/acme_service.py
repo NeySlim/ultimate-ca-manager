@@ -605,18 +605,20 @@ class AcmeService:
         
         try:
             # SSRF protection: reject domains resolving to private/loopback IPs
-            from utils.ssrf_protection import validate_host_not_private
-            try:
-                validate_host_not_private(domain)
-            except ValueError as ssrf_err:
-                challenge.status = "invalid"
-                challenge.error = json.dumps({
-                    "type": "urn:ietf:params:acme:error:rejectedIdentifier",
-                    "detail": "Domain resolves to a non-public address"
-                })
-                db.session.commit()
-                logger.warning(f"HTTP-01 SSRF blocked for {domain}: {ssrf_err}")
-                return False
+            # unless explicitly allowed (local ACME is meant for internal infra).
+            if not self._acme_allow_private_ips():
+                from utils.ssrf_protection import validate_host_not_private
+                try:
+                    validate_host_not_private(domain)
+                except ValueError as ssrf_err:
+                    challenge.status = "invalid"
+                    challenge.error = json.dumps({
+                        "type": "urn:ietf:params:acme:error:rejectedIdentifier",
+                        "detail": "Domain resolves to a non-public address"
+                    })
+                    db.session.commit()
+                    logger.warning(f"HTTP-01 SSRF blocked for {domain}: {ssrf_err}")
+                    return False
             
             response = requests.get(url, timeout=10, allow_redirects=False)
             response.raise_for_status()
@@ -771,18 +773,20 @@ class AcmeService:
         
         try:
             # SSRF protection: reject domains resolving to private/loopback IPs
-            from utils.ssrf_protection import validate_host_not_private
-            try:
-                validate_host_not_private(domain)
-            except ValueError as ssrf_err:
-                challenge.status = "invalid"
-                challenge.error = json.dumps({
-                    "type": "urn:ietf:params:acme:error:rejectedIdentifier",
-                    "detail": "Domain resolves to a non-public address"
-                })
-                db.session.commit()
-                logger.warning(f"TLS-ALPN-01 SSRF blocked for {domain}: {ssrf_err}")
-                return False
+            # unless explicitly allowed (local ACME is meant for internal infra).
+            if not self._acme_allow_private_ips():
+                from utils.ssrf_protection import validate_host_not_private
+                try:
+                    validate_host_not_private(domain)
+                except ValueError as ssrf_err:
+                    challenge.status = "invalid"
+                    challenge.error = json.dumps({
+                        "type": "urn:ietf:params:acme:error:rejectedIdentifier",
+                        "detail": "Domain resolves to a non-public address"
+                    })
+                    db.session.commit()
+                    logger.warning(f"TLS-ALPN-01 SSRF blocked for {domain}: {ssrf_err}")
+                    return False
             
             # Create SSL context with acme-tls/1 ALPN
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -1246,6 +1250,26 @@ class AcmeService:
             Key authorization string (token.thumbprint)
         """
         return f"{token}.{jwk_thumbprint}"
+
+    def _acme_allow_private_ips(self) -> bool:
+        """Whether HTTP-01 / TLS-ALPN-01 may target private/internal IPs.
+
+        Local ACME is typically used to issue certificates for INTERNAL
+        infrastructure (.lan, .local, .corp, etc.) which by definition
+        resolves to RFC 1918 / link-local addresses. Blocking those would
+        make the local ACME server unusable for its main use case.
+
+        Defaults to True. Operators who only want to issue for public
+        domains can flip ``acme.allow_private_ips`` to ``false``.
+        """
+        try:
+            from models import SystemConfig
+            setting = SystemConfig.query.filter_by(key='acme.allow_private_ips').first()
+            if setting is None:
+                return True
+            return str(setting.value).strip().lower() in ('1', 'true', 'yes', 'on')
+        except Exception:
+            return True
     
     def validate_eab(self, eab_data: Dict[str, Any], account_jwk: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """Validate External Account Binding (RFC 8555 §7.3.4)

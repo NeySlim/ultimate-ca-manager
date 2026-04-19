@@ -9,6 +9,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.126] - 2026-04-19
+
+### Fixed
+- **Local ACME refused HTTP-01 / TLS-ALPN-01 for internal domains (CRITICAL for on-prem use)** — The Phase 2 SSRF hardening unconditionally rejected RFC1918 / loopback / link-local / reserved targets in HTTP-01 and TLS-ALPN-01 validators. UCM's local ACME exists precisely to issue certificates for internal infrastructure (`.lan`, `.local`, `.corp`), which by definition resolves to private addresses. The check is now gated by a new `acme.allow_private_ips` setting (default `true`). Operators issuing only for public domains can flip it to `false`.
+- **OPNsense import refused LAN hosts** — `import_opnsense.py` rejected any RFC1918 OPNsense host. OPNsense is a LAN firewall by design. Replaced the broad SSRF check with the narrow guard (`validate_url_not_cloud_metadata`) that only blocks cloud metadata services and loopback.
+- **Webhooks refused internal targets** — Creating or testing a webhook pointing at an internal Slack-compatible / Mattermost / Teams self-hosted / Jenkins / Gitea / Home Assistant / n8n endpoint was rejected. UCM is on-prem; internal automation is the primary use case. Both `api/v2/webhooks.py` and the legacy `api/v2/settings.py` webhook routes now use the narrow guard.
+- **Discovery scans could not include `127.0.0.1`** — Loopback was unconditionally blocked, preventing operators from discovering certificates of services bound to localhost on the UCM host itself. Loopback is now allowed; only link-local / multicast / reserved remain blocked.
+
+### Security
+- The narrow SSRF guard (`validate_url_not_cloud_metadata`) still blocks the highest-impact targets in the on-prem context: cloud instance metadata services (AWS `169.254.169.254`, GCP `metadata.google.internal`, Azure, Alibaba) and loopback. These remain rejected for webhook/OPNsense/SSO/ACME-proxy outbound traffic.
+
 ## [2.125] - 2026-04-17
 
 ### Security

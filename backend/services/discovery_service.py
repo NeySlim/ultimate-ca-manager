@@ -23,14 +23,16 @@ from models import db, Certificate, ScanProfile, ScanRun, DiscoveredCertificate
 # Note: RFC1918 private ranges (10/8, 172.16/12, 192.168/16) are intentionally
 # allowed — scanning internal networks for certificates is a core use case.
 _BLOCKED_NETWORKS = [
-    ipaddress.ip_network('127.0.0.0/8'),       # Loopback
     ipaddress.ip_network('169.254.0.0/16'),     # Link-local
     ipaddress.ip_network('224.0.0.0/4'),        # Multicast
     ipaddress.ip_network('240.0.0.0/4'),        # Reserved
-    ipaddress.ip_network('::1/128'),            # IPv6 loopback
     ipaddress.ip_network('fe80::/10'),          # IPv6 link-local
     ipaddress.ip_network('ff00::/8'),           # IPv6 multicast
 ]
+# Note: loopback (127/8, ::1) is intentionally allowed — UCM is on-prem and
+# admins legitimately scan services bound to localhost on the UCM host.
+# Note: RFC1918 ranges (10/8, 172.16/12, 192.168/16) are intentionally allowed
+# — scanning internal networks for certificates is a core use case.
 
 # Concurrent scan rate limiting — prevents resource exhaustion
 _MAX_CONCURRENT_SCANS = 3
@@ -38,10 +40,10 @@ _scan_semaphore = threading.Semaphore(_MAX_CONCURRENT_SCANS)
 
 
 def _is_blocked_ip(host: str) -> bool:
-    """Check if host IP is in a blocked range (SSRF protection)."""
+    """Check if host IP is in a blocked range (link-local/multicast/reserved only)."""
     try:
         addr = ipaddress.ip_address(host)
-        if addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved:
+        if addr.is_link_local or addr.is_multicast or addr.is_reserved:
             return True
         for net in _BLOCKED_NETWORKS:
             if addr in net:

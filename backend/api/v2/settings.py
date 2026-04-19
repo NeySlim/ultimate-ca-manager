@@ -6,7 +6,7 @@ Settings Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response
-from utils.ssrf_protection import validate_url_not_private
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db, SystemConfig
 from services.audit_service import AuditService
 from datetime import datetime, timezone
@@ -866,11 +866,12 @@ def create_webhook():
     if not data.get('url'):
         return error_response('Webhook URL required', 400)
 
-    # SSRF protection: reject private/loopback/metadata addresses
+    # Narrow SSRF guard — internal webhooks (Slack/Teams/Mattermost on LAN)
+    # are legitimate. Block only cloud metadata + loopback.
     try:
-        validate_url_not_private(data['url'])
+        validate_url_not_cloud_metadata(data['url'])
     except ValueError:
-        return error_response('Webhook URL must not target private or loopback addresses', 400)
+        return error_response('Webhook URL must not target cloud metadata services or loopback', 400)
 
     if not data.get('events'):
         return error_response('At least one event required', 400)
@@ -941,12 +942,12 @@ def test_webhook(webhook_id):
     if not webhook:
         return error_response('Webhook not found', 404)
 
-    # SSRF protection: re-validate stored URL before sending (defense-in-depth)
+    # Re-validate stored URL before sending (defense-in-depth, narrow guard)
     try:
-        validate_url_not_private(webhook['url'])
+        validate_url_not_cloud_metadata(webhook['url'])
     except ValueError as e:
-        logger.warning(f"Blocked test of webhook {webhook_id} — URL resolves to private address: {e}")
-        return error_response('Webhook URL points to a private or disallowed address', 400)
+        logger.warning(f"Blocked test of webhook {webhook_id} — URL targets cloud metadata or loopback: {e}")
+        return error_response('Webhook URL targets cloud metadata services or loopback', 400)
 
     test_payload = {
         'event': 'test',

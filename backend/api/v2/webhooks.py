@@ -5,7 +5,7 @@ Endpoints for managing webhook configurations.
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from utils.ssrf_protection import validate_url_not_private
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db
 from services.webhook_service import WebhookEndpoint, WebhookService
 import json
@@ -49,12 +49,14 @@ def create_webhook():
     if not url.startswith(('http://', 'https://')):
         return error_response("URL must start with http:// or https://", 400)
     
-    # SSRF protection: prevent webhooks pointing to internal services
+    # Narrow SSRF guard — UCM is on-prem, internal webhooks (Slack/Mattermost/
+    # Teams/Jenkins/Gitea/Home Assistant on RFC1918) are a primary use case.
+    # Only block cloud metadata endpoints + loopback (high-impact targets).
     try:
-        validate_url_not_private(url)
+        validate_url_not_cloud_metadata(url)
     except ValueError as e:
         logger.warning(f"Webhook SSRF blocked: {e}")
-        return error_response("Webhook URL must not point to private/internal addresses", 400)
+        return error_response("Webhook URL must not target cloud metadata services or loopback", 400)
     
     events = data.get('events', ['*'])
     if not isinstance(events, list):
@@ -93,10 +95,10 @@ def update_webhook(endpoint_id):
         if not url.startswith(('http://', 'https://')):
             return error_response("URL must start with http:// or https://", 400)
         try:
-            validate_url_not_private(url)
+            validate_url_not_cloud_metadata(url)
         except ValueError as e:
             logger.warning(f"Webhook SSRF blocked: {e}")
-            return error_response("Webhook URL must not point to private/internal addresses", 400)
+            return error_response("Webhook URL must not target cloud metadata services or loopback", 400)
         endpoint.url = url
     if 'secret' in data:
         endpoint.secret = data['secret']

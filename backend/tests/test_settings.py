@@ -713,14 +713,14 @@ class TestWebhooks:
         r = post_json(auth_client, '/api/v2/settings/webhooks/99999/test', {})
         assert_error(r, 404)
 
-    def test_test_webhook_unreachable(self, auth_client):
-        """Creating a webhook with a private/reserved IP must be rejected (SSRF)."""
+    def test_test_webhook_blocks_cloud_metadata(self, auth_client):
+        """Creating a webhook targeting cloud metadata or loopback must be rejected (narrow SSRF)."""
         r = post_json(auth_client, '/api/v2/settings/webhooks', {
-            'name': 'Unreachable Hook',
-            'url': 'https://192.0.2.1:9999/nope',
+            'name': 'Metadata Hook',
+            'url': 'http://169.254.169.254/latest/meta-data/',
             'events': ['test'],
         })
-        # SSRF protection rejects private/reserved IPs at create time
+        # Narrow SSRF guard rejects cloud metadata IPs (AWS/GCP/Azure)
         assert r.status_code == 400
         body = get_json(r)
         assert 'error' in body or 'message' in body

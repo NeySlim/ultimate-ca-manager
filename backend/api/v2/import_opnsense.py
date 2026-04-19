@@ -8,7 +8,7 @@ import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.safe_requests import create_session
-from utils.ssrf_protection import validate_host_not_private
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 from services.audit_service import AuditService
 
 # Setup logging
@@ -67,12 +67,13 @@ def test_connection():
         logger.warning(f"OpnSense test failed: missing required fields")
         return error_response("Missing required fields: host, api_key, api_secret", 400)
     
-    # SSRF protection: prevent connecting to internal services
+    # Narrow SSRF guard — OPNsense is by design a LAN firewall (RFC1918).
+    # Block only cloud metadata + loopback.
     try:
-        validate_host_not_private(host)
+        validate_url_not_cloud_metadata(f"https://{host}")
     except ValueError as e:
         logger.warning(f"OPNsense SSRF blocked: {e}")
-        return error_response("OPNsense host must not be a private/internal address", 400)
+        return error_response("OPNsense host must not target cloud metadata services or loopback", 400)
     
     base_url = f"https://{host}:{port}"
     
@@ -198,12 +199,12 @@ def import_items():
         logger.warning("OpnSense import failed: missing required fields")
         return error_response("Missing required fields", 400)
     
-    # SSRF protection
+    # Narrow SSRF guard — OPNsense is LAN firewall, RFC1918 expected.
     try:
-        validate_host_not_private(host)
+        validate_url_not_cloud_metadata(f"https://{host}")
     except ValueError as e:
         logger.warning(f"OPNsense SSRF blocked: {e}")
-        return error_response("OPNsense host must not be a private/internal address", 400)
+        return error_response("OPNsense host must not target cloud metadata services or loopback", 400)
     
     # Allow empty items array to import all
     if items is None:
