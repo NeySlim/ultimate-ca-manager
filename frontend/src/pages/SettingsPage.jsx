@@ -36,6 +36,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
 import EmailTemplateWindow from '../components/EmailTemplateWindow'
+import DatabaseBackendSection from './settings/DatabaseBackendSection'
 import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 
@@ -3656,6 +3657,7 @@ export default function SettingsPage() {
               title={t('settings.helpDatabase')}
               subtitle={t('settings.databaseSubtitle')}
             />
+            <DatabaseBackendSection />
             <DetailSection title={t('settings.databaseStatistics')} icon={HardDrives} iconClass="icon-bg-teal">
               <DetailGrid>
                 <DetailField
