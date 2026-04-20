@@ -114,7 +114,9 @@ def migrate_data():
                 resource_type='system',
                 details={'database_url': database_url, 'error': msg, 'stats': stats}
             )
-            return error_response(msg, 500)
+            # Pre-flight refusals (target unreachable / not empty) → 409 Conflict
+            status = 409 if ('not empty' in msg or 'unreachable' in msg) else 500
+            return error_response(msg, status)
 
         # Docker: skip persist + restart, return instructions
         if is_docker():

@@ -80,8 +80,13 @@ def get_status() -> dict:
 # Test connection
 # ---------------------------------------------------------------------------
 
+MIN_POSTGRES_MAJOR = 13
+
+
 def test_connection(database_url: str) -> Tuple[bool, str]:
-    """Validate a DATABASE_URL by opening a connection and running SELECT 1."""
+    """Validate a DATABASE_URL by opening a connection and running SELECT 1.
+    For PostgreSQL, also checks server version >= MIN_POSTGRES_MAJOR.
+    """
     if not database_url or not isinstance(database_url, str):
         return False, "DATABASE_URL is required"
 
@@ -97,6 +102,20 @@ def test_connection(database_url: str) -> Tuple[bool, str]:
         )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+            if parsed.scheme.startswith("postgresql"):
+                row = conn.execute(text("SHOW server_version_num")).fetchone()
+                if row:
+                    try:
+                        ver_num = int(row[0])  # e.g. 130012 = 13.12, 160003 = 16.3
+                        major = ver_num // 10000
+                        if major < MIN_POSTGRES_MAJOR:
+                            engine.dispose()
+                            return False, (
+                                f"PostgreSQL {major} is not supported. "
+                                f"UCM requires PostgreSQL {MIN_POSTGRES_MAJOR} or newer."
+                            )
+                    except (ValueError, TypeError):
+                        pass  # don't fail on parse errors, just skip the check
         engine.dispose()
         return True, "Connection successful"
     except SQLAlchemyError as e:
@@ -166,6 +185,40 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
     ok, msg = test_connection(target_url)
     if not ok:
         return False, f"Target unreachable: {msg}", stats
+
+    # Refuse if target already contains UCM data (avoid silent data clobbering / partial states)
+    try:
+        probe_engine = create_engine(target_url, pool_pre_ping=True)
+        probe_insp = inspect(probe_engine)
+        existing_tables = [
+            t for t in probe_insp.get_table_names()
+            if not t.startswith("_") and t != "alembic_version"
+        ]
+        non_empty = []
+        if existing_tables:
+            with probe_engine.connect() as probe:
+                # Check a few canonical tables — if any has rows, we refuse
+                for tname in ("users", "cas", "certificates"):
+                    if tname in existing_tables:
+                        try:
+                            row = probe.execute(text(f'SELECT COUNT(*) FROM "{tname}"')).fetchone()
+                            if row and row[0] and row[0] > 0:
+                                non_empty.append(f"{tname}={row[0]}")
+                        except Exception:
+                            pass
+        probe_engine.dispose()
+        if non_empty:
+            target_is_pg = target_url.startswith("postgresql")
+            cleanup_hint = (
+                'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+                if target_is_pg else 'rm <target>.db'
+            )
+            return False, (
+                f"Target database is not empty ({', '.join(non_empty)}). "
+                f"Refusing to overwrite. To reset the target, run: {cleanup_hint}"
+            ), stats
+    except Exception as e:
+        logger.warning(f"Target emptiness check failed (continuing): {e}")
 
     # 1. Backup source
     try:
@@ -271,7 +324,17 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
 
     except Exception as e:
         logger.exception("Data migration failed")
-        return False, f"Migration failed: {_short_err(str(e))}", stats
+        target_is_pg = target_url.startswith("postgresql")
+        cleanup_hint = (
+            'Reset the target before retrying: DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+            if target_is_pg else
+            'Reset the target before retrying: delete the target SQLite file.'
+        )
+        return False, (
+            f"Migration failed: {_short_err(str(e))}. "
+            f"Target may be in a partial state. {cleanup_hint} "
+            f"Source database is untouched (backup at {stats.get('backup_path')})."
+        ), stats
 
 
 # ---------------------------------------------------------------------------
