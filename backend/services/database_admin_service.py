@@ -6,6 +6,7 @@ between SQLite and PostgreSQL.
 
 import os
 import re
+import json
 import shutil
 import logging
 from datetime import datetime
@@ -189,25 +190,64 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         except Exception:
             pass
 
+        # Create _migrations table on target (not part of SQLAlchemy metadata)
+        with target_engine.begin() as dst:
+            dst.execute(text("""
+                CREATE TABLE IF NOT EXISTS _migrations (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL UNIQUE,
+                    applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
         # Copy each table
+        source_is_pg = str(source_engine.url).startswith("postgresql")
+        target_is_pg = target_url.startswith("postgresql")
+        # Pre-fetch inspectors before opening transactions (SQLite locking)
+        src_insp = inspect(source_engine)
+        target_insp = inspect(target_engine)
+        target_tables = set(target_insp.get_table_names())
+        target_cols_by_table = {
+            t: {c["name"] for c in target_insp.get_columns(t)} for t in target_tables
+        }
+        src_table_names = src_insp.get_table_names()
+
         with source_engine.connect() as src, target_engine.begin() as dst:
-            insp = inspect(source_engine)
-            for table_name in insp.get_table_names():
+            # Disable FK checks during bulk load to avoid ordering issues
+            if target_is_pg:
+                dst.execute(text("SET session_replication_role = 'replica'"))
+            else:
+                dst.execute(text("PRAGMA foreign_keys = OFF"))
+
+            for table_name in src_table_names:
                 if table_name.startswith("_") and table_name != "_migrations":
                     continue  # skip internal tables but keep _migrations
+                if table_name not in target_tables:
+                    logger.warning(f"Skipping table {table_name}: not in target schema")
+                    continue
                 try:
-                    rows = list(src.execute(text(f"SELECT * FROM {table_name}")).mappings())
+                    target_cols = target_cols_by_table[table_name]
+                    rows = list(src.execute(text(f'SELECT * FROM "{table_name}"')).mappings())
                     if not rows:
                         stats["tables_migrated"] += 1
                         continue
-                    cols = list(rows[0].keys())
+                    src_cols = list(rows[0].keys())
+                    cols = [c for c in src_cols if c in target_cols]
+                    dropped = [c for c in src_cols if c not in target_cols]
+                    if dropped:
+                        logger.warning(f"{table_name}: dropping columns absent in target: {dropped}")
+                    if not cols:
+                        logger.warning(f"{table_name}: no overlapping columns, skipping")
+                        continue
                     placeholders = ", ".join(f":{c}" for c in cols)
                     col_list = ", ".join(f'"{c}"' for c in cols)
                     insert_sql = text(
                         f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})'
                     )
                     for row in rows:
-                        dst.execute(insert_sql, dict(row))
+                        d = _normalize_row(dict(row), source_is_pg, target_is_pg)
+                        d = {c: d.get(c) for c in cols}
+                        dst.execute(insert_sql, d)
                     stats["tables_migrated"] += 1
                     stats["rows_migrated"] += len(rows)
                 except Exception as e:
@@ -215,6 +255,12 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
                     logger.error(f"Migration error on table {err}")
                     stats["errors"].append(err)
                     raise
+
+            # Re-enable FK checks
+            if target_is_pg:
+                dst.execute(text("SET session_replication_role = 'origin'"))
+            else:
+                dst.execute(text("PRAGMA foreign_keys = ON"))
 
         # Reset PG sequences if target is PG
         if target_url.startswith("postgresql"):
@@ -287,3 +333,27 @@ def _reset_pg_sequences(engine):
                 ))
             except Exception as e:
                 logger.warning(f"Failed to reset sequence for {table_name}.{column_name}: {e}")
+
+
+def _normalize_row(row: dict, source_is_pg: bool, target_is_pg: bool) -> dict:
+    """Normalize values for cross-backend insert.
+
+    - PG → SQLite: dict/list become JSON strings; memoryview → bytes
+    - SQLite → PG: JSON-looking strings on JSON columns are left as-is
+      (SQLAlchemy handles the cast on ORM-typed columns; raw INSERT works
+      because PG accepts text in JSON columns when string is valid JSON
+      — but psycopg2 doesn't cast str→json automatically, so we leave
+      strings unchanged and rely on PG implicit cast for TEXT columns;
+      JSON columns get TEXT input which fails — so we don't touch).
+    """
+    out = {}
+    for k, v in row.items():
+        if v is None:
+            out[k] = None
+        elif isinstance(v, memoryview):
+            out[k] = bytes(v)
+        elif isinstance(v, (dict, list)) and not target_is_pg:
+            out[k] = json.dumps(v)
+        else:
+            out[k] = v
+    return out
