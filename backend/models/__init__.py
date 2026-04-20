@@ -24,7 +24,12 @@ from models.rbac import CustomRole, RolePermission
 from models.sso import SSOProvider, SSOSession
 from models.policy import CertificatePolicy, ApprovalRequest
 from models.ssh import SSHCertificateAuthority, SSHCertificate
+from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+
+# Note: WebhookEndpoint lives in services/webhook_service.py and is imported
+# explicitly in app.py before db.create_all() runs. We can't import it here
+# without creating a circular dependency (services -> models -> services).
 
 
 class UserSession(db.Model):
