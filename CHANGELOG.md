@@ -9,6 +9,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **PostgreSQL 13+ as a native database backend (alongside SQLite)** — UCM now supports PostgreSQL via the `DATABASE_URL` environment variable (e.g. `postgresql+psycopg2://user:pass@host:5432/ucm`). When unset, UCM falls back to the bundled SQLite at `UCM_DATA_DIR/ucm.db`. The schema is created automatically on first start; no manual SQL required. The `psycopg2-binary` driver is bundled in DEB/RPM/Docker.
+- **Settings → Database** — new UI section showing the active backend (sqlite/postgresql), database size, table count, and migration version. Operators can:
+  - **Test** an arbitrary `DATABASE_URL` before switching
+  - **Switch** the backend (persists to `/etc/ucm/ucm.env` on DEB/RPM and triggers restart)
+  - **Migrate data** between backends in either direction (SQLite → PostgreSQL or PostgreSQL → SQLite)
+- **Bidirectional database migration** (`/api/v2/database/migrate`) — backs up the source first, creates the schema on the target via SQLAlchemy, disables FK checks during bulk load (PostgreSQL `session_replication_role`, SQLite `PRAGMA foreign_keys`), intersects source/target columns to handle legacy schema drift, normalizes `memoryview`/JSON values across drivers, and resets PostgreSQL sequences after load. Verified end-to-end with 47 tables / 3800+ rows in both directions.
+- **Documentation** — `docs/ADMIN_GUIDE.md` and `docs/installation/docker.md` updated with PostgreSQL setup, `DATABASE_URL` reference, and migration workflow. In-app **Help** (Quick Help + Guide) updated for the Database section in all 9 languages.
+
+### Notes
+- Docker installs cannot persist `/etc/ucm/ucm.env` from inside the container. After running **Migrate** on Docker, the API returns the target URL and operators must set `DATABASE_URL` in their `docker-compose.yml` / `docker run -e` and restart the container manually.
+- The migration runner's `_migrations` bookkeeping table is created on the target if missing (it is bootstrapped outside SQLAlchemy metadata).
+
 ## [2.126] - 2026-04-19
 
 ### Fixed

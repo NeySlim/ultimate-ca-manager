@@ -156,6 +156,7 @@ volumes:
 | `UCM_ACME_ENABLED` | `true` | Enable ACME protocol |
 | `UCM_CACHE_ENABLED` | `true` | Enable response caching |
 | `UCM_SMTP_ENABLED` | `false` | Enable email notifications |
+| `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql+psycopg2://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
 
 See full list in [docker-compose.yml](../../docker-compose.yml)
 
@@ -181,7 +182,7 @@ docker run -v /opt/ucm/data:/opt/ucm/data ...
 
 ```
 ucm-data/
-├── ucm.db # SQLite database
+├── ucm.db # SQLite database (omitted when DATABASE_URL points to PostgreSQL)
 ├── https_cert.pem # HTTPS certificate
 ├── https_key.pem # HTTPS private key
 ├── cas/ # Certificate Authority files

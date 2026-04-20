@@ -14,7 +14,7 @@ export default {
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC und LDAP Single-Sign-On-Integration' },
           { label: 'Sicherung', text: 'Manuelle und geplante Datenbanksicherungen' },
           { label: 'Audit', text: 'Protokollaufbewahrung, Syslog-Weiterleitung, Integritätsüberprüfung' },
-          { label: 'Datenbank', text: 'Datenbankpfad, Größe und Migrationsstatus' },
+          { label: 'Datenbank', text: 'Aktives Backend (SQLite oder PostgreSQL), Größe, Tabellenanzahl, testen/wechseln/migrieren zwischen Backends' },
           { label: 'HTTPS', text: 'TLS-Zertifikat für die UCM-Weboberfläche' },
           { label: 'Updates', text: 'Nach neuen Versionen suchen, Änderungsprotokoll anzeigen, Auto-Update (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP-Webhooks für Zertifikatsereignisse (Ausstellung, Widerruf, Ablauf)' },
@@ -150,11 +150,35 @@ Laden Sie eine Sicherungsdatei hoch, um UCM auf einen früheren Zustand zurückz
 
 ## Datenbank
 
-Informationen über die UCM-Datenbank:
-- Pfad auf der Festplatte
-- Dateigröße
+UCM unterstützt zwei Datenbank-Backends:
+
+- **SQLite** (Standard) — dateibasiert, ohne Konfiguration, ideal für Einzelknoten
+- **PostgreSQL 13+** — empfohlen für Hochverfügbarkeit, Multi-Instanz oder wenn Sie bereits einen verwalteten PG-Cluster betreiben
+
+Das aktive Backend wird über die Umgebungsvariable \`DATABASE_URL\` ausgewählt. Wenn nicht gesetzt, verwendet UCM SQLite unter \`UCM_DATA_DIR/ucm.db\`.
+
+### Statusbereich
+- Aktives Backend (sqlite / postgresql) und Treiber
+- Datenbankgröße und Tabellenanzahl
 - Migrationsversion
-- SQLite-Version
+
+### Verbindung testen
+Validieren Sie eine \`DATABASE_URL\` (z. B. \`postgresql+psycopg2://user:pass@host:5432/ucm\`) vor dem Wechsel. Der Test öffnet eine echte Verbindung und meldet jeden Fehler.
+
+### Backend wechseln
+Speichert \`DATABASE_URL\` in \`/etc/ucm/ucm.env\` (DEB/RPM) und startet UCM neu. **Keine Daten werden kopiert** — verwenden Sie zuerst **Migrieren**, wenn Sie Ihre bestehenden Daten behalten möchten.
+
+### Daten migrieren
+Kopiert alle Zeilen vom aktuellen zum Ziel-Backend. Funktioniert in beide Richtungen (SQLite ↔ PostgreSQL):
+
+1. Die Quelldatenbank wird unter \`/opt/ucm/data/backups/db_migration/\` gesichert
+2. Das Schema wird auf dem Ziel über SQLAlchemy erstellt
+3. FK-Prüfungen werden während des Bulk-Loads deaktiviert
+4. Quell-/Ziel-Spalten werden geschnitten (Legacy-Spalten werden mit einer Warnung übersprungen)
+5. PostgreSQL-Sequenzen werden nach dem Laden zurückgesetzt
+6. Der Dienst startet automatisch neu (DEB/RPM) — auf Docker setzen Sie \`DATABASE_URL\` in Ihrer Compose-Datei und starten den Container manuell neu
+
+> ⚠ Erstellen Sie immer eine vollständige UCM-Sicherung (Einstellungen → Sicherung), bevor Sie zwischen Backends migrieren.
 
 ## HTTPS
 

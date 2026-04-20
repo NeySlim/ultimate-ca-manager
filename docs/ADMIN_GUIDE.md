@@ -7,7 +7,7 @@ Administration and configuration guide for Ultimate Certificate Manager.
 ## Configuration Overview
 
 UCM stores data in:
-- **Database** -- `/opt/ucm/data/ucm.db` (SQLite)
+- **Database** -- `/opt/ucm/data/ucm.db` (SQLite, default) or PostgreSQL via `DATABASE_URL`
 - **Data Directory** -- `/opt/ucm/data/` (certificates, keys, backups)
 - **Config** -- `/etc/ucm/ucm.env` (DEB/RPM) or environment variables (Docker)
 - **Logs** -- `/var/log/ucm/` (DEB/RPM) or stdout (Docker)
@@ -27,6 +27,7 @@ UCM stores data in:
 | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
 | `UCM_HTTPS_CERT` | (auto) | Server certificate |
 | `UCM_HTTPS_KEY` | (auto) | Server private key |
+| `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql+psycopg2://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `UCM_DATA_DIR/ucm.db`. |
 
 ### Systemd Service
 
@@ -202,6 +203,34 @@ sudo systemctl start ucm
 
 ## Database Management
 
+UCM supports two database backends:
+
+- **SQLite** (default) — zero-config, file-based, suitable for single-node deployments
+- **PostgreSQL 13+** — recommended for high availability, multi-instance, or when you already operate a managed PG cluster
+
+The active backend is selected by the `DATABASE_URL` environment variable (or `/etc/ucm/ucm.env` on DEB/RPM):
+
+- **Unset** → SQLite at `UCM_DATA_DIR/ucm.db`
+- **`postgresql+psycopg2://user:pass@host:5432/dbname`** → PostgreSQL
+
+### Switching Backend (UI)
+
+**Settings → Database** shows the current backend, size, table count, and exposes:
+
+- **Test connection** — validate a `DATABASE_URL` before switching
+- **Switch backend** — persist `DATABASE_URL` to `/etc/ucm/ucm.env` and restart (DEB/RPM)
+- **Migrate data** — copy all rows from the current backend to the target, then restart
+
+The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
+
+- Backs up the source first (`/opt/ucm/data/backups/db_migration/`)
+- Creates the schema on the target via SQLAlchemy
+- Disables FK checks during bulk load
+- Intersects source/target columns (legacy columns are skipped with a warning)
+- Resets PostgreSQL sequences after load
+
+> ⚠ Docker installs cannot persist `/etc/ucm/ucm.env` from inside the container. After running **Migrate** on Docker, the API returns the target URL — set `DATABASE_URL` in your `docker-compose.yml` or `docker run -e` and restart the container manually.
+
 ### SQLite Database
 
 Location: `/opt/ucm/data/ucm.db`
@@ -217,6 +246,45 @@ sudo systemctl start ucm
 ```bash
 sqlite3 /opt/ucm/data/ucm.db ".dump" > ucm_dump.sql
 ```
+
+### PostgreSQL Backend
+
+UCM supports PostgreSQL 13+ as a drop-in replacement for SQLite. The schema is created automatically on first start.
+
+**Recommended PostgreSQL setup:**
+```sql
+CREATE USER ucm WITH PASSWORD 'strong-password';
+CREATE DATABASE ucm OWNER ucm;
+GRANT ALL PRIVILEGES ON DATABASE ucm TO ucm;
+```
+
+**Activate PostgreSQL (DEB/RPM):**
+```bash
+echo 'DATABASE_URL=postgresql+psycopg2://ucm:strong-password@db.example.com:5432/ucm' | sudo tee -a /etc/ucm/ucm.env
+sudo systemctl restart ucm
+```
+
+**Activate PostgreSQL (Docker):**
+```yaml
+# docker-compose.yml
+services:
+  ucm:
+    image: neyslim/ultimate-ca-manager:latest
+    environment:
+      DATABASE_URL: postgresql+psycopg2://ucm:strong-password@db:5432/ucm
+```
+
+**Backup PostgreSQL:**
+```bash
+pg_dump -U ucm -h db.example.com ucm > ucm-pg-backup.sql
+```
+
+**Restore PostgreSQL:**
+```bash
+psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
+```
+
+> ℹ The `psycopg2-binary` driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
 ### Database Tables
 

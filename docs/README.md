@@ -32,7 +32,7 @@ Technical documentation for Ultimate Certificate Manager.
 | Backend | Flask + SQLAlchemy |
 | API | REST v2 (`/api/v2`) |
 | Auth | Session-based |
-| Database | SQLite |
+| Database | SQLite (default) or PostgreSQL 13+ |
 | Frontend | React 18 + Radix UI + Vite |
 
 ## Links

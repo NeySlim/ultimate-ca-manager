@@ -646,7 +646,7 @@ export const helpContent = {
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC, and LDAP single sign-on integration' },
           { label: 'Backup', text: 'Manual and scheduled database backups' },
           { label: 'Audit', text: 'Log retention, syslog forwarding, integrity verification' },
-          { label: 'Database', text: 'Database path, size, and migration status' },
+          { label: 'Database', text: 'Active backend (SQLite or PostgreSQL), size, table count, test/switch/migrate between backends' },
           { label: 'HTTPS', text: 'TLS certificate for the UCM web interface' },
           { label: 'Updates', text: 'Check for new versions, view changelog, auto-update (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP webhooks for certificate events (issue, revoke, expire)' },

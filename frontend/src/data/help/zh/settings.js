@@ -14,7 +14,7 @@ export default {
           { label: 'SSO', text: 'SAML 2.0、OAuth2/OIDC 和 LDAP 单点登录集成' },
           { label: '备份', text: '手动和计划的数据库备份' },
           { label: '审计', text: '日志保留、syslog 转发、完整性验证' },
-          { label: '数据库', text: '数据库路径、大小和迁移状态' },
+          { label: '数据库', text: '活动后端（SQLite 或 PostgreSQL）、大小、表数量、在后端之间测试/切换/迁移' },
           { label: 'HTTPS', text: 'UCM Web 界面的 TLS 证书' },
           { label: '更新', text: '检查新版本、查看变更日志、自动更新（DEB/RPM）' },
           { label: 'Webhook', text: '证书事件（签发、吊销、过期）的 HTTP Webhook' },
@@ -150,11 +150,35 @@ export default {
 
 ## 数据库
 
-关于 UCM 数据库的信息：
-- 磁盘路径
-- 文件大小
+UCM 支持两种数据库后端：
+
+- **SQLite**（默认）— 基于文件，无需配置，适合单节点
+- **PostgreSQL 13+** — 推荐用于高可用、多实例，或您已运行托管 PG 集群的场景
+
+活动后端通过 \`DATABASE_URL\` 环境变量选择。如未设置，UCM 将使用位于 \`UCM_DATA_DIR/ucm.db\` 的 SQLite。
+
+### 状态面板
+- 活动后端（sqlite / postgresql）和驱动
+- 数据库大小和表数量
 - 迁移版本
-- SQLite 版本
+
+### 测试连接
+切换前验证 \`DATABASE_URL\`（例如 \`postgresql+psycopg2://user:pass@host:5432/ucm\`）。测试会打开真实连接并报告任何错误。
+
+### 切换后端
+将 \`DATABASE_URL\` 持久化到 \`/etc/ucm/ucm.env\`（DEB/RPM）并重启 UCM。**不会复制任何数据** — 如果您希望保留现有数据，请先使用**迁移**。
+
+### 迁移数据
+将所有行从当前后端复制到目标后端。支持双向（SQLite ↔ PostgreSQL）：
+
+1. 源数据库会备份到 \`/opt/ucm/data/backups/db_migration/\`
+2. 通过 SQLAlchemy 在目标上创建模式
+3. 批量加载期间禁用 FK 约束
+4. 源/目标列取交集（遗留列会被跳过并发出警告）
+5. 加载后重置 PostgreSQL 序列
+6. 服务自动重启（DEB/RPM）— Docker 上请在 compose 文件中设置 \`DATABASE_URL\` 并手动重启容器
+
+> ⚠ 在不同后端之间迁移之前，请始终执行完整的 UCM 备份（设置 → 备份）。
 
 ## HTTPS
 

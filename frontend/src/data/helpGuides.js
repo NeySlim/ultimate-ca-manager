@@ -1505,11 +1505,35 @@ Upload a backup file to restore UCM to a previous state.
 
 ## Database
 
-Information about the UCM database:
-- Path on disk
-- File size
+UCM supports two database backends:
+
+- **SQLite** (default) — file-based, zero-config, ideal for single-node
+- **PostgreSQL 13+** — recommended for HA, multi-instance, or when you already operate a managed PG cluster
+
+The active backend is selected by the \`DATABASE_URL\` environment variable. When unset, UCM uses SQLite at \`UCM_DATA_DIR/ucm.db\`.
+
+### Status panel
+- Active backend (sqlite / postgresql) and driver
+- Database size and table count
 - Migration version
-- SQLite version
+
+### Test connection
+Validate a \`DATABASE_URL\` (e.g. \`postgresql+psycopg2://user:pass@host:5432/ucm\`) before switching. The test opens a real connection and reports any error.
+
+### Switch backend
+Persists \`DATABASE_URL\` to \`/etc/ucm/ucm.env\` (DEB/RPM) and restarts UCM. **No data is copied** — use **Migrate** first if you want to keep your existing data.
+
+### Migrate data
+Copies all rows from the current backend to the target. Works in both directions (SQLite ↔ PostgreSQL):
+
+1. The source database is backed up to \`/opt/ucm/data/backups/db_migration/\`
+2. The schema is created on the target via SQLAlchemy
+3. FK checks are disabled during the bulk load
+4. Source/target columns are intersected (legacy columns are skipped with a warning)
+5. PostgreSQL sequences are reset after load
+6. The service restarts automatically (DEB/RPM) — on Docker, set \`DATABASE_URL\` in your compose file and restart the container manually
+
+> ⚠ Always take a full UCM backup (Settings → Backup) before migrating between backends.
 
 ## HTTPS
 

@@ -18,7 +18,7 @@ This guide covers all installation methods for Ultimate Certificate Manager.
 ### Software Requirements
 - **Docker:** 20.10+ (for Docker installation)
 - **Python:** 3.11+ (for source installation)
-- **Database:** SQLite (included)
+- **Database:** SQLite (included) or PostgreSQL 13+ (optional, set via `DATABASE_URL`)
 
 ---
 
