@@ -39,7 +39,7 @@ pg_compatible = True
 _BACKFILL_SQL = """
 UPDATE acme_client_orders
 SET expires_at = (
-    SELECT certificates.not_after
+    SELECT certificates.valid_to
     FROM certificates
     WHERE certificates.id = acme_client_orders.certificate_id
 )
@@ -48,7 +48,7 @@ WHERE acme_client_orders.status = 'issued'
   AND EXISTS (
       SELECT 1 FROM certificates
       WHERE certificates.id = acme_client_orders.certificate_id
-        AND certificates.not_after IS NOT NULL
+        AND certificates.valid_to IS NOT NULL
   )
 """
 
@@ -75,14 +75,14 @@ def _upgrade_pg(engine):
         conn.execute(text(_BACKFILL_SQL))
 
 
-def upgrade(arg):
+def upgrade(conn):
     """Dispatch to SQLite or PostgreSQL backend based on argument type."""
-    if isinstance(arg, sqlite3.Connection):
-        _upgrade_sqlite(arg)
+    if isinstance(conn, sqlite3.Connection):
+        _upgrade_sqlite(conn)
     else:
-        _upgrade_pg(arg)
+        _upgrade_pg(conn)
 
 
-def downgrade(arg):
+def downgrade(conn):
     """No-op — we won't restore the broken 7-day window."""
     pass

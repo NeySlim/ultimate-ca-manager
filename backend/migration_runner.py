@@ -259,8 +259,12 @@ def _run_one_sqlite(conn, path: Path, db_path: str, dry_run: bool) -> bool:
             if n == 0:
                 mod.upgrade()
             elif n == 1:
-                pname = list(sig.parameters)[0].lower()
-                mod.upgrade(conn) if "conn" in pname else mod.upgrade(db_path)
+                # All current migrations accept a sqlite3.Connection (or a
+                # SQLAlchemy Engine on the PG path). Always pass the connection
+                # — never inspect the parameter name; that heuristic silently
+                # passed the db_path string when a migration called its
+                # parameter anything other than "conn", which broke 020.
+                mod.upgrade(conn)
             else:
                 mod.upgrade(conn)
         elif hasattr(mod, "MIGRATION_SQL"):
