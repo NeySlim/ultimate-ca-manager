@@ -375,6 +375,8 @@ class TestAcmeClientSettings:
         assert 'environment' in data
         assert 'renewal_enabled' in data
         assert 'renewal_days' in data
+        assert 'verify_ssl' in data
+        assert 'proxy_verify_ssl' in data
 
     def test_get_client_settings_has_account_flags(self, auth_client):
         r = auth_client.get('/api/v2/acme/client/settings')
@@ -432,6 +434,32 @@ class TestAcmeClientSettings:
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
                        {'proxy_enabled': True})
         assert_success(r)
+
+    def test_patch_client_settings_verify_ssl(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'verify_ssl': False})
+        assert_success(r)
+        r2 = auth_client.get('/api/v2/acme/client/settings')
+        data2 = assert_success(r2)
+        assert data2['verify_ssl'] is False
+
+    def test_patch_client_settings_proxy_verify_ssl(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_verify_ssl': False})
+        assert_success(r)
+        r2 = auth_client.get('/api/v2/acme/client/settings')
+        data2 = assert_success(r2)
+        assert data2['proxy_verify_ssl'] is False
+
+    def test_patch_client_settings_verify_ssl_rejects_invalid(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'verify_ssl': 'not-bool'})
+        assert_error(r, 400)
+
+    def test_patch_client_settings_proxy_verify_ssl_rejects_invalid(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/acme/client/settings',
+                       {'proxy_verify_ssl': 'not-bool'})
+        assert_error(r, 400)
 
     def test_patch_client_settings_proxy_upstream_url(self, auth_client):
         r = patch_json(auth_client, '/api/v2/acme/client/settings',

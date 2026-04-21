@@ -75,7 +75,9 @@ export const acmeService = {
   },
 
   async testProxyConnection(url) {
-    return apiClient.post('/acme/client/proxy/test-connection', url ? { url } : {})
+    const payload = {}
+    if (url) payload.url = url
+    return apiClient.post('/acme/client/proxy/test-connection', payload)
   },
 
   // Client Account (Let's Encrypt account)

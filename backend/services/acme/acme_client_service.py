@@ -76,14 +76,37 @@ class AcmeClientService:
         self.directory = None
         self.account_key = None
         self.account_url = None
-        self.session = create_session()
+        self.verify_ssl = self._get_verify_ssl()
+        self.session = create_session(verify_ssl=self.verify_ssl)
         self.session.headers['User-Agent'] = 'UCM-ACME-Client/2.1'
+        if not self.verify_ssl:
+            logger.warning(
+                "ACME client SSL verification disabled by settings "
+                "(acme.client.verify_ssl=false)."
+            )
     
     @staticmethod
     def _get_custom_directory_url() -> Optional[str]:
         """Get custom ACME directory URL from settings"""
         cfg = SystemConfig.query.filter_by(key='acme.client.directory_url').first()
         return cfg.value if cfg and cfg.value else None
+
+    @staticmethod
+    def _get_verify_ssl() -> bool:
+        """Get ACME client TLS verification setting (default: True)."""
+        cfg = SystemConfig.query.filter_by(key='acme.client.verify_ssl').first()
+        if not cfg or cfg.value is None:
+            return True
+        parsed = str(cfg.value).strip().lower()
+        if parsed in ('true', '1', 'yes', 'on'):
+            return True
+        if parsed in ('false', '0', 'no', 'off'):
+            return False
+        logger.warning(
+            "Invalid acme.client.verify_ssl value '%s'; falling back to secure default (True).",
+            cfg.value
+        )
+        return True
         
     # =========================================================================
     # Directory & Nonce

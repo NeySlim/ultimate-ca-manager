@@ -57,6 +57,8 @@ def get_settings():
     # Proxy upstream URL and mode
     proxy_upstream_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
     proxy_mode_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_mode').first()
+    client_verify_ssl_cfg = SystemConfig.query.filter_by(key='acme.client.verify_ssl').first()
+    proxy_verify_ssl_cfg = SystemConfig.query.filter_by(key='acme.proxy.verify_ssl').first()
     
     # Proxy account registration status
     proxy_account_url_cfg = SystemConfig.query.filter_by(key='acme.proxy.account_url').first()
@@ -77,10 +79,12 @@ def get_settings():
         'has_staging_account': bool(staging_account),
         'has_production_account': bool(production_account),
         'proxy_enabled': proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False,
+        'verify_ssl': _coerce_bool(client_verify_ssl_cfg.value if client_verify_ssl_cfg else None, True),
         'proxy_email': proxy_email_cfg.value if proxy_email_cfg else None,
         'proxy_registered': bool(proxy_email_cfg),
         'proxy_upstream_url': proxy_upstream_url,
         'proxy_upstream_mode': proxy_mode_cfg.value if proxy_mode_cfg else 'staging',
+        'proxy_verify_ssl': _coerce_bool(proxy_verify_ssl_cfg.value if proxy_verify_ssl_cfg else None, True),
         'proxy_account_url': proxy_account_url,
         'proxy_account_registered': bool(proxy_account_url),
         'proxy_eab_kid': proxy_eab_kid_cfg.value if proxy_eab_kid_cfg else None,
@@ -131,6 +135,30 @@ def update_settings():
                     'true' if data['proxy_enabled'] else 'false',
                     'Let\'s Encrypt proxy enabled')
         updates.append('proxy_enabled')
+
+    if 'verify_ssl' in data:
+        try:
+            verify_ssl = _coerce_bool(data.get('verify_ssl'), True, strict=True)
+        except ValueError:
+            return error_response('verify_ssl must be a boolean', 400)
+        _set_config(
+            'acme.client.verify_ssl',
+            'true' if verify_ssl else 'false',
+            'ACME client SSL certificate verification'
+        )
+        updates.append('verify_ssl')
+
+    if 'proxy_verify_ssl' in data:
+        try:
+            proxy_verify_ssl = _coerce_bool(data.get('proxy_verify_ssl'), True, strict=True)
+        except ValueError:
+            return error_response('proxy_verify_ssl must be a boolean', 400)
+        _set_config(
+            'acme.proxy.verify_ssl',
+            'true' if proxy_verify_ssl else 'false',
+            'ACME proxy upstream SSL certificate verification'
+        )
+        updates.append('proxy_verify_ssl')
     
     if 'directory_url' in data:
         url_val = (data['directory_url'] or '').strip()
@@ -270,6 +298,24 @@ def _set_config(key: str, value: str, description: str = ''):
         db.session.add(SystemConfig(key=key, value=value, description=description))
 
 
+def _coerce_bool(value, default=True, strict=False) -> bool:
+    """Coerce bool-like values from JSON/config strings."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    parsed = str(value).strip().lower()
+    if parsed in ('true', '1', 'yes', 'on'):
+        return True
+    if parsed in ('false', '0', 'no', 'off'):
+        return False
+    if strict:
+        raise ValueError(f'Invalid boolean value: {value}')
+    return default
+
+
 # =============================================================================
 # ACME Proxy
 # =============================================================================
@@ -301,9 +347,17 @@ def test_proxy_connection():
     
     if not url.startswith('https://'):
         return error_response('URL must use HTTPS', 400)
+
+    try:
+        validate_url_not_cloud_metadata(url)
+    except ValueError:
+        return error_response('URL cannot target cloud metadata or loopback', 400)
+
+    cfg = SystemConfig.query.filter_by(key='acme.proxy.verify_ssl').first()
+    verify_ssl = _coerce_bool(cfg.value if cfg else None, True)
     
     try:
-        ctx = ssl.create_default_context()
+        ctx = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
         req = urllib.request.Request(url, headers={'User-Agent': 'UCM-ACME-Proxy'})
         resp = urllib.request.urlopen(req, timeout=10, context=ctx)
         directory = json.loads(resp.read().decode('utf-8'))
@@ -326,6 +380,7 @@ def test_proxy_connection():
         
         return success_response(data={
             'connected': True,
+            'verify_ssl': verify_ssl,
             'ca_name': ca_name,
             'terms_of_service': meta.get('termsOfService'),
             'website': meta.get('website'),

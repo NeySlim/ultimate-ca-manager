@@ -1221,6 +1221,19 @@ export default function ACMEPage() {
             label={t('acme.autoRenewal')}
             description={t('acme.autoRenewalDesc')}
           />
+
+          <ToggleSwitch
+            checked={clientSettings.verify_ssl ?? true}
+            onChange={(val) => handleUpdateClientSetting('verify_ssl', val)}
+            disabled={!canWrite('acme')}
+            label={t('sso.verifySsl')}
+          />
+
+          {clientSettings.verify_ssl === false && (
+            <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
+              <p className="text-xs status-warning-text">{t('sso.sslWarning')}</p>
+            </div>
+          )}
           
           <Select
             label={t('acme.keyType')}
@@ -1332,6 +1345,19 @@ export default function ACMEPage() {
                 ]}
                 helperText={t('acme.upstreamCAHelper')}
               />
+
+              <ToggleSwitch
+                checked={clientSettings.proxy_verify_ssl ?? true}
+                onChange={(val) => handleUpdateClientSetting('proxy_verify_ssl', val)}
+                disabled={!canWrite('acme')}
+                label={t('sso.verifySsl')}
+              />
+
+              {clientSettings.proxy_verify_ssl === false && (
+                <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
+                  <p className="text-xs status-warning-text">{t('sso.sslWarning')}</p>
+                </div>
+              )}
 
               {/* Custom URL (only in custom mode) */}
               {(clientSettings.proxy_upstream_mode === 'custom') && (

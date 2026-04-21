@@ -29,8 +29,14 @@ class AcmeProxyService:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip('/')
         self.upstream_directory_url = self._get_upstream_url()
+        self.verify_ssl = self._get_verify_ssl()
         self.directory = None
         self.nonces = []
+        if not self.verify_ssl:
+            logger.warning(
+                "ACME proxy upstream SSL verification disabled by settings "
+                "(acme.proxy.verify_ssl=false)."
+            )
         
         # Load or create upstream account key
         self.private_key, self.account_key = self._load_or_create_account_key()
@@ -53,6 +59,23 @@ class AcmeProxyService:
         """Get configured upstream URL (falls back to default if empty/missing)"""
         config = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
         return config.value if config and config.value else self.DEFAULT_UPSTREAM
+
+    @staticmethod
+    def _get_verify_ssl() -> bool:
+        """Get proxy upstream TLS verification setting (default: True)."""
+        cfg = SystemConfig.query.filter_by(key='acme.proxy.verify_ssl').first()
+        if not cfg or cfg.value is None:
+            return True
+        parsed = str(cfg.value).strip().lower()
+        if parsed in ('true', '1', 'yes', 'on'):
+            return True
+        if parsed in ('false', '0', 'no', 'off'):
+            return False
+        logger.warning(
+            "Invalid acme.proxy.verify_ssl value '%s'; falling back to secure default (True).",
+            cfg.value
+        )
+        return True
 
     def _load_or_create_account_key(self):
         """Load upstream account private key"""
@@ -206,7 +229,11 @@ class AcmeProxyService:
         """Fetch upstream directory"""
         if not self.directory:
             try:
-                resp = requests.get(self.upstream_directory_url, timeout=15)
+                resp = requests.get(
+                    self.upstream_directory_url,
+                    timeout=15,
+                    verify=self.verify_ssl
+                )
                 resp.raise_for_status()
                 self.directory = resp.json()
             except requests.exceptions.ConnectionError as e:
@@ -225,7 +252,11 @@ class AcmeProxyService:
     def _get_nonce(self):
         """Get nonce from upstream"""
         self._ensure_directory()
-        resp = requests.head(self.directory['newNonce'], timeout=15)
+        resp = requests.head(
+            self.directory['newNonce'],
+            timeout=15,
+            verify=self.verify_ssl
+        )
         return resp.headers['Replay-Nonce']
 
     def _sign_and_post(self, url: str, payload, nonce: str, kid: str = None) -> requests.Response:
@@ -263,7 +294,13 @@ class AcmeProxyService:
         }
 
         headers = {"Content-Type": "application/jose+json"}
-        return requests.post(url, json=data, headers=headers, timeout=30)
+        return requests.post(
+            url,
+            json=data,
+            headers=headers,
+            timeout=30,
+            verify=self.verify_ssl
+        )
 
     def _post_jws(self, url: str, payload: Union[Dict, str], kid: str = None) -> requests.Response:
         """Sign and post JWS to upstream, with automatic badNonce retry (RFC 8555 §6.5).
