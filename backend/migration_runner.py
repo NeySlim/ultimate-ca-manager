@@ -27,10 +27,16 @@ Backend behavior
 
 Future migrations
 -----------------
-A migration may declare `pg_compatible = True` and expose
-`upgrade(engine)` (SQLAlchemy Engine) to run on both backends.
-Migrations without this declaration are SQLite-only and are silently
-skipped on PostgreSQL.
+Starting with migration 020 (v2.128), every new migration MUST be
+multi-backend:
+
+  * Set ``pg_compatible = True`` at module scope.
+  * Expose ``upgrade(arg)`` that accepts EITHER ``sqlite3.Connection``
+    (SQLite path) OR ``sqlalchemy.Engine`` (PostgreSQL path).
+  * Use ``isinstance(arg, sqlite3.Connection)`` to dispatch.
+
+Migrations 000-019 are SQLite-only by design (they predate native PG
+support) and are silently skipped on PostgreSQL.
 
 Public API
 ----------
