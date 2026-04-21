@@ -10,6 +10,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
+- **User UI preferences persisted server-side** — language, theme family, and theme mode are now saved per-user in the database (`users.preferences` JSON column) instead of only in the browser's `localStorage`. New endpoints `GET/PUT /api/v2/account/preferences` (whitelist-validated, admin or self) store the preferences, and `/api/v2/auth/verify` returns them so they are applied on every page load. Logging in from a fresh browser, a different device, or after clearing site data now restores the user's chosen language and theme instead of falling back to the browser locale and default theme. Migration `022` adds the column on both SQLite and PostgreSQL. Fixes [#73](https://github.com/NeySlim/ultimate-ca-manager/issues/73).
 - **ACME proxy orders linked to local accounts** — proxy order rows now record which local `AcmeAccount` initiated them (FK `account_id` resolved from the client JWK thumbprint). The proxy order list now displays the account email/short id beside each order, and the account detail "Orders" tab now merges local + proxy orders with a "Proxy" badge so operators can see all activity per account in one place. Migration `021` backfills `account_id` for existing proxy orders by joining on `acme_accounts.jwk_thumbprint`. Fixes [#71](https://github.com/NeySlim/ultimate-ca-manager/issues/71).
 
 ### Fixed

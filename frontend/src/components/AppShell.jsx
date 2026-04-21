@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom'
+import { persistPreference } from '../stores/userPreferencesStore'
 import { 
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
@@ -308,6 +309,7 @@ export function AppShell() {
                           onClick={() => {
                             i18n.changeLanguage(lang.code)
                             try { localStorage.setItem('i18nextLng', lang.code) } catch {}
+                            persistPreference('language', lang.code)
                           }}
                           className="flex items-center gap-2 px-2.5 py-1.5 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary"
                         >

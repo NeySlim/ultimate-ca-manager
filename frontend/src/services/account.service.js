@@ -17,6 +17,15 @@ export const accountService = {
     return apiClient.post('/account/password', data)
   },
 
+  // Preferences (issue #73) — UI settings persisted server-side
+  async getPreferences() {
+    return apiClient.get('/account/preferences')
+  },
+
+  async updatePreferences(prefs) {
+    return apiClient.put('/account/preferences', prefs)
+  },
+
   // API Keys
   async getApiKeys() {
     return apiClient.get('/account/apikeys')

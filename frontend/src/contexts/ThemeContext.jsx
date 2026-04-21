@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { subscribePreferences, persistPreference, getPreferences } from '../stores/userPreferencesStore'
 
 // Theme families with integrated icon colors
 // Icon colors are theme-aware to avoid "ton sur ton" conflicts
@@ -324,18 +325,43 @@ export function ThemeProvider({ children }) {
     }
   }, [themeFamily, resolvedMode, mode])
 
+  // Server-side preferences (issue #73): on each prefs change, sync local
+  // theme state. Triggered when AuthContext applies values from the server.
+  useEffect(() => {
+    const apply = (prefs) => {
+      if (prefs.theme_family && themeFamilies[prefs.theme_family]) {
+        setThemeFamily(prev => prev !== prefs.theme_family ? prefs.theme_family : prev)
+      }
+      if (prefs.theme_mode && ['system', 'dark', 'light'].includes(prefs.theme_mode)) {
+        setMode(prev => prev !== prefs.theme_mode ? prefs.theme_mode : prev)
+      }
+    }
+    apply(getPreferences())
+    return subscribePreferences(apply)
+  }, [])
+
+  // Wrap setters so user changes propagate to the server when authenticated.
+  const setThemeFamilyAndPersist = useCallback((value) => {
+    setThemeFamily(value)
+    persistPreference('theme_family', value)
+  }, [])
+  const setModeAndPersist = useCallback((value) => {
+    setMode(value)
+    persistPreference('theme_mode', value)
+  }, [])
+
   const currentTheme = `${themeFamily}-${resolvedMode}`
   const setCurrentTheme = useCallback((themeId) => {
     if (themeFamilies[themeId]) {
-      setThemeFamily(themeId)
+      setThemeFamilyAndPersist(themeId)
     } else if (themeId === 'dark') {
-      setThemeFamily('gray')
-      setMode('dark')
+      setThemeFamilyAndPersist('gray')
+      setModeAndPersist('dark')
     } else if (themeId === 'light') {
-      setThemeFamily('gray')
-      setMode('light')
+      setThemeFamilyAndPersist('gray')
+      setModeAndPersist('light')
     }
-  }, [])
+  }, [setThemeFamilyAndPersist, setModeAndPersist])
 
   const themes = Object.values(themeFamilies)
   const isLight = resolvedMode === 'light'
@@ -343,9 +369,9 @@ export function ThemeProvider({ children }) {
   return (
     <ThemeContext.Provider value={{ 
       themeFamily,
-      setThemeFamily,
+      setThemeFamily: setThemeFamilyAndPersist,
       mode,
-      setMode,
+      setMode: setModeAndPersist,
       resolvedMode,
       isLight,
       themes,

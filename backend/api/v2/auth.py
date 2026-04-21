@@ -299,7 +299,8 @@ def verify():
             'timezone': app_timezone,
             'date_format': app_date_format,
             'show_time': app_show_time,
-            'session_timeout': session_timeout
+            'session_timeout': session_timeout,
+            'preferences': g.current_user.get_preferences()
         }
     )
 

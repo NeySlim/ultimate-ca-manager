@@ -13,6 +13,7 @@ import {
   Clock, Terminal
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
+import { persistPreference } from '../stores/userPreferencesStore'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -450,6 +451,7 @@ export function Sidebar({ activePage }) {
                         onClick={() => {
                           i18n.changeLanguage(lang.code)
                           try { localStorage.setItem('i18nextLng', lang.code) } catch {}
+                          persistPreference('language', lang.code)
                         }}
                         className="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
                       >

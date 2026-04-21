@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { languages } from '../../i18n'
 import { Globe } from '@phosphor-icons/react'
+import { persistPreference } from '../../stores/userPreferencesStore'
 
 export default function LanguageSelector({ className = '' }) {
   const { i18n } = useTranslation()
@@ -13,6 +14,8 @@ export default function LanguageSelector({ className = '' }) {
     } catch {
       // Safari private mode
     }
+    // Persist server-side when authenticated (issue #73). No-op on login page.
+    persistPreference('language', newLang)
   }
 
   return (

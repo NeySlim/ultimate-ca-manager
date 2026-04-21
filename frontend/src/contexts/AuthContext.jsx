@@ -7,9 +7,12 @@
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authService } from '../services/auth.service'
+import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
+import { applyServerPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
+import i18n from '../i18n'
 
 const AuthContext = createContext()
 
@@ -37,6 +40,7 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(false)
         setPermissions([])
         setRole(null)
+        setPrefsAuthenticated(false)
         return false
       }
 
@@ -47,6 +51,13 @@ export function AuthProvider({ children }) {
       if (userData.timezone) setAppTimezone(userData.timezone)
       if (userData.date_format) setDateFormat(userData.date_format)
       if (userData.show_time !== undefined) setShowTime(userData.show_time !== false)
+      // Apply server-side UI preferences (issue #73)
+      setPrefsAuthenticated(true)
+      const verifyPrefs = userData.preferences || {}
+      applyServerPreferences(verifyPrefs)
+      if (verifyPrefs.language && verifyPrefs.language !== i18n.language) {
+        try { i18n.changeLanguage(verifyPrefs.language) } catch { /* noop */ }
+      }
       debug('✅ Session valid:', userData.user?.username)
       return true
     } catch (error) {
@@ -99,6 +110,19 @@ export function AuthProvider({ children }) {
       if (loginData.timezone) setAppTimezone(loginData.timezone)
       if (loginData.date_format) setDateFormat(loginData.date_format)
       if (loginData.show_time !== undefined) setShowTime(loginData.show_time !== false)
+      // Apply server-side UI preferences (issue #73). Most login endpoints
+      // don't include them, so we fetch them once auth is established.
+      setPrefsAuthenticated(true)
+      try {
+        const prefsResp = await accountService.getPreferences()
+        const prefs = prefsResp?.data || prefsResp || {}
+        applyServerPreferences(prefs)
+        if (prefs.language && prefs.language !== i18n.language) {
+          try { i18n.changeLanguage(prefs.language) } catch { /* noop */ }
+        }
+      } catch {
+        // Preferences fetch is best-effort; localStorage fallback applies.
+      }
       debug('✅ User authenticated:', userData)
       return response
     } catch (error) {
@@ -128,6 +152,7 @@ export function AuthProvider({ children }) {
       setPermissions([])
       setRole(null)
       setForcePasswordChange(false)
+      setPrefsAuthenticated(false)
       setLoading(false)
       debug('🔓 Local session cleared')
     }

@@ -97,6 +97,88 @@ def update_profile():
     )
 
 
+# ---------------------------------------------------------------------------
+# User preferences (issue #73)
+#
+# Stored as a JSON object in ``users.preferences`` so they follow the user
+# across browsers and devices instead of being limited to localStorage.
+# ---------------------------------------------------------------------------
+
+# Whitelist of allowed preference keys + value validators.
+# Anything not listed here is silently dropped to avoid storing arbitrary blobs.
+_PREF_VALIDATORS = {
+    'language': lambda v: isinstance(v, str) and 1 <= len(v) <= 10,
+    'theme_family': lambda v: isinstance(v, str) and 1 <= len(v) <= 30,
+    'theme_mode': lambda v: v in ('light', 'dark', 'system'),
+    'density': lambda v: v in ('compact', 'comfortable', 'spacious'),
+    'sidebar_collapsed': lambda v: isinstance(v, bool),
+    'force_desktop': lambda v: isinstance(v, bool),
+    'date_format': lambda v: isinstance(v, str) and 1 <= len(v) <= 30,
+    'show_time': lambda v: isinstance(v, bool),
+    'timezone': lambda v: isinstance(v, str) and 1 <= len(v) <= 64,
+}
+
+
+def _sanitize_preferences(payload):
+    """Return only valid known preference keys."""
+    if not isinstance(payload, dict):
+        return {}
+    cleaned = {}
+    for key, value in payload.items():
+        validator = _PREF_VALIDATORS.get(key)
+        if validator is None:
+            continue
+        try:
+            if validator(value):
+                cleaned[key] = value
+        except Exception:  # noqa: BLE001 - reject anything that explodes
+            continue
+    return cleaned
+
+
+@bp.route('/api/v2/account/preferences', methods=['GET'])
+@require_auth()
+def get_preferences():
+    """Return the current user's stored preferences."""
+    from models import User
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
+    return success_response(data=user.get_preferences())
+
+
+@bp.route('/api/v2/account/preferences', methods=['PUT'])
+@require_auth()
+def update_preferences():
+    """
+    Replace the current user's preferences with the provided object.
+
+    Body: { "language": "fr", "theme_mode": "dark", "theme_family": "gray", ... }
+    Unknown keys are dropped. Returns the persisted preferences.
+    """
+    from models import User
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return error_response('JSON body required', 400)
+
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
+
+    # PUT replaces; PATCH would merge — frontend currently uses PUT after
+    # merging client-side, which keeps the contract simple.
+    cleaned = _sanitize_preferences(payload)
+    try:
+        user.set_preferences(cleaned)
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001
+        db.session.rollback()
+        logger.error(f"Failed to save preferences for user {user.id}: {exc}")
+        return error_response('Failed to save preferences', 500)
+
+    return success_response(data=cleaned, message='Preferences updated')
+
+
 @bp.route('/api/v2/account/password', methods=['POST'])
 @require_auth()
 def change_password():

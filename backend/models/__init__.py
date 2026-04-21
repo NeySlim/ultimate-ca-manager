@@ -88,6 +88,10 @@ class User(db.Model):
     login_count = db.Column(db.Integer, default=0)  # Total successful logins
     failed_logins = db.Column(db.Integer, default=0)  # Failed login attempts
     locked_until = db.Column(db.DateTime, nullable=True)  # Account lockout timestamp
+
+    # User preferences (JSON-encoded; language, theme, density, etc.)
+    # Persisted server-side so they follow the user across browsers/devices.
+    preferences = db.Column(db.Text, nullable=True)
     
     # Relationships
     custom_role = db.relationship('CustomRole', foreign_keys=[custom_role_id], lazy='select')
@@ -106,6 +110,22 @@ class User(db.Model):
     def check_password(self, password: str) -> bool:
         """Verify password"""
         return check_password_hash(self.password_hash, password)
+
+    def get_preferences(self) -> dict:
+        """Return the user's preferences as a dict (empty if unset/invalid)."""
+        import json
+        if not self.preferences:
+            return {}
+        try:
+            data = json.loads(self.preferences)
+            return data if isinstance(data, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def set_preferences(self, value: dict) -> None:
+        """Persist preferences dict as JSON."""
+        import json
+        self.preferences = json.dumps(value or {}, separators=(',', ':'))
     
     def to_dict(self):
         """Convert to dictionary"""
