@@ -32,8 +32,9 @@ export const sshCasService = {
     return apiClient.get(`/ssh/cas/${id}/krl`, { responseType: 'blob' })
   },
 
-  async getSetupScript(id) {
-    return apiClient.get(`/ssh/cas/${id}/setup-script`, { responseType: 'blob' })
+  async getSetupScript(id, platform = 'unix') {
+    const qs = platform && platform !== 'unix' ? `?platform=${encodeURIComponent(platform)}` : ''
+    return apiClient.get(`/ssh/cas/${id}/setup-script${qs}`, { responseType: 'blob' })
   },
 
   async importCA(data) {

@@ -3748,7 +3748,12 @@
     "importCA": "导入SSH CA",
     "privateKey": "私钥",
     "privateKeyPlaceholder": "粘贴OpenSSH PEM格式的SSH私钥",
-    "importCADescription": "通过提供私钥导入现有SSH CA"
+    "importCADescription": "通过提供私钥导入现有SSH CA",
+    "quickInstallLinuxDescription": "在任意 Linux/macOS 服务器上运行此命令以信任此 CA：",
+    "quickInstallWindowsDescription": "在 Windows 服务器上以管理员身份运行 PowerShell 并执行此命令以信任此 CA：",
+    "powershellCopied": "PowerShell 命令已复制到剪贴板",
+    "downloadSetupScriptLinux": "下载 .sh (Linux/macOS)",
+    "downloadSetupScriptWindows": "下载 .ps1 (Windows)"
   },
   "sshCertificates": {
     "title": "SSH 证书",

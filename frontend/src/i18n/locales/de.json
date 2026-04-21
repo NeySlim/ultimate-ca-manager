@@ -3748,7 +3748,12 @@
     "importCA": "SSH-CA importieren",
     "privateKey": "Privater Schlüssel",
     "privateKeyPlaceholder": "SSH-Privatschlüssel im OpenSSH-PEM-Format einfügen",
-    "importCADescription": "Vorhandene SSH-CA durch Angabe des privaten Schlüssels importieren"
+    "importCADescription": "Vorhandene SSH-CA durch Angabe des privaten Schlüssels importieren",
+    "quickInstallLinuxDescription": "Führen Sie diesen Befehl auf einem Linux-/macOS-Server aus, um dieser CA zu vertrauen:",
+    "quickInstallWindowsDescription": "Führen Sie diesen Befehl in einer erhöhten PowerShell auf einem Windows-Server aus, um dieser CA zu vertrauen:",
+    "powershellCopied": "PowerShell-Befehl in die Zwischenablage kopiert",
+    "downloadSetupScriptLinux": ".sh herunterladen (Linux/macOS)",
+    "downloadSetupScriptWindows": ".ps1 herunterladen (Windows)"
   },
   "sshCertificates": {
     "title": "SSH-Zertifikate",

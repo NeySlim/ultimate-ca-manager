@@ -26,10 +26,12 @@ bp = Blueprint('ssh_setup_public', __name__)
 def get_public_setup_script(refid):
     """Serve SSH CA setup script publicly (like CDP serves CRLs).
 
-    Usage:
+    Usage (Linux/macOS):
         curl -sSL https://ucm.example.com:8443/ssh/setup/<refid> | sudo bash
         curl -sSL https://ucm.example.com:8443/ssh/setup/<refid>?type=host | sudo bash
-        curl -sSL https://ucm.example.com:8443/ssh/setup/<refid> -o setup.sh && sudo bash setup.sh
+
+    Usage (Windows, elevated PowerShell):
+        iwr -useb https://ucm.example.com:8443/ssh/setup/<refid>?platform=windows | iex
     """
     try:
         ca = SSHCertificateAuthority.query.filter_by(refid=refid).first()
@@ -48,17 +50,29 @@ def get_public_setup_script(refid):
 
         hostname = request.args.get('hostname', '').strip()
 
+        platform = request.args.get('platform', 'unix').strip().lower()
+        if platform not in ('unix', 'linux', 'macos', 'windows'):
+            return Response('#!/bin/sh\necho "Error: Invalid platform. Use ?platform=unix or ?platform=windows"\nexit 1\n',
+                            status=400, mimetype='text/x-shellscript')
+
         # Reuse the script generators from the authenticated endpoint
         from api.v2.ssh_cas import _generate_setup_script
-        script = _generate_setup_script(ca, pub_key, ca_type, hostname)
+        script = _generate_setup_script(ca, pub_key, ca_type, hostname, platform)
 
         safe_name = ca.descr.replace(' ', '_').replace('"', '').replace("'", '')
 
+        if platform == 'windows':
+            mimetype = 'text/x-powershell'
+            filename = f'ssh_ca_setup_{safe_name}.ps1'
+        else:
+            mimetype = 'text/x-shellscript'
+            filename = f'ssh_ca_setup_{safe_name}.sh'
+
         return Response(
             script,
-            mimetype='text/x-shellscript',
+            mimetype=mimetype,
             headers={
-                'Content-Disposition': f'attachment; filename="ssh_ca_setup_{safe_name}.sh"',
+                'Content-Disposition': f'attachment; filename="{filename}"',
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
             }
         )

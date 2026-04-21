@@ -3748,7 +3748,12 @@
     "importCA": "Importa CA SSH",
     "privateKey": "Chiave privata",
     "privateKeyPlaceholder": "Incolla la tua chiave privata SSH in formato OpenSSH PEM",
-    "importCADescription": "Importa una CA SSH esistente fornendo la sua chiave privata"
+    "importCADescription": "Importa una CA SSH esistente fornendo la sua chiave privata",
+    "quickInstallLinuxDescription": "Esegui questo comando su un server Linux/macOS per fidarti di questa CA:",
+    "quickInstallWindowsDescription": "Esegui questo comando in PowerShell con privilegi elevati su un server Windows per fidarti di questa CA:",
+    "powershellCopied": "Comando PowerShell copiato negli appunti",
+    "downloadSetupScriptLinux": "Scarica .sh (Linux/macOS)",
+    "downloadSetupScriptWindows": "Scarica .ps1 (Windows)"
   },
   "sshCertificates": {
     "title": "Certificati SSH",

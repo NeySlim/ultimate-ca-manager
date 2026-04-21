@@ -3748,7 +3748,12 @@
     "importCA": "Імпортувати SSH CA",
     "privateKey": "Приватний ключ",
     "privateKeyPlaceholder": "Вставте ваш SSH приватний ключ у форматі OpenSSH PEM",
-    "importCADescription": "Імпортувати існуючу SSH CA, надавши її приватний ключ"
+    "importCADescription": "Імпортувати існуючу SSH CA, надавши її приватний ключ",
+    "quickInstallLinuxDescription": "Виконайте цю команду на сервері Linux/macOS, щоб довіряти цьому CA:",
+    "quickInstallWindowsDescription": "Виконайте цю команду в PowerShell з правами адміністратора на сервері Windows, щоб довіряти цьому CA:",
+    "powershellCopied": "Команду PowerShell скопійовано до буфера обміну",
+    "downloadSetupScriptLinux": "Завантажити .sh (Linux/macOS)",
+    "downloadSetupScriptWindows": "Завантажити .ps1 (Windows)"
   },
   "sshCertificates": {
     "title": "SSH-сертифікати",

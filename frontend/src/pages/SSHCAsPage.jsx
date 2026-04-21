@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Key, Plus, Trash, PencilSimple, Download, Copy, Upload,
-  ShieldCheck, User, Clock, Fingerprint, Terminal, Check
+  ShieldCheck, User, Clock, Fingerprint, Terminal, Check, WindowsLogo
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Input, Select,
@@ -191,13 +191,14 @@ export default function SSHCAsPage() {
     }
   }
 
-  const handleDownloadSetupScript = async (ca) => {
+  const handleDownloadSetupScript = async (ca, platform = 'unix') => {
     try {
-      const blob = await sshCasService.getSetupScript(ca.id)
+      const blob = await sshCasService.getSetupScript(ca.id, platform)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
+      const ext = platform === 'windows' ? 'ps1' : 'sh'
       a.href = url
-      a.download = `ssh_ca_setup_${(ca.descr || 'ca').replace(/[^a-zA-Z0-9_-]/g, '_')}.sh`
+      a.download = `ssh_ca_setup_${(ca.descr || 'ca').replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
     } catch (error) {
@@ -221,10 +222,24 @@ export default function SSHCAsPage() {
     return `curl -sSL ${baseUrl}/ssh/setup/${ca.refid} | sudo bash`
   }
 
+  const getPowershellCommand = (ca) => {
+    const baseUrl = window.location.origin
+    return `iwr -useb '${baseUrl}/ssh/setup/${ca.refid}?platform=windows' | iex`
+  }
+
   const handleCopyCurlCommand = async (ca) => {
     try {
       await clipboardCopy(getCurlCommand(ca), 'curl')
       showSuccess(t('sshCas.curlCopied'))
+    } catch (error) {
+      showError(error.message || t('messages.errors.copyFailed.publicKey'))
+    }
+  }
+
+  const handleCopyPowershellCommand = async (ca) => {
+    try {
+      await clipboardCopy(getPowershellCommand(ca), 'powershell')
+      showSuccess(t('sshCas.powershellCopied'))
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))
     }
@@ -396,8 +411,11 @@ export default function SSHCAsPage() {
           {isCopied('publicKey') ? <Check size={14} /> : <Copy size={14} />}
           {isCopied('publicKey') ? t('sshCas.publicKeyCopied') : t('sshCas.copyPublicKey')}
         </Button>
-        <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA)}>
-          <Terminal size={14} /> {t('sshCertificates.downloadSetupScript')}
+        <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA, 'unix')}>
+          <Terminal size={14} /> {t('sshCas.downloadSetupScriptLinux')}
+        </Button>
+        <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA, 'windows')}>
+          <WindowsLogo size={14} /> {t('sshCas.downloadSetupScriptWindows')}
         </Button>
         {canWrite('ssh') && (
           <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingCA(selectedCA); setShowModal(true) }}>
@@ -413,13 +431,22 @@ export default function SSHCAsPage() {
 
       {/* Quick Install */}
       <CompactSection title={t('sshCas.quickInstall')} icon={Terminal}>
-        <p className="text-xs text-secondary mb-2">{t('sshCas.quickInstallDescription')}</p>
-        <div className="flex items-center gap-2">
+        <p className="text-xs text-secondary mb-2">{t('sshCas.quickInstallLinuxDescription')}</p>
+        <div className="flex items-center gap-2 mb-3">
           <code className="flex-1 text-xs bg-tertiary rounded px-3 py-2 font-mono text-primary overflow-x-auto whitespace-nowrap">
             {getCurlCommand(selectedCA)}
           </code>
           <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyCurlCommand(selectedCA)}>
             {isCopied('curl') ? <Check size={14} /> : <Copy size={14} />}
+          </Button>
+        </div>
+        <p className="text-xs text-secondary mb-2">{t('sshCas.quickInstallWindowsDescription')}</p>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-xs bg-tertiary rounded px-3 py-2 font-mono text-primary overflow-x-auto whitespace-nowrap">
+            {getPowershellCommand(selectedCA)}
+          </code>
+          <Button type="button" size="sm" variant="secondary" onClick={() => handleCopyPowershellCommand(selectedCA)}>
+            {isCopied('powershell') ? <Check size={14} /> : <Copy size={14} />}
           </Button>
         </div>
       </CompactSection>
