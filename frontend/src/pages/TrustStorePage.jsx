@@ -21,7 +21,7 @@ import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
-import { usePermission, useModals } from '../hooks'
+import { usePermission, useModals, usePersistedState } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 export default function TrustStorePage() {
   const { t } = useTranslation()
@@ -39,8 +39,8 @@ export default function TrustStorePage() {
   const [selectedCert, setSelectedCert] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [filterPurpose, setFilterPurpose] = useState([])
-  const [filterExpiryStatus, setFilterExpiryStatus] = useState([])
+  const [filterPurpose, setFilterPurpose] = usePersistedState('ucm-filter-truststore-purpose', [])
+  const [filterExpiryStatus, setFilterExpiryStatus] = usePersistedState('ucm-filter-truststore-expiry', [])
   
   // Add from managed CAs modal state
   const [managedCAs, setManagedCAs] = useState([])

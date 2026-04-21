@@ -19,7 +19,7 @@ import {
 } from '../components'
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useWebSocket, useClipboard } from '../hooks'
+import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 // ============= CONSTANTS =============
@@ -97,9 +97,9 @@ export default function SSHCertificatesPage() {
   const [sortOrder, setSortOrder] = useState('desc')
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState([])
-  const [filterType, setFilterType] = useState([])
-  const [filterCA, setFilterCA] = useState([])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-ssh-certs-status', [])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-ssh-certs-type', [])
+  const [filterCA, setFilterCA] = usePersistedState('ucm-filter-ssh-certs-ca', [])
 
   // ============= DATA LOADING =============
 

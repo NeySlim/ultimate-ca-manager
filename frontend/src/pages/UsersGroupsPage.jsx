@@ -19,7 +19,7 @@ import {
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useWebSocket } from '../hooks'
+import { usePermission, useWebSocket, usePersistedState } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
@@ -68,8 +68,8 @@ export default function UsersGroupsPage() {
   const [perPage, setPerPage] = useState(25)
   
   // Filters
-  const [filterRole, setFilterRole] = useState([])
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterRole, setFilterRole] = usePersistedState('ucm-filter-users-role', [])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-users-status', '')
 
   // Tab change
   const handleTabChange = (tab) => {

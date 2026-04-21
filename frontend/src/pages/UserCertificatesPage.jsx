@@ -16,7 +16,7 @@ import {
 import { userCertificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
-import { usePermission } from '../hooks'
+import { usePermission, usePersistedState } from '../hooks'
 import { formatDate, extractCN } from '../lib/utils'
 
 export default function UserCertificatesPage() {
@@ -40,7 +40,7 @@ export default function UserCertificatesPage() {
   const [total, setTotal] = useState(0)
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState([])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-usercerts-status', [])
 
   // Export modal
   const [showExportModal, setShowExportModal] = useState(false)

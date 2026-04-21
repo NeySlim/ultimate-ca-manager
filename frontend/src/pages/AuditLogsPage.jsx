@@ -45,7 +45,7 @@ import {
   CompactStats
 } from '../components';
 import { useNotification } from '../contexts';
-import { usePermission } from '../hooks';
+import { usePermission, usePersistedState } from '../hooks';
 import auditService from '../services/audit.service';
 import { formatRelativeTime } from '../lib/ui';
 import { formatDate } from '../lib/utils';
@@ -111,11 +111,11 @@ export default function AuditLogsPage() {
   
   // Search & Filters
   const [search, setSearch] = useState('');
-  const [filterUsername, setFilterUsername] = useState('');
-  const [filterAction, setFilterAction] = useState([]);
-  const [filterSuccess, setFilterSuccess] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterUsername, setFilterUsername] = usePersistedState('ucm-filter-audit-username', '');
+  const [filterAction, setFilterAction] = usePersistedState('ucm-filter-audit-action', []);
+  const [filterSuccess, setFilterSuccess] = usePersistedState('ucm-filter-audit-success', '');
+  const [filterDateFrom, setFilterDateFrom] = usePersistedState('ucm-filter-audit-datefrom', '');
+  const [filterDateTo, setFilterDateTo] = usePersistedState('ucm-filter-audit-dateto', '');
   
   // Modals
   const [showCleanupModal, setShowCleanupModal] = useState(false);

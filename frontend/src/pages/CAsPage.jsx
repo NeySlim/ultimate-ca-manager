@@ -21,7 +21,7 @@ import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
-import { usePermission, useModals, useRecentHistory, useWebSocket } from '../hooks'
+import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 import { getAppTimezone } from '../stores/timezoneStore'
@@ -53,8 +53,8 @@ export default function CAsPage() {
   const [createFormOcspMustStaple, setCreateFormOcspMustStaple] = useState(false)
   
   // Filter state
-  const [filterType, setFilterType] = useState([])
-  const [filterStatus, setFilterStatus] = useState([])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-cas-type', [])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-cas-status', [])
   const [searchQuery, setSearchQuery] = useState('')
 
   // Chain repair state

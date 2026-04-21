@@ -16,7 +16,7 @@ import {
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { useNotification, useMobile } from '../contexts'
-import { useModals } from '../hooks'
+import { useModals, usePersistedState } from '../hooks'
 import { rolesService } from '../services'
 // Permission categories for RBAC - aligned with backend
 const PERMISSION_CATEGORIES = {
@@ -91,7 +91,7 @@ export default function RBACPage() {
   const [loading, setLoading] = useState(true)
   const [roles, setRoles] = useState([])
   const [selectedRole, setSelectedRole] = useState(null)
-  const [filterType, setFilterType] = useState([])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-rbac-type', [])
   
   const [formData, setFormData] = useState({
     name: '',

@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, usePersistedState } from '../hooks'
 import { formatDate } from '../lib/utils'
 export default function TemplatesPage() {
   const { t } = useTranslation()
@@ -45,7 +45,7 @@ export default function TemplatesPage() {
   const [perPage, setPerPage] = useState(25)
   
   // Filters
-  const [filterType, setFilterType] = useState([])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-templates-type', [])
   
   // Import state
   const [importFile, setImportFile] = useState(null)

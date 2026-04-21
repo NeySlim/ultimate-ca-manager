@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useClipboard } from '../hooks'
+import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 const KEY_ALGORITHM_OPTIONS = [
@@ -68,7 +68,7 @@ export default function SSHCAsPage() {
   const [perPage, setPerPage] = useState(25)
 
   // Filters
-  const [filterType, setFilterType] = useState([])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-ssh-cas-type', [])
 
   // Copy state — managed by useClipboard hook
 

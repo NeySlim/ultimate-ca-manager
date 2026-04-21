@@ -15,7 +15,7 @@ import {
 } from '../components'
 import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks'
+import { usePermission, usePersistedState } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 
 // Policy type options — labels resolved via t() inside component
@@ -86,8 +86,8 @@ export default function PoliciesPage() {
   const [selectedPolicy, setSelectedPolicy] = useState(null)
 
   // Filters
-  const [filterType, setFilterType] = useState([])
-  const [filterStatus, setFilterStatus] = useState([])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-policies-type', [])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-policies-status', [])
 
   const loadData = useCallback(async () => {
     try {

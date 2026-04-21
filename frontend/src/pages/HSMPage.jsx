@@ -16,7 +16,7 @@ import {
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useClipboard } from '../hooks'
+import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 
@@ -48,8 +48,8 @@ export default function HSMPage() {
   const [modalMode, setModalMode] = useState('create')
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [filterType, setFilterType] = useState([])
-  const [filterStatus, setFilterStatus] = useState([])
+  const [filterType, setFilterType] = usePersistedState('ucm-filter-hsm-type', [])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-hsm-status', [])
   const [hsmStatus, setHsmStatus] = useState(null)
   const { showSuccess, showError, showConfirm } = useNotification()
   const { isMobile } = useMobile()

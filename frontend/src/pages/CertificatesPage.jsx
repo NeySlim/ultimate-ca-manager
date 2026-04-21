@@ -20,7 +20,7 @@ import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService, truststoreService, templatesService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
-import { usePermission, useRecentHistory, useFavorites, useWebSocket } from '../hooks'
+import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
 
 export default function CertificatesPage() {
@@ -60,8 +60,8 @@ export default function CertificatesPage() {
   const [sortOrder, setSortOrder] = useState('asc')
   
   // Filters
-  const [filterStatus, setFilterStatus] = useState([])
-  const [filterCA, setFilterCA] = useState([])
+  const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-certs-status', [])
+  const [filterCA, setFilterCA] = usePersistedState('ucm-filter-certs-ca', [])
   
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
