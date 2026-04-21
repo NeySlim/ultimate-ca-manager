@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [2.128.1] - 2026-04-21
 
 ### Fixed
-- **Migration runner crash on SQLite upgrade for multi-backend migrations** — upgrading an existing SQLite install from v2.127 → v2.128 left the service in a failed state because migrations 020/021/022 never ran. Two bugs combined: migration 020's `UPDATE` referenced `certificates.not_after` instead of the actual column name `valid_to`, and the runner's parameter-name heuristic in `_run_one_sqlite` passed the DB path *string* (not the open `sqlite3.Connection`) to migrations whose first parameter was named anything other than `conn` — which silently broke 020 (`def upgrade(arg)`). Migration 020 now uses `valid_to`, and the runner always passes the live connection regardless of the parameter name. Fresh installs were unaffected.
+- **Service fails to start after upgrading to v2.128 on SQLite installs** — the new v2.128 database migrations did not apply on upgrade and the service stayed in a failed state. Fresh installs were not affected.
 
 ## [2.128] - 2026-04-21
 
