@@ -32,7 +32,15 @@ CSRF_EXEMPT_PATHS = [
     '/api/v2/auth/forgot',      # Forgot password (no session yet)
     '/api/v2/auth/reset',       # Reset password (token-based)
     '/api/v2/auth/methods',     # Auth method detection (pre-login)
-    '/api/v2/sso/',             # SSO callbacks (OAuth2/LDAP, external flow)
+    # SSO flows triggered from outside the app (no session yet to mint a token)
+    '/api/v2/sso/callback',     # OAuth2/SAML/OIDC callbacks
+    '/api/v2/sso/login',        # SSO login redirects
+    '/api/v2/sso/ldap/login',   # LDAP password login (pre-session)
+    '/api/v2/sso/saml/metadata',  # SAML metadata exchange (public)
+    '/api/v2/sso/available',    # Public auth method discovery
+    # mTLS bare-cert authentication (no prior session)
+    '/api/v2/mtls/enroll',
+    '/api/v2/mtls/enroll-import',
     '/acme/',                   # ACME protocol
     '/scep/',                   # SCEP protocol  
     '/.well-known/acme',        # ACME challenge
@@ -44,7 +52,6 @@ CSRF_EXEMPT_PATHS = [
     '/ssh/setup/',              # Public SSH CA setup scripts
     '/api/health',              # Health checks
     '/api/v2/health',           # Health checks (v2)
-    '/api/v2/mtls/',            # mTLS authentication (cert-based)
 ]
 
 
