@@ -32,7 +32,7 @@ def get_status():
 
 
 @websocket_bp.route('/clients', methods=['GET'])
-@require_auth()
+@require_auth(['admin:system'])
 def get_clients():
     """Get list of connected WebSocket clients (admin only)."""
     clients_info = get_connected_clients_info()
@@ -41,7 +41,7 @@ def get_clients():
 
 
 @websocket_bp.route('/broadcast', methods=['POST'])
-@require_auth()
+@require_auth(['admin:system'])
 def broadcast_message():
     """Broadcast a system alert to all connected clients (admin only)."""
     data = request.get_json()
