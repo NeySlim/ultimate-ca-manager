@@ -4,7 +4,7 @@ Centralized audit logging for all user actions
 """
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
-from flask import request, g
+from flask import request, g, has_request_context
 from models import db, AuditLog
 import logging
 import json
@@ -56,31 +56,40 @@ class AuditService:
             Created AuditLog entry
         """
         try:
+            in_request = has_request_context()
+
             # Auto-detect user info from Flask context
-            if username is None and hasattr(g, 'current_user') and g.current_user:
+            if username is None and in_request and hasattr(g, 'current_user') and g.current_user:
                 username = g.current_user.username
-            if user_id is None and hasattr(g, 'user_id'):
+            if user_id is None and in_request and hasattr(g, 'user_id'):
                 user_id = g.user_id
-            
+
             # Get request context
             ip_address = None
             user_agent = None
-            if request:
+            if in_request:
                 ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
                 if ip_address and ',' in ip_address:
                     ip_address = ip_address.split(',')[0].strip()
                 user_agent = request.headers.get('User-Agent', '')[:500]  # Limit length
-            
+
+            # Background tasks (scheduler, startup, signal handlers) have no
+            # request context — record them as 'system' instead of 'anonymous'.
+            # 'anonymous' is reserved for genuine unauthenticated HTTP requests
+            # (public protocol endpoints, login screens, etc.).
+            if not username:
+                username = 'system' if not in_request else 'anonymous'
+
             # Ensure resource_name and details are strings (guard against dicts)
             if isinstance(resource_name, dict):
                 resource_name = json.dumps(resource_name)
             if isinstance(details, dict):
                 details = json.dumps(details)
-            
+
             # Create audit log entry
             audit_log = AuditLog(
                 timestamp=utc_now(),
-                username=username or 'anonymous',
+                username=username,
                 action=action,
                 resource_type=resource_type,
                 resource_id=str(resource_id) if resource_id else None,
@@ -181,7 +190,7 @@ class AuditService:
     # =========================================================================
     
     @staticmethod
-    def log_certificate(action: str, cert, details: str = None, success: bool = True):
+    def log_certificate(action: str, cert, details: str = None, success: bool = True, username: str = None):
         """Log certificate-related actions"""
         name = getattr(cert, 'descr', None) or getattr(cert, 'subject', None) or f'Cert #{cert.id}'
         return AuditService.log_action(
@@ -190,11 +199,12 @@ class AuditService:
             resource_id=cert.id if hasattr(cert, 'id') else str(cert),
             resource_name=name,
             details=details or f'{action.replace("_", " ").title()}: {name}',
-            success=success
+            success=success,
+            username=username,
         )
     
     @staticmethod
-    def log_ca(action: str, ca, details: str = None, success: bool = True):
+    def log_ca(action: str, ca, details: str = None, success: bool = True, username: str = None):
         """Log CA-related actions"""
         name = getattr(ca, 'descr', None) or getattr(ca, 'subject', None) or f'CA #{ca.id}'
         return AuditService.log_action(
@@ -203,11 +213,12 @@ class AuditService:
             resource_id=ca.id if hasattr(ca, 'id') else str(ca),
             resource_name=name,
             details=details or f'{action.replace("_", " ").title()}: {name}',
-            success=success
+            success=success,
+            username=username,
         )
     
     @staticmethod
-    def log_csr(action: str, csr, details: str = None, success: bool = True):
+    def log_csr(action: str, csr, details: str = None, success: bool = True, username: str = None):
         """Log CSR-related actions"""
         name = getattr(csr, 'descr', None) or getattr(csr, 'subject', None) or f'CSR #{csr.id}'
         return AuditService.log_action(
@@ -216,7 +227,8 @@ class AuditService:
             resource_id=csr.id if hasattr(csr, 'id') else str(csr),
             resource_name=name,
             details=details or f'{action.replace("_", " ").title()}: {name}',
-            success=success
+            success=success,
+            username=username,
         )
     
     @staticmethod

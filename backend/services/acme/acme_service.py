@@ -331,6 +331,7 @@ class AcmeService:
                 try:
                     from services.audit_service import AuditService
                     AuditService.log_action(
+                        username='acme',
                         action='acme_auto_approve',
                         resource_type='acme_authorization',
                         resource_id=domain_value,
@@ -446,6 +447,7 @@ class AcmeService:
             try:
                 from services.audit_service import AuditService
                 AuditService.log_action(
+                    username='acme',
                     action='acme_auto_approve',
                     resource_type='acme_authorization',
                     resource_id=str(auth.id),

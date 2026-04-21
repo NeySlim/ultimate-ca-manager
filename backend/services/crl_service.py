@@ -230,7 +230,7 @@ class CRLService:
         
         # Audit log
         from services.audit_service import AuditService
-        AuditService.log_ca('generate_crl', ca, f"Generated CRL #{crl_number} for CA {ca.descr} with {len(revoked_certs)} revoked certificates")
+        AuditService.log_ca('generate_crl', ca, f"Generated CRL #{crl_number} for CA {ca.descr} with {len(revoked_certs)} revoked certificates", username=username)
         
         db.session.commit()
         
@@ -489,7 +489,8 @@ class CRLService:
             from services.audit_service import AuditService
             AuditService.log_ca('generate_delta_crl', ca, 
                 f"Generated delta CRL #{crl_number} (base #{base_crl.crl_number}) "
-                f"with {len(revoked_certs)} new revocations")
+                f"with {len(revoked_certs)} new revocations",
+                username=username)
             
             db.session.commit()
         except Exception:
