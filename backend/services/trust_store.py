@@ -847,6 +847,7 @@ class TrustStoreService:
         cps_uri: Optional[str] = None,
         cps_oid: Optional[str] = None,
         ocsp_must_staple: bool = False,
+        extra_ekus: Optional[List[str]] = None,
     ) -> bytes:
         """
         Sign a CSR with a CA
@@ -985,32 +986,57 @@ class TrustStoreService:
                     critical=True,
                 )
         
-        # Add Extended Key Usage if not in CSR
+        # Add Extended Key Usage if not in CSR — and merge any extra_ekus
+        from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
+        extra_oid_strs, extra_err = normalize_extra_ekus(extra_ekus)
+        if extra_err:
+            raise ValueError(f'Invalid extra_ekus: {extra_err}')
+        extra_oids = to_object_identifiers(extra_oid_strs)
+
         try:
-            csr.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE)
+            existing_eku = csr.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE)
+            csr_has_eku = True
         except x509.ExtensionNotFound:
+            existing_eku = None
+            csr_has_eku = False
+
+        if not csr_has_eku:
+            # CSR has no EKU — apply cert_type default + extras
+            base_eku = []
             if cert_type == 'server_cert':
-                builder = builder.add_extension(
-                    x509.ExtendedKeyUsage([
-                        x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
-                    ]),
-                    critical=False,
-                )
+                base_eku = [x509.oid.ExtendedKeyUsageOID.SERVER_AUTH]
             elif cert_type in ('usr_cert', 'client_cert'):
-                builder = builder.add_extension(
-                    x509.ExtendedKeyUsage([
-                        x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
-                    ]),
-                    critical=False,
-                )
+                base_eku = [x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH]
             elif cert_type in ('combined_server_client', 'combined_cert'):
+                base_eku = [x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
+                            x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH]
+            merged = merge_eku_lists(base_eku, extra_oids)
+            if merged:
                 builder = builder.add_extension(
-                    x509.ExtendedKeyUsage([
-                        x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
-                        x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
-                    ]),
+                    x509.ExtendedKeyUsage(merged),
                     critical=False,
                 )
+        elif extra_oids:
+            # CSR already had EKU (copied above via `for extension in csr.extensions`)
+            # We must REPLACE that copied extension with a merged one.
+            # Build new builder discarding the EKU we already added, then re-add merged.
+            merged = merge_eku_lists(list(existing_eku.value), extra_oids)
+            # Reconstruct the builder without the duplicate EKU extension
+            new_builder = x509.CertificateBuilder()
+            new_builder = new_builder.subject_name(builder._subject_name)
+            new_builder = new_builder.issuer_name(builder._issuer_name)
+            new_builder = new_builder.public_key(builder._public_key)
+            new_builder = new_builder.serial_number(builder._serial_number)
+            new_builder = new_builder.not_valid_before(builder._not_valid_before)
+            new_builder = new_builder.not_valid_after(builder._not_valid_after)
+            for ext in builder._extensions:
+                if ext.oid == ExtensionOID.EXTENDED_KEY_USAGE:
+                    continue
+                new_builder = new_builder.add_extension(ext.value, ext.critical)
+            new_builder = new_builder.add_extension(
+                x509.ExtendedKeyUsage(merged), critical=existing_eku.critical
+            )
+            builder = new_builder
         
         # CRL Distribution Points — embed CA's CDP URLs
         all_cdp = cdp_urls or ([cdp_url] if cdp_url else [])

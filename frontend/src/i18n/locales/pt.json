@@ -743,7 +743,18 @@
     "ctSubmitFailed": "Falha ao enviar para logs CT",
     "ctScts": "SCTs CT",
     "ctSctsCount": "{{count}} SCT(s) registrado(s)",
-    "ctNoScts": "Sem SCTs — não enviado para logs CT"
+    "ctNoScts": "Sem SCTs — não enviado para logs CT",
+    "eku": {
+      "title": "Usos estendidos de chave (EKU)",
+      "addKnown": "Adicionar um EKU conhecido…",
+      "customPlaceholder": "OID personalizado (ex. 1.3.6.1.4.1.311.54.1.2)",
+      "invalidOid": "Formato de OID inválido (deve ser como 1.2.3.4)",
+      "anyNotAllowed": "anyExtendedKeyUsage (2.5.29.37.0) não é permitido",
+      "alreadyPresent": "Este EKU já está presente",
+      "maxReached": "Máximo de {{max}} EKUs atingido",
+      "helper": "Mais {{remaining}} EKUs podem ser adicionados (RFC 5280 §4.2.1.12).",
+      "defaultLocked": "Padrão para este tipo de certificado"
+    }
   },
   "cas": {
     "parentCA": "CA pai",

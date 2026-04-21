@@ -743,7 +743,18 @@
     "ctSubmitFailed": "Не вдалося надіслати до журналів CT",
     "ctScts": "CT SCTs",
     "ctSctsCount": "{{count}} SCT записано",
-    "ctNoScts": "Немає SCTs — не надіслано до журналів CT"
+    "ctNoScts": "Немає SCTs — не надіслано до журналів CT",
+    "eku": {
+      "title": "Розширені призначення ключа (EKU)",
+      "addKnown": "Додати відомий EKU…",
+      "customPlaceholder": "Власний OID (напр. 1.3.6.1.4.1.311.54.1.2)",
+      "invalidOid": "Невірний формат OID (має бути як 1.2.3.4)",
+      "anyNotAllowed": "anyExtendedKeyUsage (2.5.29.37.0) не дозволено",
+      "alreadyPresent": "Цей EKU вже присутній",
+      "maxReached": "Досягнуто максимум {{max}} EKU",
+      "helper": "Можна додати ще {{remaining}} EKU (RFC 5280 §4.2.1.12).",
+      "defaultLocked": "За замовчуванням для цього типу сертифіката"
+    }
   },
   "cas": {
     "parentCA": "Батьківський ЦС",

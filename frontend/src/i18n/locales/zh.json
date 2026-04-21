@@ -743,7 +743,18 @@
     "ctSubmitFailed": "提交到CT日志失败",
     "ctScts": "CT SCTs",
     "ctSctsCount": "已记录{{count}}个SCT",
-    "ctNoScts": "无SCT — 未提交到CT日志"
+    "ctNoScts": "无SCT — 未提交到CT日志",
+    "eku": {
+      "title": "扩展密钥用法 (EKU)",
+      "addKnown": "添加已知 EKU…",
+      "customPlaceholder": "自定义 OID (例如 1.3.6.1.4.1.311.54.1.2)",
+      "invalidOid": "OID 格式无效 (应为类似 1.2.3.4)",
+      "anyNotAllowed": "不允许 anyExtendedKeyUsage (2.5.29.37.0)",
+      "alreadyPresent": "此 EKU 已存在",
+      "maxReached": "已达到最多 {{max}} 个 EKU",
+      "helper": "还可以添加 {{remaining}} 个 EKU (RFC 5280 §4.2.1.12)。",
+      "defaultLocked": "此证书类型的默认值"
+    }
   },
   "cas": {
     "parentCA": "父CA",

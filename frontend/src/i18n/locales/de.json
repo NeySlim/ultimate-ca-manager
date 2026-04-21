@@ -743,7 +743,18 @@
     "ctSubmitFailed": "Übermittlung an CT-Logs fehlgeschlagen",
     "ctScts": "CT-SCTs",
     "ctSctsCount": "{{count}} SCT(s) aufgezeichnet",
-    "ctNoScts": "Keine SCTs — nicht an CT-Logs übermittelt"
+    "ctNoScts": "Keine SCTs — nicht an CT-Logs übermittelt",
+    "eku": {
+      "title": "Extended Key Usages (EKU)",
+      "addKnown": "Bekannten EKU hinzufügen…",
+      "customPlaceholder": "Benutzerdefinierte OID (z. B. 1.3.6.1.4.1.311.54.1.2)",
+      "invalidOid": "Ungültiges OID-Format (muss wie 1.2.3.4 aussehen)",
+      "anyNotAllowed": "anyExtendedKeyUsage (2.5.29.37.0) ist nicht erlaubt",
+      "alreadyPresent": "Dieser EKU ist bereits vorhanden",
+      "maxReached": "Maximum von {{max}} EKUs erreicht",
+      "helper": "Es können {{remaining}} weitere EKUs hinzugefügt werden (RFC 5280 §4.2.1.12).",
+      "defaultLocked": "Standard für diesen Zertifikatstyp"
+    }
   },
   "cas": {
     "parentCA": "Übergeordnete CA",

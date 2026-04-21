@@ -19,6 +19,7 @@ from sqlalchemy import or_, and_, case, func
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.dn_validation import validate_dn_field
+from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists, EKU_NAMES
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from models import Certificate, CA, db
@@ -515,7 +516,14 @@ def create_certificate():
         
         profile = cert_profiles.get(cert_type, cert_profiles['server'])
         builder = builder.add_extension(x509.KeyUsage(**profile['ku']), critical=True)
-        builder = builder.add_extension(x509.ExtendedKeyUsage(profile['eku']), critical=False)
+
+        # Custom Extended Key Usage OIDs (RFC 5280 §4.2.1.12)
+        extra_ekus_input = data.get('extra_ekus')
+        extra_oid_strs, extra_err = normalize_extra_ekus(extra_ekus_input)
+        if extra_err:
+            return error_response(f'Invalid extra_ekus: {extra_err}', 400)
+        eku_oids = merge_eku_lists(profile['eku'], to_object_identifiers(extra_oid_strs))
+        builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
         
         # Subject Alternative Names
         san_list = []
@@ -2187,3 +2195,19 @@ def submit_to_ct(cert_id):
     except Exception as e:
         logger.error(f"CT submission failed for cert {cert_id}: {e}")
         return error_response('CT submission failed', 500)
+
+
+@bp.route('/api/v2/eku/known', methods=['GET'])
+@require_auth(['read:certificates'])
+def list_known_ekus():
+    """Return the catalog of well-known Extended Key Usage OIDs.
+
+    Used by the frontend to populate the EKU dropdown when issuing
+    certificates or signing CSRs (RFC 5280 §4.2.1.12).
+    """
+    return success_response(data={
+        'ekus': [
+            {'oid': oid, 'name': name}
+            for oid, name in EKU_NAMES.items()
+        ]
+    })

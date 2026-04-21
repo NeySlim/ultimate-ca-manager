@@ -34,8 +34,10 @@ export const csrsService = {
     })
   },
 
-  async sign(id, ca_id, validity_days, cert_type = 'server') {
-    return apiClient.post(`/csrs/${id}/sign`, { ca_id, validity_days, cert_type })
+  async sign(id, ca_id, validity_days, cert_type = 'server', extra_ekus = []) {
+    const payload = { ca_id, validity_days, cert_type }
+    if (Array.isArray(extra_ekus) && extra_ekus.length) payload.extra_ekus = extra_ekus
+    return apiClient.post(`/csrs/${id}/sign`, payload)
   },
 
   async delete(id) {

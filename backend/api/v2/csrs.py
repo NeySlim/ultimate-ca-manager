@@ -610,6 +610,15 @@ def sign_csr(csr_id):
     ca_id = data.get('ca_id')
     validity_days = data.get('validity_days', 365)
     cert_type = data.get('cert_type', 'server')
+    extra_ekus = data.get('extra_ekus')
+
+    # Validate extra_ekus early to surface a clean 400
+    if extra_ekus is not None:
+        from utils.eku_validation import normalize_extra_ekus
+        _normalized, _err = normalize_extra_ekus(extra_ekus)
+        if _err:
+            return error_response(f'Invalid extra_ekus: {_err}', 400)
+        extra_ekus = _normalized
     
     # Map frontend cert_type to backend cert_type format
     cert_type_map = {
@@ -639,7 +648,8 @@ def sign_csr(csr_id):
             cert_id=csr_id,
             caref=ca.refid,
             validity_days=validity_days,
-            cert_type=backend_cert_type
+            cert_type=backend_cert_type,
+            extra_ekus=extra_ekus,
         )
         
         # Determine if result is a CA or Certificate

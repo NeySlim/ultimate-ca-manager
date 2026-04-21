@@ -743,7 +743,18 @@
     "ctSubmitFailed": "Failed to submit to CT logs",
     "ctScts": "CT SCTs",
     "ctSctsCount": "{{count}} SCT(s) recorded",
-    "ctNoScts": "No SCTs — not submitted to CT logs"
+    "ctNoScts": "No SCTs — not submitted to CT logs",
+    "eku": {
+      "title": "Extended Key Usages (EKU)",
+      "addKnown": "Add a well-known EKU…",
+      "customPlaceholder": "Custom OID (e.g. 1.3.6.1.4.1.311.54.1.2)",
+      "invalidOid": "Invalid OID format (must be like 1.2.3.4)",
+      "anyNotAllowed": "anyExtendedKeyUsage (2.5.29.37.0) is not allowed",
+      "alreadyPresent": "This EKU is already present",
+      "maxReached": "Maximum {{max}} EKUs reached",
+      "helper": "{{remaining}} more EKUs can be added (RFC 5280 §4.2.1.12).",
+      "defaultLocked": "Default for this certificate type"
+    }
   },
   "cas": {
     "parentCA": "Parent CA",

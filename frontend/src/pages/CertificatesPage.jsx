@@ -14,11 +14,12 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, DatePicker, HelpCard,
-  CertificateDetails, CertificateCompareModal, KeyIndicator
+  CertificateDetails, CertificateCompareModal, KeyIndicator, EkuMultiSelect
 } from '../components'
 import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService, truststoreService, templatesService } from '../services'
+import { apiClient } from '../services/apiClient'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
@@ -940,7 +941,28 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
     validity_days: '365',
     expiry_date: '',
     ocsp_must_staple: false,
+    extra_ekus: [],
   })
+
+  const [knownEkus, setKnownEkus] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    apiClient.get('/eku/known')
+      .then((resp) => {
+        if (!cancelled) setKnownEkus(resp?.data?.ekus || resp?.ekus || [])
+      })
+      .catch(() => { /* dropdown still works with custom OID input */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // EKU OIDs implied by the selected cert_type (must mirror backend cert_profiles)
+  const EKU_DEFAULTS_BY_TYPE = {
+    server:       ['1.3.6.1.5.5.7.3.1'],
+    client:       ['1.3.6.1.5.5.7.3.2'],
+    combined:     ['1.3.6.1.5.5.7.3.1', '1.3.6.1.5.5.7.3.2'],
+    code_signing: ['1.3.6.1.5.5.7.3.3'],
+    email:        ['1.3.6.1.5.5.7.3.4'],
+  }
 
   const [sans, setSans] = useState([{ type: 'dns', value: '' }])
 
@@ -1141,6 +1163,7 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
       ...(san_uri.length && { san_uri }),
       ...(selectedTemplate && { template_id: parseInt(selectedTemplate) }),
       ...(formData.ocsp_must_staple && { ocsp_must_staple: true }),
+      ...(formData.extra_ekus?.length && { extra_ekus: formData.extra_ekus }),
     }
     onSubmit(payload)
   }
@@ -1188,6 +1211,14 @@ function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
           options={certTypeOptions}
         />
       </div>
+
+      {/* Custom EKU OIDs (RFC 5280 §4.2.1.12) */}
+      <EkuMultiSelect
+        value={formData.extra_ekus}
+        onChange={(v) => update('extra_ekus', v)}
+        defaults={EKU_DEFAULTS_BY_TYPE[formData.cert_type] || []}
+        knownEkus={knownEkus}
+      />
 
       {/* CN + Description */}
       <Input 

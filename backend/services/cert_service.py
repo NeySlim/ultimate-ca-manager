@@ -359,7 +359,8 @@ class CertificateService:
         cert_type: str = 'server_cert',
         validity_days: int = 397,
         digest: str = 'sha256',
-        username: str = 'system'
+        username: str = 'system',
+        extra_ekus: list = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -431,6 +432,7 @@ class CertificateService:
             cps_uri=cps_uri,
             cps_oid=cps_oid,
             ocsp_must_staple=getattr(certificate, 'ocsp_must_staple', False) or False,
+            extra_ekus=extra_ekus,
         )
         
         # Parse signed certificate

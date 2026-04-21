@@ -633,7 +633,18 @@
     "ctSubmitFailed": "Échec de la soumission aux journaux CT",
     "ctScts": "SCTs CT",
     "ctSctsCount": "{{count}} SCT(s) enregistré(s)",
-    "ctNoScts": "Aucun SCT — non soumis aux journaux CT"
+    "ctNoScts": "Aucun SCT — non soumis aux journaux CT",
+    "eku": {
+      "title": "Extended Key Usages (EKU)",
+      "addKnown": "Ajouter un EKU connu…",
+      "customPlaceholder": "OID personnalisé (ex. 1.3.6.1.4.1.311.54.1.2)",
+      "invalidOid": "Format OID invalide (doit ressembler à 1.2.3.4)",
+      "anyNotAllowed": "anyExtendedKeyUsage (2.5.29.37.0) est interdit",
+      "alreadyPresent": "Cet EKU est déjà présent",
+      "maxReached": "Maximum de {{max}} EKU atteint",
+      "helper": "{{remaining}} EKU supplémentaires peuvent être ajoutés (RFC 5280 §4.2.1.12).",
+      "defaultLocked": "Par défaut pour ce type de certificat"
+    }
   },
   "common": {
     "saved": "Paramètres enregistrés",

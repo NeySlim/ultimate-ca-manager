@@ -13,11 +13,12 @@ import {
 import {
   Badge, Button, Modal, Input, Select, HelpCard, FileUpload, Textarea,
   CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
-  KeyIndicator
+  KeyIndicator, EkuMultiSelect
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { csrsService, casService, templatesService, mscaService } from '../services'
+import { apiClient } from '../services/apiClient'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
@@ -52,6 +53,23 @@ export default function CSRsPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [signCA, setSignCA] = useState('')
   const [signCertType, setSignCertType] = useState('server')
+  const [signExtraEkus, setSignExtraEkus] = useState([])
+  const [knownEkus, setKnownEkus] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    apiClient.get('/eku/known')
+      .then((resp) => { if (!cancelled) setKnownEkus(resp?.data?.ekus || resp?.ekus || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  const EKU_DEFAULTS_BY_TYPE = {
+    server: ['1.3.6.1.5.5.7.3.1'],
+    client: ['1.3.6.1.5.5.7.3.2'],
+    combined: ['1.3.6.1.5.5.7.3.1', '1.3.6.1.5.5.7.3.2'],
+    intermediate_ca: [],
+    code_signing: ['1.3.6.1.5.5.7.3.3'],
+    email: ['1.3.6.1.5.5.7.3.4'],
+  }
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
   const [signMode, setSignMode] = useState('local') // 'local' or 'msca'
   const [mscaConnections, setMscaConnections] = useState([])
@@ -179,7 +197,7 @@ export default function CSRsPage() {
         return
       }
       try {
-        await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType)
+        await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType, signExtraEkus)
         showSuccess(t('messages.success.other.signed'))
         closeModal('sign')
         loadData()
@@ -856,6 +874,13 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                 onChange={(e) => setValidityDays(parseInt(e.target.value))}
                 min="1"
                 max="3650"
+              />
+
+              <EkuMultiSelect
+                value={signExtraEkus}
+                onChange={setSignExtraEkus}
+                defaults={EKU_DEFAULTS_BY_TYPE[signCertType] || []}
+                knownEkus={knownEkus}
               />
             </>
           ) : (

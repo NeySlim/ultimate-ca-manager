@@ -75,6 +75,7 @@ export { TemplatePreviewModal } from './TemplatePreviewModal'
 export { CADetails } from './CADetails'
 export { CSRDetails } from './CSRDetails'
 export { TrustCertDetails } from './TrustCertDetails'
+export { EkuMultiSelect } from './EkuMultiSelect'
 
 // Filter components
 export { FilterPanel, FilterChips, FilterButton } from './FilterPanel'
