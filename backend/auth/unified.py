@@ -89,6 +89,13 @@ class AuthManager:
         if api_key.expires_at and api_key.expires_at < utc_now():
             return None
         
+        # Reject if the linked user is missing or deactivated. Without this,
+        # API keys belonging to a disabled user remain valid until the key
+        # itself is revoked.
+        linked_user = api_key.user
+        if not linked_user or not getattr(linked_user, 'active', False):
+            return None
+        
         # Update last_used timestamp
         api_key.last_used_at = utc_now()
         db.session.commit()
