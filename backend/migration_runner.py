@@ -208,7 +208,10 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
         print(f"Found {len(pending)} pending migration(s) for {backend}:")
         if is_pg:
             return _run_pending_pg(engine, pending, dry_run)
-        return _run_pending_sqlite(pending, dry_run)
+        # Pass the SQLite path derived from db_url so DATABASE_URL stays the
+        # single source of truth (avoids DATABASE_URL/DATABASE_PATH mismatch).
+        sqlite_path = db_url.replace("sqlite:///", "", 1) if db_url.startswith("sqlite:///") else None
+        return _run_pending_sqlite(pending, dry_run, db_path=sqlite_path)
     finally:
         engine.dispose()
 
@@ -217,8 +220,9 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
 # SQLite execution path (legacy migrations 000-019 are SQLite-only)
 # ---------------------------------------------------------------------------
 
-def _run_pending_sqlite(pending, dry_run) -> bool:
-    db_path = os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db")
+def _run_pending_sqlite(pending, dry_run, db_path: str = None) -> bool:
+    if not db_path:
+        db_path = os.environ.get("DATABASE_PATH", "/opt/ucm/data/ucm.db")
     if not os.path.exists(db_path):
         print(f"✗ SQLite file not found: {db_path}")
         return False

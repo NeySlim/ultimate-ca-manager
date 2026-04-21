@@ -128,14 +128,20 @@ def create_app(config_name=None):
     # Backend-agnostic: the runner detects FRESH/LEGACY/TRACKED state and
     # skips legacy SQL migrations on PostgreSQL or fresh installs (schema is
     # built by SQLAlchemy create_all() instead). See migration_runner.py.
-    try:
-        from migration_runner import run_all_migrations
-        db_path = config.DATABASE_PATH
-        if db_path:
-            os.environ.setdefault('DATABASE_PATH', str(db_path))
-        run_all_migrations(dry_run=False, verbose=False)
-    except Exception as e:
-        app.logger.warning(f"Pre-init migration check: {e}")
+    #
+    # Failure here MUST stop startup: continuing with a broken schema causes
+    # silent data corruption or 500s on every request. Operators should see
+    # the failure immediately and fix it before the service comes back up.
+    from migration_runner import run_all_migrations
+    db_path = config.DATABASE_PATH
+    if db_path:
+        os.environ.setdefault('DATABASE_PATH', str(db_path))
+    if not run_all_migrations(dry_run=False, verbose=False):
+        raise RuntimeError(
+            "Schema migration failed at startup. Refusing to start with an "
+            "inconsistent database. Check the migration log and fix the issue "
+            "before restarting the service."
+        )
     
     # Initialize extensions
     db.init_app(app)
