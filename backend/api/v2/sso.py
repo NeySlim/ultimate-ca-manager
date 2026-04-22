@@ -1748,9 +1748,12 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 logger.info(f"SSO auto-update: user {username} role changed {user.role} → {new_role}")
                 from services.audit_service import AuditService
                 AuditService.log_action(
-                    'role_change', username,
+                    action='role_change',
+                    resource_type='user',
+                    resource_name=username,
+                    username=username,
                     details=f"SSO auto-update: role changed from {user.role} to {new_role}",
-                    status='success'
+                    success=True
                 )
                 user.role = new_role
             user.last_login = utc_now()

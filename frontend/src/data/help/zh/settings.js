@@ -163,7 +163,7 @@ UCM 支持两种数据库后端：
 - 迁移版本
 
 ### 测试连接
-切换前验证 \`DATABASE_URL\`（例如 \`postgresql+psycopg2://user:pass@host:5432/ucm\`）。测试会打开真实连接并报告任何错误。 早于版本 13 的 PostgreSQL 服务器将被拒绝 — UCM 需要 PostgreSQL 13 或更高版本。
+切换前验证 \`DATABASE_URL\`（例如 \`postgresql://user:pass@host:5432/ucm\`）。测试会打开真实连接并报告任何错误。 早于版本 13 的 PostgreSQL 服务器将被拒绝 — UCM 需要 PostgreSQL 13 或更高版本。
 
 ### 切换后端
 将 \`DATABASE_URL\` 持久化到 \`/etc/ucm/ucm.env\`（DEB/RPM）并重启 UCM。**不会复制任何数据** — 如果您希望保留现有数据，请先使用**迁移**。

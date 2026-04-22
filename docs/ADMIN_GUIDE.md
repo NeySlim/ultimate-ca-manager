@@ -27,7 +27,7 @@ UCM stores data in:
 | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
 | `UCM_HTTPS_CERT` | (auto) | Server certificate |
 | `UCM_HTTPS_KEY` | (auto) | Server private key |
-| `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql+psycopg2://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `UCM_DATA_DIR/ucm.db`. |
+| `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `UCM_DATA_DIR/ucm.db`. |
 
 ### Systemd Service
 
@@ -211,7 +211,7 @@ UCM supports two database backends:
 The active backend is selected by the `DATABASE_URL` environment variable (or `/etc/ucm/ucm.env` on DEB/RPM):
 
 - **Unset** → SQLite at `UCM_DATA_DIR/ucm.db`
-- **`postgresql+psycopg2://user:pass@host:5432/dbname`** → PostgreSQL
+- **`postgresql://user:pass@host:5432/dbname`** → PostgreSQL
 
 ### Switching Backend (UI)
 
@@ -268,7 +268,7 @@ GRANT ALL PRIVILEGES ON DATABASE ucm TO ucm;
 
 **Activate PostgreSQL (DEB/RPM):**
 ```bash
-echo 'DATABASE_URL=postgresql+psycopg2://ucm:strong-password@db.example.com:5432/ucm' | sudo tee -a /etc/ucm/ucm.env
+echo 'DATABASE_URL=postgresql://ucm:strong-password@db.example.com:5432/ucm' | sudo tee -a /etc/ucm/ucm.env
 sudo systemctl restart ucm
 ```
 
@@ -279,7 +279,7 @@ services:
   ucm:
     image: neyslim/ultimate-ca-manager:latest
     environment:
-      DATABASE_URL: postgresql+psycopg2://ucm:strong-password@db:5432/ucm
+      DATABASE_URL: postgresql://ucm:strong-password@db:5432/ucm
 ```
 
 **Backup PostgreSQL:**

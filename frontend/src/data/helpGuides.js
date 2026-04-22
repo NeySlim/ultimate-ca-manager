@@ -1546,7 +1546,7 @@ The active backend is selected by the \`DATABASE_URL\` environment variable. Whe
 - Migration version
 
 ### Test connection
-Validate a \`DATABASE_URL\` (e.g. \`postgresql+psycopg2://user:pass@host:5432/ucm\`) before switching. The test opens a real connection and reports any error. PostgreSQL servers older than 13 are rejected — UCM requires PostgreSQL 13 or newer.
+Validate a \`DATABASE_URL\` (e.g. \`postgresql://user:pass@host:5432/ucm\`) before switching. The test opens a real connection and reports any error. PostgreSQL servers older than 13 are rejected — UCM requires PostgreSQL 13 or newer.
 
 ### Switch backend
 Persists \`DATABASE_URL\` to \`/etc/ucm/ucm.env\` (DEB/RPM) and restarts UCM. **No data is copied** — use **Migrate** first if you want to keep your existing data.

@@ -9,6 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **PostgreSQL backend on DEB/RPM (#78)** — `psycopg2-binary` is now declared in `backend/requirements.txt` so the runtime install pulls the driver automatically. `Test connection` and `Switch to PostgreSQL` no longer fail with `No module named 'psycopg2'` on a fresh DEB/RPM install.
+- **SSO callback crash on role auto-update (#79)** — the audit log call after a role change in `api/v2/sso.py` used keyword arguments not accepted by `AuditService.log_action()` (`status='success'`) and passed the username as a positional `resource_type`. Rewritten with the correct kwargs (`action='role_change'`, `resource_type='user'`, `resource_name=<username>`, `username=<username>`, `success=True`). SSO logins that change a user's role no longer raise `TypeError`.
+- **PostgreSQL URL examples harmonized** — in-app help, guides and admin docs now show `postgresql://user:pass@host:5432/ucm` (consistent with the UI placeholder) instead of mixing in `postgresql+psycopg2://`. Both forms remain accepted by the backend validator.
+
 ## [2.130] - 2026-04-22
 
 ### Added
@@ -60,7 +65,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [2.127] - 2026-04-21
 
 ### Added
-- **PostgreSQL 13+ as a native database backend (alongside SQLite)** — UCM now supports PostgreSQL via the `DATABASE_URL` environment variable (e.g. `postgresql+psycopg2://user:pass@host:5432/ucm`). When unset, UCM falls back to the bundled SQLite at `UCM_DATA_DIR/ucm.db`. The schema is created automatically on first start; no manual SQL required. The `psycopg2-binary` driver is bundled in DEB/RPM/Docker.
+- **PostgreSQL 13+ as a native database backend (alongside SQLite)** — UCM now supports PostgreSQL via the `DATABASE_URL` environment variable (e.g. `postgresql://user:pass@host:5432/ucm`). When unset, UCM falls back to the bundled SQLite at `UCM_DATA_DIR/ucm.db`. The schema is created automatically on first start; no manual SQL required. The `psycopg2-binary` driver is bundled in DEB/RPM/Docker.
 - **Settings → Database** — new UI section showing the active backend (sqlite/postgresql), database size, table count, and migration version. Operators can:
   - **Test** an arbitrary `DATABASE_URL` before switching
   - **Switch** the backend (persists to `/etc/ucm/ucm.env` on DEB/RPM and triggers restart)

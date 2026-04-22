@@ -67,8 +67,9 @@ azure-keyvault-keys>=4.9.0
 azure-identity>=1.15.0
 google-cloud-kms>=2.21.0
 
-# PostgreSQL support (optional, for HA deployments)
-# psycopg2-binary>=2.9.9
+# PostgreSQL support (for HA / multi-node deployments)
+# Pre-built binary wheel — no compilation toolchain needed at install time.
+psycopg2-binary>=2.9.9
 
 # Redis session store (optional, install with: pip install redis)
 # redis>=5.0.0
