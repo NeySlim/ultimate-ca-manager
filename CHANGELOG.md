@@ -9,10 +9,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.131] - 2026-04-22
+
 ### Fixed
 - **PostgreSQL backend on DEB/RPM (#78)** — `psycopg2-binary` is now declared in `backend/requirements.txt` so the runtime install pulls the driver automatically. `Test connection` and `Switch to PostgreSQL` no longer fail with `No module named 'psycopg2'` on a fresh DEB/RPM install.
 - **SSO callback crash on role auto-update (#79)** — the audit log call after a role change in `api/v2/sso.py` used keyword arguments not accepted by `AuditService.log_action()` (`status='success'`) and passed the username as a positional `resource_type`. Rewritten with the correct kwargs (`action='role_change'`, `resource_type='user'`, `resource_name=<username>`, `username=<username>`, `success=True`). SSO logins that change a user's role no longer raise `TypeError`.
 - **PostgreSQL URL examples harmonized** — in-app help, guides and admin docs now show `postgresql://user:pass@host:5432/ucm` (consistent with the UI placeholder) instead of mixing in `postgresql+psycopg2://`. Both forms remain accepted by the backend validator.
+
+### Also in this release (carried over from cancelled v2.131-rc)
+- **HSM warning is now provider-aware** — the "SoftHSM not detected" banner only shows when SoftHSM is actually the configured provider. Users running OpenBao or a vendor PKCS#11 module no longer see a misleading warning.
 
 ## [2.130] - 2026-04-22
 
