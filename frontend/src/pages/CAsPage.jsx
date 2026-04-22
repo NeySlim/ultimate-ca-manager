@@ -18,7 +18,7 @@ import {
 import { ExportModal } from '../components/ExportModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
-import { casService } from '../services'
+import { casService, hsmService } from '../services'
 import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
@@ -51,6 +51,17 @@ export default function CAsPage() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [createFormPathLength, setCreateFormPathLength] = useState('')
   const [createFormOcspMustStaple, setCreateFormOcspMustStaple] = useState(false)
+
+  // HSM key storage state for Create CA
+  const [createFormKeyStorage, setCreateFormKeyStorage] = useState('local') // 'local' | 'hsm'
+  const [createFormHsmProviderId, setCreateFormHsmProviderId] = useState('')
+  const [createFormHsmKeyMode, setCreateFormHsmKeyMode] = useState('generate') // 'generate' | 'existing'
+  const [createFormHsmKeyLabel, setCreateFormHsmKeyLabel] = useState('')
+  const [createFormHsmKeyAlgorithm, setCreateFormHsmKeyAlgorithm] = useState('RSA-2048')
+  const [createFormHsmKeyId, setCreateFormHsmKeyId] = useState('')
+  const [hsmProviders, setHsmProviders] = useState([])
+  const [hsmKeys, setHsmKeys] = useState([])
+  const [hsmLoading, setHsmLoading] = useState(false)
   
   // Filter state
   const [filterType, setFilterType] = usePersistedState('ucm-filter-cas-type', [])
@@ -95,6 +106,49 @@ export default function CAsPage() {
     window.addEventListener('ucm:data-changed', handler)
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [])
+
+  // Load HSM providers when create modal opens
+  useEffect(() => {
+    if (!modals.create) return
+    let cancelled = false
+    setHsmLoading(true)
+    hsmService.getProviders()
+      .then(res => {
+        if (cancelled) return
+        const list = extractData(res) || []
+        setHsmProviders(list.filter(p => p.is_active && p.is_connected))
+      })
+      .catch(() => { if (!cancelled) setHsmProviders([]) })
+      .finally(() => { if (!cancelled) setHsmLoading(false) })
+    return () => { cancelled = true }
+  }, [modals.create])
+
+  // Load HSM signing keys when provider selected and "use existing" mode active
+  useEffect(() => {
+    if (createFormKeyStorage !== 'hsm' || createFormHsmKeyMode !== 'existing' || !createFormHsmProviderId) {
+      setHsmKeys([])
+      return
+    }
+    let cancelled = false
+    hsmService.getSigningKeys({ providerId: parseInt(createFormHsmProviderId, 10), unused: true })
+      .then(res => {
+        if (cancelled) return
+        setHsmKeys(extractData(res) || [])
+      })
+      .catch(() => { if (!cancelled) setHsmKeys([]) })
+    return () => { cancelled = true }
+  }, [createFormKeyStorage, createFormHsmKeyMode, createFormHsmProviderId])
+
+  // Reset HSM form state when modal closes
+  useEffect(() => {
+    if (modals.create) return
+    setCreateFormKeyStorage('local')
+    setCreateFormHsmProviderId('')
+    setCreateFormHsmKeyMode('generate')
+    setCreateFormHsmKeyLabel('')
+    setCreateFormHsmKeyAlgorithm('RSA-2048')
+    setCreateFormHsmKeyId('')
+  }, [modals.create])
 
   // Handle selected param from navigation
   useEffect(() => {
@@ -253,7 +307,37 @@ export default function CAsPage() {
       parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null,
       ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
     }
-    
+
+    // HSM key storage — replaces local key fields
+    if (createFormKeyStorage === 'hsm') {
+      if (!createFormHsmProviderId) {
+        showError(t('cas.create.hsmProviderRequired'))
+        return
+      }
+      delete data.keyAlgo
+      delete data.keySize
+      if (createFormHsmKeyMode === 'generate') {
+        const label = (createFormHsmKeyLabel || '').trim()
+        if (!label) {
+          showError(t('cas.create.hsmKeyLabelRequired'))
+          return
+        }
+        if (!/^[a-zA-Z0-9_-]+$/.test(label)) {
+          showError(t('cas.create.hsmKeyLabelInvalid'))
+          return
+        }
+        data.hsmProviderId = parseInt(createFormHsmProviderId, 10)
+        data.hsmKeyLabel = label
+        data.hsmKeyAlgorithm = createFormHsmKeyAlgorithm
+      } else {
+        if (!createFormHsmKeyId) {
+          showError(t('cas.create.hsmExistingKeyRequired'))
+          return
+        }
+        data.hsmKeyId = parseInt(createFormHsmKeyId, 10)
+      }
+    }
+
     try {
       muteToasts()
       await casService.create(data)
@@ -614,6 +698,45 @@ export default function CAsPage() {
           </div>
 
           <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">{t('cas.create.keyStorage')}</h3>
+            <div className="flex gap-2">
+              <label className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
+                createFormKeyStorage === 'local'
+                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
+                  : 'border-border hover:border-border-hover text-text-secondary'
+              )}>
+                <input
+                  type="radio"
+                  name="keyStorage"
+                  value="local"
+                  className="sr-only"
+                  checked={createFormKeyStorage === 'local'}
+                  onChange={() => setCreateFormKeyStorage('local')}
+                />
+                {t('cas.create.keyStorageLocal')}
+              </label>
+              <label className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
+                createFormKeyStorage === 'hsm'
+                  ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
+                  : 'border-border hover:border-border-hover text-text-secondary'
+              )}>
+                <input
+                  type="radio"
+                  name="keyStorage"
+                  value="hsm"
+                  className="sr-only"
+                  checked={createFormKeyStorage === 'hsm'}
+                  onChange={() => setCreateFormKeyStorage('hsm')}
+                />
+                {t('cas.create.keyStorageHsm')}
+              </label>
+            </div>
+          </div>
+
+          {createFormKeyStorage === 'local' && (
+          <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
             <div className="grid grid-cols-2 gap-4">
               <Select
@@ -644,6 +767,115 @@ export default function CAsPage() {
               />
             </div>
           </div>
+          )}
+
+          {createFormKeyStorage === 'hsm' && (
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
+            {!hsmLoading && hsmProviders.length === 0 ? (
+              <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
+                {t('cas.create.hsmNoProviders')}
+              </div>
+            ) : (
+              <>
+                <Select
+                  label={t('cas.create.hsmProvider')}
+                  options={hsmProviders.map(p => ({
+                    value: p.id.toString(),
+                    label: `${p.name} (${p.provider_type})`
+                  }))}
+                  value={createFormHsmProviderId}
+                  onChange={(v) => { setCreateFormHsmProviderId(v); setCreateFormHsmKeyId('') }}
+                  required
+                />
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    {t('cas.create.hsmKeyMode')}
+                  </label>
+                  <div className="flex gap-2">
+                    <label className={cn(
+                      'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
+                      createFormHsmKeyMode === 'generate'
+                        ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
+                        : 'border-border hover:border-border-hover text-text-secondary'
+                    )}>
+                      <input
+                        type="radio"
+                        name="hsmKeyMode"
+                        value="generate"
+                        className="sr-only"
+                        checked={createFormHsmKeyMode === 'generate'}
+                        onChange={() => setCreateFormHsmKeyMode('generate')}
+                      />
+                      {t('cas.create.hsmKeyModeGenerate')}
+                    </label>
+                    <label className={cn(
+                      'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
+                      createFormHsmKeyMode === 'existing'
+                        ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
+                        : 'border-border hover:border-border-hover text-text-secondary'
+                    )}>
+                      <input
+                        type="radio"
+                        name="hsmKeyMode"
+                        value="existing"
+                        className="sr-only"
+                        checked={createFormHsmKeyMode === 'existing'}
+                        onChange={() => setCreateFormHsmKeyMode('existing')}
+                      />
+                      {t('cas.create.hsmKeyModeExisting')}
+                    </label>
+                  </div>
+                </div>
+
+                {createFormHsmKeyMode === 'generate' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label={t('cas.create.hsmKeyLabel')}
+                      value={createFormHsmKeyLabel}
+                      onChange={(e) => setCreateFormHsmKeyLabel(e.target.value)}
+                      placeholder="ca-signing-key-1"
+                      helperText={t('cas.create.hsmKeyLabelHelp')}
+                      required
+                    />
+                    <Select
+                      label={t('cas.create.hsmKeyAlgorithm')}
+                      options={[
+                        { value: 'RSA-2048', label: 'RSA-2048' },
+                        { value: 'RSA-3072', label: 'RSA-3072' },
+                        { value: 'RSA-4096', label: 'RSA-4096' },
+                        { value: 'EC-P256', label: 'EC-P256' },
+                        { value: 'EC-P384', label: 'EC-P384' },
+                        { value: 'EC-P521', label: 'EC-P521' }
+                      ]}
+                      value={createFormHsmKeyAlgorithm}
+                      onChange={(v) => setCreateFormHsmKeyAlgorithm(v)}
+                    />
+                  </div>
+                )}
+
+                {createFormHsmKeyMode === 'existing' && (
+                  createFormHsmProviderId && hsmKeys.length === 0 ? (
+                    <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
+                      {t('cas.create.hsmNoUnusedKeys')}
+                    </div>
+                  ) : (
+                    <Select
+                      label={t('cas.create.hsmExistingKey')}
+                      options={hsmKeys.map(k => ({
+                        value: k.id.toString(),
+                        label: `${k.label} (${k.algorithm})`
+                      }))}
+                      value={createFormHsmKeyId}
+                      onChange={(v) => setCreateFormHsmKeyId(v)}
+                      required
+                    />
+                  )
+                )}
+              </>
+            )}
+          </div>
+          )}
 
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">{t('common.validityPeriod')}</h3>
@@ -713,7 +945,17 @@ export default function CAsPage() {
             <Button type="button" variant="secondary" onClick={() => closeModal('create')}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit">{t('common.createCA')}</Button>
+            <Button
+              type="submit"
+              disabled={
+                createFormKeyStorage === 'hsm' && (
+                  hsmProviders.length === 0 ||
+                  (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && hsmKeys.length === 0)
+                )
+              }
+            >
+              {t('common.createCA')}
+            </Button>
           </div>
         </form>
       </Modal>
@@ -811,6 +1053,20 @@ function TypeBadge({ type, isMobile, t }) {
   )
 }
 
+/** HSM badge — shown when CA's signing key is on an HSM */
+function HsmBadge({ ca, t }) {
+  if (!ca?.uses_hsm) return null
+  const tip = [ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')
+  return (
+    <span
+      className="shrink-0 px-1.5 py-0.5 rounded-md text-2xs font-semibold badge-bg-violet"
+      title={tip || t('cas.detail.hsmBacked')}
+    >
+      HSM
+    </span>
+  )
+}
+
 // =============================================================================
 // VIEW A: ORGANIGRAMME — Root = big card, children nested inside
 // =============================================================================
@@ -897,6 +1153,7 @@ function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobi
             </span>
           </div>
           <TypeBadge type="root" isMobile={isMobile} t={t} />
+          <HsmBadge ca={ca} t={t} />
           <StatusBadge status={ca.status} />
         </div>
         <div className={cn('mt-1.5', hasChildren ? 'ml-8' : 'ml-0')}>
@@ -972,6 +1229,7 @@ function OrgChildCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMob
             </span>
           </div>
           <TypeBadge type="intermediate" isMobile={isMobile} t={t} />
+          <HsmBadge ca={ca} t={t} />
           <StatusBadge status={ca.status} />
         </div>
         <div className={cn('mt-1', isMobile ? 'ml-9' : 'ml-7')}>
@@ -1091,6 +1349,7 @@ function ColumnHeader({ ca, selectedId, onSelect, isMobile, t }) {
         )}>
           {ca.name || ca.common_name}
         </span>
+        <HsmBadge ca={ca} t={t} />
         <StatusBadge status={ca.status} />
       </div>
       <div className="mt-1 ml-7">
@@ -1135,6 +1394,7 @@ function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan, dept
           )}>
             {ca.name || ca.common_name}
           </span>
+          <HsmBadge ca={ca} t={t} />
           <StatusBadge status={ca.status} />
         </div>
         <div className="mt-1 ml-7 flex items-center gap-2 text-2xs text-text-tertiary">
@@ -1214,6 +1474,7 @@ function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
                   {ca.name || ca.common_name || t('cas.unnamedCA')}
                 </span>
                 <TypeBadge type={ca.type} isMobile={isMobile} t={t} />
+                <HsmBadge ca={ca} t={t} />
                 <StatusBadge status={ca.status} />
               </div>
               {/* Row 2 */}
@@ -1255,6 +1516,11 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
             <Badge variant={ca.type === 'root' || ca.is_root ? 'warning' : 'primary'} size="sm">
               {ca.type === 'root' || ca.is_root ? t('common.rootCA') : t('common.intermediateCA')}
             </Badge>
+            {ca.uses_hsm && (
+              <Badge variant="info" size="sm" title={[ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')}>
+                {t('cas.detail.hsmBacked')}
+              </Badge>
+            )}
           </div>
           {ca.subject && (
             <p className="text-xs text-text-secondary truncate">{ca.subject}</p>
@@ -1298,6 +1564,12 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
           <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={ca.key_algorithm || 'RSA'} />
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={ca.key_size} />
           <CompactField autoIcon="signature" label={t('common.signature')} value={ca.signature_algorithm} />
+          {ca.uses_hsm && (
+            <>
+              <CompactField label={t('cas.create.hsmProvider')} value={ca.hsm_provider_name || '—'} />
+              <CompactField label={t('cas.detail.hsmKey')} value={ca.hsm_key_label || '—'} mono />
+            </>
+          )}
         </CompactGrid>
       </CompactSection>
 
@@ -1330,8 +1602,9 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
       onClose={() => setShowExportModal(false)}
       entityType="ca"
       entityName={ca.name || ca.common_name || ''}
-      hasPrivateKey={!!ca.has_private_key}
-      canExportKey={canWrite('cas')}
+      hasPrivateKey={!!ca.has_private_key && !ca.uses_hsm}
+      canExportKey={canWrite('cas') && !ca.uses_hsm}
+      isHsmBacked={!!ca.uses_hsm}
       onExport={onExport}
     />
     </>

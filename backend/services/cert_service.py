@@ -111,22 +111,19 @@ class CertificateService:
         if not ca:
             raise ValueError(f"CA not found: {caref}")
         
-        if not ca.prv:
+        if not ca.has_private_key:
             raise ValueError("CA has no private key - cannot sign certificates")
         
-        # Load CA certificate and private key
+        # Load CA certificate
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         
-        # Decrypt CA private key if encrypted
+        # Load CA signing key (local or HSM-backed)
+        from services.hsm.ca_key_loader import get_ca_signing_key
         try:
-            ca_prv_decrypted = decrypt_private_key(ca.prv)
-            ca_key_pem = base64.b64decode(ca_prv_decrypted)
-            ca_private_key = serialization.load_pem_private_key(
-                ca_key_pem, password=None, backend=default_backend()
-            )
+            ca_private_key = get_ca_signing_key(ca)
         except Exception as e:
-            raise ValueError(f"Failed to load CA private key: {e}. Check that KEY_ENCRYPTION_KEY is set correctly.")
+            raise ValueError(f"Failed to load CA signing key: {e}")
         
         # Build subject
         subject = TrustStoreService.build_subject(dn)
@@ -392,17 +389,15 @@ class CertificateService:
         if not ca:
             raise ValueError(f"CA not found: {caref}")
         
-        if not ca.prv:
+        if not ca.has_private_key:
             raise ValueError("CA has no private key")
         
         # Load CA cert and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         
-        ca_key_pem = base64.b64decode(decrypt_private_key(ca.prv))
-        ca_private_key = serialization.load_pem_private_key(
-            ca_key_pem, password=None, backend=default_backend()
-        )
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        ca_private_key = get_ca_signing_key(ca)
         
         # Load CSR - handle both raw PEM and base64-encoded PEM
         csr_data = certificate.csr

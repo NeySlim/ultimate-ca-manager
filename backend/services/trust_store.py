@@ -458,12 +458,21 @@ class TrustStoreService:
         # Serialize certificate
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
         
-        # Serialize private key
-        key_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        )
+        # Serialize private key — HSM-backed keys cannot be exported,
+        # callers must detect ``key_pem is None`` and store HSM metadata instead.
+        try:
+            from services.hsm.hsm_private_key import is_hsm_private_key
+        except ImportError:
+            is_hsm_private_key = lambda _k: False  # noqa: E731
+
+        if is_hsm_private_key(private_key):
+            key_pem = None
+        else:
+            key_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
         
         return cert_pem, key_pem
     

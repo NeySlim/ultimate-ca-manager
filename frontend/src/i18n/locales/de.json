@@ -813,7 +813,31 @@
     "policyConstraintsRequire": "Explizite Richtlinie erforderlich",
     "policyConstraintsInhibit": "Richtlinienzuordnung verhindern",
     "inhibitAnyPolicy": "Jede Richtlinie verhindern",
-    "siaUrls": "Subjekt-Informationszugang"
+    "siaUrls": "Subjekt-Informationszugang",
+    "create": {
+      "keyStorage": "Schlüsselspeicher",
+      "keyStorageLocal": "Lokal",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "HSM-Anbieter",
+      "hsmProviderRequired": "HSM-Anbieter auswählen",
+      "hsmNoProviders": "Kein verbundener HSM-Anbieter. Konfigurieren Sie zuerst einen in der HSM-Verwaltung.",
+      "hsmKeyMode": "HSM-Schlüssel",
+      "hsmKeyModeGenerate": "Neuen Schlüssel generieren",
+      "hsmKeyModeExisting": "Vorhandenen Schlüssel verwenden",
+      "hsmKeyLabel": "Schlüsselbezeichnung",
+      "hsmKeyLabelHelp": "Nur Buchstaben, Ziffern, Unterstrich und Bindestrich",
+      "hsmKeyLabelRequired": "Schlüsselbezeichnung ist erforderlich",
+      "hsmKeyLabelInvalid": "Ungültige Schlüsselbezeichnung",
+      "hsmKeyAlgorithm": "HSM-Schlüsselalgorithmus",
+      "hsmExistingKey": "Vorhandener HSM-Schlüssel",
+      "hsmExistingKeyRequired": "HSM-Schlüssel auswählen",
+      "hsmNoUnusedKeys": "Keine ungenutzten Signaturschlüssel auf diesem Anbieter"
+    },
+    "detail": {
+      "hsmBacked": "HSM-gesichert",
+      "hsmKey": "HSM-Schlüssel",
+      "exportBlockedHsm": "HSM-gesicherter Schlüssel kann nicht exportiert werden"
+    }
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",

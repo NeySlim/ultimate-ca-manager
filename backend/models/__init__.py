@@ -541,6 +541,12 @@ class CA(db.Model):
             # Ownership (Pro feature)
             "owner_group_id": self.owner_group_id,
             "owner_group_name": self.owner_group.name if self.owner_group else None,
+            # HSM backing (Issue #77.3)
+            "uses_hsm": self.uses_hsm,
+            "hsm_key_id": self.hsm_key_id,
+            "hsm_provider_id": self.hsm_key.provider_id if self.hsm_key else None,
+            "hsm_provider_name": (self.hsm_key.provider.name if (self.hsm_key and self.hsm_key.provider) else None),
+            "hsm_key_label": self.hsm_key.label if self.hsm_key else None,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }

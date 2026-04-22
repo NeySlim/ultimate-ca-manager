@@ -23,6 +23,16 @@ export default {
           { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
         ]
       },
+      {
+        title: 'CA adossées HSM',
+        items: [
+          { label: 'Stockage de la clé', text: 'Choisissez Local (chiffré en BD) ou HSM lors de la création de la CA' },
+          { label: 'Générer une nouvelle clé', text: 'Créer une nouvelle clé de signature sur le fournisseur HSM sélectionné' },
+          { label: 'Utiliser une clé existante', text: 'Lier la CA à une clé de signature inutilisée déjà présente sur le HSM' },
+          { label: 'Pas d\'export de clé privée', text: 'Les clés adossées HSM ne quittent jamais le HSM — les exports PKCS#12, JKS et clé seule sont désactivés' },
+          { label: 'Prérequis', text: 'Configurer et connecter un fournisseur HSM dans la gestion HSM au préalable' },
+        ]
+      },
     ],
     tips: [
       'Les CA avec une icône de clé (🔑) possèdent une clé privée et peuvent signer des certificats',
@@ -125,6 +135,34 @@ Les certificats existants signés par la CA restent valides.
 > ⚠ Supprimer une CA la retire de UCM mais ne révoque PAS les certificats qu'elle a émis. Révoquez les certificats au préalable si nécessaire.
 
 La suppression est bloquée si la CA a des CA enfants. Supprimez ou réaffectez les enfants d'abord.
+
+## CA adossées HSM
+
+UCM peut stocker la clé de signature d'une CA sur un module matériel de sécurité (HSM) externe au lieu de la base de données chiffrée locale. C'est l'option recommandée pour les CA racines et intermédiaires en production.
+
+### Quand l'utiliser
+- Exigences de conformité (FIPS 140-2/3, eIDAS, Critères communs)
+- Défense en profondeur : les clés ne peuvent pas être exfiltrées même si l'hôte UCM est compromis
+- Gestion centralisée des clés sur plusieurs outils PKI
+
+### Prérequis
+1. Ouvrez **Gestion HSM** et configurez un fournisseur (PKCS#11 / OpenBao / etc.)
+2. Vérifiez que le fournisseur est **Actif** et **Connecté**
+
+### Étape par étape
+1. Ouvrez **Créer une CA**
+2. Renseignez le sujet et la validité comme d'habitude
+3. Dans **Stockage de la clé**, basculez de *Local* à **HSM**
+4. Choisissez le fournisseur HSM
+5. Choisissez un mode de clé :
+   - **Générer une nouvelle clé** — fournissez une étiquette (lettres/chiffres/_/-) et choisissez l'algorithme (RSA-2048/3072/4096 ou EC-P256/P384/P521)
+   - **Utiliser une clé existante** — choisissez une clé de signature inutilisée déjà présente sur le HSM
+6. Validez. UCM crée le certificat de CA et le lie à la clé HSM.
+
+### Limitations
+- Les clés privées adossées HSM **ne peuvent pas être exportées**. Les options d'export PKCS#12, JKS et clé seule sont masquées pour les CA HSM. Seul le certificat (PEM/DER/P7B) peut être exporté.
+- Il n'y a **pas de migration en place** entre Local et HSM. Pour « déplacer » une CA locale existante sur un HSM, créez une nouvelle CA sur le HSM et réémettez les certificats.
+- Les clés existantes proposées dans *Utiliser une clé existante* sont filtrées sur les clés asymétriques de signature non encore liées à une autre CA.
 `
   }
 }

@@ -23,6 +23,16 @@ export default {
           { label: 'Reparo de Cadeia', text: 'Corrigir relações pai-filho quebradas automaticamente' },
         ]
       },
+      {
+        title: 'CAs apoiadas por HSM',
+        items: [
+          { label: 'Armazenamento de chave', text: 'Na criação da CA, escolha Local (criptografado no BD) ou HSM' },
+          { label: 'Gerar nova chave', text: 'Cria uma nova chave de assinatura no provedor HSM selecionado' },
+          { label: 'Usar chave existente', text: 'Vincula a CA a uma chave de assinatura não utilizada já presente no HSM' },
+          { label: 'Sem exportação de chave privada', text: 'As chaves apoiadas por HSM nunca saem do HSM — exportações PKCS#12, JKS e apenas chave estão desativadas' },
+          { label: 'Pré-requisito', text: 'Configure e conecte um provedor HSM em Gerenciamento HSM primeiro' },
+        ]
+      },
     ],
     tips: [
       'CAs com ícone de chave (🔑) possuem chave privada e podem assinar certificados',
@@ -125,6 +135,34 @@ Os certificados existentes assinados pela CA permanecem válidos.
 > ⚠ Excluir uma CA a remove do UCM mas NÃO revoga os certificados que ela emitiu. Revogue os certificados primeiro se necessário.
 
 A exclusão é bloqueada se a CA tiver CAs filhas. Exclua ou reatribua as CAs filhas primeiro.
+
+## CAs apoiadas por HSM
+
+O UCM pode armazenar a chave de assinatura de uma CA em um módulo de segurança de hardware (HSM) externo em vez do banco de dados criptografado local. Esta é a opção recomendada para CAs raiz e intermediárias em produção.
+
+### Quando usar
+- Requisitos de conformidade (FIPS 140-2/3, eIDAS, Common Criteria)
+- Defesa em profundidade: as chaves não podem ser exfiltradas mesmo se o host UCM for comprometido
+- Custódia centralizada de chaves entre várias ferramentas PKI
+
+### Pré-requisitos
+1. Abra **Gerenciamento HSM** e configure um provedor (PKCS#11 / OpenBao / etc.)
+2. Verifique se o provedor está **Ativo** e **Conectado**
+
+### Passo a passo
+1. Abra **Criar CA**
+2. Preencha Subject e validade como de costume
+3. Em **Armazenamento de chave**, mude de *Local* para **HSM**
+4. Escolha o provedor HSM
+5. Escolha um modo de chave:
+   - **Gerar nova chave** — forneça um rótulo (letras/dígitos/_/-) e escolha o algoritmo (RSA-2048/3072/4096 ou EC-P256/P384/P521)
+   - **Usar chave existente** — escolha uma chave de assinatura não utilizada já presente no HSM
+6. Envie. O UCM cria o certificado CA e o vincula à chave HSM.
+
+### Limitações
+- As chaves privadas apoiadas por HSM **não podem ser exportadas**. As opções PKCS#12, JKS e somente-chave ficam ocultas para CAs HSM. Apenas o certificado (PEM/DER/P7B) pode ser exportado.
+- **Não há migração no lugar** entre Local e HSM. Para "mover" uma CA local existente para um HSM, crie uma nova CA no HSM e reemita os certificados.
+- As chaves existentes oferecidas em *Usar chave existente* são filtradas para chaves assimétricas com capacidade de assinatura ainda não vinculadas a outra CA.
 `
   }
 }

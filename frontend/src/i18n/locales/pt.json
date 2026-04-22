@@ -813,7 +813,31 @@
     "policyConstraintsRequire": "Exigir política explícita",
     "policyConstraintsInhibit": "Inibir mapeamento de política",
     "inhibitAnyPolicy": "Inibir qualquer política",
-    "siaUrls": "Acesso à informação do sujeito"
+    "siaUrls": "Acesso à informação do sujeito",
+    "create": {
+      "keyStorage": "Armazenamento de chave",
+      "keyStorageLocal": "Local",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "Provedor HSM",
+      "hsmProviderRequired": "Selecione um provedor HSM",
+      "hsmNoProviders": "Nenhum provedor HSM conectado. Configure um em Gerenciamento HSM primeiro.",
+      "hsmKeyMode": "Chave HSM",
+      "hsmKeyModeGenerate": "Gerar nova chave",
+      "hsmKeyModeExisting": "Usar chave existente",
+      "hsmKeyLabel": "Rótulo da chave",
+      "hsmKeyLabelHelp": "Apenas letras, dígitos, sublinhado e hífen",
+      "hsmKeyLabelRequired": "O rótulo da chave é obrigatório",
+      "hsmKeyLabelInvalid": "Rótulo de chave inválido",
+      "hsmKeyAlgorithm": "Algoritmo de chave HSM",
+      "hsmExistingKey": "Chave HSM existente",
+      "hsmExistingKeyRequired": "Selecione uma chave HSM",
+      "hsmNoUnusedKeys": "Nenhuma chave de assinatura não utilizada neste provedor"
+    },
+    "detail": {
+      "hsmBacked": "Apoiada por HSM",
+      "hsmKey": "Chave HSM",
+      "exportBlockedHsm": "A chave apoiada por HSM não pode ser exportada"
+    }
   },
   "csrs": {
     "uploadCSR": "Carregar CSR",

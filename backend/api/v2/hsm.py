@@ -13,6 +13,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from services.hsm import HsmService
 from services.hsm.base_provider import HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
+from models import db
 from models.hsm import HsmProvider, HsmKey
 from services.audit_service import AuditService
 import logging
@@ -280,8 +281,10 @@ def list_keys():
     
     Query params:
         provider_id: Filter by provider (optional)
+        unused: bool — return only signing keys NOT bound to any CA
     """
     provider_id = request.args.get('provider_id', type=int)
+    unused = request.args.get('unused', '').lower() in ('true', '1', 'yes')
     
     if provider_id:
         provider = HsmService.get_provider(provider_id)
@@ -289,6 +292,18 @@ def list_keys():
             return error_response('Provider not found', 404)
     
     keys = HsmService.list_keys(provider_id=provider_id)
+
+    if unused:
+        # Filter to signing-capable asymmetric keys not yet bound to any CA
+        from models import CA
+        bound_ids = {row[0] for row in db.session.query(CA.hsm_key_id).filter(CA.hsm_key_id.isnot(None)).all()}
+        keys = [
+            k for k in keys
+            if k.get('id') not in bound_ids
+            and k.get('key_type') == 'asymmetric'
+            and k.get('purpose') in ('signing', 'all')
+        ]
+
     return success_response(data=keys)
 
 

@@ -23,6 +23,16 @@ export default {
           { label: 'Kettenreparatur', text: 'Unterbrochene Eltern-Kind-Beziehungen automatisch reparieren' },
         ]
       },
+      {
+        title: 'HSM-gesicherte CAs',
+        items: [
+          { label: 'Schlüsselspeicher', text: 'Bei der CA-Erstellung Lokal (in DB verschlüsselt) oder HSM wählen' },
+          { label: 'Neuen Schlüssel generieren', text: 'Neuen Signaturschlüssel auf dem ausgewählten HSM-Anbieter erstellen' },
+          { label: 'Vorhandenen Schlüssel verwenden', text: 'CA an einen ungenutzten Signaturschlüssel auf dem HSM binden' },
+          { label: 'Kein privater Schlüssel-Export', text: 'HSM-gesicherte Schlüssel verlassen das HSM nicht — PKCS#12-, JKS- und Nur-Schlüssel-Exporte sind deaktiviert' },
+          { label: 'Voraussetzung', text: 'Zuerst einen HSM-Anbieter in der HSM-Verwaltung konfigurieren und verbinden' },
+        ]
+      },
     ],
     tips: [
       'CAs mit einem Schlüsselsymbol (🔑) haben einen privaten Schlüssel und können Zertifikate signieren',
@@ -125,6 +135,34 @@ Vorhandene von der CA signierte Zertifikate bleiben gültig.
 > ⚠ Das Löschen einer CA entfernt sie aus UCM, widerruft aber NICHT die von ihr ausgestellten Zertifikate. Widerrufen Sie Zertifikate bei Bedarf zuerst.
 
 Das Löschen wird blockiert, wenn die CA untergeordnete CAs hat. Löschen oder übertragen Sie untergeordnete CAs zuerst.
+
+## HSM-gesicherte CAs
+
+UCM kann den Signaturschlüssel einer CA auf einem externen Hardware-Sicherheitsmodul anstelle der lokal verschlüsselten Datenbank speichern. Dies ist die empfohlene Option für Produktions-Root- und -Intermediate-CAs.
+
+### Wann verwenden
+- Compliance-Anforderungen (FIPS 140-2/3, eIDAS, Common Criteria)
+- Verteidigung in der Tiefe: Schlüssel können nicht exfiltriert werden, selbst wenn der UCM-Host kompromittiert ist
+- Zentralisierte Schlüsselverwahrung über mehrere PKI-Tools hinweg
+
+### Voraussetzungen
+1. Öffnen Sie **HSM-Verwaltung** und konfigurieren Sie einen Anbieter (PKCS#11 / OpenBao / etc.)
+2. Stellen Sie sicher, dass der Anbieter **Aktiv** und **Verbunden** ist
+
+### Schritt für Schritt
+1. Öffnen Sie **CA erstellen**
+2. Füllen Sie wie üblich Subject und Gültigkeit aus
+3. Wechseln Sie unter **Schlüsselspeicher** von *Lokal* zu **HSM**
+4. Wählen Sie den HSM-Anbieter
+5. Wählen Sie einen Schlüsselmodus:
+   - **Neuen Schlüssel generieren** — Bezeichnung angeben (Buchstaben/Ziffern/_/-) und Algorithmus wählen (RSA-2048/3072/4096 oder EC-P256/P384/P521)
+   - **Vorhandenen Schlüssel verwenden** — einen ungenutzten Signaturschlüssel auf dem HSM auswählen
+6. Absenden. UCM erstellt das CA-Zertifikat und bindet es an den HSM-Schlüssel.
+
+### Einschränkungen
+- HSM-gesicherte private Schlüssel **können nicht exportiert werden**. PKCS#12-, JKS- und Nur-Schlüssel-Exportoptionen werden für HSM-CAs ausgeblendet. Nur das Zertifikat (PEM/DER/P7B) kann exportiert werden.
+- Es gibt **keine In-Place-Migration** zwischen Lokal und HSM. Um eine bestehende lokale CA auf ein HSM zu „verschieben", erstellen Sie eine neue CA auf dem HSM und stellen Sie Zertifikate neu aus.
+- Die in *Vorhandenen Schlüssel verwenden* angebotenen Schlüssel sind auf signaturfähige asymmetrische Schlüssel beschränkt, die noch keiner anderen CA zugeordnet sind.
 `
   }
 }

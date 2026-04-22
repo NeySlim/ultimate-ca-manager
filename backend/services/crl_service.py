@@ -98,14 +98,9 @@ class CRLService:
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
         
-        # Load CA private key (decrypt if encrypted)
-        ca_prv_decrypted = decrypt_private_key(ca.prv)
-        ca_key_pem = base64.b64decode(ca_prv_decrypted).decode('utf-8')
-        ca_private_key = serialization.load_pem_private_key(
-            ca_key_pem.encode(),
-            password=None,
-            backend=default_backend()
-        )
+        # Load CA private key (local or HSM)
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        ca_private_key = get_ca_signing_key(ca)
         
         # Get revoked certificates
         revoked_certs = CRLService.get_revoked_certificates(ca_id)
@@ -365,11 +360,8 @@ class CRLService:
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
         
-        ca_prv_decrypted = decrypt_private_key(ca.prv)
-        ca_key_pem = base64.b64decode(ca_prv_decrypted).decode('utf-8')
-        ca_private_key = serialization.load_pem_private_key(
-            ca_key_pem.encode(), password=None, backend=default_backend()
-        )
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        ca_private_key = get_ca_signing_key(ca)
         
         # Get revocations since base CRL's this_update
         revoked_certs = Certificate.query.filter(
