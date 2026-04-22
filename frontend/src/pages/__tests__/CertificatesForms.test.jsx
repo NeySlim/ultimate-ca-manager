@@ -243,8 +243,8 @@ describe('CA Creation Form — POST /cas/create', () => {
 
   it('HSM provider Select options use String(id)', () => {
     const providers = [
-      { id: 1, name: 'OpenBao', provider_type: 'openbao', is_active: true, is_connected: true },
-      { id: 2, name: 'SoftHSM', provider_type: 'pkcs11', is_active: true, is_connected: true },
+      { id: 1, name: 'OpenBao', provider_type: 'openbao', enabled: true },
+      { id: 2, name: 'SoftHSM', provider_type: 'pkcs11', enabled: true },
     ]
     const options = providers.map(p => ({
       value: p.id.toString(),
@@ -253,15 +253,16 @@ describe('CA Creation Form — POST /cas/create', () => {
     expectValidSelectOptions(options, 'hsmProvider')
   })
 
-  it('HSM provider list filters out inactive/disconnected', () => {
+  it('HSM provider list filters by enabled (= status === connected)', () => {
+    // Backend returns `enabled: status === 'connected'` (see models/hsm.py)
     const providers = [
-      { id: 1, is_active: true, is_connected: true },
-      { id: 2, is_active: false, is_connected: true },
-      { id: 3, is_active: true, is_connected: false },
+      { id: 1, enabled: true },
+      { id: 2, enabled: false },
+      { id: 3, enabled: true },
     ]
-    const filtered = providers.filter(p => p.is_active && p.is_connected)
-    expect(filtered).toHaveLength(1)
-    expect(filtered[0].id).toBe(1)
+    const filtered = providers.filter(p => p.enabled)
+    expect(filtered).toHaveLength(2)
+    expect(filtered.map(p => p.id)).toEqual([1, 3])
   })
 
   it('HSM key algorithm Select options match backend enum', () => {

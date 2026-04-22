@@ -116,7 +116,10 @@ export default function CAsPage() {
       .then(res => {
         if (cancelled) return
         const list = extractData(res) || []
-        setHsmProviders(list.filter(p => p.is_active && p.is_connected))
+        // Backend returns `enabled` (= status === 'connected'). Older drafts
+        // used `is_active`/`is_connected` which don't exist — would filter to []
+        // and show "No connected HSM provider" even when one is configured (#80).
+        setHsmProviders(list.filter(p => p.enabled))
       })
       .catch(() => { if (!cancelled) setHsmProviders([]) })
       .finally(() => { if (!cancelled) setHsmLoading(false) })
