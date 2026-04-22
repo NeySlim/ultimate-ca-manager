@@ -533,7 +533,31 @@
     "policyConstraintsRequire": "Exiger une politique explicite",
     "policyConstraintsInhibit": "Interdire le mappage de politique",
     "inhibitAnyPolicy": "Interdire toute politique",
-    "siaUrls": "Accès aux informations du sujet"
+    "siaUrls": "Accès aux informations du sujet",
+    "create": {
+      "keyStorage": "Stockage de la clé",
+      "keyStorageLocal": "Local",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "Fournisseur HSM",
+      "hsmProviderRequired": "Sélectionnez un fournisseur HSM",
+      "hsmNoProviders": "Aucun fournisseur HSM connecté. Configurez-en un dans la gestion HSM d'abord.",
+      "hsmKeyMode": "Clé HSM",
+      "hsmKeyModeGenerate": "Générer une nouvelle clé",
+      "hsmKeyModeExisting": "Utiliser une clé existante",
+      "hsmKeyLabel": "Étiquette de clé",
+      "hsmKeyLabelHelp": "Lettres, chiffres, soulignement et tiret uniquement",
+      "hsmKeyLabelRequired": "L'étiquette de clé est requise",
+      "hsmKeyLabelInvalid": "Étiquette de clé invalide",
+      "hsmKeyAlgorithm": "Algorithme de clé HSM",
+      "hsmExistingKey": "Clé HSM existante",
+      "hsmExistingKeyRequired": "Sélectionnez une clé HSM",
+      "hsmNoUnusedKeys": "Aucune clé de signature inutilisée sur ce fournisseur"
+    },
+    "detail": {
+      "hsmBacked": "Adossé HSM",
+      "hsmKey": "Clé HSM",
+      "exportBlockedHsm": "La clé adossée HSM ne peut pas être exportée"
+    }
   },
   "certificates": {
     "createCertificate": "Créer un certificat",

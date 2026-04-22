@@ -1,7 +1,7 @@
 /**
  * HSM Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const hsmService = {
   async getProviders() {
@@ -18,6 +18,13 @@ export const hsmService = {
 
   async getKeys(providerId) {
     return apiClient.get(`/hsm/keys?provider_id=${providerId}`)
+  },
+
+  async getSigningKeys({ providerId = null, unused = true } = {}) {
+    const params = {}
+    if (providerId) params.provider_id = providerId
+    if (unused) params.unused = true
+    return apiClient.get(`/hsm/keys${buildQueryString(params)}`)
   },
 
   async deleteProvider(id) {

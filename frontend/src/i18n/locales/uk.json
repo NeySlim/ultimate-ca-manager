@@ -813,7 +813,31 @@
     "policyConstraintsRequire": "Вимагати явну політику",
     "policyConstraintsInhibit": "Заборонити відображення політик",
     "inhibitAnyPolicy": "Заборонити будь-яку політику",
-    "siaUrls": "Доступ до інформації суб'єкта"
+    "siaUrls": "Доступ до інформації суб'єкта",
+    "create": {
+      "keyStorage": "Сховище ключа",
+      "keyStorageLocal": "Локальне",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "Постачальник HSM",
+      "hsmProviderRequired": "Виберіть постачальника HSM",
+      "hsmNoProviders": "Немає підключеного постачальника HSM. Спочатку налаштуйте його в Керуванні HSM.",
+      "hsmKeyMode": "Ключ HSM",
+      "hsmKeyModeGenerate": "Згенерувати новий ключ",
+      "hsmKeyModeExisting": "Використати наявний ключ",
+      "hsmKeyLabel": "Мітка ключа",
+      "hsmKeyLabelHelp": "Лише літери, цифри, підкреслення та дефіс",
+      "hsmKeyLabelRequired": "Мітка ключа обовʼязкова",
+      "hsmKeyLabelInvalid": "Недійсна мітка ключа",
+      "hsmKeyAlgorithm": "Алгоритм ключа HSM",
+      "hsmExistingKey": "Наявний ключ HSM",
+      "hsmExistingKeyRequired": "Виберіть ключ HSM",
+      "hsmNoUnusedKeys": "Немає невикористаних ключів підписання на цьому постачальнику"
+    },
+    "detail": {
+      "hsmBacked": "На основі HSM",
+      "hsmKey": "Ключ HSM",
+      "exportBlockedHsm": "Ключ на основі HSM не можна експортувати"
+    }
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",

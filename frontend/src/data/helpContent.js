@@ -73,6 +73,17 @@ export const helpContent = {
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
         ]
       },
+      {
+        title: 'HSM-backed CAs',
+        icon: Key,
+        items: [
+          { label: 'Key Storage', text: 'Choose Local (encrypted in DB) or HSM at CA creation time' },
+          { label: 'Generate new key', text: 'Create a fresh signing key on the selected HSM provider' },
+          { label: 'Use existing key', text: 'Bind the CA to an unused signing key already on the HSM' },
+          { label: 'No private key export', text: 'HSM-backed keys never leave the HSM — PKCS#12, JKS and key-only exports are disabled' },
+          { label: 'Prerequisite', text: 'Configure and connect an HSM provider in HSM Management first' },
+        ]
+      },
     ],
     tips: [
       'CAs with a key icon (🔑) have a private key and can sign certificates',

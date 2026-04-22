@@ -813,7 +813,31 @@
     "policyConstraintsRequire": "要求显式策略",
     "policyConstraintsInhibit": "禁止策略映射",
     "inhibitAnyPolicy": "禁止任何策略",
-    "siaUrls": "主体信息访问"
+    "siaUrls": "主体信息访问",
+    "create": {
+      "keyStorage": "密钥存储",
+      "keyStorageLocal": "本地",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "HSM 提供商",
+      "hsmProviderRequired": "选择 HSM 提供商",
+      "hsmNoProviders": "没有已连接的 HSM 提供商。请先在 HSM 管理中配置。",
+      "hsmKeyMode": "HSM 密钥",
+      "hsmKeyModeGenerate": "生成新密钥",
+      "hsmKeyModeExisting": "使用现有密钥",
+      "hsmKeyLabel": "密钥标签",
+      "hsmKeyLabelHelp": "仅允许字母、数字、下划线和短划线",
+      "hsmKeyLabelRequired": "需要密钥标签",
+      "hsmKeyLabelInvalid": "密钥标签无效",
+      "hsmKeyAlgorithm": "HSM 密钥算法",
+      "hsmExistingKey": "现有 HSM 密钥",
+      "hsmExistingKeyRequired": "选择 HSM 密钥",
+      "hsmNoUnusedKeys": "此提供商上没有未使用的签名密钥"
+    },
+    "detail": {
+      "hsmBacked": "HSM 支持",
+      "hsmKey": "HSM 密钥",
+      "exportBlockedHsm": "无法导出由 HSM 支持的密钥"
+    }
   },
   "csrs": {
     "uploadCSR": "上传CSR",

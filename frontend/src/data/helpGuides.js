@@ -166,6 +166,34 @@ Existing certificates signed by the CA remain valid.
 > ⚠ Deleting a CA removes it from UCM but does NOT revoke certificates it has issued. Revoke certificates first if needed.
 
 Deletion is blocked if the CA has child CAs. Delete or re-parent children first.
+
+## HSM-backed CAs
+
+UCM can store a CA's signing key on an external Hardware Security Module instead of the local encrypted database. This is the recommended option for production Root and Intermediate CAs.
+
+### When to use
+- Compliance requirements (FIPS 140-2/3, eIDAS, Common Criteria)
+- Defense-in-depth: keys cannot be exfiltrated even if the UCM host is compromised
+- Centralized key custody across multiple PKI tools
+
+### Prerequisites
+1. Open **HSM Management** and configure a provider (PKCS#11 / OpenBao / etc.)
+2. Verify the provider is **Active** and **Connected**
+
+### Step by step
+1. Open **Create CA**
+2. Fill in the Subject and validity as usual
+3. In **Key Storage**, switch from *Local* to **HSM**
+4. Pick the HSM provider
+5. Choose a key mode:
+   - **Generate new key** — provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521)
+   - **Use existing key** — pick an unused signing key already present on the HSM
+6. Submit. UCM creates the CA certificate and binds it to the HSM key.
+
+### Limitations
+- HSM-backed private keys **cannot be exported**. PKCS#12, JKS and key-only export options are hidden for HSM CAs. Only the certificate (PEM/DER/P7B) can be exported.
+- There is **no in-place migration** between Local and HSM. To "move" an existing local CA onto an HSM, create a new CA on the HSM and re-issue certificates.
+- Existing keys offered in *Use existing key* are filtered to signing-capable asymmetric keys not yet bound to another CA.
 `
   },
 

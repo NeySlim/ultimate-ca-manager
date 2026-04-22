@@ -52,6 +52,10 @@ class CAService:
         policy_constraints_inhibit: Optional[int] = None,
         inhibit_any_policy: Optional[int] = None,
         sia_urls: Optional[list] = None,
+        hsm_provider_id: Optional[int] = None,
+        hsm_key_id: Optional[int] = None,
+        hsm_key_label: Optional[str] = None,
+        hsm_key_algorithm: Optional[str] = None,
     ) -> CA:
         """
         Create an internal Certificate Authority
@@ -59,21 +63,68 @@ class CAService:
         Args:
             descr: Description
             dn: Distinguished Name components (CN, O, OU, C, ST, L, email)
-            key_type: Key type
+            key_type: Key type (used only for local-key CAs)
             validity_days: Validity in days
             digest: Hash algorithm
             caref: Parent CA refid (for intermediate CA)
             ocsp_uri: Optional OCSP URI
             username: User creating the CA
+            hsm_key_id: Bind CA to an existing HSM key (mutually exclusive
+                with hsm_provider_id+hsm_key_label).
+            hsm_provider_id: Generate a new HSM key on this provider.
+            hsm_key_label: Label for the new HSM key.
+            hsm_key_algorithm: Algorithm for the new HSM key
+                (e.g. ``RSA-2048``, ``EC-P256``).
             
         Returns:
             CA model instance
         """
+        # ------------------------------------------------------------------
+        # Resolve signing key — local generation, existing HSM key,
+        # or freshly generated HSM key.
+        # ------------------------------------------------------------------
+        use_hsm = bool(hsm_key_id) or bool(hsm_provider_id)
+        hsm_key = None  # HsmKey model, populated when use_hsm
+
+        if hsm_key_id and (hsm_provider_id or hsm_key_label or hsm_key_algorithm):
+            raise ValueError(
+                "Provide either hsm_key_id (existing key) OR "
+                "hsm_provider_id+hsm_key_label+hsm_key_algorithm (generate new)"
+            )
+
+        if use_hsm:
+            from services.hsm import HsmService
+            from services.hsm.hsm_private_key import load_hsm_private_key
+            from models.hsm import HsmKey
+
+            if hsm_key_id:
+                hsm_key = HsmKey.query.get(hsm_key_id)
+                if not hsm_key:
+                    raise ValueError(f"HSM key {hsm_key_id} not found")
+                if CA.query.filter_by(hsm_key_id=hsm_key.id).first():
+                    raise ValueError(
+                        f"HSM key {hsm_key.label} is already bound to another CA"
+                    )
+            else:
+                if not (hsm_provider_id and hsm_key_label and hsm_key_algorithm):
+                    raise ValueError(
+                        "hsm_provider_id, hsm_key_label and hsm_key_algorithm "
+                        "are all required to generate a new HSM key"
+                    )
+                hsm_key = HsmService.generate_key(
+                    provider_id=hsm_provider_id,
+                    label=hsm_key_label,
+                    algorithm=hsm_key_algorithm,
+                    purpose='signing',
+                )
+
+            private_key = load_hsm_private_key(hsm_key.id)
+        else:
+            # Local key generation (existing path)
+            private_key = TrustStoreService.generate_private_key(key_type)
+
         # Build subject
         subject = TrustStoreService.build_subject(dn)
-        
-        # Generate private key
-        private_key = TrustStoreService.generate_private_key(key_type)
         
         # Get parent CA if intermediate
         issuer = None
@@ -94,14 +145,11 @@ class CAService:
             )
             issuer = parent_cert.subject
             
-            # Load parent CA private key (decrypt if encrypted)
-            if not parent_ca.prv:
+            # Load parent CA signing key — supports HSM-backed parent CAs
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            if not parent_ca.has_private_key:
                 raise ValueError("Parent CA has no private key")
-            parent_prv_decrypted = decrypt_private_key(parent_ca.prv)
-            parent_key_pem = base64.b64decode(parent_prv_decrypted)
-            issuer_private_key = serialization.load_pem_private_key(
-                parent_key_pem, password=None, backend=default_backend()
-            )
+            issuer_private_key = get_ca_signing_key(parent_ca)
             
             # Increment parent CA serial
             parent_ca.serial = (parent_ca.serial or 0) + 1
@@ -139,14 +187,17 @@ class CAService:
         # Parse certificate for details
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
         
-        # Encrypt private key if encryption is enabled
-        prv_encoded = base64.b64encode(key_pem).decode('utf-8')
-        try:
-            from security.encryption import key_encryption
-            if key_encryption.is_enabled:
-                prv_encoded = key_encryption.encrypt(prv_encoded)
-        except ImportError:
-            pass  # Security module not available
+        # Encrypt private key if encryption is enabled (local keys only).
+        # HSM CAs have key_pem == None — no on-disk private key material.
+        prv_encoded = None
+        if key_pem is not None:
+            prv_encoded = base64.b64encode(key_pem).decode('utf-8')
+            try:
+                from security.encryption import key_encryption
+                if key_encryption.is_enabled:
+                    prv_encoded = key_encryption.encrypt(prv_encoded)
+            except ImportError:
+                pass  # Security module not available
         
         # Extract SKI from generated cert
         from cryptography.x509.oid import ExtensionOID
@@ -176,6 +227,7 @@ class CAService:
             policy_constraints_require=policy_constraints_require,
             policy_constraints_inhibit=policy_constraints_inhibit,
             inhibit_any_policy=inhibit_any_policy,
+            hsm_key_id=hsm_key.id if hsm_key else None,
         )
         # Store JSON-serialized constraints
         if name_constraints_permitted:
@@ -187,7 +239,12 @@ class CAService:
             ca.set_sia_urls(sia_urls)
         
         db.session.add(ca)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to persist CA: {e}")
+            raise
         
         # Auto-enable CDP if protocol base URL is configured
         try:
@@ -202,18 +259,20 @@ class CAService:
         
         # Audit log
         from services.audit_service import AuditService
-        AuditService.log_ca('ca_created', ca, f'Created CA: {descr}')
+        hsm_note = f' (HSM key: {hsm_key.label})' if hsm_key else ''
+        AuditService.log_ca('ca_created', ca, f'Created CA: {descr}{hsm_note}')
         
         # Save certificate to file
         cert_path = ca_cert_path(ca)
         with open(cert_path, 'wb') as f:
             f.write(cert_pem)
         
-        # Save private key to file
-        key_path = ca_key_path(ca)
-        with open(key_path, 'wb') as f:
-            f.write(key_pem)
-        key_path.chmod(0o600)
+        # Save private key to file (skipped for HSM-backed CAs)
+        if key_pem is not None:
+            key_path = ca_key_path(ca)
+            with open(key_path, 'wb') as f:
+                f.write(key_pem)
+            key_path.chmod(0o600)
         
         return ca
     

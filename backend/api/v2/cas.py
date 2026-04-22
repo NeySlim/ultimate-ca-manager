@@ -154,13 +154,38 @@ def create_ca():
         elif data.get('keyAlgo') == 'ECDSA':
             key_type = data.get('keySize') or 'prime256v1'
         
+        # ----- HSM key selection (Issue #77.3) -----
+        hsm_provider_id = data.get('hsm_provider_id') or data.get('hsmProviderId')
+        hsm_key_id = data.get('hsm_key_id') or data.get('hsmKeyId')
+        hsm_key_label = data.get('hsm_key_label') or data.get('hsmKeyLabel')
+        hsm_key_algorithm = data.get('hsm_key_algorithm') or data.get('hsmKeyAlgorithm')
+
+        # Mutually exclusive: local vs existing-HSM-key vs new-HSM-key
+        modes = []
+        if hsm_key_id:
+            modes.append('existing-hsm-key')
+        if hsm_provider_id and hsm_key_label and hsm_key_algorithm:
+            modes.append('new-hsm-key')
+        if (hsm_provider_id or hsm_key_label or hsm_key_algorithm) and 'new-hsm-key' not in modes and not hsm_key_id:
+            return error_response(
+                'To generate a new HSM key, hsm_provider_id, hsm_key_label '
+                'and hsm_key_algorithm are all required',
+                400,
+            )
+        if len(modes) > 1:
+            return error_response(
+                'Provide either hsm_key_id (existing) OR '
+                'hsm_provider_id+hsm_key_label+hsm_key_algorithm (new), not both',
+                400,
+            )
+
         # Resolve parent CA for intermediate CAs
         caref = None
         if data.get('type') == 'intermediate' and data.get('parentCAId'):
             parent_ca = CA.query.get(int(data['parentCAId']))
             if not parent_ca:
                 return error_response('Parent CA not found', 400)
-            if not parent_ca.prv:
+            if not parent_ca.has_private_key:
                 return error_response('Parent CA has no private key', 400)
             # Check parent CA is not expired
             from cryptography import x509 as crypto_x509
@@ -188,6 +213,10 @@ def create_ca():
             policy_constraints_inhibit=data.get('policyConstraintsInhibit'),
             inhibit_any_policy=data.get('inhibitAnyPolicy'),
             sia_urls=data.get('siaUrls'),
+            hsm_provider_id=int(hsm_provider_id) if hsm_provider_id else None,
+            hsm_key_id=int(hsm_key_id) if hsm_key_id else None,
+            hsm_key_label=hsm_key_label,
+            hsm_key_algorithm=hsm_key_algorithm,
         )
         
         # Send notification for CA creation
@@ -211,6 +240,10 @@ def create_ca():
             data=ca.to_dict(),
             message='CA created successfully'
         )
+    except ValueError as e:
+        # Validation errors (HSM key conflicts, missing fields, etc.) — surface to user
+        logger.info(f"CA creation validation error: {e}")
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"Failed to create CA: {e}")
         return error_response("Failed to create CA", 500)
@@ -671,6 +704,9 @@ def export_ca(ca_id):
     if include_key or export_format in ('pkcs12', 'pfx', 'key', 'jks'):
         if not has_permission('write:cas', g.permissions):
             return error_response('Private key export requires write:cas permission', 403)
+        # HSM-backed CAs cannot export their private key — it never leaves the HSM
+        if ca.uses_hsm:
+            return error_response('Cannot export HSM-backed key', 409)
     
     try:
         cert_pem = base64.b64decode(ca.crt)

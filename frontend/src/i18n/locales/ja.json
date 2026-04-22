@@ -813,7 +813,31 @@
     "policyConstraintsRequire": "明示的ポリシー必須",
     "policyConstraintsInhibit": "ポリシーマッピング禁止",
     "inhibitAnyPolicy": "任意ポリシー禁止",
-    "siaUrls": "サブジェクト情報アクセス"
+    "siaUrls": "サブジェクト情報アクセス",
+    "create": {
+      "keyStorage": "鍵の保存先",
+      "keyStorageLocal": "ローカル",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "HSM プロバイダー",
+      "hsmProviderRequired": "HSM プロバイダーを選択してください",
+      "hsmNoProviders": "接続済みの HSM プロバイダーがありません。先に HSM 管理で設定してください。",
+      "hsmKeyMode": "HSM 鍵",
+      "hsmKeyModeGenerate": "新しい鍵を生成",
+      "hsmKeyModeExisting": "既存の鍵を使用",
+      "hsmKeyLabel": "鍵ラベル",
+      "hsmKeyLabelHelp": "英数字、アンダースコア、ハイフンのみ",
+      "hsmKeyLabelRequired": "鍵ラベルは必須です",
+      "hsmKeyLabelInvalid": "無効な鍵ラベルです",
+      "hsmKeyAlgorithm": "HSM 鍵アルゴリズム",
+      "hsmExistingKey": "既存の HSM 鍵",
+      "hsmExistingKeyRequired": "HSM 鍵を選択してください",
+      "hsmNoUnusedKeys": "このプロバイダーに未使用の署名鍵はありません"
+    },
+    "detail": {
+      "hsmBacked": "HSM バック",
+      "hsmKey": "HSM 鍵",
+      "exportBlockedHsm": "HSM バックの鍵はエクスポートできません"
+    }
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

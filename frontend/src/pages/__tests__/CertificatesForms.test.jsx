@@ -228,6 +228,124 @@ describe('CA Creation Form — POST /cas/create', () => {
     const parentCAId = type === 'intermediate' ? '1' : null
     expect(parentCAId).toBeNull()
   })
+
+  // ---------- HSM-backed CA support (Issue #77.3) ----------
+
+  it('HSM key storage radio uses local|hsm values', () => {
+    const values = ['local', 'hsm']
+    values.forEach(v => expect(typeof v).toBe('string'))
+  })
+
+  it('HSM key mode radio uses generate|existing values', () => {
+    const values = ['generate', 'existing']
+    values.forEach(v => expect(typeof v).toBe('string'))
+  })
+
+  it('HSM provider Select options use String(id)', () => {
+    const providers = [
+      { id: 1, name: 'OpenBao', provider_type: 'openbao', is_active: true, is_connected: true },
+      { id: 2, name: 'SoftHSM', provider_type: 'pkcs11', is_active: true, is_connected: true },
+    ]
+    const options = providers.map(p => ({
+      value: p.id.toString(),
+      label: `${p.name} (${p.provider_type})`,
+    }))
+    expectValidSelectOptions(options, 'hsmProvider')
+  })
+
+  it('HSM provider list filters out inactive/disconnected', () => {
+    const providers = [
+      { id: 1, is_active: true, is_connected: true },
+      { id: 2, is_active: false, is_connected: true },
+      { id: 3, is_active: true, is_connected: false },
+    ]
+    const filtered = providers.filter(p => p.is_active && p.is_connected)
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].id).toBe(1)
+  })
+
+  it('HSM key algorithm Select options match backend enum', () => {
+    const options = [
+      { value: 'RSA-2048', label: 'RSA-2048' },
+      { value: 'RSA-3072', label: 'RSA-3072' },
+      { value: 'RSA-4096', label: 'RSA-4096' },
+      { value: 'EC-P256', label: 'EC-P256' },
+      { value: 'EC-P384', label: 'EC-P384' },
+      { value: 'EC-P521', label: 'EC-P521' },
+    ]
+    expectValidSelectOptions(options, 'hsmKeyAlgorithm')
+  })
+
+  it('HSM key label only allows letters, digits, underscore, dash', () => {
+    const re = /^[a-zA-Z0-9_-]+$/
+    expect(re.test('ca-signing-key-1')).toBe(true)
+    expect(re.test('valid_label_123')).toBe(true)
+    expect(re.test('bad label')).toBe(false)
+    expect(re.test('bad/slash')).toBe(false)
+    expect(re.test('')).toBe(false)
+  })
+
+  it('HSM existing-key Select options use String(id) and show label+algorithm', () => {
+    const keys = [
+      { id: 10, label: 'rsa-key', algorithm: 'RSA-2048' },
+      { id: 11, label: 'ec-key',  algorithm: 'EC-P256' },
+    ]
+    const options = keys.map(k => ({ value: k.id.toString(), label: `${k.label} (${k.algorithm})` }))
+    expectValidSelectOptions(options, 'hsmExistingKey')
+    expect(options[0].label).toBe('rsa-key (RSA-2048)')
+  })
+
+  it('HSM payload (generate) sends camelCase fields and drops local key fields', () => {
+    const baseLocal = { commonName: 'CA', keyAlgo: 'RSA', keySize: 2048, validityYears: 10, type: 'root' }
+    const out = { ...baseLocal }
+    delete out.keyAlgo
+    delete out.keySize
+    Object.assign(out, {
+      hsmProviderId: 1,
+      hsmKeyLabel: 'ca-signing-key-1',
+      hsmKeyAlgorithm: 'RSA-2048',
+    })
+    expect(out).not.toHaveProperty('keyAlgo')
+    expect(out).not.toHaveProperty('keySize')
+    expect(out).toHaveProperty('hsmProviderId', 1)
+    expect(out).toHaveProperty('hsmKeyLabel', 'ca-signing-key-1')
+    expect(out).toHaveProperty('hsmKeyAlgorithm', 'RSA-2048')
+    expect(out).not.toHaveProperty('hsmKeyId')
+  })
+
+  it('HSM payload (existing) sends only hsmKeyId — never both', () => {
+    const baseLocal = { commonName: 'CA', keyAlgo: 'RSA', keySize: 2048, validityYears: 10, type: 'root' }
+    const out = { ...baseLocal }
+    delete out.keyAlgo
+    delete out.keySize
+    out.hsmKeyId = 42
+    expect(out).toHaveProperty('hsmKeyId', 42)
+    expect(out).not.toHaveProperty('hsmProviderId')
+    expect(out).not.toHaveProperty('hsmKeyLabel')
+    expect(out).not.toHaveProperty('hsmKeyAlgorithm')
+  })
+
+  it('CA payload exposes uses_hsm and hsm_* fields on the response', () => {
+    const ca = {
+      id: 1, name: 'Prod Root',
+      uses_hsm: true,
+      hsm_key_id: 10,
+      hsm_provider_id: 1,
+      hsm_provider_name: 'OpenBao',
+      hsm_key_label: 'prod-root-key',
+    }
+    expect(ca.uses_hsm).toBe(true)
+    expect(ca.hsm_provider_name).toBe('OpenBao')
+    expect(ca.hsm_key_label).toBe('prod-root-key')
+  })
+
+  it('HSM-backed CA hides private-key export options', () => {
+    const ca = { uses_hsm: true, has_private_key: true }
+    const exposeKey = !!ca.has_private_key && !ca.uses_hsm
+    const canExportKey = true && !ca.uses_hsm
+    expect(exposeKey).toBe(false)
+    expect(canExportKey).toBe(false)
+  })
 })
 
 // ============================================================

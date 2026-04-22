@@ -23,6 +23,16 @@ export default {
           { label: 'Ripara catena', text: 'Correggi automaticamente le relazioni padre-figlio interrotte' },
         ]
       },
+      {
+        title: 'CA supportate da HSM',
+        items: [
+          { label: 'Archiviazione chiave', text: 'Alla creazione della CA scegli Locale (cifrato in DB) o HSM' },
+          { label: 'Genera nuova chiave', text: 'Crea una nuova chiave di firma sul provider HSM selezionato' },
+          { label: 'Usa chiave esistente', text: 'Collega la CA a una chiave di firma inutilizzata già presente sull\'HSM' },
+          { label: 'Nessuna esportazione chiave privata', text: 'Le chiavi supportate da HSM non lasciano mai l\'HSM — le esportazioni PKCS#12, JKS e solo-chiave sono disabilitate' },
+          { label: 'Prerequisito', text: 'Prima configura e collega un provider HSM in Gestione HSM' },
+        ]
+      },
     ],
     tips: [
       'Le CA con l\'icona della chiave (🔑) hanno una chiave privata e possono firmare certificati',
@@ -125,6 +135,34 @@ I certificati esistenti firmati dalla CA rimangono validi.
 > ⚠ L'eliminazione di una CA la rimuove da UCM ma NON revoca i certificati che ha emesso. Revoca prima i certificati se necessario.
 
 L'eliminazione è bloccata se la CA ha CA figlie. Elimina o riassegna le figlie prima.
+
+## CA supportate da HSM
+
+UCM può memorizzare la chiave di firma di una CA su un modulo di sicurezza hardware (HSM) esterno anziché nel database cifrato locale. È l'opzione consigliata per le CA radice e intermedie in produzione.
+
+### Quando usarlo
+- Requisiti di conformità (FIPS 140-2/3, eIDAS, Common Criteria)
+- Difesa in profondità: le chiavi non possono essere esfiltrate anche se l'host UCM è compromesso
+- Custodia centralizzata delle chiavi tra più strumenti PKI
+
+### Prerequisiti
+1. Apri **Gestione HSM** e configura un provider (PKCS#11 / OpenBao / ecc.)
+2. Verifica che il provider sia **Attivo** e **Connesso**
+
+### Passo per passo
+1. Apri **Crea CA**
+2. Compila Subject e validità come al solito
+3. In **Archiviazione chiave**, passa da *Locale* a **HSM**
+4. Scegli il provider HSM
+5. Scegli una modalità chiave:
+   - **Genera nuova chiave** — fornisci un'etichetta (lettere/cifre/_/-) e scegli l'algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521)
+   - **Usa chiave esistente** — scegli una chiave di firma inutilizzata già presente sull'HSM
+6. Invia. UCM crea il certificato CA e lo collega alla chiave HSM.
+
+### Limitazioni
+- Le chiavi private supportate da HSM **non possono essere esportate**. Le opzioni di esportazione PKCS#12, JKS e solo-chiave sono nascoste per le CA HSM. Può essere esportato solo il certificato (PEM/DER/P7B).
+- **Non esiste migrazione in loco** tra Locale e HSM. Per «spostare» una CA locale esistente su un HSM, crea una nuova CA sull'HSM e riemetti i certificati.
+- Le chiavi esistenti offerte in *Usa chiave esistente* sono filtrate a chiavi asimmetriche di firma non ancora collegate ad altre CA.
 `
   }
 }

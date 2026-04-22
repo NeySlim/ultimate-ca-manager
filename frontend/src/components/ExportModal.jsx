@@ -38,6 +38,7 @@ export function ExportModal({
   entityName = '',
   hasPrivateKey = false,
   canExportKey = false,
+  isHsmBacked = false,
   onExport,
 }) {
   const { t } = useTranslation()
@@ -192,6 +193,14 @@ export function ExportModal({
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary text-xs text-text-tertiary">
               <Lock size={14} className="shrink-0" />
               {t('export.noKeyPermission', 'Private key export requires elevated permissions')}
+            </div>
+          )}
+
+          {/* HSM-backed key notice */}
+          {isHsmBacked && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary text-xs text-text-tertiary">
+              <Lock size={14} className="shrink-0" />
+              {t('cas.detail.exportBlockedHsm', 'HSM-backed key cannot be exported')}
             </div>
           )}
         </div>

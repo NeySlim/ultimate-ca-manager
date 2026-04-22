@@ -813,7 +813,31 @@
     "policyConstraintsRequire": "Require Explicit Policy",
     "policyConstraintsInhibit": "Inhibit Policy Mapping",
     "inhibitAnyPolicy": "Inhibit Any Policy",
-    "siaUrls": "Subject Information Access"
+    "siaUrls": "Subject Information Access",
+    "create": {
+      "keyStorage": "Key Storage",
+      "keyStorageLocal": "Local",
+      "keyStorageHsm": "HSM",
+      "hsmProvider": "HSM Provider",
+      "hsmProviderRequired": "Select an HSM provider",
+      "hsmNoProviders": "No connected HSM provider. Configure one in HSM Management first.",
+      "hsmKeyMode": "HSM Key",
+      "hsmKeyModeGenerate": "Generate new key",
+      "hsmKeyModeExisting": "Use existing key",
+      "hsmKeyLabel": "Key label",
+      "hsmKeyLabelHelp": "Letters, digits, underscore and dash only",
+      "hsmKeyLabelRequired": "Key label is required",
+      "hsmKeyLabelInvalid": "Invalid key label",
+      "hsmKeyAlgorithm": "HSM Key Algorithm",
+      "hsmExistingKey": "Existing HSM Key",
+      "hsmExistingKeyRequired": "Select an HSM key",
+      "hsmNoUnusedKeys": "No unused signing keys on this provider"
+    },
+    "detail": {
+      "hsmBacked": "HSM-backed",
+      "hsmKey": "HSM Key",
+      "exportBlockedHsm": "HSM-backed key cannot be exported"
+    }
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
