@@ -12,6 +12,7 @@ export default {
           { label: 'Estado', text: 'Activar o desactivar cuentas de usuario' },
           { label: 'Restablecer contraseña', text: 'Restablecer la contraseña de un usuario (acción de administrador)' },
           { label: 'Claves API', text: 'Administrar claves API por usuario para acceso programático' },
+          { label: 'Origen', text: 'Muestra el origen de cada usuario: Local (gestionado en UCM) o LDAP / OAuth2 / SAML (provisionado por un proveedor SSO). La insignia muestra el nombre del proveedor de origen.' },
         ]
       },
       {
@@ -90,6 +91,14 @@ Los permisos efectivos de un usuario son la **unión** de:
 Cree roles con permisos granulares en la página **RBAC**.
 
 > 💡 Use grupos para gestionar permisos de equipos en lugar de asignar roles a usuarios individuales.
+
+## Origen de autenticación
+
+La columna **Origen** indica de dónde proviene cada usuario:
+- **Local** — creado y gestionado en UCM (contraseña local)
+- **LDAP / OAuth2 / SAML** — provisionado automáticamente en el primer inicio de sesión SSO; el nombre del proveedor de origen aparece en la insignia (p. ej. \`LDAP · Corporate AD\`).
+
+Desde v2.133, los roles modificados manualmente en UCM para usuarios SSO se **conservan** entre inicios de sesión, salvo que **«Sincronizar rol en cada inicio de sesión»** esté activado en el proveedor (ver **Configuración → SSO**).
 `
   }
 }

@@ -545,6 +545,7 @@ export const helpContent = {
           { label: 'Status', text: 'Enable or disable user accounts' },
           { label: 'Password Reset', text: 'Reset a user\'s password (admin action)' },
           { label: 'API Keys', text: 'Manage per-user API keys for programmatic access' },
+          { label: 'Source', text: 'Shows where each user comes from: Local (managed in UCM) or LDAP / OAuth2 / SAML (provisioned by an SSO provider). The badge displays the originating provider name.' },
         ]
       },
       {

@@ -12,6 +12,7 @@ export default {
           { label: 'Stato', text: 'Abilita o disabilita gli account utente' },
           { label: 'Reset password', text: 'Reimposta la password di un utente (azione amministratore)' },
           { label: 'Chiavi API', text: 'Gestisci le chiavi API per utente per l\'accesso programmatico' },
+          { label: 'Origine', text: 'Mostra la provenienza di ogni utente: Locale (gestito in UCM) oppure LDAP / OAuth2 / SAML (provvisto da un provider SSO). Il badge mostra il nome del provider di origine.' },
         ]
       },
       {
@@ -90,6 +91,14 @@ I permessi effettivi di un utente sono l'**unione** di:
 Crea ruoli con permessi granulari nella pagina **RBAC**.
 
 > 💡 Usa i gruppi per gestire i permessi dei team piuttosto che assegnare ruoli ai singoli utenti.
+
+## Origine di autenticazione
+
+La colonna **Origine** indica la provenienza di ogni utente:
+- **Locale** — creato e gestito in UCM (password locale)
+- **LDAP / OAuth2 / SAML** — provvisto automaticamente al primo accesso SSO; il nome del provider di origine appare sul badge (es. \`LDAP · Corporate AD\`).
+
+Dalla v2.133 i ruoli modificati manualmente in UCM per utenti SSO vengono **conservati** tra un accesso e l'altro, a meno che **«Sincronizza ruolo a ogni accesso»** non sia attivato sul provider (vedere **Impostazioni → SSO**).
 `
   }
 }

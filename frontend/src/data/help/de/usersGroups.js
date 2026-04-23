@@ -12,6 +12,7 @@ export default {
           { label: 'Status', text: 'Benutzerkonten aktivieren oder deaktivieren' },
           { label: 'Passwort zurücksetzen', text: 'Passwort eines Benutzers zurücksetzen (Admin-Aktion)' },
           { label: 'API-Schlüssel', text: 'Pro-Benutzer-API-Schlüssel für programmatischen Zugriff verwalten' },
+          { label: 'Quelle', text: 'Zeigt die Herkunft jedes Benutzers: Lokal (in UCM verwaltet) oder LDAP / OAuth2 / SAML (von einem SSO-Anbieter bereitgestellt). Das Badge zeigt den Namen des ursprünglichen Anbieters.' },
         ]
       },
       {
@@ -90,6 +91,14 @@ Die effektiven Berechtigungen eines Benutzers sind die **Vereinigung** von:
 Erstellen Sie Rollen mit granularen Berechtigungen auf der **RBAC**-Seite.
 
 > 💡 Verwenden Sie Gruppen zur Verwaltung von Team-Berechtigungen anstelle der Zuweisung von Rollen an einzelne Benutzer.
+
+## Authentifizierungsquelle
+
+Die Spalte **Quelle** zeigt die Herkunft jedes Benutzers:
+- **Lokal** — in UCM erstellt und verwaltet (lokales Passwort)
+- **LDAP / OAuth2 / SAML** — automatisch beim ersten SSO-Login bereitgestellt; der Name des ursprünglichen Anbieters erscheint auf dem Badge (z. B. \`LDAP · Corporate AD\`).
+
+Seit v2.133 bleiben manuell in UCM geänderte Rollen für SSO-Benutzer zwischen den Logins **erhalten**, sofern nicht **„Rolle bei jedem Login synchronisieren"** auf dem Anbieter aktiviert ist (siehe **Einstellungen → SSO**).
 `
   }
 }

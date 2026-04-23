@@ -1277,6 +1277,14 @@ A user's effective permissions are the **union** of:
 Create roles with granular permissions on the **RBAC** page.
 
 > 💡 Use groups to manage team permissions rather than assigning roles to individual users.
+
+## Authentication Source
+
+The **Source** column shows where each user comes from:
+- **Local** — created and managed in UCM (local password)
+- **LDAP / OAuth2 / SAML** — auto-provisioned on first SSO login. The originating provider name is shown on the badge (e.g. \`LDAP · Corporate AD\`).
+
+Since v2.133, roles changed manually in UCM for SSO users are **preserved** between logins, unless **"Sync role on every login"** is enabled on the provider (see **Settings → SSO**).
 `
   },
 

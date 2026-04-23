@@ -12,6 +12,7 @@ export default {
           { label: 'Status', text: 'Ativar ou desativar contas de usuário' },
           { label: 'Redefinir Senha', text: 'Redefinir a senha de um usuário (ação de administrador)' },
           { label: 'Chaves de API', text: 'Gerenciar chaves de API por usuário para acesso programático' },
+          { label: 'Origem', text: 'Mostra a origem de cada utilizador: Local (gerido no UCM) ou LDAP / OAuth2 / SAML (provisionado por um fornecedor SSO). O selo apresenta o nome do fornecedor de origem.' },
         ]
       },
       {
@@ -90,6 +91,14 @@ As permissões efetivas de um usuário são a **união** de:
 Crie funções com permissões granulares na página **RBAC**.
 
 > 💡 Use grupos para gerenciar permissões de equipes em vez de atribuir funções a usuários individuais.
+
+## Origem de autenticação
+
+A coluna **Origem** indica a proveniência de cada utilizador:
+- **Local** — criado e gerido no UCM (palavra-passe local)
+- **LDAP / OAuth2 / SAML** — provisionado automaticamente no primeiro início de sessão SSO; o nome do fornecedor de origem aparece no selo (ex.: \`LDAP · Corporate AD\`).
+
+Desde a v2.133, os papéis alterados manualmente no UCM para utilizadores SSO são **preservados** entre sessões, exceto se **«Sincronizar papel em cada início de sessão»** estiver ativo no fornecedor (ver **Definições → SSO**).
 `
   }
 }

@@ -12,6 +12,7 @@ export default {
           { label: 'Statut', text: 'Activer ou désactiver les comptes utilisateurs' },
           { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur)' },
           { label: 'Clés API', text: 'Gérer les clés API par utilisateur pour l\'accès programmatique' },
+          { label: 'Source', text: 'Indique l\'origine de chaque utilisateur : Local (géré dans UCM) ou LDAP / OAuth2 / SAML (provisionné par un fournisseur SSO). Le badge affiche le nom du fournisseur d\'origine.' },
         ]
       },
       {
@@ -90,6 +91,14 @@ Les permissions effectives d'un utilisateur sont l'**union** de :
 Créez des rôles avec des permissions granulaires sur la page **RBAC**.
 
 > 💡 Utilisez les groupes pour gérer les permissions d'équipe plutôt que d'attribuer des rôles à des utilisateurs individuels.
+
+## Source d'authentification
+
+La colonne **Source** indique d'où provient chaque utilisateur :
+- **Local** — créé et géré dans UCM (mot de passe local)
+- **LDAP / OAuth2 / SAML** — provisionné automatiquement lors d'une connexion SSO ; le nom du fournisseur d'origine apparaît sur le badge (ex. \`LDAP · Corporate AD\`).
+
+Depuis la v2.133, les rôles modifiés manuellement dans UCM sur des utilisateurs SSO sont **conservés** entre deux connexions, sauf si **« Synchroniser le rôle à chaque connexion »** est activé sur le fournisseur (voir page **Paramètres → SSO**).
 `
   }
 }
