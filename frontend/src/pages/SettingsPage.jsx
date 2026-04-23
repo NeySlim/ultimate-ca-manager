@@ -1824,6 +1824,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({})
   const [emailTestResult, setEmailTestResult] = useState(null) // { success, message }
   const [emailTesting, setEmailTesting] = useState(false)
+  const [oauthDirty, setOauthDirty] = useState(false)
+  const [oauthPresets, setOauthPresets] = useState({})
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [backups, setBackups] = useState([])
   const [dbStats, setDbStats] = useState(null)
@@ -1960,7 +1962,22 @@ export default function SettingsPage() {
         smtp_from_name: emailSettings.from_name,
         smtp_auth: emailSettings.smtp_auth !== false,
         smtp_content_type: emailSettings.smtp_content_type || 'html',
+        smtp_auth_method: emailSettings.smtp_auth_method || 'password',
+        smtp_oauth_provider: emailSettings.smtp_oauth_provider || 'google',
+        smtp_oauth_tenant_id: emailSettings.smtp_oauth_tenant_id || '',
+        smtp_oauth_client_id: emailSettings.smtp_oauth_client_id || '',
+        smtp_oauth_client_secret: emailSettings.has_oauth_client_secret ? '********' : '',
+        has_oauth_client_secret: emailSettings.has_oauth_client_secret,
+        has_oauth_refresh_token: emailSettings.has_oauth_refresh_token,
+        smtp_oauth_authorize_url: emailSettings.smtp_oauth_authorize_url || '',
+        smtp_oauth_token_url: emailSettings.smtp_oauth_token_url || '',
+        smtp_oauth_scope: emailSettings.smtp_oauth_scope || '',
+        smtp_oauth_redirect_uri: emailSettings.smtp_oauth_redirect_uri || '',
       })
+      // Load OAuth provider presets in parallel (best-effort, non-blocking)
+      settingsService.getSmtpOAuthProviders()
+        .then(res => setOauthPresets(res?.data?.providers || res?.providers || {}))
+        .catch(() => { /* presets optional, frontend has fallbacks */ })
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.settings'))
     } finally {
@@ -2436,19 +2453,29 @@ export default function SettingsPage() {
         await settingsService.updateEmailSettings({
           smtp_host: settings.smtp_host,
           smtp_port: settings.smtp_port,
-          smtp_username: settings.smtp_auth !== false ? settings.smtp_username : '',
-          smtp_password: settings.smtp_auth !== false ? settings.smtp_password : '',
+          smtp_username: settings.smtp_auth_method !== 'none' ? settings.smtp_username : '',
+          smtp_password: settings.smtp_auth_method === 'password' ? settings.smtp_password : '',
           smtp_tls: settings.smtp_use_tls,
-          smtp_auth: settings.smtp_auth !== false,
+          smtp_auth: settings.smtp_auth_method !== 'none',
           smtp_content_type: settings.smtp_content_type || 'html',
           from_email: settings.smtp_from_email,
           from_name: settings.smtp_from_name,
-          enabled: true
+          enabled: true,
+          smtp_auth_method: settings.smtp_auth_method,
+          smtp_oauth_provider: settings.smtp_oauth_provider,
+          smtp_oauth_tenant_id: settings.smtp_oauth_tenant_id,
+          smtp_oauth_client_id: settings.smtp_oauth_client_id,
+          ...(settings.smtp_oauth_client_secret && settings.smtp_oauth_client_secret !== '********' ? { smtp_oauth_client_secret: settings.smtp_oauth_client_secret } : {}),
+          smtp_oauth_authorize_url: settings.smtp_oauth_authorize_url,
+          smtp_oauth_token_url: settings.smtp_oauth_token_url,
+          smtp_oauth_scope: settings.smtp_oauth_scope,
+          smtp_oauth_redirect_uri: settings.smtp_oauth_redirect_uri,
         })
       } else {
         await settingsService.updateBulk(settings)
       }
       showSuccess(t('messages.success.update.settings'))
+      if (section === 'email') setOauthDirty(false)
       if (settings.timezone) setAppTimezone(settings.timezone)
       if (settings.date_format) setDateFormat(settings.date_format)
       if (settings.show_time !== undefined) setShowTime(settings.show_time !== 'false' && settings.show_time !== false)
@@ -2477,6 +2504,118 @@ export default function SettingsPage() {
       setEmailTestResult({ success: false, message: msg })
     } finally {
       setEmailTesting(false)
+    }
+  }
+
+  const applyOAuthProviderPreset = (providerKey) => {
+    updateSetting('smtp_oauth_provider', providerKey)
+    setOauthDirty(true)
+    const preset = oauthPresets[providerKey]
+    if (preset) {
+      if (preset.smtp_host) updateSetting('smtp_host', preset.smtp_host)
+      if (preset.smtp_port) updateSetting('smtp_port', preset.smtp_port)
+      if (typeof preset.smtp_use_tls === 'boolean') updateSetting('smtp_use_tls', preset.smtp_use_tls)
+      // Force tenant to the right default for each Microsoft variant.
+      // Personal Outlook.com → 'consumers' (the field is hidden in the UI).
+      // M365 → 'common' unless the admin already set a tenant GUID.
+      if (providerKey === 'microsoft') {
+        updateSetting('smtp_oauth_tenant_id', 'consumers')
+      } else if (providerKey === 'microsoft365' && !settings.smtp_oauth_tenant_id) {
+        updateSetting('smtp_oauth_tenant_id', 'common')
+      }
+    }
+  }
+
+  // Per-provider setup guide config (links + step-by-step).
+  const oauthProviderSetup = {
+    google: {
+      consoleUrl: 'https://console.cloud.google.com/apis/credentials',
+      consoleLabel: 'Google Cloud Console → APIs & Services → Credentials',
+    },
+    microsoft: {
+      consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+      consoleLabel: 'Azure Portal → App registrations',
+    },
+    microsoft365: {
+      consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
+      consoleLabel: 'Azure Portal → App registrations',
+    },
+  }
+
+  const handleSmtpOAuthAuthorize = async () => {
+    try {
+      // Auto-save OAuth config if there are unsaved changes,
+      // so the backend uses the latest client_id/secret/redirect_uri.
+      if (oauthDirty) {
+        await handleSave('email')
+      }
+      const res = await settingsService.getSmtpOAuthAuthorizeUrl(settings.smtp_oauth_redirect_uri || '')
+      const authorizeUrl = res?.data?.authorize_url || res?.authorize_url
+      if (!authorizeUrl) throw new Error('No authorize URL returned')
+      const popup = window.open(authorizeUrl, 'smtp-oauth', 'width=600,height=700')
+      let settled = false
+      const finish = async (ok) => {
+        if (settled) return
+        settled = true
+        window.removeEventListener('message', handler)
+        try { bc && bc.close() } catch {}
+        if (ok) {
+          showSuccess(t('settings.smtpOauthSuccess'))
+          setOauthDirty(false)
+          await loadSettings()
+        } else {
+          showError(t('settings.smtpOauthFailure'))
+        }
+      }
+      const handler = (event) => {
+        if (!event.data || event.data.type !== 'smtp-oauth') return
+        finish(!!event.data.ok)
+      }
+      window.addEventListener('message', handler)
+      // BroadcastChannel works even when window.opener is null (COOP).
+      let bc = null
+      try {
+        bc = new BroadcastChannel('smtp-oauth')
+        bc.onmessage = (event) => {
+          if (!event.data || event.data.type !== 'smtp-oauth') return
+          finish(!!event.data.ok)
+        }
+      } catch {}
+      // Fallback: when popup closes, re-check settings — covers cases where
+      // both postMessage and BroadcastChannel are blocked (strict COOP/sandbox).
+      const pollClose = setInterval(async () => {
+        if (popup && popup.closed) {
+          clearInterval(pollClose)
+          if (settled) return
+          await loadSettings()
+          // Re-read latest settings to detect if authorization succeeded.
+          try {
+            const fresh = await settingsService.getAll()
+            const authorized = !!(fresh?.data?.smtp_oauth_authorized || fresh?.smtp_oauth_authorized)
+            finish(authorized)
+          } catch {
+            finish(false)
+          }
+        }
+      }, 1000)
+    } catch (error) {
+      showError(error.message || t('settings.smtpOauthFailure'))
+    }
+  }
+
+  const handleSmtpOAuthRevoke = async () => {
+    const confirmed = await showConfirm(t('settings.smtpOauthRevokeConfirm'), {
+      title: t('settings.smtpOauthRevoke'),
+      confirmText: t('settings.smtpOauthRevoke'),
+      variant: 'danger'
+    })
+    if (!confirmed) return
+    try {
+      await settingsService.revokeSmtpOAuth()
+      showSuccess(t('messages.success.update.settings'))
+      loadSettings()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
     }
   }
 
@@ -2870,22 +3009,32 @@ export default function SettingsPage() {
 
                 {/* Authentication */}
                 <div className="border-t border-border pt-4 space-y-3">
-                  <ToggleSwitch
-                    checked={settings.smtp_auth !== false}
-                    onChange={(val) => {
-                      updateSetting('smtp_auth', val)
-                      if (!val) {
-                        updateSetting('smtp_username', '')
-                        updateSetting('smtp_password', '')
-                      }
-                    }}
-                    label={t('settings.smtpAuthRequired')}
-                    size="sm"
-                  />
-                  {!settings.smtp_auth && settings.smtp_auth !== undefined && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-text-secondary">{t('settings.smtpAuthMethod')}:</span>
+                    {['password', 'oauth2', 'none'].map(method => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => {
+                          updateSetting('smtp_auth_method', method)
+                          setOauthDirty(prev => prev || method === 'oauth2')
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          (settings.smtp_auth_method || 'password') === method
+                            ? 'bg-accent-primary text-white'
+                            : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
+                        }`}
+                      >
+                        {t(`settings.smtpAuthMethod_${method}`)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {(settings.smtp_auth_method || 'password') === 'none' && (
                     <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
                   )}
-                  {settings.smtp_auth !== false && (
+
+                  {(settings.smtp_auth_method || 'password') === 'password' && (
                     <DetailGrid>
                       <div className="col-span-full md:col-span-1">
                         <Input
@@ -2905,6 +3054,207 @@ export default function SettingsPage() {
                         />
                       </div>
                     </DetailGrid>
+                  )}
+
+                  {(settings.smtp_auth_method || 'password') === 'oauth2' && (
+                    <div className="space-y-3">
+                      {/* Mailbox / username (XOAUTH2 uses email address as user) */}
+                      <DetailGrid>
+                        <div className="col-span-full md:col-span-1">
+                          <Input
+                            label={t('settings.smtpUsername')}
+                            value={settings.smtp_username || ''}
+                            onChange={(e) => updateSetting('smtp_username', e.target.value)}
+                          />
+                        </div>
+                      </DetailGrid>
+
+                      {/* Provider selector */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm text-text-secondary">{t('settings.smtpOauthProvider')}:</span>
+                        {['google', 'microsoft', 'microsoft365', 'custom'].map(provider => (
+                          <button
+                            key={provider}
+                            type="button"
+                            onClick={() => applyOAuthProviderPreset(provider)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                              (settings.smtp_oauth_provider || 'google') === provider
+                                ? 'bg-accent-primary text-white'
+                                : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
+                            }`}
+                          >
+                            {t(`settings.smtpOauthProvider_${provider}`)}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Per-provider setup guide */}
+                      {oauthProviderSetup[settings.smtp_oauth_provider || 'google'] && (
+                        <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info/30 rounded-lg text-xs text-text-secondary">
+                          <Info size={16} className="shrink-0 mt-0.5 text-status-info" />
+                          <div className="space-y-1.5 flex-1">
+                            <p className="font-medium text-text-primary">
+                              {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_title`)}
+                            </p>
+                            <p className="whitespace-pre-line">
+                              {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_steps`)}
+                            </p>
+                            <a
+                              href={oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-accent-primary hover:underline font-medium"
+                            >
+                              {oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleLabel} ↗
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      <DetailGrid>
+                        {(settings.smtp_oauth_provider || 'google') === 'microsoft365' && (
+                          <div className="col-span-full md:col-span-1">
+                            <Input
+                              label={t('settings.smtpOauthTenant')}
+                              value={settings.smtp_oauth_tenant_id || ''}
+                              onChange={(e) => { updateSetting('smtp_oauth_tenant_id', e.target.value); setOauthDirty(true) }}
+                              placeholder="common"
+                              helper={t('settings.smtpOauthTenantHintM365')}
+                            />
+                          </div>
+                        )}
+                        <div className="col-span-full md:col-span-1">
+                          <Input
+                            label={t('settings.smtpOauthClientId')}
+                            value={settings.smtp_oauth_client_id || ''}
+                            onChange={(e) => { updateSetting('smtp_oauth_client_id', e.target.value); setOauthDirty(true) }}
+                          />
+                        </div>
+                        <div className="col-span-full md:col-span-1">
+                          <Input
+                            label={t('settings.smtpOauthClientSecret')}
+                            type="password"
+                            noAutofill
+                            value={settings.smtp_oauth_client_secret === '********' ? '' : (settings.smtp_oauth_client_secret || '')}
+                            onChange={(e) => { updateSetting('smtp_oauth_client_secret', e.target.value); setOauthDirty(true) }}
+                            hasExistingValue={settings.has_oauth_client_secret}
+                          />
+                        </div>
+                        {(settings.smtp_oauth_provider || 'google') === 'custom' && (
+                          <>
+                            <div className="col-span-full md:col-span-1">
+                              <Input
+                                label={t('settings.smtpOauthAuthorizeUrl')}
+                                value={settings.smtp_oauth_authorize_url || ''}
+                                onChange={(e) => { updateSetting('smtp_oauth_authorize_url', e.target.value); setOauthDirty(true) }}
+                              />
+                            </div>
+                            <div className="col-span-full md:col-span-1">
+                              <Input
+                                label={t('settings.smtpOauthTokenUrl')}
+                                value={settings.smtp_oauth_token_url || ''}
+                                onChange={(e) => { updateSetting('smtp_oauth_token_url', e.target.value); setOauthDirty(true) }}
+                              />
+                            </div>
+                            <div className="col-span-full md:col-span-1">
+                              <Input
+                                label={t('settings.smtpOauthScope')}
+                                value={settings.smtp_oauth_scope || ''}
+                                onChange={(e) => { updateSetting('smtp_oauth_scope', e.target.value); setOauthDirty(true) }}
+                              />
+                            </div>
+                          </>
+                        )}
+                        <div className="col-span-full">
+                          <Input
+                            label={t('settings.smtpOauthRedirectUri')}
+                            value={settings.smtp_oauth_redirect_uri || ''}
+                            onChange={(e) => { updateSetting('smtp_oauth_redirect_uri', e.target.value); setOauthDirty(true) }}
+                            placeholder={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/v2/settings/email/oauth/callback`}
+                            helper={t('settings.smtpOauthRedirectUriHint')}
+                          />
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                if (typeof window === 'undefined') return
+                                const defaultUri = `${window.location.origin}/api/v2/settings/email/oauth/callback`
+                                updateSetting('smtp_oauth_redirect_uri', defaultUri)
+                                setOauthDirty(true)
+                              }}
+                            >
+                              {t('settings.smtpOauthRedirectUriUseDefault')}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={!settings.smtp_oauth_redirect_uri}
+                              onClick={() => {
+                                const val = settings.smtp_oauth_redirect_uri || ''
+                                if (!val) return
+                                navigator.clipboard?.writeText(val)
+                                showSuccess(t('common.copiedToClipboard'))
+                              }}
+                            >
+                              <Copy size={14} className="mr-1.5" />
+                              {t('common.copy')}
+                            </Button>
+                          </div>
+                        </div>
+                      </DetailGrid>
+
+                      {/* Authorization status + actions */}
+                      {/* Unverified-app warning notice — only shown before authorization */}
+                      {!settings.has_oauth_refresh_token && ['google', 'microsoft', 'microsoft365'].includes(settings.smtp_oauth_provider || 'google') && (
+                        <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info/30 rounded-lg text-xs text-text-secondary">
+                          <Warning size={16} className="shrink-0 mt-0.5 text-status-info" />
+                          <div className="space-y-1">
+                            <p className="font-medium text-text-primary">{t('settings.smtpOauthUnverifiedTitle')}</p>
+                            <p>{t('settings.smtpOauthUnverifiedBody')}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Authorization status + actions */}
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                          settings.has_oauth_refresh_token
+                            ? 'bg-status-success-op10 text-status-success'
+                            : 'bg-bg-tertiary text-text-tertiary'
+                        }`}>
+                          {settings.has_oauth_refresh_token
+                            ? <><CheckCircle size={13} />{t('settings.smtpOauthStatusAuthorized')}</>
+                            : <><XCircle size={13} />{t('settings.smtpOauthStatusNotAuthorized')}</>
+                          }
+                        </span>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSmtpOAuthAuthorize}
+                          disabled={!settings.smtp_oauth_client_id || saving}
+                          title={oauthDirty ? t('settings.smtpOauthAutoSaveHint') : undefined}
+                        >
+                          <Key size={14} />
+                          {oauthDirty ? t('settings.smtpOauthSaveAndAuthorize') : t('settings.smtpOauthAuthorize')}
+                        </Button>
+
+                        {settings.has_oauth_refresh_token && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger-soft"
+                            onClick={handleSmtpOAuthRevoke}
+                          >
+                            <XCircle size={14} />
+                            {t('settings.smtpOauthRevoke')}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 

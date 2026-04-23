@@ -28,6 +28,62 @@ class SMTPConfig(db.Model):
     enabled = db.Column(db.Boolean, default=False)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     updated_by = db.Column(db.String(80))
+
+    # OAuth2 (XOAUTH2) authentication — alternative to password auth.
+    # When smtp_auth_method == 'oauth2', email_service uses services.smtp_oauth
+    # to mint a short-lived access token from the stored refresh_token.
+    smtp_auth_method = db.Column(db.String(20), default='password', nullable=False)
+    smtp_oauth_provider = db.Column(db.String(20))               # google | microsoft | custom
+    smtp_oauth_tenant_id = db.Column(db.String(100))             # microsoft: 'consumers' | 'common' | tenant GUID
+    smtp_oauth_client_id = db.Column(db.String(255))
+    _smtp_oauth_client_secret = db.Column('smtp_oauth_client_secret', db.String(1024))  # encrypted
+    _smtp_oauth_refresh_token = db.Column('smtp_oauth_refresh_token', db.String(4096))  # encrypted
+    smtp_oauth_authorize_url = db.Column(db.String(512))         # custom provider only
+    smtp_oauth_token_url = db.Column(db.String(512))             # custom provider only
+    smtp_oauth_scope = db.Column(db.String(512))                 # custom provider only
+    smtp_oauth_redirect_uri = db.Column(db.String(512))          # optional override
+
+    @property
+    def smtp_oauth_client_secret(self):
+        if not self._smtp_oauth_client_secret:
+            return None
+        try:
+            from utils.encryption import decrypt_if_needed
+            return decrypt_if_needed(self._smtp_oauth_client_secret)
+        except Exception:
+            return self._smtp_oauth_client_secret
+
+    @smtp_oauth_client_secret.setter
+    def smtp_oauth_client_secret(self, value):
+        if not value:
+            self._smtp_oauth_client_secret = None
+            return
+        try:
+            from utils.encryption import encrypt_if_needed
+            self._smtp_oauth_client_secret = encrypt_if_needed(value)
+        except Exception:
+            self._smtp_oauth_client_secret = value
+
+    @property
+    def smtp_oauth_refresh_token(self):
+        if not self._smtp_oauth_refresh_token:
+            return None
+        try:
+            from utils.encryption import decrypt_if_needed
+            return decrypt_if_needed(self._smtp_oauth_refresh_token)
+        except Exception:
+            return self._smtp_oauth_refresh_token
+
+    @smtp_oauth_refresh_token.setter
+    def smtp_oauth_refresh_token(self, value):
+        if not value:
+            self._smtp_oauth_refresh_token = None
+            return
+        try:
+            from utils.encryption import encrypt_if_needed
+            self._smtp_oauth_refresh_token = encrypt_if_needed(value)
+        except Exception:
+            self._smtp_oauth_refresh_token = value
     
     # SECURITY: Encrypted password property
     @property
@@ -72,6 +128,16 @@ class SMTPConfig(db.Model):
             "smtp_use_ssl": self.smtp_use_ssl,
             "enabled": self.enabled,
             "has_password": bool(self._smtp_password),
+            "smtp_auth_method": self.smtp_auth_method or 'password',
+            "smtp_oauth_provider": self.smtp_oauth_provider,
+            "smtp_oauth_tenant_id": self.smtp_oauth_tenant_id,
+            "smtp_oauth_client_id": self.smtp_oauth_client_id,
+            "has_oauth_client_secret": bool(self._smtp_oauth_client_secret),
+            "has_oauth_refresh_token": bool(self._smtp_oauth_refresh_token),
+            "smtp_oauth_authorize_url": self.smtp_oauth_authorize_url,
+            "smtp_oauth_token_url": self.smtp_oauth_token_url,
+            "smtp_oauth_scope": self.smtp_oauth_scope,
+            "smtp_oauth_redirect_uri": self.smtp_oauth_redirect_uri,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "updated_by": self.updated_by,
         }

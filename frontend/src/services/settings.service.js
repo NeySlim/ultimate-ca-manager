@@ -25,6 +25,18 @@ export const settingsService = {
     return apiClient.post('/settings/email/test', { email })
   },
 
+  async getSmtpOAuthAuthorizeUrl(redirectUri) {
+    return apiClient.post('/settings/email/oauth/authorize-url', redirectUri ? { redirect_uri: redirectUri } : {})
+  },
+
+  async revokeSmtpOAuth() {
+    return apiClient.post('/settings/email/oauth/revoke', {})
+  },
+
+  async getSmtpOAuthProviders() {
+    return apiClient.get('/settings/email/oauth/providers')
+  },
+
   // Expiry Alerts
   async getExpiryAlerts() {
     return apiClient.get('/system/alerts/expiry')

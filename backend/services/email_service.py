@@ -10,8 +10,34 @@ from datetime import datetime
 from models import db
 from models.email_notification import SMTPConfig, NotificationLog
 from utils.datetime_utils import utc_now
+from services import smtp_oauth
 
 logger = logging.getLogger(__name__)
+
+
+def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
+    """Authenticate against SMTP using either password or XOAUTH2.
+
+    Raises ``smtplib.SMTPAuthenticationError`` (or ``smtplib.SMTPException``)
+    on failure — caller catches and reports.
+    """
+    if (config.smtp_auth_method or 'password') == 'oauth2':
+        if not config.smtp_user:
+            raise smtplib.SMTPAuthenticationError(535, b'OAuth2 requires smtp_user (mailbox)')
+        access_token = smtp_oauth.get_access_token(config)
+        xoauth2 = smtp_oauth.build_xoauth2_string(config.smtp_user, access_token)
+        # Outlook/M365 require EHLO before AUTH (smtplib.login() does this
+        # automatically; docmd() does NOT). Re-EHLO here to be safe — also
+        # needed after STARTTLS so the server advertises AUTH XOAUTH2.
+        server.ehlo_or_helo_if_needed()
+        code, resp = server.docmd('AUTH', 'XOAUTH2 ' + xoauth2)
+        if code != 235:
+            # Token may have been revoked by user — drop cache so next
+            # attempt mints a fresh one.
+            smtp_oauth.invalidate_cache(config.id)
+            raise smtplib.SMTPAuthenticationError(code, resp)
+    elif config.smtp_user and config.smtp_password:
+        server.login(config.smtp_user, config.smtp_password)
 
 
 class EmailService:
@@ -50,8 +76,7 @@ class EmailService:
                     server.starttls()
             
             # Login if credentials provided
-            if config.smtp_user and config.smtp_password:
-                server.login(config.smtp_user, config.smtp_password)
+            _smtp_authenticate(server, config)
             
             server.quit()
             return True, "SMTP connection successful"
@@ -133,8 +158,7 @@ class EmailService:
                     server.starttls()
             
             # Login if credentials provided
-            if config.smtp_user and config.smtp_password:
-                server.login(config.smtp_user, config.smtp_password)
+            _smtp_authenticate(server, config)
             
             # Send to all recipients
             server.sendmail(config.smtp_from, recipients, msg.as_string())

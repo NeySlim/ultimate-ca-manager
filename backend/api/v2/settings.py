@@ -345,7 +345,18 @@ def get_email_settings():
         'smtp_auth': smtp.smtp_auth if smtp.smtp_auth is not None else True,
         'smtp_content_type': smtp.smtp_content_type or 'html',
         'from_name': smtp.smtp_from_name or 'UCM Certificate Manager',
-        'from_email': smtp.smtp_from or ''
+        'from_email': smtp.smtp_from or '',
+        # OAuth2 (XOAUTH2) fields — secrets/tokens never returned, only flags
+        'smtp_auth_method': smtp.smtp_auth_method or 'password',
+        'smtp_oauth_provider': smtp.smtp_oauth_provider or '',
+        'smtp_oauth_tenant_id': smtp.smtp_oauth_tenant_id or '',
+        'smtp_oauth_client_id': smtp.smtp_oauth_client_id or '',
+        'smtp_oauth_authorize_url': smtp.smtp_oauth_authorize_url or '',
+        'smtp_oauth_token_url': smtp.smtp_oauth_token_url or '',
+        'smtp_oauth_scope': smtp.smtp_oauth_scope or '',
+        'smtp_oauth_redirect_uri': smtp.smtp_oauth_redirect_uri or '',
+        'has_oauth_client_secret': bool(smtp._smtp_oauth_client_secret),
+        'has_oauth_refresh_token': bool(smtp._smtp_oauth_refresh_token),
     })
 
 
@@ -385,6 +396,33 @@ def update_email_settings():
         smtp.smtp_from_name = data['from_name']  # Model uses smtp_from_name
     if 'from_email' in data:
         smtp.smtp_from = data['from_email']  # Model uses smtp_from
+
+    # OAuth2 fields — admin-supplied client_id / urls / etc.
+    # Secrets are only written when explicitly provided (avoids wiping on save).
+    if 'smtp_auth_method' in data and data['smtp_auth_method'] in ('password', 'oauth2'):
+        smtp.smtp_auth_method = data['smtp_auth_method']
+    if 'smtp_oauth_provider' in data:
+        smtp.smtp_oauth_provider = (data['smtp_oauth_provider'] or '').lower() or None
+    if 'smtp_oauth_tenant_id' in data:
+        smtp.smtp_oauth_tenant_id = data['smtp_oauth_tenant_id'] or None
+    if 'smtp_oauth_client_id' in data:
+        smtp.smtp_oauth_client_id = data['smtp_oauth_client_id'] or None
+    if 'smtp_oauth_client_secret' in data and data['smtp_oauth_client_secret'] and data['smtp_oauth_client_secret'] != '********':
+        smtp.smtp_oauth_client_secret = data['smtp_oauth_client_secret']
+    if 'smtp_oauth_authorize_url' in data:
+        url = data['smtp_oauth_authorize_url'] or None
+        if url:
+            validate_url_not_cloud_metadata(url)
+        smtp.smtp_oauth_authorize_url = url
+    if 'smtp_oauth_token_url' in data:
+        url = data['smtp_oauth_token_url'] or None
+        if url:
+            validate_url_not_cloud_metadata(url)
+        smtp.smtp_oauth_token_url = url
+    if 'smtp_oauth_scope' in data:
+        smtp.smtp_oauth_scope = data['smtp_oauth_scope'] or None
+    if 'smtp_oauth_redirect_uri' in data:
+        smtp.smtp_oauth_redirect_uri = data['smtp_oauth_redirect_uri'] or None
     
     try:
         db.session.commit()
@@ -429,6 +467,199 @@ def test_email():
         )
     else:
         return error_response(message or 'Failed to send test email', 500)
+
+
+# -----------------------------------------------------------------------------
+# SMTP OAuth2 (XOAUTH2) — Authorization Code + Refresh Token flow
+# -----------------------------------------------------------------------------
+
+def _default_oauth_redirect_uri() -> str:
+    """Compute the default redirect URI from the current request host."""
+    # request.host_url ends with '/'
+    return f"{request.host_url}api/v2/settings/email/oauth/callback"
+
+
+@bp.route('/api/v2/settings/email/oauth/providers', methods=['GET'])
+@require_auth(['read:settings'])
+def smtp_oauth_providers():
+    """Return the static OAuth provider presets (host/port/tenant defaults).
+
+    Used by the frontend to auto-fill SMTP host/port/TLS when the admin picks
+    Gmail / Outlook personal / Microsoft 365. Public to authenticated admins;
+    no secrets exposed.
+    """
+    from services.smtp_oauth import PROVIDERS
+    presets = {}
+    for key, p in PROVIDERS.items():
+        presets[key] = {
+            'smtp_host': p.smtp_host,
+            'smtp_port': p.smtp_port,
+            'smtp_use_tls': p.smtp_use_tls,
+            'smtp_use_ssl': p.smtp_use_ssl,
+            'needs_tenant': p.needs_tenant,
+            'default_tenant': 'common' if key == 'microsoft365' else ('consumers' if key == 'microsoft' else None),
+        }
+    return success_response(data={'providers': presets})
+
+
+@bp.route('/api/v2/settings/email/oauth/authorize-url', methods=['POST'])
+@require_auth(['write:settings'])
+def smtp_oauth_authorize_url():
+    """Build the OAuth consent URL and stash ``state`` in the user session.
+
+    Body (optional): {"redirect_uri": "https://..."} to override default.
+    Returns: {"authorize_url": "...", "redirect_uri": "..."}
+    """
+    from flask import session
+    from models.email_notification import SMTPConfig
+    from services import smtp_oauth as oauth_helper
+
+    smtp = SMTPConfig.query.first()
+    if not smtp:
+        return error_response('SMTP configuration not found — save settings first', 404)
+
+    data = request.json or {}
+    redirect_uri = (
+        data.get('redirect_uri')
+        or smtp.smtp_oauth_redirect_uri
+        or _default_oauth_redirect_uri()
+    )
+
+    try:
+        url, state = oauth_helper.build_authorize_url(smtp, redirect_uri)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"Failed to build OAuth authorize URL: {e}")
+        return error_response('Failed to build authorize URL', 500)
+
+    # Persist state + redirect_uri so the callback can verify them.
+    session['smtp_oauth_state'] = state
+    session['smtp_oauth_redirect_uri'] = redirect_uri
+
+    AuditService.log_action(
+        action='smtp_oauth_authorize_init',
+        resource_type='settings',
+        resource_name='SMTP OAuth',
+        details=f'Initiated OAuth consent for provider {smtp.smtp_oauth_provider}',
+        success=True,
+    )
+    return success_response(data={'authorize_url': url, 'redirect_uri': redirect_uri})
+
+
+@bp.route('/api/v2/settings/email/oauth/callback', methods=['GET'])
+@require_auth(['write:settings'])
+def smtp_oauth_callback():
+    """Receive the OAuth redirect, exchange ``code`` for tokens, persist refresh_token.
+
+    Renders a tiny HTML page (popup-friendly) instead of JSON so the
+    provider redirect lands cleanly in the browser.
+    """
+    from flask import session, make_response
+    from models.email_notification import SMTPConfig
+    from services import smtp_oauth as oauth_helper
+
+    code = request.args.get('code')
+    state = request.args.get('state')
+    err = request.args.get('error')
+
+    def _html(title: str, message: str, ok: bool = True) -> 'flask.Response':
+        body = f"""<!doctype html><html><head><meta charset=utf-8>
+<title>{title}</title><style>body{{font-family:system-ui,sans-serif;padding:2rem;text-align:center}}
+.ok{{color:#16a34a}}.err{{color:#dc2626}}</style></head>
+<body><h2 class="{'ok' if ok else 'err'}">{title}</h2><p>{message}</p>
+<p><small>You can close this window.</small></p>
+<script>(function(){{var ok={str(ok).lower()};var msg={{type:'smtp-oauth',ok:ok}};try{{window.opener&&window.opener.postMessage(msg,'*');}}catch(e){{}}try{{var bc=new BroadcastChannel('smtp-oauth');bc.postMessage(msg);bc.close();}}catch(e){{}}setTimeout(function(){{try{{window.close();}}catch(e){{}}}},1200);}})();</script>
+</body></html>"""
+        resp = make_response(body, 200 if ok else 400)
+        resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+        return resp
+
+    if err:
+        logger.warning(f"OAuth callback returned error: {err}")
+        return _html('Authorization failed', f'Provider error: {err}', ok=False)
+
+    if not code or not state:
+        return _html('Authorization failed', 'Missing code or state parameter', ok=False)
+
+    expected_state = session.pop('smtp_oauth_state', None)
+    redirect_uri = session.pop('smtp_oauth_redirect_uri', None)
+    if not expected_state or state != expected_state:
+        logger.warning('OAuth callback state mismatch — possible CSRF')
+        return _html('Authorization failed', 'State mismatch — please retry', ok=False)
+    if not redirect_uri:
+        return _html('Authorization failed', 'Missing redirect URI in session', ok=False)
+
+    smtp = SMTPConfig.query.first()
+    if not smtp:
+        return _html('Authorization failed', 'SMTP configuration not found', ok=False)
+
+    try:
+        payload = oauth_helper.exchange_code_for_tokens(smtp, code, redirect_uri)
+    except Exception as e:
+        logger.error(f"OAuth code exchange failed: {e}")
+        return _html('Authorization failed', 'Token exchange failed — see server logs', ok=False)
+
+    refresh_token = payload.get('refresh_token')
+    if not refresh_token:
+        # Provider didn't issue one — usually means user already consented and
+        # we forgot prompt=consent, or it's a non-offline scope.
+        return _html(
+            'Authorization incomplete',
+            'No refresh_token received — revoke prior consent in your provider account and retry.',
+            ok=False,
+        )
+
+    smtp.smtp_oauth_refresh_token = refresh_token
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to persist OAuth refresh_token: {e}")
+        return _html('Authorization failed', 'Database error', ok=False)
+
+    # Drop any stale cached access_token from before the new consent.
+    oauth_helper.invalidate_cache(smtp.id)
+
+    AuditService.log_action(
+        action='smtp_oauth_authorize_complete',
+        resource_type='settings',
+        resource_name='SMTP OAuth',
+        details=f'OAuth consent completed for provider {smtp.smtp_oauth_provider}',
+        success=True,
+    )
+    return _html('Authorization successful', 'SMTP OAuth refresh token stored.', ok=True)
+
+
+@bp.route('/api/v2/settings/email/oauth/revoke', methods=['POST'])
+@require_auth(['write:settings'])
+def smtp_oauth_revoke():
+    """Drop the stored refresh_token and cached access_token."""
+    from models.email_notification import SMTPConfig
+    from services import smtp_oauth as oauth_helper
+
+    smtp = SMTPConfig.query.first()
+    if not smtp:
+        return error_response('SMTP configuration not found', 404)
+
+    smtp.smtp_oauth_refresh_token = None
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to revoke OAuth refresh_token: {e}")
+        return error_response('Failed to revoke', 500)
+
+    oauth_helper.invalidate_cache(smtp.id)
+
+    AuditService.log_action(
+        action='smtp_oauth_revoke',
+        resource_type='settings',
+        resource_name='SMTP OAuth',
+        details='Revoked stored OAuth refresh token',
+        success=True,
+    )
+    return success_response(message='OAuth credentials revoked')
 
 
 @bp.route('/api/v2/settings/email/template', methods=['GET'])
