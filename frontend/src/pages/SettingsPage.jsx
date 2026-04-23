@@ -2716,7 +2716,8 @@ export default function SettingsPage() {
 
   const handleIntegrityCheck = async () => {
     try {
-      const result = await systemService.integrityCheck()
+      const response = await systemService.integrityCheck()
+      const result = response?.data || {}
       if (result.passed) {
         showSuccess(t('messages.success.database.integrityPassed'))
       } else {

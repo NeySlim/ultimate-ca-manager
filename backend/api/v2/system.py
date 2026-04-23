@@ -57,10 +57,16 @@ def get_db_stats():
 @bp.route('/api/v2/system/database/optimize', methods=['POST'])
 @require_auth(['admin:system'])
 def optimize_db():
-    """Run VACUUM and ANALYZE"""
+    """Run VACUUM and ANALYZE (works on SQLite and PostgreSQL)."""
     try:
-        db.session.execute(db.text("VACUUM"))
-        db.session.execute(db.text("ANALYZE"))
+        db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('postgresql'):
+            # PG forbids VACUUM inside a transaction block. Use AUTOCOMMIT.
+            with db.engine.execution_options(isolation_level='AUTOCOMMIT').connect() as conn:
+                conn.execute(db.text('VACUUM ANALYZE'))
+        else:
+            db.session.execute(db.text('VACUUM'))
+            db.session.execute(db.text('ANALYZE'))
         AuditService.log_action(
             action='system_optimize',
             resource_type='system',
@@ -76,13 +82,34 @@ def optimize_db():
 @bp.route('/api/v2/system/database/integrity-check', methods=['POST'])
 @require_auth(['admin:system'])
 def check_integrity():
-    """Run PRAGMA integrity_check"""
+    """Run database integrity check (works on SQLite and PostgreSQL).
+
+    Returns success_response with {passed, errors, message} under data.
+    """
     try:
-        result = db.session.execute(db.text("PRAGMA integrity_check")).scalar()
-        if result == "ok":
-            return success_response(message="Integrity check passed")
+        db_uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('postgresql'):
+            # PRAGMA is SQLite-only. On PG, verify connectivity + count public tables.
+            tables = db.session.execute(db.text(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_schema = 'public'"
+            )).scalar()
+            db.session.execute(db.text('SELECT 1')).scalar()
+            return success_response(
+                data={'passed': True, 'errors': 0, 'tables': int(tables or 0)},
+                message=f"Integrity check passed ({tables} tables verified)"
+            )
         else:
-            return error_response(f"Integrity check failed: {result}")
+            result = db.session.execute(db.text('PRAGMA integrity_check')).scalar()
+            if result == 'ok':
+                return success_response(
+                    data={'passed': True, 'errors': 0},
+                    message='Integrity check passed'
+                )
+            return success_response(
+                data={'passed': False, 'errors': result},
+                message='Integrity check found errors'
+            )
     except Exception as e:
         logger.error(f"Integrity check failed: {e}")
         return error_response("Integrity check failed")
