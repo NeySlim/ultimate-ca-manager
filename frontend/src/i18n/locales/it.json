@@ -3835,7 +3835,7 @@
     "privateKeyPlaceholder": "Incolla la tua chiave privata SSH in formato OpenSSH PEM",
     "importCADescription": "Importa una CA SSH esistente fornendo la sua chiave privata",
     "quickInstallLinuxDescription": "Esegui questo comando su un server Linux/macOS per fidarti di questa CA:",
-    "quickInstallWindowsDescription": "Esegui questo comando in PowerShell con privilegi elevati su un server Windows per fidarti di questa CA:",
+    "quickInstallWindowsDescription": "Incolla questo in qualsiasi PowerShell sul server Windows. Scarica lo script di setup e lo avvia come amministratore in una nuova finestra che rimane aperta. Funziona anche quando l'esecuzione locale di .ps1 è bloccata.",
     "powershellCopied": "Comando PowerShell copiato negli appunti",
     "downloadSetupScriptLinux": "Scarica .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Scarica .ps1 (Windows)"

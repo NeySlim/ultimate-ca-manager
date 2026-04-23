@@ -224,7 +224,11 @@ export default function SSHCAsPage() {
 
   const getPowershellCommand = (ca) => {
     const baseUrl = window.location.origin
-    return `iwr -useb '${baseUrl}/ssh/setup/${ca.refid}?platform=windows' | iex`
+    // Self-elevating one-liner: opens a NEW admin PowerShell window (-Verb RunAs),
+    // keeps it open (-NoExit), bypasses ExecutionPolicy, and runs the script via iex.
+    // The script itself handles pause + transcript logging.
+    const url = `${baseUrl}/ssh/setup/${ca.refid}?platform=windows`
+    return `Start-Process powershell -Verb RunAs "-NoExit -ExecutionPolicy Bypass -Command iwr '${url}' -UseBasicParsing|iex"`
   }
 
   const handleCopyCurlCommand = async (ca) => {

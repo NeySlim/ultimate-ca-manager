@@ -3835,7 +3835,7 @@
     "privateKeyPlaceholder": "OpenSSH PEM形式のSSH秘密鍵を貼り付け",
     "importCADescription": "秘密鍵を提供して既存のSSH CAをインポート",
     "quickInstallLinuxDescription": "Linux/macOS サーバーでこのコマンドを実行して、この CA を信頼します:",
-    "quickInstallWindowsDescription": "管理者権限の PowerShell で Windows サーバー上で次のコマンドを実行して、この CA を信頼します:",
+    "quickInstallWindowsDescription": "Windows サーバー上の任意の PowerShell に貼り付けてください。セットアップスクリプトをダウンロードし、開いたままになる新しいウィンドウで管理者として起動します。ローカルの .ps1 実行がブロックされていても動作します。",
     "powershellCopied": "PowerShell コマンドをクリップボードにコピーしました",
     "downloadSetupScriptLinux": ".sh をダウンロード (Linux/macOS)",
     "downloadSetupScriptWindows": ".ps1 をダウンロード (Windows)"

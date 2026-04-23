@@ -3835,7 +3835,7 @@
     "privateKeyPlaceholder": "粘贴OpenSSH PEM格式的SSH私钥",
     "importCADescription": "通过提供私钥导入现有SSH CA",
     "quickInstallLinuxDescription": "在任意 Linux/macOS 服务器上运行此命令以信任此 CA：",
-    "quickInstallWindowsDescription": "在 Windows 服务器上以管理员身份运行 PowerShell 并执行此命令以信任此 CA：",
+    "quickInstallWindowsDescription": "将其粘贴到 Windows 服务器上的任意 PowerShell 中。它会下载安装脚本，然后以管理员身份在保持打开的新窗口中启动。即使本地 .ps1 执行被阻止也能正常工作。",
     "powershellCopied": "PowerShell 命令已复制到剪贴板",
     "downloadSetupScriptLinux": "下载 .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "下载 .ps1 (Windows)"
