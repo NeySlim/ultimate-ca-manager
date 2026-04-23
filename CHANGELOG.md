@@ -9,12 +9,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.136] - 2026-04-24
+
 ### Fixed
 - **Smart Import duplicate detection (#85)** — duplicate detection across `Smart Import`, `Auto-Renewal`, and mTLS enrollment previously matched only on `serial_number`. Per RFC 5280, serials are only unique per-issuer, so two unrelated certs from different CAs that happened to share a serial were flagged as duplicates (or worse, the wrong cert was returned).
   - New helper `find_existing_cert_by_identity()` uses an indexed `(serial_number, issuer DN)` pre-filter (RFC 5280) and confirms with the **SHA-256 fingerprint of the DER bytes** — globally unique, immune to PEM reformatting, 0% false positives.
   - Applied to: `services/smart_import/validator._check_duplicate_cert()`, `services/smart_import/importer` (CA + leaf cert paths), `api/v2/users` mTLS import, `api/v2/mtls` mTLS enrollment.
   - Auto-renewal lookup now also scopes by `caref` to disambiguate identical serials issued by different CAs.
-
 ## [2.135] - 2026-04-23
 
 ### Fixed
