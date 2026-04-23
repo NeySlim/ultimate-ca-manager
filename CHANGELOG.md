@@ -9,6 +9,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **Database Stats panel on PostgreSQL (#83)** — `Settings → Database` previously showed `-` for size and `Never` for `Last Optimized` on PostgreSQL deployments, and the panel never refreshed after `Optimize` / `Integrity Check`.
+  - `get_db_stats()` now queries `pg_database_size(current_database())` on PostgreSQL (was using `os.path.getsize` on the SQLite file path → always `0` → frontend rendered `-`).
+  - `Last Optimized` and `Last Integrity Check` timestamps are persisted via `SystemConfig` (`db_last_optimized`, `db_last_integrity_check`) and surfaced from `get_db_stats()` (was hardcoded `Never` with a TODO).
+  - `SettingsPage` now re-runs `loadDbStats()` after `Optimize` and `Integrity Check` succeed.
+- **Certificate Activity chart on PostgreSQL (#84)** — the dashboard chart always rendered all-zero bars on PostgreSQL.
+  - Replaced SQLite-only boolean comparisons (`revoked = 0`, `is_active = 1`, `ocsp_enabled = 1`, `cdp_enabled = 1`, `active = 1`) with `IS NOT TRUE` / `= true`, which work on both SQLite and PostgreSQL.
+  - Replaced SQLite-only `datetime('now', '+30 days')` in the auto-renewal status query with Python-computed bounds passed as parameters.
+  - Without these fixes, the shared `try` block in `get_certificate_trend()` raised `operator does not exist: boolean = integer` on PostgreSQL and the `except` handler returned an empty trend for all three series.
+
 ## [2.134] - 2026-04-23
 
 ### Added
