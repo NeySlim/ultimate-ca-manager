@@ -233,13 +233,16 @@ class SmartImporter:
         ski_to_refid: Dict[str, str] = {}
         
         for ca_obj in ca_objects:
-            # Check duplicate by SKI first, then serial_number
+            # Check duplicate by SKI first, then (serial_number, issuer) + fingerprint (#85)
             if skip_duplicates:
                 existing = None
                 if ca_obj.ski:
                     existing = CA.query.filter_by(ski=ca_obj.ski).first()
                 if not existing and ca_obj.serial_number:
-                    existing = CA.query.filter_by(serial_number=ca_obj.serial_number).first()
+                    from services.smart_import.validator import find_existing_cert_by_identity
+                    existing = find_existing_cert_by_identity(
+                        CA, ca_obj.serial_number, ca_obj.issuer, ca_obj.raw_pem
+                    )
                 if existing:
                     result.warnings.append(f"Skipped duplicate CA: {self._get_cn(ca_obj.subject)}")
                     subject_to_refid[ca_obj.subject] = existing.refid
@@ -318,9 +321,12 @@ class SmartImporter:
         cert_objects = [o for o in objects if o.type == ObjectType.CERTIFICATE and not o.is_ca]
         
         for cert_obj in cert_objects:
-            # Check duplicate
+            # Check duplicate via (serial_number, issuer) + SHA-256 fingerprint (#85)
             if skip_duplicates:
-                existing = Certificate.query.filter_by(serial_number=cert_obj.serial_number).first()
+                from services.smart_import.validator import find_existing_cert_by_identity
+                existing = find_existing_cert_by_identity(
+                    Certificate, cert_obj.serial_number, cert_obj.issuer, cert_obj.raw_pem
+                )
                 if existing:
                     result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj.subject)}")
                     continue

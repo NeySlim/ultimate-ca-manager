@@ -19,6 +19,64 @@ from .parser import ParsedObject, ObjectType
 from .chain_builder import ChainInfo
 
 
+def _compute_cert_fingerprint(pem_or_b64: Optional[str]) -> Optional[str]:
+    """Compute SHA-256 fingerprint of a certificate stored as PEM or base64-encoded PEM.
+
+    Returns hex string, or None if the input can't be parsed.
+    """
+    if not pem_or_b64:
+        return None
+    import base64
+    from cryptography import x509 as _x509
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.backends import default_backend as _dfb
+    try:
+        data = pem_or_b64
+        if "BEGIN CERTIFICATE" not in data:
+            try:
+                data = base64.b64decode(pem_or_b64).decode()
+            except Exception:
+                return None
+        c = _x509.load_pem_x509_certificate(data.encode(), _dfb())
+        return c.fingerprint(hashes.SHA256()).hex()
+    except Exception:
+        return None
+
+
+def find_existing_cert_by_identity(model_cls, serial_number: Optional[str],
+                                   issuer: Optional[str], new_pem: Optional[str]):
+    """Find an existing cert/CA record matching the given identity.
+
+    Strategy (issue #85):
+      1. Pre-filter on serial_number (fast, indexed). Per RFC 5280, serial+issuer
+         is unique per-issuer, so we narrow with issuer DN.
+      2. Confirm with SHA-256 fingerprint of DER bytes — globally unique, immune
+         to PEM reformatting.
+
+    Returns the matching ORM record or None.
+    """
+    if not serial_number:
+        return None
+    candidates = model_cls.query.filter_by(serial_number=serial_number).all()
+    if not candidates:
+        return None
+
+    new_fp = _compute_cert_fingerprint(new_pem) if new_pem else None
+
+    for rec in candidates:
+        # Filter by issuer DN if both sides have it (RFC 5280 narrowing)
+        rec_issuer = getattr(rec, 'issuer', None)
+        if issuer and rec_issuer and rec_issuer != issuer:
+            continue
+        # Confirm with fingerprint when possible
+        if new_fp is None:
+            return rec
+        existing_fp = _compute_cert_fingerprint(getattr(rec, 'crt', None))
+        if existing_fp is None or existing_fp == new_fp:
+            return rec
+    return None
+
+
 @dataclass
 class ValidationResult:
     """Result of validation"""
@@ -295,19 +353,25 @@ class ImportValidator:
         return None
     
     def _check_duplicate_cert(self, obj: ParsedObject) -> Optional[int]:
-        """Check if certificate already exists in database"""
+        """Check if certificate already exists in database (issue #85).
+
+        Uses (serial_number, issuer) RFC 5280 pre-filter + SHA-256 fingerprint
+        confirmation to avoid false positives across different issuers.
+        """
         from models import Certificate, CA
-        
-        # Check by serial number
-        cert = Certificate.query.filter_by(serial_number=obj.serial_number).first()
-        if cert:
-            return cert.id
-        
-        # Also check CAs
-        ca = CA.query.filter_by(serial_number=obj.serial_number).first()
-        if ca:
-            return ca.id
-        
+
+        existing = find_existing_cert_by_identity(
+            Certificate, obj.serial_number, obj.issuer, obj.raw_pem
+        )
+        if existing:
+            return existing.id
+
+        existing_ca = find_existing_cert_by_identity(
+            CA, obj.serial_number, obj.issuer, obj.raw_pem
+        )
+        if existing_ca:
+            return existing_ca.id
+
         return None
     
     def _get_cn(self, subject: str) -> str:
