@@ -3838,7 +3838,7 @@
     "privateKeyPlaceholder": "Collez votre clé privée SSH au format OpenSSH PEM",
     "importCADescription": "Importer une CA SSH existante en fournissant sa clé privée",
     "quickInstallLinuxDescription": "Exécutez cette commande sur un serveur Linux/macOS pour faire confiance à cette CA :",
-    "quickInstallWindowsDescription": "Exécutez cette commande dans PowerShell en mode administrateur sur un serveur Windows pour faire confiance à cette CA :",
+    "quickInstallWindowsDescription": "Collez ceci dans n'importe quel PowerShell sur le serveur Windows. La commande télécharge le script puis le lance en tant qu'administrateur dans une nouvelle fenêtre qui reste ouverte. Fonctionne même si l'exécution locale de fichiers .ps1 est bloquée.",
     "powershellCopied": "Commande PowerShell copiée dans le presse-papiers",
     "downloadSetupScriptLinux": "Télécharger .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Télécharger .ps1 (Windows)"

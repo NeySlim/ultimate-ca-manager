@@ -3838,7 +3838,7 @@
     "privateKeyPlaceholder": "Paste your SSH private key in OpenSSH PEM format",
     "importCADescription": "Import an existing SSH CA by providing its private key",
     "quickInstallLinuxDescription": "Run this command on any Linux/macOS server to trust this CA:",
-    "quickInstallWindowsDescription": "Run this command in elevated PowerShell on a Windows server to trust this CA:",
+    "quickInstallWindowsDescription": "Paste this in any PowerShell on the Windows server. It downloads the setup script, then launches it as Administrator in a new window that stays open. Works even when local .ps1 execution is blocked.",
     "powershellCopied": "PowerShell command copied to clipboard",
     "downloadSetupScriptLinux": "Download .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Download .ps1 (Windows)"

@@ -929,17 +929,46 @@ def _user_ca_script_windows(pub_key, ca_label):
 .PARAMETER DryRun
     Preview what would change without modifying any file or service.
 
+.PARAMETER NonInteractive
+    Skip all prompts (OpenSSH install, end pause). Use in CI/automation.
+
+.PARAMETER NoPause
+    Do not pause at the end (default is to pause so the window stays open).
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\\ssh_ca_setup.ps1
     powershell -ExecutionPolicy Bypass -File .\\ssh_ca_setup.ps1 -DryRun
+    powershell -ExecutionPolicy Bypass -File .\\ssh_ca_setup.ps1 -NonInteractive -NoPause
 #>
 
 [CmdletBinding()]
 param(
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$NonInteractive,
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
+
+# --- Helpers ---
+function Write-Info  ($msg) {{ Write-Host "[INFO]  $msg" -ForegroundColor Cyan }}
+function Write-Ok    ($msg) {{ Write-Host "[OK]    $msg" -ForegroundColor Green }}
+function Write-Warn2 ($msg) {{ Write-Host "[WARN]  $msg" -ForegroundColor Yellow }}
+function Write-Err   ($msg) {{ Write-Host "[ERROR] $msg" -ForegroundColor Red }}
+
+function Pause-IfInteractive {{
+    param([string]$Message = 'Press Enter to close this window...')
+    if ($NoPause -or $NonInteractive) {{ return }}
+    try {{ Read-Host -Prompt $Message | Out-Null }} catch {{ Start-Sleep -Seconds 30 }}
+}}
+
+# --- Transcript log (always-on so output survives even if window closes) ---
+$LogFile = Join-Path $env:TEMP ("ucm_ssh_user_ca_setup_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + ".log")
+try {{ Start-Transcript -Path $LogFile -Force | Out-Null }} catch {{ }}
+Write-Host "Log file: $LogFile" -ForegroundColor DarkGray
+
+$ScriptFailed = $false
+try {{
 
 # --- Configuration ---
 $SshDir         = Join-Path $env:ProgramData 'ssh'
@@ -948,18 +977,13 @@ $CaKeyFile      = Join-Path $CaKeyDir 'user_ca.pub'
 $SshdConfig     = Join-Path $SshDir 'sshd_config'
 $PrincipalsDir  = Join-Path $SshDir 'auth_principals'
 
-# --- Helpers ---
-function Write-Info  ($msg) {{ Write-Host "[INFO]  $msg" -ForegroundColor Cyan }}
-function Write-Ok    ($msg) {{ Write-Host "[OK]    $msg" -ForegroundColor Green }}
-function Write-Warn2 ($msg) {{ Write-Host "[WARN]  $msg" -ForegroundColor Yellow }}
-function Write-Err   ($msg) {{ Write-Host "[ERROR] $msg" -ForegroundColor Red }}
-
 # --- Admin check ---
 $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{
     Write-Err "This script must be run as Administrator."
-    exit 1
+    Write-Info "Right-click PowerShell -> Run as Administrator, then re-run this script."
+    throw "Not running as Administrator"
 }}
 
 Write-Host "========================================" -ForegroundColor White
@@ -971,16 +995,51 @@ if ($DryRun) {{
 Write-Host "========================================" -ForegroundColor White
 Write-Host ""
 
-# --- Pre-flight: OpenSSH Server must be installed ---
+# --- Pre-flight: OpenSSH Server must be installed (offer auto-install) ---
 $sshdSvc = Get-Service -Name sshd -ErrorAction SilentlyContinue
 if (-not $sshdSvc) {{
-    Write-Err "OpenSSH Server (sshd) is not installed."
-    Write-Info "Install it with:"
-    Write-Info "  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
-    Write-Info "  Start-Service sshd; Set-Service -Name sshd -StartupType 'Automatic'"
-    exit 1
+    Write-Warn2 "OpenSSH Server (sshd) is not installed."
+    $doInstall = $false
+    if ($DryRun) {{
+        Write-Info "Would offer to install OpenSSH.Server (skipped in -DryRun)."
+    }} elseif ($NonInteractive) {{
+        Write-Err "OpenSSH Server is missing and -NonInteractive was supplied."
+        Write-Info "Install manually with:"
+        Write-Info "  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+        Write-Info "  Set-Service -Name sshd -StartupType 'Automatic'; Start-Service sshd"
+        throw "OpenSSH Server missing"
+    }} else {{
+        $resp = Read-Host "Install OpenSSH Server now? [Y/n]"
+        if ($resp -eq '' -or $resp -match '^[Yy]') {{ $doInstall = $true }}
+    }}
+    if ($doInstall) {{
+        Write-Info "Installing OpenSSH.Server (this may take 1-2 minutes)..."
+        try {{
+            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null
+        }} catch {{
+            Write-Err "Add-WindowsCapability failed: $_"
+            Write-Info "On older Windows, install via 'Settings > Apps > Optional features > OpenSSH Server'."
+            throw
+        }}
+        Set-Service -Name sshd -StartupType 'Automatic'
+        Start-Service sshd
+        if (-not (Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue)) {{
+            try {{
+                New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd)' `
+                    -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
+                Write-Ok "Firewall rule added (TCP/22 inbound)"
+            }} catch {{
+                Write-Warn2 "Could not create firewall rule: $_"
+            }}
+        }}
+        $sshdSvc = Get-Service -Name sshd
+        Write-Ok "OpenSSH Server installed and started"
+    }} elseif (-not $DryRun) {{
+        throw "OpenSSH Server is required. Install it and re-run this script."
+    }}
+}} else {{
+    Write-Info "OpenSSH Server detected (status: $($sshdSvc.Status))"
 }}
-Write-Info "OpenSSH Server detected (status: $($sshdSvc.Status))"
 
 # --- Step 1: Create CA key directory ---
 Write-Info "Creating CA key directory: $CaKeyDir"
@@ -1122,6 +1181,26 @@ if (-not $DryRun) {{
     Write-Info "  2. Sign user keys with the CA in UCM (SSH > Certificates > Sign)"
     Write-Info "  3. Users can now log in with their signed certificate"
 }}
+
+}} catch {{
+    $ScriptFailed = $true
+    Write-Host ""
+    Write-Err "Setup FAILED: $_"
+    if ($_.ScriptStackTrace) {{
+        Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    }}
+    Write-Host ""
+    Write-Info "Full log saved to: $LogFile"
+}} finally {{
+    try {{ Stop-Transcript | Out-Null }} catch {{ }}
+    Write-Host ""
+    if ($ScriptFailed) {{
+        Pause-IfInteractive 'An error occurred. Press Enter to close this window...'
+        exit 1
+    }} else {{
+        Pause-IfInteractive
+    }}
+}}
 '''
 
 
@@ -1144,16 +1223,43 @@ def _host_ca_script_windows(pub_key, ca_label, hostname):
 .PARAMETER DryRun
     Preview without modifying anything.
 
+.PARAMETER NonInteractive
+    Skip all prompts (OpenSSH install, end pause). Use in CI/automation.
+
+.PARAMETER NoPause
+    Do not pause at the end (default is to pause so the window stays open).
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\\ssh_ca_setup.ps1
 #>
 
 [CmdletBinding()]
 param(
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$NonInteractive,
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Write-Info  ($msg) {{ Write-Host "[INFO]  $msg" -ForegroundColor Cyan }}
+function Write-Ok    ($msg) {{ Write-Host "[OK]    $msg" -ForegroundColor Green }}
+function Write-Warn2 ($msg) {{ Write-Host "[WARN]  $msg" -ForegroundColor Yellow }}
+function Write-Err   ($msg) {{ Write-Host "[ERROR] $msg" -ForegroundColor Red }}
+
+function Pause-IfInteractive {{
+    param([string]$Message = 'Press Enter to close this window...')
+    if ($NoPause -or $NonInteractive) {{ return }}
+    try {{ Read-Host -Prompt $Message | Out-Null }} catch {{ Start-Sleep -Seconds 30 }}
+}}
+
+# --- Transcript log (always-on so output survives even if window closes) ---
+$LogFile = Join-Path $env:TEMP ("ucm_ssh_host_ca_setup_" + (Get-Date -Format 'yyyyMMdd_HHmmss') + ".log")
+try {{ Start-Transcript -Path $LogFile -Force | Out-Null }} catch {{ }}
+Write-Host "Log file: $LogFile" -ForegroundColor DarkGray
+
+$ScriptFailed = $false
+try {{
 
 # --- Configuration ---
 $SshDir     = Join-Path $env:ProgramData 'ssh'
@@ -1162,17 +1268,13 @@ $CaKeyFile  = Join-Path $CaKeyDir 'host_ca.pub'
 $SshdConfig = Join-Path $SshDir 'sshd_config'
 $Hostname   = '{hostname_init}'
 
-function Write-Info  ($msg) {{ Write-Host "[INFO]  $msg" -ForegroundColor Cyan }}
-function Write-Ok    ($msg) {{ Write-Host "[OK]    $msg" -ForegroundColor Green }}
-function Write-Warn2 ($msg) {{ Write-Host "[WARN]  $msg" -ForegroundColor Yellow }}
-function Write-Err   ($msg) {{ Write-Host "[ERROR] $msg" -ForegroundColor Red }}
-
 # --- Admin check ---
 $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{
     Write-Err "This script must be run as Administrator."
-    exit 1
+    Write-Info "Right-click PowerShell -> Run as Administrator, then re-run this script."
+    throw "Not running as Administrator"
 }}
 
 if (-not $Hostname) {{
@@ -1191,9 +1293,44 @@ Write-Host ""
 
 $sshdSvc = Get-Service -Name sshd -ErrorAction SilentlyContinue
 if (-not $sshdSvc) {{
-    Write-Err "OpenSSH Server (sshd) is not installed."
-    Write-Info "Install with: Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
-    exit 1
+    Write-Warn2 "OpenSSH Server (sshd) is not installed."
+    $doInstall = $false
+    if ($DryRun) {{
+        Write-Info "Would offer to install OpenSSH.Server (skipped in -DryRun)."
+    }} elseif ($NonInteractive) {{
+        Write-Err "OpenSSH Server is missing and -NonInteractive was supplied."
+        Write-Info "Install with: Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0"
+        throw "OpenSSH Server missing"
+    }} else {{
+        $resp = Read-Host "Install OpenSSH Server now? [Y/n]"
+        if ($resp -eq '' -or $resp -match '^[Yy]') {{ $doInstall = $true }}
+    }}
+    if ($doInstall) {{
+        Write-Info "Installing OpenSSH.Server (this may take 1-2 minutes)..."
+        try {{
+            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null
+        }} catch {{
+            Write-Err "Add-WindowsCapability failed: $_"
+            throw
+        }}
+        Set-Service -Name sshd -StartupType 'Automatic'
+        Start-Service sshd
+        if (-not (Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue)) {{
+            try {{
+                New-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -DisplayName 'OpenSSH Server (sshd)' `
+                    -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 | Out-Null
+                Write-Ok "Firewall rule added (TCP/22 inbound)"
+            }} catch {{
+                Write-Warn2 "Could not create firewall rule: $_"
+            }}
+        }}
+        $sshdSvc = Get-Service -Name sshd
+        Write-Ok "OpenSSH Server installed and started"
+    }} elseif (-not $DryRun) {{
+        throw "OpenSSH Server is required. Install it and re-run this script."
+    }}
+}} else {{
+    Write-Info "OpenSSH Server detected (status: $($sshdSvc.Status))"
 }}
 
 # --- Step 1: Create CA key directory ---
@@ -1301,6 +1438,26 @@ Write-Host ""
 
 Write-Info "Clients should add to their known_hosts:"
 Write-Info "  @cert-authority * <CA public key from $CaKeyFile>"
+
+}} catch {{
+    $ScriptFailed = $true
+    Write-Host ""
+    Write-Err "Setup FAILED: $_"
+    if ($_.ScriptStackTrace) {{
+        Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    }}
+    Write-Host ""
+    Write-Info "Full log saved to: $LogFile"
+}} finally {{
+    try {{ Stop-Transcript | Out-Null }} catch {{ }}
+    Write-Host ""
+    if ($ScriptFailed) {{
+        Pause-IfInteractive 'An error occurred. Press Enter to close this window...'
+        exit 1
+    }} else {{
+        Pause-IfInteractive
+    }}
+}}
 '''
 
 

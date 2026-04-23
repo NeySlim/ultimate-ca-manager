@@ -3835,7 +3835,7 @@
     "privateKeyPlaceholder": "Вставте ваш SSH приватний ключ у форматі OpenSSH PEM",
     "importCADescription": "Імпортувати існуючу SSH CA, надавши її приватний ключ",
     "quickInstallLinuxDescription": "Виконайте цю команду на сервері Linux/macOS, щоб довіряти цьому CA:",
-    "quickInstallWindowsDescription": "Виконайте цю команду в PowerShell з правами адміністратора на сервері Windows, щоб довіряти цьому CA:",
+    "quickInstallWindowsDescription": "Вставте це в будь-який PowerShell на сервері Windows. Команда завантажить сценарій налаштування та запустить його як адміністратор у новому вікні, яке залишається відкритим. Працює навіть коли локальне виконання .ps1 заблоковане.",
     "powershellCopied": "Команду PowerShell скопійовано до буфера обміну",
     "downloadSetupScriptLinux": "Завантажити .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Завантажити .ps1 (Windows)"
