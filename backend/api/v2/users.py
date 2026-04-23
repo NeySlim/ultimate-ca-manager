@@ -783,8 +783,11 @@ def create_user_mtls_certificate(user_id):
 
         cert_name = name or cn or f"Imported {serial[:8]}"
 
-        # Create Certificate record if not exists
-        existing_cert = Certificate.query.filter_by(serial_number=serial).first()
+        # Create Certificate record if not exists (#85: match by serial+issuer+fingerprint)
+        from services.smart_import.validator import find_existing_cert_by_identity
+        existing_cert = find_existing_cert_by_identity(
+            Certificate, serial, issuer_dn, pem_text
+        )
         if not existing_cert:
             issuer_ca = CA.query.filter(CA.subject == issuer_dn).first()
             existing_cert = Certificate(

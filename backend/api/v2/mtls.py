@@ -495,8 +495,13 @@ def enroll_import_certificate():
     if hasattr(valid_until, 'timestamp') and valid_until < now:
         return error_response('Cannot enroll expired certificate', 400)
 
-    # Check duplicate
-    existing_cert = Certificate.query.filter_by(serial_number=serial).first()
+    # Check duplicate (#85: match by serial+issuer+fingerprint, not just serial)
+    from services.smart_import.validator import find_existing_cert_by_identity
+    pem_str = cert_obj.public_bytes(serialization.Encoding.PEM).decode('utf-8')
+    issuer_dn = cert_obj.issuer.rfc4514_string()
+    existing_cert = find_existing_cert_by_identity(
+        Certificate, serial, issuer_dn, pem_str
+    )
     existing_auth = AuthCertificate.query.filter_by(cert_serial=serial).first()
     if existing_auth:
         if existing_auth.user_id == user.id:

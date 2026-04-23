@@ -130,8 +130,10 @@ class AutoRenewalService:
                 source=f'{cert.source}-renewal'
             )
 
-            # Get new certificate ID
-            new_cert = Certificate.query.filter_by(serial_number=serial).first()
+            # Get new certificate ID — scope by caref to disambiguate across CAs (#85)
+            new_cert = Certificate.query.filter_by(
+                serial_number=serial, caref=ca.refid
+            ).order_by(Certificate.id.desc()).first()
 
             # Archive old certificate (no `superseded` status column exists)
             cert.archived = True
