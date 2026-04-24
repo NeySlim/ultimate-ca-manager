@@ -2,7 +2,7 @@ name: Tests & Quality Checks
 
 on:
   push:
-    branches: [main, master, develop, 'v*', '*-dev', 'feature/**']
+    branches: [main, master, develop, test, 'v*', '*-dev', 'feature/**']
   pull_request:
     branches: [main, master, develop]
   workflow_dispatch:
