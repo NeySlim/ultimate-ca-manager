@@ -98,6 +98,6 @@ jobs:
             5. build-release.yml will publish DEB/RPM/Docker as a GitHub
                pre-release (NOT marked as latest).
 
-          See RELEASE_TESTING.md for the full workflow + smoke-test matrix.
+          Run the maintainer-local smoke-test matrix before promoting to stable.
           ============================================================
           EOF
