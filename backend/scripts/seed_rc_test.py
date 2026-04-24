@@ -161,7 +161,7 @@ def seed():
         print()
         print("Login: admin / changeme123")
         print()
-        print("Next: restart the service and run through RELEASE_TESTING.md checklist.")
+        print("Next: restart the service and run through the RC smoke-test checklist.")
 
 
 if __name__ == '__main__':
