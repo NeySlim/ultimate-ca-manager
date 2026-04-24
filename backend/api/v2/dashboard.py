@@ -13,7 +13,7 @@ from utils.response import success_response
 from models import db, CA, Certificate
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from sqlalchemy import text
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +155,8 @@ def get_recent_cas():
         'descr': ca.descr,
         'common_name': ca.common_name,
         'is_root': ca.is_root,
-        'created_at': ca.created_at.isoformat() + 'Z' if ca.created_at else None,
-        'valid_to': ca.valid_to.isoformat() + 'Z' if ca.valid_to else None
+        'created_at': utc_isoformat(ca.created_at),
+        'valid_to': utc_isoformat(ca.valid_to)
     } for ca in recent])
 
 
@@ -180,8 +180,8 @@ def get_expiring_certificates():
         'descr': cert.descr,
         'common_name': cert.common_name,
         'subject': cert.subject,
-        'valid_from': cert.valid_from.isoformat() + 'Z' if cert.valid_from else None,
-        'valid_to': cert.valid_to.isoformat() + 'Z' if cert.valid_to else None
+        'valid_from': utc_isoformat(cert.valid_from),
+        'valid_to': utc_isoformat(cert.valid_to)
     } for cert in certs])
 
 
@@ -236,7 +236,7 @@ def get_activity_log():
             # Handle timestamp
             ts = row.timestamp
             if ts and hasattr(ts, 'isoformat'):
-                ts = ts.isoformat() + 'Z'
+                ts = utc_isoformat(ts)
             
             activity.append({
                 'type': resource or 'system',

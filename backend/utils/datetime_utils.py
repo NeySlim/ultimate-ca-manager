@@ -16,3 +16,17 @@ def utc_now() -> datetime:
     stored in SQLite via SQLAlchemy.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def utc_isoformat(dt):
+    """Return an ISO 8601 UTC string ending in 'Z', or None.
+
+    Handles both naive-UTC datetimes (from SQLAlchemy/utc_now) and
+    timezone-aware datetimes (from the cryptography library etc.).
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.isoformat() + 'Z'
+    from datetime import timezone
+    return dt.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')

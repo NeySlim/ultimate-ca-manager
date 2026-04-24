@@ -1,3 +1,4 @@
+from utils.datetime_utils import utc_isoformat
 """
 ACME Configuration Routes v2.0
 /api/acme/* - ACME settings and stats
@@ -226,7 +227,7 @@ def list_acme_accounts():
             'contact': acc.contact_list,
             'terms_of_service_agreed': acc.terms_of_service_agreed,
             'jwk_thumbprint': acc.jwk_thumbprint,
-            'created_at': acc.created_at.isoformat() + 'Z'
+            'created_at': utc_isoformat(acc.created_at)
         })
         
     return success_response(data=data)
@@ -338,7 +339,7 @@ def create_acme_account():
             'contact': account.contact_list,
             'key_type': key_type,
             'terms_of_service_agreed': account.terms_of_service_agreed,
-            'created_at': account.created_at.isoformat() + 'Z'
+            'created_at': utc_isoformat(account.created_at)
         }, message='Account created')
     except Exception as e:
         db.session.rollback()
@@ -387,7 +388,7 @@ def get_acme_account(account_id):
         'contact': acc.contact_list,
         'terms_of_service_agreed': acc.terms_of_service_agreed,
         'jwk_thumbprint': acc.jwk_thumbprint,
-        'created_at': acc.created_at.isoformat() + 'Z'
+        'created_at': utc_isoformat(acc.created_at)
     })
 
 
@@ -459,7 +460,7 @@ def list_acme_orders():
             'status': order.status.capitalize(),
             'expires': order.expires.strftime('%Y-%m-%d'),
             'method': method,
-            'created_at': order.created_at.isoformat() + 'Z'
+            'created_at': utc_isoformat(order.created_at)
         })
         
     return success_response(data=data)
@@ -502,7 +503,7 @@ def list_account_orders(account_id):
             'status': order.status.capitalize(),
             'expires': order.expires.strftime('%Y-%m-%d') if order.expires else None,
             'method': method,
-            'created_at': order.created_at.isoformat() + 'Z',
+            'created_at': utc_isoformat(order.created_at),
             'source': 'local',
         })
 
@@ -520,7 +521,7 @@ def list_account_orders(account_id):
             'status': (po.status or '').capitalize(),
             'expires': po.expires_at.strftime('%Y-%m-%d') if po.expires_at else None,
             'method': (po.challenge_type or 'N/A').upper(),
-            'created_at': po.created_at.isoformat() + 'Z' if po.created_at else None,
+            'created_at': utc_isoformat(po.created_at),
             'source': 'proxy',
             'environment': po.environment,
             'certificate_id': po.certificate_id,
@@ -558,9 +559,9 @@ def list_account_challenges(account_id):
                     'status': challenge.status.capitalize(),
                     'domain': domain,
                     'token': challenge.token[:20] + '...' if challenge.token and len(challenge.token) > 20 else challenge.token,
-                    'validated': challenge.validated.isoformat() + 'Z' if challenge.validated else None,
+                    'validated': utc_isoformat(challenge.validated),
                     'order_id': order.order_id,
-                    'created_at': challenge.created_at.isoformat() + 'Z' if hasattr(challenge, 'created_at') and challenge.created_at else None
+                    'created_at': utc_isoformat(challenge.created_at) if hasattr(challenge, 'created_at') and challenge.created_at else None
                 })
     
     return success_response(data=data)
@@ -662,10 +663,10 @@ def get_acme_history():
             'challenge_type': order_data.get('challenge_type'),
             'environment': order_data.get('environment'),
             'dns_provider': order_data.get('dns_provider'),
-            'valid_from': cert.valid_from.isoformat() + 'Z' if cert.valid_from else None,
-            'valid_to': cert.valid_to.isoformat() + 'Z' if cert.valid_to else None,
+            'valid_from': utc_isoformat(cert.valid_from),
+            'valid_to': utc_isoformat(cert.valid_to),
             'revoked': cert.revoked,
-            'created_at': cert.created_at.isoformat() + 'Z' if cert.created_at else None,
+            'created_at': utc_isoformat(cert.created_at),
             'order': order_data
         })
     

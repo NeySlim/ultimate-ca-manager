@@ -20,7 +20,7 @@ from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from utils.response import error_response, no_content_response, success_response
 from utils.sanitize import sanitize_filename
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +61,8 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['subject'] = certificate.subject
         result['issuer'] = certificate.issuer
         result['serial_number'] = certificate.serial_number
-        result['valid_from'] = certificate.valid_from.isoformat() + 'Z' if certificate.valid_from else None
-        result['valid_to'] = certificate.valid_to.isoformat() + 'Z' if certificate.valid_to else None
+        result['valid_from'] = utc_isoformat(certificate.valid_from)
+        result['valid_to'] = utc_isoformat(certificate.valid_to)
         result['cert_type'] = certificate.cert_type
         result['revoked'] = certificate.revoked or False
         result['has_private_key'] = bool(certificate.prv)

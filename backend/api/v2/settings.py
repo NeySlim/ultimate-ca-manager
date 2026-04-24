@@ -12,7 +12,7 @@ from services.audit_service import AuditService
 from datetime import datetime, timezone
 import json
 import logging
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, utc_isoformat
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('settings_v2', __name__)
@@ -880,7 +880,7 @@ def get_notification_logs():
             'notification_type': log.type,  # Model uses 'type'
             'recipient': log.recipient,
             'subject': log.subject,
-            'sent_at': log.sent_at.isoformat() + 'Z' if log.sent_at else None,
+            'sent_at': utc_isoformat(log.sent_at),
             'status': log.status,  # Model uses 'status' not 'success'
             'error_message': log.error_message,
             'retry_count': log.retry_count

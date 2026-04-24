@@ -13,6 +13,7 @@ import os
 import traceback
 import uuid
 from datetime import datetime, timezone
+from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
@@ -1088,7 +1089,7 @@ def get_ocsp_responder(ca_id):
         'id': cert.id,
         'common_name': cert.common_name,
         'serial_number': cert.serial_number,
-        'valid_to': cert.valid_to.isoformat() + 'Z' if cert.valid_to else None,
+        'valid_to': utc_isoformat(cert.valid_to),
         'issuer_name': cert.issuer_name,
         'revoked': cert.revoked
     }})
@@ -1215,7 +1216,7 @@ def list_eligible_ocsp_responders(ca_id):
                     'id': cert.id,
                     'common_name': cert.common_name,
                     'serial_number': cert.serial_number,
-                    'valid_to': cert.valid_to.isoformat() + 'Z' if cert.valid_to else None
+                    'valid_to': utc_isoformat(cert.valid_to)
                 })
         except (x509.ExtensionNotFound, Exception):
             continue

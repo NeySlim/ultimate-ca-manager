@@ -8,6 +8,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timezone
+from utils.datetime_utils import utc_isoformat
 
 from flask import Blueprint, request, g, Response
 from cryptography import x509 as cx509
@@ -64,7 +65,7 @@ def get_mtls_settings():
             ca_info = {
                 'refid': ca.refid,
                 'name': ca.descr,
-                'valid_to': ca.valid_to.isoformat() + 'Z' if ca.valid_to else None,
+                'valid_to': utc_isoformat(ca.valid_to),
                 'has_private_key': ca.has_private_key,
             }
 
@@ -247,8 +248,8 @@ def create_mtls_certificate():
             'serial': cert_obj.serial_number or '',
             'certificate': cert_pem,
             'private_key': key_pem,
-            'created_at': cert_obj.valid_from.isoformat() + 'Z' if cert_obj.valid_from else '',
-            'expires_at': cert_obj.valid_to.isoformat() + 'Z' if cert_obj.valid_to else '',
+            'created_at': utc_isoformat(cert_obj.valid_from) or '',
+            'expires_at': utc_isoformat(cert_obj.valid_to) or '',
             'status': 'valid',
         }, message='mTLS certificate created')
 
@@ -613,8 +614,8 @@ def list_available_certificates():
             'subject': c.subject,
             'issuer': c.issuer,
             'serial_number': c.serial_number,
-            'valid_from': c.valid_from.isoformat() + 'Z' if c.valid_from else None,
-            'valid_to': c.valid_to.isoformat() + 'Z' if c.valid_to else None,
+            'valid_from': utc_isoformat(c.valid_from),
+            'valid_to': utc_isoformat(c.valid_to),
             'created_by': c.created_by,
             'has_private_key': bool(c.prv),
         })
