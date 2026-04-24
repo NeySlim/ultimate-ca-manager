@@ -34,7 +34,7 @@ def get_db_stats():
         else:
             db_path = db_uri.replace('sqlite:///', '')
             size_bytes = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-        size_mb = round(size_bytes / (1024 * 1024), 2)
+        size_mb = round(size_bytes / (1024 * 1024), 1)
 
         counts = {
             'cas': CA.query.count(),
