@@ -64,7 +64,7 @@ def get_mtls_settings():
             ca_info = {
                 'refid': ca.refid,
                 'name': ca.descr,
-                'valid_to': ca.valid_to.isoformat() if ca.valid_to else None,
+                'valid_to': ca.valid_to.isoformat() + 'Z' if ca.valid_to else None,
                 'has_private_key': ca.has_private_key,
             }
 
@@ -247,8 +247,8 @@ def create_mtls_certificate():
             'serial': cert_obj.serial_number or '',
             'certificate': cert_pem,
             'private_key': key_pem,
-            'created_at': cert_obj.valid_from.isoformat() if cert_obj.valid_from else '',
-            'expires_at': cert_obj.valid_to.isoformat() if cert_obj.valid_to else '',
+            'created_at': cert_obj.valid_from.isoformat() + 'Z' if cert_obj.valid_from else '',
+            'expires_at': cert_obj.valid_to.isoformat() + 'Z' if cert_obj.valid_to else '',
             'status': 'valid',
         }, message='mTLS certificate created')
 
@@ -613,8 +613,8 @@ def list_available_certificates():
             'subject': c.subject,
             'issuer': c.issuer,
             'serial_number': c.serial_number,
-            'valid_from': c.valid_from.isoformat() if c.valid_from else None,
-            'valid_to': c.valid_to.isoformat() if c.valid_to else None,
+            'valid_from': c.valid_from.isoformat() + 'Z' if c.valid_from else None,
+            'valid_to': c.valid_to.isoformat() + 'Z' if c.valid_to else None,
             'created_by': c.created_by,
             'has_private_key': bool(c.prv),
         })

@@ -41,11 +41,11 @@ def get_profile():
             'full_name': getattr(user, 'full_name', None),
             'role': user.role,
             'active': getattr(user, 'active', True),
-            'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
-            'last_login': user.last_login.isoformat() if hasattr(user, 'last_login') and user.last_login else None,
+            'created_at': user.created_at.isoformat() + 'Z' if hasattr(user, 'created_at') and user.created_at else None,
+            'last_login': user.last_login.isoformat() + 'Z' if hasattr(user, 'last_login') and user.last_login else None,
             'login_count': getattr(user, 'login_count', 0),
             'two_factor_enabled': getattr(user, 'totp_confirmed', False),
-            'password_changed_at': user.password_changed_at.isoformat() if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
+            'password_changed_at': user.password_changed_at.isoformat() + 'Z' if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
         }
     )
 
@@ -709,8 +709,8 @@ def list_sessions():
             'id': s.id,
             'ip_address': s.ip_address,
             'user_agent': s.user_agent,
-            'created_at': s.created_at.isoformat() if s.created_at else None,
-            'last_activity': s.last_activity.isoformat() if s.last_activity else None,
+            'created_at': s.created_at.isoformat() + 'Z' if s.created_at else None,
+            'last_activity': s.last_activity.isoformat() + 'Z' if s.last_activity else None,
             'is_current': str(s.id) == current_session_id
         } for s in sessions],
         meta={'total': len(sessions)}

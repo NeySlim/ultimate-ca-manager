@@ -987,7 +987,7 @@ def list_saml_certificates():
             'id': 'https',
             'label': f'HTTPS Certificate ({cert.subject.rfc4514_string()})',
             'subject': cert.subject.rfc4514_string(),
-            'not_after': cert.not_valid_after_utc.isoformat() if hasattr(cert, 'not_valid_after_utc') else cert.not_valid_after.isoformat(),
+            'not_after': cert.not_valid_after_utc.isoformat() + 'Z' if hasattr(cert, 'not_valid_after_utc') else cert.not_valid_after.isoformat(),
             'is_default': True,
         })
     except Exception as e:
@@ -1014,7 +1014,7 @@ def list_saml_certificates():
                 'label': c.subject_cn or c.descr or f'Certificate #{c.id}',
                 'subject': c.subject,
                 'issuer': c.issuer,
-                'not_after': c.valid_to.isoformat() if c.valid_to else None,
+                'not_after': c.valid_to.isoformat() + 'Z' if c.valid_to else None,
                 'key_type': c.key_algo,
                 'is_default': False,
             })

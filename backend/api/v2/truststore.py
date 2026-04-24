@@ -575,7 +575,7 @@ def get_expiring_trusted_certs():
                 'name': c.name,
                 'subject': c.subject,
                 'purpose': c.purpose,
-                'not_after': c.not_after.isoformat() if c.not_after else None,
+                'not_after': c.not_after.isoformat() + 'Z' if c.not_after else None,
                 'days_remaining': days_left,
                 'fingerprint_sha256': c.fingerprint_sha256,
             }

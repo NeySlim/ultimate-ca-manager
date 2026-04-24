@@ -52,9 +52,9 @@ class UserSession(db.Model):
             'ip_address': self.ip_address,
             'user_agent': self.user_agent,
             'auth_method': self.auth_method,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_activity': self.last_activity.isoformat() if self.last_activity else None,
-            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+            'created_at': self.created_at.isoformat() + 'Z' if self.created_at else None,
+            'last_activity': self.last_activity.isoformat() + 'Z' if self.last_activity else None,
+            'expires_at': self.expires_at.isoformat() + 'Z' if self.expires_at else None
         }
 
 
@@ -152,8 +152,8 @@ class User(db.Model):
             "totp_enabled": self.totp_confirmed,
             "two_factor_enabled": self.totp_confirmed,
             "force_password_change": self.force_password_change or False,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "last_login": self.last_login.isoformat() if self.last_login else None,
+            "created_at": self.created_at.isoformat() + 'Z' if self.created_at else None,
+            "last_login": self.last_login.isoformat() + 'Z' if self.last_login else None,
             "login_count": self.login_count or 0,
             "failed_logins": self.failed_logins or 0,
             "auth_source": self.auth_source or 'local',
@@ -193,7 +193,7 @@ class SystemConfig(db.Model):
             "value": self.value if not self.encrypted else "***",
             "encrypted": self.encrypted,
             "description": self.description,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "updated_at": self.updated_at.isoformat() + 'Z' if self.updated_at else None,
             "updated_by": self.updated_by,
         }
 
@@ -508,13 +508,13 @@ class CA(db.Model):
             "ski": self.ski,
             "subject": self.subject,
             "issuer": self.issuer,
-            "valid_from": self.valid_from.isoformat() if self.valid_from else None,
-            "valid_to": self.valid_to.isoformat() if self.valid_to else None,
+            "valid_from": self.valid_from.isoformat() + 'Z' if self.valid_from else None,
+            "valid_to": self.valid_to.isoformat() + 'Z' if self.valid_to else None,
             "issued": issued,  # Frontend-friendly date
             "expires": expires,  # Frontend-friendly date
             "expiry": expiry,  # Frontend-friendly date
             "imported_from": self.imported_from,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": self.created_at.isoformat() + 'Z' if self.created_at else None,
             "created_by": self.created_by,
             "has_private_key": self.has_private_key,
             # Computed properties for display
@@ -981,14 +981,14 @@ class Certificate(db.Model):
             "serial_number": self.serial_number,
             "aki": self.aki,
             "ski": self.ski,
-            "valid_from": self.valid_from.isoformat() if self.valid_from else None,
-            "valid_to": self.valid_to.isoformat() if self.valid_to else None,
+            "valid_from": self.valid_from.isoformat() + 'Z' if self.valid_from else None,
+            "valid_to": self.valid_to.isoformat() + 'Z' if self.valid_to else None,
             "revoked": self.revoked,
-            "revoked_at": self.revoked_at.isoformat() if self.revoked_at else None,
+            "revoked_at": self.revoked_at.isoformat() + 'Z' if self.revoked_at else None,
             "revoke_reason": self.revoke_reason,
             "archived": self.archived or False,
             "imported_from": self.imported_from,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": self.created_at.isoformat() + 'Z' if self.created_at else None,
             "created_by": self.created_by,
             "source": self.source or 'manual',
             "has_private_key": self.has_private_key,
@@ -1071,8 +1071,8 @@ class CRL(db.Model):
             "descr": self.descr,
             "serial": self.serial,
             "lifetime": self.lifetime,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_at": self.created_at.isoformat() + 'Z' if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() + 'Z' if self.updated_at else None,
         }
         if include_crl:
             data["text"] = self.text
@@ -1109,10 +1109,10 @@ class SCEPRequest(db.Model):
             "subject": self.subject,
             "client_ip": self.client_ip,
             "approved_by": self.approved_by,
-            "approved_at": self.approved_at.isoformat() if self.approved_at else None,
+            "approved_at": self.approved_at.isoformat() + 'Z' if self.approved_at else None,
             "rejection_reason": self.rejection_reason,
             "cert_refid": self.cert_refid,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": self.created_at.isoformat() + 'Z' if self.created_at else None,
         }
 
 

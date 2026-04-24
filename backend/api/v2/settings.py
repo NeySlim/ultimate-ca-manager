@@ -880,7 +880,7 @@ def get_notification_logs():
             'notification_type': log.type,  # Model uses 'type'
             'recipient': log.recipient,
             'subject': log.subject,
-            'sent_at': log.sent_at.isoformat() if log.sent_at else None,
+            'sent_at': log.sent_at.isoformat() + 'Z' if log.sent_at else None,
             'status': log.status,  # Model uses 'status' not 'success'
             'error_message': log.error_message,
             'retry_count': log.retry_count

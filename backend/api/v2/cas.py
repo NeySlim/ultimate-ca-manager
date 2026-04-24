@@ -1088,7 +1088,7 @@ def get_ocsp_responder(ca_id):
         'id': cert.id,
         'common_name': cert.common_name,
         'serial_number': cert.serial_number,
-        'valid_to': cert.valid_to.isoformat() if cert.valid_to else None,
+        'valid_to': cert.valid_to.isoformat() + 'Z' if cert.valid_to else None,
         'issuer_name': cert.issuer_name,
         'revoked': cert.revoked
     }})
@@ -1215,7 +1215,7 @@ def list_eligible_ocsp_responders(ca_id):
                     'id': cert.id,
                     'common_name': cert.common_name,
                     'serial_number': cert.serial_number,
-                    'valid_to': cert.valid_to.isoformat() if cert.valid_to else None
+                    'valid_to': cert.valid_to.isoformat() + 'Z' if cert.valid_to else None
                 })
         except (x509.ExtensionNotFound, Exception):
             continue
