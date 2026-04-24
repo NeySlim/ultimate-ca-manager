@@ -80,7 +80,7 @@ def optimize_db():
         else:
             db.session.execute(db.text('VACUUM'))
             db.session.execute(db.text('ANALYZE'))
-        ts = utc_now().strftime('%Y-%m-%d %H:%M:%S UTC')
+        ts = utc_isoformat(utc_now())
         try:
             _set_system_config('db_last_optimized', ts,
                                'Last database optimization timestamp')
@@ -128,7 +128,7 @@ def check_integrity():
                 passed, errors_payload = False, result
                 message = 'Integrity check found errors'
 
-        ts = utc_now().strftime('%Y-%m-%d %H:%M:%S UTC')
+        ts = utc_isoformat(utc_now())
         try:
             _set_system_config('db_last_integrity_check', ts,
                                'Last database integrity check timestamp')

@@ -2046,7 +2046,7 @@ export default function SettingsPage() {
         certificates: stats.counts?.certificates || 0,
         cas: stats.counts?.cas || 0,
         size: stats.size_mb ? `${stats.size_mb} MB` : '-',
-        last_optimized: stats.last_vacuum || 'Never'
+        last_optimized: stats.last_vacuum || null
       })
     } catch (error) {
     }
@@ -4046,7 +4046,7 @@ export default function SettingsPage() {
                 />
                 <DetailField
                   label={t('settings.lastOptimized')}
-                  value={dbStats?.last_optimized || '-'}
+                  value={dbStats?.last_optimized && dbStats.last_optimized !== 'Never' ? formatDate(dbStats.last_optimized) : '-'}
                 />
               </DetailGrid>
             </DetailSection>
