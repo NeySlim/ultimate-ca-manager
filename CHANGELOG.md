@@ -9,8 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.137] - 2026-04-24
+
 ### Fixed
-- **Windows SSH Host/User CA setup script — clearer diagnostics on `Add-WindowsCapability` failure.** When OpenSSH Server install fails on a domain-joined / WSUS-managed machine (typical errors `0x8024500c WU_E_PT_WMT_MISSING`, `0x800f0954`, WU connectivity codes), the script now prints a labelled diagnostic block: classifies the error, reports the detected `UseWUServer` / `WUServer` group-policy values, and lists three policy-compliant remediation paths (WSUS approval / FoD-from-WU policy / offline FoD ISO / manual install via Optional Features). The script never modifies WSUS or update policy itself — it explains the problem so the Windows / AD team can fix it.
+- **Datetime serialisation now consistently UTC across the API (#87)** — every `datetime.isoformat()` returned by the backend now carries an explicit `Z` suffix via the new `utc_isoformat()` helper. Frontend components (audit log viewer, dashboards, certificate detail) consistently render in the user's local timezone without ambiguity. Backend-wide sweep: 84 auto-fixed call sites + 9 manual fixes; full backend test suite (1558 tests) green.
+- **Windows SSH Host/User CA setup script — clearer diagnostics on `Add-WindowsCapability` failure (#75).** When OpenSSH Server install fails on a domain-joined / WSUS-managed machine (typical errors `0x8024500c WU_E_PT_WMT_MISSING`, `0x800f0954`, WU connectivity codes), the script now prints a labelled diagnostic block: classifies the error, reports the detected `UseWUServer` / `WUServer` group-policy values, and lists three policy-compliant remediation paths (WSUS approval / FoD-from-WU policy / offline FoD ISO / manual install via Optional Features). The script never modifies WSUS or update policy itself — it explains the problem so the Windows / AD team can fix it.
 
 ## [2.136] - 2026-04-24
 
