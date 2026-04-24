@@ -1015,10 +1015,45 @@ if (-not $sshdSvc) {{
     if ($doInstall) {{
         Write-Info "Installing OpenSSH.Server (this may take 1-2 minutes)..."
         try {{
-            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null
+            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction Stop | Out-Null
         }} catch {{
-            Write-Err "Add-WindowsCapability failed: $_"
-            Write-Info "On older Windows, install via 'Settings > Apps > Optional features > OpenSSH Server'."
+            $errMsg = $_.Exception.Message
+            Write-Err "Add-WindowsCapability failed: $errMsg"
+            Write-Host ""
+            Write-Host "---- Diagnostic ----" -ForegroundColor Yellow
+            if ($errMsg -match '0x8024500c|WU_E_PT_WMT_MISSING') {{
+                Write-Host "Cause: 0x8024500c (WU_E_PT_WMT_MISSING)" -ForegroundColor Yellow
+                Write-Host "  This machine is configured to use WSUS (group policy), but the WSUS server"
+                Write-Host "  does not host the OpenSSH Features-on-Demand source, so Windows refuses to"
+                Write-Host "  download it from Microsoft Update."
+            }} elseif ($errMsg -match '0x800f0954') {{
+                Write-Host "Cause: 0x800f0954 (CBS_E_INVALID_WINDOWS_UPDATE_COUNT_WSUS)" -ForegroundColor Yellow
+                Write-Host "  Group policy forbids reaching Microsoft Update for Features-on-Demand."
+            }} elseif ($errMsg -match '0x80240438|0x8024402c|0x80072ee2|0x80072efd') {{
+                Write-Host "Cause: Windows Update / WSUS connectivity error ($errMsg)" -ForegroundColor Yellow
+                Write-Host "  The Windows Update client cannot reach its configured update source."
+            }} else {{
+                Write-Host "Cause: see error message above." -ForegroundColor Yellow
+            }}
+            $regAU = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
+            $useWUServer = (Get-ItemProperty -Path $regAU -Name UseWUServer -ErrorAction SilentlyContinue).UseWUServer
+            $wuServer = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' -Name WUServer -ErrorAction SilentlyContinue).WUServer
+            if ($useWUServer -eq 1) {{
+                Write-Host ("  Detected WSUS policy: UseWUServer=1, WUServer={0}" -f $wuServer)
+            }} else {{
+                Write-Host "  No WSUS policy detected (UseWUServer != 1)."
+            }}
+            Write-Host ""
+            Write-Host "Resolution options (ask your Windows / AD team — do NOT bypass policy yourself):" -ForegroundColor Cyan
+            Write-Host "  1. Ask the WSUS admin to approve the OpenSSH FoD package, OR enable the policy"
+            Write-Host "     'Specify settings for optional component installation and component repair'"
+            Write-Host "     with 'Download repair content ... directly from Windows Update' enabled"
+            Write-Host "     (Computer Config > Admin Templates > System)."
+            Write-Host "  2. Install offline from a Features-on-Demand ISO matching this Windows build:"
+            Write-Host "     Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -Source <FoD-ISO>\LanguagesAndOptionalFeatures"
+            Write-Host "  3. Install OpenSSH Server manually via Settings > Apps > Optional features."
+            Write-Host "Re-run this script once OpenSSH Server is installed and running."
+            Write-Host "--------------------" -ForegroundColor Yellow
             throw
         }}
         Set-Service -Name sshd -StartupType 'Automatic'
@@ -1308,9 +1343,45 @@ if (-not $sshdSvc) {{
     if ($doInstall) {{
         Write-Info "Installing OpenSSH.Server (this may take 1-2 minutes)..."
         try {{
-            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null
+            Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction Stop | Out-Null
         }} catch {{
-            Write-Err "Add-WindowsCapability failed: $_"
+            $errMsg = $_.Exception.Message
+            Write-Err "Add-WindowsCapability failed: $errMsg"
+            Write-Host ""
+            Write-Host "---- Diagnostic ----" -ForegroundColor Yellow
+            if ($errMsg -match '0x8024500c|WU_E_PT_WMT_MISSING') {{
+                Write-Host "Cause: 0x8024500c (WU_E_PT_WMT_MISSING)" -ForegroundColor Yellow
+                Write-Host "  This machine is configured to use WSUS (group policy), but the WSUS server"
+                Write-Host "  does not host the OpenSSH Features-on-Demand source, so Windows refuses to"
+                Write-Host "  download it from Microsoft Update."
+            }} elseif ($errMsg -match '0x800f0954') {{
+                Write-Host "Cause: 0x800f0954 (CBS_E_INVALID_WINDOWS_UPDATE_COUNT_WSUS)" -ForegroundColor Yellow
+                Write-Host "  Group policy forbids reaching Microsoft Update for Features-on-Demand."
+            }} elseif ($errMsg -match '0x80240438|0x8024402c|0x80072ee2|0x80072efd') {{
+                Write-Host "Cause: Windows Update / WSUS connectivity error ($errMsg)" -ForegroundColor Yellow
+                Write-Host "  The Windows Update client cannot reach its configured update source."
+            }} else {{
+                Write-Host "Cause: see error message above." -ForegroundColor Yellow
+            }}
+            $regAU = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
+            $useWUServer = (Get-ItemProperty -Path $regAU -Name UseWUServer -ErrorAction SilentlyContinue).UseWUServer
+            $wuServer = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' -Name WUServer -ErrorAction SilentlyContinue).WUServer
+            if ($useWUServer -eq 1) {{
+                Write-Host ("  Detected WSUS policy: UseWUServer=1, WUServer={0}" -f $wuServer)
+            }} else {{
+                Write-Host "  No WSUS policy detected (UseWUServer != 1)."
+            }}
+            Write-Host ""
+            Write-Host "Resolution options (ask your Windows / AD team — do NOT bypass policy yourself):" -ForegroundColor Cyan
+            Write-Host "  1. Ask the WSUS admin to approve the OpenSSH FoD package, OR enable the policy"
+            Write-Host "     'Specify settings for optional component installation and component repair'"
+            Write-Host "     with 'Download repair content ... directly from Windows Update' enabled"
+            Write-Host "     (Computer Config > Admin Templates > System)."
+            Write-Host "  2. Install offline from a Features-on-Demand ISO matching this Windows build:"
+            Write-Host "     Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -Source <FoD-ISO>\LanguagesAndOptionalFeatures"
+            Write-Host "  3. Install OpenSSH Server manually via Settings > Apps > Optional features."
+            Write-Host "Re-run this script once OpenSSH Server is installed and running."
+            Write-Host "--------------------" -ForegroundColor Yellow
             throw
         }}
         Set-Service -Name sshd -StartupType 'Automatic'
