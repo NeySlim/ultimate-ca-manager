@@ -387,7 +387,7 @@ def _generate_setup_script(ca, pub_key, ca_type, hostname, platform='unix'):
 
 
 def _user_ca_script(pub_key, ca_label):
-    return f'''#!/bin/sh
+    return rf'''#!/bin/sh
 # ============================================================================
 # SSH User CA Trust Setup Script
 # CA: {ca_label}
@@ -635,7 +635,7 @@ fi
 
 def _host_ca_script(pub_key, ca_label, hostname):
     hostname_display = hostname if hostname else '$(hostname -f)'
-    return f'''#!/bin/sh
+    return rf'''#!/bin/sh
 # ============================================================================
 # SSH Host CA Trust Setup Script
 # CA: {ca_label}
@@ -913,7 +913,7 @@ def _user_ca_script_windows(pub_key, ca_label):
     # Escape any single quote in the public key for safety.
     ps_pub_key = pub_key.replace("'", "''")
     ps_label = ca_label.replace("'", "''")
-    return f'''<#
+    return rf'''<#
 .SYNOPSIS
     SSH User CA Trust Setup Script (Windows OpenSSH Server)
     CA: {ca_label}
@@ -1267,7 +1267,7 @@ def _host_ca_script_windows(pub_key, ca_label, hostname):
     ps_pub_key = pub_key.replace("'", "''")
     ps_label = ca_label.replace("'", "''")
     hostname_init = hostname if hostname else ''
-    return f'''<#
+    return rf'''<#
 .SYNOPSIS
     SSH Host CA Trust Setup Script (Windows OpenSSH Server)
     CA: {ca_label}
