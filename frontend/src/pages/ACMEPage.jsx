@@ -93,6 +93,15 @@ export default function ACMEPage() {
   const [historyFilterCA, setHistoryFilterCA] = useState('')
   const [historyFilterSource, setHistoryFilterSource] = useState('')
 
+  // EAB Credentials (RFC 8555 §7.3.4 — server-side External Account Binding)
+  const [eabCredentials, setEabCredentials] = useState([])
+  const [eabRequired, setEabRequired] = useState(false)
+  const [showCreateEabModal, setShowCreateEabModal] = useState(false)
+  const [newEabSecret, setNewEabSecret] = useState(null)
+  const [eabLabel, setEabLabel] = useState('')
+  const [eabExpiresInDays, setEabExpiresInDays] = useState('')
+  const [eabFilterStatus, setEabFilterStatus] = useState('')
+
   useEffect(() => {
     loadData()
   }, [])
@@ -100,7 +109,7 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabCredsRes, eabReqRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
@@ -110,7 +119,9 @@ export default function ACMEPage() {
         acmeService.getDnsProviders().catch(() => ({ data: [] })),
         acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
         acmeService.getDomains().catch(() => ({ data: [] })),
-        acmeService.getLocalDomains().catch(() => ({ data: [] }))
+        acmeService.getLocalDomains().catch(() => ({ data: [] })),
+        acmeService.listEabCredentials().catch(() => ({ data: [] })),
+        acmeService.getEabRequired().catch(() => ({ data: { eab_required: false } }))
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
@@ -119,6 +130,8 @@ export default function ACMEPage() {
       setClientOrders(clientOrdersRes.data || [])
       setClientSettings(clientSettingsRes.data || {})
       setEabHmacInput(null)
+      setEabCredentials(eabCredsRes.data || [])
+      setEabRequired(!!(eabReqRes.data?.eab_required))
       
       // Sync local text input state from loaded settings
       const cs = clientSettingsRes.data || {}
@@ -624,6 +637,56 @@ export default function ACMEPage() {
     }
   }
 
+  // EAB credential handlers
+  const handleToggleEabRequired = async (value) => {
+    try {
+      await acmeService.setEabRequired(value)
+      setEabRequired(value)
+      showSuccess(t('acme.eab.requiredUpdated'))
+    } catch (error) {
+      showError(error.message || t('acme.eab.requiredUpdateFailed'))
+    }
+  }
+
+  const handleCreateEabCredential = async () => {
+    try {
+      const payload = { label: eabLabel || null }
+      const days = parseInt(eabExpiresInDays, 10)
+      if (!Number.isNaN(days) && days > 0) payload.expires_in_days = days
+
+      const res = await acmeService.createEabCredential(payload)
+      const created = res.data || res
+      setNewEabSecret(created)
+      setShowCreateEabModal(false)
+      setEabLabel('')
+      setEabExpiresInDays('')
+      const list = await acmeService.listEabCredentials()
+      setEabCredentials(list.data || [])
+    } catch (error) {
+      showError(error.message || t('acme.eab.createFailed'))
+    }
+  }
+
+  const handleRevokeEabCredential = async (cred) => {
+    const confirmed = await showConfirm(
+      t('acme.eab.confirmRevoke', { kid: cred.kid }),
+      {
+        title: t('acme.eab.revokeTitle'),
+        confirmText: t('acme.eab.revoke'),
+        variant: 'danger'
+      }
+    )
+    if (!confirmed) return
+    try {
+      await acmeService.revokeEabCredential(cred.id)
+      showSuccess(t('acme.eab.revokedSuccess'))
+      const list = await acmeService.listEabCredentials()
+      setEabCredentials(list.data || [])
+    } catch (error) {
+      showError(error.message || t('acme.eab.revokeFailed'))
+    }
+  }
+
   // Computed stats
   const stats = useMemo(() => ({
     total: accounts.length,
@@ -708,6 +771,7 @@ export default function ACMEPage() {
     { id: 'config', label: t('acme.server'), icon: Gear },
     { id: 'localdomains', label: t('acme.localDomains'), icon: GlobeHemisphereWest, count: localDomains.length },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
+    { id: 'eab', label: t('acme.eab.tab'), icon: LockKey, count: eabCredentials.length },
     { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: history.length }
   ]
 
@@ -741,6 +805,12 @@ export default function ACMEPage() {
         <Button type="button" size="sm" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.addDomain')}</span>
+        </Button>
+      )}
+      {activeTab === 'eab' && canWrite('acme') && (
+        <Button type="button" size="sm" onClick={() => { setEabLabel(''); setEabExpiresInDays(''); setShowCreateEabModal(true) }}>
+          <Plus size={14} />
+          <span className="hidden sm:inline">{t('acme.eab.new')}</span>
         </Button>
       )}
     </>
@@ -1973,7 +2043,130 @@ export default function ACMEPage() {
     />
   )
 
-  // History content
+  // EAB Credentials content (RFC 8555 §7.3.4)
+  const filteredEabCredentials = useMemo(() => {
+    if (!eabFilterStatus) return eabCredentials
+    return eabCredentials.filter(c => c.status === eabFilterStatus)
+  }, [eabCredentials, eabFilterStatus])
+
+  const eabContent = (
+    <div className="space-y-4">
+      <Card>
+        <div className="p-4 flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
+              <LockKey size={20} weight="duotone" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-semibold">{t('acme.eab.requiredTitle')}</div>
+              <div className="text-sm text-text-tertiary mt-1">
+                {t('acme.eab.requiredDescription')}
+              </div>
+            </div>
+          </div>
+          <ToggleSwitch
+            checked={eabRequired}
+            onChange={handleToggleEabRequired}
+            disabled={!canWrite('acme')}
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <div className="p-4 border-b border-border flex items-center gap-3">
+          <Select
+            value={eabFilterStatus}
+            onChange={setEabFilterStatus}
+            options={[
+              { value: '', label: t('acme.eab.allStatuses') },
+              { value: 'active', label: t('acme.eab.statusActive') },
+              { value: 'used', label: t('acme.eab.statusUsed') },
+              { value: 'revoked', label: t('acme.eab.statusRevoked') }
+            ]}
+            className="w-44"
+          />
+          <span className="text-sm text-text-tertiary">
+            {t('acme.eab.totalCount', { count: filteredEabCredentials.length })}
+          </span>
+        </div>
+        {filteredEabCredentials.length === 0 ? (
+          <div className="p-8 text-center">
+            <LockKey size={36} className="mx-auto mb-3 text-text-tertiary" weight="duotone" />
+            <div className="font-medium">{t('acme.eab.empty')}</div>
+            <div className="text-sm text-text-tertiary mt-1">{t('acme.eab.emptyDesc')}</div>
+            {canWrite('acme') && (
+              <Button type="button" className="mt-4" onClick={() => setShowCreateEabModal(true)}>
+                <Plus size={14} />
+                {t('acme.eab.new')}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredEabCredentials.map(cred => (
+              <div key={cred.id} className="p-4 flex items-center justify-between gap-3 hover:bg-bg-tertiary/40">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium truncate">{cred.label || t('acme.eab.unlabeled')}</span>
+                    <Badge variant={
+                      cred.status === 'active' ? 'success' :
+                      cred.status === 'used' ? 'info' :
+                      cred.status === 'revoked' ? 'danger' :
+                      'default'
+                    }>
+                      {t(`acme.eab.status${cred.status.charAt(0).toUpperCase() + cred.status.slice(1)}`)}
+                    </Badge>
+                    {cred.expires_at && (
+                      <Badge variant="warning" className="text-xs">
+                        <Clock size={12} /> {formatDate(cred.expires_at)}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-text-tertiary font-mono break-all">
+                    <span>kid:</span>
+                    <span className="select-all">{cred.kid}</span>
+                    <button
+                      type="button"
+                      className="text-accent-primary hover:underline"
+                      onClick={() => { copy(cred.kid); showSuccess(t('acme.eab.kidCopied')) }}
+                      title={t('common.copy')}
+                    >
+                      <Copy size={12} />
+                    </button>
+                  </div>
+                  <div className="mt-1 text-xs text-text-tertiary">
+                    {t('acme.eab.created')}: {formatDate(cred.created_at)}
+                    {cred.used_at && (
+                      <> · {t('acme.eab.usedAt')}: {formatDate(cred.used_at)}</>
+                    )}
+                    {cred.used_by_account_id && (
+                      <> · {t('acme.eab.boundTo')}: <span className="font-mono">{cred.used_by_account_id.slice(0, 16)}…</span></>
+                    )}
+                    {cred.revoked_at && (
+                      <> · {t('acme.eab.revokedAt')}: {formatDate(cred.revoked_at)}</>
+                    )}
+                  </div>
+                </div>
+                {canDelete('acme') && cred.status === 'active' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRevokeEabCredential(cred)}
+                    title={t('acme.eab.revoke')}
+                  >
+                    <Trash size={14} />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+
+
   const historyColumns = useMemo(() => [
     {
       key: 'common_name',
@@ -2488,7 +2681,7 @@ export default function ACMEPage() {
         sidebarContentClass=""
         tabGroups={[
           { labelKey: 'acme.groups.letsEncrypt', tabs: ['letsencrypt', 'dns', 'domains'], color: 'icon-bg-emerald' },
-          { labelKey: 'acme.groups.localAcme', tabs: ['config', 'localdomains', 'accounts'], color: 'icon-bg-violet' },
+          { labelKey: 'acme.groups.localAcme', tabs: ['config', 'localdomains', 'accounts', 'eab'], color: 'icon-bg-violet' },
           { labelKey: 'acme.groups.history', tabs: ['history'], color: 'icon-bg-blue' },
         ]}
         onTabChange={(tab) => {
@@ -2536,6 +2729,7 @@ export default function ACMEPage() {
         {activeTab === 'config' && configContent}
         {activeTab === 'localdomains' && localDomainsContent}
         {activeTab === 'accounts' && accountsContent}
+        {activeTab === 'eab' && eabContent}
         {activeTab === 'history' && historyContent}
       </ResponsiveLayout>
 
@@ -2549,6 +2743,87 @@ export default function ACMEPage() {
           onSubmit={handleCreate}
           onCancel={() => setShowCreateModal(false)}
         />
+      </Modal>
+
+      {/* Create EAB Credential Modal */}
+      <Modal
+        open={showCreateEabModal}
+        onClose={() => setShowCreateEabModal(false)}
+        title={t('acme.eab.newTitle')}
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-tertiary">
+            {t('acme.eab.newDescription')}
+          </p>
+          <Input
+            label={t('acme.eab.label')}
+            placeholder={t('acme.eab.labelPlaceholder')}
+            value={eabLabel}
+            onChange={(e) => setEabLabel(e.target.value)}
+            maxLength={255}
+          />
+          <Input
+            label={t('acme.eab.expiresInDays')}
+            type="number"
+            placeholder={t('acme.eab.expiresPlaceholder')}
+            value={eabExpiresInDays}
+            onChange={(e) => setEabExpiresInDays(e.target.value)}
+            min={1}
+            helperText={t('acme.eab.expiresHelp')}
+          />
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => setShowCreateEabModal(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" onClick={handleCreateEabCredential}>
+              {t('acme.eab.generate')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Show EAB Secret Once Modal */}
+      <Modal
+        open={!!newEabSecret}
+        onClose={() => setNewEabSecret(null)}
+        title={t('acme.eab.secretTitle')}
+        size="md"
+      >
+        {newEabSecret && (
+          <div className="p-4 space-y-4">
+            <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 flex gap-2">
+              <Warning size={20} className="text-yellow-500 shrink-0 mt-0.5" weight="duotone" />
+              <div className="text-sm">
+                <div className="font-semibold">{t('acme.eab.secretWarningTitle')}</div>
+                <div className="text-text-tertiary mt-1">{t('acme.eab.secretWarning')}</div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('acme.eab.kid')}</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{newEabSecret.kid}</code>
+                <Button type="button" variant="secondary" size="sm" onClick={() => { copy(newEabSecret.kid); showSuccess(t('acme.eab.kidCopied')) }}>
+                  <Copy size={14} />
+                </Button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t('acme.eab.hmacKey')}</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{newEabSecret.hmac_key}</code>
+                <Button type="button" variant="secondary" size="sm" onClick={() => { copy(newEabSecret.hmac_key); showSuccess(t('acme.eab.hmacCopied')) }}>
+                  <Copy size={14} />
+                </Button>
+              </div>
+              <p className="text-xs text-text-tertiary mt-1">{t('acme.eab.hmacFormat')}</p>
+            </div>
+            <div className="flex justify-end pt-2 border-t border-border">
+              <Button type="button" onClick={() => setNewEabSecret(null)}>
+                {t('acme.eab.secretConfirm')}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
       
       {/* Request Certificate Modal */}

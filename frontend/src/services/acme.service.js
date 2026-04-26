@@ -53,6 +53,36 @@ export const acmeService = {
   },
 
   // =========================================================================
+  // EAB Credentials (RFC 8555 §7.3.4 — External Account Binding)
+  // =========================================================================
+
+  async getEabRequired() {
+    return apiClient.get('/acme/eab-required')
+  },
+
+  async setEabRequired(value) {
+    return apiClient.put('/acme/eab-required', { eab_required: !!value })
+  },
+
+  async listEabCredentials(status) {
+    const qs = status ? buildQueryString({ status }) : ''
+    return apiClient.get(`/acme/eab-credentials${qs}`)
+  },
+
+  async createEabCredential(data) {
+    // Returns { kid, hmac_key, ... } — hmac_key is shown ONCE.
+    return apiClient.post('/acme/eab-credentials', data)
+  },
+
+  async getEabCredential(id) {
+    return apiClient.get(`/acme/eab-credentials/${id}`)
+  },
+
+  async revokeEabCredential(id) {
+    return apiClient.delete(`/acme/eab-credentials/${id}`)
+  },
+
+  // =========================================================================
   // ACME Client (Let's Encrypt)
   // =========================================================================
 
