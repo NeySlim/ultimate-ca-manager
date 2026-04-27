@@ -74,59 +74,55 @@ def seed():
         for u in users:
             print(f"  - {u.username} ({u.role})")
 
-        ca_service = CAService()
-        cert_service = CertificateService()
-
         print("\n[3/4] Creating CAs...")
-        root_ca = ca_service.create_internal_ca(
-            common_name='Test Root CA',
-            organization='UCM RC Test',
-            organizational_unit='Testing',
-            country='US',
-            state='Test',
-            locality='Test',
+        base_dn = {
+            'O': 'UCM RC Test',
+            'OU': 'Testing',
+            'C': 'US',
+            'ST': 'Test',
+            'L': 'Test',
+        }
+        root_ca = CAService.create_internal_ca(
+            descr='Test Root CA',
+            dn={**base_dn, 'CN': 'Test Root CA'},
+            key_type='4096',
             validity_days=3650,
-            key_type='RSA_4096',
-            hash_algorithm='SHA256',
+            digest='sha256',
         )
-        print(f"  - {root_ca.common_name} (root, RSA-4096)")
+        print(f"  - {root_ca.descr} (root, RSA-4096, refid={root_ca.refid})")
 
-        intermediate_ca = ca_service.create_internal_ca(
-            common_name='Test Intermediate CA',
-            organization='UCM RC Test',
-            organizational_unit='Testing',
-            country='US',
-            state='Test',
-            locality='Test',
+        intermediate_ca = CAService.create_internal_ca(
+            descr='Test Intermediate CA',
+            dn={**base_dn, 'CN': 'Test Intermediate CA'},
+            key_type='prime256v1',
             validity_days=1825,
-            key_type='ECDSA_P256',
-            hash_algorithm='SHA256',
-            parent_ca_id=root_ca.id,
+            digest='sha256',
+            caref=root_ca.refid,
         )
         intermediate_ca.cdp_enabled = True
         intermediate_ca.cdp_url = 'https://localhost/cdp/{ca_refid}.crl'
         db.session.commit()
-        print(f"  - {intermediate_ca.common_name} (intermediate, ECDSA-P256, CDP enabled)")
+        print(f"  - {intermediate_ca.descr} (intermediate, ECDSA-P256, CDP enabled, refid={intermediate_ca.refid})")
 
         print("\n[4/4] Creating leaf certificates...")
         leaf_specs = [
-            # (CN, validity_days, label)
-            ('valid-1y.example.test', 365, 'valid (1y)'),
-            ('expiring-soon.example.test', 7, 'expiring (7d)'),
-            ('wildcard.example.test', 180, 'wildcard (6m)'),
-            ('client-auth.example.test', 365, 'client auth'),
+            # (CN, validity_days, label, sans)
+            ('valid-1y.example.test', 365, 'valid (1y)', ['valid-1y.example.test']),
+            ('expiring-soon.example.test', 7, 'expiring (7d)', ['expiring-soon.example.test']),
+            ('wildcard.example.test', 180, 'wildcard (6m)', ['*.example.test', 'example.test']),
+            ('client-auth.example.test', 365, 'client auth', ['client-auth.example.test']),
         ]
-        for cn, days, label in leaf_specs:
+        for cn, days, label, sans in leaf_specs:
             try:
-                cert = cert_service.issue_certificate(
-                    ca_id=intermediate_ca.id,
-                    common_name=cn,
-                    organization='UCM RC Test',
-                    country='US',
+                cert = CertificateService.create_certificate(
+                    descr=cn,
+                    caref=intermediate_ca.refid,
+                    dn={'CN': cn, 'O': 'UCM RC Test', 'C': 'US'},
+                    cert_type='server_cert',
+                    key_type='2048',
                     validity_days=days,
-                    key_type='RSA_2048',
-                    hash_algorithm='SHA256',
-                    san_dns=[cn] if not cn.startswith('wildcard') else ['*.example.test'],
+                    digest='sha256',
+                    san_dns=sans,
                 )
                 print(f"  - {cn} [{label}]")
             except Exception as e:
@@ -134,14 +130,14 @@ def seed():
 
         # Issue an expired cert by issuing with 1 day then back-dating
         try:
-            expired = cert_service.issue_certificate(
-                ca_id=intermediate_ca.id,
-                common_name='expired.example.test',
-                organization='UCM RC Test',
-                country='US',
+            expired = CertificateService.create_certificate(
+                descr='expired.example.test',
+                caref=intermediate_ca.refid,
+                dn={'CN': 'expired.example.test', 'O': 'UCM RC Test', 'C': 'US'},
+                cert_type='server_cert',
+                key_type='2048',
                 validity_days=1,
-                key_type='RSA_2048',
-                hash_algorithm='SHA256',
+                digest='sha256',
                 san_dns=['expired.example.test'],
             )
             # Force expired: set expires_at in past
