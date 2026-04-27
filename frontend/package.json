@@ -1,7 +1,7 @@
 {
   "name": "ucm-radix",
   "private": true,
-  "version": "2.139-rc1",
+  "version": "2.139",
   "type": "module",
   "scripts": {
     "dev": "vite",
