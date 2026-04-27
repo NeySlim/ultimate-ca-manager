@@ -13,7 +13,7 @@ ROLE_PERMISSIONS = {
         'read:templates',
         'read:truststore', 'write:truststore',
         'read:crl', 'write:crl',
-        'read:acme', 'write:acme',
+        'read:acme', 'write:acme', 'delete:acme',
         'read:scep',
         'read:est',
         'read:hsm',
