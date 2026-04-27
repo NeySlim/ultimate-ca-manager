@@ -20,6 +20,32 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 acme_bp = Blueprint('acme', __name__, url_prefix='/acme')
 
+
+def _audit_acme(action: str, *, resource_type: str, resource_id, details: str = '', success: bool = True) -> None:
+    """Best-effort audit log for ACME server (RFC 8555) events.
+
+    ACME has no UCM session — username is ``acme`` and ip_address is taken
+    from the real ACME client (cert-manager pod, certbot, lego, ...) via the
+    X-Forwarded-For chain so we can correlate reverse-proxied issuance.
+    Failures are swallowed so audit issues never break the ACME flow.
+    """
+    try:
+        from services.audit_service import AuditService
+        ip = (request.headers.get('X-Forwarded-For')
+              or request.remote_addr or '').split(',')[0].strip()
+        AuditService.log_action(
+            username='acme',
+            action=action,
+            resource_type=resource_type,
+            resource_id=str(resource_id) if resource_id is not None else None,
+            details=details,
+            ip_address=ip or None,
+            user_agent=request.headers.get('User-Agent'),
+            success=success,
+        )
+    except Exception as audit_err:  # pragma: no cover - audit must never break ACME
+        logger.warning(f"ACME audit log failed for {action}: {audit_err}")
+
 # Note: ACME service is instantiated per-request (see get_acme_service)
 # to avoid stale base_url issues behind reverse proxies or multi-hostname access.
 
@@ -400,13 +426,25 @@ def new_account():
             eab_valid, eab_error = service.validate_eab(eab_data, jwk)
             if not eab_valid:
                 return acme_error('malformed', f'Invalid external account binding: {eab_error}')
-        
+
         # Create or retrieve account
         account, is_new = service.create_account(
             jwk=jwk,
             contact=contact,
             terms_of_service_agreed=terms_agreed
         )
+
+        # Bind the EAB credential (if any) to the freshly-created account
+        # so the admin UI can show "this k8s cluster registered acct/abc".
+        if eab_data and is_new:
+            try:
+                import base64 as _b64
+                eab_protected = json.loads(_b64.urlsafe_b64decode(eab_data['protected'] + '=='))
+                eab_kid = eab_protected.get('kid', '')
+                if eab_kid:
+                    service.mark_eab_used(eab_kid, account.account_id)
+            except Exception as bind_err:
+                logger.warning(f"Failed to bind EAB credential to account: {bind_err}")
         
         # Build response
         account_url = f"{service.base_url}/acme/acct/{account.account_id}"
@@ -420,7 +458,15 @@ def new_account():
         
         response = acme_response(response_data, 201 if is_new else 200)
         response.headers['Location'] = account_url
-        
+
+        if is_new:
+            _audit_acme(
+                'acme.account.register',
+                resource_type='acme_account',
+                resource_id=account.account_id,
+                details=f"contact={','.join(contact) if contact else '(none)'} eab={'yes' if eab_data else 'no'}",
+            )
+
         return response
         
     except Exception as e:
@@ -684,7 +730,14 @@ def new_order():
         
         response = acme_response(response_data, 201)
         response.headers['Location'] = order_url
-        
+
+        _audit_acme(
+            'acme.order.create',
+            resource_type='acme_order',
+            resource_id=order.order_id,
+            details=f"account={account.account_id} identifiers={json.dumps(identifiers)}",
+        )
+
         return response
         
     except Exception as e:
@@ -795,11 +848,25 @@ def finalize_order(order_id: str):
         success, error = service.finalize_order(order_id, csr_pem)
         
         if not success:
+            _audit_acme(
+                'acme.order.finalize',
+                resource_type='acme_order',
+                resource_id=order_id,
+                details=f"failed: {error}",
+                success=False,
+            )
             return acme_error('badCSR', error)
         
         # Return updated order
         order = service.get_order(order_id)
         order_url = f"{service.base_url}/acme/order/{order.order_id}"
+
+        _audit_acme(
+            'acme.order.finalize',
+            resource_type='acme_order',
+            resource_id=order.order_id,
+            details=f"status={order.status} cert={order.certificate_url or '(pending)'}",
+        )
         
         authz_urls = [
             f"{service.base_url}/acme/authz/{auth.authorization_id}"
@@ -957,6 +1024,17 @@ def respond_to_challenge(challenge_id: str):
             success = service.validate_tls_alpn01_challenge(challenge, account)
         else:
             return acme_error('unsupportedType', f'Challenge type {challenge.type} not supported')
+
+        # Audit only on terminal state transitions (avoids polling noise)
+        if challenge.status in ('valid', 'invalid'):
+            domain = challenge.authorization.identifier_value if challenge.authorization else '?'
+            _audit_acme(
+                'acme.challenge.respond',
+                resource_type='acme_challenge',
+                resource_id=challenge.challenge_id,
+                details=f"type={challenge.type} domain={domain} status={challenge.status} account={account.account_id}",
+                success=(challenge.status == 'valid'),
+            )
         
         # Build response
         response_data = {
@@ -1125,8 +1203,22 @@ def revoke_cert():
             )
         except Exception as e:
             logger.error(f"ACME revocation failed: {e}")
+            _audit_acme(
+                'acme.cert.revoke',
+                resource_type='certificate',
+                resource_id=cert.id,
+                details=f"failed serial={serial_hex} reason={reason}: {e}",
+                success=False,
+            )
             return acme_error('serverInternal', 'Revocation failed', 500)
-        
+
+        _audit_acme(
+            'acme.cert.revoke',
+            resource_type='certificate',
+            resource_id=cert.id,
+            details=f"serial={serial_hex} reason={reason}",
+        )
+
         # RFC 8555 §7.6: successful revocation returns 200 with proper headers
         response = make_response('', 200)
         response.headers['Replay-Nonce'] = service.generate_nonce()
@@ -1243,7 +1335,21 @@ def key_change():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to update account key: {e}")
+            _audit_acme(
+                'acme.account.key_change',
+                resource_type='acme_account',
+                resource_id=account.account_id,
+                details=f"failed: {e}",
+                success=False,
+            )
             return acme_error('serverInternal', 'Failed to update account key', 500)
+
+        _audit_acme(
+            'acme.account.key_change',
+            resource_type='acme_account',
+            resource_id=account.account_id,
+            details='ACME account key rotated',
+        )
         
         account_url_full = f"{service.base_url}/acme/acct/{account.account_id}"
         response_data = {

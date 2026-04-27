@@ -693,7 +693,19 @@ class AcmeService:
         txt_record = f"_acme-challenge.{domain}"
         
         try:
-            answers = dns.resolver.resolve(txt_record, 'TXT')
+            # Optional override: allow operators to point DNS-01 validation at
+            # a specific authoritative resolver (e.g. an internal BIND9 fed by
+            # cert-manager rfc2136) regardless of the system /etc/resolv.conf.
+            # Comma-separated list in SystemConfig key ``acme.dns01_nameservers``.
+            custom_ns = self._acme_dns01_nameservers()
+            if custom_ns:
+                resolver = dns.resolver.Resolver(configure=False)
+                resolver.nameservers = custom_ns
+                resolver.timeout = 5
+                resolver.lifetime = 10
+                answers = resolver.resolve(txt_record, 'TXT')
+            else:
+                answers = dns.resolver.resolve(txt_record, 'TXT')
             
             for rdata in answers:
                 # RFC 8555 §8.4: TXT record content must EQUAL the key authorization hash.
@@ -1273,6 +1285,26 @@ class AcmeService:
         except Exception:
             return True
     
+    def _acme_dns01_nameservers(self) -> list:
+        """Optional list of DNS servers to use for DNS-01 challenge validation.
+
+        When set (SystemConfig key ``acme.dns01_nameservers``, comma-separated
+        IPs), DNS-01 validation queries those resolvers instead of the system
+        resolver. Useful when the authoritative DNS for the validation zone
+        (e.g. a local BIND9 driven by cert-manager rfc2136) is not reachable
+        via the OS /etc/resolv.conf chain.
+
+        Returns an empty list when unset.
+        """
+        try:
+            from models import SystemConfig
+            setting = SystemConfig.query.filter_by(key='acme.dns01_nameservers').first()
+            if not setting or not setting.value:
+                return []
+            return [ip.strip() for ip in str(setting.value).split(',') if ip.strip()]
+        except Exception:
+            return []
+
     def validate_eab(self, eab_data: Dict[str, Any], account_jwk: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """Validate External Account Binding (RFC 8555 §7.3.4)
         
@@ -1308,19 +1340,33 @@ class AcmeService:
             if not kid:
                 return False, "EAB missing kid (external account ID)"
             
-            # Look up the HMAC key for this external account
-            from models import SystemConfig
-            eab_config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
-            eab_keys_json = eab_config.value if eab_config else '{}'
-            try:
-                eab_keys = json.loads(eab_keys_json)
-            except Exception:
-                eab_keys = {}
-            
-            hmac_key_b64 = eab_keys.get(kid)
+            # Look up the HMAC key for this external account.
+            # Preferred path: dedicated AcmeEabCredential table (v2.139+).
+            # Fallback: legacy SystemConfig 'acme_eab_keys' JSON blob.
+            from models import SystemConfig, AcmeEabCredential
+            from utils.datetime_utils import utc_now as _utc_now
+
+            credential = AcmeEabCredential.query.filter_by(kid=kid).first()
+            hmac_key_b64 = None
+            legacy = False
+
+            if credential is not None:
+                if not credential.is_usable:
+                    return False, f"EAB credential not usable (status={credential.status})"
+                hmac_key_b64 = credential.hmac_key_b64
+            else:
+                eab_config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
+                eab_keys_json = eab_config.value if eab_config else '{}'
+                try:
+                    eab_keys = json.loads(eab_keys_json)
+                except Exception:
+                    eab_keys = {}
+                hmac_key_b64 = eab_keys.get(kid)
+                legacy = True
+
             if not hmac_key_b64:
                 return False, "Unknown external account"
-            
+
             # Decode the HMAC key
             hmac_key = base64.urlsafe_b64decode(hmac_key_b64 + '==')
             
@@ -1350,14 +1396,26 @@ class AcmeService:
             
             if not hmac_lib.compare_digest(expected_sig, actual_sig):
                 return False, "EAB signature verification failed"
-            
-            # Mark key as used (one-time use)
-            eab_keys.pop(kid, None)
+
+            # Mark credential as used (single-use semantics, RFC 8555 §7.3.4).
+            # The actual binding to the freshly-created AcmeAccount is done
+            # by the caller (new_account handler) via mark_eab_used().
             try:
-                if eab_config:
-                    eab_config.value = json.dumps(eab_keys)
+                if legacy:
+                    eab_config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
+                    eab_keys_json = eab_config.value if eab_config else '{}'
+                    try:
+                        eab_keys = json.loads(eab_keys_json)
+                    except Exception:
+                        eab_keys = {}
+                    eab_keys.pop(kid, None)
+                    if eab_config:
+                        eab_config.value = json.dumps(eab_keys)
+                    else:
+                        db.session.add(SystemConfig(key='acme_eab_keys', value=json.dumps(eab_keys)))
                 else:
-                    db.session.add(SystemConfig(key='acme_eab_keys', value=json.dumps(eab_keys)))
+                    credential.status = 'used'
+                    credential.used_at = _utc_now()
                 db.session.commit()
             except Exception as commit_err:
                 db.session.rollback()
@@ -1368,6 +1426,23 @@ class AcmeService:
         except Exception as e:
             logger.error(f"EAB validation error: {e}")
             return False, str(e)
+
+    def mark_eab_used(self, kid: str, account_id: str) -> None:
+        """Bind an EAB credential to the ACME account that consumed it.
+
+        Called from the new-account handler once the account row is
+        committed. Best-effort: does nothing for legacy SystemConfig
+        credentials or unknown kids.
+        """
+        try:
+            from models import AcmeEabCredential
+            cred = AcmeEabCredential.query.filter_by(kid=kid).first()
+            if cred is not None and cred.used_by_account_id is None:
+                cred.used_by_account_id = account_id
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f"Failed to bind EAB credential {kid} to account {account_id}: {e}")
     
     def get_directory(self) -> Dict[str, str]:
         """Get ACME directory (RFC 8555 Section 7.1.1)

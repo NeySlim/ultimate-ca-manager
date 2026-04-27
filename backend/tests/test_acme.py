@@ -1413,3 +1413,119 @@ class TestViewerPermissions:
     def test_viewer_cannot_delete_local_domain(self, viewer_client):
         r = viewer_client.delete('/api/v2/acme/local-domains/1')
         assert r.status_code in (403, 404)
+
+
+# ============================================================
+# ACME Server — EAB Credentials (RFC 8555 §7.3.4)
+# ============================================================
+
+class TestAcmeEabRequired:
+    """GET/PUT /api/v2/acme/eab-required"""
+
+    def test_get_eab_required_default_false(self, auth_client):
+        r = auth_client.get('/api/v2/acme/eab-required')
+        data = assert_success(r)
+        assert 'eab_required' in data
+        assert isinstance(data['eab_required'], bool)
+
+    def test_set_eab_required_true(self, auth_client):
+        r = put_json(auth_client, '/api/v2/acme/eab-required', {'eab_required': True})
+        data = assert_success(r)
+        assert data['eab_required'] is True
+
+        # And it persists
+        r2 = auth_client.get('/api/v2/acme/eab-required')
+        assert assert_success(r2)['eab_required'] is True
+
+    def test_set_eab_required_false(self, auth_client):
+        put_json(auth_client, '/api/v2/acme/eab-required', {'eab_required': True})
+        r = put_json(auth_client, '/api/v2/acme/eab-required', {'eab_required': False})
+        data = assert_success(r)
+        assert data['eab_required'] is False
+
+
+class TestAcmeEabCredentials:
+    """GET/POST/DELETE /api/v2/acme/eab-credentials[/<id>]"""
+
+    def test_list_eab_credentials_empty(self, auth_client):
+        r = auth_client.get('/api/v2/acme/eab-credentials')
+        data = assert_success(r)
+        assert isinstance(data, list)
+
+    def test_create_eab_credential_returns_secret_once(self, auth_client):
+        r = post_json(auth_client, '/api/v2/acme/eab-credentials',
+                      {'label': 'pytest cluster', 'expires_in_days': 30})
+        data = assert_success(r, status=201)
+        assert 'kid' in data and len(data['kid']) > 0
+        assert 'hmac_key' in data and len(data['hmac_key']) > 20
+        assert data['label'] == 'pytest cluster'
+        assert data['status'] == 'active'
+        assert data['used_at'] is None
+        cred_id = data['id']
+
+        # Subsequent GET must NOT return the HMAC
+        r2 = auth_client.get(f'/api/v2/acme/eab-credentials/{cred_id}')
+        data2 = assert_success(r2)
+        assert 'hmac_key' not in data2
+        assert data2['kid'] == data['kid']
+
+    def test_create_eab_credential_invalid_expires(self, auth_client):
+        r = post_json(auth_client, '/api/v2/acme/eab-credentials',
+                      {'label': 'x', 'expires_in_days': 'not-a-number'})
+        assert_error(r, 400)
+
+    def test_create_eab_credential_no_expiry(self, auth_client):
+        r = post_json(auth_client, '/api/v2/acme/eab-credentials', {'label': 'no-exp'})
+        data = assert_success(r, status=201)
+        assert data['expires_at'] is None
+
+    def test_revoke_eab_credential(self, auth_client):
+        r = post_json(auth_client, '/api/v2/acme/eab-credentials', {'label': 'to-revoke'})
+        cred_id = assert_success(r, status=201)['id']
+
+        r2 = auth_client.delete(f'/api/v2/acme/eab-credentials/{cred_id}')
+        data2 = assert_success(r2)
+        assert data2['status'] == 'revoked'
+        assert data2['revoked_at'] is not None
+
+    def test_revoke_eab_credential_not_found(self, auth_client):
+        r = auth_client.delete('/api/v2/acme/eab-credentials/999999')
+        assert_error(r, 404)
+
+    def test_get_eab_credential_not_found(self, auth_client):
+        r = auth_client.get('/api/v2/acme/eab-credentials/999999')
+        assert_error(r, 404)
+
+    def test_list_filter_by_status(self, auth_client):
+        # Create one, revoke it, create another active
+        r1 = post_json(auth_client, '/api/v2/acme/eab-credentials', {'label': 'rev'})
+        rid = assert_success(r1, status=201)['id']
+        auth_client.delete(f'/api/v2/acme/eab-credentials/{rid}')
+        post_json(auth_client, '/api/v2/acme/eab-credentials', {'label': 'live'})
+
+        revoked = assert_success(auth_client.get('/api/v2/acme/eab-credentials?status=revoked'))
+        active = assert_success(auth_client.get('/api/v2/acme/eab-credentials?status=active'))
+        assert all(c['status'] == 'revoked' for c in revoked)
+        assert all(c['status'] == 'active' for c in active)
+
+
+class TestAcmeEabAuth:
+    """EAB endpoints must require auth."""
+
+    def test_eab_required_get_requires_auth(self, client):
+        assert client.get('/api/v2/acme/eab-required').status_code == 401
+
+    def test_eab_required_put_requires_auth(self, client):
+        assert put_json(client, '/api/v2/acme/eab-required', {'eab_required': True}).status_code == 401
+
+    def test_eab_credentials_list_requires_auth(self, client):
+        assert client.get('/api/v2/acme/eab-credentials').status_code == 401
+
+    def test_eab_credentials_create_requires_auth(self, client):
+        assert post_json(client, '/api/v2/acme/eab-credentials', {}).status_code == 401
+
+    def test_eab_credential_get_requires_auth(self, client):
+        assert client.get('/api/v2/acme/eab-credentials/1').status_code == 401
+
+    def test_eab_credential_delete_requires_auth(self, client):
+        assert client.delete('/api/v2/acme/eab-credentials/1').status_code == 401

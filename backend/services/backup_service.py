@@ -30,7 +30,7 @@ from models import db, User, CA, Certificate, SystemConfig
 from models.acme_models import AcmeAccount
 from models.webauthn import WebAuthnCredential
 from config.settings import Config
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,7 @@ class BackupService:
                 'users': True,
                 'configuration': True,
                 'acme_accounts': True,
+                'acme_eab_credentials': True,
                 'email_password': False,
                 'groups': True,
                 'custom_roles': True,
@@ -151,6 +152,7 @@ class BackupService:
             'certificate_authorities': _safe(self._export_cas, include.get('cas', True)),
             'certificates': _safe(self._export_certificates, include.get('certificates', True)),
             'acme_accounts': _safe(self._export_acme_accounts, include.get('acme_accounts', True)),
+            'acme_eab_credentials': _safe(self._export_acme_eab_credentials, include.get('acme_eab_credentials', True)),
             'groups': _safe(self._export_groups, include.get('groups', True)),
             'custom_roles': _safe(self._export_custom_roles, include.get('custom_roles', True)),
             'certificate_templates': _safe(self._export_templates, include.get('certificate_templates', True)),
@@ -509,25 +511,55 @@ class BackupService:
         return certs
     
     def _export_acme_accounts(self, include: bool) -> List[Dict[str, Any]]:
-        """Export ACME accounts"""
+        """Export ACME server accounts (RFC 8555 §7.1.2)."""
         if not include:
             return []
-        
+
         accounts = []
         for account in AcmeAccount.query.all():
-            # Handle potential bytes in private_key
-            key_pem = account.private_key
-            if isinstance(key_pem, bytes):
-                key_pem = key_pem.decode('utf-8')
-            
             accounts.append({
-                'email': account.email,
-                'account_url': account.account_url,
+                'account_id': account.account_id,
+                'jwk': account.jwk,
+                'jwk_thumbprint': account.jwk_thumbprint,
+                'contact': account.contact,
                 'status': account.status,
-                'key_pem': key_pem
+                'terms_of_service_agreed': account.terms_of_service_agreed,
+                'external_account_binding': account.external_account_binding,
+                'created_at': utc_isoformat(account.created_at) if account.created_at else None,
+                'updated_at': utc_isoformat(account.updated_at) if account.updated_at else None,
             })
-        
+
         return accounts
+
+    def _export_acme_eab_credentials(self, include: bool) -> List[Dict[str, Any]]:
+        """Export ACME EAB credentials (RFC 8555 §7.3.4).
+
+        Includes the HMAC key — required so restored ACME clients can keep
+        registering. Key is already protected by the backup's master key
+        (AES-256-GCM); no extra wrapping needed.
+        """
+        if not include:
+            return []
+        try:
+            from models.acme_models import AcmeEabCredential
+        except Exception:
+            return []
+        creds = []
+        for c in AcmeEabCredential.query.all():
+            creds.append({
+                'kid': c.kid,
+                'hmac_key_b64': c.hmac_key_b64,
+                'label': c.label,
+                'created_by_user_id': c.created_by_user_id,
+                'created_at': utc_isoformat(c.created_at) if c.created_at else None,
+                'expires_at': utc_isoformat(c.expires_at) if c.expires_at else None,
+                'used_at': utc_isoformat(c.used_at) if c.used_at else None,
+                'used_by_account_id': c.used_by_account_id,
+                'revoked_at': utc_isoformat(c.revoked_at) if c.revoked_at else None,
+                'revoked_by_user_id': c.revoked_by_user_id,
+                'status': c.status,
+            })
+        return creds
     
     def _export_groups(self, include: bool) -> List[Dict[str, Any]]:
         """Export groups with members"""
@@ -1370,6 +1402,7 @@ class BackupService:
             'cas': 0,
             'certificates': 0,
             'acme_accounts': 0,
+            'acme_eab_credentials': 0,
             'settings': 0,
             'groups': 0,
             'custom_roles': 0,
@@ -1520,22 +1553,79 @@ class BackupService:
                 db.session.add(new_cert)
             results['certificates'] += 1
         
-        # Restore ACME accounts
+        # Restore ACME accounts (RFC 8555 §7.1.2)
         for acme_data in backup_data.get('acme_accounts', []):
-            existing = AcmeAccount.query.filter_by(email=acme_data['email']).first()
+            account_id = acme_data.get('account_id')
+            jwk_thumbprint = acme_data.get('jwk_thumbprint')
+            if not account_id or not jwk_thumbprint or not acme_data.get('jwk'):
+                # Legacy v1 backup with email/account_url/key_pem — not restorable as
+                # ACME server account (different shape). Skip silently.
+                continue
+            existing = AcmeAccount.query.filter_by(account_id=account_id).first()
             if existing:
-                existing.account_url = acme_data.get('account_url')
-                existing.status = acme_data.get('status')
+                existing.jwk = acme_data['jwk']
+                existing.jwk_thumbprint = jwk_thumbprint
+                existing.contact = acme_data.get('contact')
+                existing.status = acme_data.get('status', 'valid')
+                existing.terms_of_service_agreed = acme_data.get('terms_of_service_agreed', False)
+                existing.external_account_binding = acme_data.get('external_account_binding')
             else:
                 new_acme = AcmeAccount(
-                    email=acme_data['email'],
-                    account_url=acme_data.get('account_url'),
+                    account_id=account_id,
+                    jwk=acme_data['jwk'],
+                    jwk_thumbprint=jwk_thumbprint,
+                    contact=acme_data.get('contact'),
                     status=acme_data.get('status', 'valid'),
-                    private_key=acme_data.get('key_pem')
+                    terms_of_service_agreed=acme_data.get('terms_of_service_agreed', False),
+                    external_account_binding=acme_data.get('external_account_binding'),
                 )
                 db.session.add(new_acme)
             results['acme_accounts'] += 1
-        
+
+        # Restore ACME EAB credentials (RFC 8555 §7.3.4)
+        try:
+            from models.acme_models import AcmeEabCredential
+            from datetime import datetime as _dt
+            def _parse_dt(v):
+                if not v:
+                    return None
+                try:
+                    return _dt.fromisoformat(v.replace('Z', '+00:00'))
+                except Exception:
+                    return None
+            for eab in backup_data.get('acme_eab_credentials', []):
+                kid = eab.get('kid')
+                if not kid or not eab.get('hmac_key_b64'):
+                    continue
+                existing = AcmeEabCredential.query.filter_by(kid=kid).first()
+                if existing:
+                    existing.hmac_key_b64 = eab['hmac_key_b64']
+                    existing.label = eab.get('label')
+                    existing.status = eab.get('status', 'active')
+                    existing.used_at = _parse_dt(eab.get('used_at'))
+                    existing.used_by_account_id = eab.get('used_by_account_id')
+                    existing.revoked_at = _parse_dt(eab.get('revoked_at'))
+                    existing.revoked_by_user_id = eab.get('revoked_by_user_id')
+                    existing.expires_at = _parse_dt(eab.get('expires_at'))
+                else:
+                    new_eab = AcmeEabCredential(
+                        kid=kid,
+                        hmac_key_b64=eab['hmac_key_b64'],
+                        label=eab.get('label'),
+                        created_by_user_id=eab.get('created_by_user_id'),
+                        expires_at=_parse_dt(eab.get('expires_at')),
+                        used_at=_parse_dt(eab.get('used_at')),
+                        used_by_account_id=eab.get('used_by_account_id'),
+                        revoked_at=_parse_dt(eab.get('revoked_at')),
+                        revoked_by_user_id=eab.get('revoked_by_user_id'),
+                        status=eab.get('status', 'active'),
+                    )
+                    db.session.add(new_eab)
+                results.setdefault('acme_eab_credentials', 0)
+                results['acme_eab_credentials'] += 1
+        except Exception as e:
+            logger.warning(f"Failed to restore acme_eab_credentials: {e}")
+
         # Restore settings
         config_data = backup_data.get('configuration', {}).get('settings', {})
         for key, value in config_data.items():

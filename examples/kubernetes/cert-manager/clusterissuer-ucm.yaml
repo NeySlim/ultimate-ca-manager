@@ -1,0 +1,37 @@
+# ClusterIssuer using UCM ACME server with HTTP-01 challenge.
+#
+# Use this when cert-manager can serve HTTP-01 challenges (workloads
+# behind an Ingress reachable from UCM on port 80).
+#
+# Prerequisites:
+#   - cert-manager installed (>=1.13)
+#   - UCM ACME server reachable from k8s pods (default scheme: https)
+#   - In UCM Settings → ACME, leave "External Account Required" OFF for this issuer.
+#     If you need EAB instead, see clusterissuer-ucm-eab.yaml.
+#
+# UCM ACME directory: https://<ucm-host>:8443/acme/directory
+#
+# UCM is on-prem: acme.allow_private_ips=true (default) lets cert-manager
+# validate internal/.lan/.local domains. No special config needed.
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ucm-acme-http01
+spec:
+  acme:
+    server: https://ucm.example.lan:8443/acme/directory
+    # Email is optional for UCM (no terms of service to accept), but
+    # cert-manager wants the field. Use a real mailbox you can monitor.
+    email: pki-admin@example.lan
+    # Where cert-manager stores the ACME account private key.
+    privateKeySecretRef:
+      name: ucm-acme-http01-account-key
+    # Skip TLS verify only if UCM uses a self-signed cert that the
+    # cluster does not trust. In production, mount UCM's CA cert into
+    # cert-manager (see README.md → "Trusting UCM's TLS cert").
+    skipTLSVerify: true
+    solvers:
+      - http01:
+          ingress:
+            class: nginx     # adjust to your Ingress class

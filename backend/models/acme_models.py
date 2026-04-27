@@ -512,3 +512,55 @@ class AcmeLocalDomain(db.Model):
     
     def __repr__(self):
         return f'<AcmeLocalDomain {self.domain} -> CA#{self.issuing_ca_id}>'
+
+
+class AcmeEabCredential(db.Model):
+    """ACME External Account Binding credential (RFC 8555 §7.3.4)
+
+    A pre-shared HMAC credential issued by UCM admins and given to an
+    ACME client (cert-manager, certbot, lego...) so it can register an
+    account on this server. Single-use by design — once an account has
+    been bound to a credential, the credential transitions to ``used``
+    and cannot register another account.
+    """
+    __tablename__ = 'acme_eab_credentials'
+
+    id = db.Column(db.Integer, primary_key=True)
+    kid = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    hmac_key_b64 = db.Column(db.Text, nullable=False)
+    label = db.Column(db.String(255))
+    created_by_user_id = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
+    expires_at = db.Column(db.DateTime)
+    used_at = db.Column(db.DateTime)
+    used_by_account_id = db.Column(db.String(64))
+    revoked_at = db.Column(db.DateTime)
+    revoked_by_user_id = db.Column(db.Integer)
+    status = db.Column(db.String(20), default='active', nullable=False, index=True)
+
+    @property
+    def is_usable(self):
+        if self.status != 'active':
+            return False
+        if self.expires_at and self.expires_at < utc_now():
+            return False
+        return True
+
+    def to_dict(self, *, include_secret=False):
+        data = {
+            'id': self.id,
+            'kid': self.kid,
+            'label': self.label,
+            'status': self.status,
+            'created_at': utc_isoformat(self.created_at),
+            'expires_at': utc_isoformat(self.expires_at) if self.expires_at else None,
+            'used_at': utc_isoformat(self.used_at) if self.used_at else None,
+            'used_by_account_id': self.used_by_account_id,
+            'revoked_at': utc_isoformat(self.revoked_at) if self.revoked_at else None,
+        }
+        if include_secret:
+            data['hmac_key'] = self.hmac_key_b64
+        return data
+
+    def __repr__(self):
+        return f'<AcmeEabCredential kid={self.kid} status={self.status}>'

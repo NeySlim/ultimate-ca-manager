@@ -1,0 +1,41 @@
+# Sample Certificate resource issued by UCM via cert-manager.
+#
+# Two flavours below — uncomment the one matching your ClusterIssuer.
+# (Both reuse the same secretName for clarity; in real life pick one.)
+---
+# A — Single-host cert via HTTP-01
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: app-tls
+  namespace: default
+spec:
+  secretName: app-tls
+  issuerRef:
+    name: ucm-acme-http01
+    kind: ClusterIssuer
+  commonName: app.example.lan
+  dnsNames:
+    - app.example.lan
+  # Optional: shorten/extend duration. UCM honours the request within
+  # the bounds of its issuing CA's max validity.
+  duration: 2160h     # 90 days
+  renewBefore: 720h   # renew 30 days before expiry
+---
+# B — Wildcard + multi-SAN via DNS-01 + EAB
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: wildcard-example
+#   namespace: default
+# spec:
+#   secretName: wildcard-example-tls
+#   issuerRef:
+#     name: ucm-acme-dns01
+#     kind: ClusterIssuer
+#   commonName: example.lan
+#   dnsNames:
+#     - example.lan
+#     - "*.example.lan"
+#     - api.example.lan
+#     - admin.example.lan
