@@ -560,7 +560,14 @@ def create_certificate():
                 existing_emails = [str(s.value) for s in san_list if isinstance(s, x509.RFC822Name)]
                 if subject_email not in existing_emails:
                     san_list.append(x509.RFC822Name(subject_email))
-        
+
+        # Derive final SAN lists from san_list so auto-added entries are
+        # reflected in the DB columns, not just the X.509 extension.
+        final_san_dns = [s.value for s in san_list if isinstance(s, x509.DNSName)]
+        final_san_ip = [str(s.value) for s in san_list if isinstance(s, x509.IPAddress)]
+        final_san_email = [s.value for s in san_list if isinstance(s, x509.RFC822Name)]
+        final_san_uri = [s.value for s in san_list if isinstance(s, x509.UniformResourceIdentifier)]
+
         if san_list:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(san_list),
@@ -682,10 +689,10 @@ def create_certificate():
             ski=cert_ski,
             valid_from=not_before,
             valid_to=not_after,
-            san_dns=json.dumps(data.get('san_dns', [])),
-            san_ip=json.dumps(data.get('san_ip', [])),
-            san_email=json.dumps(data.get('san_email', [])),
-            san_uri=json.dumps(data.get('san_uri', [])),
+            san_dns=json.dumps(final_san_dns),
+            san_ip=json.dumps(final_san_ip),
+            san_email=json.dumps(final_san_email),
+            san_uri=json.dumps(final_san_uri),
             ocsp_must_staple=bool(data.get('ocsp_must_staple')),
             created_by=g.current_user.username if hasattr(g, 'current_user') else None
         )
