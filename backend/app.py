@@ -146,7 +146,28 @@ def create_app(config_name=None):
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
-    
+
+    # Write cert/CA files to disk immediately after any INSERT so they are
+    # available without waiting for the next service restart.
+    from sqlalchemy import event as sa_event
+    from models import Certificate as _Certificate, CA as _CA
+
+    @sa_event.listens_for(_Certificate, 'after_insert')
+    def _on_cert_insert(mapper, connection, target):
+        try:
+            from services.file_regen_service import write_cert_files
+            write_cert_files(target)
+        except Exception as e:
+            app.logger.warning(f"Could not write files for cert {target.refid}: {e}")
+
+    @sa_event.listens_for(_CA, 'after_insert')
+    def _on_ca_insert(mapper, connection, target):
+        try:
+            from services.file_regen_service import write_ca_files
+            write_ca_files(target)
+        except Exception as e:
+            app.logger.warning(f"Could not write files for CA {target.refid}: {e}")
+
     # Log database type
     app.logger.info(f"✓ Database: {config.DATABASE_TYPE.upper()}")
     
