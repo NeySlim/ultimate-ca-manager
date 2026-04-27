@@ -1,0 +1,56 @@
+# ClusterIssuer using UCM ACME server with EAB (External Account Binding)
+# and DNS-01 challenge via RFC 2136 (TSIG dynamic update).
+#
+# Use this when:
+#   - You need wildcard certs (*.example.lan) — DNS-01 only.
+#   - Workloads are not reachable on port 80 from UCM (HTTP-01 won't work).
+#   - You want to gate ACME account creation behind a credential issued
+#     by UCM admin (EAB).
+#
+# Prerequisites:
+#   - cert-manager installed
+#   - A DNS server accepting RFC 2136 dynamic updates with TSIG
+#     (BIND9, Knot, PowerDNS with backend, ...).
+#   - UCM Settings → ACME: "External Account Required" = ON.
+#   - An EAB credential created in UCM (ACME → EAB Credentials → Create).
+#     UCM returns a single-use kid + HMAC. Put both in the secrets below
+#     BEFORE applying this issuer (cert-manager only registers once).
+#
+# Apply order:
+#   kubectl apply -f eab-secret.yaml
+#   kubectl apply -f tsig-secret.yaml      # see README.md
+#   kubectl apply -f clusterissuer-ucm-dns01.yaml
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ucm-acme-dns01
+spec:
+  acme:
+    server: https://ucm.example.lan:8443/acme/directory
+    email: pki-admin@example.lan
+    privateKeySecretRef:
+      name: ucm-acme-dns01-account-key
+    skipTLSVerify: true
+    # External Account Binding — REQUIRED if UCM has the flag enabled.
+    # The HMAC in eab-secret must match exactly what UCM showed at
+    # creation time (urlsafe-base64, no padding).
+    externalAccountBinding:
+      keyID: REPLACE_WITH_KID_FROM_UCM
+      keySecretRef:
+        name: ucm-acme-eab
+        key: hmac
+    solvers:
+      - dns01:
+          rfc2136:
+            # Authoritative DNS server that will accept the update.
+            nameserver: 192.168.1.10:53
+            tsigKeyName: cert-manager-key.
+            tsigAlgorithm: HMACSHA256
+            tsigSecretSecretRef:
+              name: tsig-secret
+              key: tsig-secret-key
+        # Optional: scope this solver to a specific zone
+        # selector:
+        #   dnsZones:
+        #     - "example.lan"
