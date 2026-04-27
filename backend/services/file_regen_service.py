@@ -16,6 +16,73 @@ from utils.file_naming import (
 logger = logging.getLogger(__name__)
 
 
+def write_cert_files(cert) -> None:
+    """Write certificate, key, and CSR files for a single Certificate object.
+
+    Called immediately after a new certificate is committed so the files
+    are available on disk without waiting for the next service restart.
+    Errors are logged but never raised — a missing file is recoverable at
+    the next startup via regenerate_all_files().
+    """
+    from security.encryption import decrypt_private_key
+
+    Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
+    Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
+
+    cert_path = cert_cert_path(cert)
+    if not cert_path.exists() and cert.crt:
+        try:
+            cert_path.write_bytes(base64.b64decode(cert.crt))
+        except Exception as e:
+            logger.warning(f"Could not write cert file for {cert.descr}: {e}")
+
+    key_path = cert_key_path(cert)
+    if not key_path.exists() and cert.prv:
+        try:
+            key_pem = base64.b64decode(decrypt_private_key(cert.prv))
+            key_path.write_bytes(key_pem)
+            key_path.chmod(0o600)
+        except Exception as e:
+            logger.warning(f"Could not write key file for {cert.descr}: {e}")
+
+    csr_path = cert_csr_path(cert)
+    if not csr_path.exists() and cert.csr:
+        try:
+            csr_data = cert.csr
+            csr_bytes = csr_data.encode() if csr_data.startswith('-----BEGIN') else base64.b64decode(csr_data)
+            csr_path.write_bytes(csr_bytes)
+        except Exception as e:
+            logger.warning(f"Could not write CSR file for {cert.descr}: {e}")
+
+
+def write_ca_files(ca) -> None:
+    """Write certificate and key files for a single CA object.
+
+    Called immediately after a new CA is committed so the files are
+    available on disk without waiting for the next service restart.
+    """
+    from security.encryption import decrypt_private_key
+
+    Config.CA_DIR.mkdir(parents=True, exist_ok=True)
+    Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
+
+    cert_path = ca_cert_path(ca)
+    if not cert_path.exists() and ca.crt:
+        try:
+            cert_path.write_bytes(base64.b64decode(ca.crt))
+        except Exception as e:
+            logger.warning(f"Could not write CA cert file for {ca.descr}: {e}")
+
+    key_path = ca_key_path(ca)
+    if not key_path.exists() and ca.prv:
+        try:
+            key_pem = base64.b64decode(decrypt_private_key(ca.prv))
+            key_path.write_bytes(key_pem)
+            key_path.chmod(0o600)
+        except Exception as e:
+            logger.warning(f"Could not write CA key file for {ca.descr}: {e}")
+
+
 def regenerate_all_files():
     """
     Check and regenerate all certificate/key files from database.
