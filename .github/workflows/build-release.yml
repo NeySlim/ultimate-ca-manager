@@ -311,6 +311,7 @@ jobs:
           
           # Extract changelog section for this version
           CHANGES_FILE=$(mktemp)
+          PREVIOUS_FILE=$(mktemp)
           if [ -f CHANGELOG.md ]; then
             # Extract content between ## [VERSION] and the next ## [
             SECTION=$(sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | head -n -1)
@@ -319,6 +320,23 @@ jobs:
             fi
             # Remove the heading line itself, keep the content
             echo "$SECTION" | tail -n +2 | sed '/^$/d; 1i\\' > "$CHANGES_FILE" || true
+
+            # Extract the 2 previous versioned sections (skip Unreleased and current)
+            # Output is the raw markdown blocks (heading + body) so users see version + date.
+            awk -v current="${VERSION}" '
+              /^## \[Unreleased\]/ { capture=0; next }
+              /^## \[/ {
+                line = $0
+                sub(/^## \[/, "", line)
+                sub(/\].*$/, "", line)
+                ver = line
+                if (ver == current) { capture=0; next }
+                if (count >= 2) { capture=0; exit }
+                count++
+                capture=1
+              }
+              capture { print }
+            ' CHANGELOG.md > "$PREVIOUS_FILE" || true
           fi
           
           # Build release notes
@@ -327,6 +345,18 @@ jobs:
               echo "## What's Changed"
               echo ""
               cat "$CHANGES_FILE"
+              echo ""
+              echo "---"
+              echo ""
+            fi
+            if [ -s "$PREVIOUS_FILE" ]; then
+              echo "<details>"
+              echo "<summary><strong>📜 Recent release history (last 2 versions)</strong></summary>"
+              echo ""
+              cat "$PREVIOUS_FILE"
+              echo ""
+              echo "Full history: [CHANGELOG.md](https://github.com/REPO/blob/main/CHANGELOG.md)"
+              echo "</details>"
               echo ""
               echo "---"
               echo ""
@@ -392,7 +422,7 @@ jobs:
           sed -i "s|REPO|$REPO|g" notes.md
           sed -i "s|VERSION|$VERSION|g" notes.md
           
-          rm -f "$CHANGES_FILE"
+          rm -f "$CHANGES_FILE" "$PREVIOUS_FILE"
           cat notes.md
       
       - name: Delete existing release assets

@@ -9,6 +9,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.140] - 2026-04-27
+
 ### Fixed
 - **Certificate SAN database columns now derived from the final SAN list** (#94). When a CN is auto-promoted to an `rfc822Name` SAN at issuance, the `san_email` / `san_dns` / `san_ip` / `san_uri` columns are now written from the canonical SAN list instead of the raw form payload, so DB queries match the X.509 extension. Migration `027_backfill_san_email` re-parses existing certificate PEMs and backfills any rows that were out of sync (idempotent on SQLite and PostgreSQL). Thanks @Hemsby.
 - **Certificate and CA files written to disk on creation** (#95). Added SQLAlchemy `after_insert` listeners on the `Certificate` and `CA` models that immediately materialize `.crt` / `.key` files under `data/certs/` and `data/cas/` for every creation path (UI, CSR signing, ACME, SCEP, import). The startup file-regeneration scan is kept as a safety net. File-write errors are logged but never abort the database transaction. Thanks @Hemsby.
