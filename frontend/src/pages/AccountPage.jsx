@@ -50,6 +50,9 @@ export default function AccountPage() {
   // Modals
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
+  // Holds the freshly-created key + metadata so we can display it once,
+  // not in a fleeting toast (#90).
+  const [newApiKey, setNewApiKey] = useState(null)
   const [show2FAModal, setShow2FAModal] = useState(false)
   const [showWebAuthnModal, setShowWebAuthnModal] = useState(false)
   const [showMTLSModal, setShowMTLSModal] = useState(false)
@@ -306,15 +309,23 @@ export default function AccountPage() {
       return
     }
     try {
+      // Empty expiration field => no expiration (backend treats null as
+      // "never expires"). Otherwise send the number of days.
+      const expiresDays = apiKeyForm.expires_days
+        ? parseInt(apiKeyForm.expires_days, 10)
+        : null
       const payload = {
         name: apiKeyForm.name.trim(),
         permissions: SCOPE_PERMISSIONS[apiKeyForm.scope] || ['*'],
-        ...(apiKeyForm.expires_days ? { expires_days: parseInt(apiKeyForm.expires_days, 10) } : {})
+        expires_days: expiresDays,
       }
-      const created = await accountService.createApiKey(payload)
-      showSuccess(t('account.apiKeyCreated', { key: created.key || created.data?.key }))
+      const response = await accountService.createApiKey(payload)
+      // apiClient returns the full envelope: { data: {...}, message }
+      const created = response.data || response
       setShowApiKeyModal(false)
       setApiKeyForm({ name: '', expires_days: '', scope: 'full' })
+      // Show the key in a dedicated modal — it's only available once.
+      setNewApiKey(created)
       await loadApiKeys()
     } catch (error) {
       showError(error.message || t('messages.errors.createFailed.generic'))
@@ -728,15 +739,21 @@ export default function AccountPage() {
                       {!key.is_active && <Badge variant="secondary" size="xs">{t('common.inactive')}</Badge>}
                     </div>
                     <p className="text-xs text-text-tertiary font-mono inline-flex items-center gap-1">
-                      {key.key_prefix}...
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); copy(key.key_prefix); showSuccess(t('common.copied')) }}
-                        className="inline-flex items-center p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
-                        aria-label={t('common.copy')}
-                      >
-                        <Copy size={12} />
-                      </button>
+                      {key.key_prefix ? (
+                        <>
+                          {key.key_prefix}…
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); copy(key.key_prefix); showSuccess(t('common.copied')) }}
+                            className="inline-flex items-center p-0.5 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                            aria-label={t('common.copy')}
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="italic">{t('account.apiKeyPrefixUnavailable')}</span>
+                      )}
                     </p>
                     <p className="text-xs text-text-tertiary">
                       {key.permissions && (
@@ -867,10 +884,11 @@ export default function AccountPage() {
             <Input
               label={t('account.expiresInDays')}
               type="number"
+              min="0"
               value={apiKeyForm.expires_days}
               onChange={(e) => setApiKeyForm(f => ({ ...f, expires_days: e.target.value }))}
-              placeholder={t('common.validityPlaceholder')}
-              helperText={t('account.noExpiration')}
+              placeholder={t('account.expiresInDaysPlaceholder')}
+              helperText={t('account.expiresInDaysHelp')}
             />
           </div>
           <div className="flex justify-end gap-2 p-4 border-t border-border">
@@ -882,6 +900,60 @@ export default function AccountPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Newly-created API key — show ONCE so the user can copy it */}
+      <Modal
+        open={!!newApiKey}
+        onOpenChange={(open) => { if (!open) setNewApiKey(null) }}
+        title={t('account.apiKeyCreatedTitle')}
+      >
+        <div className="p-4 space-y-4">
+          <div className="flex items-start gap-2 p-3 rounded-lg border border-status-warning/40 bg-status-warning/10">
+            <Warning size={20} className="text-status-warning shrink-0 mt-0.5" />
+            <p className="text-sm text-text-primary">
+              {t('account.apiKeyCreatedWarning')}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+              {t('account.apiKeyValue')}
+            </label>
+            <div className="mt-1 flex items-stretch gap-2">
+              <code className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg-tertiary text-xs font-mono text-text-primary break-all select-all">
+                {newApiKey?.key}
+              </code>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  if (newApiKey?.key) {
+                    copy(newApiKey.key)
+                    showSuccess(t('common.copied'))
+                  }
+                }}
+                aria-label={t('common.copy')}
+              >
+                <Copy size={16} />
+              </Button>
+            </div>
+          </div>
+          {newApiKey?.expires_at && (
+            <p className="text-xs text-text-tertiary">
+              {t('common.expires')} {formatDate(newApiKey.expires_at)}
+            </p>
+          )}
+          {newApiKey && !newApiKey.expires_at && (
+            <p className="text-xs text-text-tertiary">
+              {t('account.apiKeyNoExpiry')}
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 p-4 border-t border-border">
+          <Button type="button" onClick={() => setNewApiKey(null)}>
+            {t('account.apiKeySavedDone')}
+          </Button>
+        </div>
       </Modal>
 
       {/* 2FA Setup Modal */}

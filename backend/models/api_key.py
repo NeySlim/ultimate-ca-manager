@@ -24,7 +24,12 @@ class APIKey(db.Model if db else object):
     
     # Hashed key (SHA256) - NEVER store plaintext!
     key_hash = db.Column(db.String(255), nullable=False, unique=True, index=True)
-    
+
+    # First ~12 chars of the plaintext key (e.g. 'ucm_ak_AbC1') so the
+    # list view can identify a key without revealing it. Nullable for keys
+    # created before migration 026.
+    key_prefix = db.Column(db.String(20), nullable=True)
+
     # Friendly name
     name = db.Column(db.String(100), nullable=False)
     
@@ -51,6 +56,7 @@ class APIKey(db.Model if db else object):
         return {
             'id': self.id,
             'name': self.name,
+            'key_prefix': self.key_prefix,
             'permissions': json.loads(self.permissions),
             'created_at': utc_isoformat(self.created_at),
             'expires_at': utc_isoformat(self.expires_at),

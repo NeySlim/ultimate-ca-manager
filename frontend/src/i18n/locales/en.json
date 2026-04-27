@@ -2212,7 +2212,15 @@
     "scopeReadOnly": "Read Only",
     "scopeReadWrite": "Read & Write",
     "scopeCertificates": "Certificates Only",
-    "apiKeyNameRequired": "API key name is required"
+    "apiKeyNameRequired": "API key name is required",
+    "apiKeyCreatedTitle": "API key created — copy it now",
+    "apiKeyCreatedWarning": "This is the only time the full key is shown. Store it in a safe place — you won't be able to retrieve it again.",
+    "apiKeyValue": "API key",
+    "apiKeyNoExpiry": "This key never expires.",
+    "apiKeySavedDone": "I've saved the key",
+    "apiKeyPrefixUnavailable": "Key prefix unavailable (legacy key)",
+    "expiresInDaysHelp": "Leave empty or set 0 for a key that never expires.",
+    "expiresInDaysPlaceholder": "e.g. 365 (empty = no expiration)"
   },
   "rbac": {
     "title": "Role-Based Access Control",

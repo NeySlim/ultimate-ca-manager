@@ -208,40 +208,52 @@ class AuthManager:
     def create_api_key(self, user_id, name, permissions, expires_days=365):
         """
         Create new API key
-        
+
         Args:
             user_id: User ID
             name: Friendly name for the key
             permissions: List of permissions (e.g., ['read:cas', 'write:certificates'])
-            expires_days: Days until expiration
-        
+            expires_days: Days until expiration. Pass ``None`` or ``0`` for a
+                key that never expires.
+
         Returns:
             dict: API key info (key is shown ONLY ONCE!)
         """
         if not APIKey:
             raise Exception("APIKey model not available")
-        
+
         # Generate secure random key
         key = f"ucm_ak_{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(key.encode()).hexdigest()
-        
+        # First 12 chars are enough to identify a key in the UI
+        # (e.g. 'ucm_ak_AbC1') without revealing it.
+        key_prefix = key[:12]
+
+        # ``None`` or ``0`` => no expiration
+        if expires_days in (None, 0):
+            expires_at = None
+        else:
+            expires_at = utc_now() + timedelta(days=int(expires_days))
+
         # Create API key record
         api_key = APIKey(
             user_id=user_id,
             key_hash=key_hash,
+            key_prefix=key_prefix,
             name=name,
             permissions=json.dumps(permissions),
-            expires_at=utc_now() + timedelta(days=expires_days)
+            expires_at=expires_at
         )
-        
+
         db.session.add(api_key)
         db.session.commit()
-        
+
         # Return key - ONLY TIME WE SHOW IT!
         return {
             'key': key,  # ⚠️ Store this! We won't show it again
             'id': api_key.id,
             'name': name,
+            'key_prefix': key_prefix,
             'permissions': permissions,
             'created_at': utc_isoformat(api_key.created_at),
             'expires_at': utc_isoformat(api_key.expires_at)

@@ -2211,7 +2211,15 @@
     "scopeReadOnly": "Лише читання",
     "scopeReadWrite": "Читання та запис",
     "scopeCertificates": "Лише сертифікати",
-    "apiKeyNameRequired": "Назва ключа API обов'язкова"
+    "apiKeyNameRequired": "Назва ключа API обов'язкова",
+    "apiKeyCreatedTitle": "Ключ API створено — скопіюйте його зараз",
+    "apiKeyCreatedWarning": "Це єдиний раз, коли показується повний ключ. Збережіть його в надійному місці — отримати його знову буде неможливо.",
+    "apiKeyValue": "Ключ API",
+    "apiKeyNoExpiry": "Цей ключ ніколи не закінчується.",
+    "apiKeySavedDone": "Я зберіг ключ",
+    "apiKeyPrefixUnavailable": "Префікс недоступний (старий ключ)",
+    "expiresInDaysHelp": "Залиште порожнім або встановіть 0 для безстрокового ключа.",
+    "expiresInDaysPlaceholder": "напр. 365 (порожньо = без терміну)"
   },
   "rbac": {
     "title": "Контроль доступу на основі ролей",

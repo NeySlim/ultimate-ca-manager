@@ -238,6 +238,98 @@ class TestCreateAPIKey:
         data = assert_success(r, 201)
         assert 'key' in data or 'id' in data
 
+    def _create_and_cleanup(self, auth_client, payload):
+        r = post_json(auth_client, '/api/v2/account/apikeys', payload)
+        data = assert_success(r, 201)
+        kid = data.get('id')
+        return data, kid
+
+    def _delete(self, auth_client, kid):
+        if kid:
+            auth_client.delete(f'/api/v2/account/apikeys/{kid}')
+
+    def test_create_returns_key_prefix(self, auth_client):
+        """Created key must include a key_prefix so the list view can render it."""
+        data, kid = self._create_and_cleanup(auth_client, {
+            'name': 'Prefix Key',
+            'permissions': ['read:certificates'],
+        })
+        try:
+            assert data.get('key', '').startswith('ucm_ak_')
+            assert data.get('key_prefix') and data['key'].startswith(data['key_prefix'])
+        finally:
+            self._delete(auth_client, kid)
+
+    def test_create_no_expiration_when_null(self, auth_client):
+        """expires_days=null must yield a key with no expiration (#90)."""
+        data, kid = self._create_and_cleanup(auth_client, {
+            'name': 'Forever Key',
+            'permissions': ['read:certificates'],
+            'expires_days': None,
+        })
+        try:
+            assert data.get('expires_at') is None
+        finally:
+            self._delete(auth_client, kid)
+
+    def test_create_no_expiration_when_zero(self, auth_client):
+        """expires_days=0 must also mean no expiration (#90)."""
+        data, kid = self._create_and_cleanup(auth_client, {
+            'name': 'Forever Key 2',
+            'permissions': ['read:certificates'],
+            'expires_days': 0,
+        })
+        try:
+            assert data.get('expires_at') is None
+        finally:
+            self._delete(auth_client, kid)
+
+    def test_create_explicit_expiry_kept(self, auth_client):
+        """Explicit expires_days must produce an expires_at."""
+        data, kid = self._create_and_cleanup(auth_client, {
+            'name': 'Short Lived Key',
+            'permissions': ['read:certificates'],
+            'expires_days': 7,
+        })
+        try:
+            assert data.get('expires_at') is not None
+        finally:
+            self._delete(auth_client, kid)
+
+    def test_create_default_expiry_when_omitted(self, auth_client):
+        """Backwards compat: omitting expires_days keeps the historical 365-day default."""
+        data, kid = self._create_and_cleanup(auth_client, {
+            'name': 'Default Expiry Key',
+            'permissions': ['read:certificates'],
+        })
+        try:
+            assert data.get('expires_at') is not None
+        finally:
+            self._delete(auth_client, kid)
+
+    def test_create_invalid_expiry_string(self, auth_client):
+        r = post_json(auth_client, '/api/v2/account/apikeys', {
+            'name': 'Bad Expiry',
+            'permissions': ['read:certificates'],
+            'expires_days': 'forever',
+        })
+        assert_error(r, 400)
+
+    def test_list_includes_key_prefix(self, auth_client):
+        """Listing keys must include key_prefix for the UI copy button (#90)."""
+        data, kid = self._create_and_cleanup(auth_client, {
+            'name': 'Listed Key',
+            'permissions': ['read:certificates'],
+        })
+        try:
+            r = auth_client.get('/api/v2/account/apikeys')
+            body = r.get_json()
+            listed = [k for k in body['data'] if k['name'] == 'Listed Key']
+            assert listed, 'newly created key missing from list'
+            assert listed[0].get('key_prefix', '').startswith('ucm_ak_')
+        finally:
+            self._delete(auth_client, kid)
+
     def test_invalid_permission_category(self, auth_client):
         r = post_json(auth_client, '/api/v2/account/apikeys', {
             'name': 'Bad Cat', 'permissions': ['bogus:certificates'],

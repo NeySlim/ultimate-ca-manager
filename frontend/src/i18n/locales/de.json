@@ -2211,7 +2211,15 @@
     "scopeReadOnly": "Nur Lesen",
     "scopeReadWrite": "Lesen & Schreiben",
     "scopeCertificates": "Nur Zertifikate",
-    "apiKeyNameRequired": "API-Schlüsselname ist erforderlich"
+    "apiKeyNameRequired": "API-Schlüsselname ist erforderlich",
+    "apiKeyCreatedTitle": "API-Schlüssel erstellt — jetzt kopieren",
+    "apiKeyCreatedWarning": "Dies ist die einzige Gelegenheit, den vollständigen Schlüssel zu sehen. Bewahren Sie ihn sicher auf — er kann später nicht erneut angezeigt werden.",
+    "apiKeyValue": "API-Schlüssel",
+    "apiKeyNoExpiry": "Dieser Schlüssel läuft nie ab.",
+    "apiKeySavedDone": "Ich habe den Schlüssel gespeichert",
+    "apiKeyPrefixUnavailable": "Präfix nicht verfügbar (alter Schlüssel)",
+    "expiresInDaysHelp": "Leer lassen oder 0 setzen für einen Schlüssel ohne Ablaufdatum.",
+    "expiresInDaysPlaceholder": "z. B. 365 (leer = kein Ablaufdatum)"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",

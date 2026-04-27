@@ -2211,7 +2211,15 @@
     "scopeReadOnly": "読み取り専用",
     "scopeReadWrite": "読み取り・書き込み",
     "scopeCertificates": "証明書のみ",
-    "apiKeyNameRequired": "APIキー名は必須です"
+    "apiKeyNameRequired": "APIキー名は必須です",
+    "apiKeyCreatedTitle": "APIキーが作成されました — 今すぐコピーしてください",
+    "apiKeyCreatedWarning": "完全なキーが表示されるのはこの一度きりです。安全な場所に保管してください — 後で取得することはできません。",
+    "apiKeyValue": "APIキー",
+    "apiKeyNoExpiry": "このキーには有効期限がありません。",
+    "apiKeySavedDone": "キーを保存しました",
+    "apiKeyPrefixUnavailable": "プレフィックスは利用できません (古いキー)",
+    "expiresInDaysHelp": "無期限のキーにするには空欄または0を入力してください。",
+    "expiresInDaysPlaceholder": "例: 365 (空欄 = 無期限)"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",

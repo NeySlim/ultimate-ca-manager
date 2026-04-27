@@ -108,7 +108,15 @@
     "scopeReadOnly": "Lecture seule",
     "scopeReadWrite": "Lecture et écriture",
     "scopeCertificates": "Certificats uniquement",
-    "apiKeyNameRequired": "Le nom de la clé API est requis"
+    "apiKeyNameRequired": "Le nom de la clé API est requis",
+    "apiKeyCreatedTitle": "Clé API créée — copiez-la maintenant",
+    "apiKeyCreatedWarning": "C'est la seule fois où la clé complète est affichée. Conservez-la en lieu sûr — vous ne pourrez plus la récupérer.",
+    "apiKeyValue": "Clé API",
+    "apiKeyNoExpiry": "Cette clé n'expire jamais.",
+    "apiKeySavedDone": "J'ai sauvegardé la clé",
+    "apiKeyPrefixUnavailable": "Préfixe indisponible (ancienne clé)",
+    "expiresInDaysHelp": "Laissez vide ou mettez 0 pour une clé sans date d'expiration.",
+    "expiresInDaysPlaceholder": "ex. 365 (vide = pas d'expiration)"
   },
   "acme": {
     "title": "Protocole ACME",

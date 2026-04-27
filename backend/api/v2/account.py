@@ -329,7 +329,27 @@ def create_api_key():
     
     # Create API key
     auth_manager = AuthManager()
-    expires_days = data.get('expires_days') or data.get('expires_in_days') or 365
+
+    # Resolve expiration:
+    #   - key absent           -> default to 365 days
+    #   - explicit None / 0    -> never expires
+    #   - positive int         -> N days
+    if 'expires_days' in data:
+        raw_expires = data.get('expires_days')
+    elif 'expires_in_days' in data:
+        raw_expires = data.get('expires_in_days')
+    else:
+        raw_expires = 365
+
+    if raw_expires in (None, 0, '', '0'):
+        expires_days = None
+    else:
+        try:
+            expires_days = int(raw_expires)
+            if expires_days < 0:
+                return error_response('expires_days must be >= 0', 400)
+        except (TypeError, ValueError):
+            return error_response('expires_days must be an integer or null', 400)
     
     try:
         key_info = auth_manager.create_api_key(

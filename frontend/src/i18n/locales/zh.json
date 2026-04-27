@@ -2211,7 +2211,15 @@
     "scopeReadOnly": "只读",
     "scopeReadWrite": "读写",
     "scopeCertificates": "仅证书",
-    "apiKeyNameRequired": "API密钥名称为必填项"
+    "apiKeyNameRequired": "API密钥名称为必填项",
+    "apiKeyCreatedTitle": "API 密钥已创建 — 立即复制",
+    "apiKeyCreatedWarning": "这是唯一一次显示完整密钥。请将其保存到安全的地方 — 之后将无法再次获取。",
+    "apiKeyValue": "API 密钥",
+    "apiKeyNoExpiry": "此密钥永不过期。",
+    "apiKeySavedDone": "我已保存密钥",
+    "apiKeyPrefixUnavailable": "前缀不可用（旧密钥）",
+    "expiresInDaysHelp": "留空或设为 0 表示永不过期。",
+    "expiresInDaysPlaceholder": "例如 365 (留空 = 永不过期)"
   },
   "rbac": {
     "title": "基于角色的访问控制",

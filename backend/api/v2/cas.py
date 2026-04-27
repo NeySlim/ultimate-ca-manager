@@ -60,6 +60,7 @@ def list_cas():
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    paginated = 'page' in request.args or 'per_page' in request.args
     search = request.args.get('search', '')
     ca_type = request.args.get('type', '')
     
@@ -85,9 +86,14 @@ def list_cas():
     
     # Paginate manually since list_cas returns list
     total = len(filtered_cas)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_cas = filtered_cas[start:end]
+    if paginated:
+        start = (page - 1) * per_page
+        end = start + per_page
+        paginated_cas = filtered_cas[start:end]
+    else:
+        # No explicit pagination requested → return all so the UI (which has no
+        # pagination controls) doesn't silently truncate the list. See issue #89.
+        paginated_cas = filtered_cas
     
     # Add certificate count for each CA
     result = []
@@ -109,9 +115,9 @@ def list_cas():
         data=result,
         meta={
             'total': total,
-            'page': page,
-            'per_page': per_page,
-            'total_pages': (total + per_page - 1) // per_page
+            'page': page if paginated else 1,
+            'per_page': per_page if paginated else total,
+            'total_pages': ((total + per_page - 1) // per_page) if paginated else 1
         }
     )
 

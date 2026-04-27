@@ -2211,7 +2211,15 @@
     "scopeReadOnly": "Solo lettura",
     "scopeReadWrite": "Lettura e scrittura",
     "scopeCertificates": "Solo certificati",
-    "apiKeyNameRequired": "Il nome della chiave API è obbligatorio"
+    "apiKeyNameRequired": "Il nome della chiave API è obbligatorio",
+    "apiKeyCreatedTitle": "Chiave API creata — copiala ora",
+    "apiKeyCreatedWarning": "Questa è l'unica volta che la chiave completa viene mostrata. Conservala in un luogo sicuro — non potrai recuperarla di nuovo.",
+    "apiKeyValue": "Chiave API",
+    "apiKeyNoExpiry": "Questa chiave non scade mai.",
+    "apiKeySavedDone": "Ho salvato la chiave",
+    "apiKeyPrefixUnavailable": "Prefisso non disponibile (chiave precedente)",
+    "expiresInDaysHelp": "Lascia vuoto o imposta 0 per una chiave senza scadenza.",
+    "expiresInDaysPlaceholder": "es. 365 (vuoto = nessuna scadenza)"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",
