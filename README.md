@@ -158,10 +158,11 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 
 - [ ] **Code Signing** — Issue and manage code signing certificates (Authenticode, JAR, macOS)
 - [ ] **High Availability / Clustering** — Active-passive or active-active HA deployment
-- [ ] **Helm chart** — Package UCM itself as a Helm chart for in-cluster deployment
+- [ ] **Helm chart** — Package UCM itself as a Helm chart for in-cluster deployment (k8s clusters can already *consume* UCM today via the cert-manager integration shipped in v2.139)
 - [ ] **Post-Quantum Cryptography** — ML-DSA, ML-KEM, SLH-DSA key types (NIST FIPS 203/204/205)
 - [ ] **CMP Protocol (RFC 4210)** — Certificate Management Protocol support
 - [ ] **Key Archival & Recovery** — Secure key escrow with recovery workflows
+- [x] **SAN database columns derived from final SAN list** — `san_email` / `san_dns` / `san_ip` / `san_uri` always match the X.509 extension, with backfill migration *(v2.140)*
 - [x] **On-disk certificate & CA files** — `.crt` / `.key` materialized to disk on every creation path *(v2.140)*
 - [x] **ACME External Account Binding (EAB, RFC 8555 §7.3.4)** — Issue/rotate/revoke `kid`+`hmac` pairs for cert-manager / certbot / acme.sh *(v2.139)*
 - [x] **ACME custom DNS resolvers + private-IP validation** — Split-horizon DNS, RFC1918/`.lan`/`.local` HTTP-01 & TLS-ALPN-01 *(v2.139)*
@@ -170,6 +171,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [x] **SSO `auth_source` tracking + role preservation** — Per-user origin, optional sync-on-login, UI never overwritten *(v2.133)*
 - [x] **HSM-backed Certificate Authorities** — Signing key generated/stored in HSM, never exportable *(v2.130)*
 - [x] **Native PostgreSQL backend** — Bidirectional migration UI with safety checks *(v2.127)*
+- [x] **PostgreSQL feature parity** — Database stats, optimize, integrity check, certificate activity chart all work natively on PostgreSQL *(v2.135)*
 - [x] **Custom Extra EKU OIDs** — Microsoft RDP, smartcard logon, document signing, IPsec, Kerberos PKINIT… (RFC 5280 §4.2.1.12) *(v2.128)*
 - [x] **Persisted UI filters** — Filter selections survive reloads on every list page *(v2.128)*
 - [x] **User preferences server-side** — Language/theme follow the user across browsers *(v2.128)*
