@@ -158,6 +158,87 @@ def persist_database_url(database_url: Optional[str]) -> Tuple[bool, str]:
 
 
 # ---------------------------------------------------------------------------
+# Switch-without-migration bootstrap
+# ---------------------------------------------------------------------------
+
+def bootstrap_users_to_target(target_url: str) -> Tuple[bool, str]:
+    """
+    Prepare a fresh target DB for switch-without-migration.
+    Creates the full schema, marks all migrations as applied (so the startup
+    migration runner won't try to re-run them), and copies the users table so
+    admins are not locked out immediately after the switch.
+    """
+    from pathlib import Path as _Path
+
+    source_url = Config.SQLALCHEMY_DATABASE_URI
+    source_is_pg = source_url.startswith("postgresql")
+    target_is_pg = target_url.startswith("postgresql")
+    rows: list = []
+
+    try:
+        target_engine = create_engine(target_url)
+
+        # Create full schema on target
+        db.metadata.create_all(target_engine)
+
+        # Create _migrations tracking table and mark all migrations applied
+        migrations_dir = _Path(__file__).parent.parent / "migrations"
+        migration_names = sorted(
+            f.stem for f in migrations_dir.glob("*.py")
+            if not f.name.startswith("_")
+        )
+        ddl = (
+            "CREATE TABLE IF NOT EXISTS _migrations "
+            "(id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, "
+            "applied_at TIMESTAMP DEFAULT NOW())"
+            if target_is_pg else
+            "CREATE TABLE IF NOT EXISTS _migrations "
+            "(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, "
+            "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+        )
+        with target_engine.begin() as conn:
+            conn.execute(text(ddl))
+            for name in migration_names:
+                if target_is_pg:
+                    conn.execute(
+                        text("INSERT INTO _migrations (name) VALUES (:n) ON CONFLICT (name) DO NOTHING"),
+                        {"n": name},
+                    )
+                else:
+                    conn.execute(
+                        text("INSERT OR IGNORE INTO _migrations (name) VALUES (:n)"),
+                        {"n": name},
+                    )
+
+        # Copy users table from source to target
+        source_engine = create_engine(source_url)
+        try:
+            with source_engine.connect() as src, target_engine.begin() as dst:
+                rows = list(src.execute(text('SELECT * FROM "users"')).mappings())
+                if rows:
+                    cols = list(rows[0].keys())
+                    placeholders = ", ".join(f":{c}" for c in cols)
+                    col_list = ", ".join(f'"{c}"' for c in cols)
+                    insert_sql = text(
+                        f'INSERT INTO "users" ({col_list}) VALUES ({placeholders})'
+                    )
+                    for row in rows:
+                        d = _normalize_row(dict(row), source_is_pg, target_is_pg)
+                        dst.execute(insert_sql, d)
+        finally:
+            source_engine.dispose()
+
+        if target_is_pg:
+            _reset_pg_sequences(target_engine)
+
+        target_engine.dispose()
+        return True, f"Target bootstrapped with {len(rows)} user account(s)"
+    except Exception as e:
+        logger.exception("bootstrap_users_to_target failed")
+        return False, f"Failed to bootstrap target: {_short_err(str(e))}"
+
+
+# ---------------------------------------------------------------------------
 # Data migration (dump/load)
 # ---------------------------------------------------------------------------
 

@@ -71,6 +71,10 @@ def switch_backend():
             if not ok:
                 return error_response(f'Target DB unreachable: {msg}', 400)
 
+            ok, msg = svc.bootstrap_users_to_target(database_url)
+            if not ok:
+                return error_response(f'Failed to prepare target database: {msg}', 500)
+
         ok, msg = svc.persist_database_url(database_url)
         if not ok:
             return error_response(msg, 500)
