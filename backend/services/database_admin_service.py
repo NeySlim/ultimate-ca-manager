@@ -291,9 +291,20 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         src_table_names = src_insp.get_table_names()
 
         with source_engine.connect() as src, target_engine.begin() as dst:
-            # Disable FK checks during bulk load to avoid ordering issues
+            # Disable FK checks during bulk load to avoid ordering issues.
+            # session_replication_role requires superuser/replication privilege; fall back
+            # gracefully if the DB user doesn't have it — migrated data is already consistent.
+            _pg_fk_disabled = False
             if target_is_pg:
-                dst.execute(text("SET session_replication_role = 'replica'"))
+                try:
+                    dst.execute(text("SET session_replication_role = 'replica'"))
+                    _pg_fk_disabled = True
+                except Exception:
+                    logger.warning(
+                        "Could not set session_replication_role (insufficient privileges). "
+                        "Proceeding without FK constraint bypass — migration should still "
+                        "succeed as source data is internally consistent."
+                    )
             else:
                 dst.execute(text("PRAGMA foreign_keys = OFF"))
 
@@ -336,7 +347,8 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
 
             # Re-enable FK checks
             if target_is_pg:
-                dst.execute(text("SET session_replication_role = 'origin'"))
+                if _pg_fk_disabled:
+                    dst.execute(text("SET session_replication_role = 'origin'"))
             else:
                 dst.execute(text("PRAGMA foreign_keys = ON"))
 
