@@ -213,6 +213,7 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
             t: {c["name"] for c in target_insp.get_columns(t)} for t in target_tables
         }
         target_json_cols = _detect_json_columns(target_insp, target_tables)
+        target_bool_cols = _detect_boolean_columns(target_insp, target_tables)
 
         # Refuse to bootstrap if target already has users (already provisioned)
         if "users" in target_tables:
@@ -222,11 +223,7 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
                     target_engine.dispose()
                     return True, "Target already has users; bootstrap skipped.", stats
 
-        with source_engine.connect() as src, target_engine.begin() as dst:
-            # Disable FK checks during bulk load (best-effort — works as
-            # superuser; fall back to ordering otherwise)
-            fk_disabled = _try_disable_fks(dst, target_is_pg)
-
+        with source_engine.connect() as src:
             for table_name in BOOTSTRAP_AUTH_TABLES:
                 if table_name not in target_tables:
                     stats["skipped"].append(f"{table_name} (missing on target)")
@@ -248,29 +245,43 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
                         f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})'
                     )
                     json_cols_here = target_json_cols.get(table_name, set())
-                    for row in rows:
-                        d = _normalize_row(
-                            dict(row), source_is_pg, target_is_pg, json_cols_here
-                        )
-                        d = {c: d.get(c) for c in cols}
-                        dst.execute(insert_sql, d)
+                    bool_cols_here = target_bool_cols.get(table_name, set())
+                    # Per-table transaction: a single bad row on PG poisons the
+                    # whole tx (InFailedSqlTransaction), so isolate each table.
+                    with target_engine.begin() as dst:
+                        _try_disable_fks(dst, target_is_pg)
+                        for row in rows:
+                            d = _normalize_row(
+                                dict(row),
+                                source_is_pg,
+                                target_is_pg,
+                                json_cols_here,
+                                bool_cols_here,
+                            )
+                            d = {c: d.get(c) for c in cols}
+                            dst.execute(insert_sql, d)
                     stats["tables_bootstrapped"] += 1
                     stats["rows_copied"] += len(rows)
                 except Exception as e:
                     err = f"{table_name}: {_short_err(str(e))}"
                     logger.error(f"Bootstrap error on table {err}")
                     stats["skipped"].append(err)
-                    if not fk_disabled:
-                        # Without FK relaxation a single failure may cascade;
-                        # bail out cleanly so the caller can decide.
-                        raise
-
-            _try_reenable_fks(dst, target_is_pg, fk_disabled)
 
         if target_is_pg:
             _reset_pg_sequences(target_engine)
 
         target_engine.dispose()
+
+        # If users table failed, lockout is guaranteed — surface as failure.
+        if stats["rows_copied"] == 0 or any(
+            s.startswith("users:") or s.startswith("users ") for s in stats["skipped"]
+        ):
+            return (
+                False,
+                "Bootstrap failed for users table — switch aborted to prevent lockout",
+                stats,
+            )
+
         return True, "Auth tables bootstrapped to target", stats
 
     except Exception as e:
@@ -404,6 +415,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
             t: {c["name"] for c in target_insp.get_columns(t)} for t in target_tables
         }
         target_json_cols = _detect_json_columns(target_insp, target_tables)
+        target_bool_cols = _detect_boolean_columns(target_insp, target_tables)
         src_table_names = _topo_sort_tables(src_insp)
 
         with source_engine.connect() as src, target_engine.begin() as dst:
@@ -440,9 +452,14 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
                         f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})'
                     )
                     json_cols_here = target_json_cols.get(table_name, set())
+                    bool_cols_here = target_bool_cols.get(table_name, set())
                     for row in rows:
                         d = _normalize_row(
-                            dict(row), source_is_pg, target_is_pg, json_cols_here
+                            dict(row),
+                            source_is_pg,
+                            target_is_pg,
+                            json_cols_here,
+                            bool_cols_here,
                         )
                         d = {c: d.get(c) for c in cols}
                         dst.execute(insert_sql, d)
@@ -597,15 +614,21 @@ def _normalize_row(
     source_is_pg: bool,
     target_is_pg: bool,
     target_json_cols: Optional[set] = None,
+    target_bool_cols: Optional[set] = None,
 ) -> dict:
     """Normalize values for cross-backend insert.
 
-    - PG → SQLite: dict/list become JSON strings; memoryview → bytes
+    - PG → SQLite: dict/list become JSON strings; memoryview → bytes; booleans
+      become int (SQLite has no real bool type but accepts ints fine).
     - SQLite → PG: when the target column is JSON/JSONB, JSON-string values
       are parsed back to dict/list so psycopg2's JSON adapter serializes
       them correctly (otherwise PG rejects "raw text into json column").
+      When the target column is BOOLEAN, integer 0/1 (or strings "0"/"1"/
+      "true"/"false") are coerced to real bool — SQLite stores booleans as
+      INTEGER and psycopg2 refuses to insert int into BOOLEAN.
     """
     target_json_cols = target_json_cols or set()
+    target_bool_cols = target_bool_cols or set()
     out = {}
     for k, v in row.items():
         if v is None:
@@ -617,16 +640,37 @@ def _normalize_row(
         elif (
             target_is_pg
             and not source_is_pg
-            and isinstance(v, str)
-            and k in target_json_cols
-            and v != ""
+            and k in target_bool_cols
+            and not isinstance(v, bool)
         ):
-            # SQLite stored JSON columns as TEXT; reconstruct so psycopg2
-            # adapts them via the json/jsonb adapter on insert.
-            try:
-                out[k] = json.loads(v)
-            except (TypeError, ValueError):
+            # SQLite stored bools as INTEGER (0/1). Coerce to real bool.
+            if isinstance(v, (int, float)):
+                out[k] = bool(v)
+            elif isinstance(v, str):
+                s = v.strip().lower()
+                if s in ("1", "true", "t", "yes", "y"):
+                    out[k] = True
+                elif s in ("0", "false", "f", "no", "n", ""):
+                    out[k] = False
+                else:
+                    out[k] = v
+            else:
                 out[k] = v
+        elif target_is_pg and k in target_json_cols:
+            # PG json/jsonb columns: always send as JSON-encoded text.
+            # - dict/list (SQLAlchemy auto-deserialized SQLite JSON) → encode
+            #   so psycopg2 doesn't send a Python list as PostgreSQL ARRAY.
+            # - str: keep as-is if already valid JSON, otherwise wrap.
+            # PG parses the text into json/jsonb on INSERT.
+            if isinstance(v, (dict, list)):
+                out[k] = json.dumps(v)
+            elif isinstance(v, str):
+                if v == "":
+                    out[k] = None
+                else:
+                    out[k] = v  # assume already JSON text
+            else:
+                out[k] = json.dumps(v)
         else:
             out[k] = v
     return out
@@ -679,6 +723,30 @@ def _detect_json_columns(insp, table_names) -> dict:
             continue
         if json_cols:
             out[t] = json_cols
+    return out
+
+
+def _detect_boolean_columns(insp, table_names) -> dict:
+    """Return {table: {col_name, ...}} for columns whose SQL type is BOOLEAN.
+
+    Needed when migrating SQLite → PostgreSQL: SQLite stores booleans as
+    INTEGER (0/1), but psycopg2 refuses to insert int into a real BOOLEAN
+    column. We detect them up-front and coerce in _normalize_row.
+    """
+    out = {}
+    for t in table_names:
+        bool_cols = set()
+        try:
+            for col in insp.get_columns(t):
+                type_str = str(col.get("type", "")).upper()
+                # Match BOOLEAN, BOOL — but NOT TINYINT/SMALLINT (they are
+                # integers in SQLite even when SQLAlchemy maps to Boolean).
+                if type_str in ("BOOLEAN", "BOOL"):
+                    bool_cols.add(col["name"])
+        except Exception:
+            continue
+        if bool_cols:
+            out[t] = bool_cols
     return out
 
 
