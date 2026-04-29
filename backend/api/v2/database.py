@@ -71,19 +71,39 @@ def switch_backend():
             if not ok:
                 return error_response(f'Target DB unreachable: {msg}', 400)
 
+            # Bootstrap auth/RBAC/SSO/MFA tables to the new (empty) target so
+            # admins, custom roles and SSO config survive the switch — without
+            # this, the new DB has no users and the operator is locked out.
+            ok_boot, boot_msg, boot_stats = svc.bootstrap_auth_to_target(database_url)
+            if not ok_boot:
+                return error_response(
+                    f'Pre-flight bootstrap failed (no changes made): {boot_msg}',
+                    500,
+                )
+        else:
+            boot_msg = 'Reverting to SQLite default — no bootstrap needed'
+            boot_stats = {}
+
         ok, msg = svc.persist_database_url(database_url)
         if not ok:
             return error_response(msg, 500)
 
+        # Audit BEFORE restart so the log entry is guaranteed to flush.
         AuditService.log_action(
             action='database.switch',
             resource_type='system',
-            details={'database_url': database_url or 'sqlite (default)', 'data_migrated': False}
+            details={
+                'database_url': database_url or 'sqlite (default)',
+                'data_migrated': False,
+                'bootstrap': boot_stats,
+            },
         )
 
         ok, restart_msg = restart_ucm_service()
         return success_response(data={
             'persisted': True,
+            'bootstrap': boot_stats,
+            'bootstrap_message': boot_msg,
             'restart_initiated': ok,
             'restart_message': restart_msg,
         }, message='Backend switched. Service restarting…')

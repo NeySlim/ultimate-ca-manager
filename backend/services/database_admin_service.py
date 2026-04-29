@@ -161,6 +161,123 @@ def persist_database_url(database_url: Optional[str]) -> Tuple[bool, str]:
 # Data migration (dump/load)
 # ---------------------------------------------------------------------------
 
+# Tables that must be present on a target backend even when an admin switches
+# WITHOUT migrating data, so we don't lock everyone out of the new empty DB.
+# Order matters: parents before children to satisfy FKs without disabling them.
+BOOTSTRAP_AUTH_TABLES = (
+    "users",
+    "groups",
+    "group_members",
+    "pro_custom_roles",
+    "pro_role_permissions",
+    "pro_sso_providers",
+    "pro_sso_sessions",
+    "webauthn_credentials",
+    "webauthn_challenges",
+    "api_keys",
+    # Keep system_config so SSO/SMTP/HSM toggles survive the switch
+    "system_config",
+)
+
+
+def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
+    """
+    Copy auth/RBAC/SSO/MFA tables from the current DB to a fresh target so
+    admins, custom roles and SSO config survive a `switch_backend` call.
+
+    Used when the user switches backends WITHOUT a full data migration.
+    Without this, the new DB has no users → nobody can log in → lockout.
+
+    Safe to call against an empty target. If the target already has any users,
+    bootstrap is skipped (we assume the operator manages that DB themselves).
+    """
+    # Force-load every model module so db.metadata.create_all() sees them.
+    # Some modules (webhooks, …) are only imported when their feature runs.
+    _force_register_all_models()
+
+    stats = {"tables_bootstrapped": 0, "rows_copied": 0, "skipped": []}
+    try:
+        from models import db as _db
+        source_engine = _db.engine
+        target_engine = create_engine(target_url, pool_pre_ping=True)
+
+        # Build schema on target via SQLAlchemy metadata (safe to call repeatedly)
+        _db.metadata.create_all(target_engine)
+
+        target_is_pg = target_url.startswith("postgresql")
+        source_is_pg = str(source_engine.url).startswith("postgresql")
+
+        target_insp = inspect(target_engine)
+        target_tables = set(target_insp.get_table_names())
+        target_cols_by_table = {
+            t: {c["name"] for c in target_insp.get_columns(t)} for t in target_tables
+        }
+        target_json_cols = _detect_json_columns(target_insp, target_tables)
+
+        # Refuse to bootstrap if target already has users (already provisioned)
+        if "users" in target_tables:
+            with target_engine.connect() as probe:
+                row = probe.execute(text('SELECT COUNT(*) FROM users')).fetchone()
+                if row and row[0] and row[0] > 0:
+                    target_engine.dispose()
+                    return True, "Target already has users; bootstrap skipped.", stats
+
+        with source_engine.connect() as src, target_engine.begin() as dst:
+            # Disable FK checks during bulk load (best-effort — works as
+            # superuser; fall back to ordering otherwise)
+            fk_disabled = _try_disable_fks(dst, target_is_pg)
+
+            for table_name in BOOTSTRAP_AUTH_TABLES:
+                if table_name not in target_tables:
+                    stats["skipped"].append(f"{table_name} (missing on target)")
+                    continue
+                try:
+                    target_cols = target_cols_by_table[table_name]
+                    rows = list(src.execute(text(f'SELECT * FROM "{table_name}"')).mappings())
+                    if not rows:
+                        stats["tables_bootstrapped"] += 1
+                        continue
+                    src_cols = list(rows[0].keys())
+                    cols = [c for c in src_cols if c in target_cols]
+                    if not cols:
+                        stats["skipped"].append(f"{table_name} (no overlapping columns)")
+                        continue
+                    placeholders = ", ".join(f":{c}" for c in cols)
+                    col_list = ", ".join(f'"{c}"' for c in cols)
+                    insert_sql = text(
+                        f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})'
+                    )
+                    json_cols_here = target_json_cols.get(table_name, set())
+                    for row in rows:
+                        d = _normalize_row(
+                            dict(row), source_is_pg, target_is_pg, json_cols_here
+                        )
+                        d = {c: d.get(c) for c in cols}
+                        dst.execute(insert_sql, d)
+                    stats["tables_bootstrapped"] += 1
+                    stats["rows_copied"] += len(rows)
+                except Exception as e:
+                    err = f"{table_name}: {_short_err(str(e))}"
+                    logger.error(f"Bootstrap error on table {err}")
+                    stats["skipped"].append(err)
+                    if not fk_disabled:
+                        # Without FK relaxation a single failure may cascade;
+                        # bail out cleanly so the caller can decide.
+                        raise
+
+            _try_reenable_fks(dst, target_is_pg, fk_disabled)
+
+        if target_is_pg:
+            _reset_pg_sequences(target_engine)
+
+        target_engine.dispose()
+        return True, "Auth tables bootstrapped to target", stats
+
+    except Exception as e:
+        logger.exception("bootstrap_auth_to_target failed")
+        return False, f"Bootstrap failed: {_short_err(str(e))}", stats
+
+
 def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
     """
     Migrate all data from current backend → target_url.
@@ -175,11 +292,15 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
     On failure: target is left in whatever state it reached. Caller should NOT
     persist the URL. Source DB is untouched.
     """
+    # Force-load every model module so db.metadata.create_all() sees them.
+    _force_register_all_models()
+
     stats = {
         "tables_migrated": 0,
         "rows_migrated": 0,
         "backup_path": None,
         "errors": [],
+        "dropped_columns": {},
     }
 
     ok, msg = test_connection(target_url)
@@ -245,15 +366,9 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         source_engine = _db.engine
         target_engine = create_engine(target_url, pool_pre_ping=True)
 
-        # Build schema on target via SQLAlchemy metadata
+        # Build schema on target via SQLAlchemy metadata (covers all models
+        # registered above by _force_register_all_models)
         _db.metadata.create_all(target_engine)
-
-        # Also create webhook table (registered at runtime, not in metadata at import time)
-        try:
-            from services.webhook_service import WebhookEndpoint  # noqa: F401
-            _db.metadata.create_all(target_engine)
-        except Exception:
-            pass
 
         # Create _migrations table on target (not part of SQLAlchemy metadata).
         # Use a backend-appropriate auto-increment primary key — plain
@@ -288,14 +403,15 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         target_cols_by_table = {
             t: {c["name"] for c in target_insp.get_columns(t)} for t in target_tables
         }
-        src_table_names = src_insp.get_table_names()
+        target_json_cols = _detect_json_columns(target_insp, target_tables)
+        src_table_names = _topo_sort_tables(src_insp)
 
         with source_engine.connect() as src, target_engine.begin() as dst:
-            # Disable FK checks during bulk load to avoid ordering issues
-            if target_is_pg:
-                dst.execute(text("SET session_replication_role = 'replica'"))
-            else:
-                dst.execute(text("PRAGMA foreign_keys = OFF"))
+            # Disable FK checks during bulk load to avoid ordering issues.
+            # Falls back gracefully if the PG user is not a superuser
+            # (session_replication_role is superuser-only) — in that case we
+            # rely on the topological order computed above.
+            fk_disabled = _try_disable_fks(dst, target_is_pg)
 
             for table_name in src_table_names:
                 if table_name.startswith("_") and table_name != "_migrations":
@@ -314,6 +430,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
                     dropped = [c for c in src_cols if c not in target_cols]
                     if dropped:
                         logger.warning(f"{table_name}: dropping columns absent in target: {dropped}")
+                        stats["dropped_columns"][table_name] = dropped
                     if not cols:
                         logger.warning(f"{table_name}: no overlapping columns, skipping")
                         continue
@@ -322,8 +439,11 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
                     insert_sql = text(
                         f'INSERT INTO "{table_name}" ({col_list}) VALUES ({placeholders})'
                     )
+                    json_cols_here = target_json_cols.get(table_name, set())
                     for row in rows:
-                        d = _normalize_row(dict(row), source_is_pg, target_is_pg)
+                        d = _normalize_row(
+                            dict(row), source_is_pg, target_is_pg, json_cols_here
+                        )
                         d = {c: d.get(c) for c in cols}
                         dst.execute(insert_sql, d)
                     stats["tables_migrated"] += 1
@@ -334,11 +454,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
                     stats["errors"].append(err)
                     raise
 
-            # Re-enable FK checks
-            if target_is_pg:
-                dst.execute(text("SET session_replication_role = 'origin'"))
-            else:
-                dst.execute(text("PRAGMA foreign_keys = ON"))
+            _try_reenable_fks(dst, target_is_pg, fk_disabled)
 
         # Reset PG sequences if target is PG
         if target_url.startswith("postgresql"):
@@ -462,25 +578,34 @@ def _reset_pg_sequences(engine):
         )).fetchall()
         for table_name, column_name in rows:
             try:
+                seq_row = conn.execute(text(
+                    "SELECT pg_get_serial_sequence(:t, :c)"
+                ), {"t": table_name, "c": column_name}).fetchone()
+                if not seq_row or not seq_row[0]:
+                    continue  # column has nextval() default but no resolvable seq
+                seq_name = seq_row[0]
                 conn.execute(text(
-                    f"SELECT setval(pg_get_serial_sequence('{table_name}', '{column_name}'), "
+                    f"SELECT setval('{seq_name}', "
                     f"COALESCE((SELECT MAX(\"{column_name}\") FROM \"{table_name}\"), 1))"
                 ))
             except Exception as e:
                 logger.warning(f"Failed to reset sequence for {table_name}.{column_name}: {e}")
 
 
-def _normalize_row(row: dict, source_is_pg: bool, target_is_pg: bool) -> dict:
+def _normalize_row(
+    row: dict,
+    source_is_pg: bool,
+    target_is_pg: bool,
+    target_json_cols: Optional[set] = None,
+) -> dict:
     """Normalize values for cross-backend insert.
 
     - PG → SQLite: dict/list become JSON strings; memoryview → bytes
-    - SQLite → PG: JSON-looking strings on JSON columns are left as-is
-      (SQLAlchemy handles the cast on ORM-typed columns; raw INSERT works
-      because PG accepts text in JSON columns when string is valid JSON
-      — but psycopg2 doesn't cast str→json automatically, so we leave
-      strings unchanged and rely on PG implicit cast for TEXT columns;
-      JSON columns get TEXT input which fails — so we don't touch).
+    - SQLite → PG: when the target column is JSON/JSONB, JSON-string values
+      are parsed back to dict/list so psycopg2's JSON adapter serializes
+      them correctly (otherwise PG rejects "raw text into json column").
     """
+    target_json_cols = target_json_cols or set()
     out = {}
     for k, v in row.items():
         if v is None:
@@ -489,6 +614,136 @@ def _normalize_row(row: dict, source_is_pg: bool, target_is_pg: bool) -> dict:
             out[k] = bytes(v)
         elif isinstance(v, (dict, list)) and not target_is_pg:
             out[k] = json.dumps(v)
+        elif (
+            target_is_pg
+            and not source_is_pg
+            and isinstance(v, str)
+            and k in target_json_cols
+            and v != ""
+        ):
+            # SQLite stored JSON columns as TEXT; reconstruct so psycopg2
+            # adapts them via the json/jsonb adapter on insert.
+            try:
+                out[k] = json.loads(v)
+            except (TypeError, ValueError):
+                out[k] = v
         else:
             out[k] = v
     return out
+
+
+# ---------------------------------------------------------------------------
+# Helpers — model registration, FK control, JSON detection, topo sort
+# ---------------------------------------------------------------------------
+
+def _force_register_all_models() -> None:
+    """Import every model module so db.metadata.create_all sees all tables.
+
+    Some modules are registered lazily (only when their feature runs) which
+    means create_all on a fresh target would silently miss their tables.
+    """
+    try:
+        # Core model packages — importing the package triggers SQLAlchemy
+        # registration via class definitions.
+        import models  # noqa: F401
+        from models import (  # noqa: F401
+            acme_models, api_key, auth_certificate, certificate_template,
+            crl, discovered_certificate, email_notification, group, hsm,
+            msca, ocsp, policy, rbac, ssh, sso, truststore, webauthn,
+        )
+    except Exception as e:
+        logger.warning(f"Some core models failed to import: {e}")
+
+    # Service-owned tables (lazy-registered)
+    for mod in (
+        "services.webhook_service",
+        "services.notification_service",
+    ):
+        try:
+            __import__(mod)
+        except Exception as e:
+            logger.debug(f"Optional model module {mod} not loaded: {e}")
+
+
+def _detect_json_columns(insp, table_names) -> dict:
+    """Return {table: {col_name, ...}} for columns whose SQL type is JSON/JSONB."""
+    out = {}
+    for t in table_names:
+        json_cols = set()
+        try:
+            for col in insp.get_columns(t):
+                type_str = str(col.get("type", "")).upper()
+                if "JSON" in type_str:  # matches JSON and JSONB
+                    json_cols.add(col["name"])
+        except Exception:
+            continue
+        if json_cols:
+            out[t] = json_cols
+    return out
+
+
+def _try_disable_fks(conn, target_is_pg: bool) -> bool:
+    """Disable FK checks for bulk load. Returns True if successful.
+
+    On PostgreSQL `SET session_replication_role` requires SUPERUSER. When the
+    DBA followed best practice and gave UCM a non-superuser role, the call
+    fails — we catch it and rely on the topological insert order instead.
+    """
+    try:
+        if target_is_pg:
+            conn.execute(text("SET session_replication_role = 'replica'"))
+        else:
+            conn.execute(text("PRAGMA foreign_keys = OFF"))
+        return True
+    except Exception as e:
+        logger.warning(
+            f"Could not disable FK checks ({_short_err(str(e))}); "
+            "falling back to topological insert order."
+        )
+        return False
+
+
+def _try_reenable_fks(conn, target_is_pg: bool, was_disabled: bool) -> None:
+    if not was_disabled:
+        return
+    try:
+        if target_is_pg:
+            conn.execute(text("SET session_replication_role = 'origin'"))
+        else:
+            conn.execute(text("PRAGMA foreign_keys = ON"))
+    except Exception as e:
+        logger.warning(f"Could not re-enable FK checks: {_short_err(str(e))}")
+
+
+def _topo_sort_tables(insp) -> list:
+    """Return table names in FK-dependency order (parents first).
+
+    Falls back to alphabetical on any error so a sort failure doesn't
+    abort the whole migration.
+    """
+    try:
+        all_tables = insp.get_table_names()
+        deps = {t: set() for t in all_tables}
+        for t in all_tables:
+            for fk in insp.get_foreign_keys(t):
+                ref = fk.get("referred_table")
+                if ref and ref in deps and ref != t:
+                    deps[t].add(ref)
+
+        ordered = []
+        remaining = dict(deps)
+        while remaining:
+            ready = sorted(t for t, d in remaining.items() if not d)
+            if not ready:
+                # Cycle detected — append the rest in alpha order
+                ordered.extend(sorted(remaining.keys()))
+                break
+            for t in ready:
+                ordered.append(t)
+                remaining.pop(t)
+            for t in remaining:
+                remaining[t] -= set(ready)
+        return ordered
+    except Exception as e:
+        logger.warning(f"Topo sort failed ({e}); using alphabetical order.")
+        return sorted(insp.get_table_names())
