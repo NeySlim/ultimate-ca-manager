@@ -146,14 +146,15 @@ def test_normalize_row_pg_to_sqlite_serializes_dicts():
 
 
 def test_normalize_row_sqlite_to_pg_parses_json_columns():
-    # JSON-typed target column → string must become dict so psycopg2 adapts it
+    # JSON-typed target column → JSON-encoded text (PG parses on insert).
+    # Strings that are already JSON pass through verbatim.
     out = svc._normalize_row(
         {"perms": '["read:certs","write:cas"]', "name": "alice"},
         source_is_pg=False,
         target_is_pg=True,
         target_json_cols={"perms"},
     )
-    assert out["perms"] == ["read:certs", "write:cas"]
+    assert out["perms"] == '["read:certs","write:cas"]'
     assert out["name"] == "alice"  # untouched
 
 
@@ -175,6 +176,70 @@ def test_normalize_row_handles_memoryview():
         target_is_pg=False,
     )
     assert out["blob"] == b"hello"
+
+
+def test_normalize_row_sqlite_to_pg_coerces_int_to_bool():
+    """SQLite stores bools as INTEGER; PG BOOLEAN refuses int — must coerce."""
+    out = svc._normalize_row(
+        {"active": 1, "deleted": 0, "name": "alice"},
+        source_is_pg=False,
+        target_is_pg=True,
+        target_bool_cols={"active", "deleted"},
+    )
+    assert out["active"] is True
+    assert out["deleted"] is False
+    assert out["name"] == "alice"
+
+
+def test_normalize_row_sqlite_to_pg_coerces_str_bool_variants():
+    out = svc._normalize_row(
+        {"a": "true", "b": "false", "c": "1", "d": "0", "e": ""},
+        source_is_pg=False,
+        target_is_pg=True,
+        target_bool_cols={"a", "b", "c", "d", "e"},
+    )
+    assert out["a"] is True
+    assert out["b"] is False
+    assert out["c"] is True
+    assert out["d"] is False
+    assert out["e"] is False
+
+
+def test_normalize_row_preserves_real_bools():
+    out = svc._normalize_row(
+        {"active": True, "deleted": False},
+        source_is_pg=False,
+        target_is_pg=True,
+        target_bool_cols={"active", "deleted"},
+    )
+    assert out["active"] is True
+    assert out["deleted"] is False
+
+
+def test_normalize_row_pg_to_sqlite_leaves_bool_alone():
+    # SQLite accepts True/False (stored as 1/0). No need to mangle.
+    out = svc._normalize_row(
+        {"active": True},
+        source_is_pg=True,
+        target_is_pg=False,
+        target_bool_cols={"active"},
+    )
+    assert out["active"] is True
+
+
+def test_normalize_row_sqlite_to_pg_encodes_dict_list_for_json_column():
+    """SQLAlchemy auto-deserializes SQLite JSON to dict/list. psycopg2 would
+    send a Python list as PostgreSQL text[], breaking a real json column.
+    """
+    out = svc._normalize_row(
+        {"perms": ["read:certs", "write:cas"], "meta": {"key": "val"}},
+        source_is_pg=False,
+        target_is_pg=True,
+        target_json_cols={"perms", "meta"},
+    )
+    # Both must end up as JSON-encoded strings (PG parses them on insert).
+    assert out["perms"] == '["read:certs", "write:cas"]'
+    assert out["meta"] == '{"key": "val"}'
 
 
 def test_topo_sort_puts_parents_before_children(populated_app):
