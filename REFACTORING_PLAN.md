@@ -240,7 +240,7 @@ class ExportService:
 ## ✅ Progrès
 
 ### Backend API
-- [ ] certificates.py (2220l) → 5 modules
+- [x] certificates.py (2220l) → 6 modules (crud, export, bulk, ct, stats, eku) ✅
 - [ ] cas.py (1245l) → 4 modules
 - [ ] backup_service.py (2351l) → 1 module (déjà service, à découper)
 - [ ] system.py (1556l) → à analyser
@@ -269,7 +269,8 @@ class ExportService:
 
 | Date | Commit | Description | Statut |
 |------|--------|-------------|--------|
-| - | - | Initial refactor branch | ✅ |
+| 2026-05-01 | aaae72f1 | docs(refactor): add comprehensive refactoring plan | ✅ |
+| 2026-05-01 | 317253e9 | refactor(backend): split certificates.py (2220l) into modular structure | ✅ |
 
 *(À mettre à jour après chaque commit)*
 
