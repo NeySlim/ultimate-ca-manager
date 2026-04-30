@@ -579,8 +579,8 @@ export default function DashboardPage() {
                     </div>
                   }
                 />
-                <Card.Body className="flex-1 min-h-[180px] !p-2 !pr-3 !pt-2">
-                  <div style={{ height: 200 }}>
+                <Card.Body className="flex-1 overflow-hidden !p-2 !pr-3 !pt-2">
+                  <div style={{ height: '100%' }}>
                     <CertificateTrendChart data={certificateTrend} />
                   </div>
                 </Card.Body>
@@ -600,9 +600,9 @@ export default function DashboardPage() {
                   title={t('dashboard.statusDistribution')}
                   subtitle={t('dashboard.currentCertificates')}
                 />
-                <Card.Body className="flex-1 min-h-[180px] !p-2">
-                  <div style={{ height: 200 }}>
-                    <StatusPieChart 
+                <Card.Body className="flex-1 overflow-hidden !p-2">
+                  <div style={{ height: '100%' }}>
+                    <StatusPieChart
                       data={{
                         valid: stats?.valid ?? Math.max(0, totalCerts - (stats?.expiring_soon || 0) - (stats?.expired || 0) - (stats?.revoked || 0)),
                         expiring: stats?.expiring_soon || 0,
@@ -876,7 +876,7 @@ export default function DashboardPage() {
                     </Button>
                   }
                 />
-                <Card.Body className="flex-1 overflow-hidden !pt-2 !pb-0.5">
+                <Card.Body className="flex-1 overflow-y-auto !pt-2 !pb-0.5">
                   <div className="grid grid-cols-2 gap-1 mb-1.5">
                     <SystemStat 
                       icon={WifiHigh} 
