@@ -794,9 +794,9 @@ def export_ca(ca_id):
             key_pem = base64.b64decode(decrypt_private_key(ca.prv))
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
             
-            # Build parent CA chain if available
+            # Build parent CA chain if available and requested
             ca_certs = []
-            if ca.caref:
+            if include_chain and ca.caref:
                 parent = CA.query.filter_by(refid=ca.caref).first()
                 while parent:
                     if parent.crt:
@@ -808,7 +808,7 @@ def export_ca(ca_id):
                         parent = CA.query.filter_by(refid=parent.caref).first()
                     else:
                         break
-            
+
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(ca.descr or ca.refid).encode(),
                 key=private_key,
@@ -816,7 +816,7 @@ def export_ca(ca_id):
                 cas=ca_certs if ca_certs else None,
                 encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
             )
-            
+
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
@@ -866,15 +866,30 @@ def export_ca(ca_id):
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem_data = base64.b64decode(decrypt_private_key(ca.prv))
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
-            
+
+            # Build parent CA chain if available and requested
+            ca_certs = []
+            if include_chain and ca.caref:
+                parent = CA.query.filter_by(refid=ca.caref).first()
+                while parent:
+                    if parent.crt:
+                        parent_cert = x509.load_pem_x509_certificate(
+                            base64.b64decode(parent.crt), default_backend()
+                        )
+                        ca_certs.append(parent_cert)
+                    if parent.caref:
+                        parent = CA.query.filter_by(refid=parent.caref).first()
+                    else:
+                        break
+
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(ca.descr or ca.refid).encode(),
                 key=private_key,
                 cert=cert,
-                cas=None,
+                cas=ca_certs if ca_certs else None,
                 encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
             )
-            
+
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
