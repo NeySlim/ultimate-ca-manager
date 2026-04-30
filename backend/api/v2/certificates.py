@@ -1100,9 +1100,9 @@ def export_certificate(cert_id):
             key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
             
-            # Build CA chain if available
+            # Build CA chain if available and requested
             ca_certs = []
-            if certificate.caref:
+            if include_chain and certificate.caref:
                 ca = CA.query.filter_by(refid=certificate.caref).first()
                 while ca:
                     if ca.crt:
@@ -1114,7 +1114,7 @@ def export_certificate(cert_id):
                         ca = CA.query.filter_by(refid=ca.caref).first()
                     else:
                         break
-            
+
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(certificate.descr or certificate.refid).encode(),
                 key=private_key,
@@ -1122,7 +1122,7 @@ def export_certificate(cert_id):
                 cas=ca_certs if ca_certs else None,
                 encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
             )
-            
+
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
@@ -1174,9 +1174,9 @@ def export_certificate(cert_id):
             key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
             
-            # Build CA chain
+            # Build CA chain if available and requested
             ca_certs = []
-            if certificate.caref:
+            if include_chain and certificate.caref:
                 ca = CA.query.filter_by(refid=certificate.caref).first()
                 while ca:
                     if ca.crt:
@@ -1188,7 +1188,7 @@ def export_certificate(cert_id):
                         ca = CA.query.filter_by(refid=ca.caref).first()
                     else:
                         break
-            
+
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(certificate.descr or certificate.refid).encode(),
                 key=private_key,
@@ -1196,7 +1196,7 @@ def export_certificate(cert_id):
                 cas=ca_certs if ca_certs else None,
                 encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
             )
-            
+
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
