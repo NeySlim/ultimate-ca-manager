@@ -12,7 +12,14 @@ logger = logging.getLogger(__name__)
 from api.v2.auth import bp as auth_bp
 from api.v2.auth_methods import bp as auth_methods_bp  # Multi-method auth
 from api.v2.account import bp as account_bp
+# CAs: import package (creates bp) then all route modules
 from api.v2.cas import bp as cas_bp
+from api.v2.cas import crud  # noqa: F401
+from api.v2.cas import import_  # noqa: F401
+from api.v2.cas import export  # noqa: F401
+from api.v2.cas import bulk  # noqa: F401
+from api.v2.cas import ocsp  # noqa: F401
+from api.v2.cas import certificates  # noqa: F401
 # Certificates: import package (creates bp) then all route modules
 from api.v2.certificates import bp as certificates_bp
 from api.v2.certificates import crud  # noqa: F401
