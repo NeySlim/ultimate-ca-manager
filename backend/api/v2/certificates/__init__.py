@@ -1,8 +1,8 @@
 """
 Certificates API v2.0 - Modular Routes Package
 
-Ce package contient les routes pour /api/v2/certificates/*
-découpées en modules thématiques.
+This package contains routes for /api/v2/certificates/*
+split into thematic modules.
 """
 
 from flask import Blueprint

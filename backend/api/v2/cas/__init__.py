@@ -1,8 +1,8 @@
 """
 CAs API v2.0 - Modular Routes Package
 
-Ce package contient les routes pour /api/v2/cas/*
-découpées en modules thématiques.
+This package contains routes for /api/v2/cas/*
+split into thematic modules.
 """
 
 from flask import Blueprint
