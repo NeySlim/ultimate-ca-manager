@@ -10,6 +10,7 @@ import logging.handlers
 import json
 from datetime import datetime
 from utils.datetime_utils import utc_now
+from utils.request_helpers import safe_call
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +79,7 @@ class SyslogForwarder:
     def _close(self):
         """Close existing socket."""
         if self._socket:
-            try:
-                self._socket.close()
-            except Exception:
-                pass
+            safe_call(self._socket.close)
             self._socket = None
 
     def _get_socket(self):
