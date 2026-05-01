@@ -19,7 +19,7 @@ import {
 import { sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useClipboard, usePersistedState } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate , downloadBlob} from '../lib/utils'
 
 const KEY_ALGORITHM_OPTIONS = [
   { value: 'ed25519', label: 'Ed25519' },
@@ -166,12 +166,7 @@ export default function SSHCAsPage() {
       const res = await sshCasService.getPublicKey(ca.id)
       const publicKey = res.data?.public_key || res.data
       const blob = new Blob([typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey)], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${ca.descr || 'ssh-ca'}_key.pub`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${ca.descr || 'ssh-ca'}_key.pub`)
     } catch (error) {
       showError(error.message || t('messages.errors.downloadFailed.publicKey'))
     }
@@ -180,12 +175,7 @@ export default function SSHCAsPage() {
   const handleDownloadKRL = async (ca) => {
     try {
       const blob = await sshCasService.getKRL(ca.id)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${ca.descr || 'ssh-ca'}_krl.bin`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${ca.descr || 'ssh-ca'}_krl.bin`)
     } catch (error) {
       showError(error.message || t('messages.errors.downloadFailed.krl'))
     }
@@ -194,13 +184,8 @@ export default function SSHCAsPage() {
   const handleDownloadSetupScript = async (ca, platform = 'unix') => {
     try {
       const blob = await sshCasService.getSetupScript(ca.id, platform)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
       const ext = platform === 'windows' ? 'ps1' : 'sh'
-      a.href = url
-      a.download = `ssh_ca_setup_${(ca.descr || 'ca').replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `ssh_ca_setup_${(ca.descr || 'ca').replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`)
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
     }

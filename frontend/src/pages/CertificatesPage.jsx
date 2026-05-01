@@ -22,7 +22,7 @@ import { certificatesService, casService, truststoreService, templatesService } 
 import { apiClient } from '../services/apiClient'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
-import { formatDate, extractCN, cn } from '../lib/utils'
+import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
 
 export default function CertificatesPage() {
   const { t } = useTranslation()
@@ -204,13 +204,8 @@ export default function CertificatesPage() {
     
     try {
       const blob = await certificatesService.export(selectedCert.id, format, options)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', pfx: 'pfx', jks: 'jks' }[format] || format
-      a.download = `${selectedCert.common_name || 'certificate'}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${selectedCert.common_name || 'certificate'}.${ext}`)
       showSuccess(t('messages.success.export.certificate'))
     } catch {
       showError(t('messages.errors.exportFailed.certificate'))
@@ -589,13 +584,8 @@ export default function CertificatesPage() {
     const cert = exportRowCert
     try {
       const blob = await certificatesService.export(cert.id, format, options)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const ext = { pkcs12: 'p12', pkcs7: 'p7b', jks: 'jks' }[format] || format
-      a.download = `${cert.common_name || cert.cn || 'certificate'}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${cert.common_name || cert.cn || 'certificate'}.${ext}`)
       showSuccess(t('messages.success.export.certificate'))
     } catch {
       showError(t('messages.errors.exportFailed.certificate'))

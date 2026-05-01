@@ -31,7 +31,7 @@ import { settingsService, systemService, casService, ssoService, mtlsService, ms
 import { useNotification, useMobile } from '../contexts'
 import { useServiceReconnect } from '../hooks'
 import { usePermission } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate , downloadBlob} from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import TagsInput from '../components/ui/TagsInput'
@@ -2630,12 +2630,7 @@ export default function SettingsPage() {
       const response = await systemService.backup(backupPassword)
       if (response.data) {
         const blob = await systemService.downloadBackup(response.data.filename)
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = response.data.filename
-        a.click()
-        URL.revokeObjectURL(url)
+        downloadBlob(blob, response.data.filename)
         showSuccess(t('messages.success.backup.created'))
         setShowBackupModal(false)
         setBackupPassword('')
@@ -2651,12 +2646,7 @@ export default function SettingsPage() {
   const handleDownloadBackup = async (filename) => {
     try {
       const blob = await systemService.downloadBackup(filename)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, filename)
       showSuccess(t('messages.success.backup.downloaded'))
     } catch (error) {
       showError(error.message || t('messages.errors.backup.downloadFailed'))
@@ -2733,11 +2723,7 @@ export default function SettingsPage() {
   const handleExportDb = async () => {
     try {
       const blob = await systemService.exportDatabase()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ucm-database-${new Date().toISOString().split('T')[0]}.sql`
-      a.click()
+      downloadBlob(blob, `ucm-database-${new Date().toISOString().split('T')[0]}.sql`)
       showSuccess(t('messages.success.export.database'))
     } catch (error) {
       showError(error.message || t('messages.errors.database.exportFailed'))

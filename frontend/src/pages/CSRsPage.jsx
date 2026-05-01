@@ -22,7 +22,7 @@ import { apiClient } from '../services/apiClient'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
-import { extractData, formatDate, cn } from '../lib/utils'
+import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 export default function CSRsPage() {
   const { t } = useTranslation()
@@ -339,11 +339,7 @@ export default function CSRsPage() {
   const handleDownload = async (id, filename) => {
     try {
       const blob = await csrsService.download(id)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename || 'csr.pem'
-      a.click()
+      downloadBlob(blob, filename || 'csr.pem')
       showSuccess(t('common.downloadSuccess'))
     } catch (error) {
       showError(error.message || t('csrs.downloadFailed'))

@@ -126,6 +126,7 @@ export function exportToCSV(data, columns, filename = 'export') {
   URL.revokeObjectURL(link.href)
 }
 
+
 /**
  * Export data to JSON file
  * @param {Array} data - Data to export
@@ -142,3 +143,19 @@ export function exportToJSON(data, filename = 'export') {
   link.click()
   URL.revokeObjectURL(link.href)
 }
+/**
+ * Trigger a browser file download from a Blob
+ * @param {Blob} blob - The blob to download
+ * @param {string} filename - Target filename for download
+ */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+

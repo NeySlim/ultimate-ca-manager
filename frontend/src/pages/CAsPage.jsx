@@ -23,7 +23,7 @@ import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
-import { extractData, formatDate, cn } from '../lib/utils'
+import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
 import { getAppTimezone } from '../stores/timezoneStore'
 
 export default function CAsPage() {
@@ -279,13 +279,8 @@ export default function CAsPage() {
   const handleExport = async (ca, format = 'pem', options = {}) => {
     try {
       const blob = await casService.export(ca.id, format, options)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', jks: 'jks' }[format] || format
-      a.download = `${ca.name || ca.common_name || 'ca'}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${ca.name || ca.common_name || 'ca'}.${ext}`)
       showSuccess(t('messages.success.export.ca'))
     } catch (error) {
       showError(error.message || t('cas.exportFailed'))

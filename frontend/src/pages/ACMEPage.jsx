@@ -27,7 +27,7 @@ import {
 import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate, cn , downloadBlob} from '../lib/utils'
 import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
 
 export default function ACMEPage() {
@@ -405,16 +405,9 @@ export default function ACMEPage() {
       
       // Create download
       const blob = new Blob([response], { type: 'application/x-pem-file' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const domain = order.primary_domain || 'certificate'
       const suffix = includeKey ? '-with-key' : ''
-      a.download = `${domain}${suffix}.${format}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${domain}${suffix}.${format}`)
       
       showSuccess(t('acme.certificateDownloaded'))
     } catch (error) {

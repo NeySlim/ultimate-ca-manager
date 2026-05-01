@@ -28,7 +28,7 @@ import { discoveryService } from '../services'
 import { useNotification } from '../contexts'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useWebSocket } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate, cn, extractCN, downloadBlob } from '../lib/utils'
 
 export default function DiscoveryPage() {
   const { t } = useTranslation()
@@ -266,12 +266,7 @@ export default function DiscoveryPage() {
   const handleExport = async (format = 'csv') => {
     try {
       const blob = await discoveryService.export(format)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `discovered_certificates.${format}`
-      a.click()
-      window.URL.revokeObjectURL(url)
+      downloadBlob(blob, `discovered_certificates.${format}`)
       showSuccess(t('discovery.exportSuccess'))
     } catch (error) {
       showError(error.message || t('discovery.exportFailed'))
@@ -311,7 +306,6 @@ export default function DiscoveryPage() {
       sortable: true,
       priority: 1,
       render: (val, row) => {
-        const extractCN = (s) => { const m = s?.match(/CN=([^,]+)/); return m ? m[1] : null }
         const name = extractCN(row.subject) || row.target || t('common.unknown')
         const isError = row.status === 'error'
         return (
@@ -1548,7 +1542,6 @@ function DiscoveredDetailPanel({ item, t }) {
   }, [item?.id])
 
   const cert = detail || item
-  const extractCN = (s) => { const m = s?.match(/CN=([^,]+)/); return m ? m[1] : null }
   const isError = item.status === 'error'
   const name = isError ? `${item.target}:${item.port || 443}` : (extractCN(cert.subject) || cert.target || t('common.unknown'))
   const days = item.days_until_expiry

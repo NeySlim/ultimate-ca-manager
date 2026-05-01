@@ -19,7 +19,7 @@ import {
 import { templatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, usePersistedState } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate , downloadBlob} from '../lib/utils'
 export default function TemplatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -141,12 +141,7 @@ export default function TemplatesPage() {
     try {
       const data = await templatesService.export(template.id)
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${template.name || 'template'}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${template.name || 'template'}.json`)
       showSuccess(t('messages.success.export.template'))
     } catch (error) {
       showError(error.message || t('messages.errors.exportFailed.template'))

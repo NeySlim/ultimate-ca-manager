@@ -18,7 +18,7 @@ import { ResponsiveLayout } from '../components/ui/responsive'
 import { toolsService } from '../services'
 import { useNotification } from '../contexts'
 import { useClipboard } from '../hooks'
-import { cn, formatDate } from '../lib/utils'
+import { cn, formatDate , downloadBlob} from '../lib/utils'
 
 // Tool definitions with tab-compatible format for sidebar layout
 const TOOLS = [
@@ -268,12 +268,7 @@ export default function CertificateToolsPage() {
       blob = new Blob([data], { type: 'text/plain' })
     }
     
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
     showSuccess(t('tools.downloaded', { filename }))
   }
 

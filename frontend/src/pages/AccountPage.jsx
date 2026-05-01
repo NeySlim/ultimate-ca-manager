@@ -17,7 +17,7 @@ import {
 import { accountService, casService, userCertificatesService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useClipboard } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate , downloadBlob} from '../lib/utils'
 
 export default function AccountPage() {
   const { t } = useTranslation()
@@ -464,14 +464,7 @@ export default function AccountPage() {
     try {
       const blob = await userCertificatesService.export(exportCert.id, format, options)
       const extMap = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', key: 'key', jks: 'jks' }
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${exportCert.name || 'certificate'}.${extMap[format] || 'pem'}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${exportCert.name || 'certificate'}.${extMap[format] || 'pem'}`)
       showSuccess(t('userCertificates.exportSuccess'))
       setExportCert(null)
     } catch (error) {
@@ -1094,14 +1087,7 @@ export default function AccountPage() {
                 <Button type="button" variant="outline" size="sm" onClick={() => {
                   const pem = (mtlsResult.certificate || '') + '\n' + (mtlsResult.private_key || '')
                   const blob = new Blob([pem], { type: 'application/x-pem-file' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `${mtlsResult.name || 'mtls-cert'}.pem`
-                  document.body.appendChild(a)
-                  a.click()
-                  document.body.removeChild(a)
-                  URL.revokeObjectURL(url)
+                  downloadBlob(blob, `${mtlsResult.name || 'mtls-cert'}.pem`)
                 }}>
                   <Download size={16} className="mr-1" />
                   {t('account.downloadPEM')}

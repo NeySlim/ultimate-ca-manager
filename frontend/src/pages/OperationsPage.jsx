@@ -22,7 +22,7 @@ import {
 } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, extractCN, cn } from '../lib/utils'
+import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
 
 const STORAGE_KEY = 'opnsense_config'
 
@@ -461,13 +461,8 @@ export default function OperationsPage() {
   const handleExport = async (service, format, filename) => {
     try {
       const blob = await service(format)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const ext = { pem: 'pem', pkcs7: 'p7b', p7b: 'p7b' }[format] || format
-      a.download = `${filename}.${ext}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${filename}.${ext}`)
       showSuccess(t('importExport.export.certificatesExported'))
     } catch (error) {
       showError(error.message || t('importExport.export.exportFailed'))
@@ -598,12 +593,7 @@ export default function OperationsPage() {
               const service = bulkResourceType === 'certificates' ? certificatesService : casService
               const blob = await service.bulkExport(ids, 'pem')
               if (blob) {
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `${bulkResourceType}_export.pem`
-                a.click()
-                URL.revokeObjectURL(url)
+                downloadBlob(blob, `${bulkResourceType}_export.pem`)
               }
               showSuccess(t('operations.bulkSuccess', { action: 'export', count: ids.length, defaultValue: `Exported ${ids.length} items` }))
             } catch (e) { showError(e.message || 'Export failed') }
