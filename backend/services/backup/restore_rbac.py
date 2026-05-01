@@ -40,7 +40,7 @@ class RestoreRbacMixin:
                         role=m_data.get('role', 'member'),
                     ))
             results['groups'] += 1
-    
+
     def _restore_custom_roles(self, backup_data: Dict, results: Dict) -> None:
         """Restore custom roles from backup data"""
         from models.rbac import CustomRole
@@ -59,7 +59,7 @@ class RestoreRbacMixin:
                 )
                 db.session.add(new_role)
             results['custom_roles'] += 1
-    
+
     def _restore_templates(self, backup_data: Dict, results: Dict) -> None:
         """Restore certificate templates from backup data"""
         from models.certificate_template import CertificateTemplate as CT
@@ -91,7 +91,7 @@ class RestoreRbacMixin:
                 )
                 db.session.add(new_t)
             results['certificate_templates'] += 1
-    
+
     def _restore_truststore(self, backup_data: Dict, results: Dict) -> None:
         """Restore trusted certificates from backup data"""
         from models.truststore import TrustedCertificate

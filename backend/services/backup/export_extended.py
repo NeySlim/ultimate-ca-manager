@@ -133,7 +133,7 @@ class ExportExtendedMixin:
                     ca_data['_private_key_plaintext'] = str(prv)
             cas.append(ca_data)
         return cas
-    
+
     def _export_ssh_certificates(self, include: bool) -> List[Dict[str, Any]]:
         """Export SSH certificates"""
         if not include:
@@ -169,7 +169,7 @@ class ExportExtendedMixin:
                 'owner_group_id': getattr(c, 'owner_group_id', None),
             })
         return certs
-    
+
     def _export_microsoft_cas(self, include: bool) -> List[Dict[str, Any]]:
         """Export Microsoft CA (ADCS) connection configurations"""
         if not include:
@@ -200,7 +200,7 @@ class ExportExtendedMixin:
                 'created_by': getattr(ca, 'created_by', None),
             })
         return items
-    
+
     def _export_msca_requests(self, include: bool) -> List[Dict[str, Any]]:
         """Export MSCA sign request history"""
         if not include:
@@ -228,7 +228,7 @@ class ExportExtendedMixin:
                 'enrollee_upn': getattr(r, 'enrollee_upn', None),
             })
         return items
-    
+
     def _export_scan_profiles(self, include: bool) -> List[Dict[str, Any]]:
         """Export discovery scan profiles"""
         if not include:
@@ -257,7 +257,7 @@ class ExportExtendedMixin:
                 'created_at': p.created_at.isoformat() if getattr(p, 'created_at', None) else None,
             })
         return profiles
-    
+
     def _export_scan_runs(self, include: bool) -> List[Dict[str, Any]]:
         """Export discovery scan run history"""
         if not include:
@@ -286,7 +286,7 @@ class ExportExtendedMixin:
                 'resolve_dns': getattr(r, 'resolve_dns', True),
             })
         return runs
-    
+
     def _export_discovered_certificates(self, include: bool) -> List[Dict[str, Any]]:
         """Export discovered certificates"""
         if not include:
@@ -323,7 +323,7 @@ class ExportExtendedMixin:
                 'scan_error': getattr(d, 'scan_error', None),
             })
         return items
-    
+
     def _export_approval_requests(self, include: bool) -> List[Dict[str, Any]]:
         """Export approval requests (pending + recent)"""
         if not include:
@@ -349,7 +349,7 @@ class ExportExtendedMixin:
                 'resolved_at': a.resolved_at.isoformat() if getattr(a, 'resolved_at', None) else None,
             })
         return items
-    
+
     def _export_scep_requests(self, include: bool) -> List[Dict[str, Any]]:
         """Export SCEP enrollment history"""
         if not include:
@@ -373,7 +373,7 @@ class ExportExtendedMixin:
                 'created_at': r.created_at.isoformat() if getattr(r, 'created_at', None) else None,
             })
         return items
-    
+
     def _export_acme_client_orders(self, include: bool) -> List[Dict[str, Any]]:
         """Export ACME client (proxy) order history"""
         if not include:
@@ -411,7 +411,7 @@ class ExportExtendedMixin:
                 'created_at': o.created_at.isoformat() if getattr(o, 'created_at', None) else None,
             })
         return items
-    
+
     def _export_hsm_keys(self, include: bool) -> List[Dict[str, Any]]:
         """Export HSM key registrations (labels/ids, not the key material)"""
         if not include:
@@ -435,7 +435,7 @@ class ExportExtendedMixin:
                 'created_at': k.created_at.isoformat() if getattr(k, 'created_at', None) else None,
             })
         return items
-    
+
     def _export_audit_logs(self, include: bool) -> List[Dict[str, Any]]:
         """Export audit log chain (opt-in — can be very large)"""
         if not include:
@@ -461,7 +461,7 @@ class ExportExtendedMixin:
                 'entry_hash': a.entry_hash,
             })
         return items
-    
+
     def _export_https_files(self) -> Dict[str, Any]:
         """Export HTTPS server certificate and key files"""
         result = {}
@@ -487,7 +487,7 @@ class ExportExtendedMixin:
                     master_key
                 )
                 del ca['_private_key_plaintext']
-        
+
         # Encrypt certificate private keys
         for cert in backup_data.get('certificates', []):
             if '_private_key_plaintext' in cert:
@@ -496,7 +496,7 @@ class ExportExtendedMixin:
                     master_key
                 )
                 del cert['_private_key_plaintext']
-        
+
         # Encrypt SSH CA private keys
         for ssh_ca in backup_data.get('ssh_cas', []):
             if '_private_key_plaintext' in ssh_ca:
@@ -505,6 +505,5 @@ class ExportExtendedMixin:
                     master_key
                 )
                 del ssh_ca['_private_key_plaintext']
-        
+
         return backup_data
-    

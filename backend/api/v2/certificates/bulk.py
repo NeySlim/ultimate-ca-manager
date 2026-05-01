@@ -181,10 +181,10 @@ def bulk_delete_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
-            
+
             from models import ApprovalRequest
             ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
-            
+
             db.session.delete(cert)
             db.session.commit()
             results['success'].append(cert_id)

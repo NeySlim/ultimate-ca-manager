@@ -18,7 +18,7 @@ from .key_operations_mixin import KeyOperationsMixin
 
 class CertificateCreationMixin:
     """End-entity X.509 certificate creation mixin"""
-    
+
     @staticmethod
     def create_certificate(
         subject: x509.Name,
@@ -44,10 +44,10 @@ class CertificateCreationMixin:
     ) -> Tuple[bytes, bytes]:
         """Create a certificate signed by a CA."""
         from cryptography.hazmat.primitives import hashes
-        
+
         # Generate private key for certificate
         private_key = KeyOperationsMixin.generate_private_key(key_type)
-        
+
         # Build certificate
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
@@ -58,14 +58,14 @@ class CertificateCreationMixin:
         builder = builder.not_valid_after(
             utc_now() + timedelta(days=validity_days)
         )
-        
+
         # Basic Constraints
         is_ca = (cert_type == 'ca_cert')
         builder = builder.add_extension(
             x509.BasicConstraints(ca=is_ca, path_length=None if not is_ca else 0),
             critical=True,
         )
-        
+
         # Key Usage based on cert type
         if cert_type == 'ca_cert':
             builder = builder.add_extension(
@@ -143,7 +143,7 @@ class CertificateCreationMixin:
                 ]),
                 critical=False,
             )
-        
+
         # Subject Alternative Names
         san_list = []
         if san_dns:
@@ -156,20 +156,20 @@ class CertificateCreationMixin:
             san_list.extend([x509.UniformResourceIdentifier(uri) for uri in san_uri])
         if san_email:
             san_list.extend([x509.RFC822Name(email) for email in san_email])
-        
+
         if san_list:
             san_critical = not bool(list(subject))
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(san_list),
                 critical=san_critical,
             )
-        
+
         # Subject Key Identifier
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
             critical=False,
         )
-        
+
         # Authority Key Identifier
         builder = builder.add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_public_key(
@@ -177,7 +177,7 @@ class CertificateCreationMixin:
             ),
             critical=False,
         )
-        
+
         # Authority Information Access
         all_ocsp = ocsp_uris or ([ocsp_uri] if ocsp_uri else [])
         all_aia = aia_ca_issuers_urls or ([aia_ca_issuers_url] if aia_ca_issuers_url else [])
@@ -201,7 +201,7 @@ class CertificateCreationMixin:
                 x509.AuthorityInformationAccess(aia_descriptions),
                 critical=False,
             )
-        
+
         # CRL Distribution Points
         all_cdp = cdp_urls or ([cdp_url] if cdp_url else [])
         if all_cdp:
@@ -216,7 +216,7 @@ class CertificateCreationMixin:
                 x509.CRLDistributionPoints(dist_points),
                 critical=False,
             )
-        
+
         # Certificate Policies
         if cps_uri:
             policy_oid = x509.ObjectIdentifier(cps_oid or '2.5.29.32.0')
@@ -229,14 +229,14 @@ class CertificateCreationMixin:
                 ]),
                 critical=False,
             )
-        
+
         # OCSP Must-Staple
         if ocsp_must_staple:
             builder = builder.add_extension(
                 x509.TLSFeature([x509.TLSFeatureType.status_request]),
                 critical=False,
             )
-        
+
         # NameConstraints enforcement
         san_names = []
         if san_dns:
@@ -246,7 +246,7 @@ class CertificateCreationMixin:
         if san_email:
             san_names.extend(x509.RFC822Name(e) for e in san_email)
         ConstraintsMixin._validate_name_constraints(ca_cert, subject, san_names or None)
-        
+
         # Sign
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
@@ -254,7 +254,7 @@ class CertificateCreationMixin:
             algorithm=hash_algo,
             backend=default_backend()
         )
-        
+
         # Serialize
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
         key_pem = private_key.private_bytes(
@@ -262,5 +262,5 @@ class CertificateCreationMixin:
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         )
-        
+
         return cert_pem, key_pem

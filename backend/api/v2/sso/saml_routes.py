@@ -17,9 +17,9 @@ def list_saml_certificates():
     Returns HTTPS cert + all valid certs from the database."""
     import os
     from datetime import datetime
-    
+
     certs = []
-    
+
     # Option 1: HTTPS certificate (default)
     data_path = os.environ.get('DATA_PATH', '/opt/ucm/data')
     cert_path = os.path.join(data_path, 'https_cert.pem')
@@ -45,7 +45,7 @@ def list_saml_certificates():
             'not_after': None,
             'is_default': True,
         })
-    
+
     # Option 2+: Valid certificates from database
     try:
         db_certs = Certificate.query.filter(
@@ -53,7 +53,7 @@ def list_saml_certificates():
             Certificate.valid_to > utc_now(),
             Certificate.crt.isnot(None)
         ).order_by(Certificate.subject_cn).all()
-        
+
         for c in db_certs:
             certs.append({
                 'id': str(c.id),
@@ -66,14 +66,14 @@ def list_saml_certificates():
             })
     except Exception as e:
         logger.warning(f"Could not list certificates: {e}")
-    
+
     return success_response(data=certs)
 
 
 @bp.route('/api/v2/sso/saml/metadata', methods=['GET'])
 def get_sp_metadata():
     """Generate schema-valid SAML 2.0 SP metadata XML for configuring the IDP.
-    
+
     Uses python3-saml's metadata builder to ensure compliance with
     the SAML 2.0 Metadata XSD (correct element ordering, validUntil, etc.).
     Includes SP signing certificate (HTTPS cert) in KeyDescriptor.
@@ -81,25 +81,25 @@ def get_sp_metadata():
     """
     import os
     from onelogin.saml2.settings import OneLogin_Saml2_Settings
-    
+
     sp_base = request.url_root.rstrip('/')
     entity_id = f'{sp_base}/api/v2/sso'
     acs_url = f'{sp_base}/api/v2/sso/callback/saml'
     slo_url = f'{sp_base}/api/v2/sso/callback/saml'
-    
+
     # Load SAML provider config if available (for NameIDFormat override + cert source)
     provider = SSOProvider.query.filter_by(provider_type='saml').first()
-    name_id_format = (getattr(provider, 'saml_name_id_format', None) 
+    name_id_format = (getattr(provider, 'saml_name_id_format', None)
                       if provider else None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
-    
+
     # Determine certificate source
     cert_source = (getattr(provider, 'saml_sp_cert_source', None)
                    if provider else None) or 'https'
-    
+
     # Load SP certificate for KeyDescriptor
     sp_cert = ''
     data_path = os.environ.get('DATA_PATH', '/opt/ucm/data')
-    
+
     if cert_source != 'https':
         # Load certificate from database by ID (must be valid and not revoked)
         try:
@@ -130,7 +130,7 @@ def get_sp_metadata():
         except Exception as e:
             logger.warning(f"Could not load certificate #{cert_source}: {e}, falling back to HTTPS cert")
             cert_source = 'https'
-    
+
     if cert_source == 'https':
         # Default: use HTTPS certificate
         cert_path = os.path.join(data_path, 'https_cert.pem')
@@ -150,7 +150,7 @@ def get_sp_metadata():
             sp_cert = ''.join(cert_lines)
         except Exception as e:
             logger.warning(f"Could not load SP certificate from {cert_path}: {e}")
-    
+
     settings_data = {
         'strict': False,
         'sp': {
@@ -173,21 +173,21 @@ def get_sp_metadata():
             },
         },
     }
-    
+
     # Include SP cert if available — generates KeyDescriptor in metadata
     if sp_cert:
         settings_data['sp']['x509cert'] = sp_cert
-    
+
     try:
         settings = OneLogin_Saml2_Settings(settings_data, custom_base_path='/tmp')
         metadata = settings.get_sp_metadata()
         if isinstance(metadata, bytes):
             metadata = metadata.decode('utf-8')
-        
+
         errors = settings.validate_metadata(metadata)
         if errors:
             logger.warning(f"SP metadata validation warnings: {errors}")
-        
+
         return Response(metadata, mimetype='application/xml',
                         headers={'Content-Disposition': 'inline; filename="ucm-sp-metadata.xml"'})
     except Exception as e:
@@ -228,25 +228,25 @@ def _parse_saml_metadata(xml_text):
         'md': 'urn:oasis:names:tc:SAML:2.0:metadata',
         'ds': 'http://www.w3.org/2000/09/xmldsig#',
     }
-    
+
     root = safe_fromstring(xml_text.encode('utf-8'))
-    
+
     result = {
         'entity_id': None,
         'sso_url': None,
         'slo_url': None,
         'certificate': None,
     }
-    
+
     # Entity ID from root or IDPSSODescriptor
     result['entity_id'] = root.get('entityID')
-    
+
     # Find IDPSSODescriptor
     idp = root.find('.//md:IDPSSODescriptor', NS)
     if idp is None:
         # Try without namespace prefix (some IdPs use default ns)
         idp = root.find('.//{urn:oasis:names:tc:SAML:2.0:metadata}IDPSSODescriptor')
-    
+
     if idp is not None:
         # SSO URL (HTTP-Redirect preferred, fallback to HTTP-POST)
         for binding in ['urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
@@ -257,7 +257,7 @@ def _parse_saml_metadata(xml_text):
             if sso is not None:
                 result['sso_url'] = sso.get('Location')
                 break
-        
+
         # SLO URL
         for binding in ['urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
                         'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']:
@@ -267,7 +267,7 @@ def _parse_saml_metadata(xml_text):
             if slo is not None:
                 result['slo_url'] = slo.get('Location')
                 break
-        
+
         # Certificate (first X509Certificate found)
         cert = idp.find('.//ds:X509Certificate', NS)
         if cert is None:
@@ -278,9 +278,8 @@ def _parse_saml_metadata(xml_text):
             # Format as PEM lines of 64 chars
             lines = [cert_text[i:i+64] for i in range(0, len(cert_text), 64)]
             result['certificate'] = '\n'.join(lines)
-    
+
     if not result['entity_id'] and not result['sso_url']:
         raise ValueError("Could not find IDP entity ID or SSO URL in metadata")
-    
-    return result
 
+    return result

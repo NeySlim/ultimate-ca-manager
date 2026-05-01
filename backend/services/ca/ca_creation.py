@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class CACreationMixin:
     """CA creation and import operations"""
-    
+
     @staticmethod
     def create_internal_ca(
         descr: str,
@@ -48,7 +48,7 @@ class CACreationMixin:
     ) -> CA:
         """
         Create an internal Certificate Authority.
-        
+
         Args:
             descr: Description
             dn: Distinguished Name components (CN, O, OU, C, ST, L, email)
@@ -62,24 +62,24 @@ class CACreationMixin:
             hsm_provider_id: Generate a new HSM key on this provider
             hsm_key_label: Label for the new HSM key
             hsm_key_algorithm: Algorithm for the new HSM key
-            
+
         Returns:
             CA model instance
         """
         from services.hsm import HsmService
         from services.hsm.hsm_private_key import load_hsm_private_key
         from services.hsm.ca_key_loader import get_ca_signing_key
-        
+
         # Resolve signing key - local generation, existing HSM key, or new HSM key
         use_hsm = bool(hsm_key_id) or bool(hsm_provider_id)
         hsm_key = None
-        
+
         if hsm_key_id and (hsm_provider_id or hsm_key_label or hsm_key_algorithm):
             raise ValueError(
                 "Provide either hsm_key_id (existing key) OR "
                 "hsm_provider_id+hsm_key_label+hsm_key_algorithm (generate new)"
             )
-        
+
         if use_hsm:
             if hsm_key_id:
                 hsm_key = HsmKey.query.get(hsm_key_id)
@@ -101,7 +101,7 @@ class CACreationMixin:
                     algorithm=hsm_key_algorithm,
                     purpose='signing',
                 )
-            
+
             private_key = load_hsm_private_key(hsm_key.id)
             key_pem = None  # HSM keys don't have on-disk PEM
         else:
@@ -112,10 +112,10 @@ class CACreationMixin:
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption()
             )
-        
+
         # Build subject
         subject = TrustStoreService.build_subject(dn)
-        
+
         # Get parent CA if intermediate
         issuer = None
         issuer_private_key = None
@@ -123,37 +123,37 @@ class CACreationMixin:
         parent_ocsp_urls = None
         parent_cps_uri = None
         parent_cps_oid = None
-        
+
         if caref:
             parent_ca = CA.query.filter_by(refid=caref).first()
             if not parent_ca:
                 raise ValueError(f"Parent CA not found: {caref}")
-            
+
             # Load parent CA certificate
             parent_cert_pem = base64.b64decode(parent_ca.crt)
             parent_cert = x509.load_pem_x509_certificate(
                 parent_cert_pem, default_backend()
             )
             issuer = parent_cert.subject
-            
+
             # Load parent CA signing key
             if not parent_ca.has_private_key:
                 raise ValueError("Parent CA has no private key")
             issuer_private_key = get_ca_signing_key(parent_ca)
-            
+
             # Increment parent CA serial
             parent_ca.serial = (parent_ca.serial or 0) + 1
-            
+
             # Resolve parent CDP/OCSP URLs
             if parent_ca.cdp_enabled:
-                parent_cdp_urls = [url.replace('{ca_refid}', parent_ca.refid or '') 
+                parent_cdp_urls = [url.replace('{ca_refid}', parent_ca.refid or '')
                                   for url in parent_ca.get_cdp_urls()]
             if parent_ca.ocsp_enabled:
                 parent_ocsp_urls = parent_ca.get_ocsp_urls()
             if parent_ca.cps_enabled and parent_ca.cps_uri:
                 parent_cps_uri = parent_ca.cps_uri
                 parent_cps_oid = parent_ca.cps_oid
-        
+
         # Create CA certificate
         cert_pem, generated_key_pem = TrustStoreService.create_ca_certificate(
             subject=subject,
@@ -174,14 +174,14 @@ class CACreationMixin:
             inhibit_any_policy=inhibit_any_policy,
             sia_urls=sia_urls,
         )
-        
+
         # If using local key, use the generated key PEM
         if not use_hsm and generated_key_pem:
             key_pem = generated_key_pem
-        
+
         # Parse certificate for details
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-        
+
         # Encrypt private key if encryption is enabled (local keys only)
         prv_encoded = None
         if key_pem is not None:
@@ -192,7 +192,7 @@ class CACreationMixin:
                     prv_encoded = key_encryption.encrypt(prv_encoded)
             except ImportError:
                 pass
-        
+
         # Extract SKI from generated cert
         ca_ski = None
         try:
@@ -200,7 +200,7 @@ class CACreationMixin:
             ca_ski = ext.value.key_identifier.hex(':').upper()
         except Exception:
             pass
-        
+
         # Create CA record
         ca = CA(
             refid=str(uuid.uuid4()),
@@ -222,7 +222,7 @@ class CACreationMixin:
             inhibit_any_policy=inhibit_any_policy,
             hsm_key_id=hsm_key.id if hsm_key else None,
         )
-        
+
         # Store JSON-serialized constraints
         if name_constraints_permitted:
             ca.set_name_constraints_permitted(name_constraints_permitted)
@@ -231,7 +231,7 @@ class CACreationMixin:
         if sia_urls:
             ca.sia_enabled = True
             ca.set_sia_urls(sia_urls)
-        
+
         db.session.add(ca)
         try:
             db.session.commit()
@@ -239,7 +239,7 @@ class CACreationMixin:
             db.session.rollback()
             logger.error(f"Failed to persist CA: {e}")
             raise
-        
+
         # Auto-enable CDP if protocol base URL is configured
         try:
             from utils.protocol_url import get_protocol_base_url
@@ -250,16 +250,16 @@ class CACreationMixin:
                 db.session.commit()
         except Exception:
             pass
-        
+
         # Audit log
         hsm_note = f' (HSM key: {hsm_key.label})' if hsm_key else ''
         AuditService.log_ca('ca_created', ca, f'Created CA: {descr}{hsm_note}')
-        
+
         # Save certificate to file
         save_ca_files(ca, cert_pem, key_pem)
-        
+
         return ca
-    
+
     @staticmethod
     def import_ca(
         descr: str,
@@ -269,13 +269,13 @@ class CACreationMixin:
     ) -> CA:
         """
         Import an existing CA certificate.
-        
+
         Args:
             descr: Description
             cert_pem: Certificate in PEM format
             key_pem: Optional private key in PEM format
             username: User importing
-            
+
         Returns:
             CA model instance
         """
@@ -284,7 +284,7 @@ class CACreationMixin:
             cert_pem.encode() if isinstance(cert_pem, str) else cert_pem,
             default_backend()
         )
-        
+
         # Validate it's a CA certificate
         try:
             bc = cert.extensions.get_extension_for_oid(
@@ -294,7 +294,7 @@ class CACreationMixin:
                 raise ValueError("Certificate is not a CA certificate")
         except x509.ExtensionNotFound:
             raise ValueError("Certificate has no BasicConstraints extension")
-        
+
         # Create CA record
         ca = CA(
             refid=str(uuid.uuid4()),
@@ -309,16 +309,16 @@ class CACreationMixin:
             imported_from='manual',
             created_by=username
         )
-        
+
         db.session.add(ca)
         db.session.commit()
-        
+
         # Audit log
         AuditService.log_ca('ca_imported', ca, f'Imported CA: {descr}')
-        
+
         # Save files
         cert_path_bytes = cert_pem.encode() if isinstance(cert_pem, str) else cert_pem
         key_path_bytes = key_pem.encode() if key_pem else None
         save_ca_files(ca, cert_path_bytes, key_path_bytes)
-        
+
         return ca

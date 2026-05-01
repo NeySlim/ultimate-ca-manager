@@ -18,13 +18,13 @@ from . import bp
 @require_auth(['read:certificates'])
 def get_certificate_stats():
     """Get certificate statistics"""
-    
+
     now = utc_now()
     expiry_threshold = now + timedelta(days=30)
-    
+
     # Only count actual certificates (not pending CSRs)
     base_query = Certificate.query.filter(Certificate.crt.isnot(None))
-    
+
     total = base_query.count()
     revoked = base_query.filter(Certificate.revoked == True).count()
     expired = base_query.filter(
@@ -40,7 +40,7 @@ def get_certificate_stats():
         Certificate.valid_to > now,
         Certificate.revoked == False
     ).count() - expiring  # Don't double-count expiring as valid
-    
+
     return success_response(data={
         'total': total,
         'valid': valid,

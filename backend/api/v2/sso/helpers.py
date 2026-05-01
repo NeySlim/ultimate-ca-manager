@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def _get_ssl_verify(provider, protocol):
     """Get SSL verification parameter for requests library.
-    
+
     Returns:
         False if verify_ssl is disabled
         str (temp file path) if ca_bundle PEM is configured
@@ -20,7 +20,7 @@ def _get_ssl_verify(provider, protocol):
     verify_ssl = getattr(provider, f'{protocol}_verify_ssl', None)
     if verify_ssl is False or verify_ssl == 0:
         return False
-    
+
     ca_bundle = getattr(provider, f'{protocol}_ca_bundle', None)
     if ca_bundle:
         fd, path = tempfile.mkstemp(suffix='.pem', prefix='ucm_sso_ca_')
@@ -29,7 +29,7 @@ def _get_ssl_verify(provider, protocol):
         finally:
             os.close(fd)
         return path
-    
+
     return True
 
 
@@ -46,13 +46,13 @@ def _build_ldap_tls(provider):
     """Build ldap3 Tls object based on provider SSL settings."""
     import ssl
     verify_ssl = provider.ldap_verify_ssl if provider.ldap_verify_ssl is not None else True
-    
+
     if not provider.ldap_use_ssl and not verify_ssl:
         return None
-    
+
     if not verify_ssl:
         return __import__('ldap3').Tls(validate=ssl.CERT_NONE)
-    
+
     ca_bundle = provider.ldap_ca_bundle
     if ca_bundle:
         fd, ca_path = tempfile.mkstemp(suffix='.pem', prefix='ucm_ldap_ca_')
@@ -61,7 +61,7 @@ def _build_ldap_tls(provider):
         finally:
             os.close(fd)
         return __import__('ldap3').Tls(ca_certs_file=ca_path, validate=ssl.CERT_REQUIRED)
-    
+
     return None
 
 
@@ -200,5 +200,3 @@ def _resolve_role(provider, external_data):
     fallback = provider.default_role if provider.default_role in VALID_ROLES else 'viewer'
     logger.info(f"Role resolved via default_role: {fallback}")
     return fallback
-
-

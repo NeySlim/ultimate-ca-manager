@@ -150,17 +150,17 @@ def export_db():
     """Export database as SQL dump"""
     try:
         db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
-        
+
         if not os.path.exists(db_path):
             return error_response("Database not found")
-        
+
         # Create SQL dump using sqlite3
         conn = sqlite3.connect(db_path)
         sql_dump = io.StringIO()
         for line in conn.iterdump():
             sql_dump.write(f"{line}\n")
         conn.close()
-        
+
         return Response(
             sql_dump.getvalue(),
             mimetype='application/sql',
@@ -177,9 +177,9 @@ def reset_db():
     """Reset database to initial state - DANGEROUS"""
     try:
         from auth.unified import get_current_user
-        
+
         current_user = get_current_user()
-        
+
         # Log this critical action before reset
         AuditService.log_action(
             action='database_reset',
@@ -188,15 +188,15 @@ def reset_db():
             details=f"Initiated by {current_user.get('username', 'unknown')}",
             user_id=current_user.get('id')
         )
-        
+
         # Drop all tables and recreate
         db.drop_all()
         db.create_all()
-        
+
         # Create default admin user
         from models import User
         from werkzeug.security import generate_password_hash
-        
+
         admin = User(
             username='admin',
             email='admin@localhost',
@@ -207,7 +207,7 @@ def reset_db():
         )
         db.session.add(admin)
         db.session.commit()
-        
+
         return success_response(message="Database reset successfully. Default admin user created.")
     except Exception as e:
         db.session.rollback()

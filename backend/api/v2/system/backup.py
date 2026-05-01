@@ -28,25 +28,25 @@ def create_backup():
     try:
         data = request.json or {}
         password = data.get('password')
-        
+
         if not password:
             return error_response("Password required for encryption", 400)
-        
+
         if len(password) < 12:
             return error_response("Password must be at least 12 characters", 400)
 
         service = BackupService()
         backup_bytes = service.create_backup(password)
-        
+
         # Save to disk
         filename = f"ucm_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.ucmbkp"
         backup_dir = "/opt/ucm/data/backups"
         os.makedirs(backup_dir, exist_ok=True)
-        
+
         filepath = os.path.join(backup_dir, filename)
         with open(filepath, 'wb') as f:
             f.write(backup_bytes)
-        
+
         AuditService.log_action(
             action='system_backup',
             resource_type='system',
@@ -54,7 +54,7 @@ def create_backup():
             details=f'Created backup: {filename}',
             success=True
         )
-        
+
         # Format size
         size = len(backup_bytes)
         if size > 1024*1024:
@@ -63,9 +63,9 @@ def create_backup():
             size_str = f"{size/1024:.1f} KB"
         else:
             size_str = f"{size} B"
-            
+
         return success_response(
-            message="Backup created successfully", 
+            message="Backup created successfully",
             data={
                 'filename': filename,
                 'size': size_str,
@@ -89,13 +89,13 @@ def list_backups():
         backup_dir = "/opt/ucm/data/backups"
         if not os.path.exists(backup_dir):
             return success_response(data=[])
-            
+
         files = []
         for f in os.listdir(backup_dir):
             if f.endswith('.ucmbkp') or f.endswith('.json.enc'):
                 path = os.path.join(backup_dir, f)
                 stat = os.stat(path)
-                
+
                 # Format size
                 size = stat.st_size
                 if size > 1024*1024:
@@ -104,14 +104,14 @@ def list_backups():
                     size_str = f"{size/1024:.1f} KB"
                 else:
                     size_str = f"{size} B"
-                
+
                 files.append({
                     'filename': f,
                     'size': size_str,
                     'size_bytes': size,
                     'created_at': datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                 })
-        
+
         # Sort by date desc
         files.sort(key=lambda x: x['size_bytes'], reverse=True)
         files.sort(key=lambda x: x['created_at'], reverse=True)
@@ -128,9 +128,9 @@ def download_backup(filename):
     backup_dir = "/opt/ucm/data/backups"
     filename = werkzeug.utils.secure_filename(filename)
     return send_from_directory(
-        backup_dir, 
-        filename, 
-        as_attachment=True, 
+        backup_dir,
+        filename,
+        as_attachment=True,
         mimetype='application/octet-stream'
     )
 
@@ -143,10 +143,10 @@ def delete_backup(filename):
         backup_dir = "/opt/ucm/data/backups"
         filename = werkzeug.utils.secure_filename(filename)
         filepath = os.path.join(backup_dir, filename)
-        
+
         if not os.path.exists(filepath):
             return error_response("Backup file not found", 404)
-        
+
         os.remove(filepath)
         AuditService.log_action(
             action='backup_delete',
@@ -169,26 +169,26 @@ def restore_backup():
     try:
         if 'file' not in request.files:
             return error_response("No backup file provided", 400)
-        
+
         file = request.files['file']
         password = request.form.get('password')
-        
+
         if not password:
             return error_response("Password required for decryption", 400)
-        
+
         if len(password) < 12:
             return error_response("Password must be at least 12 characters", 400)
-        
+
         # Read file content with size validation
         try:
             backup_bytes, _ = validate_upload(file, BACKUP_EXTENSIONS, max_size=100 * 1024 * 1024)
         except ValueError as e:
             logger.warning(f"Backup upload validation error: {e}")
             return error_response("Invalid backup file", 400)
-        
+
         service = BackupService()
         results = service.restore_backup(backup_bytes, password)
-        
+
         AuditService.log_action(
             action='system_restore',
             resource_type='system',
@@ -196,7 +196,7 @@ def restore_backup():
             details='Restored from backup file',
             success=True
         )
-        
+
         return success_response(
             message="Backup restored successfully",
             data=results

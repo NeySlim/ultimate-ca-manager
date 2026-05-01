@@ -48,16 +48,16 @@ def list_cas():
     paginated = 'page' in request.args or 'per_page' in request.args
     search = request.args.get('search', '')
     ca_type = request.args.get('type', '')
-    
+
     # Get all CAs
     all_cas = CAService.list_cas()
-    
+
     # Filter
     filtered_cas = []
     for ca in all_cas:
         if search and search.lower() not in ca.descr.lower():
             continue
-            
+
         # Optional: Filter by 'orphan' logic if requested
         if ca_type == 'orphan':
              # Orphan = Intermediate (caref set) but parent not found in list?
@@ -66,9 +66,9 @@ def list_cas():
              if ca.imported_from == 'manual' and not ca.is_root and not ca.caref:
                  filtered_cas.append(ca)
              continue
-             
+
         filtered_cas.append(ca)
-    
+
     # Paginate manually since list_cas returns list
     total = len(filtered_cas)
     if paginated:
@@ -79,7 +79,7 @@ def list_cas():
         # No explicit pagination requested -> return all so the UI (which has no
         # pagination controls) doesn't silently truncate the list. See issue #89.
         paginated_cas = filtered_cas
-    
+
     # Add certificate count for each CA
     result = []
     for ca in paginated_cas:
@@ -89,13 +89,13 @@ def list_cas():
         if cert_count == 0 and ca_dict.get('common_name'):
             cn = ca_dict.get('common_name')
             cert_count = Certificate.query.filter(
-                Certificate.issuer.ilike(f'CN={cn},%') | 
+                Certificate.issuer.ilike(f'CN={cn},%') |
                 Certificate.issuer.ilike(f'%,CN={cn},%') |
                 Certificate.issuer.ilike(f'%,CN={cn}')
             ).count()
         ca_dict['certs'] = cert_count
         result.append(ca_dict)
-    
+
     return success_response(
         data=result,
         meta={
@@ -115,10 +115,10 @@ def create_ca():
     Body: {commonName, organization, country, keyAlgo, keySize, validityYears, type...}
     """
     data = request.json
-    
+
     if not data or not data.get('commonName'):
         return error_response('Common Name is required', 400)
-    
+
     try:
         # Map frontend fields to backend expected fields
         dn = {
@@ -129,12 +129,12 @@ def create_ca():
             'ST': data.get('state') or None,
             'L': data.get('locality') or None
         }
-        
+
         # SECURITY: Validate DN fields
         is_valid, error = validate_dn(dn)
         if not is_valid:
             return error_response(error, 400)
-        
+
         # Determine key type
         key_type = '2048'  # Default
         if data.get('keyAlgo') == 'RSA':
@@ -144,7 +144,7 @@ def create_ca():
             key_type = str(key_size)
         elif data.get('keyAlgo') == 'ECDSA':
             key_type = data.get('keySize') or 'prime256v1'
-        
+
         # ----- HSM key selection (Issue #77.3) -----
         hsm_provider_id = data.get('hsm_provider_id') or data.get('hsmProviderId')
         hsm_key_id = data.get('hsm_key_id') or data.get('hsmKeyId')
@@ -185,9 +185,9 @@ def create_ca():
             if datetime.now(timezone.utc) > parent_cert.not_valid_after_utc:
                 return error_response('Parent CA certificate has expired', 400)
             caref = parent_ca.refid
-        
+
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
-            
+
         ca = CAService.create_internal_ca(
             descr=data.get('description') or data.get('commonName'),
             dn=dn,
@@ -207,13 +207,13 @@ def create_ca():
             hsm_key_label=hsm_key_label,
             hsm_key_algorithm=hsm_key_algorithm,
         )
-        
+
         # Send notification for CA creation
         try:
             NotificationService.on_ca_created(ca, username)
         except Exception:
             pass  # Non-blocking
-        
+
         # WebSocket event
         try:
             on_ca_created(
@@ -224,7 +224,7 @@ def create_ca():
             )
         except Exception:
             pass  # Non-blocking
-        
+
         return created_response(
             data=ca.to_dict(),
             message='CA created successfully'
@@ -245,21 +245,21 @@ def get_ca(ca_id):
     ca = CAService.get_ca(ca_id)
     if not ca:
         return error_response('CA not found', 404)
-    
+
     # Get basic model data
     ca_data = ca.to_dict()
-    
+
     # Add certificate count
     cert_count = Certificate.query.filter_by(caref=ca.refid).count()
     if cert_count == 0 and ca_data.get('common_name'):
         cn = ca_data.get('common_name')
         cert_count = Certificate.query.filter(
-            Certificate.issuer.ilike(f'CN={cn},%') | 
+            Certificate.issuer.ilike(f'CN={cn},%') |
             Certificate.issuer.ilike(f'%,CN={cn},%') |
             Certificate.issuer.ilike(f'%,CN={cn}')
         ).count()
     ca_data['certs'] = cert_count
-    
+
     # Get CRL status
     crl_status = 'Not Generated'
     next_crl_update = 'N/A'
@@ -271,7 +271,7 @@ def get_ca(ca_id):
             next_crl_update = crl_info.get('next_update', 'N/A')
     except Exception:
         pass
-    
+
     # Get parsed certificate details
     try:
         details = CAService.get_ca_details(ca_id)
@@ -296,7 +296,7 @@ def get_ca(ca_id):
         ca_data['extensions'] = parse_certificate_extensions(ca.crt)
     except Exception:
         pass
-        
+
     return success_response(data=ca_data)
 
 
@@ -305,7 +305,7 @@ def get_ca(ca_id):
 def update_ca(ca_id):
     """
     Update CA settings (OCSP, CDP, etc.)
-    
+
     Body (all optional):
         name: Display name
         ocsp_enabled: bool - Enable OCSP responder
@@ -314,13 +314,13 @@ def update_ca(ca_id):
         cdp_url: string - CRL Distribution Point URL
         is_active: bool - Active status
     """
-    
+
     ca = CA.query.get(ca_id)
     if not ca:
         return error_response('CA not found', 404)
-    
+
     data = request.json or {}
-    
+
     # Update allowed fields
     if 'name' in data:
         ca.descr = data['name']
@@ -369,10 +369,10 @@ def update_ca(ca_id):
         ca.cps_oid = data['cps_oid'] or '2.5.29.32.0'
     if 'is_active' in data:
         ca.is_active = bool(data['is_active'])
-    
+
     try:
         db.session.commit()
-        
+
         # Audit log
         AuditService.log_action(
             action='ca_updated',
@@ -382,12 +382,12 @@ def update_ca(ca_id):
             details=f'CA {ca.descr} settings updated',
             success=True
         )
-        
+
         try:
             on_ca_updated(ca_id, ca.descr, {k: v for k, v in data.items()})
         except Exception:
             pass
-        
+
         return success_response(data=ca.to_dict(), message='CA updated successfully')
     except Exception as e:
         db.session.rollback()
@@ -399,13 +399,13 @@ def update_ca(ca_id):
 @require_auth(['delete:cas'])
 def delete_ca(ca_id):
     """Delete CA and all dependent records (CRLs, OCSP responses, etc.)"""
-    
+
     ca = CA.query.get(ca_id)
     if not ca:
         return error_response('CA not found', 404)
-    
+
     ca_name = ca.descr or f'CA #{ca_id}'
-    
+
     # Check for child CAs (intermediates signed by this CA)
     child_cas = CA.query.filter_by(caref=ca.refid).count()
     if child_cas > 0:
@@ -413,7 +413,7 @@ def delete_ca(ca_id):
             f'Cannot delete CA: {child_cas} intermediate CA(s) depend on it. Delete them first.',
             409
         )
-    
+
     # Check for issued certificates
     issued_certs = Certificate.query.filter_by(caref=ca.refid).count()
     if issued_certs > 0:
@@ -421,21 +421,21 @@ def delete_ca(ca_id):
             f'Cannot delete CA: {issued_certs} certificate(s) were issued by it. Revoke and delete them first.',
             409
         )
-    
+
     try:
         # Delete dependent records before deleting CA
         from models.crl import CRLMetadata
         from models.ocsp import OCSPResponse
-        
+
         crl_count = CRLMetadata.query.filter_by(ca_id=ca_id).delete()
         ocsp_count = OCSPResponse.query.filter_by(ca_id=ca_id).delete()
-        
+
         if crl_count or ocsp_count:
             logger.info(f"Deleted {crl_count} CRL(s) and {ocsp_count} OCSP response(s) for CA {ca_name}")
-        
+
         db.session.delete(ca)
         db.session.commit()
-        
+
         # Audit log
         AuditService.log_action(
             action='ca_deleted',
@@ -445,13 +445,13 @@ def delete_ca(ca_id):
             details=f'Deleted CA: {ca_name} (cleaned {crl_count} CRLs, {ocsp_count} OCSP responses)',
             success=True
         )
-        
+
         try:
             username = g.current_user.username if hasattr(g, 'current_user') else 'system'
             on_ca_deleted(ca_id, ca_name, username)
         except Exception:
             pass
-        
+
         return no_content_response()
     except Exception as e:
         db.session.rollback()

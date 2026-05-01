@@ -16,7 +16,7 @@ from .constraints_mixin import ConstraintsMixin
 
 class CACertificateCreationMixin:
     """CA X.509 certificate creation mixin"""
-    
+
     @staticmethod
     def create_ca_certificate(
         subject: x509.Name,
@@ -44,12 +44,12 @@ class CACertificateCreationMixin:
         # Normalize URL params: merge singular into list
         all_cdp_urls = cdp_urls or ([cdp_url] if cdp_url else [])
         all_ocsp_uris = ocsp_uris or ([ocsp_uri] if ocsp_uri else [])
-        
+
         # For self-signed, issuer is subject
         if issuer is None:
             issuer = subject
             issuer_private_key = private_key
-        
+
         # Build certificate
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
@@ -62,13 +62,13 @@ class CACertificateCreationMixin:
         builder = builder.not_valid_after(
             utc_now() + timedelta(days=validity_days)
         )
-        
+
         # CA extensions — BasicConstraints with configurable pathLenConstraint
         builder = builder.add_extension(
             x509.BasicConstraints(ca=True, path_length=path_length),
             critical=True,
         )
-        
+
         builder = builder.add_extension(
             x509.KeyUsage(
                 digital_signature=True,
@@ -83,13 +83,13 @@ class CACertificateCreationMixin:
             ),
             critical=True,
         )
-        
+
         # Subject Key Identifier
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
             critical=False,
         )
-        
+
         # Authority Key Identifier (for intermediate CAs)
         if issuer != subject:
             builder = builder.add_extension(
@@ -98,7 +98,7 @@ class CACertificateCreationMixin:
                 ),
                 critical=False,
             )
-        
+
         # Authority Information Access — OCSP URIs
         if all_ocsp_uris:
             aia_descriptions = [
@@ -112,7 +112,7 @@ class CACertificateCreationMixin:
                 x509.AuthorityInformationAccess(aia_descriptions),
                 critical=False,
             )
-        
+
         # CRL Distribution Points
         if all_cdp_urls:
             dist_points = [
@@ -128,7 +128,7 @@ class CACertificateCreationMixin:
                 x509.CRLDistributionPoints(dist_points),
                 critical=False,
             )
-        
+
         # Certificate Policies / CPS
         if cps_uri:
             policy_oid = x509.ObjectIdentifier(cps_oid or '2.5.29.32.0')
@@ -141,7 +141,7 @@ class CACertificateCreationMixin:
                 ]),
                 critical=False,
             )
-        
+
         # NameConstraints
         nc_permitted = ConstraintsMixin._build_general_subtrees(name_constraints_permitted)
         nc_excluded = ConstraintsMixin._build_general_subtrees(name_constraints_excluded)
@@ -153,7 +153,7 @@ class CACertificateCreationMixin:
                 ),
                 critical=True,
             )
-        
+
         # PolicyConstraints
         if policy_constraints_require is not None or policy_constraints_inhibit is not None:
             builder = builder.add_extension(
@@ -163,14 +163,14 @@ class CACertificateCreationMixin:
                 ),
                 critical=True,
             )
-        
+
         # InhibitAnyPolicy
         if inhibit_any_policy is not None:
             builder = builder.add_extension(
                 x509.InhibitAnyPolicy(skip_certs=inhibit_any_policy),
                 critical=True,
             )
-        
+
         # Subject Information Access — caRepository
         if sia_urls:
             sia_descriptions = [
@@ -184,7 +184,7 @@ class CACertificateCreationMixin:
                 x509.SubjectInformationAccess(sia_descriptions),
                 critical=False,
             )
-        
+
         # Sign certificate
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
@@ -192,16 +192,16 @@ class CACertificateCreationMixin:
             algorithm=hash_algo,
             backend=default_backend()
         )
-        
+
         # Serialize certificate
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
-        
+
         # Serialize private key — HSM-backed keys cannot be exported
         try:
             from services.hsm.hsm_private_key import is_hsm_private_key
         except ImportError:
             is_hsm_private_key = lambda _k: False  # noqa: E731
-        
+
         if is_hsm_private_key(private_key):
             key_pem = None
         else:
@@ -210,5 +210,5 @@ class CACertificateCreationMixin:
                 format=serialization.PrivateFormat.TraditionalOpenSSL,
                 encryption_algorithm=serialization.NoEncryption()
             )
-        
+
         return cert_pem, key_pem

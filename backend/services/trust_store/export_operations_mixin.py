@@ -11,7 +11,7 @@ from cryptography.hazmat.backends import default_backend
 
 class ExportOperationsMixin:
     """Certificate export operations mixin"""
-    
+
     @staticmethod
     def export_pkcs12(
         cert_pem: bytes,
@@ -24,7 +24,7 @@ class ExportOperationsMixin:
         key = serialization.load_pem_private_key(
             key_pem, password=None, backend=default_backend()
         )
-        
+
         p12 = pkcs12.serialize_key_and_certificates(
             friendly_name.encode(),
             key,
@@ -32,5 +32,5 @@ class ExportOperationsMixin:
             None,
             serialization.BestAvailableEncryption(password.encode())
         )
-        
+
         return p12

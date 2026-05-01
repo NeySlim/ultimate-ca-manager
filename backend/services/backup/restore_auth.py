@@ -53,7 +53,7 @@ class RestoreAuthMixin:
             sso.ldap_email_attr = sso_data.get('ldap_email_attr')
             sso.ldap_fullname_attr = sso_data.get('ldap_fullname_attr')
             results['sso_providers'] += 1
-    
+
     def _restore_hsm_providers(self, backup_data: Dict, results: Dict) -> None:
         """Restore HSM providers from backup data"""
         from models.hsm import HsmProvider
@@ -72,7 +72,7 @@ class RestoreAuthMixin:
                 )
                 db.session.add(new_hsm)
             results['hsm_providers'] += 1
-    
+
     def _restore_api_keys(self, backup_data: Dict, results: Dict) -> None:
         """Restore API keys from backup data"""
         from models.api_key import APIKey
@@ -92,7 +92,7 @@ class RestoreAuthMixin:
                 )
                 db.session.add(new_ak)
             results['api_keys'] += 1
-    
+
     def _restore_auth_certificates(self, backup_data: Dict, results: Dict) -> None:
         """Restore authentication certificates from backup data"""
         import base64

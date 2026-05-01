@@ -33,23 +33,23 @@ def get_provider(provider_id):
 def create_provider():
     """Create new SSO provider"""
     data = request.get_json()
-    
+
     if not data.get('name'):
         return error_response("Provider name is required", 400)
     if not data.get('provider_type'):
         return error_response("Provider type is required", 400)
     if data['provider_type'] not in ['saml', 'oauth2', 'ldap']:
         return error_response("Invalid provider type. Must be: saml, oauth2, ldap", 400)
-    
+
     # Check name uniqueness
     if SSOProvider.query.filter_by(name=data['name']).first():
         return error_response("Provider name already exists", 400)
-    
+
     # Enforce 1 provider per type
     existing = SSOProvider.query.filter_by(provider_type=data['provider_type']).first()
     if existing:
         return error_response(f"A {data['provider_type'].upper()} provider already exists. Only one provider per type is allowed.", 400)
-    
+
     provider = SSOProvider(
         name=data['name'],
         provider_type=data['provider_type'],
@@ -62,11 +62,11 @@ def create_provider():
         auto_update_users=data.get('auto_update_users', True),
         sync_role_on_login=data.get('sync_role_on_login', False),
     )
-    
+
     # If setting as default, clear other providers
     if provider.is_default:
         SSOProvider.query.filter(SSOProvider.id != provider.id).update({'is_default': False})
-    
+
     # Type-specific fields
     if data['provider_type'] == 'saml':
         provider.saml_metadata_url = data.get('saml_metadata_url')
@@ -79,7 +79,7 @@ def create_provider():
         provider.saml_verify_ssl = data.get('saml_verify_ssl', True)
         ca = data.get('saml_ca_bundle')
         provider.saml_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
-    
+
     elif data['provider_type'] == 'oauth2':
         provider.oauth2_client_id = data.get('oauth2_client_id')
         provider.oauth2_client_secret = data.get('oauth2_client_secret')
@@ -90,7 +90,7 @@ def create_provider():
         provider.oauth2_verify_ssl = data.get('oauth2_verify_ssl', True)
         ca = data.get('oauth2_ca_bundle')
         provider.oauth2_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
-    
+
     elif data['provider_type'] == 'ldap':
         provider.ldap_server = data.get('ldap_server')
         provider.ldap_port = data.get('ldap_port', 389)
@@ -107,7 +107,7 @@ def create_provider():
         provider.ldap_username_attr = data.get('ldap_username_attr', 'uid')
         provider.ldap_email_attr = data.get('ldap_email_attr', 'mail')
         provider.ldap_fullname_attr = data.get('ldap_fullname_attr', 'cn')
-    
+
     # JSON fields - normalize to ensure clean JSON string storage
     if data.get('attribute_mapping'):
         val = data['attribute_mapping']
@@ -119,10 +119,10 @@ def create_provider():
         if isinstance(val, str):
             val = json.loads(val)
         provider.role_mapping = json.dumps(val)
-    
+
     db.session.add(provider)
     db.session.commit()
-    
+
     AuditService.log_action(
         action='sso_provider_created',
         resource_type='sso_provider',
@@ -131,7 +131,7 @@ def create_provider():
         details=f"Type: {provider.provider_type}",
         success=True,
     )
-    
+
     return success_response(data=provider.to_dict(), message="SSO provider created")
 
 
@@ -150,9 +150,9 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider_id = provider.id
     else:
         return error_response("Provider ID or type required", 400)
-    
+
     data = request.get_json()
-    
+
     # Update common fields
     if 'name' in data:
         # Check uniqueness
@@ -160,7 +160,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         if existing and existing.id != provider_id:
             return error_response("Provider name already exists", 400)
         provider.name = data['name']
-    
+
     if 'display_name' in data:
         provider.display_name = data['display_name']
     if 'icon' in data:
@@ -179,10 +179,10 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider.auto_update_users = data['auto_update_users']
     if 'sync_role_on_login' in data:
         provider.sync_role_on_login = bool(data['sync_role_on_login'])
-    
+
     # Type-specific fields
     if provider.provider_type == 'saml':
-        for field in ['saml_metadata_url', 'saml_entity_id', 'saml_sso_url', 'saml_slo_url', 
+        for field in ['saml_metadata_url', 'saml_entity_id', 'saml_sso_url', 'saml_slo_url',
                       'saml_certificate', 'saml_sign_requests', 'saml_sp_cert_source',
                       'saml_verify_ssl']:
             if field in data:
@@ -190,9 +190,9 @@ def update_provider(provider_id=None, provider_type_name=None):
         # ca_bundle: only update if string PEM content (ignore bool from to_dict round-trip)
         if 'saml_ca_bundle' in data and isinstance(data['saml_ca_bundle'], str):
             provider.saml_ca_bundle = data['saml_ca_bundle'] or None
-    
+
     elif provider.provider_type == 'oauth2':
-        for field in ['oauth2_client_id', 'oauth2_auth_url', 
+        for field in ['oauth2_client_id', 'oauth2_auth_url',
                       'oauth2_token_url', 'oauth2_userinfo_url',
                       'oauth2_verify_ssl']:
             if field in data:
@@ -205,11 +205,11 @@ def update_provider(provider_id=None, provider_type_name=None):
             provider.oauth2_client_secret = data['oauth2_client_secret']
         if 'oauth2_scopes' in data:
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
-    
+
     elif provider.provider_type == 'ldap':
-        for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn', 
+        for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
                       'ldap_base_dn', 'ldap_user_filter',
-                      'ldap_group_filter', 'ldap_group_member_attr', 'ldap_username_attr', 'ldap_email_attr', 
+                      'ldap_group_filter', 'ldap_group_member_attr', 'ldap_username_attr', 'ldap_email_attr',
                       'ldap_fullname_attr', 'ldap_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
@@ -219,7 +219,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         # Only update password if non-empty (empty = keep existing)
         if data.get('ldap_bind_password'):
             provider.ldap_bind_password = _encrypt_ldap_password(data['ldap_bind_password'])
-    
+
     # JSON fields
     if 'attribute_mapping' in data:
         val = data['attribute_mapping']
@@ -231,7 +231,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         if isinstance(val, str):
             val = json.loads(val)
         provider.role_mapping = json.dumps(val)
-    
+
     db.session.commit()
     AuditService.log_action(
         action='sso_provider_updated',
@@ -251,13 +251,13 @@ def delete_provider(provider_id):
     provider = SSOProvider.query.get_or_404(provider_id)
     provider_name = provider.name
     provider_type = provider.provider_type
-    
+
     # Delete associated sessions first
     SSOSession.query.filter_by(provider_id=provider_id).delete()
-    
+
     db.session.delete(provider)
     db.session.commit()
-    
+
     AuditService.log_action(
         action='sso_provider_deleted',
         resource_type='sso_provider',
@@ -266,7 +266,7 @@ def delete_provider(provider_id):
         details=f"Type: {provider_type}",
         success=True,
     )
-    
+
     return success_response(message="SSO provider deleted")
 
 
@@ -277,7 +277,7 @@ def toggle_provider(provider_id):
     provider = SSOProvider.query.get_or_404(provider_id)
     provider.enabled = not provider.enabled
     db.session.commit()
-    
+
     status = "enabled" if provider.enabled else "disabled"
     AuditService.log_action(
         action=f'sso_provider_{status}',
@@ -295,14 +295,12 @@ def toggle_provider(provider_id):
 def test_provider(provider_id):
     """Test SSO provider connection"""
     provider = SSOProvider.query.get_or_404(provider_id)
-    
+
     if provider.provider_type == 'ldap':
         return _test_ldap_connection(provider)
     elif provider.provider_type == 'oauth2':
         return _test_oauth2_connection(provider)
     elif provider.provider_type == 'saml':
         return _test_saml_connection(provider)
-    
+
     return error_response("Unknown provider type", 400)
-
-

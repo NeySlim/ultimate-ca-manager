@@ -48,7 +48,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                    RestoreCoreMixin, RestoreRbacMixin, RestoreAuthMixin,
                    RestoreNotificationsMixin, RestorePoliciesMixin, RestoreExtendedMixin):
     """Service for creating encrypted system backups
-    
+
     Format v2 container layout:
         [0:4]      magic = b'UCMB'
         [4]        format_version = 0x02
@@ -59,55 +59,55 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         [10:10+N]  metadata JSON (unencrypted header: ucm_version, created_at,
                    kdf params, salt_b64, nonce_b64)
         [10+N:]    AES-256-GCM ciphertext (plaintext = gzipped JSON if flag set)
-    
+
     Format v1 (legacy): raw 32-byte salt + 12-byte nonce + GCM ciphertext.
     restore_backup() auto-detects format from magic bytes.
     """
-    
+
     # v1/legacy constants (PBKDF2)
     PBKDF2_ITERATIONS = 100000
     KEY_SIZE = 32  # 256 bits for AES-256
     NONCE_SIZE = 12  # 96 bits for GCM
     SALT_SIZE = 32
-    
+
     # v2 constants
     MAGIC = b'UCMB'
     FORMAT_VERSION_V2 = 2
     FLAG_GZIP = 0x01
     KDF_PBKDF2 = 1
     KDF_ARGON2ID = 2
-    
+
     # Argon2id params (OWASP 2024 recommendation for sensitive data)
     ARGON2_TIME_COST = 3
     ARGON2_MEMORY_COST = 65536  # 64 MiB
     ARGON2_PARALLELISM = 4
     ARGON2_SALT_SIZE = 16
-    
+
     # Stronger PBKDF2 when Argon2 unavailable
     PBKDF2_ITERATIONS_V2 = 600000
-    
+
     def __init__(self):
         self.app_version = Config.APP_VERSION
     def create_backup(
-        self, 
+        self,
         password: str,
         backup_type: str = "full",
         include: Optional[Dict[str, bool]] = None
     ) -> bytes:
         """
         Create encrypted backup archive
-        
+
         Args:
             password: Encryption password (min 12 chars)
             backup_type: "full", "database", or "certificates"
             include: Dict of what to include (cas, certificates, users, etc.)
-            
+
         Returns:
             Encrypted backup as bytes
         """
         # Validate password
         self._validate_password(password)
-        
+
         # Default includes
         if include is None:
             include = {
@@ -145,7 +145,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                 'hsm_keys': True,
                 'audit_logs': False,  # opt-in, tamper-evident chain, can be huge
             }
-        
+
         # Build backup data structure
         def _safe(fn, *args, **kwargs):
             """Call an export method; return [] on failure (missing table, model import error, etc.)"""
@@ -154,7 +154,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             except Exception as e:
                 logger.warning(f"Backup export {fn.__name__} failed: {e}")
                 return [] if 'export' in fn.__name__ else {}
-        
+
         backup_data = {
             'metadata': self._get_metadata(backup_type),
             'configuration': _safe(self._export_configuration, include.get('configuration', True)),
@@ -191,7 +191,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             'audit_logs': _safe(self._export_audit_logs, include.get('audit_logs', False)),
             'https_server': _safe(self._export_https_files),
         }
-        
+
         # Choose KDF: Argon2id if available, else strong PBKDF2
         if _ARGON2_AVAILABLE:
             kdf_id = self.KDF_ARGON2ID
@@ -213,10 +213,10 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                 'iterations': self.PBKDF2_ITERATIONS_V2,
                 'hash_len': self.KEY_SIZE,
             }
-        
+
         # Encrypt private keys individually (uses same master_key + PBKDF2 per-key salt for legacy compat)
         backup_data = self._encrypt_private_keys(backup_data, master_key)
-        
+
         # Calculate checksum of plaintext
         json_str = json.dumps(backup_data, indent=2, sort_keys=True)
         checksum = hashlib.sha256(json_str.encode()).hexdigest()
@@ -224,18 +224,18 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             'algorithm': 'SHA256',
             'value': checksum
         }
-        
+
         # Serialize final payload
         final_json = json.dumps(backup_data, indent=2, sort_keys=True).encode()
-        
+
         # Compress (gzip level 6 — good ratio, fast)
         flags = self.FLAG_GZIP
         plaintext = gzip.compress(final_json, compresslevel=6)
-        
+
         # Encrypt with AES-256-GCM
         nonce = secrets.token_bytes(self.NONCE_SIZE)
         ciphertext = AESGCM(master_key).encrypt(nonce, plaintext, self.MAGIC)
-        
+
         # Build v2 container
         metadata = {
             'format_version': self.FORMAT_VERSION_V2,
@@ -249,7 +249,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         metadata_bytes = json.dumps(metadata, separators=(',', ':')).encode()
         if len(metadata_bytes) > 65535:
             raise ValueError("Backup metadata too large")
-        
+
         header = (
             self.MAGIC
             + bytes([self.FORMAT_VERSION_V2, flags, kdf_id, 0])
@@ -257,7 +257,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             + metadata_bytes
         )
         return header + ciphertext
-    
+
     def _derive_argon2id(self, password: str, salt: bytes,
                           time_cost: int = None, memory_cost: int = None,
                           parallelism: int = None, hash_len: int = None) -> bytes:
@@ -273,7 +273,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             hash_len=hash_len or self.KEY_SIZE,
             type=Argon2Type.ID,
         )
-    
+
     def _derive_pbkdf2(self, password: str, salt: bytes, iterations: int) -> bytes:
         """Derive key using PBKDF2-SHA256"""
         kdf = PBKDF2HMAC(
@@ -284,30 +284,30 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             backend=default_backend()
         )
         return kdf.derive(password.encode())
-    
+
     def _validate_password(self, password: str):
         """Validate backup password strength"""
         if len(password) < 12:
             raise ValueError("Backup password must be at least 12 characters")
-        
+
         # Check entropy (basic)
         unique_chars = len(set(password))
         if unique_chars < 8:
             raise ValueError("Backup password is too simple")
-    
+
     def _derive_master_key(self, password: str) -> tuple:
         """Legacy v1 PBKDF2 derivation (kept for backward-compat restore)"""
         salt = secrets.token_bytes(self.SALT_SIZE)
         key = self._derive_pbkdf2(password, salt, self.PBKDF2_ITERATIONS)
         return key, salt
-    
+
     def _encrypt_backup(self, data: bytes, key: bytes) -> bytes:
         """Legacy v1 AES-256-GCM encrypt (kept for tests / fallback)"""
         nonce = secrets.token_bytes(self.NONCE_SIZE)
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce, data, None)
         return nonce + ciphertext
-    
+
     def _encrypt_private_key(self, key_pem: str, master_key: bytes) -> Dict[str, str]:
         """Encrypt individual private key with unique salt"""
         # Derive unique key for this specific private key
@@ -320,12 +320,12 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             backend=default_backend()
         )
         key = kdf.derive(master_key)
-        
+
         # Encrypt
         nonce = secrets.token_bytes(self.NONCE_SIZE)
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce, key_pem.encode(), None)
-        
+
         return {
             'algorithm': 'AES-256-GCM',
             'salt': salt.hex(),

@@ -33,7 +33,7 @@ def fetch_idp_metadata():
     metadata_url = data.get('metadata_url')
     if not metadata_url:
         return error_response("metadata_url is required", 400)
-    
+
     # Validate URL scheme to prevent SSRF
     from urllib.parse import urlparse
     parsed = urlparse(metadata_url)
@@ -49,7 +49,7 @@ def fetch_idp_metadata():
         validate_url_not_cloud_metadata(metadata_url)
     except ValueError:
         return error_response("metadata_url cannot target cloud metadata or loopback", 400)
-    
+
     try:
         # Use provider SSL settings if provider_id provided, otherwise default to True
         provider_id = data.get('provider_id')
@@ -69,7 +69,7 @@ def fetch_idp_metadata():
                 finally:
                     os.close(fd)
                 verify = path
-        
+
         resp = http_requests.get(metadata_url, timeout=10, verify=verify)
         resp.raise_for_status()
     except http_requests.exceptions.SSLError as e:
@@ -82,11 +82,10 @@ def fetch_idp_metadata():
     finally:
         if isinstance(verify, str) and verify.startswith(tempfile.gettempdir()):
             _cleanup_ssl_verify(verify)
-    
+
     try:
         parsed = _parse_saml_metadata(resp.text)
         return success_response(data=parsed, message="IDP metadata parsed successfully")
     except Exception as e:
         logger.error(f"Failed to parse IDP metadata XML: {e}")
         return error_response("Failed to parse metadata XML. Ensure the URL returns valid SAML metadata.", 400)
-

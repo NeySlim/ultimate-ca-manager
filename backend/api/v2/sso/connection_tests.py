@@ -14,7 +14,7 @@ def _test_ldap_connection(provider):
         import ldap3
         from ldap3 import Server, Connection, ALL, Tls
         from ldap3.utils.conv import escape_filter_chars
-        
+
         tls_config = _build_ldap_tls(provider)
         server = Server(
             provider.ldap_server,
@@ -23,14 +23,14 @@ def _test_ldap_connection(provider):
             tls=tls_config,
             get_info=ALL
         )
-        
+
         conn = Connection(
             server,
             user=provider.ldap_bind_dn,
             password=_decrypt_ldap_password(provider),
             auto_bind=True
         )
-        
+
         # Test search with escaped filter
         conn.search(
             provider.ldap_base_dn,
@@ -38,9 +38,9 @@ def _test_ldap_connection(provider):
             attributes=['cn'],
             size_limit=1
         )
-        
+
         conn.unbind()
-        
+
         return success_response(data={
             'status': 'success',
             'message': 'LDAP connection successful',
@@ -59,7 +59,7 @@ def _ldap_authenticate_user(provider, username, password):
         import ldap3
         from ldap3 import Server, Connection, ALL, Tls
         from ldap3.utils.conv import escape_filter_chars
-        
+
         tls_config = _build_ldap_tls(provider)
         server = Server(
             provider.ldap_server,
@@ -68,7 +68,7 @@ def _ldap_authenticate_user(provider, username, password):
             tls=tls_config,
             get_info=ALL
         )
-        
+
         # First bind as service account
         conn = Connection(
             server,
@@ -76,10 +76,10 @@ def _ldap_authenticate_user(provider, username, password):
             password=_decrypt_ldap_password(provider),
             auto_bind=True
         )
-        
+
         # SECURITY: Escape username to prevent LDAP injection
         safe_username = escape_filter_chars(username)
-        
+
         # Search for user with escaped filter
         user_filter = provider.ldap_user_filter.replace('{username}', safe_username)
         conn.search(
@@ -91,29 +91,29 @@ def _ldap_authenticate_user(provider, username, password):
                 provider.ldap_fullname_attr
             ]
         )
-        
+
         if not conn.entries:
             conn.unbind()
             return None, "Invalid credentials"
-        
+
         user_entry = conn.entries[0]
         user_dn = user_entry.entry_dn
-        
+
         # Close service account connection
         conn.unbind()
-        
+
         # Attempt to bind as the user to verify password
         user_conn = Connection(
             server,
             user=user_dn,
             password=password
         )
-        
+
         if not user_conn.bind():
             return None, "Invalid credentials"
-        
+
         user_conn.unbind()
-        
+
         # Fetch user's groups for role mapping
         groups = []
         if provider.ldap_group_filter:
@@ -138,7 +138,7 @@ def _ldap_authenticate_user(provider, username, password):
                         safe_un = escape_filter_chars(username)
                         uf = provider.ldap_user_filter.replace('{username}', safe_un)
                         memberof_conn.search(provider.ldap_base_dn, uf, attributes=['memberOf'])
-                    
+
                     if memberof_conn.entries:
                         entry = memberof_conn.entries[0]
                         if hasattr(entry, 'memberOf'):
@@ -175,7 +175,7 @@ def _ldap_authenticate_user(provider, username, password):
                     logger.info(f"LDAP {member_attr} groups for {username}: {groups}")
             except Exception as e:
                 logger.warning(f"Failed to fetch LDAP groups for {username}: {e}")
-        
+
         # Return user info
         return {
             'dn': user_dn,
@@ -184,7 +184,7 @@ def _ldap_authenticate_user(provider, username, password):
             'fullname': str(getattr(user_entry, provider.ldap_fullname_attr, '')),
             'groups': groups
         }, None
-        
+
     except ImportError:
         return None, "LDAP library not installed"
     except Exception as e:
@@ -204,7 +204,7 @@ def _test_oauth2_connection(provider):
         return error_response("Authorization URL cannot target cloud metadata or loopback", 400)
     try:
         response = http_requests.head(provider.oauth2_auth_url, timeout=5, allow_redirects=True, verify=verify)
-        
+
         return success_response(data={
             'status': 'success',
             'message': 'OAuth2 endpoints reachable',
@@ -226,18 +226,18 @@ def _test_saml_connection(provider):
     # For SAML, we mainly verify the certificate is valid
     if not provider.saml_certificate:
         return error_response("SAML certificate not configured", 400)
-    
+
     try:
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
-        
+
         # Try to parse certificate
         cert_pem = provider.saml_certificate
         if not cert_pem.startswith('-----BEGIN'):
             cert_pem = f"-----BEGIN CERTIFICATE-----\n{cert_pem}\n-----END CERTIFICATE-----"
-        
+
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-        
+
         return success_response(data={
             'status': 'success',
             'message': 'SAML certificate valid',

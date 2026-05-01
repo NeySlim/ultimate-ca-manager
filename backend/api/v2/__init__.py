@@ -127,5 +127,5 @@ def register_api_v2(app):
     """Register all API v2 blueprints"""
     for blueprint in API_V2_BLUEPRINTS:
         app.register_blueprint(blueprint)
-    
+
     logger.info(f"Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")

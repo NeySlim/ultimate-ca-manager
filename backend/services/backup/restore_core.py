@@ -19,11 +19,11 @@ class RestoreCoreMixin:
     def restore_backup(self, backup_bytes: bytes, password: str) -> Dict[str, Any]:
         """
         Restore from encrypted backup. Auto-detects format v1 (legacy) or v2.
-        
+
         Args:
             backup_bytes: Encrypted backup file content
             password: Decryption password
-            
+
         Returns:
             Dict with restore results
         """
@@ -32,7 +32,7 @@ class RestoreCoreMixin:
             master_key, backup_data = self._decrypt_v2(backup_bytes, password)
         else:
             master_key, backup_data = self._decrypt_v1(backup_bytes, password)
-        
+
         # Verify checksum
         saved_checksum = backup_data.pop('checksum', None)
         if saved_checksum:
@@ -40,7 +40,7 @@ class RestoreCoreMixin:
             calc_checksum = hashlib.sha256(json_str.encode()).hexdigest()
             if calc_checksum != saved_checksum.get('value'):
                 raise ValueError("Backup checksum mismatch - file may be corrupted")
-        
+
         # Initialize results
         results = {
             'users': 0,
@@ -65,7 +65,7 @@ class RestoreCoreMixin:
             'acme_local_domains': 0,
             'https_server': 0,
         }
-        
+
         # Core restores
         self._restore_users(backup_data, results)
         self._restore_cas(backup_data, results, master_key)
@@ -73,35 +73,35 @@ class RestoreCoreMixin:
         self._restore_acme_accounts(backup_data, results)
         self._restore_acme_eab_credentials(backup_data, results)
         self._restore_settings(backup_data, results)
-        
+
         # Commit after core entities
         db.session.commit()
-        
+
         # Regenerate CA/cert files on disk
         self._regenerate_files()
-        
+
         # RBAC restores
         self._restore_groups(backup_data, results)
         self._restore_custom_roles(backup_data, results)
         self._restore_templates(backup_data, results)
         self._restore_truststore(backup_data, results)
-        
+
         # Auth restores
         self._restore_sso_providers(backup_data, results)
         self._restore_hsm_providers(backup_data, results)
         self._restore_api_keys(backup_data, results)
         self._restore_auth_certificates(backup_data, results)
-        
+
         # Notification restores
         self._restore_smtp_config(backup_data, results)
         self._restore_notification_config(backup_data, results)
-        
+
         # Policy restores
         self._restore_policies(backup_data, results)
         self._restore_dns_providers(backup_data, results)
         self._restore_acme_domains(backup_data, results)
         self._restore_acme_local_domains(backup_data, results)
-        
+
         # Extended restores
         self._restore_ssh_cas(backup_data, results, master_key)
         self._restore_ssh_certificates(backup_data, results)
@@ -111,11 +111,11 @@ class RestoreCoreMixin:
         self._restore_approval_requests(backup_data, results)
         self._restore_acme_client_orders(backup_data, results)
         self._restore_https_files(backup_data, results)
-        
+
         db.session.commit()
-        
+
         return results
-    
+
     def _restore_users(self, backup_data: Dict, results: Dict) -> None:
         """Restore users from backup data"""
         from models import User
@@ -138,20 +138,20 @@ class RestoreCoreMixin:
                 )
                 db.session.add(new_user)
             results['users'] += 1
-    
+
     def _restore_cas(self, backup_data: Dict, results: Dict, master_key: bytes) -> None:
         """Restore certificate authorities from backup data"""
         for ca_data in backup_data.get('certificate_authorities', []):
             existing = CA.query.filter_by(refid=ca_data['refid']).first()
-            
+
             # Decrypt private key if encrypted
             prv_pem = None
             if ca_data.get('private_key_pem_encrypted'):
                 prv_pem = self._decrypt_private_key(
-                    ca_data['private_key_pem_encrypted'], 
+                    ca_data['private_key_pem_encrypted'],
                     master_key
                 )
-            
+
             if existing:
                 existing.descr = ca_data.get('descr')
                 existing.crt = base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None
@@ -177,11 +177,11 @@ class RestoreCoreMixin:
                 )
                 db.session.add(new_ca)
             results['cas'] += 1
-    
+
     def _restore_certificates(self, backup_data: Dict, results: Dict, master_key: bytes) -> None:
         """Restore certificates from backup data"""
         from datetime import datetime as _dt
-        
+
         def _parse_dt(val):
             if not val:
                 return None
@@ -189,10 +189,10 @@ class RestoreCoreMixin:
                 return _dt.fromisoformat(val.replace('Z', '+00:00'))
             except Exception:
                 return None
-        
+
         for cert_data in backup_data.get('certificates', []):
             existing = Certificate.query.filter_by(refid=cert_data['refid']).first()
-            
+
             # Decrypt private key if encrypted
             prv_pem = None
             if cert_data.get('private_key_pem_encrypted'):
@@ -200,13 +200,13 @@ class RestoreCoreMixin:
                     cert_data['private_key_pem_encrypted'],
                     master_key
                 )
-            
+
             prv_b64 = None
             if prv_pem:
                 prv_b64 = base64.b64encode(prv_pem.encode()).decode()
                 from security.encryption import encrypt_private_key
                 prv_b64 = encrypt_private_key(prv_b64)
-            
+
             if existing:
                 existing.descr = cert_data.get('descr')
                 existing.crt = base64.b64encode(cert_data['certificate_pem'].encode()).decode() if cert_data.get('certificate_pem') else None
@@ -250,7 +250,7 @@ class RestoreCoreMixin:
                 )
                 db.session.add(new_cert)
             results['certificates'] += 1
-    
+
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME accounts from backup data (RFC 8555)"""
         for acme_data in backup_data.get('acme_accounts', []):
@@ -278,13 +278,13 @@ class RestoreCoreMixin:
                 )
                 db.session.add(new_acme)
             results['acme_accounts'] += 1
-    
+
     def _restore_acme_eab_credentials(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME EAB credentials from backup data (RFC 8555)"""
         try:
             from models.acme_models import AcmeEabCredential
             from datetime import datetime as _dt
-            
+
             def _parse_dt(v):
                 if not v:
                     return None
@@ -292,7 +292,7 @@ class RestoreCoreMixin:
                     return _dt.fromisoformat(v.replace('Z', '+00:00'))
                 except Exception:
                     return None
-            
+
             for eab in backup_data.get('acme_eab_credentials', []):
                 kid = eab.get('kid')
                 if not kid or not eab.get('hmac_key_b64'):
@@ -325,7 +325,7 @@ class RestoreCoreMixin:
                 results['acme_eab_credentials'] += 1
         except Exception as e:
             logger.warning(f"Failed to restore acme_eab_credentials: {e}")
-    
+
     def _restore_settings(self, backup_data: Dict, results: Dict) -> None:
         """Restore system settings from backup data"""
         from models import SystemConfig
@@ -343,11 +343,11 @@ class RestoreCoreMixin:
                 new_config = SystemConfig(key=key, value=value)
                 db.session.add(new_config)
             results['settings'] += 1
-    
+
     def _regenerate_files(self) -> None:
         """Regenerate CA and certificate files on disk"""
         from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_key_path, cert_csr_path
-        
+
         for ca in CA.query.all():
             if ca.crt:
                 try:
@@ -367,7 +367,7 @@ class RestoreCoreMixin:
                     p.chmod(0o600)
                 except Exception:
                     pass
-        
+
         for cert in Certificate.query.all():
             if cert.crt:
                 try:

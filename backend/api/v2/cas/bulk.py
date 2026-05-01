@@ -36,27 +36,27 @@ def bulk_delete_cas():
             if not ca:
                 results['failed'].append({'id': ca_id, 'error': 'Not found'})
                 continue
-            
+
             ca_name = ca.descr or f'CA #{ca_id}'
-            
+
             # Check for child CAs
             child_cas = CA.query.filter_by(caref=ca.refid).count()
             if child_cas > 0:
                 results['failed'].append({'id': ca_id, 'error': f'{child_cas} intermediate CA(s) depend on it'})
                 continue
-            
+
             # Check for issued certificates
             issued_certs = Certificate.query.filter_by(caref=ca.refid).count()
             if issued_certs > 0:
                 results['failed'].append({'id': ca_id, 'error': f'{issued_certs} certificate(s) issued by it'})
                 continue
-            
+
             # Clean up dependent records
             from models.crl import CRLMetadata
             from models.ocsp import OCSPResponse
             CRLMetadata.query.filter_by(ca_id=ca_id).delete()
             OCSPResponse.query.filter_by(ca_id=ca_id).delete()
-            
+
             db.session.delete(ca)
             db.session.commit()
             results['success'].append(ca_id)

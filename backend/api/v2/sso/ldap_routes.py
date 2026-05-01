@@ -19,35 +19,35 @@ def ldap_login():
     Direct LDAP authentication.
     Unlike OAuth2/SAML, LDAP authenticates with username/password directly.
     """
-    
+
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
     provider_id = data.get('provider_id')
-    
+
     if not username or not password:
         return error_response("Username and password required", 400)
-    
+
     # Check account lockout before attempting LDAP auth
     if _check_ldap_lockout(username):
         return error_response("Account temporarily locked due to too many failed attempts", 429)
-    
+
     # Find LDAP provider
     if provider_id:
         provider = SSOProvider.query.get(provider_id)
     else:
         # Use first enabled LDAP provider
         provider = SSOProvider.query.filter_by(provider_type='ldap', enabled=True).first()
-    
+
     if not provider:
         return error_response("No LDAP provider configured", 400)
-    
+
     if not provider.enabled:
         return error_response("LDAP provider is disabled", 400)
-    
+
     # Authenticate via LDAP
     user_info, error = _ldap_authenticate_user(provider, username, password)
-    
+
     if error:
         _record_ldap_failed_attempt(username)
         # SEC-11: Audit log failed LDAP attempt
@@ -59,7 +59,7 @@ def ldap_login():
             username=username
         )
         return error_response("Invalid credentials", 401)
-    
+
     # Create or update user
     user, error_code = _get_or_create_sso_user(
         provider,
@@ -68,15 +68,15 @@ def ldap_login():
         user_info.get('fullname', ''),
         user_info
     )
-    
+
     if not user:
         if error_code == 'auto_create_disabled':
             return error_response("User not found and automatic account creation is disabled. Contact your administrator.", 403)
         return error_response("Failed to create user account", 500)
-    
+
     # Clear failed attempts on successful login
     _clear_ldap_failed_attempts(username)
-    
+
     # Create or update session (deduplicate like OAuth2/SAML)
     session_id = user_info['dn']
     sso_session = SSOSession.query.filter_by(session_id=session_id).first()
@@ -92,7 +92,7 @@ def ldap_login():
         )
         db.session.add(sso_session)
     db.session.commit()
-    
+
     # Establish Flask session (clear first to prevent session fixation)
     _ldap_now = utc_now()
     session.clear()
@@ -103,7 +103,7 @@ def ldap_login():
     session['login_time'] = _ldap_now.isoformat()
     session['last_activity'] = _ldap_now.isoformat()
     session.permanent = True
-    
+
     # Audit log LDAP login success
     AuditService.log_action(
         action='login_success',
@@ -114,7 +114,7 @@ def ldap_login():
         success=True,
         username=user.username
     )
-    
+
     # Generate CSRF token
     csrf_token = None
     try:
@@ -122,17 +122,17 @@ def ldap_login():
         csrf_token = CSRFProtection.generate_token(user.id)
     except ImportError:
         pass
-    
+
     # Get role permissions
     from auth.permissions import get_role_permissions
     permissions = get_role_permissions(user.role)
-    
+
     # Get display settings for frontend
     from models import SystemConfig
     tz_row = SystemConfig.query.filter_by(key='timezone').first()
     df_row = SystemConfig.query.filter_by(key='date_format').first()
     st_row = SystemConfig.query.filter_by(key='show_time').first()
-    
+
     return success_response(
         data={
             'user': user.to_dict(),
@@ -150,7 +150,7 @@ def ldap_login():
 def _get_saml_auth(flask_request, provider, relay_state=None):
     """Build a OneLogin_Saml2_Auth from Flask request and SSO provider config."""
     from onelogin.saml2.auth import OneLogin_Saml2_Auth
-    
+
     # Build request dict for python3-saml
     url_data = urllib.parse.urlparse(flask_request.url)
     req = {
@@ -161,9 +161,9 @@ def _get_saml_auth(flask_request, provider, relay_state=None):
         'post_data': flask_request.form.copy(),
         'server_port': url_data.port or (443 if url_data.scheme == 'https' else 80),
     }
-    
+
     sp_base = flask_request.url_root.rstrip('/')
-    
+
     saml_settings = {
         'strict': False,
         'debug': True,
@@ -197,24 +197,24 @@ def _get_saml_auth(flask_request, provider, relay_state=None):
             'allowSingleLabelDomains': True,
         },
     }
-    
+
     if provider.saml_slo_url:
         saml_settings['idp']['singleLogoutService'] = {
             'url': provider.saml_slo_url,
             'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
         }
-    
+
     return OneLogin_Saml2_Auth(req, saml_settings)
 
 
 def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     """Create or update a user from SSO authentication
-    
+
     Returns:
         tuple: (user, error_code) - user object or None, and error code if failed
     """
     user = User.query.filter_by(username=username).first()
-    
+
     if user:
         # Backfill auth_source/sso_provider_id for users created before
         # migration 024 — useful when several providers share a directory
@@ -268,15 +268,15 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
             db.session.rollback()
             logger.error(f"Failed to update SSO user {username}: {e}")
         return user, None
-    
+
     # Create new user if auto_create is enabled
     if not provider.auto_create_users:
         logger.warning(f"SSO user {username} not found and auto_create disabled")
         return None, 'auto_create_disabled'
-    
+
     # Creation path keeps the historical fallback to default_role.
     role = _resolve_role(provider, external_data)
-    
+
     user = User(
         username=username,
         email=email or f'{username}@sso.local',
@@ -287,12 +287,12 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         auth_source=provider.provider_type,
         sso_provider_id=provider.id,
     )
-    
+
     # SSO users don't have a password — use sentinel that cannot match any hash
     user.password_hash = '!SSO_NO_PASSWORD!'
-    
+
     db.session.add(user)
     db.session.commit()
-    
+
     logger.info(f"Created SSO user: {username} with role {role}")
     return user, None

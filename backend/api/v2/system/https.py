@@ -32,7 +32,7 @@ def get_https_cert_info():
     """Get information about the current HTTPS certificate"""
     data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
     cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
-    
+
     if not cert_path.exists():
         return success_response(data={
             'common_name': 'Not configured',
@@ -42,32 +42,32 @@ def get_https_cert_info():
             'fingerprint': '-',
             'type': 'none'
         })
-    
+
     try:
         cert_pem = cert_path.read_bytes()
         cert = x509.load_pem_x509_certificate(cert_pem)
-        
+
         # Extract subject CN
         cn = None
         for attr in cert.subject:
             if attr.oid == x509.oid.NameOID.COMMON_NAME:
                 cn = attr.value
                 break
-        
+
         # Extract issuer CN
         issuer_cn = None
         for attr in cert.issuer:
             if attr.oid == x509.oid.NameOID.COMMON_NAME:
                 issuer_cn = attr.value
                 break
-        
+
         # Check if self-signed
         is_self_signed = cert.subject == cert.issuer
-        
+
         # Calculate fingerprint
         fingerprint = cert.fingerprint(hashes.SHA256()).hex()
         fingerprint_formatted = ':'.join(fingerprint[i:i+2].upper() for i in range(0, len(fingerprint), 2))
-        
+
         return success_response(data={
             'common_name': cn or 'Unknown',
             'issuer': issuer_cn or 'Unknown',
@@ -96,21 +96,21 @@ def regenerate_https_cert():
     data = request.json or {}
     common_name = data.get('common_name', 'localhost')
     validity_days = data.get('validity_days', 365)
-    
+
     try:
         # Generate private key
         private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048
         )
-        
+
         # Build certificate
         subject = issuer = x509.Name([
             x509.NameAttribute(NameOID.COUNTRY_NAME, "NL"),
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Ultimate Certificate Manager"),
             x509.NameAttribute(NameOID.COMMON_NAME, common_name[:64]),
         ])
-        
+
         now = datetime.now(timezone.utc)
         cert = (
             x509.CertificateBuilder()
@@ -129,19 +129,19 @@ def regenerate_https_cert():
             )
             .sign(private_key, hashes.SHA256())
         )
-        
+
         # Get cert paths dynamically - same logic as gunicorn.conf.py
         data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
         cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
         key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
-        
+
         # Backup existing
         if cert_path.exists():
             backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
             shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
         if key_path.exists():
             shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
-        
+
         # Write new cert and key
         cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
         key_path.write_bytes(private_key.private_bytes(
@@ -150,7 +150,7 @@ def regenerate_https_cert():
             encryption_algorithm=serialization.NoEncryption()
         ))
         os.chmod(key_path, 0o600)
-        
+
         # Set ownership
         try:
             ucm_user = pwd.getpwnam('ucm')
@@ -158,9 +158,9 @@ def regenerate_https_cert():
             os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
         except KeyError:
             pass
-        
+
         current_app.logger.info(f"Regenerated HTTPS certificate for {common_name}")
-        
+
         AuditService.log_action(
             action='https_regenerate',
             resource_type='system',
@@ -168,14 +168,14 @@ def regenerate_https_cert():
             details=f'Regenerated self-signed HTTPS certificate for {common_name}',
             success=True
         )
-        
+
         # Restart service (skip in Docker - user must restart container)
         if is_docker():
             return success_response(
                 message="Certificate regenerated. Restart the container to apply.",
                 data={'requires_container_restart': True}
             )
-        
+
         from utils.service_manager import restart_service as do_restart
         success, msg = do_restart()
         if not success:
@@ -183,9 +183,9 @@ def regenerate_https_cert():
                 message="Certificate regenerated but service restart failed. Please restart manually.",
                 data={'restart_failed': True, 'error': msg}
             )
-        
+
         return success_response(message="Certificate regenerated. Service restarting...")
-        
+
     except Exception as e:
         current_app.logger.error(f"Failed to regenerate HTTPS cert: {e}")
         return error_response("Failed to regenerate certificate", 500)
@@ -197,48 +197,48 @@ def apply_https_cert():
     """Apply a managed certificate to HTTPS"""
     data = request.json
     cert_id = data.get('cert_id')
-    
+
     if not cert_id:
         return error_response("Certificate ID required", 400)
-        
+
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response("Certificate not found", 404)
-    
+
     # Verify cert has private key
     if not cert.prv:
         return error_response("Certificate has no private key - cannot use for HTTPS", 400)
-    
+
     try:
         # Get cert paths dynamically - same logic as gunicorn.conf.py
         data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
         cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
         key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
-        
+
         # Backup existing certs
         if cert_path.exists():
             backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
             shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
         if key_path.exists():
             shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
-        
+
         # Decode cert/key - they may be base64 encoded or raw PEM
         cert_data = cert.crt
         key_data = cert.prv
-        
+
         # Check if base64 encoded (doesn't start with -----BEGIN)
         if not cert_data.startswith('-----BEGIN'):
             try:
                 cert_data = base64.b64decode(cert_data).decode('utf-8')
             except Exception:
                 pass  # Already decoded or different format
-        
+
         if not key_data.startswith('-----BEGIN'):
             try:
                 key_data = base64.b64decode(key_data).decode('utf-8')
             except Exception:
                 pass
-        
+
         # Write new certificate with full chain (leaf + intermediates + root)
         full_cert = cert_data
         if cert.caref:
@@ -250,13 +250,13 @@ def apply_https_cert():
                     if not full_cert.endswith('\n'):
                         full_cert += '\n'
                     full_cert += chain_str
-        
+
         cert_path.write_text(full_cert)
-        
+
         # Write private key with restricted permissions
         key_path.write_text(key_data)
         os.chmod(key_path, 0o600)
-        
+
         # Set ownership to ucm user (if exists)
         try:
             ucm_user = pwd.getpwnam('ucm')
@@ -264,9 +264,9 @@ def apply_https_cert():
             os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
         except KeyError:
             pass  # ucm user doesn't exist, skip chown
-        
+
         current_app.logger.info(f"Applied certificate {cert.refid} as HTTPS cert")
-        
+
         AuditService.log_action(
             action='https_apply',
             resource_type='system',
@@ -275,14 +275,14 @@ def apply_https_cert():
             details=f'Applied certificate {cert.refid} as HTTPS certificate',
             success=True
         )
-        
+
         # Restart service (skip in Docker - user must restart container)
         if is_docker():
             return success_response(
                 message="Certificate applied. Restart the container to apply.",
                 data={'requires_container_restart': True}
             )
-        
+
         from utils.service_manager import restart_service as do_restart
         success, msg = do_restart()
         if not success:
@@ -290,9 +290,9 @@ def apply_https_cert():
                 message="Certificate applied but service restart failed. Please restart manually.",
                 data={'restart_failed': True, 'error': msg}
             )
-        
+
         return success_response(message="Certificate applied. Service restarting...")
-        
+
     except Exception as e:
         current_app.logger.error(f"Failed to apply HTTPS cert: {e}")
         return error_response("Failed to apply certificate", 500)

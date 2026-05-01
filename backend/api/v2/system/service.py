@@ -74,17 +74,17 @@ def get_service_status():
         parent = proc.parent()
         # Use parent (gunicorn master) if available, else current worker
         main_proc = parent if parent and 'gunicorn' in (parent.name() or '') else proc
-        
+
         create_time = datetime.fromtimestamp(main_proc.create_time(), tz=timezone.utc)
         uptime_seconds = int((datetime.now(timezone.utc) - create_time).total_seconds())
-        
+
         # Memory in MB
         mem_info = main_proc.memory_info()
         memory_mb = round(mem_info.rss / 1024 / 1024, 1)
-        
+
         # Check if running in Docker
         is_docker_env = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv') or os.environ.get('UCM_DOCKER') == '1'
-        
+
         return success_response(data={
             'version': get_current_version(),
             'pid': main_proc.pid,
@@ -105,7 +105,7 @@ def restart_service():
     """Restart the UCM service"""
     if is_docker():
         return error_response("Service restart is not available in Docker. Restart the container instead.", 400)
-    
+
     try:
         AuditService.log_action(
             action='service_restart',
@@ -113,10 +113,10 @@ def restart_service():
             details='Manual service restart requested from settings',
             success=True
         )
-        
+
         from utils.service_manager import restart_service as do_restart
         success, message = do_restart()
-        
+
         if success:
             return success_response(message=message)
         else:

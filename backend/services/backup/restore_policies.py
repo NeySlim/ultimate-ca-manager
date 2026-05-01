@@ -44,7 +44,7 @@ class RestorePoliciesMixin:
                 )
                 db.session.add(new_pol)
             results['certificate_policies'] += 1
-    
+
     def _restore_dns_providers(self, backup_data: Dict, results: Dict) -> None:
         """Restore DNS providers from backup data"""
         from models.acme_models import DnsProvider
@@ -67,7 +67,7 @@ class RestorePoliciesMixin:
                 )
                 db.session.add(new_dp)
             results['dns_providers'] += 1
-    
+
     def _restore_acme_domains(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME domains from backup data"""
         from models.acme_models import AcmeDomain
@@ -89,7 +89,7 @@ class RestorePoliciesMixin:
                 )
                 db.session.add(new_ad)
             results['acme_domains'] += 1
-    
+
     def _restore_acme_local_domains(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME local domains from backup data"""
         from models.acme_models import AcmeLocalDomain

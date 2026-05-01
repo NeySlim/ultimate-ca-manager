@@ -12,12 +12,12 @@ from utils.datetime_utils import utc_isoformat
 
 class ParsingMixin:
     """Certificate parsing operations mixin"""
-    
+
     @staticmethod
     def parse_certificate(cert_pem: bytes) -> Dict:
         """Parse a certificate and extract information."""
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-        
+
         return {
             'subject': cert.subject.rfc4514_string(),
             'issuer': cert.issuer.rfc4514_string(),
@@ -29,12 +29,12 @@ class ParsingMixin:
             'extended_key_usage': [],
             'san': [],
         }
-    
+
     @staticmethod
     def parse_certificate_details(cert_pem: bytes) -> Dict:
         """Parse full certificate details including all X.509 extensions."""
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-        
+
         details = {
             'version': cert.version.name,
             'serial_number': format(cert.serial_number, 'x').upper(),
@@ -48,15 +48,15 @@ class ParsingMixin:
             'extensions': {},
             'public_key': {}
         }
-        
+
         # Parse subject
         for attr in cert.subject:
             details['subject'][attr.oid._name] = attr.value
-        
+
         # Parse issuer
         for attr in cert.issuer:
             details['issuer'][attr.oid._name] = attr.value
-        
+
         # Parse public key info
         public_key = cert.public_key()
         if isinstance(public_key, rsa.RSAPublicKey):
@@ -70,7 +70,7 @@ class ParsingMixin:
                 'algorithm': 'EC',
                 'curve': public_key.curve.name
             }
-        
+
         # Parse extensions
         for ext in cert.extensions:
             ext_name = ext.oid._name
@@ -169,7 +169,7 @@ class ParsingMixin:
                 elif isinstance(ext.value, x509.UnrecognizedExtension):
                     oid = ext.oid.dotted_string
                     ext_data = ext.value.value
-                    
+
                     if oid == '2.16.840.1.113730.1.13':  # Netscape Comment
                         if ext_data[0] == 0x16:
                             length = ext_data[1]
@@ -218,5 +218,5 @@ class ParsingMixin:
                     'critical': ext.critical,
                     'error': str(e)
                 }
-        
+
         return details

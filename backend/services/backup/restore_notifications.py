@@ -30,7 +30,7 @@ class RestoreNotificationsMixin:
             smtp.smtp_use_ssl = smtp_data.get('smtp_use_ssl', False)
             smtp.enabled = smtp_data.get('enabled', False)
             results['smtp_config'] += 1
-    
+
     def _restore_notification_config(self, backup_data: Dict, results: Dict) -> None:
         """Restore notification configuration from backup data"""
         from models.email_notification import NotificationConfig

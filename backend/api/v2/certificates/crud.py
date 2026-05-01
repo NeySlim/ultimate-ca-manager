@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 @require_auth(['read:certificates'])
 def list_certificates():
     """List certificates"""
-    
+
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     status_list = request.args.getlist('status')  # supports multi-select: ?status=valid&status=expired
@@ -61,7 +61,7 @@ def list_certificates():
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
-    
+
     # Whitelist of allowed sort columns
     # Use COALESCE for subject_cn to fallback to descr if CN not populated
     _cn_sort = func.coalesce(Certificate.subject_cn, Certificate.descr)
@@ -79,9 +79,9 @@ def list_certificates():
         'status': 'special',  # Handled separately with CASE
         'compliance_grade': 'special_compliance'  # Handled separately
     }
-    
+
     query = Certificate.query.filter(Certificate.crt.isnot(None))
-    
+
     # Apply CA filter (Certificate stores caref=CA.refid, not ca_id)
     if ca_id_list:
         ca_refs = []
@@ -93,7 +93,7 @@ def list_certificates():
             query = query.filter(Certificate.caref.in_(ca_refs))
         else:
             query = query.filter(Certificate.id < 0)  # No results for invalid CAs
-    
+
     # Apply status filter (supports multi-select)
     if status_list:
         status_conditions = []
@@ -117,7 +117,7 @@ def list_certificates():
                 )
         if status_conditions:
             query = query.filter(or_(*status_conditions))
-    
+
     # Apply search filter (escape LIKE wildcards)
     if search:
         safe_search = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
@@ -129,16 +129,16 @@ def list_certificates():
                 Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\')
             )
         )
-    
+
     # Apply sorting BEFORE pagination (use whitelist)
     sort_column = ALLOWED_SORT_COLUMNS.get(sort_by, Certificate.subject)
-    
+
     if sort_by == 'status':
         # Special handling: sort by computed status (revoked > expired > expiring > valid)
         # Then alphabetically by subject within each group
         now = utc_now()
         expiry_threshold = now + timedelta(days=30)
-        
+
         # Status priority: 1=revoked, 2=expired, 3=expiring, 4=valid
         status_order = case(
             (Certificate.revoked == True, 1),
@@ -146,7 +146,7 @@ def list_certificates():
             (Certificate.valid_to <= expiry_threshold, 3),
             else_=4
         )
-        
+
         if sort_order == 'desc':
             query = query.order_by(status_order.desc(), Certificate.subject.asc())
         else:
@@ -158,7 +158,7 @@ def list_certificates():
         # This gives a rough sort order consistent with the computed score
         now = utc_now()
         expiry_threshold = now + timedelta(days=30)
-        
+
         compliance_order = (
             # Key strength component (0-30)
             case(
@@ -179,7 +179,7 @@ def list_certificates():
                 else_=25
             )
         )
-        
+
         if sort_order == 'desc':
             query = query.order_by(compliance_order.desc(), _cn_sort.asc())
         else:
@@ -189,10 +189,10 @@ def list_certificates():
             query = query.order_by(sort_column.desc())
         else:
             query = query.order_by(sort_column.asc())
-    
+
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    
+
     certs = []
     for cert in pagination.items:
         d = cert.to_dict()
@@ -200,7 +200,7 @@ def list_certificates():
         d['compliance_score'] = compliance['score']
         d['compliance_grade'] = compliance['grade']
         certs.append(d)
-    
+
     return success_response(
         data=certs,
         meta={'total': pagination.total, 'page': page, 'per_page': per_page}
@@ -210,15 +210,15 @@ def list_certificates():
 @require_auth(['write:certificates'])
 def create_certificate():
     """Create certificate - Real implementation"""
-    
+
     data = request.json
-    
+
     if not data or not data.get('cn'):
         return error_response('Common Name (cn) is required', 400)
-    
+
     if not data.get('ca_id'):
         return error_response('CA ID is required', 400)
-    
+
     # SECURITY: Validate DN fields
     dn_validations = [
         ('CN', data.get('cn')),
@@ -232,7 +232,7 @@ def create_certificate():
         is_valid, error = validate_dn_field(field_name, value)
         if not is_valid:
             return error_response(error, 400)
-    
+
     # Parse SAN string into typed arrays if not already provided
     if data.get('san') and not data.get('san_dns'):
         san_dns = []
@@ -275,15 +275,15 @@ def create_certificate():
             data['san_email'] = san_email
         if san_uri:
             data['san_uri'] = san_uri
-    
+
     # Get the CA
     ca = CA.query.get(data['ca_id'])
     if not ca:
         return error_response('CA not found', 404)
-    
+
     if not ca.prv:
         return error_response('CA private key not available', 400)
-    
+
     # Policy evaluation — check if approval is required (admins bypass)
     try:
         user_role = getattr(g.current_user, 'role', None) if hasattr(g, 'current_user') else None
@@ -320,23 +320,23 @@ def create_certificate():
                 )
     except Exception as e:
         logger.warning(f"Policy evaluation failed (non-blocking): {e}")
-    
+
     try:
         # Load CA certificate and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         ca_key_pem = base64.b64decode(decrypt_private_key(ca.prv))
         ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
-        
+
         # Generate key pair
         key_type = data.get('key_type', 'RSA')
         key_size = data.get('key_size', '2048')
-        
+
         # Validate RSA key size
         if key_type.upper() not in ('EC', 'ECDSA'):
             if int(key_size) < 2048:
                 return error_response('RSA key size must be at least 2048 bits', 400)
-        
+
         if key_type.upper() in ('EC', 'ECDSA'):
             # Map key_size to curve name if needed
             curve_map = {
@@ -358,7 +358,7 @@ def create_certificate():
                 key_size=int(key_size),
                 backend=default_backend()
             )
-        
+
         # Build subject
         subject_attrs = [x509.NameAttribute(NameOID.COMMON_NAME, data['cn'])]
         if data.get('organization'):
@@ -373,15 +373,15 @@ def create_certificate():
             subject_attrs.append(x509.NameAttribute(NameOID.LOCALITY_NAME, data['locality']))
         if data.get('email'):
             subject_attrs.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, data['email']))
-        
+
         subject = x509.Name(subject_attrs)
-        
+
         # Validity
         validity_days = data.get('validity_days', 365)
         now = utc_now()
         not_before = now
         not_after = now + timedelta(days=validity_days)
-        
+
         # Build certificate
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
@@ -390,16 +390,16 @@ def create_certificate():
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.not_valid_before(not_before)
         builder = builder.not_valid_after(not_after)
-        
+
         # Basic Constraints (not a CA)
         builder = builder.add_extension(
             x509.BasicConstraints(ca=False, path_length=None),
             critical=True
         )
-        
+
         # Key Usage & Extended Key Usage based on cert_type
         cert_type = data.get('cert_type', 'server')
-        
+
         # Define profiles for each certificate type
         cert_profiles = {
             'server': {
@@ -433,7 +433,7 @@ def create_certificate():
                 'eku': [ExtendedKeyUsageOID.EMAIL_PROTECTION],
             },
         }
-        
+
         profile = cert_profiles.get(cert_type, cert_profiles['server'])
         builder = builder.add_extension(x509.KeyUsage(**profile['ku']), critical=True)
 
@@ -444,7 +444,7 @@ def create_certificate():
             return error_response(f'Invalid extra_ekus: {extra_err}', 400)
         eku_oids = merge_eku_lists(profile['eku'], to_object_identifiers(extra_oid_strs))
         builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
-        
+
         # Subject Alternative Names
         san_list = []
         if data.get('san_dns'):
@@ -459,7 +459,7 @@ def create_certificate():
         if data.get('san_uri'):
             for uri in data['san_uri']:
                 san_list.append(x509.UniformResourceIdentifier(uri))
-        
+
         # Auto-add CN as SAN based on cert type
         cn = data['cn']
         cn_looks_like_hostname = '.' in cn or cn.startswith('*')
@@ -493,19 +493,19 @@ def create_certificate():
                 x509.SubjectAlternativeName(san_list),
                 critical=False
             )
-        
+
         # Subject Key Identifier
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()),
             critical=False
         )
-        
+
         # Authority Key Identifier
         builder = builder.add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
             critical=False
         )
-        
+
         # CRL Distribution Points — embed CA's CDP URLs if enabled
         if ca.cdp_enabled:
             cdp_urls = [url.replace('{ca_refid}', ca.refid) for url in ca.get_cdp_urls()]
@@ -523,7 +523,7 @@ def create_certificate():
                     x509.CRLDistributionPoints(dist_points),
                     critical=False
                 )
-        
+
         # Authority Information Access — embed OCSP/AIA URLs if enabled
         aia_descriptions = []
         if ca.ocsp_enabled:
@@ -560,17 +560,17 @@ def create_certificate():
                 ]),
                 critical=False
             )
-        
+
         # OCSP Must-Staple / TLS Feature (RFC 6066)
         if data.get('ocsp_must_staple'):
             builder = builder.add_extension(
                 x509.TLSFeature([x509.TLSFeatureType.status_request]),
                 critical=False,
             )
-        
+
         # Sign certificate
         new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
-        
+
         # Serialize
         cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         key_pem = new_key.private_bytes(
@@ -578,7 +578,7 @@ def create_certificate():
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         ).decode('utf-8')
-        
+
         # Save to database
         # Extract SKI/AKI from issued cert
         cert_ski = None
@@ -616,10 +616,10 @@ def create_certificate():
             ocsp_must_staple=bool(data.get('ocsp_must_staple')),
             created_by=g.current_user.username if hasattr(g, 'current_user') else None
         )
-        
+
         db.session.add(db_cert)
         db.session.commit()
-        
+
         # Audit log
         try:
             AuditService.log_action(
@@ -632,14 +632,14 @@ def create_certificate():
             )
         except Exception:
             pass
-        
+
         # Send notification
         try:
             username = g.current_user.username if hasattr(g, 'current_user') else 'system'
             NotificationService.on_certificate_issued(db_cert, username)
         except Exception:
             pass  # Non-blocking
-        
+
         # WebSocket event
         try:
             on_certificate_issued(
@@ -651,12 +651,12 @@ def create_certificate():
             )
         except Exception:
             pass  # Non-blocking
-        
+
         return created_response(
             data=db_cert.to_dict(),
             message='Certificate created successfully'
         )
-        
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create certificate: {e}")
@@ -667,25 +667,25 @@ def create_certificate():
 @require_auth(['read:certificates'])
 def get_certificate(cert_id):
     """Get certificate details with chain validation status"""
-    
+
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
+
     data = cert.to_dict()
-    
+
     # Parse X.509 extensions from PEM
     from utils.cert_extensions import parse_certificate_extensions
     data['extensions'] = parse_certificate_extensions(cert.crt)
-    
+
     # Build chain validation status
     chain_status = _validate_cert_chain(cert)
     data['chain_status'] = chain_status
-    
+
     # Full compliance breakdown for detail view
     compliance = calculate_compliance_score(data)
     data['compliance'] = compliance
-    
+
     # CT SCT info
     from models import SystemConfig
     sct_config = SystemConfig.query.filter_by(key=f'cert_scts_{cert_id}').first()
@@ -696,18 +696,18 @@ def get_certificate(cert_id):
             data['ct_scts'] = None
     else:
         data['ct_scts'] = None
-    
+
     return success_response(data=data)
 
 
 def _validate_cert_chain(cert):
     """Validate certificate chain and return status info"""
-    
+
     chain = []
     status = 'unknown'
     trust_source = None
     trust_anchor = None
-    
+
     # If cert has a caref, it's linked to a managed CA
     if cert.caref:
         ca = CA.query.filter_by(refid=cert.caref).first()
@@ -732,7 +732,7 @@ def _validate_cert_chain(cert):
                         break
                 else:
                     break
-            
+
             # If chain is not complete, check Trust Store for the top CA's issuer
             if status != 'complete' and current_ca:
                 trusted = TrustedCertificate.query.filter_by(subject=current_ca.issuer).first()
@@ -776,7 +776,7 @@ def _validate_cert_chain(cert):
                     trust_anchor = trusted.name
                 else:
                     status = 'incomplete'
-    
+
     return {
         'status': status,  # complete, incomplete, partial, unknown
         'trust_source': trust_source,
@@ -790,21 +790,21 @@ def _validate_cert_chain(cert):
 @require_auth(['delete:certificates'])
 def delete_certificate(cert_id):
     """Delete certificate"""
-    
+
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
+
     cert_name = cert.descr or f'Certificate #{cert_id}'
-    
+
     try:
         # Clean up dependent records
         from models import ApprovalRequest
         ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
-        
+
         db.session.delete(cert)
         db.session.commit()
-        
+
         # Audit log
         AuditService.log_action(
             action='certificate_deleted',
@@ -814,13 +814,13 @@ def delete_certificate(cert_id):
             details=f'Deleted certificate: {cert_name}',
             success=True
         )
-        
+
         try:
             username = g.current_user.username if hasattr(g, 'current_user') else 'system'
             on_certificate_deleted(cert_id, cert_name, username)
         except Exception:
             pass
-        
+
         return no_content_response()
     except Exception as e:
         db.session.rollback()
@@ -832,33 +832,33 @@ def delete_certificate(cert_id):
 @require_auth(['write:certificates'])
 def revoke_certificate(cert_id):
     """Revoke certificate"""
-    
+
     data = request.json
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
-    
+
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
+
     if cert.revoked:
         return error_response('Certificate already revoked', 400)
-    
+
     try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-        
+
         # Revoke using service
         cert = CertificateService.revoke_certificate(
             cert_id=cert_id,
             reason=reason,
             username=username
         )
-        
+
         # Send notification
         try:
             NotificationService.on_certificate_revoked(cert, reason, username)
         except Exception:
             pass  # Non-blocking
-        
+
         # WebSocket event
         try:
             on_certificate_revoked(
@@ -869,7 +869,7 @@ def revoke_certificate(cert_id):
             )
         except Exception:
             pass  # Non-blocking
-        
+
         return success_response(
             data=cert.to_dict(),
             message='Certificate revoked successfully'
@@ -886,29 +886,29 @@ def revoke_certificate(cert_id):
 @require_auth(['write:certificates'])
 def unhold_certificate(cert_id):
     """Remove certificate hold (temporary revocation) and restore to valid status"""
-    
+
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
+
     if not cert.revoked:
         return error_response('Certificate is not revoked', 400)
-    
+
     # Only certificateHold can be unheld
     hold_reasons = ('certificate_hold', 'certificateHold')
     if cert.revoke_reason not in hold_reasons:
         return error_response(
             'Only certificates with reason "certificateHold" can be unheld', 400
         )
-    
+
     try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-        
+
         cert.revoked = False
         cert.revoked_at = None
         cert.revoke_reason = None
         db.session.commit()
-        
+
         # Audit log
         AuditService.log(
             action='certificate.unheld',
@@ -918,7 +918,7 @@ def unhold_certificate(cert_id):
             username=username,
             details=f'Certificate hold removed, restored to valid status'
         )
-        
+
         # Regenerate CRL for the issuing CA
         try:
             if cert.ca_id:
@@ -927,14 +927,14 @@ def unhold_certificate(cert_id):
                 logger.info(f"Regenerated CRL for CA {cert.ca_id} after unhold")
         except Exception as e:
             logger.warning(f"Failed to regenerate CRL after unhold: {e}")
-        
+
         # Invalidate OCSP cache for this cert
         try:
             OCSPResponse.query.filter_by(cert_serial=cert.serial).delete()
             db.session.commit()
         except Exception:
             pass
-        
+
         return success_response(
             data=cert.to_dict(),
             message='Certificate hold removed successfully'
@@ -949,26 +949,26 @@ def unhold_certificate(cert_id):
 def upload_private_key(cert_id):
     """
     Upload/attach a private key to an existing certificate
-    
+
     Request body:
     - key: Private key in PEM format (raw or base64 encoded)
     - passphrase: Optional passphrase if key is encrypted
     """
-    
+
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
+
     if cert.has_private_key:
         return error_response('Certificate already has a private key', 400)
-    
+
     data = request.json
     if not data or not data.get('key'):
         return error_response('Private key is required', 400)
-    
+
     key_data = data['key'].strip()
     passphrase = data.get('passphrase')
-    
+
     try:
         # Decode key if base64 encoded
         if not key_data.startswith('-----BEGIN'):
@@ -976,15 +976,15 @@ def upload_private_key(cert_id):
                 key_data = base64.b64decode(key_data).decode('utf-8')
             except Exception:
                 return error_response('Invalid key format - must be PEM or base64-encoded PEM', 400)
-        
+
         # Validate key format
         if 'PRIVATE KEY' not in key_data:
             return error_response('Invalid private key format', 400)
-        
+
         # Try to load the key to validate it
         key_bytes = key_data.encode('utf-8')
         password = passphrase.encode('utf-8') if passphrase else None
-        
+
         try:
             private_key = serialization.load_pem_private_key(
                 key_bytes,
@@ -996,7 +996,7 @@ def upload_private_key(cert_id):
                 return error_response('Private key is encrypted - please provide passphrase', 400)
             logger.error(f"Invalid private key format: {e}")
             return error_response('Invalid private key format', 400)
-        
+
         # Verify key matches certificate public key
         if cert.crt:
             try:
@@ -1004,7 +1004,7 @@ def upload_private_key(cert_id):
                 certificate = load_pem_x509_certificate(cert_pem, default_backend())
                 cert_public_key = certificate.public_key()
                 key_public_key = private_key.public_key()
-                
+
                 # Compare public key bytes
                 cert_pub_bytes = cert_public_key.public_bytes(
                     encoding=serialization.Encoding.PEM,
@@ -1014,26 +1014,26 @@ def upload_private_key(cert_id):
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PublicFormat.SubjectPublicKeyInfo
                 )
-                
+
                 if cert_pub_bytes != key_pub_bytes:
                     return error_response('Private key does not match certificate public key', 400)
             except Exception as e:
                 logger.error(f"Failed to verify key matches certificate: {e}")
                 return error_response('Failed to verify key matches certificate', 400)
-        
+
         # Store key (decrypt if needed, re-encode without password)
         unencrypted_key = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         )
-        
+
         # Encrypt with our key encryption if configured
         key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
         cert.prv = encrypt_private_key(key_encoded)
-        
+
         db.session.commit()
-        
+
         # Audit log
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         AuditService.log_action(
@@ -1044,12 +1044,12 @@ def upload_private_key(cert_id):
             details=f'Private key uploaded by {username}',
             success=True
         )
-        
+
         return success_response(
             data=cert.to_dict(),
             message='Private key uploaded successfully'
         )
-        
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to upload private key: {e}")
@@ -1062,15 +1062,15 @@ def renew_certificate(cert_id):
     """
     Renew certificate - Creates a new certificate with same subject/SANs but new validity
     """
-    
+
     # Get original certificate
     cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
-    
+
     if not cert.crt:
         return error_response('Certificate data not available', 400)
-    
+
     # Get the CA that issued this certificate
     # Try by refid first, then by matching issuer to CA subject
     ca = CA.query.filter_by(refid=cert.caref).first()
@@ -1087,24 +1087,24 @@ def renew_certificate(cert_id):
                     if ca_cn and cert_issuer_cn and ca_cn == cert_issuer_cn:
                         ca = potential_ca
                         break
-    
+
     if not ca:
         return error_response('Issuing CA not found. The CA that signed this certificate is not in the system.', 404)
-    
+
     if not ca.prv:
         return error_response('CA private key not available. Cannot renew without CA private key.', 400)
-    
+
     try:
         # Load original certificate
         orig_cert_pem = base64.b64decode(cert.crt)
         orig_cert = x509.load_pem_x509_certificate(orig_cert_pem, default_backend())
-        
+
         # Load CA certificate and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         ca_key_pem = base64.b64decode(decrypt_private_key(ca.prv))
         ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
-        
+
         # Generate new key pair (same type and size as original)
         orig_pub_key = orig_cert.public_key()
         if isinstance(orig_pub_key, rsa.RSAPublicKey):
@@ -1124,15 +1124,15 @@ def renew_certificate(cert_id):
                 key_size=2048,
                 backend=default_backend()
             )
-        
+
         # Calculate new validity (same duration as original, starting now)
         orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
         validity_days = orig_duration.days if orig_duration.days > 0 else 365
-        
+
         now = utc_now()
         not_before = now
         not_after = now + timedelta(days=validity_days)
-        
+
         # Build new certificate with same subject and extensions
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(orig_cert.subject)
@@ -1141,7 +1141,7 @@ def renew_certificate(cert_id):
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.not_valid_before(not_before)
         builder = builder.not_valid_after(not_after)
-        
+
         # Copy extensions from original certificate
         for ext in orig_cert.extensions:
             # Skip Authority Key Identifier (will be regenerated)
@@ -1155,13 +1155,13 @@ def renew_certificate(cert_id):
             except Exception:
                 # Skip extensions that can't be copied
                 pass
-        
+
         # Add Subject Key Identifier for new key
         builder = builder.add_extension(
             x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()),
             critical=False
         )
-        
+
         # Add Authority Key Identifier
         try:
             builder = builder.add_extension(
@@ -1170,10 +1170,10 @@ def renew_certificate(cert_id):
             )
         except Exception:
             pass
-        
+
         # Sign new certificate
         new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
-        
+
         # Serialize to PEM
         new_cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         new_key_pem = new_key.private_bytes(
@@ -1181,7 +1181,7 @@ def renew_certificate(cert_id):
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         ).decode('utf-8')
-        
+
         # Update existing certificate IN-PLACE (replace, no archive)
         cert.crt = base64.b64encode(new_cert_pem.encode()).decode()
         cert.prv = base64.b64encode(new_key_pem.encode()).decode()
@@ -1191,9 +1191,9 @@ def renew_certificate(cert_id):
         cert.revoked = False
         cert.revoked_at = None
         cert.revoke_reason = None
-        
+
         db.session.commit()
-        
+
         # Audit log
         try:
             AuditService.log_action(
@@ -1206,17 +1206,17 @@ def renew_certificate(cert_id):
             )
         except Exception:
             pass
-        
+
         try:
             on_certificate_renewed(cert_id, cert_id, cert.descr or cert.subject or f'Certificate #{cert_id}')
         except Exception:
             pass
-        
+
         return success_response(
             data=cert.to_dict(),
             message='Certificate renewed successfully'
         )
-        
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to renew certificate: {e}")
@@ -1231,7 +1231,7 @@ def import_certificate():
     Supports: PEM, DER, PKCS12, PKCS7
     Auto-detects CA certificates and stores them in CA table
     Auto-updates existing cert/CA if duplicate found
-    
+
     Form data:
         file: Certificate file (optional if pem_content provided)
         pem_content: Pasted PEM content (optional if file provided)
@@ -1241,11 +1241,11 @@ def import_certificate():
         import_key: Whether to import private key (default: true)
         update_existing: Whether to update if duplicate found (default: true)
     """
-    
+
     # Get file data from either file upload or pasted PEM content
     file_data = None
     filename = 'pasted.pem'
-    
+
     if 'file' in request.files and request.files['file'].filename:
         file = request.files['file']
         try:
@@ -1259,38 +1259,38 @@ def import_certificate():
         filename = 'pasted.pem'
     else:
         return error_response('No file or PEM content provided', 400)
-    
+
     password = request.form.get('password')
     name = request.form.get('name', '')
     ca_id = request.form.get('ca_id', type=int)
     import_key = request.form.get('import_key', 'true').lower() == 'true'
     update_existing = request.form.get('update_existing', 'true').lower() == 'true'
-    
+
     try:
         # Parse certificate using shared service
         cert, private_key, format_detected = parse_certificate_file(
             file_data, filename, password, import_key
         )
-        
+
         # Extract certificate info
         cert_info = extract_cert_info(cert)
-        
+
         # Serialize to PEM
         cert_pem = serialize_cert_to_pem(cert)
         key_pem = serialize_key_to_pem(private_key) if import_key else None
-        
+
         # Check if this is a CA certificate - auto-route to CA table
         if is_ca_certificate(cert):
             # Check for existing CA
             existing_ca = find_existing_ca(cert_info)
-            
+
             if existing_ca:
                 if not update_existing:
                     return error_response(
                         f'CA with subject "{cert_info["cn"]}" already exists (ID: {existing_ca.id})',
                         409
                     )
-                
+
                 # Update existing CA
                 existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
                 existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
@@ -1300,7 +1300,7 @@ def import_certificate():
                 existing_ca.valid_from = cert_info['valid_from']
                 existing_ca.valid_to = cert_info['valid_to']
                 existing_ca.ski = cert_info.get('ski')
-                
+
                 db.session.commit()
                 AuditService.log_action(
                     action='ca_updated',
@@ -1310,12 +1310,12 @@ def import_certificate():
                     details=f'Updated CA via import: {existing_ca.descr}',
                     success=True
                 )
-                
+
                 return success_response(
                     data=existing_ca.to_dict(),
                     message=f'CA certificate "{existing_ca.descr}" updated (already existed)'
                 )
-            
+
             # Create new CA
             refid = str(uuid.uuid4())
             ca = CA(
@@ -1331,7 +1331,7 @@ def import_certificate():
                 valid_to=cert_info['valid_to'],
                 imported_from='manual'
             )
-            
+
             db.session.add(ca)
             db.session.commit()
             AuditService.log_action(
@@ -1342,22 +1342,22 @@ def import_certificate():
                 details=f'Imported CA (auto-detected): {ca.descr}',
                 success=True
             )
-            
+
             return created_response(
                 data=ca.to_dict(),
                 message=f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
             )
-        
+
         # Check for existing certificate
         existing_cert = find_existing_certificate(cert_info)
-        
+
         if existing_cert:
             if not update_existing:
                 return error_response(
                     f'Certificate with subject "{cert_info["cn"]}" already exists (ID: {existing_cert.id})',
                     409
                 )
-            
+
             # Update existing certificate
             existing_cert.descr = name or cert_info['cn'] or existing_cert.descr
             existing_cert.crt = base64.b64encode(cert_pem).decode('utf-8')
@@ -1375,13 +1375,13 @@ def import_certificate():
                 existing_cert.san_email = json.dumps(cert_info['san_email'])
             if cert_info.get('san_uri'):
                 existing_cert.san_uri = json.dumps(cert_info['san_uri'])
-            
+
             # Update CA link if provided
             if ca_id:
                 ca = CA.query.get(ca_id)
                 if ca:
                     existing_cert.caref = ca.refid
-            
+
             db.session.commit()
             AuditService.log_action(
                 action='certificate_updated',
@@ -1391,12 +1391,12 @@ def import_certificate():
                 details=f'Updated certificate via import: {existing_cert.descr}',
                 success=True
             )
-            
+
             return success_response(
                 data=existing_cert.to_dict(),
                 message=f'Certificate "{existing_cert.descr}" updated (already existed)'
             )
-        
+
         # Regular certificate - find parent CA
         caref = None
         if ca_id:
@@ -1414,7 +1414,7 @@ def import_certificate():
                 ca = CA.query.filter_by(subject=cert_info['issuer']).first()
                 if ca:
                     caref = ca.refid
-        
+
         # Create certificate record
         refid = str(uuid.uuid4())
         certificate = Certificate(
@@ -1436,7 +1436,7 @@ def import_certificate():
             source='import',
             created_by='import'
         )
-        
+
         db.session.add(certificate)
         db.session.commit()
         AuditService.log_action(
@@ -1447,12 +1447,12 @@ def import_certificate():
             details=f'Imported certificate: {certificate.descr}',
             success=True
         )
-        
+
         return created_response(
             data=certificate.to_dict(),
             message=f'Certificate "{certificate.descr}" imported successfully'
         )
-        
+
     except ValueError as e:
         db.session.rollback()
         logger.error(f"Certificate import validation error: {e}")
@@ -1467,4 +1467,3 @@ def import_certificate():
 # ============================================================
 # Bulk Operations
 # ============================================================
-

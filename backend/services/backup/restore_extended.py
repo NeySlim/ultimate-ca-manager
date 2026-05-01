@@ -60,7 +60,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"SSH CA restore failed: {e}")
-    
+
     def _restore_ssh_certificates(self, backup_data: Dict, results: Dict) -> None:
         """Restore SSH certificates from backup data"""
         results.setdefault('ssh_certificates', 0)
@@ -102,7 +102,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"SSH cert restore failed: {e}")
-    
+
     def _restore_microsoft_cas(self, backup_data: Dict, results: Dict) -> None:
         """Restore Microsoft certificate authorities from backup data"""
         results.setdefault('microsoft_cas', 0)
@@ -138,7 +138,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"MSCA restore failed: {e}")
-    
+
     def _restore_scan_profiles(self, backup_data: Dict, results: Dict) -> None:
         """Restore scan profiles from backup data"""
         results.setdefault('scan_profiles', 0)
@@ -170,7 +170,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"Scan profile restore failed: {e}")
-    
+
     def _restore_hsm_keys(self, backup_data: Dict, results: Dict) -> None:
         """Restore HSM keys from backup data"""
         results.setdefault('hsm_keys', 0)
@@ -203,7 +203,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"HSM key restore failed: {e}")
-    
+
     def _restore_approval_requests(self, backup_data: Dict, results: Dict) -> None:
         """Restore approval requests from backup data"""
         results.setdefault('approval_requests', 0)
@@ -240,7 +240,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"Approval request restore failed: {e}")
-    
+
     def _restore_acme_client_orders(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME client orders from backup data"""
         results.setdefault('acme_client_orders', 0)
@@ -277,7 +277,7 @@ class RestoreExtendedMixin:
             except Exception as e:
                 db.session.rollback()
                 logger.warning(f"ACME client order restore failed: {e}")
-    
+
     def _restore_https_files(self, backup_data: Dict, results: Dict) -> None:
         """Restore HTTPS server files from backup data"""
         https_data = backup_data.get('https_server', {})

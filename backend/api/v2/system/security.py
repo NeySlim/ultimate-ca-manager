@@ -31,22 +31,22 @@ def get_encryption_status():
     """Get private key encryption status"""
     try:
         from security.encryption import key_encryption, MASTER_KEY_PATH
-        
+
         encrypted = 0
         unencrypted = 0
-        
+
         for ca in CA.query.filter(CA.prv.isnot(None)).all():
             if key_encryption.is_encrypted(ca.prv):
                 encrypted += 1
             else:
                 unencrypted += 1
-        
+
         for cert in Certificate.query.filter(Certificate.prv.isnot(None)).all():
             if key_encryption.is_encrypted(cert.prv):
                 encrypted += 1
             else:
                 unencrypted += 1
-        
+
         return success_response(data={
             'enabled': key_encryption.is_enabled,
             'key_source': key_encryption.key_source,
@@ -56,7 +56,7 @@ def get_encryption_status():
             'unencrypted_count': unencrypted,
             'total_keys': encrypted + unencrypted
         })
-        
+
     except Exception as e:
         logger.error(f"Failed to get encryption status: {e}")
         return error_response("Failed to get encryption status", 500)
@@ -74,24 +74,24 @@ def enable_encryption():
         from security.encryption import (
             KeyEncryption, key_encryption, encrypt_all_keys as do_encrypt
         )
-        
+
         if key_encryption.is_enabled:
             return error_response("Encryption is already enabled", 400)
-        
+
         # Generate key and write to file
         key = KeyEncryption.generate_key()
         KeyEncryption.write_key_file(key)
-        
+
         # Reload singleton to pick up the new key
         key_encryption.reload()
-        
+
         if not key_encryption.is_enabled:
             KeyEncryption.remove_key_file()
             return error_response("Failed to initialize encryption after key generation", 500)
-        
+
         # Encrypt all existing keys
         encrypted, skipped, errors = do_encrypt(dry_run=False)
-        
+
         AuditService.log_action(
             action='encryption_enabled',
             resource_type='system',
@@ -99,7 +99,7 @@ def enable_encryption():
             details=f'Encryption enabled. Encrypted {encrypted} keys, {skipped} already encrypted.',
             success=True
         )
-        
+
         return success_response(
             message=f"Encryption enabled. {encrypted} keys encrypted.",
             data={
@@ -110,7 +110,7 @@ def enable_encryption():
                 'errors': errors
             }
         )
-        
+
     except PermissionError:
         is_docker = os.path.exists('/.dockerenv')
         hint = (
@@ -140,25 +140,25 @@ def disable_encryption():
         from security.encryption import (
             KeyEncryption, key_encryption, decrypt_all_keys as do_decrypt
         )
-        
+
         if not key_encryption.is_enabled:
             return error_response("Encryption is not enabled", 400)
-        
+
         # Decrypt all keys first (while we still have the key)
         decrypted, skipped, errors = do_decrypt(dry_run=False)
-        
+
         if errors:
             return error_response(
                 f"Failed to decrypt some keys: {', '.join(errors[:3])}. "
                 "Encryption NOT disabled to prevent data loss.", 500
             )
-        
+
         # Remove key file
         KeyEncryption.remove_key_file()
-        
+
         # Reload singleton
         key_encryption.reload()
-        
+
         AuditService.log_action(
             action='encryption_disabled',
             resource_type='system',
@@ -166,7 +166,7 @@ def disable_encryption():
             details=f'Encryption disabled. Decrypted {decrypted} keys.',
             success=True
         )
-        
+
         return success_response(
             message=f"Encryption disabled. {decrypted} keys decrypted.",
             data={
@@ -175,7 +175,7 @@ def disable_encryption():
                 'skipped': skipped
             }
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to disable encryption: {e}")
         return error_response("Failed to disable encryption", 500)
@@ -187,12 +187,12 @@ def encrypt_all_keys():
     """Encrypt all unencrypted private keys in the database"""
     try:
         from security.encryption import encrypt_all_keys as do_encrypt
-        
+
         data = request.get_json() or {}
         dry_run = data.get('dry_run', True)
-        
+
         encrypted, skipped, errors = do_encrypt(dry_run=dry_run)
-        
+
         if not dry_run:
             AuditService.log_action(
                 action='system_encrypt',
@@ -201,11 +201,11 @@ def encrypt_all_keys():
                 details=f'Encrypted {encrypted} private keys, skipped {skipped}',
                 success=True
             )
-        
+
         message = f"Encrypted {encrypted} keys, skipped {skipped} (already encrypted)"
         if dry_run:
             message = f"[DRY RUN] Would encrypt {encrypted} keys, {skipped} already encrypted"
-        
+
         return success_response(
             message=message,
             data={
@@ -215,7 +215,7 @@ def encrypt_all_keys():
                 'errors': errors
             }
         )
-        
+
     except Exception as e:
         logger.error(f"Encryption failed: {e}")
         return error_response("Encryption failed", 500)
@@ -231,7 +231,7 @@ def generate_encryption_key():
     try:
         from security.encryption import KeyEncryption, MASTER_KEY_PATH
         key = KeyEncryption.generate_key()
-        
+
         return success_response(data={
             'key': key,
             'key_file_path': str(MASTER_KEY_PATH),
@@ -255,10 +255,10 @@ def get_rate_limit_config():
     """Get rate limiting configuration"""
     try:
         from security.rate_limiter import RateLimitConfig, get_rate_limiter
-        
+
         config = RateLimitConfig.get_config()
         stats = get_rate_limiter().get_stats()
-        
+
         return success_response(data={
             'config': config,
             'stats': stats
@@ -275,22 +275,22 @@ def update_rate_limit_config():
     try:
         from security.rate_limiter import RateLimitConfig
         data = request.get_json() or {}
-        
+
         if 'enabled' in data:
             RateLimitConfig.set_enabled(data['enabled'])
-        
+
         if 'custom_limits' in data:
             for path, limit in data['custom_limits'].items():
                 RateLimitConfig.set_custom_limit(path, limit['rpm'], limit.get('burst', limit['rpm'] // 3))
-        
+
         if 'whitelist_add' in data:
             for ip in data['whitelist_add']:
                 RateLimitConfig.add_whitelist(ip)
-        
+
         if 'whitelist_remove' in data:
             for ip in data['whitelist_remove']:
                 RateLimitConfig.remove_whitelist(ip)
-        
+
         return success_response(
             message="Rate limit config updated",
             data=RateLimitConfig.get_config()
@@ -319,14 +319,14 @@ def reset_rate_limits():
     try:
         from security.rate_limiter import get_rate_limiter
         data = request.get_json() or {}
-        
+
         limiter = get_rate_limiter()
         ip = data.get('ip')  # Optional: clear specific IP only
-        
+
         limiter.clear_bucket(ip)
         if data.get('reset_stats', False):
             limiter.reset_stats()
-        
+
         return success_response(message="Rate limits reset")
     except Exception as e:
         logger.error(f"Failed to reset rate limits: {e}")
@@ -340,7 +340,7 @@ def reset_rate_limits():
 def rotate_secrets():
     """
     Rotate session secret key with automatic .env update.
-    
+
     Process:
     1. Backup current .env file
     2. Generate new SECRET_KEY
@@ -350,13 +350,13 @@ def rotate_secrets():
     data = request.get_json() or {}
     new_secret = data.get('new_secret')
     auto_apply = data.get('auto_apply', True)
-    
+
     # Generate new secret if not provided
     if not new_secret:
         new_secret = py_secrets.token_urlsafe(32)
     elif len(new_secret) < 32:
         return error_response("Secret must be at least 32 characters", 400)
-    
+
     if auto_apply:
         # Determine .env path based on environment
         is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
@@ -369,21 +369,21 @@ def rotate_secrets():
                     env_path = Path('/app/backend/.env')
         else:
             env_path = Path('/etc/ucm/ucm.env')
-        
+
         if not env_path.exists():
             return error_response(f"Environment file not found: {env_path}", 500)
-        
+
         try:
             # Backup current .env
             backup_path = env_path.with_suffix(f'.env.backup-{utc_now().strftime("%Y%m%d_%H%M%S")}')
             shutil.copy(env_path, backup_path)
-            
+
             # Read and update .env
             env_content = env_path.read_text()
             lines = env_content.splitlines()
             new_lines = []
             key_found = False
-            
+
             for line in lines:
                 stripped = line.strip()
                 if stripped.startswith('SECRET_KEY='):
@@ -393,12 +393,12 @@ def rotate_secrets():
                     continue  # Remove old JWT keys
                 else:
                     new_lines.append(line)
-            
+
             if not key_found:
                 new_lines.append(f'SECRET_KEY={new_secret}')
-            
+
             env_path.write_text('\n'.join(new_lines) + '\n')
-            
+
             # Log the rotation
             AuditService.log_action(
                 action='secrets_rotated',
@@ -406,11 +406,11 @@ def rotate_secrets():
                 details=f'Session secret key rotated. Backup: {backup_path.name}',
                 success=True
             )
-            
+
             # Restart service
             from utils.service_manager import restart_service as do_restart
             do_restart()
-            
+
             return success_response(
                 data={
                     'rotated': True,
@@ -419,11 +419,11 @@ def rotate_secrets():
                 },
                 message='Session secret rotated successfully. Service restarting.'
             )
-            
+
         except Exception as e:
             current_app.logger.error(f"Failed to rotate secrets: {e}")
             return error_response("Failed to rotate secrets", 500)
-    
+
     else:
         AuditService.log_action(
             action='secrets_rotation_initiated',
@@ -431,7 +431,7 @@ def rotate_secrets():
             details='Session secret key generated (manual apply required)',
             success=True
         )
-        
+
         return success_response(
             data={
                 'new_secret': new_secret,
@@ -452,10 +452,10 @@ def rotate_secrets():
 def secrets_status():
     """Get status of secret keys (without revealing them)"""
     from config.settings import Config
-    
+
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
     encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or os.path.exists('/etc/ucm/master.key')
-    
+
     return success_response(data={
         'session_secret': {
             'configured': session_configured
@@ -472,10 +472,10 @@ def get_security_anomalies():
     """Get recent security anomalies"""
     try:
         from security.anomaly_detection import get_anomaly_detector
-        
+
         hours = request.args.get('hours', 24, type=int)
         anomalies = get_anomaly_detector().get_recent_anomalies(hours)
-        
+
         return success_response(
             data={
                 'anomalies': anomalies,

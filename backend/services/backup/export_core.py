@@ -37,21 +37,21 @@ class ExportCoreMixin:
             'backup_type': backup_type,
             'format_version': '2.0'
         }
-    
+
     def _export_configuration(self, include: bool) -> Dict[str, Any]:
         """Export system configuration"""
         if not include:
             return {}
-        
+
         config = {}
-        
+
         # Get all system config entries
         system_configs = SystemConfig.query.all()
         for sc in system_configs:
             # Skip sensitive data unless explicitly included
             if sc.encrypted:
                 continue
-            
+
             val = sc.value
             if isinstance(val, bytes):
                 try:
@@ -59,9 +59,9 @@ class ExportCoreMixin:
                 except Exception:
                     import base64
                     val = base64.b64encode(val).decode('utf-8')
-            
+
             config[sc.key] = val
-        
+
         return {
             'system': {
                 'fqdn': os.environ.get('FQDN', ''),
@@ -71,12 +71,12 @@ class ExportCoreMixin:
             },
             'settings': config
         }
-    
+
     def _export_users(self, include: bool) -> List[Dict[str, Any]]:
         """Export users with password hashes and WebAuthn credentials"""
         if not include:
             return []
-        
+
         users = []
         for user in User.query.all():
             user_data = {
@@ -89,13 +89,13 @@ class ExportCoreMixin:
                 'created_at': user.created_at.isoformat() if user.created_at else None,
                 'password_hash': user.password_hash
             }
-            
+
             # Export WebAuthn credentials
             webauthn_creds = WebAuthnCredential.query.filter_by(
-                user_id=user.id, 
+                user_id=user.id,
                 enabled=True
             ).all()
-            
+
             import base64
             user_data['webauthn_credentials'] = [
                 {
@@ -107,16 +107,16 @@ class ExportCoreMixin:
                 }
                 for cred in webauthn_creds
             ]
-            
+
             users.append(user_data)
-        
+
         return users
-    
+
     def _export_cas(self, include: bool) -> List[Dict[str, Any]]:
         """Export Certificate Authorities with encrypted private keys"""
         if not include:
             return []
-        
+
         import base64
         cas = []
         for ca in CA.query.all():
@@ -145,7 +145,7 @@ class ExportCoreMixin:
                 'certificate_pem': base64.b64decode(ca.crt).decode() if ca.crt else None,
                 'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
             }
-            
+
             # Decrypt at-rest encryption before export (backup uses its own encryption)
             if ca.prv:
                 try:
@@ -154,16 +154,16 @@ class ExportCoreMixin:
                     ca_data['_private_key_plaintext'] = base64.b64decode(prv_decrypted).decode()
                 except Exception:
                     ca_data['_private_key_plaintext'] = ca.prv
-            
+
             cas.append(ca_data)
-        
+
         return cas
-    
+
     def _export_certificates(self, include: bool) -> List[Dict[str, Any]]:
         """Export certificates with encrypted private keys"""
         if not include:
             return []
-        
+
         import base64
         certs = []
         for cert in Certificate.query.all():
@@ -199,7 +199,7 @@ class ExportCoreMixin:
                 'csr_pem': base64.b64decode(cert.csr).decode() if cert.csr else None,
                 'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
             }
-            
+
             # Decrypt at-rest encryption before export
             if cert.prv:
                 try:
@@ -208,11 +208,11 @@ class ExportCoreMixin:
                     cert_data['_private_key_plaintext'] = base64.b64decode(prv_decrypted).decode()
                 except Exception:
                     cert_data['_private_key_plaintext'] = cert.prv
-            
+
             certs.append(cert_data)
-        
+
         return certs
-    
+
     def _export_acme_accounts(self, include: bool) -> List[Dict[str, Any]]:
         """Export ACME server accounts (RFC 8555 §7.1.2)."""
         if not include:
@@ -263,7 +263,7 @@ class ExportCoreMixin:
                 'status': c.status,
             })
         return creds
-    
+
     def _export_groups(self, include: bool) -> List[Dict[str, Any]]:
         """Export groups with members"""
         if not include:
@@ -492,4 +492,3 @@ class ExportCoreMixin:
                 'created_by': p.created_by,
             })
         return policies
-

@@ -18,7 +18,7 @@ from .constraints_mixin import ConstraintsMixin
 
 class CSROperationsMixin:
     """CSR generation and signing operations mixin"""
-    
+
     @staticmethod
     def generate_csr(
         subject: x509.Name,
@@ -32,11 +32,11 @@ class CSROperationsMixin:
         """Generate a Certificate Signing Request."""
         # Generate private key
         private_key = KeyOperationsMixin.generate_private_key(key_type)
-        
+
         # Build CSR
         builder = x509.CertificateSigningRequestBuilder()
         builder = builder.subject_name(subject)
-        
+
         # Add SANs if provided
         san_list = []
         if san_dns:
@@ -49,17 +49,17 @@ class CSROperationsMixin:
             san_list.extend([x509.RFC822Name(email) for email in san_email])
         if san_uri:
             san_list.extend([x509.UniformResourceIdentifier(uri) for uri in san_uri])
-        
+
         if san_list:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(san_list),
                 critical=False,
             )
-        
+
         # Sign CSR
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         csr = builder.sign(private_key, hash_algo, default_backend())
-        
+
         # Serialize
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
         key_pem = private_key.private_bytes(
@@ -67,9 +67,9 @@ class CSROperationsMixin:
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         )
-        
+
         return csr_pem, key_pem
-    
+
     @staticmethod
     def sign_csr(
         csr_pem: bytes,
@@ -91,12 +91,12 @@ class CSROperationsMixin:
     ) -> bytes:
         """Sign a CSR with a CA."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
-        
+
         # Load CSR
         csr = x509.load_pem_x509_csr(csr_pem, default_backend())
         if not csr.is_signature_valid:
             raise ValueError("CSR has invalid signature")
-        
+
         # NameConstraints enforcement
         csr_sans = None
         try:
@@ -105,7 +105,7 @@ class CSROperationsMixin:
         except x509.ExtensionNotFound:
             pass
         ConstraintsMixin._validate_name_constraints(ca_cert, csr.subject, csr_sans)
-        
+
         # If CSR has empty subject, populate CN from first SAN DNS name
         subject = csr.subject
         if not list(subject):
@@ -117,7 +117,7 @@ class CSROperationsMixin:
                         break
             except x509.ExtensionNotFound:
                 pass
-        
+
         # Build certificate from CSR
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
@@ -128,11 +128,11 @@ class CSROperationsMixin:
         builder = builder.not_valid_after(
             utc_now() + timedelta(days=validity_days)
         )
-        
+
         # Copy extensions from CSR
         for extension in csr.extensions:
             builder = builder.add_extension(extension.value, extension.critical)
-        
+
         # Auto-add SAN from CN if CSR has no SAN extension
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
@@ -160,7 +160,7 @@ class CSROperationsMixin:
                     x509.SubjectAlternativeName(san_names),
                     critical=False,
                 )
-        
+
         # Add basic extensions if not in CSR
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
@@ -175,7 +175,7 @@ class CSROperationsMixin:
                     x509.BasicConstraints(ca=False, path_length=None),
                     critical=True,
                 )
-        
+
         # Add key usage based on cert type
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE)
@@ -200,20 +200,20 @@ class CSROperationsMixin:
                     ),
                     critical=True,
                 )
-        
+
         # Add Extended Key Usage if not in CSR
         extra_oid_strs, extra_err = normalize_extra_ekus(extra_ekus)
         if extra_err:
             raise ValueError(f'Invalid extra_ekus: {extra_err}')
         extra_oids = to_object_identifiers(extra_oid_strs)
-        
+
         try:
             existing_eku = csr.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE)
             csr_has_eku = True
         except x509.ExtensionNotFound:
             existing_eku = None
             csr_has_eku = False
-        
+
         if not csr_has_eku:
             base_eku = []
             if cert_type == 'server_cert':
@@ -248,7 +248,7 @@ class CSROperationsMixin:
                 x509.ExtendedKeyUsage(merged), critical=existing_eku.critical
             )
             builder = new_builder
-        
+
         # CRL Distribution Points
         all_cdp = cdp_urls or ([cdp_url] if cdp_url else [])
         if all_cdp:
@@ -266,7 +266,7 @@ class CSROperationsMixin:
                     x509.CRLDistributionPoints(dist_points),
                     critical=False
                 )
-        
+
         # Authority Information Access
         all_ocsp = ocsp_urls or ([ocsp_url] if ocsp_url else [])
         all_aia = aia_ca_issuers_urls or ([aia_ca_issuers_url] if aia_ca_issuers_url else [])
@@ -293,7 +293,7 @@ class CSROperationsMixin:
                     x509.AuthorityInformationAccess(aia_descriptions),
                     critical=False
                 )
-        
+
         # Certificate Policies
         if cps_uri:
             try:
@@ -309,7 +309,7 @@ class CSROperationsMixin:
                     ]),
                     critical=False
                 )
-        
+
         # SubjectKeyIdentifier
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
@@ -318,7 +318,7 @@ class CSROperationsMixin:
                 x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
                 critical=False
             )
-        
+
         # AuthorityKeyIdentifier
         try:
             csr.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
@@ -327,14 +327,14 @@ class CSROperationsMixin:
                 x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key()),
                 critical=False
             )
-        
+
         # OCSP Must-Staple
         if ocsp_must_staple:
             builder = builder.add_extension(
                 x509.TLSFeature([x509.TLSFeatureType.status_request]),
                 critical=False,
             )
-        
+
         # Sign
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
@@ -342,5 +342,5 @@ class CSROperationsMixin:
             algorithm=hash_algo,
             backend=default_backend()
         )
-        
+
         return certificate.public_bytes(serialization.Encoding.PEM)
