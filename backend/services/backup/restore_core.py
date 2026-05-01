@@ -329,7 +329,12 @@ class RestoreCoreMixin:
     def _restore_settings(self, backup_data: Dict, results: Dict) -> None:
         """Restore system settings from backup data"""
         from models import SystemConfig
-        config_data = backup_data.get('configuration', {}).get('settings', {})
+        configuration = backup_data.get('configuration', {})
+        # Handle legacy backups where configuration might be a list instead of dict
+        if isinstance(configuration, list):
+            config_data = {}
+        else:
+            config_data = configuration.get('settings', {})
         for key, value in config_data.items():
             existing = SystemConfig.query.filter_by(key=key).first()
             if existing:

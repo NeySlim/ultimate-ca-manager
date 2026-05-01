@@ -7,6 +7,18 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+from models import db, SystemConfig, User, CA, Certificate
+from models.acme_models import AcmeAccount, AcmeEabCredential
+from models.webauthn import WebAuthnCredential
+from models.group import Group
+from models.rbac import CustomRole
+from models.certificate_template import CertificateTemplate
+from models.truststore import TrustedCertificate
+from models.sso import SSOProvider
+from models.hsm import HsmProvider
+from models.api_key import APIKey
+from models.email_notification import SMTPConfig, NotificationConfig
+from models.policy import CertificatePolicy
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
 

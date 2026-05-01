@@ -7,6 +7,14 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+from models import db, SCEPRequest, AuditLog
+from models.auth_certificate import AuthCertificate
+from models.acme_models import DnsProvider, AcmeDomain, AcmeLocalDomain, AcmeClientOrder
+from models.ssh import SSHCertificateAuthority, SSHCertificate
+from models.msca import MicrosoftCA, MSCARequest
+from models.discovered_certificate import ScanProfile, ScanRun, DiscoveredCertificate
+from models.policy import ApprovalRequest
+from models.hsm import HsmKey
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
 

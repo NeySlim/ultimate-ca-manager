@@ -27,9 +27,7 @@ try:
 except ImportError:
     _ARGON2_AVAILABLE = False
 
-from models import db, User, CA, Certificate, SystemConfig
-from models.acme_models import AcmeAccount
-from models.webauthn import WebAuthnCredential
+from models import db
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
 
