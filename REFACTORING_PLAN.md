@@ -66,7 +66,8 @@ fix(backend): corriger import circulaire dans acme_service
 |---|--------|--------|--------|---------------|
 | 1 | `api/v2/certificates.py` | 2220 | ✅ | `refactor(backend): split certificates.py into modular structure` |
 | 2 | `api/v2/cas.py` | 1245 | ✅ | `refactor(backend): split cas.py into modular structure` |
-| 3 | `api/v2/backup_service.py` | 2351 | ⏳ | `refactor(backend): split backup_service.py into modules` |
+| 3 | `api/v2/system.py` | 1556 | ✅ | `refactor(backend): split system.py into modular structure` |
+| 4 | `api/v2/backup_service.py` | 2351 | ⏳ | `refactor(backend): split backup_service.py into modules` |
 | 4 | `api/v2/sso.py` | 1843 | ⏳ | `refactor(backend): split sso.py into modules` |
 | 5 | `api/v2/system.py` | 1556 | ⏳ | `refactor(backend): split system.py into modules` |
 | 6 | `api/v2/settings.py` | 1314 | ⏳ | `refactor(backend): split settings.py into modules` |
@@ -246,6 +247,7 @@ class ExportService:
 ### Backend API
 - [x] certificates.py (2220l) → 6 modules (crud:1470l, export:385l, bulk:250l, ct:85l, stats:92l, eku:26l) ✅
 - [x] cas.py (1245l) → 6 modules (crud:459l, import_:159l, export:366l, bulk:122l, ocsp:172l, certificates:35l) ✅
+- [x] system.py (1556l) → 9 modules (database:215l, https:298l, backup:209l, security:488l, audit:140l, alerts:87l, updates:92l, service:126l, __init__:14l) ✅
 - [ ] backup_service.py (2351l) → 6 modules (create, restore, export, cleanup, migration, service)
 - [ ] system.py (1556l) → à analyser
 - [ ] sso.py (1843l) → à analyser
@@ -278,6 +280,9 @@ class ExportService:
 | 2026-05-01 | f21e9ff8 | docs(refactor): update REFACTORING_PLAN.md with certificates.py progress | ✅ |
 | 2026-05-01 | e208d468 | docs(refactor): update plan with next steps | ✅ |
 | 2026-05-01 | 8f9f15f0 | refactor(backend): split cas.py (1245l) into modular structure | ✅ |
+| 2026-05-01 | b255a2dd | docs(refactor): update plan with cas.py completion | ✅ |
+| 2026-05-01 | 2d418f76 | fix(backend): use English docstrings for consistency | ✅ |
+| 2026-05-01 | 678d7553 | refactor(backend): split system.py (1556l) into modular structure | ✅ |
 
 *(À mettre à jour après chaque commit)*
 
@@ -303,7 +308,6 @@ class ExportService:
 ## 🎯 Prochaines étapes
 
 **Priorité 1 (Backend API) :**
-- `system.py` (1556l) → À analyser
 - `sso.py` (1843l) → À analyser
 - `settings.py` (1314l) → À analyser
 - `backup_service.py` (2351l) → Découper en : create, restore, export, cleanup, migration, service
