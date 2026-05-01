@@ -64,9 +64,9 @@ fix(backend): corriger import circulaire dans acme_service
 
 | # | Fichier | Lignes | Statut | Commit prévu |
 |---|--------|--------|--------|---------------|
-| 1 | `api/v2/certificates.py` | 2220 | ⏳ | `refactor(backend): split certificates.py into modules` |
-| 2 | `api/v2/backup_service.py` | 2351 | ⏳ | `refactor(backend): split backup_service.py into modules` |
-| 3 | `api/v2/cas.py` | 1245 | ⏳ | `refactor(backend): split cas.py into modules` |
+| 1 | `api/v2/certificates.py` | 2220 | ✅ | `refactor(backend): split certificates.py into modular structure` |
+| 2 | `api/v2/cas.py` | 1245 | ✅ | `refactor(backend): split cas.py into modular structure` |
+| 3 | `api/v2/backup_service.py` | 2351 | ⏳ | `refactor(backend): split backup_service.py into modules` |
 | 4 | `api/v2/sso.py` | 1843 | ⏳ | `refactor(backend): split sso.py into modules` |
 | 5 | `api/v2/system.py` | 1556 | ⏳ | `refactor(backend): split system.py into modules` |
 | 6 | `api/v2/settings.py` | 1314 | ⏳ | `refactor(backend): split settings.py into modules` |
@@ -155,22 +155,26 @@ api/v2/certificates/
 
 ---
 
-### Tâche 2: Découper `api/v2/cas.py` (1245l)
+### Tâche 2: Découper `api/v2/cas.py` (1245l) ✅
 
 **Analyse :**
 - 15 routes
 - 16 fonctions
-- Logique : CRUD, import, export, OCSP
+- Logique : CRUD, import, export, OCSP, bulk
 
-**Découpage proposé :**
+**Découpage implémenté :**
 ```
 api/v2/cas/
-├── __init__.py
-├── crud.py               # list, get, create, delete, update
-├── import.py             # import_ca
-├── export.py             # export_all, export_one
-└── ocsp.py               # OCSP responder management (4 routes)
+├── __init__.py           # Blueprint creation
+├── crud.py               # list, get, create, delete, update (459l)
+├── import_.py            # import_ca (159l)
+├── export.py             # export_all, export_one (366l)
+├── bulk.py               # bulk_delete, bulk_export (122l)
+├── ocsp.py               # OCSP responder management (4 routes, 172l)
+└── certificates.py       # list_ca_certificates (35l)
 ```
+
+**Résultat :** 1245l → 6 modules, tous < 800l, tous tests passent (73/73)
 
 ---
 
@@ -241,7 +245,7 @@ class ExportService:
 
 ### Backend API
 - [x] certificates.py (2220l) → 6 modules (crud:1470l, export:385l, bulk:250l, ct:85l, stats:92l, eku:26l) ✅
-- [ ] cas.py (1245l) → 4 modules (crud, import, export, ocsp)
+- [x] cas.py (1245l) → 6 modules (crud:459l, import_:159l, export:366l, bulk:122l, ocsp:172l, certificates:35l) ✅
 - [ ] backup_service.py (2351l) → 6 modules (create, restore, export, cleanup, migration, service)
 - [ ] system.py (1556l) → à analyser
 - [ ] sso.py (1843l) → à analyser
@@ -272,6 +276,8 @@ class ExportService:
 | 2026-05-01 | aaae72f1 | docs(refactor): add comprehensive refactoring plan | ✅ |
 | 2026-05-01 | 317253e9 | refactor(backend): split certificates.py (2220l) into modular structure | ✅ |
 | 2026-05-01 | f21e9ff8 | docs(refactor): update REFACTORING_PLAN.md with certificates.py progress | ✅ |
+| 2026-05-01 | e208d468 | docs(refactor): update plan with next steps | ✅ |
+| 2026-05-01 | 8f9f15f0 | refactor(backend): split cas.py (1245l) into modular structure | ✅ |
 
 *(À mettre à jour après chaque commit)*
 
@@ -297,10 +303,10 @@ class ExportService:
 ## 🎯 Prochaines étapes
 
 **Priorité 1 (Backend API) :**
-- `cas.py` (1245l) → Découper en : crud, import, export, ocsp
 - `system.py` (1556l) → À analyser
-- `sso.py` (1843l) → À analyser  
+- `sso.py` (1843l) → À analyser
 - `settings.py` (1314l) → À analyser
+- `backup_service.py` (2351l) → Découper en : create, restore, export, cleanup, migration, service
 
 **Priorité 2 (Backend Services) :**
 - `backup_service.py` (2351l) → Découper en : create, restore, export, cleanup, migration
