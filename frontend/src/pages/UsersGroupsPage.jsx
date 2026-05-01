@@ -19,7 +19,7 @@ import {
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useWebSocket, usePersistedState } from '../hooks'
+import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
@@ -32,21 +32,36 @@ export default function UsersGroupsPage() {
   // Tab state
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'users')
   
-  // Data
-  const [users, setUsers] = useState([])
+  // groups/roles must be declared before loadFn (loadFn sets them as side effects)
   const [groups, setGroups] = useState([])
   const [roles, setRoles] = useState([])
-  const [loading, setLoading] = useState(true)
-  
+
+  // Hook: CRUD state (users sub-section)
+  const loadFn = useCallback(async () => {
+    const [usersRes, groupsRes, rolesRes] = await Promise.all([
+      usersService.getAll(),
+      groupsService.getAll(),
+      rolesService.getAll().catch(() => ({ data: [] }))
+    ])
+    setGroups(groupsRes.data || [])
+    setRoles(rolesRes.data || [])
+    return usersRes.data || []
+  }, []) // setGroups/setRoles are stable setState refs
+  const {
+    items: users, setItems: setUsers,
+    loading,
+    selectedItem: selectedUser, setSelectedItem: setSelectedUser,
+    showModal: showUserModal, setShowModal: setShowUserModal,
+    editing: editingUser, setEditing: setEditingUser,
+    loadData,
+  } = useCRUDPage({ loadFn, loadErrorMsg: t('messages.errors.loadFailed.generic') })
+
   // Selection
-  const [selectedUser, setSelectedUser] = useState(null)
   const [selectedGroup, setSelectedGroup] = useState(null)
-  
+
   // Modals
-  const [showUserModal, setShowUserModal] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showMemberModal, setShowMemberModal] = useState(false)
-  const [editingUser, setEditingUser] = useState(null)
   const [editingGroup, setEditingGroup] = useState(null)
   const [savingMembers, setSavingMembers] = useState(false)
 
@@ -78,29 +93,6 @@ export default function UsersGroupsPage() {
     setSelectedUser(null)
     setSelectedGroup(null)
     setPage(1)
-  }
-
-  // Load data
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [usersRes, groupsRes, rolesRes] = await Promise.all([
-        usersService.getAll(),
-        groupsService.getAll(),
-        rolesService.getAll().catch(() => ({ data: [] }))
-      ])
-      setUsers(usersRes.data || [])
-      setGroups(groupsRes.data || [])
-      setRoles(rolesRes.data || [])
-    } catch (error) {
-      showError(t('messages.errors.loadFailed.generic'))
-    } finally {
-      setLoading(false)
-    }
   }
 
   // ============= USER ACTIONS =============

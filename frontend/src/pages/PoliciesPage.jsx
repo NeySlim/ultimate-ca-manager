@@ -2,7 +2,7 @@
  * PoliciesPage — Certificate Policies & Approval Workflows
  * CRUD for certificate policies with rules, approval settings, and notifications.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Gavel, Plus, PencilSimple, Trash, Power, ShieldCheck,
@@ -15,7 +15,7 @@ import {
 } from '../components'
 import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission, usePersistedState } from '../hooks'
+import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 
 // Policy type options — labels resolved via t() inside component
@@ -68,46 +68,39 @@ export default function PoliciesPage() {
   const policyTypeOptions = useMemo(() => POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
   const keyTypeOptions = useMemo(() => KEY_TYPE_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
 
-  // Data state
-  const [policies, setPolicies] = useState([])
-  const [loading, setLoading] = useState(true)
+  // cas/groups must be declared before loadFn (loadFn sets them as side effects)
   const [cas, setCas] = useState([])
   const [groups, setGroups] = useState([])
 
-  // Modal state
-  const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [formData, setFormData] = useState({ ...DEFAULT_FORM })
-  const [saving, setSaving] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
-  const [actionInProgress, setActionInProgress] = useState(false)
+  // Hook: CRUD state
+  const loadFn = useCallback(async () => {
+    const [policiesRes, casRes, groupsRes] = await Promise.all([
+      policiesService.list(),
+      casService.getAll().catch(() => ({ data: [] })),
+      groupsService.getAll().catch(() => ({ data: [] })),
+    ])
+    setCas(casRes.data || [])
+    setGroups(groupsRes.data || [])
+    return policiesRes.data || []
+  }, []) // setCas/setGroups are stable setState refs
+  const {
+    items: policies, setItems: setPolicies,
+    loading,
+    selectedItem: selectedPolicy, setSelectedItem: setSelectedPolicy,
+    showModal, setShowModal,
+    editing, setEditing,
+    saving, setSaving,
+    deleteTarget: showDeleteConfirm, setDeleteTarget: setShowDeleteConfirm,
+    loadData,
+  } = useCRUDPage({ loadFn, loadErrorMsg: t('policies.loadFailed') })
 
-  // Detail state
-  const [selectedPolicy, setSelectedPolicy] = useState(null)
+  // Modal state (page-specific)
+  const [formData, setFormData] = useState({ ...DEFAULT_FORM })
+  const [actionInProgress, setActionInProgress] = useState(false)
 
   // Filters
   const [filterType, setFilterType] = usePersistedState('ucm-filter-policies-type', [])
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-policies-status', [])
-
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const [policiesRes, casRes, groupsRes] = await Promise.all([
-        policiesService.list(),
-        casService.getAll().catch(() => ({ data: [] })),
-        groupsService.getAll().catch(() => ({ data: [] })),
-      ])
-      setPolicies(policiesRes.data || [])
-      setCas(casRes.data || [])
-      setGroups(groupsRes.data || [])
-    } catch (err) {
-      showError(t('policies.loadFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [showError, t])
-
-  useEffect(() => { loadData() }, [loadData])
 
   // Filtered policies
   const filteredPolicies = useMemo(() => {

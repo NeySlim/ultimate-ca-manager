@@ -5,7 +5,7 @@
  * DESKTOP: Dense table with hover rows, inline slide-over details
  * MOBILE: Card-style list with full-screen details
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Key, Plus, Trash, PencilSimple, Download, Copy, Upload,
@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, useClipboard, usePersistedState } from '../hooks'
+import { usePermission, useClipboard, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 
 const KEY_ALGORITHM_OPTIONS = [
@@ -49,16 +49,21 @@ export default function SSHCAsPage() {
   const { canWrite, canDelete } = usePermission()
   const { copy: clipboardCopy, isCopied } = useClipboard()
 
-  // Data
-  const [sshCas, setSSHCAs] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Hook: CRUD state
+  const loadFn = useCallback(async () => {
+    const res = await sshCasService.getAll()
+    return res.data || []
+  }, [])
+  const {
+    items: sshCas, setItems: setSSHCAs,
+    loading,
+    selectedItem: selectedCA, setSelectedItem: setSelectedCA,
+    showModal, setShowModal,
+    editing: editingCA, setEditing: setEditingCA,
+    loadData,
+  } = useCRUDPage({ loadFn, loadErrorMsg: t('messages.errors.loadFailed.sshCas') })
 
-  // Selection
-  const [selectedCA, setSelectedCA] = useState(null)
-
-  // Modals
-  const [showModal, setShowModal] = useState(false)
-  const [editingCA, setEditingCA] = useState(null)
+  // Modals (page-specific)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importCaType, setImportCaType] = useState('user')
   const [importPrivateKey, setImportPrivateKey] = useState('')
@@ -69,25 +74,6 @@ export default function SSHCAsPage() {
 
   // Filters
   const [filterType, setFilterType] = usePersistedState('ucm-filter-ssh-cas-type', [])
-
-  // Copy state — managed by useClipboard hook
-
-  // Load data
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const res = await sshCasService.getAll()
-      setSSHCAs(res.data || [])
-    } catch (error) {
-      showError(error.message || t('messages.errors.loadFailed.sshCas'))
-    } finally {
-      setLoading(false)
-    }
-  }
 
     const handleApplyFilterPreset = useCallback((filters) => {
     if (filters.ca_type) setFilterType(Array.isArray(filters.ca_type) ? filters.ca_type : [filters.ca_type])

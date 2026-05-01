@@ -18,7 +18,7 @@ import {
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { usePermission, usePersistedState } from '../hooks'
+import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 export default function TemplatesPage() {
   const { t } = useTranslation()
@@ -27,47 +27,35 @@ export default function TemplatesPage() {
   const { canWrite, canDelete } = usePermission()
   const fileRef = useRef(null)
   
-  // Data
-  const [templates, setTemplates] = useState([])
-  const [loading, setLoading] = useState(true)
-  
-  // Selection
-  const [selectedTemplate, setSelectedTemplate] = useState(null)
-  
-  // Modals
-  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  // Hook: CRUD state
+  const loadFn = useCallback(async () => {
+    const res = await templatesService.getAll()
+    return res.data || []
+  }, [])
+  const {
+    items: templates, setItems: setTemplates,
+    loading,
+    selectedItem: selectedTemplate, setSelectedItem: setSelectedTemplate,
+    showModal: showTemplateModal, setShowModal: setShowTemplateModal,
+    editing: editingTemplate, setEditing: setEditingTemplate,
+    loadData,
+  } = useCRUDPage({ loadFn, loadErrorMsg: t('messages.errors.loadFailed.templates') })
+
+  // Modals (page-specific)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState(null)
-  
+
   // Pagination
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
-  
+
   // Filters
   const [filterType, setFilterType] = usePersistedState('ucm-filter-templates-type', [])
-  
+
   // Import state
   const [importFile, setImportFile] = useState(null)
   const [importJson, setImportJson] = useState('')
   const [importing, setImporting] = useState(false)
-
-  // Load data
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const res = await templatesService.getAll()
-      setTemplates(res.data || [])
-    } catch (error) {
-      showError(t('messages.errors.loadFailed.templates'))
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Get template type
   const getTemplateType = useCallback((t) => {
