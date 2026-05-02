@@ -673,17 +673,44 @@ def get_dependencies_status():
 @require_auth(['admin:system'])
 def install_dependencies():
     """
-    Install HSM dependencies (requires admin)
-    
-    Body:
-        provider: Provider type to install (pkcs11, azure, gcp, all)
-    
-    Note: This runs pip install which may take a moment.
-    In production, prefer installing via system packages.
+    Install HSM dependencies (requires admin).
+
+    DISABLED BY DEFAULT. Runtime ``pip install`` against the live
+    deployment is intentionally gated for several reasons:
+
+      * On DEB / RPM installs the ``/opt/ucm/venv`` (or system Python)
+        site-packages may be owned by root or read-only; a half-failed
+        install corrupts the running interpreter.
+      * Docker images should bake dependencies at build time; a runtime
+        ``pip install`` is lost on the next container restart.
+      * Reaching out to PyPI from the production host expands the
+        attack surface (DNS, TLS, and now an unpinned upstream feed)
+        without a corresponding hash check.
+      * Even though ``provider`` is whitelisted to (pkcs11, azure, gcp,
+        all), an admin-credential compromise should not also grant
+        arbitrary package installation on the host.
+
+    Operators who genuinely want the in-app installer can opt in:
+
+        UCM_ALLOW_RUNTIME_PIP=1 systemctl restart ucm
+
+    The recommended path is still the system package or a one-shot
+    ``/opt/ucm/venv/bin/pip install`` from a shell.
     """
+    import os
     import subprocess
     import sys
-    
+
+    if os.environ.get('UCM_ALLOW_RUNTIME_PIP', '').strip() not in ('1', 'true', 'yes'):
+        return error_response(
+            'Runtime pip install is disabled. Install HSM dependencies '
+            'via your system package manager (apt/dnf) or run '
+            '`/opt/ucm/venv/bin/pip install <pkgs>` manually. To allow '
+            'in-app installation set UCM_ALLOW_RUNTIME_PIP=1 and '
+            'restart UCM.',
+            403,
+        )
+
     data = request.get_json() or {}
     provider = data.get('provider', '').lower()
     
