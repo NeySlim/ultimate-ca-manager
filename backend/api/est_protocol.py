@@ -5,6 +5,7 @@ Enrollment over Secure Transport for automated certificate enrollment.
 from flask import Blueprint, request, Response, current_app
 from models import db, CA, Certificate
 from services.ca_service import CAService
+from services.audit_service import AuditService
 from datetime import datetime
 import base64
 import hmac
@@ -13,6 +14,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('est', __name__, url_prefix='/.well-known/est')
+
+# Hard upper bound on EST request bodies. A PKCS#10 CSR with a 4096-bit
+# RSA key + EC SAN list rarely exceeds 4 KB; 64 KB is generous and
+# still rules out resource exhaustion / accidental upload of a binary.
+EST_MAX_BODY_BYTES = 64 * 1024
+
+
+def _enforce_body_limit():
+    """Return a 413 Response if the incoming request body exceeds
+    EST_MAX_BODY_BYTES, else None. Called explicitly from each EST
+    enrollment route — kept out of @before_request so /cacerts and
+    /csrattrs (GET) are unaffected."""
+    cl = request.content_length
+    if cl is not None and cl > EST_MAX_BODY_BYTES:
+        return Response('Request body too large', status=413)
+    return None
 
 
 @bp.before_request
@@ -171,6 +188,10 @@ def simple_enroll():
     EST /simpleenroll - Enroll new certificate.
     Accepts PKCS#10 CSR, returns PKCS#7 certificate.
     """
+    too_big = _enforce_body_limit()
+    if too_big is not None:
+        return too_big
+
     authenticated, username = _authenticate_est_client()
     if not authenticated:
         return Response(
@@ -261,6 +282,10 @@ def simple_reenroll():
     Requires mTLS — client MUST present a valid certificate.
     Does NOT accept HTTP Basic Auth (unlike simpleenroll).
     """
+    too_big = _enforce_body_limit()
+    if too_big is not None:
+        return too_big
+
     # Re-enrollment requires mTLS only (RFC 7030 §3.3.2)
     client_cert = _trusted_client_cert()
     if not client_cert:
@@ -414,6 +439,13 @@ def server_keygen():
     Private key is encrypted using CMS EnvelopedData with the client's
     password as a PBKDF2-derived AES key for transport security.
     """
+    # Defensive: cap body size before parsing. RSA keygen is the most
+    # CPU-intensive EST endpoint, so reject obviously-bogus payloads
+    # early to limit the damage from a leaked Basic-Auth credential.
+    too_big = _enforce_body_limit()
+    if too_big is not None:
+        return too_big
+
     authenticated, username = _authenticate_est_client()
     if not authenticated:
         return Response(
@@ -421,13 +453,20 @@ def server_keygen():
             status=401,
             headers={'WWW-Authenticate': 'Basic realm="EST"'}
         )
-    
+
     ca = _get_est_ca()
     if not ca:
         return Response('EST not configured', status=503)
-    
+
+    # Capture remote IP for audit BEFORE any failure path so denials
+    # are visible too.
+    remote_ip = request.remote_addr or 'unknown'
+    auth_method = 'mtls' if _trusted_client_cert() else 'basic'
+
     try:
         csr_data = request.get_data(as_text=True)
+        if not csr_data or len(csr_data) > EST_MAX_BODY_BYTES:
+            return Response('Invalid CSR', status=400)
         
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes
@@ -440,6 +479,38 @@ def server_keygen():
         # Parse CSR to get subject
         csr_der = base64.b64decode(csr_data)
         csr = x509.load_der_x509_csr(csr_der, default_backend())
+
+        # RFC 7030 implies the subject in the CSR identifies the
+        # enrollee. We refuse empty / whitespace-only CNs so a
+        # compromised credential can't mint a wildcard or CA-shaped
+        # certificate by submitting a blank CSR.
+        from cryptography.x509.oid import NameOID
+        cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if not cn_attrs or not str(cn_attrs[0].value).strip():
+            AuditService.log_action(
+                action='est_serverkeygen_denied',
+                resource_type='est',
+                details=(
+                    f'EST /serverkeygen rejected empty subject CN '
+                    f'(auth={auth_method}, user={username}, ip={remote_ip})'
+                ),
+                success=False,
+            )
+            return Response('CSR subject must include a non-empty CN', status=400)
+        subject_cn = str(cn_attrs[0].value).strip()
+
+        # Audit BEFORE issuing — keeps a record even if signing fails
+        # mid-flight or the response is dropped on the wire.
+        AuditService.log_action(
+            action='est_serverkeygen_request',
+            resource_type='est',
+            resource_name=subject_cn,
+            details=(
+                f'EST /serverkeygen subject_cn={subject_cn} '
+                f'auth={auth_method} user={username} ip={remote_ip}'
+            ),
+            success=True,
+        )
         
         # Generate new key pair
         key = rsa.generate_private_key(
