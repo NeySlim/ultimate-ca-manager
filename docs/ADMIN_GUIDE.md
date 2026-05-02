@@ -89,6 +89,45 @@ Configure in **Settings** > **Security**:
 | Max Sessions | 5 | Per-user session limit |
 | Require 2FA | No | Force MFA for all users |
 
+#### Filesystem permissions (since v2.142)
+
+UCM enforces `0o700` on its session directory at boot. If the directory is group- or world-readable, the service refuses to start:
+
+```
+RuntimeError: Refusing to boot: session dir <path> has perms 0o755, expected 0o700
+```
+
+Default paths:
+
+| Install method | Path |
+|----------------|------|
+| DEB / RPM (systemd) | `/var/lib/ucm/sessions/` |
+| Source / `/opt/ucm` | `/opt/ucm/data/sessions/` |
+| Docker | `/app/data/sessions/` (inside container) |
+
+DEB/RPM post-install scripts and the Docker entrypoint already set the right perms. After a manual `cp -r` or migration that lost ownership:
+
+```bash
+sudo chown -R ucm:ucm /var/lib/ucm/sessions
+sudo chmod 0700 /var/lib/ucm/sessions
+sudo systemctl restart ucm
+```
+
+The same recommendation applies to any directory holding TLS keys or HSM PINs (`/etc/ucm/`, `/var/lib/ucm/keys/`).
+
+#### Reverse proxy & trusted_proxies (since v2.142)
+
+If you terminate TLS on a reverse proxy (Nginx, Traefik, HAProxy, NPM) and forward client info to UCM via headers, declare the proxy CIDR(s) in **Settings → Security → Trusted proxies**:
+
+```
+security.trusted_proxies = 10.0.0.5/32, 192.168.10.0/24
+```
+
+This affects:
+
+- **Audit log IP** — `X-Forwarded-For` is honoured **only** when the request comes from a trusted CIDR; otherwise the direct `remote_addr` is used. Spoofed XFF from untrusted networks is ignored.
+- **mTLS / EST / SCEP** — proxy-injected `X-SSL-Client-*` headers are only accepted from trusted CIDRs. Direct deployments (UCM terminates TLS itself) are unaffected.
+
 ### Authentication Methods
 
 Enable/disable in **Settings** > **Security**:
@@ -238,6 +277,10 @@ The migration is **bidirectional** (SQLite ↔ PostgreSQL) and:
 - If a migration fails mid-way, the source is untouched and a backup is available under `/opt/ucm/data/backups/db_migration/`. Reset the target before retrying.
 
 > ⚠ Docker installs cannot persist `/etc/ucm/ucm.env` from inside the container. After running **Migrate** on Docker, the API returns the target URL — set `DATABASE_URL` in your `docker-compose.yml` or `docker run -e` and restart the container manually.
+
+> **Admin lockout fix (v2.141).** Switching the active backend from PostgreSQL back to SQLite (or vice versa) no longer locks out the admin account. The bcrypt password hash is preserved across the swap and the in-process SQLAlchemy session pool is rebuilt before the next login attempt. Earlier releases could leave a stale connection pool pointing at the old backend, causing `Invalid credentials` on first login after the swap.
+
+> **Backups now backend-aware (v2.141).** The **Backup** action and `/api/v2/system/backup` automatically dispatch to `pg_dump -Fc` when PostgreSQL is the active backend (custom format, suitable for `pg_restore`). SQLite continues to use file-copy snapshots. Restore handles both formats transparently.
 
 ### SQLite Database
 

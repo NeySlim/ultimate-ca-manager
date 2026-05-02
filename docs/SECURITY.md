@@ -230,6 +230,44 @@ All SSO authentication events are logged:
 - OAuth2/SAML token validation failures
 - Session creation from SSO providers
 
+### 10. v2.142 hardening pass
+
+A consolidated audit landed in v2.142. All changes are operator-transparent except where noted in the right column.
+
+| Area | Change | Action required |
+|------|--------|-----------------|
+| **HSM runtime installer** | `POST /api/v2/hsm/install-dependencies` is opt-in (`UCM_ALLOW_RUNTIME_PIP=1`), returns `403` by default | Set env var **or** install `python3-pkcs11` / `PyKCS11` via OS package manager. See [HSM_DOCKER.md](./HSM_DOCKER.md). |
+| **Session directory perms** | Boot refuses to start if perms are not `0o700` (`RuntimeError: Refusing to boot: session dir <path> has perms <oct>, expected 0o700`) | DEB/RPM/Docker handle this; manual installs must `chown ucm:ucm <dir> && chmod 0700 <dir>` |
+| **Reverse-proxy mTLS** (mTLS / EST / SCEP) | Proxy-injected `X-SSL-Client-*` headers only honoured from CIDRs in `security.trusted_proxies` | Set `security.trusted_proxies` if you terminate TLS on a reverse proxy; direct deployments unaffected |
+| **CSV bulk import** (`/api/v2/users/import`) | Capped at 5 MB / 10 000 rows, returns `413` on overflow | Split larger imports |
+| **CRL on-demand** (`/cdp/<ca>.crl`) | Per-CA serialisation lock, returns `503` + `Retry-After: 5` under contention | None — clients honour `Retry-After`. Cached CRL endpoint unaffected. |
+| **Webhooks** | DNS revalidated at delivery time (closes DNS-rebinding window between config and delivery) | None — RFC1918/.lan/.local still allowed by design (on-prem) |
+| **2FA backup codes** | Hashed at rest (Argon2id), atomic single-use consumption (`UPDATE ... WHERE hash = ? AND used_at IS NULL`) | None — re-generate codes after upgrade for fresh hashes |
+| **Approval quorum** | Per-request DB lock, recount-in-transaction, idempotent re-submit | None |
+| **ACME account keys** | Encrypted at rest with master key | None — migrated transparently on first read |
+| **Audit IP** | `client_ip()` honours `X-Forwarded-For` only behind trusted proxy | None — same as mTLS row |
+| **SCEP CSR copy** | KU/EKU stripped to whitelist (`digitalSignature`, `keyEncipherment`, `serverAuth`, `clientAuth`); arbitrary client-supplied bits are dropped | Use templates/policies for non-default usages |
+| **EST endpoints** | Per-request `est_enabled` check returns `503 EST disabled` instead of falling through to SPA HTML | None |
+| **Database commits** | All `api/v2/*` go through `safe_commit()` (rollback + log on failure) | None |
+
+### Backend security helpers
+
+The hardening pass also exposed reusable helpers in `backend/utils/`:
+
+| Helper | Module | Purpose |
+|--------|--------|---------|
+| `is_request_from_trusted_proxy()` | `trusted_proxy` | Bool — true only if request comes from `security.trusted_proxies` CIDR |
+| `client_ip()` | `trusted_proxy` | Resolves XFF only behind trusted proxy, else `remote_addr` |
+| `reject_untrusted_proxy_headers()` | `trusted_proxy` | 401 helper for routes consuming proxy-injected headers |
+| `validate_url_not_cloud_metadata()` | `ssrf_protection` | Default for user-supplied outbound URLs (webhooks, SSO, ACME proxy, imports) |
+| `validate_url_not_private()` | `ssrf_protection` | Strict — only when target MUST be public Internet (rare) |
+| `safe_commit()` | `safe_commit` | Wrapped `db.session.commit()` with rollback + log |
+| `audit_event(action=..., ip=client_ip(), ...)` | `audit` | Shorthand for `AuditService.log_action` |
+| `require_json_body` | `validation` | Decorator — 400 if body is missing/invalid JSON |
+| `parse_request_pagination()` | `validation` | `(page, per_page)` from query string with bounds |
+
+> **SSRF policy reminder.** UCM is on-prem. RFC1918, loopback, `.lan`/`.local`/`.corp` are the **primary use case**, not an attack vector. Use `validate_url_not_cloud_metadata` (blocks cloud-metadata + loopback only) for any user-supplied outbound URL — never `validate_url_not_private`, which would break LAN webhooks, internal SSO, and local ACME validation.
+
 ---
 
 ## Security Best Practices
