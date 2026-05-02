@@ -374,32 +374,21 @@ def login_2fa():
     # Verify TOTP code
     totp = pyotp.TOTP(user.totp_secret)
     if not totp.verify(str(code), valid_window=1):
-        # Check recovery codes
-        recovery_used = False
-        if user.backup_codes:
-            import json
+        # Check recovery codes — atomic verify-and-consume to prevent
+        # double-spend (two parallel logins replaying the same code).
+        from utils.backup_codes import consume_code, count_remaining
+        if user.backup_codes and consume_code(user, code):
             try:
-                codes = json.loads(user.backup_codes)
-                if str(code) in codes:
-                    codes.remove(str(code))
-                    user.backup_codes = json.dumps(codes)
-                    db.session.commit()
-                    recovery_used = True
-                    logger.info(f"Recovery code used for {user.username}, {len(codes)} remaining")
-                else:
-                    AuditService.log_action(
-                        action='login_2fa_failure',
-                        resource_type='user',
-                        resource_id=user.id,
-                        details=f'Invalid 2FA code for {pending_username}',
-                        success=False,
-                        username=pending_username
-                    )
-                    _record_2fa_failure(lockout_key, _2fa_failed_attempts)
-                    return error_response('Invalid verification code', 401)
-            except (json.JSONDecodeError, ValueError):
-                _record_2fa_failure(lockout_key, _2fa_failed_attempts)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to consume backup code for {user.username}: {e}")
                 return error_response('Invalid verification code', 401)
+            recovery_used = True
+            logger.info(
+                "Recovery code used for %s, %d remaining",
+                user.username, count_remaining(user.backup_codes),
+            )
         else:
             AuditService.log_action(
                 action='login_2fa_failure',

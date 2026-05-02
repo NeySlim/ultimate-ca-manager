@@ -8,6 +8,11 @@ from models import db, User
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.backup_codes import (
+    count_remaining as backup_count,
+    hash_codes as backup_hash_codes,
+    verify_code_only as backup_verify,
+)
 from auth.unified import require_auth
 import pyotp
 import qrcode
@@ -83,9 +88,10 @@ def confirm_2fa():
     # Generate backup codes
     backup_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
 
-    # Enable 2FA
+    # Enable 2FA — backup codes are stored as scrypt hashes; the
+    # plaintext list is only ever returned here.
     user.totp_confirmed = True
-    user.backup_codes = ','.join(backup_codes)
+    user.backup_codes = backup_hash_codes(backup_codes)
     ok, _err = safe_commit(logger, "Failed to enable 2FA")
     if not ok:
         return _err
@@ -133,8 +139,7 @@ def disable_2fa():
             return error_response('Invalid verification code', 400)
     # Or verify with backup code
     elif backup_code:
-        stored_codes = (user.backup_codes or '').split(',')
-        if backup_code not in stored_codes:
+        if not backup_verify(user.backup_codes, backup_code):
             return error_response('Invalid backup code', 400)
 
     # Disable 2FA
@@ -165,13 +170,13 @@ def get_recovery_codes():
     if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
 
-    stored_codes = (user.backup_codes or '').split(',')
-    masked_codes = [f'{c[:4]}...{c[-4:]}' if len(c) > 8 else '****' for c in stored_codes if c]
-
+    # Codes are stored hashed — we can no longer show a masked
+    # plaintext preview. Only the count is exposed.
+    remaining = backup_count(user.backup_codes)
     return success_response(
         data={
-            'codes': masked_codes,
-            'count': len([c for c in stored_codes if c])
+            'codes': [],
+            'count': remaining,
         }
     )
 
@@ -198,7 +203,7 @@ def regenerate_recovery_codes():
     # Generate new backup codes
     new_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
 
-    user.backup_codes = ','.join(new_codes)
+    user.backup_codes = backup_hash_codes(new_codes)
     ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
     if not ok:
         return _err
