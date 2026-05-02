@@ -51,7 +51,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
             {t('settings.useUcmCertificateDesc')}
           </p>
           {selectedHttpsCert ? (
-            <div className="flex items-center gap-3 p-3 rounded-lg border border-accent-primary/30 bg-accent-primary/5">
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-accent-primary-op30 bg-accent-primary-op5">
               <Certificate size={20} className="text-accent-primary shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-text-primary truncate">

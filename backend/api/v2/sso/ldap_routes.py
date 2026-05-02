@@ -2,6 +2,7 @@ from . import bp, VALID_ROLES, logger
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
@@ -70,9 +71,13 @@ def ldap_login():
     )
 
     if not user:
+        # Generic message — don't disclose whether the LDAP user exists or whether
+        # auto-provisioning is on/off. Details go to logs only.
         if error_code == 'auto_create_disabled':
-            return error_response("User not found and automatic account creation is disabled. Contact your administrator.", 403)
-        return error_response("Failed to create user account", 500)
+            logger.warning(
+                f"LDAP login refused for '{username}': automatic account creation disabled"
+            )
+        return error_response("Invalid credentials", 401)
 
     # Clear failed attempts on successful login
     _clear_ldap_failed_attempts(username)
@@ -91,7 +96,9 @@ def ldap_login():
             expires_at=utc_now() + timedelta(hours=8)
         )
         db.session.add(sso_session)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to persist LDAP session")
+    if not ok:
+        return _err
 
     # Establish Flask session (clear first to prevent session fixation)
     _ldap_now = utc_now()
@@ -292,7 +299,12 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     user.password_hash = '!SSO_NO_PASSWORD!'
 
     db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to create SSO user {username}: {e}")
+        raise
 
     logger.info(f"Created SSO user: {username} with role {role}")
     return user, None

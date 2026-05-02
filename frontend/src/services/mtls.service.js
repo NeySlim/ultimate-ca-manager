@@ -1,7 +1,7 @@
 /**
  * mTLS Service - Client certificate authentication API
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const mtlsService = {
   // Settings
@@ -13,5 +13,5 @@ export const mtlsService = {
   createCertificate: (data) => apiClient.post('/mtls/certificates', data),
   revokeCertificate: (id) => apiClient.delete(`/mtls/certificates/${id}`),
   downloadCertificate: (id, format = 'pem') =>
-    apiClient.get(`/mtls/certificates/${id}/download?format=${format}`),
+    apiClient.get(`/mtls/certificates/${id}/download${buildQueryString({ format })}`),
 }

@@ -26,7 +26,12 @@ def _set_system_config(key: str, value: str, description: str) -> None:
         row.value = value
     else:
         db.session.add(SystemConfig(key=key, value=value, description=description))
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to upsert SystemConfig {key}: {e}")
+        raise
 
 
 @bp.route('/api/v2/system/database/stats', methods=['GET'])

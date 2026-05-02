@@ -37,7 +37,9 @@ export function MobileProvider({ children }) {
   // Force desktop mode preference
   const [forceDesktop, setForceDesktopState] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(FORCE_DESKTOP_KEY) === 'true'
+      try {
+        return localStorage.getItem(FORCE_DESKTOP_KEY) === 'true'
+      } catch { /* Safari private mode, quota */ }
     }
     return false
   })
@@ -46,11 +48,13 @@ export function MobileProvider({ children }) {
   const setForceDesktop = useCallback((value) => {
     setForceDesktopState(value)
     if (typeof window !== 'undefined') {
-      if (value) {
-        localStorage.setItem(FORCE_DESKTOP_KEY, 'true')
-      } else {
-        localStorage.removeItem(FORCE_DESKTOP_KEY)
-      }
+      try {
+        if (value) {
+          localStorage.setItem(FORCE_DESKTOP_KEY, 'true')
+        } else {
+          localStorage.removeItem(FORCE_DESKTOP_KEY)
+        }
+      } catch { /* Safari private mode, quota */ }
     }
   }, [])
 

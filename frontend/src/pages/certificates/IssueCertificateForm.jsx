@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Certificate, X, Plus, CaretDown, CaretUp } from '@phosphor-icons/react'
 import { Button, Select, Input, DatePicker, EkuMultiSelect } from '../../components'
-import { templatesService } from '../../services'
-import { apiClient } from '../../services/apiClient'
+import { templatesService, ekuService } from '../../services'
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -33,7 +32,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const [knownEkus, setKnownEkus] = useState([])
   useEffect(() => {
     let cancelled = false
-    apiClient.get('/eku/known')
+    ekuService.getKnown()
       .then((resp) => {
         if (!cancelled) setKnownEkus(resp?.data?.ekus || resp?.ekus || [])
       })

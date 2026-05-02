@@ -136,7 +136,7 @@ export default function EmailSection({ settings, updateSetting, handleSave, savi
 
                 {/* Per-provider setup guide */}
                 {oauthProviderSetup[settings.smtp_oauth_provider || 'google'] && (
-                  <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info/30 rounded-lg text-xs text-text-secondary">
+                  <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info-op30 rounded-lg text-xs text-text-secondary">
                     <Info size={16} className="shrink-0 mt-0.5 text-status-info" />
                     <div className="space-y-1.5 flex-1">
                       <p className="font-medium text-text-primary">
@@ -255,7 +255,7 @@ export default function EmailSection({ settings, updateSetting, handleSave, savi
                 {/* Authorization status + actions */}
                 {/* Unverified-app warning notice — only shown before authorization */}
                 {!settings.has_oauth_refresh_token && ['google', 'microsoft', 'microsoft365'].includes(settings.smtp_oauth_provider || 'google') && (
-                  <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info/30 rounded-lg text-xs text-text-secondary">
+                  <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info-op30 rounded-lg text-xs text-text-secondary">
                     <Warning size={16} className="shrink-0 mt-0.5 text-status-info" />
                     <div className="space-y-1">
                       <p className="font-medium text-text-primary">{t('settings.smtpOauthUnverifiedTitle')}</p>

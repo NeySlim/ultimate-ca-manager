@@ -4,6 +4,7 @@ from flask import request, g
 from models import db, UserSession, AuditLog
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth
 
@@ -47,7 +48,9 @@ def revoke_session(session_id):
         return error_response('Session not found', 404)
 
     db.session.delete(session)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to revoke session")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='session_revoke',
@@ -73,7 +76,9 @@ def revoke_all_sessions():
         UserSession.id != current_session_id
     ).delete(synchronize_session=False)
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to revoke other sessions")
+    if not ok:
+        return _err
 
     return success_response(message='All other sessions revoked')
 

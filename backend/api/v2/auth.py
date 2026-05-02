@@ -7,10 +7,14 @@ Supports:
 - JWT tokens (external APIs)
 """
 
+import logging
 from flask import Blueprint, request, jsonify, session, current_app
 from auth.unified import AuthManager, require_auth, require_permission
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import User, db
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 import hashlib
 from utils.datetime_utils import utc_now
@@ -70,7 +74,11 @@ def _check_account_lockout(username):
             # Lockout expired, reset
             user.locked_until = None
             user.failed_logins = 0
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to clear expired lockout: {e}")
             return False
     return False
 
@@ -101,7 +109,11 @@ def _record_failed_attempt(username):
         except Exception:
             pass  # Non-blocking
     
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to record failed attempt: {e}")
 
 
 def _clear_failed_attempts(username):
@@ -110,7 +122,11 @@ def _clear_failed_attempts(username):
     if user and (user.failed_logins or user.locked_until):
         user.failed_logins = 0
         user.locked_until = None
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to clear failed attempts: {e}")
 
 
 @bp.route('/api/v2/auth/login', methods=['POST'])
@@ -355,7 +371,9 @@ def forgot_password():
         token = secrets.token_urlsafe(48)
         user.password_reset_token = hashlib.sha256(token.encode()).hexdigest()
         user.password_reset_expires = utc_now() + timedelta(hours=1)
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to store password reset token")
+        if not ok:
+            return _err
         
         # Send email
         try:
@@ -417,7 +435,9 @@ def reset_password():
         # Clear expired token
         user.password_reset_token = None
         user.password_reset_expires = None
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to clear expired reset token")
+        if not ok:
+            return _err
         return error_response('Reset token has expired', 400)
     
     # Reset password
@@ -427,7 +447,9 @@ def reset_password():
     user.force_password_change = False
     user.failed_logins = 0
     user.locked_until = None
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to reset password")
+    if not ok:
+        return _err
     
     # Audit log
     try:

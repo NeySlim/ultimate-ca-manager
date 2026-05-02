@@ -129,7 +129,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
           ) : (
             <div className="divide-y divide-border">
               {filteredEabCredentials.map(cred => (
-                <div key={cred.id} className="p-4 flex items-center justify-between gap-3 hover:bg-bg-tertiary/40">
+                <div key={cred.id} className="p-4 flex items-center justify-between gap-3 hover:bg-tertiary-op40">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{cred.label || t('acme.eab.unlabeled')}</span>

@@ -9,6 +9,7 @@ from flask import request
 from api.v2.acme_client import bp, _set_config, _coerce_bool
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db, SystemConfig
 from services.audit_service import AuditService
@@ -269,7 +270,9 @@ def update_settings():
         _set_config('acme.proxy.eab_hmac_key', data['proxy_eab_hmac_key'] or '', 'ACME proxy EAB HMAC Key')
         updates.append('proxy_eab_hmac_key')
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update ACME client settings")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='acme_client_settings_update',

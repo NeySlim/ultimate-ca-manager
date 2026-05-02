@@ -303,7 +303,7 @@ export default function LetsEncryptTab({
 
           {/* Custom ACME Directory — collapsed advanced option */}
           <details className="group rounded-lg border border-border/50 hover:border-border transition-colors">
-            <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-bg-tertiary/30 transition-colors list-none [&::-webkit-details-marker]:hidden">
+            <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-tertiary-op30 transition-colors list-none [&::-webkit-details-marker]:hidden">
               <CaretRight size={14} weight="bold" className="shrink-0 transition-transform duration-200 group-open:rotate-90" />
               <Globe size={14} className="shrink-0" />
               {t('acme.customDirectoryOverride')}
@@ -495,7 +495,7 @@ export default function LetsEncryptTab({
 
               {/* EAB Credentials (collapsible section) */}
               <details className="group rounded-lg border border-border/50 hover:border-border transition-colors">
-                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-bg-tertiary/30 transition-colors list-none [&::-webkit-details-marker]:hidden">
+                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-tertiary-op30 transition-colors list-none [&::-webkit-details-marker]:hidden">
                   <CaretRight size={14} weight="bold" className="shrink-0 transition-transform duration-200 group-open:rotate-90" />
                   <LockKey size={14} className="shrink-0" />
                   {t('acme.proxyEabCredentials')}

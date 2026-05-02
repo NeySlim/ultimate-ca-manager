@@ -5,6 +5,7 @@ from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 
 from . import bp, logger
 
@@ -154,7 +155,9 @@ def update_acme_settings():
             db.session.add(revoke_cfg)
         revoke_cfg.value = 'true' if data['revoke_on_renewal'] else 'false'
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update ACME settings")
+    if not ok:
+        return _err
 
     # Revoke existing superseded certs if requested
     revoked_count = 0

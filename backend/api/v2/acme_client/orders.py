@@ -16,6 +16,7 @@ from flask import request
 from api.v2.acme_client import bp
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import AcmeClientService
 from services.audit_service import AuditService
@@ -329,7 +330,9 @@ def cancel_order(order_id):
 
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
     db.session.delete(order)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to cancel ACME order")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='acme_order_cancel',

@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives import serialization
 
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
 from services.audit_service import AuditService
 from security.encryption import decrypt_private_key
@@ -124,7 +125,9 @@ def create_user_mtls_certificate(user_id):
             enabled=True,
         )
         db.session.add(auth_cert)
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to import mTLS certificate")
+        if not ok:
+            return _err
 
         AuditService.log_action(
             action='admin_mtls_import',
@@ -223,7 +226,9 @@ def delete_user_mtls_certificate(user_id, cert_id):
 
     cert_name = auth_cert.name or f'Certificate #{cert_id}'
     db.session.delete(auth_cert)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to delete mTLS certificate")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='admin_mtls_delete',

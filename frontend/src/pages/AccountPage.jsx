@@ -902,7 +902,7 @@ export default function AccountPage() {
         title={t('account.apiKeyCreatedTitle')}
       >
         <div className="p-4 space-y-4">
-          <div className="flex items-start gap-2 p-3 rounded-lg border border-status-warning/40 bg-status-warning/10">
+          <div className="flex items-start gap-2 p-3 rounded-lg border border-status-warning-op40 bg-status-warning-op10">
             <Warning size={20} className="text-status-warning shrink-0 mt-0.5" />
             <p className="text-sm text-text-primary">
               {t('account.apiKeyCreatedWarning')}

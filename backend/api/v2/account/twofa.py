@@ -7,6 +7,7 @@ from flask import request, g
 from models import db, User
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from auth.unified import require_auth
 import pyotp
 import qrcode
@@ -37,7 +38,9 @@ def enable_2fa():
 
     # Store secret temporarily (will be confirmed with code)
     user.totp_secret = secret  # Store unconfirmed
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to initialize 2FA")
+    if not ok:
+        return _err
 
     # Generate QR code
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -83,7 +86,9 @@ def confirm_2fa():
     # Enable 2FA
     user.totp_confirmed = True
     user.backup_codes = ','.join(backup_codes)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to enable 2FA")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mfa_enable',
@@ -136,7 +141,9 @@ def disable_2fa():
     user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to disable 2FA")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mfa_disable',
@@ -192,7 +199,9 @@ def regenerate_recovery_codes():
     new_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
 
     user.backup_codes = ','.join(new_codes)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to regenerate backup codes")
+    if not ok:
+        return _err
 
     return success_response(
         data={'backup_codes': new_codes},

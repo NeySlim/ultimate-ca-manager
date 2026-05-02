@@ -1,7 +1,8 @@
-from . import bp, VALID_ROLES
+from . import bp, VALID_ROLES, logger
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
@@ -121,7 +122,9 @@ def create_provider():
         provider.role_mapping = json.dumps(val)
 
     db.session.add(provider)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to create SSO provider")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='sso_provider_created',
@@ -232,7 +235,9 @@ def update_provider(provider_id=None, provider_type_name=None):
             val = json.loads(val)
         provider.role_mapping = json.dumps(val)
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update SSO provider")
+    if not ok:
+        return _err
     AuditService.log_action(
         action='sso_provider_updated',
         resource_type='sso_provider',
@@ -256,7 +261,9 @@ def delete_provider(provider_id):
     SSOSession.query.filter_by(provider_id=provider_id).delete()
 
     db.session.delete(provider)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to delete SSO provider")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='sso_provider_deleted',
@@ -276,7 +283,9 @@ def toggle_provider(provider_id):
     """Enable/disable SSO provider"""
     provider = SSOProvider.query.get_or_404(provider_id)
     provider.enabled = not provider.enabled
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to toggle SSO provider")
+    if not ok:
+        return _err
 
     status = "enabled" if provider.enabled else "disabled"
     AuditService.log_action(

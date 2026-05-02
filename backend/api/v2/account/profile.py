@@ -4,6 +4,7 @@ import logging
 from flask import request, g
 from models import db, User
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth
 
@@ -108,7 +109,9 @@ def update_profile():
     if 'timezone' in data:
         user.timezone = data.get('timezone', 'UTC')
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update profile")
+    if not ok:
+        return _err
 
     return success_response(
         data={

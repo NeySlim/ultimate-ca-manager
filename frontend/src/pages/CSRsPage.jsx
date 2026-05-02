@@ -17,8 +17,7 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { csrsService, casService, templatesService, mscaService } from '../services'
-import { apiClient } from '../services/apiClient'
+import { csrsService, casService, templatesService, mscaService, ekuService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
@@ -57,7 +56,7 @@ export default function CSRsPage() {
   const [knownEkus, setKnownEkus] = useState([])
   useEffect(() => {
     let cancelled = false
-    apiClient.get('/eku/known')
+    ekuService.getKnown()
       .then((resp) => { if (!cancelled) setKnownEkus(resp?.data?.ekus || resp?.ekus || []) })
       .catch(() => {})
     return () => { cancelled = true }

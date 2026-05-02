@@ -10,6 +10,7 @@ import logging
 
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, User
 from services.audit_service import AuditService
 
@@ -237,7 +238,9 @@ def import_users():
             db.session.add(user)
             imported += 1
 
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to import users")
+        if not ok:
+            return _err
 
         AuditService.log_action(
             action='user_import',

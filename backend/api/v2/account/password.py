@@ -6,6 +6,7 @@ from models import db, User
 from werkzeug.security import check_password_hash, generate_password_hash
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from auth.unified import require_auth
 
 from . import bp
@@ -59,7 +60,9 @@ def change_password():
     # Update password
     user.password_hash = generate_password_hash(new_password)
     user.force_password_change = False
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update password")
+    if not ok:
+        return _err
 
     # Audit log
     AuditService.log_action(

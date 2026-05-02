@@ -11,6 +11,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 
 from . import bp, logger
@@ -126,7 +127,9 @@ def create_acme_account():
             terms_of_service_agreed=agree_tos,
         )
         db.session.add(account)
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to create ACME account")
+        if not ok:
+            return _err
 
         AuditService.log_action(
             action='acme.account.create',

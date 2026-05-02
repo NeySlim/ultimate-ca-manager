@@ -87,7 +87,9 @@ def create_domain():
     )
     
     db.session.add(domain)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to create ACME domain")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='acme_domain_create',
@@ -140,7 +142,9 @@ def update_domain(domain_id):
         else:
             domain.issuing_ca_id = None
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update ACME domain")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='acme_domain_update',

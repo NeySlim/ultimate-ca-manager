@@ -19,6 +19,7 @@ from security.encryption import decrypt_private_key
 from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from utils.response import error_response, no_content_response, success_response
+from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -531,7 +532,9 @@ def delete_user_certificate(cert_id):
     db.session.delete(auth_cert)
     if cert:
         db.session.delete(cert)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to delete user certificate")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='user_certificate_deleted',

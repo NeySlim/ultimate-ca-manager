@@ -14,6 +14,7 @@ Architecture:
 from flask import Blueprint, request, jsonify, session, current_app, g
 from auth.unified import AuthManager
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import User, db
 from services.mtls_auth_service import MTLSAuthService
 from services.webauthn_service import WebAuthnService
@@ -221,7 +222,9 @@ def login_password():
     if user.locked_until and utc_now() >= user.locked_until:
         user.locked_until = None
         user.failed_logins = 0
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to clear account lockout")
+        if not ok:
+            return _err
     
     # Verify password
     if not user.check_password(password):
@@ -230,7 +233,9 @@ def login_password():
         if user.failed_logins >= MAX_FAILED:
             user.locked_until = utc_now() + timedelta(minutes=LOCKOUT_MINUTES)
             logger.warning(f"Account {username} locked after {MAX_FAILED} failed attempts")
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to record failed login")
+        if not ok:
+            return _err
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -245,9 +250,11 @@ def login_password():
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
     user.failed_logins = 0  # Reset failed logins on successful login
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update login stats")
+    if not ok:
+        return _err
     
-    # Check if 2FA is enabled — require TOTP verification before creating session
+    # Check if 2FA is enabled — require TOTP verification before creating session — require TOTP verification before creating session
     if user.totp_confirmed:
         session.clear()
         session['pending_2fa_user_id'] = user.id
@@ -490,7 +497,9 @@ def login_mtls():
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
     user.failed_logins = 0  # Reset failed logins on successful login
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update login stats")
+    if not ok:
+        return _err
     
     # Create session
     now = utc_now()
@@ -642,7 +651,9 @@ def webauthn_verify():
         user.last_login = utc_now()
         user.login_count = (user.login_count or 0) + 1
         user.failed_logins = 0  # Reset failed logins on successful login
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to update login stats")
+        if not ok:
+            return _err
         
         # Create session
         now = utc_now()

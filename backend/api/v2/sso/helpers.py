@@ -137,7 +137,11 @@ def _check_ldap_lockout(username):
             return True
         user.locked_until = None
         user.failed_logins = 0
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to clear LDAP lockout: {e}")
     return False
 
 
@@ -151,7 +155,11 @@ def _record_ldap_failed_attempt(username):
     if user.failed_logins >= max_attempts:
         user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
         logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to record LDAP failed attempt for {username}: {e}")
 
 
 def _clear_ldap_failed_attempts(username):
@@ -160,7 +168,11 @@ def _clear_ldap_failed_attempts(username):
     if user and (user.failed_logins or user.locked_until):
         user.failed_logins = 0
         user.locked_until = None
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
 
 
 def _resolve_role_from_mapping(provider, external_data):

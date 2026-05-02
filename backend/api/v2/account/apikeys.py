@@ -8,6 +8,7 @@ from auth.unified import AuthManager, require_auth
 from auth.permissions import get_role_permissions
 from services.audit_service import AuditService
 from utils.response import success_response, error_response, created_response
+from utils.db_transaction import safe_commit
 
 from . import bp
 
@@ -183,7 +184,9 @@ def update_api_key(key_id):
     # Only allow updating name
     if 'name' in data:
         api_key.name = data['name']
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to update API key")
+        if not ok:
+            return _err
 
     return success_response(
         data=api_key.to_dict(),
@@ -210,7 +213,9 @@ def delete_api_key(key_id):
     # Soft delete (set is_active=False)
     api_key.is_active = False
     key_name = api_key.name
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to delete API key")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='apikey_delete',

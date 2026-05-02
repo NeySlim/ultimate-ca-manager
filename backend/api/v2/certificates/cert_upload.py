@@ -4,6 +4,7 @@ import base64
 from flask import request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import Certificate, db
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -103,7 +104,9 @@ def upload_private_key(cert_id):
         key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
         cert.prv = encrypt_private_key(key_encoded)
 
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to upload private key")
+        if not ok:
+            return _err
 
         # Audit log
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
