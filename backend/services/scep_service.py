@@ -20,8 +20,6 @@ from security.encryption import decrypt_private_key
 import asn1crypto.core
 import asn1crypto.cms
 import asn1crypto.x509
-from pyasn1.codec.der import decoder as pyasn1_decoder
-from pyasn1_modules import rfc5652
 
 from models import db, CA, Certificate, SCEPRequest
 from config.settings import Config
@@ -156,44 +154,37 @@ class SCEPService:
             # The encrypted content is a PKCS#7 envelopedData containing the CSR
             # We need to decrypt it using our CA private key
             try:
-                # Parse the enveloped data with asn1crypto first to check type
+                # asn1crypto handles both DER and BER (including Apple's indefinite-length
+                # BER encoding) — pyasn1's DER decoder rejected it with "Indefinite length
+                # encoding not supported".
                 envdata = asn1crypto.cms.ContentInfo.load(encrypted_bytes)
-                
+
                 if envdata['content_type'].native == 'enveloped_data':
-                    # This is envelopedData - use pyasn1 to handle constructed OctetString
-                    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-                    
-                    # Parse with pyasn1 to handle BER constructed OctetString
-                    content_info_inner, _ = pyasn1_decoder.decode(encrypted_bytes, asn1Spec=rfc5652.ContentInfo())
-                    env_data, _ = pyasn1_decoder.decode(bytes(content_info_inner['content']), asn1Spec=rfc5652.EnvelopedData())
-                    
-                    # Get recipient info - it's a CHOICE, need to get the component
-                    recipient_info = env_data['recipientInfos'][0]
-                    recipient_ktri = recipient_info.getComponent()  # Get KeyTransRecipientInfo from CHOICE
-                    encrypted_key_bytes = bytes(recipient_ktri['encryptedKey'])
-                    
+                    env = envdata['content']
+
+                    # Get recipient info — KTRI (RSA key transport) for SCEP
+                    ktri = env['recipient_infos'][0].chosen
+                    encrypted_key_bytes = ktri['encrypted_key'].native
+
                     # Decrypt the content encryption key with CA private key
                     content_encryption_key = self.ca_key.decrypt(
                         encrypted_key_bytes,
                         padding.PKCS1v15()
                     )
-                    
+
                     # Get encrypted content and algorithm
-                    enc_info = env_data['encryptedContentInfo']
-                    encrypted_content_bytes = bytes(enc_info['encryptedContent'])
-                    alg_oid = str(enc_info['contentEncryptionAlgorithm']['algorithm'])
-                    alg_params = enc_info['contentEncryptionAlgorithm']['parameters']
-                    
-                    # Extract IV from parameters (ASN.1 encoded OctetString)
-                    if alg_params and alg_params.hasValue():
-                        params_bytes = bytes(alg_params)
-                        # Parameters are DER-encoded OctetString
-                        from pyasn1.type import univ
-                        iv_octets, _ = pyasn1_decoder.decode(params_bytes, asn1Spec=univ.OctetString())
-                        iv = bytes(iv_octets)
+                    eci = env['encrypted_content_info']
+                    encrypted_content_bytes = eci['encrypted_content'].native
+                    alg_id = eci['content_encryption_algorithm']
+                    alg_oid = alg_id['algorithm'].dotted
+
+                    # Extract IV — CBC parameter is a plain OctetString
+                    params = alg_id['parameters']
+                    if params:
+                        iv = asn1crypto.core.OctetString.load(params.dump()).native
                     else:
-                        iv = b'\x00' * 8  # Default IV
-                    
+                        iv = b'\x00' * 8
+
                     # Decrypt the encrypted content to get CSR
                     if '1.3.14.3.2.7' in alg_oid:  # DES
                         logger.warning("SCEP client using DES encryption — rejected (insecure)")
@@ -202,7 +193,6 @@ class SCEPService:
                         logger.warning("SCEP client using 3DES encryption — deprecated, prefer AES")
                         cipher = DES3.new(content_encryption_key, DES3.MODE_CBC, iv)
                         csr_data = cipher.decrypt(encrypted_content_bytes)
-                        # Validate and remove PKCS#7 padding
                         pad_len = csr_data[-1]
                         if pad_len < 1 or pad_len > DES3.block_size or not all(b == pad_len for b in csr_data[-pad_len:]):
                             raise ValueError("Invalid PKCS#7 padding in SCEP message")
@@ -219,7 +209,7 @@ class SCEPService:
                 else:
                     # Not enveloped, use as-is (shouldn't happen in modern SCEP)
                     csr_data = encrypted_bytes
-                    
+
             except Exception as e:
                 logger.error(f"SCEP: Failed to decrypt envelopedData: {e}")
                 raise ValueError("Failed to decrypt SCEP message envelope")
