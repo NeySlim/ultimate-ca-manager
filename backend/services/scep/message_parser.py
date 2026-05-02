@@ -5,10 +5,9 @@ import logging
 from typing import Dict, Any
 
 import asn1crypto.cms
+import asn1crypto.core
 from Crypto.Cipher import DES3, AES
 from cryptography.hazmat.primitives.asymmetric import padding
-from pyasn1.codec.der import decoder as pyasn1_decoder
-from pyasn1_modules import rfc5652
 
 logger = logging.getLogger(__name__)
 
@@ -67,29 +66,26 @@ def decrypt_scep_envelope(encrypted_bytes: bytes, ca_key) -> bytes:
         # Not enveloped — return as-is (shouldn't happen in modern SCEP)
         return encrypted_bytes
 
-    # Parse with pyasn1 to handle BER-encoded constructed OctetString
-    content_info_inner, _ = pyasn1_decoder.decode(
-        encrypted_bytes, asn1Spec=rfc5652.ContentInfo()
-    )
-    env_data, _ = pyasn1_decoder.decode(
-        bytes(content_info_inner['content']), asn1Spec=rfc5652.EnvelopedData()
-    )
+    # asn1crypto handles both DER and BER (including Apple's indefinite-length
+    # BER encoding) — pyasn1's DER decoder rejected it with "Indefinite length
+    # encoding not supported".
+    env = envdata['content']
 
-    recipient_info = env_data['recipientInfos'][0]
-    recipient_ktri = recipient_info.getComponent()
-    encrypted_key_bytes = bytes(recipient_ktri['encryptedKey'])
+    # Get recipient info — KTRI (RSA key transport) for SCEP
+    ktri = env['recipient_infos'][0].chosen
+    encrypted_key_bytes = ktri['encrypted_key'].native
 
     content_encryption_key = ca_key.decrypt(encrypted_key_bytes, padding.PKCS1v15())
 
-    enc_info = env_data['encryptedContentInfo']
-    encrypted_content_bytes = bytes(enc_info['encryptedContent'])
-    alg_oid = str(enc_info['contentEncryptionAlgorithm']['algorithm'])
-    alg_params = enc_info['contentEncryptionAlgorithm']['parameters']
+    eci = env['encrypted_content_info']
+    encrypted_content_bytes = eci['encrypted_content'].native
+    alg_id = eci['content_encryption_algorithm']
+    alg_oid = alg_id['algorithm'].dotted
 
-    if alg_params and alg_params.hasValue():
-        from pyasn1.type import univ
-        iv_octets, _ = pyasn1_decoder.decode(bytes(alg_params), asn1Spec=univ.OctetString())
-        iv = bytes(iv_octets)
+    # Extract IV — CBC parameter is a plain OctetString (RFC 3370/3565)
+    params = alg_id['parameters']
+    if params:
+        iv = asn1crypto.core.OctetString.load(params.dump()).native
     else:
         iv = b'\x00' * 8
 

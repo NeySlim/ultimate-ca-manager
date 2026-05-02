@@ -113,28 +113,6 @@ class SCEPService:
         """Return CA certificate in DER format for SCEP GetCACert."""
         return self.ca_cert.public_bytes(serialization.Encoding.DER)
 
-    def get_ca_cert_chain(self) -> bytes:
-        """
-        Return CA certificate chain in degenerate PKCS#7 format (RFC 8894 §3.2).
-        Includes the CA cert and all parent CA certs up to root.
-        """
-        from services.scep.crypto_helpers import create_degenerate_pkcs7
-
-        certs = [self.ca_cert]
-        current_ca = self.ca
-        while current_ca.caref:
-            parent = CA.query.filter_by(refid=current_ca.caref).first()
-            if not parent or not parent.crt:
-                break
-            certs.append(
-                x509.load_pem_x509_certificate(
-                    base64.b64decode(parent.crt), default_backend()
-                )
-            )
-            current_ca = parent
-
-        return create_degenerate_pkcs7(certs)
-
     def process_pkcs_req(self, pkcs7_data: bytes, client_ip: str) -> Tuple[bytes, int]:
         """
         Process a SCEP PKCSReq / RenewalReq enrollment request.

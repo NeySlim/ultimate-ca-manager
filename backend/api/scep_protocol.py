@@ -116,19 +116,14 @@ def handle_get_ca_cert():
         return make_error_response(error, 500)
     
     try:
-        # Check if this is an intermediate CA (has a parent)
-        ca = service.ca
-        if ca.caref:
-            # Intermediate CA — return PKCS#7 chain (RFC 8894 §3.2)
-            chain_der = service.get_ca_cert_chain()
-            response = make_response(chain_der)
-            response.headers['Content-Type'] = 'application/x-x509-ca-ra-cert'
-        else:
-            # Root CA — return single DER certificate
-            ca_cert_der = service.get_ca_cert()
-            response = make_response(ca_cert_der)
-            response.headers['Content-Type'] = 'application/x-x509-ca-cert'
-        
+        # Always return the single CA cert as DER with application/x-x509-ca-cert.
+        # application/x-x509-ca-ra-cert is only correct when a separate RA cert
+        # exists (distinct from the CA cert); UCM uses the CA itself as the RA,
+        # so that content-type causes Apple clients to fail validation looking for
+        # dedicated RA signing/encryption certs that aren't there (-67731).
+        ca_cert_der = service.get_ca_cert()
+        response = make_response(ca_cert_der)
+        response.headers['Content-Type'] = 'application/x-x509-ca-cert'
         return response
         
     except Exception as e:
