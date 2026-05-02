@@ -574,15 +574,55 @@ class SCEPService:
             .not_valid_after(not_after)
         )
 
-        # Copy SAN / Key Usage / Extended Key Usage from CSR
+        # Copy SAN / Key Usage / Extended Key Usage from CSR.
+        # CRITICAL: do NOT copy KU/EKU verbatim — a malicious SCEP client can
+        # request keyCertSign/cRLSign or arbitrary EKUs in its CSR. Even
+        # though we hardcode BasicConstraints(ca=False) below, downstream
+        # validators that trust KeyUsage flags (or EKU like 1.3.6.1.5.5.7.3.X)
+        # would accept the issued cert for purposes the operator never
+        # authorised. Whitelist what an end-entity SCEP cert may legitimately
+        # carry.
+        _ALLOWED_EKU_OIDS = {
+            x509.ExtendedKeyUsageOID.SERVER_AUTH,
+            x509.ExtendedKeyUsageOID.CLIENT_AUTH,
+            x509.ExtendedKeyUsageOID.EMAIL_PROTECTION,
+            x509.ExtendedKeyUsageOID.CODE_SIGNING,
+            x509.ExtendedKeyUsageOID.TIME_STAMPING,
+            x509.ExtendedKeyUsageOID.OCSP_SIGNING,
+            x509.ExtendedKeyUsageOID.IPSEC_IKE,
+        }
         try:
             for ext in csr.extensions:
                 if ext.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
                     builder = builder.add_extension(ext.value, critical=False)
                 elif ext.oid == ExtensionOID.KEY_USAGE:
-                    builder = builder.add_extension(ext.value, critical=True)
+                    ku = ext.value
+                    # Force-clear bits that would let the cert act as a CA or
+                    # sign CRLs. Encipher-only / decipher-only are only valid
+                    # when key_agreement is set.
+                    safe_key_agreement = bool(ku.key_agreement)
+                    safe_ku = x509.KeyUsage(
+                        digital_signature=bool(ku.digital_signature),
+                        content_commitment=bool(ku.content_commitment),
+                        key_encipherment=bool(ku.key_encipherment),
+                        data_encipherment=bool(ku.data_encipherment),
+                        key_agreement=safe_key_agreement,
+                        key_cert_sign=False,
+                        crl_sign=False,
+                        encipher_only=bool(ku.encipher_only) if safe_key_agreement else False,
+                        decipher_only=bool(ku.decipher_only) if safe_key_agreement else False,
+                    )
+                    builder = builder.add_extension(safe_ku, critical=True)
                 elif ext.oid == ExtensionOID.EXTENDED_KEY_USAGE:
-                    builder = builder.add_extension(ext.value, critical=False)
+                    safe_ekus = [oid for oid in ext.value if oid in _ALLOWED_EKU_OIDS]
+                    if safe_ekus:
+                        builder = builder.add_extension(
+                            x509.ExtendedKeyUsage(safe_ekus), critical=False
+                        )
+                # All other extensions (BasicConstraints, NameConstraints,
+                # PolicyConstraints, AuthorityInfoAccess, custom OIDs, ...)
+                # from the CSR are silently dropped — they MUST be set by us
+                # below or not at all.
         except x509.ExtensionNotFound:
             pass
 
