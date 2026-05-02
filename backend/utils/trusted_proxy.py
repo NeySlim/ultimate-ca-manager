@@ -66,3 +66,31 @@ def reject_untrusted_proxy_headers(*header_names) -> bool:
             present, request.remote_addr,
         )
     return True
+
+
+def client_ip() -> str:
+    """
+    Return the best-effort real client IP for audit logging.
+
+    Behind a trusted reverse proxy (UCM_TRUSTED_PROXIES contains the
+    immediate peer) the left-most entry of X-Forwarded-For is taken
+    as the original client IP. Otherwise — including when the request
+    comes directly from gunicorn or from a peer NOT in the trusted
+    set — request.remote_addr is returned and any X-Forwarded-* on
+    the request is ignored. This is the same gating that protects
+    SSL_CLIENT_* headers; spoofed XFF from untrusted peers must NEVER
+    end up in the audit trail as if it were the real client.
+
+    Always returns a non-empty string ('unknown' as last resort).
+    """
+    if is_request_from_trusted_proxy():
+        xff = request.headers.get('X-Forwarded-For') or ''
+        if xff:
+            # Left-most IP is the originating client per RFC 7239.
+            first = xff.split(',', 1)[0].strip()
+            if first:
+                return first
+        real_ip = request.headers.get('X-Real-IP')
+        if real_ip:
+            return real_ip.strip()
+    return request.remote_addr or 'unknown'
