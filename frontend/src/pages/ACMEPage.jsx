@@ -1,41 +1,42 @@
-/**
- * ACME Page - Refactored with ResponsiveLayout
- * ACME Protocol management for automated certificate issuance
- * 
- * Layout:
- * - Horizontal tabs: Configuration | Accounts
- * - Desktop: Split view with accounts list + detail panel
- * - Mobile: Full-screen navigation
- */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
-  Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
-  ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning,
-  DownloadSimple, Eye, LockKey, GlobeHemisphereWest, PencilSimple, MagnifyingGlass, Copy,
-  CaretRight
+import {
+  Key, Plus, CheckCircle, ShieldCheck,
+  Globe, Lightning, Database, Gear, ClockCounterClockwise,
+  ArrowsClockwise, Warning, LockKey, GlobeHemisphereWest, PlugsConnected
 } from '@phosphor-icons/react'
-import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import {
   ResponsiveLayout,
-  ResponsiveDataTable,
-  Button, Badge, Card, Input, Modal, Select, HelpCard,
+  Button, Badge, Card, Modal, HelpCard,
   LoadingSpinner, StatusIndicator,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
+  CompactStats, CompactHeader
 } from '../components'
 import { acmeService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission, useClipboard } from '../hooks'
-import { formatDate, cn , downloadBlob} from '../lib/utils'
-import { ProviderIcon, getProviderColor } from '../components/ProviderIcons'
+import { usePermission } from '../hooks'
+import { formatDate, downloadBlob } from '../lib/utils'
+import AccountDetailPanel from './acme/AccountDetailPanel'
+import LetsEncryptTab from './acme/LetsEncryptTab'
+import ConfigTab from './acme/ConfigTab'
+import DnsProvidersTab from './acme/DnsProvidersTab'
+import DomainsTab from './acme/DomainsTab'
+import LocalDomainsTab from './acme/LocalDomainsTab'
+import AccountsTab from './acme/AccountsTab'
+import EabTab from './acme/EabTab'
+import HistoryTab from './acme/HistoryTab'
+import CertDetailPanel from './acme/CertDetailPanel'
+import OrderDetailPanel from './acme/OrderDetailPanel'
+import CreateAccountForm from './acme/CreateAccountForm'
+import RequestCertificateForm from './acme/RequestCertificateForm'
+import DnsProviderForm from './acme/DnsProviderForm'
+import DomainForm from './acme/DomainForm'
+import LocalDomainForm from './acme/LocalDomainForm'
 
 export default function ACMEPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete } = usePermission()
-  const { copy } = useClipboard()
-  
+
   // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
   const [selectedAccount, setSelectedAccount] = useState(null)
@@ -45,7 +46,7 @@ export default function ACMEPage() {
   const [acmeSettings, setAcmeSettings] = useState({})
   const [cas, setCas] = useState([])
   const [history, setHistory] = useState([])
-  
+
   // Data states - Let's Encrypt Client
   const [clientOrders, setClientOrders] = useState([])
   const [clientSettings, setClientSettings] = useState({})
@@ -56,7 +57,7 @@ export default function ACMEPage() {
   const [selectedClientOrder, setSelectedClientOrder] = useState(null)
   const [selectedDnsProvider, setSelectedDnsProvider] = useState(null)
   const [selectedAcmeDomain, setSelectedAcmeDomain] = useState(null)
-  
+
   // UI states
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -73,7 +74,8 @@ export default function ACMEPage() {
   const [eabHmacInput, setEabHmacInput] = useState(null)
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
   const [proxyEmail, setProxyEmail] = useState('')
-  
+  const [openEabCreate, setOpenEabCreate] = useState(false)
+
   // Local state for text inputs (saved on blur, not on every keystroke)
   const [localContactEmail, setLocalContactEmail] = useState('')
   const [localDirectoryUrl, setLocalDirectoryUrl] = useState('')
@@ -83,24 +85,18 @@ export default function ACMEPage() {
   const [proxyEabHmacInput, setProxyEabHmacInput] = useState(null)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionResult, setConnectionResult] = useState(null)
-  
-  // Pagination state
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
-  
+
   // History filters
   const [historyFilterStatus, setHistoryFilterStatus] = useState([])
   const [historyFilterCA, setHistoryFilterCA] = useState('')
   const [historyFilterSource, setHistoryFilterSource] = useState('')
 
-  // EAB Credentials (RFC 8555 §7.3.4 — server-side External Account Binding)
-  const [eabCredentials, setEabCredentials] = useState([])
+  // EAB — only required flag stays in parent; credentials state lives in EabTab
   const [eabRequired, setEabRequired] = useState(false)
-  const [showCreateEabModal, setShowCreateEabModal] = useState(false)
-  const [newEabSecret, setNewEabSecret] = useState(null)
-  const [eabLabel, setEabLabel] = useState('')
-  const [eabExpiresInDays, setEabExpiresInDays] = useState('')
-  const [eabFilterStatus, setEabFilterStatus] = useState('')
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -109,7 +105,7 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabCredsRes, eabReqRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
@@ -120,7 +116,6 @@ export default function ACMEPage() {
         acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
         acmeService.getDomains().catch(() => ({ data: [] })),
         acmeService.getLocalDomains().catch(() => ({ data: [] })),
-        acmeService.listEabCredentials().catch(() => ({ data: [] })),
         acmeService.getEabRequired().catch(() => ({ data: { eab_required: false } }))
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
@@ -130,7 +125,6 @@ export default function ACMEPage() {
       setClientOrders(clientOrdersRes.data || [])
       setClientSettings(clientSettingsRes.data || {})
       setEabHmacInput(null)
-      setEabCredentials(eabCredsRes.data || [])
       setEabRequired(!!(eabReqRes.data?.eab_required))
       
       // Sync local text input state from loaded settings
@@ -641,45 +635,6 @@ export default function ACMEPage() {
     }
   }
 
-  const handleCreateEabCredential = async () => {
-    try {
-      const payload = { label: eabLabel || null }
-      const days = parseInt(eabExpiresInDays, 10)
-      if (!Number.isNaN(days) && days > 0) payload.expires_in_days = days
-
-      const res = await acmeService.createEabCredential(payload)
-      const created = res.data || res
-      setNewEabSecret(created)
-      setShowCreateEabModal(false)
-      setEabLabel('')
-      setEabExpiresInDays('')
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
-    } catch (error) {
-      showError(error.message || t('acme.eab.createFailed'))
-    }
-  }
-
-  const handleRevokeEabCredential = async (cred) => {
-    const confirmed = await showConfirm(
-      t('acme.eab.confirmRevoke', { kid: cred.kid }),
-      {
-        title: t('acme.eab.revokeTitle'),
-        confirmText: t('acme.eab.revoke'),
-        variant: 'danger'
-      }
-    )
-    if (!confirmed) return
-    try {
-      await acmeService.revokeEabCredential(cred.id)
-      showSuccess(t('acme.eab.revokedSuccess'))
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
-    } catch (error) {
-      showError(error.message || t('acme.eab.revokeFailed'))
-    }
-  }
-
   // Computed stats
   const stats = useMemo(() => ({
     total: accounts.length,
@@ -764,7 +719,7 @@ export default function ACMEPage() {
     { id: 'config', label: t('acme.server'), icon: Gear },
     { id: 'localdomains', label: t('acme.localDomains'), icon: GlobeHemisphereWest, count: localDomains.length },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
-    { id: 'eab', label: t('acme.eab.tab'), icon: LockKey, count: eabCredentials.length },
+    { id: 'eab', label: t('acme.eab.tab'), icon: LockKey },
     { id: 'history', label: t('common.history'), icon: ClockCounterClockwise, count: history.length }
   ]
 
@@ -801,7 +756,7 @@ export default function ACMEPage() {
         </Button>
       )}
       {activeTab === 'eab' && canWrite('acme') && (
-        <Button type="button" size="sm" onClick={() => { setEabLabel(''); setEabExpiresInDays(''); setShowCreateEabModal(true) }}>
+        <Button type="button" size="sm" onClick={() => setOpenEabCreate(true)}>
           <Plus size={14} />
           <span className="hidden sm:inline">{t('acme.eab.new')}</span>
         </Button>
@@ -868,1787 +823,6 @@ export default function ACMEPage() {
     </div>
   )
 
-  // Account detail content for slide-over
-  const accountDetailContent = selectedAccount && (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={Key}
-        iconClass={selectedAccount.status === 'valid' ? "bg-status-success-op20" : "bg-bg-tertiary"}
-        title={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || t('acme.account')}
-        subtitle={`ID: ${selectedAccount.account_id?.substring(0, 24)}...`}
-        badge={
-          <Badge variant={selectedAccount.status === 'valid' ? 'success' : 'secondary'} size="sm">
-            {selectedAccount.status === 'valid' && <CheckCircle size={10} weight="fill" />}
-            {selectedAccount.status}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        { icon: Key, value: selectedAccount.key_type || 'RSA-2048' },
-        { icon: Globe, value: `${orders.length} ${t('acme.orders').toLowerCase()}` },
-        { icon: ShieldCheck, value: `${challenges.length} ${t('common.challenges').toLowerCase()}` },
-      ]} />
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        <Button 
-          size="sm" 
-          variant="secondary"
-          className="flex-1"
-          onClick={() => handleDeactivate(selectedAccount.id)}
-          disabled={selectedAccount.status !== 'valid'}
-        >
-          <XCircle size={14} />
-          {t('common.deactivate')}
-        </Button>
-        <Button 
-          size="sm" 
-          variant="danger"
-          onClick={() => handleDelete(selectedAccount.id)}
-        >
-          <Trash size={14} />
-        </Button>
-      </div>
-
-      {/* Detail Tabs */}
-      <div className="flex gap-1 border-b border-border">
-        {detailTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveDetailTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-              activeDetailTab === tab.id
-                ? 'border-accent-primary text-accent-primary'
-                : 'border-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <tab.icon size={14} />
-            {tab.label}
-            {tab.count > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-2xs rounded-full bg-bg-tertiary">
-                {tab.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      {activeDetailTab === 'account' && (
-        <div className="space-y-3">
-          <CompactSection title={t('common.accountInformation')}>
-            <CompactGrid>
-              <CompactField autoIcon="email" label={t('common.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} copyable />
-              <CompactField autoIcon="status" label={t('common.status')}>
-                <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
-                  {selectedAccount.status}
-                </StatusIndicator>
-              </CompactField>
-              <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedAccount.key_type || 'RSA-2048'} />
-              <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedAccount.created_at)} />
-            </CompactGrid>
-          </CompactSection>
-
-          <CompactSection title={t('acme.accountId')} collapsible defaultOpen={false}>
-            <div className="relative group">
-              <p className="font-mono text-2xs text-text-secondary break-all bg-tertiary-op50 p-2 rounded pr-8">
-                {selectedAccount.account_id}
-              </p>
-              <button
-                type="button"
-                onClick={() => { copy(selectedAccount.account_id); showSuccess(t('common.copied')) }}
-                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-all"
-                aria-label={t('common.copy')}
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-          </CompactSection>
-
-          <CompactSection title={t('acme.termsOfService')}>
-            <div className="flex items-center gap-2 text-xs">
-              {selectedAccount.terms_of_service_agreed || selectedAccount.tos_agreed ? (
-                <>
-                  <CheckCircle size={14} className="status-success-text" weight="fill" />
-                  <span className="status-success-text">{t('acme.accepted')}</span>
-                </>
-              ) : (
-                <>
-                  <XCircle size={14} className="status-danger-text" weight="fill" />
-                  <span className="status-danger-text">{t('acme.notAccepted')}</span>
-                </>
-              )}
-            </div>
-          </CompactSection>
-        </div>
-      )}
-
-      {activeDetailTab === 'orders' && (
-        <CompactSection title={`${orders.length} ${t('acme.orders')}`}>
-          {orders.length === 0 ? (
-            <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noCertificateOrders')}</p>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {orders.map((order, i) => (
-                <div key={i} className="p-3 bg-tertiary-op50 rounded-lg border border-border-op50 hover:border-border transition-colors">
-                  {/* Header: Domain + Status */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-sm font-medium text-text-primary truncate flex-1">
-                      {order.domain || order.identifier || t('common.unknown')}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {order.source === 'proxy' && (
-                        <Badge variant="info" size="sm" title={order.environment || ''}>
-                          {t('acme.proxy')}
-                        </Badge>
-                      )}
-                      <Badge 
-                        variant={
-                          order.status?.toLowerCase() === 'valid' || order.status?.toLowerCase() === 'issued' ? 'success' : 
-                          order.status?.toLowerCase() === 'pending' ? 'warning' :
-                          order.status?.toLowerCase() === 'ready' ? 'info' :
-                          'error'
-                        } 
-                        size="sm"
-                      >
-                        {order.status || t('common.unknown')}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  {/* Details Grid */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-text-tertiary">{t('acme.method')}</span>
-                      <span className="text-text-secondary font-medium">{order.method || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-tertiary">{t('common.expires')}</span>
-                      <span className="text-text-secondary">{order.expires || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('common.created')}</span>
-                      <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
-                    </div>
-                    {order.order_id && (
-                      <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border-op30">
-                        <span className="text-text-tertiary">{t('acme.orderId')}</span>
-                        <span className="text-text-tertiary font-mono text-[10px] truncate max-w-[180px]" title={order.order_id}>
-                          {order.order_id}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CompactSection>
-      )}
-
-      {activeDetailTab === 'challenges' && (
-        <CompactSection title={`${challenges.length} ${t('common.challenges')}`}>
-          {challenges.length === 0 ? (
-            <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noActiveChallenges')}</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {challenges.map((ch, i) => (
-                <div key={i} className="p-2 bg-tertiary-op30 rounded text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" size="sm">{ch.type}</Badge>
-                    <Badge 
-                      variant={ch.status === 'valid' ? 'success' : ch.status === 'pending' ? 'warning' : 'danger'} 
-                      size="sm"
-                    >
-                      {ch.status}
-                    </Badge>
-                  </div>
-                  <p className="text-text-secondary truncate">{ch.domain}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CompactSection>
-      )}
-    </div>
-  )
-
-  // =========================================================================
-  // Let's Encrypt Tab Content
-  // =========================================================================
-  
-  const letsEncryptContent = (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.letsEncryptAbout')} compact>
-        {t('acme.letsEncryptAboutDesc')}
-      </HelpCard>
-      
-      {/* Request Certificate Button */}
-      <div className="flex flex-wrap items-center gap-2">
-        {canWrite('acme') && (
-        <Button type="button" onClick={() => setShowRequestModal(true)}>
-          <Plus size={14} />
-          {t('acme.requestCertificate')}
-        </Button>
-        )}
-        <Button type="button" variant="secondary" onClick={loadData}>
-          <ArrowsClockwise size={14} />
-          {t('common.refresh')}
-        </Button>
-      </div>
-      
-      {/* Info about History tab */}
-      <HelpCard variant="info" compact>
-        <span className="flex items-center gap-2">
-          <ClockCounterClockwise size={16} />
-          {t('acme.viewHistoryForCertificates')}
-        </span>
-      </HelpCard>
-
-      {/* Client Orders */}
-      <CompactSection title={`${t('acme.orders')} (${clientOrders.length})`} icon={Certificate}>
-        {clientOrders.length === 0 ? (
-          <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noCertificateOrders')}</p>
-        ) : (
-          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-            {clientOrders.map((order) => (
-              <div 
-                key={order.id} 
-                className={cn(
-                  "p-3 bg-tertiary-op50 rounded-lg border transition-colors cursor-pointer",
-                  selectedClientOrder?.id === order.id 
-                    ? "border-accent-primary ring-1 ring-accent-primary/30" 
-                    : "border-border-op50 hover:border-border"
-                )}
-                onClick={() => setSelectedClientOrder(selectedClientOrder?.id === order.id ? null : order)}
-              >
-                {/* Header: Domain + Status */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-sm font-medium text-text-primary truncate flex-1">
-                    {order.primary_domain || order.domains?.[0] || t('common.unknown')}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={order.environment === 'production' ? 'default' : 'secondary'} size="sm">
-                      {order.environment}
-                    </Badge>
-                    <Badge 
-                      variant={
-                        order.status === 'valid' || order.status === 'issued' ? 'success' : 
-                        order.status === 'pending' || order.status === 'processing' || order.status === 'validating' ? 'warning' :
-                        order.status === 'ready' ? 'info' :
-                        'error'
-                      } 
-                      size="sm"
-                    >
-                      {order.status}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">{t('acme.method')}</span>
-                    <span className="text-text-secondary font-medium">{order.challenge_type || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-tertiary">{t('common.created')}</span>
-                    <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
-                  </div>
-                  {order.dns_provider_name && (
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('acme.dnsProviders')}</span>
-                      <span className="text-text-secondary">{order.dns_provider_name}</span>
-                    </div>
-                  )}
-                  {order.is_proxy_order && (order.account_email || order.account_short_id) && (
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('acme.account')}</span>
-                      <span className="text-text-secondary truncate max-w-[220px]" title={order.account_id || ''}>
-                        {order.account_email || `${order.account_short_id}…`}
-                      </span>
-                    </div>
-                  )}
-                  {order.domains?.length > 1 && (
-                    <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">{t('acme.domains')}</span>
-                      <span className="text-text-secondary truncate max-w-[200px]" title={order.domains.join(', ')}>
-                        {order.domains.join(', ')}
-                      </span>
-                    </div>
-                  )}
-                  {order.error_message && (
-                    <div className="col-span-2 mt-1 pt-1 border-t border-border-op30">
-                      <span className="text-xs status-danger-text">{order.error_message}</span>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Expanded Detail + Actions */}
-                {selectedClientOrder?.id === order.id && (
-                  <div className="mt-3 pt-3 border-t border-border-op30 space-y-2">
-                    {order.expires_at && (
-                      <div className="flex justify-between text-xs">
-                        <span className="text-text-tertiary">{t('common.expires')}</span>
-                        <span className="text-text-secondary">{formatDate(order.expires_at)}</span>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {(order.status === 'pending' || order.status === 'processing') && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleVerifyChallenge(order) }}>
-                          <Play size={12} />
-                          {t('acme.verifyChallenge')}
-                        </Button>
-                      )}
-                      {order.status === 'validating' && (
-                        <>
-                          <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleCheckOrderStatus(order) }}>
-                            <MagnifyingGlass size={12} />
-                            {t('acme.checkStatus')}
-                          </Button>
-                          <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleVerifyChallenge(order) }}>
-                            <Play size={12} />
-                            {t('acme.retryVerification')}
-                          </Button>
-                        </>
-                      )}
-                      {order.status === 'ready' && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleFinalizeOrder(order) }}>
-                          <CheckCircle size={12} />
-                          {t('acme.finalize')}
-                        </Button>
-                      )}
-                      {order.certificate_id && (
-                        <>
-                          <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleViewCertificate(order) }}>
-                            <Eye size={12} />
-                            {t('common.viewCertificate')}
-                          </Button>
-                          <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleDownloadCertificate(order) }}>
-                            <DownloadSimple size={12} />
-                            {t('common.download')}
-                          </Button>
-                        </>
-                      )}
-                      {(order.status === 'valid' || order.status === 'issued') && (
-                        <Button type="button" variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); handleRenewCertificate(order) }}>
-                          <ArrowsClockwise size={12} />
-                          {t('acme.renew')}
-                        </Button>
-                      )}
-                      {canDelete('acme') && (
-                        <Button type="button" variant="danger" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteClientOrder(order) }}>
-                          <Trash size={12} />
-                          {t('common.delete')}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </CompactSection>
-      
-      {/* Client Settings */}
-      <CompactSection title={t('acme.clientSettings')} icon={Gear}>
-        <div className="space-y-3">
-          <Select
-            label={t('acme.defaultEnvironment')}
-            value={clientSettings.default_environment || 'staging'}
-            onChange={(val) => handleUpdateClientSetting('default_environment', val)}
-            disabled={!canWrite('acme')}
-            options={[
-              { value: 'staging', label: t('acme.staging') + ' (Test)' },
-              { value: 'production', label: t('acme.production') + ' (Live)' }
-            ]}
-            helperText={t('acme.environmentHelper')}
-          />
-          
-          <Input
-            label={t('acme.contactEmail')}
-            type="email"
-            value={localContactEmail}
-            onChange={(e) => setLocalContactEmail(e.target.value)}
-            onBlur={() => handleBlurSave('email', localContactEmail, setLocalContactEmail)}
-            disabled={!canWrite('acme')}
-            helperText={t('acme.contactEmailHelper')}
-          />
-          
-          <ToggleSwitch
-            checked={clientSettings.auto_renewal ?? true}
-            onChange={(val) => handleUpdateClientSetting('auto_renewal', val)}
-            disabled={!canWrite('acme')}
-            label={t('acme.autoRenewal')}
-            description={t('acme.autoRenewalDesc')}
-          />
-
-          <ToggleSwitch
-            checked={clientSettings.verify_ssl ?? true}
-            onChange={(val) => handleUpdateClientSetting('verify_ssl', val)}
-            disabled={!canWrite('acme')}
-            label={t('sso.verifySsl')}
-          />
-
-          {clientSettings.verify_ssl === false && (
-            <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
-              <p className="text-xs status-warning-text">{t('sso.sslWarning')}</p>
-            </div>
-          )}
-          
-          <Select
-            label={t('acme.keyType')}
-            value={clientSettings.key_type || 'RSA-2048'}
-            onChange={(val) => handleUpdateClientSetting('key_type', val)}
-            disabled={!canWrite('acme')}
-            options={[
-              { value: 'RSA-2048', label: 'RSA 2048' },
-              { value: 'RSA-4096', label: 'RSA 4096' },
-              { value: 'EC-P256', label: 'ECDSA P-256' },
-              { value: 'EC-P384', label: 'ECDSA P-384' },
-            ]}
-            helperText={t('acme.keyTypeHelper')}
-          />
-          
-          <Select
-            label={t('acme.accountKeyType')}
-            value={clientSettings.account_key_type || 'ES256'}
-            onChange={(val) => handleUpdateClientSetting('account_key_type', val)}
-            disabled={!canWrite('acme')}
-            options={[
-              { value: 'ES256', label: 'ECDSA P-256 (ES256)' },
-              { value: 'ES384', label: 'ECDSA P-384 (ES384)' },
-              { value: 'RS256', label: 'RSA 2048 (RS256)' },
-            ]}
-            helperText={t('acme.accountKeyTypeHelper')}
-          />
-
-          {/* Custom ACME Directory — collapsed advanced option */}
-          <details className="group rounded-lg border border-border/50 hover:border-border transition-colors">
-            <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-bg-tertiary/30 transition-colors list-none [&::-webkit-details-marker]:hidden">
-              <CaretRight size={14} weight="bold" className="shrink-0 transition-transform duration-200 group-open:rotate-90" />
-              <Globe size={14} className="shrink-0" />
-              {t('acme.customDirectoryOverride')}
-              {localDirectoryUrl && (
-                <Badge variant="outline" size="sm">{t('common.configured')}</Badge>
-              )}
-            </summary>
-            <div className="px-3 pb-3 space-y-3">
-              <p className="text-xs text-text-tertiary">{t('acme.customDirectoryOverrideHelper')}</p>
-              <Input
-                label={t('acme.directoryUrl')}
-                type="url"
-                value={localDirectoryUrl}
-                onChange={(e) => setLocalDirectoryUrl(e.target.value)}
-                onBlur={() => handleBlurSave('directory_url', localDirectoryUrl, setLocalDirectoryUrl)}
-                disabled={!canWrite('acme')}
-                placeholder="https://acme.zerossl.com/v2/DV90"
-                helperText={t('acme.directoryUrlHelper')}
-              />
-              
-              <Input
-                label={t('acme.eabKid')}
-                value={localEabKid}
-                onChange={(e) => setLocalEabKid(e.target.value)}
-                onBlur={() => handleBlurSave('eab_kid', localEabKid, setLocalEabKid)}
-                disabled={!canWrite('acme')}
-                placeholder="key-id-from-ca"
-                helperText={t('acme.eabKidHelper')}
-              />
-              
-              <Input
-                label={t('acme.eabHmacKey')}
-                type="password"
-                value={eabHmacInput !== null ? eabHmacInput : (clientSettings.eab_hmac_key_set ? '••••••••' : '')}
-                onChange={(e) => setEabHmacInput(e.target.value)}
-                onBlur={() => {
-                  if (eabHmacInput !== null && eabHmacInput !== '') {
-                    handleUpdateClientSetting('eab_hmac_key', eabHmacInput)
-                  }
-                }}
-                onFocus={() => {
-                  if (eabHmacInput === null && clientSettings.eab_hmac_key_set) {
-                    setEabHmacInput('')
-                  }
-                }}
-                disabled={!canWrite('acme')}
-                placeholder={t('acme.eabHmacKeyPlaceholder')}
-                helperText={t('acme.eabHmacKeyHelper')}
-              />
-            </div>
-          </details>
-        </div>
-      </CompactSection>
-
-      {/* ACME Proxy */}
-      <CompactSection title={t('acme.acmeProxy')} icon={ShieldCheck}>
-        <div className="space-y-3">
-          <ToggleSwitch
-            checked={clientSettings.proxy_enabled || false}
-            onChange={(val) => handleUpdateClientSetting('proxy_enabled', val)}
-            disabled={!canWrite('acme')}
-            label={t('acme.enableAcmeProxy')}
-            description={t('acme.enableAcmeProxyDesc')}
-          />
-
-          {clientSettings.proxy_enabled && (
-            <>
-              {/* Upstream CA Mode Selector */}
-              <Select
-                label={t('acme.upstreamCA')}
-                value={clientSettings.proxy_upstream_mode || 'staging'}
-                onChange={handleProxyModeChange}
-                disabled={!canWrite('acme')}
-                options={[
-                  { value: 'staging', label: t('acme.letsEncryptStaging') },
-                  { value: 'production', label: t('acme.letsEncryptProduction') },
-                  { value: 'custom', label: t('acme.customCA') },
-                ]}
-                helperText={t('acme.upstreamCAHelper')}
-              />
-
-              <ToggleSwitch
-                checked={clientSettings.proxy_verify_ssl ?? true}
-                onChange={(val) => handleUpdateClientSetting('proxy_verify_ssl', val)}
-                disabled={!canWrite('acme')}
-                label={t('sso.verifySsl')}
-              />
-
-              {clientSettings.proxy_verify_ssl === false && (
-                <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
-                  <p className="text-xs status-warning-text">{t('sso.sslWarning')}</p>
-                </div>
-              )}
-
-              {/* Custom URL (only in custom mode) */}
-              {(clientSettings.proxy_upstream_mode === 'custom') && (
-                <Input
-                  label={t('acme.customCAUrl')}
-                  type="url"
-                  value={localProxyUpstreamUrl}
-                  onChange={(e) => setLocalProxyUpstreamUrl(e.target.value)}
-                  onBlur={() => handleBlurSave('proxy_upstream_url', localProxyUpstreamUrl, setLocalProxyUpstreamUrl)}
-                  disabled={!canWrite('acme')}
-                  placeholder="https://acme.zerossl.com/v2/DV90"
-                  helperText={t('acme.customCAUrlHelper')}
-                />
-              )}
-
-              {/* Account Registration Status */}
-              {clientSettings.proxy_account_registered ? (() => {
-                // Detect mismatch: account registered with different CA than selected mode
-                const accountUrl = clientSettings.proxy_account_url || ''
-                const isLEAccount = accountUrl.includes('letsencrypt.org')
-                const mode = clientSettings.proxy_upstream_mode || 'staging'
-                const isMismatch = (mode === 'custom' && isLEAccount) || 
-                  (mode !== 'custom' && !isLEAccount && accountUrl)
-                
-                return (
-                  <div className={cn(
-                    'p-3 rounded-lg border',
-                    isMismatch 
-                      ? 'status-warning-bg status-warning-border' 
-                      : 'status-success-bg status-success-border'
-                  )}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {isMismatch 
-                          ? <Warning size={18} className="status-warning-text" weight="fill" />
-                          : <CheckCircle size={18} className="status-success-text" weight="fill" />
-                        }
-                        <div>
-                          <p className="text-sm font-medium text-text-primary">
-                            {isMismatch ? t('acme.accountMismatch') : t('acme.upstreamAccountRegistered')}
-                          </p>
-                          <p className="text-xs text-text-secondary font-mono">
-                            {accountUrl ? `...${accountUrl.slice(-30)}` : t('acme.accountRegistered')}
-                          </p>
-                          {isMismatch && (
-                            <p className="text-xs status-warning-text mt-1">{t('acme.accountMismatchHelper')}</p>
-                          )}
-                        </div>
-                      </div>
-                      {canWrite('acme') && (
-                        <Button 
-                          type="button"
-                          variant="ghost" 
-                          size="sm"
-                          onClick={handleResetProxyAccount}
-                          title={t('acme.resetAccount')}
-                          className="status-danger-text hover:status-danger-bg"
-                        >
-                          <ArrowsClockwise size={14} />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })() : (
-                <div className="p-3 rounded-lg bg-tertiary-op30 border border-border">
-                  <div className="flex items-center gap-2">
-                    <Warning size={18} className="text-text-tertiary" />
-                    <div>
-                      <p className="text-sm text-text-secondary">{t('acme.upstreamAccountNotRegistered')}</p>
-                      <p className="text-xs text-text-tertiary">{t('acme.willAutoRegister')}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Connection Test */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleTestConnection}
-                  disabled={testingConnection || (clientSettings.proxy_upstream_mode === 'custom' && !localProxyUpstreamUrl && !clientSettings.proxy_upstream_url)}
-                >
-                  {testingConnection ? <ArrowsClockwise size={14} className="animate-spin" /> : <PlugsConnected size={14} />}
-                  {t('acme.testConnection')}
-                </Button>
-                {connectionResult && (
-                  <span className={cn('text-xs', connectionResult.connected ? 'status-success-text' : 'status-danger-text')}>
-                    {connectionResult.connected
-                      ? `✓ ${connectionResult.ca_name || t('common.connected')}${connectionResult.eab_required ? ` (${t('acme.eabRequired')})` : ''}`
-                      : `✗ ${connectionResult.error || t('acme.connectionFailed')}`}
-                  </span>
-                )}
-              </div>
-
-              {/* EAB Credentials (collapsible section) */}
-              <details className="group rounded-lg border border-border/50 hover:border-border transition-colors">
-                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-bg-tertiary/30 transition-colors list-none [&::-webkit-details-marker]:hidden">
-                  <CaretRight size={14} weight="bold" className="shrink-0 transition-transform duration-200 group-open:rotate-90" />
-                  <LockKey size={14} className="shrink-0" />
-                  {t('acme.proxyEabCredentials')}
-                  {(clientSettings.proxy_eab_hmac_key_set || localProxyEabKid) && (
-                    <Badge variant="outline" size="sm">{t('common.configured')}</Badge>
-                  )}
-                </summary>
-                <div className="px-3 pb-3 space-y-3">
-                  <Input
-                    label={t('acme.proxyEabKid')}
-                    value={localProxyEabKid}
-                    onChange={(e) => setLocalProxyEabKid(e.target.value)}
-                    onBlur={() => handleBlurSave('proxy_eab_kid', localProxyEabKid, setLocalProxyEabKid)}
-                    disabled={!canWrite('acme')}
-                    placeholder="key-id-from-upstream-ca"
-                    helperText={t('acme.proxyEabKidHelper')}
-                  />
-                  
-                  <Input
-                    label={t('acme.proxyEabHmacKey')}
-                    type="password"
-                    value={proxyEabHmacInput !== null ? proxyEabHmacInput : (clientSettings.proxy_eab_hmac_key_set ? '••••••••' : '')}
-                    onChange={(e) => setProxyEabHmacInput(e.target.value)}
-                    onBlur={() => {
-                      if (proxyEabHmacInput !== null && proxyEabHmacInput !== '') {
-                        handleUpdateClientSetting('proxy_eab_hmac_key', proxyEabHmacInput)
-                      }
-                    }}
-                    onFocus={() => {
-                      if (proxyEabHmacInput === null && clientSettings.proxy_eab_hmac_key_set) {
-                        setProxyEabHmacInput('')
-                      }
-                    }}
-                    disabled={!canWrite('acme')}
-                    placeholder={t('acme.proxyEabHmacKeyPlaceholder')}
-                    helperText={t('acme.proxyEabHmacKeyHelper')}
-                  />
-                </div>
-              </details>
-
-              {/* Proxy Endpoint & Usage */}
-              <div className="p-3 bg-tertiary-op50 rounded-lg space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-text-secondary">{t('acme.yourProxyUrl')}</p>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => copy(`${window.location.origin}/acme/proxy/directory`)}>
-                    <Copy size={12} />
-                  </Button>
-                </div>
-                <code className="block text-xs text-accent-primary font-mono bg-bg-secondary p-2 rounded break-all">
-                  {window.location.origin}/acme/proxy/directory
-                </code>
-                <p className="text-xs font-medium text-text-secondary mt-3">{t('acme.proxyUsage')}</p>
-                <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono whitespace-pre-wrap break-all">
-{`certbot certonly \\
-  --server ${window.location.origin}/acme/proxy/directory \\
-  --preferred-challenges dns-01 \\
-  --authenticator manual \\
-  --manual-auth-hook /bin/true \\
-  --manual-cleanup-hook /bin/true \\
-  --non-interactive --agree-tos -m you@example.com \\
-  -d example.com`}
-                </pre>
-                <p className="text-xs text-text-tertiary">{t('acme.proxyUsageNote')}</p>
-              </div>
-              
-              {/* Proxy Registration */}
-              {clientSettings.proxy_registered ? (
-                <div className="p-3 rounded-lg status-success-bg status-success-border border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="status-success-text" weight="fill" />
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">{t('acme.proxyRegistered')}</p>
-                        <p className="text-xs text-text-secondary">{clientSettings.proxy_email}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      type="button"
-                      variant="ghost" 
-                      size="sm"
-                      onClick={handleUnregisterProxy}
-                      className="status-danger-text hover:status-danger-bg"
-                    >
-                      <Trash size={14} />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3 p-3 bg-tertiary-op30 rounded-lg">
-                  <Input
-                    label={t('common.emailAddress')}
-                    type="email"
-                    value={proxyEmail}
-                    onChange={(e) => setProxyEmail(e.target.value)}
-                    placeholder={t('acme.emailPlaceholder')}
-                    helperText={t('common.emailRequired')}
-                  />
-                  <Button 
-                    type="button"
-                    variant="secondary" 
-                    size="sm"
-                    onClick={handleRegisterProxy}
-                    disabled={!proxyEmail}
-                  >
-                    <Key size={14} />
-                    {t('acme.registerAccount')}
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </CompactSection>
-    </div>
-  )
-  
-  // =========================================================================
-  // DNS Providers Tab Content
-  // =========================================================================
-  
-  const dnsProvidersContent = (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.dnsProviders')} compact>
-        {t('acme.dnsProvidersAboutDesc')}
-      </HelpCard>
-      
-      <div className="flex flex-wrap items-center gap-2">
-        {canWrite('acme') && (
-        <Button type="button" onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
-          <Plus size={14} />
-          {t('common.addDnsProvider')}
-        </Button>
-        )}
-      </div>
-      
-      {dnsProviders.length === 0 ? (
-        <div className="text-center py-8 text-text-secondary">
-          <PlugsConnected size={40} className="mx-auto mb-2 opacity-40" />
-          <p>{t('acme.noDnsProviders')}</p>
-          <p className="text-sm text-text-tertiary mt-1">{t('acme.noDnsProvidersDesc')}</p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {dnsProviders.map(provider => (
-            <Card key={provider.id} className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                    provider.is_default ? "icon-bg-emerald" : "icon-bg-violet"
-                  )}>
-                    <PlugsConnected size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{provider.name}</p>
-                    <p className="text-xs text-text-tertiary">{provider.provider_type}</p>
-                  </div>
-                </div>
-                {provider.is_default && (
-                  <Badge variant="success" size="sm">{t('common.default')}</Badge>
-                )}
-              </div>
-              
-              <div className="flex gap-2 mt-3">
-                <Button 
-                  size="sm" 
-                  variant="secondary"
-                  onClick={() => handleTestDnsProvider(provider)}
-                >
-                  <Play size={12} />
-                  {t('common.test')}
-                </Button>
-                {canWrite('acme') && (
-                <Button 
-                  size="sm" 
-                  variant="secondary"
-                  onClick={() => { setSelectedDnsProvider(provider); setShowDnsProviderModal(true) }}
-                >
-                  <Gear size={12} />
-                  {t('common.edit')}
-                </Button>
-                )}
-                {canDelete('acme') && (
-                <Button 
-                  size="sm" 
-                  variant="danger"
-                  onClick={() => handleDeleteDnsProvider(provider)}
-                >
-                  <Trash size={12} />
-                </Button>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-
-  // Domains content - Map domains to DNS providers for ACME Proxy
-  const domainsContent = (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('acme.domainsHelp')} compact>
-        {t('acme.domainsHelpDesc')}
-      </HelpCard>
-
-      {acmeDomains.length === 0 ? (
-        <Card className="p-8 text-center">
-          <GlobeHemisphereWest size={48} className="mx-auto text-text-tertiary mb-4" />
-          <h3 className="text-lg font-medium text-text-primary mb-2">
-            {t('acme.noDomainsYet')}
-          </h3>
-          <p className="text-sm text-text-secondary mb-4">
-            {t('acme.noDomainsDesc')}
-          </p>
-          {canWrite('acme') && (
-          <Button type="button" onClick={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}>
-            <Plus size={14} />
-            {t('acme.addDomain')}
-          </Button>
-          )}
-        </Card>
-      ) : (
-        <ResponsiveDataTable
-          data={acmeDomains}
-          columns={[
-            {
-              key: 'domain',
-              label: t('acme.domain'),
-              sortable: true,
-              render: (val) => (
-                <span className="font-mono text-sm">{val}</span>
-              )
-            },
-            {
-              key: 'dns_provider_name',
-              label: t('acme.provider'),
-              sortable: true,
-              render: (val, row) => (
-                <div className="flex items-center gap-2">
-                  <PlugsConnected size={14} className="text-accent-primary" />
-                  <span>{val || row.dns_provider_type}</span>
-                </div>
-              )
-            },
-            {
-              key: 'issuing_ca_name',
-              label: t('acme.issuingCA'),
-              sortable: true,
-              render: (val) => (
-                <span className={val ? 'text-text-primary' : 'text-text-tertiary'}>
-                  {val || t('acme.defaultCA')}
-                </span>
-              )
-            },
-            {
-              key: 'is_wildcard_allowed',
-              label: t('acme.wildcard'),
-              render: (val) => (
-                <Badge variant={val ? 'success' : 'secondary'}>
-                  {val ? t('common.yes') : t('common.no')}
-                </Badge>
-              )
-            },
-            {
-              key: 'auto_approve',
-              label: t('acme.autoApprove'),
-              render: (val) => (
-                <Badge variant={val ? 'success' : 'warning'}>
-                  {val ? t('common.auto') : t('common.manual')}
-                </Badge>
-              )
-            },
-            {
-              key: 'actions',
-              label: '',
-              render: (_, row) => (
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleTestDomainAccess(row) }}
-                    title={t('acme.testDnsAccess')}
-                  >
-                    <Play size={14} />
-                  </Button>
-                  {canWrite('acme') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); setSelectedAcmeDomain(row); setShowDomainModal(true) }}
-                    title={t('common.edit')}
-                  >
-                    <Gear size={14} />
-                  </Button>
-                  )}
-                  {canDelete('acme') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleDeleteDomain(row) }}
-                    title={t('common.delete')}
-                    className="text-status-error hover:text-status-error"
-                  >
-                    <Trash size={14} />
-                  </Button>
-                  )}
-                </div>
-              )
-            }
-          ]}
-          onRowClick={(row) => { setSelectedAcmeDomain(row); setShowDomainModal(true) }}
-          emptyMessage={t('acme.noDomains')}
-        />
-      )}
-    </div>
-  )
-
-  // Configuration content
-  const configContent = (
-    <div className="p-4 space-y-4">
-      <HelpCard variant="info" title={t('common.aboutAcme')} compact>
-        {t('acme.aboutAcmeDesc')}
-      </HelpCard>
-
-      {/* ACME Server */}
-      <CompactSection title={t('acme.acmeServer')} icon={Globe}>
-        <div className="space-y-3">
-          <ToggleSwitch
-            checked={acmeSettings.enabled || false}
-            onChange={(val) => updateSetting('enabled', val)}
-            disabled={!canWrite('acme')}
-            label={t('acme.enableAcmeServer')}
-            description={t('acme.enableAcmeServerDesc')}
-          />
-
-          <Select
-            label={t('acme.defaultIssuingCA')}
-            value={acmeSettings.issuing_ca_id?.toString() || ''}
-            onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
-            disabled={!acmeSettings.enabled || !canWrite('acme')}
-            placeholder={t('common.acmeSelectCA')}
-            options={cas.map(ca => ({ 
-              value: ca.id.toString(), 
-              label: ca.name || ca.common_name 
-            }))}
-          />
-        </div>
-      </CompactSection>
-
-      {/* Certificate Renewal Policy */}
-      <CompactSection title={t('acme.renewalPolicy')} icon={ArrowsClockwise}>
-        <div className="space-y-2">
-          <ToggleSwitch
-            checked={acmeSettings.revoke_on_renewal || false}
-            onChange={handleToggleRevokeOnRenewal}
-            disabled={!canWrite('acme')}
-            label={t('acme.revokeOnRenewal')}
-            description={t('acme.revokeOnRenewalDesc')}
-          />
-          
-          {!acmeSettings.revoke_on_renewal && acmeSettings.superseded_count > 0 && (
-            <label className="flex items-center gap-3 cursor-pointer ml-7 p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
-              <input
-                type="checkbox"
-                checked={revokeSuperseded}
-                onChange={(e) => setRevokeSuperseded(e.target.checked)}
-                className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-warning focus:ring-accent-warning-op50"
-              />
-              <div>
-                <p className="text-sm text-accent-warning font-medium">
-                  {t('acme.revokeExistingSuperseded', { count: acmeSettings.superseded_count })}
-                </p>
-                <p className="text-xs text-text-secondary">{t('acme.revokeExistingSupersededDesc')}</p>
-              </div>
-            </label>
-          )}
-        </div>
-      </CompactSection>
-
-      {/* ACME Endpoints */}
-      <CompactSection title={t('acme.endpoints')} icon={Lightning}>
-        <CompactGrid columns={1}>
-          <CompactField 
-            autoIcon="environment"
-            label={t('acme.directory')} 
-            value={`${window.location.origin}/acme/directory`}
-            mono
-            copyable
-          />
-        </CompactGrid>
-        <p className="text-xs text-text-tertiary mt-2">
-          {t('acme.certbotUsage')} <code className="bg-bg-tertiary px-1 rounded">--server {window.location.origin}/acme/directory</code>
-        </p>
-      </CompactSection>
-
-      {/* Save Button */}
-      {canWrite('acme') && (
-      <div className="flex gap-2 pt-3 border-t border-border">
-        <Button type="button" onClick={handleSaveConfig} disabled={saving}>
-          <FloppyDisk size={14} />
-          {saving ? t('common.saving') : t('common.saveConfiguration')}
-        </Button>
-      </div>
-      )}
-    </div>
-  )
-
-  // Local Domains content — domain to CA mapping
-  const localDomainsContent = (
-    <ResponsiveDataTable
-      data={localDomains}
-      columns={[
-        {
-          key: 'domain',
-          label: t('acme.domain'),
-          sortable: true,
-          render: (val) => (
-            <span className="font-mono text-sm">{val}</span>
-          )
-        },
-        {
-          key: 'issuing_ca_name',
-          label: t('acme.issuingCA'),
-          sortable: true,
-          render: (val) => (
-            <span className="text-text-primary">{val || '-'}</span>
-          )
-        },
-        {
-          key: 'auto_approve',
-          label: t('acme.autoApprove'),
-          render: (val) => (
-            <Badge variant={val ? 'success' : 'warning'}>
-              {val ? t('common.auto') : t('common.manual')}
-            </Badge>
-          )
-        },
-        {
-          key: 'actions',
-          label: '',
-          render: (_, row) => (
-            <div className="flex items-center gap-1">
-              {canWrite('acme') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); setSelectedLocalDomain(row); setShowLocalDomainModal(true) }}
-                title={t('common.edit')}
-              >
-                <PencilSimple size={14} />
-              </Button>
-              )}
-              {canDelete('acme') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); handleDeleteLocalDomain(row) }}
-                title={t('common.delete')}
-                className="text-status-error hover:text-status-error"
-              >
-                <Trash size={14} />
-              </Button>
-              )}
-            </div>
-          )
-        }
-      ]}
-      emptyState={{
-        icon: GlobeHemisphereWest,
-        title: t('acme.noLocalDomains'),
-        description: t('acme.noLocalDomainsDesc'),
-        action: canWrite('acme') ? (
-          <Button type="button" onClick={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}>
-            <Plus size={14} />
-            {t('acme.addDomain')}
-          </Button>
-        ) : null
-      }}
-      onRowClick={(row) => { setSelectedLocalDomain(row); setShowLocalDomainModal(true) }}
-    />
-  )
-
-  // Accounts content with table
-  const accountsContent = (
-    <ResponsiveDataTable
-      data={filteredAccounts}
-      columns={accountColumns}
-      searchable
-      searchPlaceholder={t('acme.searchAccounts')}
-      onSearch={setSearchQuery}
-      onRowClick={selectAccount}
-      selectedRow={selectedAccount}
-      getRowId={(row) => row.id}
-      pagination={{
-        page,
-        total: filteredAccounts.length,
-        perPage,
-        onChange: setPage,
-        onPerPageChange: (v) => { setPerPage(v); setPage(1) }
-      }}
-      emptyState={{
-        icon: Key,
-        title: t('acme.noAccounts'),
-        description: searchQuery ? t('acme.noMatchingAccounts') : t('acme.noAccountsDesc'),
-        action: !searchQuery && canWrite('acme') && (
-          <Button type="button" onClick={() => setShowCreateModal(true)}>
-            <Plus size={14} />
-            {t('acme.createAccount')}
-          </Button>
-        )
-      }}
-    />
-  )
-
-  // EAB Credentials content (RFC 8555 §7.3.4)
-  const filteredEabCredentials = useMemo(() => {
-    if (!eabFilterStatus) return eabCredentials
-    return eabCredentials.filter(c => c.status === eabFilterStatus)
-  }, [eabCredentials, eabFilterStatus])
-
-  const eabContent = (
-    <div className="space-y-4">
-      <Card>
-        <div className="p-4 flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
-              <LockKey size={20} weight="duotone" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-semibold">{t('acme.eab.requiredTitle')}</div>
-              <div className="text-sm text-text-tertiary mt-1">
-                {t('acme.eab.requiredDescription')}
-              </div>
-            </div>
-          </div>
-          <ToggleSwitch
-            checked={eabRequired}
-            onChange={handleToggleEabRequired}
-            disabled={!canWrite('acme')}
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <div className="p-4 border-b border-border flex items-center gap-3">
-          <Select
-            value={eabFilterStatus}
-            onChange={setEabFilterStatus}
-            options={[
-              { value: '', label: t('acme.eab.allStatuses') },
-              { value: 'active', label: t('acme.eab.statusActive') },
-              { value: 'used', label: t('acme.eab.statusUsed') },
-              { value: 'revoked', label: t('acme.eab.statusRevoked') }
-            ]}
-            className="w-44"
-          />
-          <span className="text-sm text-text-tertiary">
-            {t('acme.eab.totalCount', { count: filteredEabCredentials.length })}
-          </span>
-        </div>
-        {filteredEabCredentials.length === 0 ? (
-          <div className="p-8 text-center">
-            <LockKey size={36} className="mx-auto mb-3 text-text-tertiary" weight="duotone" />
-            <div className="font-medium">{t('acme.eab.empty')}</div>
-            <div className="text-sm text-text-tertiary mt-1">{t('acme.eab.emptyDesc')}</div>
-            {canWrite('acme') && (
-              <Button type="button" className="mt-4" onClick={() => setShowCreateEabModal(true)}>
-                <Plus size={14} />
-                {t('acme.eab.new')}
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {filteredEabCredentials.map(cred => (
-              <div key={cred.id} className="p-4 flex items-center justify-between gap-3 hover:bg-bg-tertiary/40">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium truncate">{cred.label || t('acme.eab.unlabeled')}</span>
-                    <Badge variant={
-                      cred.status === 'active' ? 'success' :
-                      cred.status === 'used' ? 'info' :
-                      cred.status === 'revoked' ? 'danger' :
-                      'default'
-                    }>
-                      {t(`acme.eab.status${cred.status.charAt(0).toUpperCase() + cred.status.slice(1)}`)}
-                    </Badge>
-                    {cred.expires_at && (
-                      <Badge variant="warning" className="text-xs">
-                        <Clock size={12} /> {formatDate(cred.expires_at)}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-text-tertiary font-mono break-all">
-                    <span>kid:</span>
-                    <span className="select-all">{cred.kid}</span>
-                    <button
-                      type="button"
-                      className="text-accent-primary hover:underline"
-                      onClick={() => { copy(cred.kid); showSuccess(t('acme.eab.kidCopied')) }}
-                      title={t('common.copy')}
-                    >
-                      <Copy size={12} />
-                    </button>
-                  </div>
-                  <div className="mt-1 text-xs text-text-tertiary">
-                    {t('acme.eab.created')}: {formatDate(cred.created_at)}
-                    {cred.used_at && (
-                      <> · {t('acme.eab.usedAt')}: {formatDate(cred.used_at)}</>
-                    )}
-                    {cred.used_by_account_id && (
-                      <> · {t('acme.eab.boundTo')}: <span className="font-mono">{cred.used_by_account_id.slice(0, 16)}…</span></>
-                    )}
-                    {cred.revoked_at && (
-                      <> · {t('acme.eab.revokedAt')}: {formatDate(cred.revoked_at)}</>
-                    )}
-                  </div>
-                </div>
-                {canDelete('acme') && cred.status === 'active' && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRevokeEabCredential(cred)}
-                    title={t('acme.eab.revoke')}
-                  >
-                    <Trash size={14} />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
-  )
-
-
-  const historyColumns = useMemo(() => [
-    {
-      key: 'common_name',
-      header: t('common.commonName'),
-      priority: 1,
-      sortable: true,
-      render: (value, row) => (
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-            row?.revoked ? "icon-bg-orange" : "icon-bg-blue"
-          )}>
-            <Certificate size={14} weight="duotone" />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-medium truncate">{value}</span>
-            {row?.order?.account && (
-              <span className="text-xs text-text-tertiary">via {row.order.account}</span>
-            )}
-          </div>
-        </div>
-      ),
-      mobileRender: (value, row) => (
-        <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className={cn(
-              "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-              row?.revoked ? "icon-bg-orange" : "icon-bg-blue"
-            )}>
-              <Certificate size={14} weight="duotone" />
-            </div>
-            <span className="font-medium truncate">{value}</span>
-          </div>
-          <Badge 
-            variant={row?.revoked ? 'danger' : 'success'} 
-            size="sm"
-            icon={row?.revoked ? XCircle : CheckCircle}
-          >
-            {row?.revoked ? t('common.revoked') : t('common.valid')}
-          </Badge>
-        </div>
-      )
-    },
-    {
-      key: 'status',
-      header: t('common.status'),
-      priority: 2,
-      hideOnMobile: true,
-      render: (value, row) => {
-        // Show revoked status first if applicable
-        if (row?.revoked) {
-          return (
-            <Badge variant="danger" size="sm" icon={XCircle} dot>
-              {t('common.revoked')}
-            </Badge>
-          );
-        }
-        // Show order status
-        const statusConfig = {
-          valid: { variant: 'success', icon: CheckCircle, pulse: true },
-          issued: { variant: 'success', icon: CheckCircle, pulse: false },
-          pending: { variant: 'warning', icon: Clock, pulse: true },
-          processing: { variant: 'info', icon: Clock, pulse: true },
-          ready: { variant: 'info', icon: CheckCircle, pulse: false },
-          invalid: { variant: 'danger', icon: XCircle, pulse: false },
-        };
-        const config = statusConfig[value] || statusConfig.valid;
-        return (
-          <Badge 
-            variant={config.variant} 
-            size="sm"
-            icon={config.icon}
-            dot
-            pulse={config.pulse}
-          >
-            {value ? value.charAt(0).toUpperCase() + value.slice(1) : t('common.valid')}
-          </Badge>
-        );
-      }
-    },
-    {
-      key: 'issuer',
-      header: t('common.issuer'),
-      priority: 3,
-      sortable: true,
-      hideOnMobile: true,
-      render: (value) => (
-        <span className="text-sm text-text-secondary">{value || t('common.unknown')}</span>
-      ),
-      mobileRender: (value) => (
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">CA:</span>
-          <span className="text-text-secondary truncate">{value || t('common.unknown')}</span>
-        </div>
-      )
-    },
-    {
-      key: 'valid_to',
-      header: t('common.expires'),
-      priority: 4,
-      sortable: true,
-      render: (value) => {
-        if (!value) return <span className="text-text-tertiary">N/A</span>
-        const expires = new Date(value)
-        const now = new Date()
-        const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
-        const isExpiring = daysLeft > 0 && daysLeft < 30
-        const isExpired = daysLeft <= 0
-        return (
-          <div className="flex items-center gap-2">
-            <Clock size={14} className={cn(
-              isExpired ? "text-status-error" : 
-              isExpiring ? "text-status-warning" : 
-              "text-text-tertiary"
-            )} />
-            <div className="flex flex-col">
-              <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(value)}</span>
-              <span className={cn(
-                "text-xs",
-                isExpired ? "text-status-error" : 
-                isExpiring ? "text-status-warning" : 
-                "text-text-tertiary"
-              )}>
-                {isExpired ? t('common.expired') : t('acme.daysLeft', { count: daysLeft })}
-              </span>
-            </div>
-          </div>
-        )
-      },
-      mobileRender: (value) => {
-        if (!value) return null
-        const expires = new Date(value)
-        const now = new Date()
-        const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
-        const isExpired = daysLeft <= 0
-        return (
-          <div className="flex items-center gap-2 text-xs">
-            <Clock size={12} className="text-text-tertiary" />
-            <span className={isExpired ? "text-status-error" : "text-text-secondary"}>
-              {isExpired ? t('common.expired') : `${daysLeft}d`}
-            </span>
-          </div>
-        )
-      }
-    },
-    {
-      key: 'source',
-      header: t('common.source'),
-      priority: 3,
-      hideOnMobile: true,
-      render: (value) => (
-        <Badge 
-          variant={value === 'letsencrypt' ? 'green' : 'cyan'} 
-          size="sm"
-          dot
-        >
-          {value === 'letsencrypt' ? t('acme.letsEncryptLabel') : t('acme.localAcmeLabel')}
-        </Badge>
-      )
-    },
-    {
-      key: 'challenge_type',
-      header: t('acme.method'),
-      priority: 4,
-      hideOnMobile: true,
-      render: (value) => (
-        <Badge variant="default" size="sm">
-          {value?.toUpperCase() || 'N/A'}
-        </Badge>
-      )
-    },
-    {
-      key: 'dns_provider',
-      header: t('acme.provider'),
-      priority: 5,
-      hideOnMobile: true,
-      render: (value) => (
-        <span className="text-sm text-text-secondary">{value || '-'}</span>
-      )
-    },
-    {
-      key: 'environment',
-      header: t('acme.environment'),
-      priority: 5,
-      hideOnMobile: true,
-      render: (value, row) => {
-        if (!value) return <span className="text-text-tertiary">-</span>
-        if (value === 'local' || row?.source === 'acme') {
-          return (
-            <Badge variant="cyan" size="sm">
-              {t('acme.localAcmeLabel')}
-            </Badge>
-          )
-        }
-        const isProduction = value === 'production'
-        return (
-          <Badge 
-            variant={isProduction ? 'success' : 'warning'} 
-            size="sm"
-          >
-            {isProduction ? t('acme.production') : t('acme.staging')}
-          </Badge>
-        )
-      }
-    },
-    {
-      key: 'created_at',
-      header: t('common.issued'),
-      priority: 6,
-      sortable: true,
-      hideOnMobile: true,
-      render: (value) => (
-        <span className="text-xs text-text-tertiary whitespace-nowrap">
-          {value ? formatDate(value) : 'N/A'}
-        </span>
-      )
-    }
-  ], [t])
-
-  // Certificate detail content for history tab
-  const certDetailContent = selectedCert && (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={ClockCounterClockwise}
-        iconClass={selectedCert.revoked ? "bg-status-error-op20" : "bg-status-success-op20"}
-        title={selectedCert.common_name}
-        subtitle={`${t('common.issuer')}: ${selectedCert.issuer || t('acme.unknownCA')}`}
-        badge={
-          <Badge variant={selectedCert.revoked ? 'danger' : 'success'} size="sm">
-            {!selectedCert.revoked && <CheckCircle size={10} weight="fill" />}
-            {selectedCert.revoked ? t('common.revoked') : t('common.valid')}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        { icon: Key, value: selectedCert.order?.account || t('common.unknown') },
-        { icon: Globe, value: selectedCert.order?.status || t('common.na') },
-      ]} />
-      
-      <CompactSection title={t('common.certificateDetails')}>
-        <CompactGrid>
-          <CompactField autoIcon="commonName" label={t('common.commonName')} value={selectedCert.common_name} copyable />
-          <CompactField autoIcon="serialNumber" label={t('common.serialNumber')} value={selectedCert.serial} mono copyable />
-          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer || t('common.unknown')} />
-        </CompactGrid>
-      </CompactSection>
-      
-      <CompactSection title={t('common.validity')}>
-        <CompactGrid>
-          <CompactField autoIcon="validFrom" label={t('common.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : t('common.na')} />
-          <CompactField autoIcon="validTo" label={t('common.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : t('common.na')} />
-          <CompactField autoIcon="issued" label={t('common.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : t('common.na')} />
-        </CompactGrid>
-      </CompactSection>
-      
-      {selectedCert.order && (
-        <CompactSection title={t('acme.acmeOrder')}>
-          <CompactGrid>
-            <CompactField autoIcon="account" label={t('acme.account')} value={selectedCert.order.account} />
-            <CompactField autoIcon="orderStatus" label={t('acme.orderStatus')} value={selectedCert.order.status} />
-            <CompactField autoIcon="orderId" label={t('acme.orderId')} value={selectedCert.order.order_id} mono copyable />
-          </CompactGrid>
-        </CompactSection>
-      )}
-    </div>
-  )
-  
-  // Let's Encrypt Order Detail Content
-  const orderDetailContent = selectedClientOrder && (
-    <div className="p-3 space-y-3">
-      <CompactHeader
-        icon={Certificate}
-        iconClass={cn(
-          selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued' ? "bg-status-success-op20" :
-          selectedClientOrder.status === 'invalid' ? "bg-status-error-op20" :
-          selectedClientOrder.status === 'pending' ? "bg-status-warning-op20" : "bg-bg-tertiary"
-        )}
-        title={selectedClientOrder.primary_domain || selectedClientOrder.domains?.[0]}
-        subtitle={`${selectedClientOrder.environment} • ${selectedClientOrder.challenge_type}`}
-        badge={
-          <Badge 
-            variant={selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued' ? 'success' : 
-                     selectedClientOrder.status === 'invalid' ? 'danger' : 
-                     selectedClientOrder.status === 'pending' ? 'warning' : 'default'}
-            size="sm"
-          >
-            {selectedClientOrder.status}
-          </Badge>
-        }
-      />
-
-      <CompactStats stats={[
-        { icon: Globe, value: `${(selectedClientOrder.domains || []).length} ${t('acme.domains').toLowerCase()}` },
-        { icon: PlugsConnected, value: selectedClientOrder.dns_provider_name || t('acme.manualDns') },
-      ]} />
-      
-      {/* Domains */}
-      <CompactSection title={t('acme.domains')}>
-        <div className="space-y-1">
-          {(selectedClientOrder.domains || []).map((domain, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm">
-              <Globe size={12} className="text-text-tertiary" />
-              <span className="text-text-primary">{domain}</span>
-            </div>
-          ))}
-        </div>
-      </CompactSection>
-      
-      {/* Order Info */}
-      <CompactSection title={t('acme.orderInfo')}>
-        <CompactGrid>
-          <CompactField autoIcon="environment" label={t('acme.environment')} value={selectedClientOrder.environment === 'production' ? t('acme.production') : t('acme.staging')} />
-          <CompactField autoIcon="method" label={t('acme.method')} value={selectedClientOrder.challenge_type?.toUpperCase()} />
-          <CompactField autoIcon="provider" label={t('acme.provider')} value={selectedClientOrder.dns_provider_name || t('acme.manualDns')} />
-          <CompactField autoIcon="status" label={t('common.status')} value={selectedClientOrder.status} />
-          <CompactField autoIcon="created" label={t('common.created')} value={formatDate(selectedClientOrder.created_at)} />
-          {selectedClientOrder.expires_at && (
-            <CompactField autoIcon="expires" label={t('common.expires')} value={formatDate(selectedClientOrder.expires_at)} />
-          )}
-        </CompactGrid>
-      </CompactSection>
-      
-      {/* Challenge Info for pending orders */}
-      {selectedClientOrder.status === 'pending' && selectedClientOrder.challenges && (
-        <CompactSection title={t('acme.pendingChallenge')}>
-          <div className="space-y-3">
-            {Object.entries(selectedClientOrder.challenges).map(([domain, data]) => (
-              <div key={domain} className="p-2 bg-tertiary-op50 rounded-lg border border-border-op50">
-                <p className="text-sm font-medium text-text-primary mb-2">{domain}</p>
-                {selectedClientOrder.challenge_type === 'dns-01' && (
-                  <div className="space-y-2 text-xs">
-                    <CompactField autoIcon="dnsRecordName" label={t('acme.dnsRecordName')} value={data.dns_txt_name || data.record_name} mono copyable />
-                    <CompactField autoIcon="dnsRecordValue" label={t('acme.dnsRecordValue')} value={data.dns_txt_value || data.record_value} mono copyable />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-      
-      {/* Error Message */}
-      {selectedClientOrder.error_message && (
-        <CompactSection title={t('common.error')}>
-          <div className="p-2 bg-status-error-op10 border border-status-error-op20 rounded-lg">
-            <p className="text-sm text-status-error">{selectedClientOrder.error_message}</p>
-          </div>
-        </CompactSection>
-      )}
-      
-      {/* Certificate Actions - for issued/valid orders */}
-      {(selectedClientOrder.status === 'valid' || selectedClientOrder.status === 'issued') && selectedClientOrder.certificate_id && (
-        <CompactSection title={t('acme.certificateActions')}>
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', false)}>
-              <DownloadSimple size={12} />
-              {t('acme.downloadCert')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadCertificate(selectedClientOrder, 'pem', true)}>
-              <LockKey size={12} />
-              {t('acme.downloadWithKey')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleViewCertificate(selectedClientOrder)}>
-              <Eye size={12} />
-              {t('common.viewCertificate')}
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={() => handleRenewCertificate(selectedClientOrder)}>
-              <ArrowsClockwise size={12} />
-              {t('acme.renewNow')}
-            </Button>
-          </div>
-        </CompactSection>
-      )}
-      
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2 pt-2">
-        {selectedClientOrder.status === 'pending' && (
-          <Button type="button" size="sm" onClick={() => handleVerifyChallenge(selectedClientOrder)}>
-            <Play size={12} />
-            {t('acme.verifyChallenge')}
-          </Button>
-        )}
-        {selectedClientOrder.status === 'processing' && (
-          <Button type="button" size="sm" onClick={() => handleFinalizeOrder(selectedClientOrder)}>
-            <CheckCircle size={12} />
-            {t('acme.finalize')}
-          </Button>
-        )}
-        <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteClientOrder(selectedClientOrder)}>
-          <Trash size={12} />
-          {t('common.delete')}
-        </Button>
-      </div>
-    </div>
-  )
-  
-  // Handle applying filter preset for history table
-  const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.source) setHistoryFilterSource(filters.source)
-    else setHistoryFilterSource('')
-    if (filters.status) setHistoryFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
-    else setHistoryFilterStatus([])
-    if (filters.ca) setHistoryFilterCA(filters.ca)
-    else setHistoryFilterCA('')
-  }, [])
-
-  // Filter history data
-  const filteredHistory = useMemo(() => {
-    let filtered = history
-    if (historyFilterStatus.length > 0) {
-      filtered = filtered.filter(cert => {
-        if (historyFilterStatus.includes('revoked') && cert.revoked) return true
-        if (historyFilterStatus.includes('valid') && !cert.revoked) return true
-        return false
-      })
-    }
-    if (historyFilterCA) {
-      filtered = filtered.filter(cert => cert.issuer === historyFilterCA)
-    }
-    if (historyFilterSource) {
-      filtered = filtered.filter(cert => cert.source === historyFilterSource)
-    }
-    return filtered
-  }, [history, historyFilterStatus, historyFilterCA, historyFilterSource])
-
-  // Get unique CAs from history for filter
-  const historyCAs = useMemo(() => {
-    const cas = [...new Set(history.map(c => c.issuer).filter(Boolean))]
-    return cas.map(ca => ({ value: ca, label: ca }))
-  }, [history])
-  
-  const historyContent = (
-    <ResponsiveDataTable
-      data={filteredHistory}
-      columns={historyColumns}
-      columnStorageKey="acme-history-columns"
-      searchable
-      searchPlaceholder={t('common.searchCertificates')}
-      searchKeys={['common_name', 'serial', 'issuer']}
-      getRowId={(row) => row.id}
-      onRowClick={setSelectedCert}
-      selectedRow={selectedCert}
-      sortable
-      defaultSort={{ key: 'created_at', direction: 'desc' }}
-      exportEnabled
-      exportFilename="acme-certificates"
-      toolbarFilters={[
-        {
-          key: 'source',
-          value: historyFilterSource,
-          onChange: setHistoryFilterSource,
-          placeholder: t('acme.allSources'),
-          options: [
-            { value: 'acme', label: t('acme.localAcme') },
-            { value: 'letsencrypt', label: t('acme.letsEncrypt') }
-          ]
-        },
-        {
-          key: 'status',
-          label: t('common.status'),
-          type: 'multiSelect',
-          value: historyFilterStatus,
-          onChange: setHistoryFilterStatus,
-          placeholder: t('common.allStatus'),
-          options: [
-            { value: 'valid', label: t('common.valid') },
-            { value: 'revoked', label: t('common.revoked') }
-          ]
-        },
-        {
-          key: 'ca',
-          value: historyFilterCA,
-          onChange: setHistoryFilterCA,
-          placeholder: t('acme.allCAs'),
-          options: historyCAs
-        }
-      ]}
-      filterPresetsKey="ucm-acme-presets"
-      densityStorageKey="ucm-acme-density"
-      onApplyFilterPreset={handleApplyFilterPreset}
-      emptyState={{
-        icon: ClockCounterClockwise,
-        title: t('acme.noCertificates'),
-        description: t('acme.noCertificatesDesc')
-      }}
-    />
-  )
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -2702,9 +876,30 @@ export default function ACMEPage() {
               : (selectedCert?.common_name || t('common.certificateDetails'))
         }
         slideOverContent={
-          activeTab === 'letsencrypt' ? orderDetailContent :
-          activeTab === 'accounts' ? accountDetailContent : 
-          certDetailContent
+          activeTab === 'letsencrypt' ? (
+            <OrderDetailPanel
+              order={selectedClientOrder}
+              onDownloadCert={handleDownloadCertificate}
+              onViewCertificate={handleViewCertificate}
+              onRenewCertificate={handleRenewCertificate}
+              onVerifyChallenge={handleVerifyChallenge}
+              onFinalizeOrder={handleFinalizeOrder}
+              onDeleteOrder={handleDeleteClientOrder}
+            />
+          ) : activeTab === 'accounts' ? (
+            <AccountDetailPanel
+              account={selectedAccount}
+              detailTabs={detailTabs}
+              activeDetailTab={activeDetailTab}
+              onDeactivate={handleDeactivate}
+              onDelete={handleDelete}
+              onDetailTabChange={setActiveDetailTab}
+              orders={orders}
+              challenges={challenges}
+            />
+          ) : (
+            <CertDetailPanel cert={selectedCert} />
+          )
         }
         onSlideOverClose={() => {
           if (activeTab === 'letsencrypt') {
@@ -2716,14 +911,136 @@ export default function ACMEPage() {
           }
         }}
       >
-        {activeTab === 'letsencrypt' && letsEncryptContent}
-        {activeTab === 'dns' && dnsProvidersContent}
-        {activeTab === 'domains' && domainsContent}
-        {activeTab === 'config' && configContent}
-        {activeTab === 'localdomains' && localDomainsContent}
-        {activeTab === 'accounts' && accountsContent}
-        {activeTab === 'eab' && eabContent}
-        {activeTab === 'history' && historyContent}
+        {activeTab === 'letsencrypt' && (
+          <LetsEncryptTab
+            clientOrders={clientOrders}
+            selectedClientOrder={selectedClientOrder}
+            onSelectOrder={setSelectedClientOrder}
+            clientSettings={clientSettings}
+            localContactEmail={localContactEmail}
+            onLocalContactEmailChange={setLocalContactEmail}
+            localDirectoryUrl={localDirectoryUrl}
+            onLocalDirectoryUrlChange={setLocalDirectoryUrl}
+            localEabKid={localEabKid}
+            onLocalEabKidChange={setLocalEabKid}
+            localProxyUpstreamUrl={localProxyUpstreamUrl}
+            onLocalProxyUpstreamUrlChange={setLocalProxyUpstreamUrl}
+            localProxyEabKid={localProxyEabKid}
+            onLocalProxyEabKidChange={setLocalProxyEabKid}
+            proxyEabHmacInput={proxyEabHmacInput}
+            onProxyEabHmacInputChange={setProxyEabHmacInput}
+            eabHmacInput={eabHmacInput}
+            onEabHmacInputChange={setEabHmacInput}
+            proxyEmail={proxyEmail}
+            onProxyEmailChange={setProxyEmail}
+            testingConnection={testingConnection}
+            connectionResult={connectionResult}
+            onBlurSave={handleBlurSave}
+            onUpdateClientSetting={handleUpdateClientSetting}
+            onRegisterProxy={handleRegisterProxy}
+            onUnregisterProxy={handleUnregisterProxy}
+            onProxyModeChange={handleProxyModeChange}
+            onResetProxyAccount={handleResetProxyAccount}
+            onTestConnection={handleTestConnection}
+            onRequestCertificate={() => setShowRequestModal(true)}
+            onRefresh={loadData}
+            onCheckOrderStatus={handleCheckOrderStatus}
+            onVerifyChallenge={handleVerifyChallenge}
+            onFinalizeOrder={handleFinalizeOrder}
+            onViewCertificate={handleViewCertificate}
+            onDownloadCertificate={handleDownloadCertificate}
+            onRenewCertificate={handleRenewCertificate}
+            onDeleteOrder={handleDeleteClientOrder}
+            canWrite={canWrite('acme')}
+            canDelete={canDelete('acme')}
+          />
+        )}
+        {activeTab === 'dns' && (
+          <DnsProvidersTab
+            dnsProviders={dnsProviders}
+            onAddProvider={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}
+            onEditProvider={(p) => { setSelectedDnsProvider(p); setShowDnsProviderModal(true) }}
+            onTestProvider={handleTestDnsProvider}
+            onDeleteProvider={handleDeleteDnsProvider}
+            canWrite={canWrite('acme')}
+            canDelete={canDelete('acme')}
+          />
+        )}
+        {activeTab === 'domains' && (
+          <DomainsTab
+            acmeDomains={acmeDomains}
+            dnsProviders={dnsProviders}
+            cas={cas}
+            onAdd={() => { setSelectedAcmeDomain(null); setShowDomainModal(true) }}
+            onEdit={(d) => { setSelectedAcmeDomain(d); setShowDomainModal(true) }}
+            onDelete={handleDeleteDomain}
+            onTest={handleTestDomainAccess}
+            canWrite={canWrite('acme')}
+            canDelete={canDelete('acme')}
+          />
+        )}
+        {activeTab === 'config' && (
+          <ConfigTab
+            acmeSettings={acmeSettings}
+            updateSetting={updateSetting}
+            onSaveConfig={handleSaveConfig}
+            saving={saving}
+            revokeSuperseded={revokeSuperseded}
+            onRevokeSupersededChange={setRevokeSuperseded}
+            onToggleRevokeOnRenewal={handleToggleRevokeOnRenewal}
+            canWrite={canWrite('acme')}
+          />
+        )}
+        {activeTab === 'localdomains' && (
+          <LocalDomainsTab
+            localDomains={localDomains}
+            cas={cas}
+            onAdd={() => { setSelectedLocalDomain(null); setShowLocalDomainModal(true) }}
+            onEdit={(d) => { setSelectedLocalDomain(d); setShowLocalDomainModal(true) }}
+            onDelete={handleDeleteLocalDomain}
+            canWrite={canWrite('acme')}
+            canDelete={canDelete('acme')}
+          />
+        )}
+        {activeTab === 'accounts' && (
+          <AccountsTab
+            accounts={filteredAccounts}
+            selectedAccount={selectedAccount}
+            onSelectAccount={selectAccount}
+            searchQuery={searchQuery}
+            onSearch={setSearchQuery}
+            columns={accountColumns}
+            page={page}
+            perPage={perPage}
+            onPageChange={setPage}
+            onPerPageChange={setPerPage}
+            canWrite={canWrite('acme')}
+            onShowCreateModal={() => setShowCreateModal(true)}
+          />
+        )}
+        {activeTab === 'eab' && (
+          <EabTab
+            eabRequired={eabRequired}
+            onToggleEabRequired={handleToggleEabRequired}
+            showCreateModal={openEabCreate}
+            onCloseCreateModal={() => setOpenEabCreate(false)}
+            canWrite={canWrite('acme')}
+            canDelete={canDelete('acme')}
+          />
+        )}
+        {activeTab === 'history' && (
+          <HistoryTab
+            history={history}
+            filterStatus={historyFilterStatus}
+            onFilterStatusChange={setHistoryFilterStatus}
+            filterCA={historyFilterCA}
+            onFilterCAChange={setHistoryFilterCA}
+            filterSource={historyFilterSource}
+            onFilterSourceChange={setHistoryFilterSource}
+            selectedCert={selectedCert}
+            onSelectCert={setSelectedCert}
+          />
+        )}
       </ResponsiveLayout>
 
       {/* Create Account Modal */}
@@ -2738,87 +1055,6 @@ export default function ACMEPage() {
         />
       </Modal>
 
-      {/* Create EAB Credential Modal */}
-      <Modal
-        open={showCreateEabModal}
-        onClose={() => setShowCreateEabModal(false)}
-        title={t('acme.eab.newTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <p className="text-sm text-text-tertiary">
-            {t('acme.eab.newDescription')}
-          </p>
-          <Input
-            label={t('acme.eab.label')}
-            placeholder={t('acme.eab.labelPlaceholder')}
-            value={eabLabel}
-            onChange={(e) => setEabLabel(e.target.value)}
-            maxLength={255}
-          />
-          <Input
-            label={t('acme.eab.expiresInDays')}
-            type="number"
-            placeholder={t('acme.eab.expiresPlaceholder')}
-            value={eabExpiresInDays}
-            onChange={(e) => setEabExpiresInDays(e.target.value)}
-            min={1}
-            helperText={t('acme.eab.expiresHelp')}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => setShowCreateEabModal(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={handleCreateEabCredential}>
-              {t('acme.eab.generate')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Show EAB Secret Once Modal */}
-      <Modal
-        open={!!newEabSecret}
-        onClose={() => setNewEabSecret(null)}
-        title={t('acme.eab.secretTitle')}
-        size="md"
-      >
-        {newEabSecret && (
-          <div className="p-4 space-y-4">
-            <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 flex gap-2">
-              <Warning size={20} className="text-yellow-500 shrink-0 mt-0.5" weight="duotone" />
-              <div className="text-sm">
-                <div className="font-semibold">{t('acme.eab.secretWarningTitle')}</div>
-                <div className="text-text-tertiary mt-1">{t('acme.eab.secretWarning')}</div>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t('acme.eab.kid')}</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{newEabSecret.kid}</code>
-                <Button type="button" variant="secondary" size="sm" onClick={() => { copy(newEabSecret.kid); showSuccess(t('acme.eab.kidCopied')) }}>
-                  <Copy size={14} />
-                </Button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">{t('acme.eab.hmacKey')}</label>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary font-mono text-sm break-all">{newEabSecret.hmac_key}</code>
-                <Button type="button" variant="secondary" size="sm" onClick={() => { copy(newEabSecret.hmac_key); showSuccess(t('acme.eab.hmacCopied')) }}>
-                  <Copy size={14} />
-                </Button>
-              </div>
-              <p className="text-xs text-text-tertiary mt-1">{t('acme.eab.hmacFormat')}</p>
-            </div>
-            <div className="flex justify-end pt-2 border-t border-border">
-              <Button type="button" onClick={() => setNewEabSecret(null)}>
-                {t('acme.eab.secretConfirm')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-      
       {/* Request Certificate Modal */}
       <Modal
         open={showRequestModal}
@@ -2908,613 +1144,3 @@ export default function ACMEPage() {
   )
 }
 
-// Create Account Form Component
-function CreateAccountForm({ onSubmit, onCancel }) {
-  const { t } = useTranslation()
-  const { showWarning } = useNotification()
-  const [formData, setFormData] = useState({
-    email: '',
-    key_type: 'RSA-2048',
-    agree_tos: false,
-  })
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!formData.agree_tos) {
-      showWarning(t('acme.agreeToTermsRequired'))
-      return
-    }
-    onSubmit(formData)
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('common.emailAddress')}
-        type="email"
-        value={formData.email}
-        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-        required
-        helperText={t('acme.contactEmailHelper')}
-      />
-      
-      <Select
-        label={t('common.keyType')}
-        value={formData.key_type}
-        onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
-        options={[
-          { value: 'RSA-2048', label: 'RSA 2048-bit' },
-          { value: 'RSA-4096', label: 'RSA 4096-bit' },
-          { value: 'EC-P256', label: 'ECDSA P-256' },
-          { value: 'EC-P384', label: 'ECDSA P-384' },
-        ]}
-      />
-      
-      <label className="flex items-start gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={formData.agree_tos}
-          onChange={(e) => setFormData(prev => ({ ...prev, agree_tos: e.target.checked }))}
-          className="rounded border-border bg-bg-tertiary mt-1"
-        />
-        <span className="text-sm text-text-primary">
-          {t('acme.agreeToTerms')}
-        </span>
-      </label>
-      
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <Plus size={14} />
-          {t('acme.createAccount')}
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-// Request Certificate Form Component (Let's Encrypt)
-function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvironment, defaultEmail }) {
-  const { t } = useTranslation()
-  const { showWarning } = useNotification()
-  const [formData, setFormData] = useState({
-    domains: '',
-    email: defaultEmail,
-    challenge_type: 'dns-01',
-    environment: defaultEnvironment,
-    dns_provider_id: dnsProviders.find(p => p.is_default)?.id || null
-  })
-  
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    
-    // Parse domains
-    const domainList = formData.domains
-      .split(/[,\n]/)
-      .map(d => d.trim())
-      .filter(d => d)
-    
-    if (domainList.length === 0) {
-      showWarning(t('acme.atLeastOneDomainRequired'))
-      return
-    }
-    
-    // Validate domain format
-    const domainRegex = /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i
-    const invalidDomains = domainList.filter(d => !domainRegex.test(d))
-    if (invalidDomains.length > 0) {
-      showWarning(t('acme.invalidDomainFormat', { domains: invalidDomains.join(', ') }))
-      return
-    }
-    
-    // Check for wildcards with HTTP-01
-    if (formData.challenge_type === 'http-01' && domainList.some(d => d.startsWith('*.'))) {
-      showWarning(t('acme.wildcardRequiresDns01'))
-      return
-    }
-    
-    if (!formData.email) {
-      showWarning(t('common.emailRequired'))
-      return
-    }
-    
-    onSubmit({
-      ...formData,
-      domains: domainList
-    })
-  }
-  
-  return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      {formData.environment === 'production' && (
-        <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-2">
-          <Warning size={18} className="text-yellow-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">{t('acme.productionWarningTitle')}</p>
-            <p className="text-xs text-text-secondary mt-1">{t('acme.productionWarningDesc')}</p>
-          </div>
-        </div>
-      )}
-      
-      <div>
-        <label className="block text-sm font-medium text-text-primary mb-1">
-          {t('acme.domains')} <span className="text-red-500">*</span>
-        </label>
-        <textarea
-          className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"
-          value={formData.domains}
-          onChange={(e) => setFormData(prev => ({ ...prev, domains: e.target.value }))}
-          placeholder="example.com&#10;*.example.com&#10;sub.example.com"
-          required
-        />
-        <p className="text-xs text-text-tertiary mt-1">{t('acme.domainsHelper')}</p>
-      </div>
-      
-      <Input
-        label={t('acme.contactEmail')}
-        type="email"
-        value={formData.email}
-        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-        required
-        helperText={t('acme.contactEmailHelper')}
-      />
-      
-      <Select
-        label={t('acme.challengeType')}
-        value={formData.challenge_type}
-        onChange={(val) => setFormData(prev => ({ ...prev, challenge_type: val }))}
-        options={[
-          { value: 'dns-01', label: 'DNS-01 - ' + t('acme.dns01Desc') },
-          { value: 'http-01', label: 'HTTP-01 - ' + t('acme.http01Desc') }
-        ]}
-        helperText={t('acme.challengeTypeHelper')}
-      />
-      
-      {formData.challenge_type === 'dns-01' && (
-        <Select
-          label={t('acme.provider')}
-          value={formData.dns_provider_id?.toString() || ''}
-          onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: val ? parseInt(val) : null }))}
-          placeholder={t('acme.selectDnsProvider')}
-          options={[
-            { value: '', label: t('acme.manualDns') },
-            ...dnsProviders.map(p => ({ 
-              value: p.id.toString(), 
-              label: p.name + (p.is_default ? ' (' + t('common.default') + ')' : '')
-            }))
-          ]}
-          helperText={t('acme.dnsProviderHelper')}
-        />
-      )}
-      
-      <Select
-        label={t('acme.environment')}
-        value={formData.environment}
-        onChange={(val) => setFormData(prev => ({ ...prev, environment: val }))}
-        options={[
-          { value: 'staging', label: t('acme.staging') + ' - ' + t('acme.stagingDesc') },
-          { value: 'production', label: t('acme.production') + ' - ' + t('acme.productionDesc') }
-        ]}
-      />
-      
-      <Select
-        label={t('acme.keyType')}
-        value={formData.key_type || 'RSA-2048'}
-        onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
-        options={[
-          { value: 'RSA-2048', label: 'RSA 2048' },
-          { value: 'RSA-4096', label: 'RSA 4096' },
-          { value: 'EC-P256', label: 'ECDSA P-256' },
-          { value: 'EC-P384', label: 'ECDSA P-384' },
-        ]}
-        helperText={t('acme.keyTypeHelper')}
-      />
-      
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <CloudArrowUp size={14} />
-          {t('acme.requestCertificate')}
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-// Provider icon/color mapping is now in components/ProviderIcons.jsx
-
-function ProviderTypeGrid({ label, providers, value, onChange, disabled }) {
-  const [search, setSearch] = useState('')
-  const { t } = useTranslation()
-
-  const filtered = providers.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.description.toLowerCase().includes(search.toLowerCase())
-  )
-
-  // Group: Manual first, then Popular (sorted by rank), then Other alphabetical
-  const popularOrder = ['cloudflare', 'route53', 'azure', 'gcloud', 'ovh', 'hetzner', 'digitalocean', 'gandi', 'porkbun']
-  const manualProvider = filtered.find(p => p.type === 'manual')
-  const rfc2136Provider = filtered.find(p => p.type === 'rfc2136')
-  const popularProviders = popularOrder
-    .map(type => filtered.find(p => p.type === type))
-    .filter(Boolean)
-  const otherProviders = filtered
-    .filter(p => p.type !== 'manual' && p.type !== 'rfc2136' && !popularOrder.includes(p.type))
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  const renderCard = (pt) => {
-    const brandColor = getProviderColor(pt.type)
-    const isSelected = value === pt.type
-    return (
-      <button
-        key={pt.type}
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && onChange(pt.type)}
-        className={cn(
-          "flex flex-col items-center gap-1.5 p-2.5 rounded-lg border text-center transition-all duration-200 min-h-[72px]",
-          "hover:scale-[1.03] hover:shadow-md",
-          disabled && "opacity-50 cursor-not-allowed",
-          isSelected
-            ? "border-accent-primary bg-accent-primary-op10 ring-2 ring-accent-primary-op40 shadow-sm"
-            : "border-border-op50 bg-tertiary-op40 hover:border-secondary-op40 hover:bg-tertiary-op70"
-        )}
-      >
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
-          style={{ backgroundColor: brandColor }}>
-          <ProviderIcon type={pt.type} size={18} />
-        </span>
-        <span className={cn("text-[11px] font-medium leading-tight", isSelected ? "text-accent-primary" : "text-text-primary")}>
-          {pt.name}
-        </span>
-      </button>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      {label && <label className="block text-sm font-medium text-text-primary">{label}</label>}
-
-      {/* Search */}
-      {providers.length > 6 && (
-        <div className="relative">
-          <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
-          <input
-            type="text"
-            className="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary outline-none focus:border-accent-primary transition-colors"
-            placeholder={t('common.search') + '...'}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      )}
-
-      {/* Grid */}
-      <div className="max-h-80 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-        {/* Manual & RFC2136 — always visible on top when not searching */}
-        {search === '' && (manualProvider || rfc2136Provider) && (
-          <div className="grid grid-cols-3 gap-2">
-            {manualProvider && renderCard(manualProvider)}
-            {rfc2136Provider && renderCard(rfc2136Provider)}
-          </div>
-        )}
-        {search === '' && popularProviders.length > 0 && (
-          <>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">{t('common.popular', 'Popular')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              {popularProviders.map(renderCard)}
-            </div>
-          </>
-        )}
-        {search === '' && otherProviders.length > 0 && (
-          <>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary pt-1">{t('common.other', 'Other')}</p>
-            <div className="grid grid-cols-3 gap-2">
-              {otherProviders.map(renderCard)}
-            </div>
-          </>
-        )}
-        {search !== '' && (
-          <div className="grid grid-cols-3 gap-2">
-            {filtered.map(renderCard)}
-          </div>
-        )}
-        {filtered.length === 0 && (
-          <p className="text-xs text-text-tertiary text-center py-4">{t('common.noResults', 'No results')}</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// DNS Provider Form Component
-function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
-  const { t } = useTranslation()
-  const { showWarning } = useNotification()
-  const [formData, setFormData] = useState({
-    name: provider?.name || '',
-    provider_type: provider?.provider_type || 'manual',
-    credentials: {},  // Always start empty - backend will merge
-    is_default: provider?.is_default || false
-  })
-  
-  // Track which credentials already exist (from credential_keys)
-  const existingCredentialKeys = provider?.credential_keys || []
-  
-  const selectedType = providerTypes.find(pt => pt.type === formData.provider_type)
-  
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    
-    if (!formData.name.trim()) {
-      showWarning(t('acme.providerNameRequired'))
-      return
-    }
-    
-    // Validate required credentials using schema
-    // Only check if it's a NEW provider or if the field is not already set
-    if (selectedType?.credentials_schema && !provider) {
-      const missing = selectedType.credentials_schema
-        .filter(field => field.required && !formData.credentials[field.name])
-        .map(field => field.label)
-      if (missing.length > 0) {
-        showWarning(t('acme.missingCredentials', { fields: missing.join(', ') }))
-        return
-      }
-    }
-    
-    onSubmit(formData)
-  }
-  
-  const updateCredential = (key, value) => {
-    setFormData(prev => ({
-      ...prev,
-      credentials: { ...prev.credentials, [key]: value }
-    }))
-  }
-  
-  return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('common.providerName')}
-        value={formData.name}
-        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-        required
-        placeholder={t('acme.providerNamePlaceholder')}
-      />
-      
-      <ProviderTypeGrid
-        label={t('common.providerType')}
-        providers={providerTypes}
-        value={formData.provider_type}
-        onChange={(val) => setFormData(prev => ({ ...prev, provider_type: val, credentials: {} }))}
-        disabled={!!provider}
-      />
-      
-      {/* Dynamic credential fields based on provider type schema */}
-      {selectedType?.credentials_schema?.length > 0 && (
-        <div className="space-y-3 p-3 bg-tertiary-op50 rounded-lg">
-          <p className="text-sm font-medium text-text-secondary">{t('acme.credentials')}</p>
-          {selectedType.credentials_schema.map(field => {
-            const hasExistingValue = existingCredentialKeys.includes(field.name)
-            const isPasswordType = field.type === 'password'
-            
-            return (
-              <div key={field.name}>
-                {field.type === 'select' ? (
-                  <Select
-                    label={field.label}
-                    value={formData.credentials[field.name] || field.default || ''}
-                    onChange={(val) => updateCredential(field.name, val)}
-                    options={field.options || []}
-                    required={field.required && !hasExistingValue}
-                  />
-                ) : (
-                  <Input
-                    label={field.label}
-                    type={isPasswordType ? 'password' : 'text'}
-                    autoComplete={isPasswordType ? 'new-password' : 'off'}
-                    value={formData.credentials[field.name] || ''}
-                    onChange={(e) => updateCredential(field.name, e.target.value)}
-                    required={field.required}
-                    placeholder={field.placeholder}
-                    hasExistingValue={hasExistingValue}
-                    helperText={field.help}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-      
-      {formData.provider_type === 'manual' && (
-        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <p className="text-sm text-text-secondary">{t('acme.manualDnsInfo')}</p>
-        </div>
-      )}
-      
-      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
-        <input
-          type="checkbox"
-          checked={formData.is_default}
-          onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary-op50"
-        />
-        <span className="text-sm text-text-primary">{t('acme.setAsDefault')}</span>
-      </label>
-      
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <FloppyDisk size={14} />
-          {provider ? t('common.update') : t('common.create')}
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-// Domain Form Component
-function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
-  const { t } = useTranslation()
-  const [formData, setFormData] = useState({
-    domain: domain?.domain || '',
-    dns_provider_id: domain?.dns_provider_id || (dnsProviders[0]?.id || ''),
-    issuing_ca_id: domain?.issuing_ca_id?.toString() || '',
-    is_wildcard_allowed: domain?.is_wildcard_allowed ?? true,
-    auto_approve: domain?.auto_approve ?? false,
-  })
-
-  // Filter CAs that have private keys (can sign)
-  const signingCas = (cas || []).filter(ca => ca.has_private_key)
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSubmit({
-      ...formData,
-      issuing_ca_id: formData.issuing_ca_id || null,
-    })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('acme.domainName')}
-        value={formData.domain}
-        onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value.toLowerCase() }))}
-        required
-        placeholder="example.com"
-        helperText={t('acme.domainNameHelper')}
-        disabled={!!domain}
-      />
-      
-      <Select
-        label={t('acme.provider')}
-        value={formData.dns_provider_id}
-        onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: parseInt(val) }))}
-        options={dnsProviders.map(p => ({
-          value: p.id.toString(),
-          label: `${p.name} (${p.provider_type})`
-        }))}
-        required
-      />
-
-      <Select
-        label={t('acme.issuingCA')}
-        value={formData.issuing_ca_id}
-        onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val ? parseInt(val) : '' }))}
-        options={[
-          { value: '', label: t('acme.useDefaultCA') },
-          ...signingCas.map(ca => ({
-            value: ca.id.toString(),
-            label: ca.common_name || ca.descr || `CA #${ca.id}`
-          }))
-        ]}
-      />
-
-      <ToggleSwitch
-        checked={formData.is_wildcard_allowed}
-        onChange={(val) => setFormData(prev => ({ ...prev, is_wildcard_allowed: val }))}
-        label={t('acme.allowWildcard')}
-        description={t('acme.allowWildcardDesc')}
-      />
-
-      <ToggleSwitch
-        checked={formData.auto_approve}
-        onChange={(val) => setFormData(prev => ({ ...prev, auto_approve: val }))}
-        label={t('acme.autoApproveRequests')}
-        description={t('acme.autoApproveDesc')}
-      />
-      {formData.auto_approve && (
-        <div className="p-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 text-sm text-yellow-200">
-          ⚠ {t('acme.autoApproveWarning')}
-        </div>
-      )}
-      
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <FloppyDisk size={14} />
-          {domain ? t('common.update') : t('common.create')}
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-
-function LocalDomainForm({ domain, cas, onSubmit, onCancel }) {
-  const { t } = useTranslation()
-  const [formData, setFormData] = useState({
-    domain: domain?.domain || '',
-    issuing_ca_id: domain?.issuing_ca_id?.toString() || '',
-    auto_approve: domain?.auto_approve ?? false,
-  })
-
-  const signingCas = (cas || []).filter(ca => ca.has_private_key)
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSubmit({
-      ...formData,
-      issuing_ca_id: formData.issuing_ca_id ? parseInt(formData.issuing_ca_id) : null,
-    })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      <Input
-        label={t('acme.domainName')}
-        value={formData.domain}
-        onChange={(e) => setFormData(prev => ({ ...prev, domain: e.target.value.toLowerCase() }))}
-        required
-        placeholder="example.com"
-        helperText={t('acme.localDomainHelper')}
-        disabled={!!domain}
-      />
-
-      <Select
-        label={t('acme.issuingCA')}
-        value={formData.issuing_ca_id}
-        onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val }))}
-        options={signingCas.map(ca => ({
-          value: ca.id.toString(),
-          label: ca.common_name || ca.descr || `CA #${ca.id}`
-        }))}
-        required
-      />
-
-      <ToggleSwitch
-        checked={formData.auto_approve}
-        onChange={(val) => setFormData(prev => ({ ...prev, auto_approve: val }))}
-        label={t('acme.autoApproveRequests')}
-        description={t('acme.autoApproveDesc')}
-      />
-      {formData.auto_approve && (
-        <div className="p-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 text-sm text-yellow-200">
-          ⚠ {t('acme.autoApproveWarning')}
-        </div>
-      )}
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          <FloppyDisk size={14} />
-          {domain ? t('common.update') : t('common.create')}
-        </Button>
-      </div>
-    </form>
-  )
-}
