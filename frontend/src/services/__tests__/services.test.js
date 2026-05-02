@@ -26,7 +26,17 @@ const mockApiClient = {
 
 vi.mock('../apiClient', async () => {
   const actual = await vi.importActual('../apiClient')
-  return { ...actual, apiClient: mockApiClient }
+  return {
+    ...actual,
+    apiClient: mockApiClient,
+    createCRUDService: (endpoint) => ({
+      getAll: (params) => mockApiClient.get(`/${endpoint}${actual.buildQueryString(params)}`),
+      getById: (id) => mockApiClient.get(`/${endpoint}/${id}`),
+      create: (data) => mockApiClient.post(`/${endpoint}`, data),
+      update: (id, data) => mockApiClient.put(`/${endpoint}/${id}`, data),
+      delete: (id) => mockApiClient.delete(`/${endpoint}/${id}`),
+    }),
+  }
 })
 
 beforeEach(() => {

@@ -286,3 +286,27 @@ export function buildQueryString(params) {
   const str = qs.toString()
   return str ? `?${str}` : ''
 }
+
+/**
+ * Create a standard CRUD service for a given API endpoint.
+ * Returns the five standard methods: getAll, getById, create, update, delete.
+ * Spread the result and add any resource-specific methods on top.
+ *
+ * @param {string} endpoint - API path segment (e.g. 'templates', 'ssh/cas')
+ * @returns {Object} Object with getAll, getById, create, update, delete
+ *
+ * @example
+ * export const myService = {
+ *   ...createCRUDService('my-resource'),
+ *   customMethod: (id) => apiClient.post(`/my-resource/${id}/custom`)
+ * }
+ */
+export function createCRUDService(endpoint) {
+  return {
+    getAll: (params) => apiClient.get(`/${endpoint}${buildQueryString(params)}`),
+    getById: (id) => apiClient.get(`/${endpoint}/${id}`),
+    create: (data) => apiClient.post(`/${endpoint}`, data),
+    update: (id, data) => apiClient.put(`/${endpoint}/${id}`, data),
+    delete: (id) => apiClient.delete(`/${endpoint}/${id}`),
+  }
+}
