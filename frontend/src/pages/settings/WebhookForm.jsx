@@ -15,7 +15,7 @@ const WEBHOOK_EVENTS = [
   'csr.rejected',
 ]
 
-const WEBHOOK_EVENT_LABELS = {
+export const WEBHOOK_EVENT_LABELS = {
   'certificate.issued': 'Issued',
   'certificate.revoked': 'Revoked',
   'certificate.renewed': 'Renewed',

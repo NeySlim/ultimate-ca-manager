@@ -45,6 +45,18 @@ import MappingEditor from './settings/MappingEditor'
 import SsoProviderForm from './settings/SsoProviderForm'
 import WebhookForm from './settings/WebhookForm'
 import MscaConnectionForm from './settings/MscaConnectionForm'
+import GeneralSection from './settings/GeneralSection'
+import EmailSection from './settings/EmailSection'
+import SecuritySection from './settings/SecuritySection'
+import SsoSection from './settings/SsoSection'
+import BackupSection from './settings/BackupSection'
+import AuditSection from './settings/AuditSection'
+import DatabaseSection from './settings/DatabaseSection'
+import HttpsSection from './settings/HttpsSection'
+import UpdatesSection from './settings/UpdatesSection'
+import WebhooksSection from './settings/WebhooksSection'
+import CTSection from './settings/CTSection'
+import MicrosoftCASection from './settings/MicrosoftCASection'
 import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 
@@ -788,22 +800,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Per-provider setup guide config (links + step-by-step).
-  const oauthProviderSetup = {
-    google: {
-      consoleUrl: 'https://console.cloud.google.com/apis/credentials',
-      consoleLabel: 'Google Cloud Console → APIs & Services → Credentials',
-    },
-    microsoft: {
-      consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-      consoleLabel: 'Azure Portal → App registrations',
-    },
-    microsoft365: {
-      consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-      consoleLabel: 'Azure Portal → App registrations',
-    },
-  }
-
   const handleSmtpOAuthAuthorize = async () => {
     try {
       // Auto-save OAuth config if there are unsaved changes,
@@ -1085,144 +1081,13 @@ export default function SettingsPage() {
     switch (selectedCategory) {
       case 'general':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={Gear}
-              title={t('settings.helpGeneral')}
-              subtitle={t('settings.generalSubtitle')}
-            />
-            <DetailSection title={t('settings.subtitle')} icon={Gear} iconClass="icon-bg-blue">
-              <div className="space-y-4">
-                <Input
-                  label={t('settings.systemName')}
-                  value={settings.system_name || ''}
-                  onChange={(e) => updateSetting('system_name', e.target.value)}
-                  helperText={t('settings.systemNameHelper')}
-                />
-                <Input
-                  label={t('settings.baseUrl')}
-                  value={settings.base_url || ''}
-                  onChange={(e) => updateSetting('base_url', e.target.value)}
-                  placeholder={t('settings.baseUrlPlaceholder')}
-                  helperText={t('settings.baseUrlHelper')}
-                />
-                <Input
-                  label={t('settings.protocolBaseUrl')}
-                  value={settings.protocol_base_url || ''}
-                  onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
-                  placeholder="http://pki.example.com"
-                  helperText={t('settings.protocolBaseUrlHelper')}
-                />
-                <Input
-                  label={t('settings.httpProtocolPort')}
-                  type="number"
-                  min={0}
-                  max={65535}
-                  value={settings.http_protocol_port ?? 8080}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value) || 0
-                    updateSetting('http_protocol_port', Math.min(65535, Math.max(0, val)))
-                  }}
-                  placeholder="8080"
-                  helperText={t('settings.httpProtocolPortHelper')}
-                />
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
-              <div className="space-y-4">
-                <Input
-                  label={t('settings.sessionTimeout')}
-                  type="number"
-                  value={Math.round((settings.session_timeout || 28800) / 60)}
-                  onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
-                  min="5"
-                  max="1440"
-                  helperText={t('settings.sessionTimeoutHelper')}
-                />
-                <Input
-                  label={t('settings.maxLoginAttempts')}
-                  type="number"
-                  value={settings.max_login_attempts || 5}
-                  onChange={(e) => updateSetting('max_login_attempts', parseInt(e.target.value))}
-                  min="3"
-                  max="20"
-                  helperText={t('settings.maxLoginAttemptsHelper')}
-                />
-                <Input
-                  label={t('settings.lockoutDuration')}
-                  type="number"
-                  value={Math.round((settings.lockout_duration || 900) / 60)}
-                  onChange={(e) => updateSetting('lockout_duration', parseInt(e.target.value) * 60)}
-                  min="1"
-                  max="60"
-                  helperText={t('settings.lockoutDurationHelper')}
-                />
-                <Select
-                  label={t('settings.timezone')}
-                  options={[
-                    { value: 'UTC', label: 'UTC (GMT+0)' },
-                    { value: 'Europe/London', label: 'Europe/London (GMT+0/+1)' },
-                    { value: 'Europe/Paris', label: 'Europe/Paris (GMT+1/+2)' },
-                    { value: 'Europe/Berlin', label: 'Europe/Berlin (GMT+1/+2)' },
-                    { value: 'Europe/Zurich', label: 'Europe/Zurich (GMT+1/+2)' },
-                    { value: 'Europe/Brussels', label: 'Europe/Brussels (GMT+1/+2)' },
-                    { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam (GMT+1/+2)' },
-                    { value: 'Europe/Rome', label: 'Europe/Rome (GMT+1/+2)' },
-                    { value: 'Europe/Madrid', label: 'Europe/Madrid (GMT+1/+2)' },
-                    { value: 'Europe/Helsinki', label: 'Europe/Helsinki (GMT+2/+3)' },
-                    { value: 'Europe/Athens', label: 'Europe/Athens (GMT+2/+3)' },
-                    { value: 'Europe/Moscow', label: 'Europe/Moscow (GMT+3)' },
-                    { value: 'America/New_York', label: 'America/New York (GMT-5/-4)' },
-                    { value: 'America/Chicago', label: 'America/Chicago (GMT-6/-5)' },
-                    { value: 'America/Denver', label: 'America/Denver (GMT-7/-6)' },
-                    { value: 'America/Los_Angeles', label: 'America/Los Angeles (GMT-8/-7)' },
-                    { value: 'America/Toronto', label: 'America/Toronto (GMT-5/-4)' },
-                    { value: 'America/Sao_Paulo', label: 'America/São Paulo (GMT-3)' },
-                    { value: 'Asia/Dubai', label: 'Asia/Dubai (GMT+4)' },
-                    { value: 'Asia/Kolkata', label: 'Asia/Kolkata (GMT+5:30)' },
-                    { value: 'Asia/Shanghai', label: 'Asia/Shanghai (GMT+8)' },
-                    { value: 'Asia/Tokyo', label: 'Asia/Tokyo (GMT+9)' },
-                    { value: 'Asia/Seoul', label: 'Asia/Seoul (GMT+9)' },
-                    { value: 'Asia/Singapore', label: 'Asia/Singapore (GMT+8)' },
-                    { value: 'Australia/Sydney', label: 'Australia/Sydney (GMT+10/+11)' },
-                    { value: 'Pacific/Auckland', label: 'Pacific/Auckland (GMT+12/+13)' },
-                  ]}
-                  value={settings.timezone || 'UTC'}
-                  onChange={(val) => updateSetting('timezone', val)}
-                />
-                <Select
-                  label={t('settings.dateFormat')}
-                  options={[
-                    { value: 'short', label: `${t('settings.dateFormats.short')} — Jan 6, 2026` },
-                    { value: 'long', label: `${t('settings.dateFormats.long')} — January 6, 2026` },
-                    { value: 'iso', label: `${t('settings.dateFormats.iso')} — 2026-01-06` },
-                    { value: 'eu', label: `${t('settings.dateFormats.eu')} — 06/01/2026` },
-                    { value: 'us', label: `${t('settings.dateFormats.us')} — 01/06/2026` },
-                  ]}
-                  value={settings.date_format || 'short'}
-                  onChange={(val) => updateSetting('date_format', val)}
-                />
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={settings.show_time !== 'false' && settings.show_time !== false}
-                    onChange={(e) => updateSetting('show_time', e.target.checked)}
-                    className="rounded"
-                  />
-                  {t('settings.showTime')}
-                </label>
-                {canWrite('settings') && (
-                  <div className="pt-2">
-                    <Button type="button" onClick={() => handleSave('general')} disabled={saving}>
-                      <FloppyDisk size={16} />
-                      {t('common.saveChanges')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </DetailSection>
-            <ServiceStatusWidget />
-          </DetailContent>
+          <GeneralSection
+            settings={settings}
+            updateSetting={updateSetting}
+            handleSave={handleSave}
+            saving={saving}
+            canWrite={canWrite}
+          />
         )
 
       case 'appearance':
@@ -1230,1470 +1095,164 @@ export default function SettingsPage() {
 
       case 'email':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={EnvelopeSimple}
-              title={t('settings.emailTitle')}
-              subtitle={t('settings.emailSubtitle')}
-            />
-            <DetailSection title={t('settings.smtpConfig')} icon={Envelope} iconClass="icon-bg-violet">
-              <div className="space-y-5">
-                {/* Server */}
-                <DetailGrid>
-                  <div className="col-span-full md:col-span-1">
-                    <Input
-                      label={t('settings.smtpHost')}
-                      value={settings.smtp_host || ''}
-                      onChange={(e) => updateSetting('smtp_host', e.target.value)}
-                      placeholder={t('settings.smtpHostPlaceholder')}
-                    />
-                  </div>
-                  <div className="col-span-full md:col-span-1">
-                    <Input
-                      label={t('settings.smtpPort')}
-                      type="number"
-                      value={settings.smtp_port || 587}
-                      onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
-                    />
-                  </div>
-                </DetailGrid>
-
-                {/* Authentication */}
-                <div className="border-t border-border pt-4 space-y-3">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-text-secondary">{t('settings.smtpAuthMethod')}:</span>
-                    {['password', 'oauth2', 'none'].map(method => (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => {
-                          updateSetting('smtp_auth_method', method)
-                          setOauthDirty(prev => prev || method === 'oauth2')
-                        }}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          (settings.smtp_auth_method || 'password') === method
-                            ? 'bg-accent-primary text-white'
-                            : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                        }`}
-                      >
-                        {t(`settings.smtpAuthMethod_${method}`)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {(settings.smtp_auth_method || 'password') === 'none' && (
-                    <p className="text-xs text-text-tertiary">{t('settings.smtpNoAuthHint')}</p>
-                  )}
-
-                  {(settings.smtp_auth_method || 'password') === 'password' && (
-                    <DetailGrid>
-                      <div className="col-span-full md:col-span-1">
-                        <Input
-                          label={t('settings.smtpUsername')}
-                          value={settings.smtp_username || ''}
-                          onChange={(e) => updateSetting('smtp_username', e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-full md:col-span-1">
-                        <Input
-                          label={t('settings.smtpPassword')}
-                          type="password"
-                          noAutofill
-                          value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
-                          onChange={(e) => updateSetting('smtp_password', e.target.value)}
-                          hasExistingValue={settings.smtp_password === '********'}
-                        />
-                      </div>
-                    </DetailGrid>
-                  )}
-
-                  {(settings.smtp_auth_method || 'password') === 'oauth2' && (
-                    <div className="space-y-3">
-                      {/* Mailbox / username (XOAUTH2 uses email address as user) */}
-                      <DetailGrid>
-                        <div className="col-span-full md:col-span-1">
-                          <Input
-                            label={t('settings.smtpUsername')}
-                            value={settings.smtp_username || ''}
-                            onChange={(e) => updateSetting('smtp_username', e.target.value)}
-                          />
-                        </div>
-                      </DetailGrid>
-
-                      {/* Provider selector */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm text-text-secondary">{t('settings.smtpOauthProvider')}:</span>
-                        {['google', 'microsoft', 'microsoft365', 'custom'].map(provider => (
-                          <button
-                            key={provider}
-                            type="button"
-                            onClick={() => applyOAuthProviderPreset(provider)}
-                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                              (settings.smtp_oauth_provider || 'google') === provider
-                                ? 'bg-accent-primary text-white'
-                                : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                            }`}
-                          >
-                            {t(`settings.smtpOauthProvider_${provider}`)}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Per-provider setup guide */}
-                      {oauthProviderSetup[settings.smtp_oauth_provider || 'google'] && (
-                        <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info/30 rounded-lg text-xs text-text-secondary">
-                          <Info size={16} className="shrink-0 mt-0.5 text-status-info" />
-                          <div className="space-y-1.5 flex-1">
-                            <p className="font-medium text-text-primary">
-                              {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_title`)}
-                            </p>
-                            <p className="whitespace-pre-line">
-                              {t(`settings.smtpOauthSetup_${settings.smtp_oauth_provider || 'google'}_steps`)}
-                            </p>
-                            <a
-                              href={oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-accent-primary hover:underline font-medium"
-                            >
-                              {oauthProviderSetup[settings.smtp_oauth_provider || 'google'].consoleLabel} ↗
-                            </a>
-                          </div>
-                        </div>
-                      )}
-
-                      <DetailGrid>
-                        {(settings.smtp_oauth_provider || 'google') === 'microsoft365' && (
-                          <div className="col-span-full md:col-span-1">
-                            <Input
-                              label={t('settings.smtpOauthTenant')}
-                              value={settings.smtp_oauth_tenant_id || ''}
-                              onChange={(e) => { updateSetting('smtp_oauth_tenant_id', e.target.value); setOauthDirty(true) }}
-                              placeholder="common"
-                              helper={t('settings.smtpOauthTenantHintM365')}
-                            />
-                          </div>
-                        )}
-                        <div className="col-span-full md:col-span-1">
-                          <Input
-                            label={t('settings.smtpOauthClientId')}
-                            value={settings.smtp_oauth_client_id || ''}
-                            onChange={(e) => { updateSetting('smtp_oauth_client_id', e.target.value); setOauthDirty(true) }}
-                          />
-                        </div>
-                        <div className="col-span-full md:col-span-1">
-                          <Input
-                            label={t('settings.smtpOauthClientSecret')}
-                            type="password"
-                            noAutofill
-                            value={settings.smtp_oauth_client_secret === '********' ? '' : (settings.smtp_oauth_client_secret || '')}
-                            onChange={(e) => { updateSetting('smtp_oauth_client_secret', e.target.value); setOauthDirty(true) }}
-                            hasExistingValue={settings.has_oauth_client_secret}
-                          />
-                        </div>
-                        {(settings.smtp_oauth_provider || 'google') === 'custom' && (
-                          <>
-                            <div className="col-span-full md:col-span-1">
-                              <Input
-                                label={t('settings.smtpOauthAuthorizeUrl')}
-                                value={settings.smtp_oauth_authorize_url || ''}
-                                onChange={(e) => { updateSetting('smtp_oauth_authorize_url', e.target.value); setOauthDirty(true) }}
-                              />
-                            </div>
-                            <div className="col-span-full md:col-span-1">
-                              <Input
-                                label={t('settings.smtpOauthTokenUrl')}
-                                value={settings.smtp_oauth_token_url || ''}
-                                onChange={(e) => { updateSetting('smtp_oauth_token_url', e.target.value); setOauthDirty(true) }}
-                              />
-                            </div>
-                            <div className="col-span-full md:col-span-1">
-                              <Input
-                                label={t('settings.smtpOauthScope')}
-                                value={settings.smtp_oauth_scope || ''}
-                                onChange={(e) => { updateSetting('smtp_oauth_scope', e.target.value); setOauthDirty(true) }}
-                              />
-                            </div>
-                          </>
-                        )}
-                        <div className="col-span-full">
-                          <Input
-                            label={t('settings.smtpOauthRedirectUri')}
-                            value={settings.smtp_oauth_redirect_uri || ''}
-                            onChange={(e) => { updateSetting('smtp_oauth_redirect_uri', e.target.value); setOauthDirty(true) }}
-                            placeholder={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/v2/settings/email/oauth/callback`}
-                            helper={t('settings.smtpOauthRedirectUriHint')}
-                          />
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                if (typeof window === 'undefined') return
-                                const defaultUri = `${window.location.origin}/api/v2/settings/email/oauth/callback`
-                                updateSetting('smtp_oauth_redirect_uri', defaultUri)
-                                setOauthDirty(true)
-                              }}
-                            >
-                              {t('settings.smtpOauthRedirectUriUseDefault')}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={!settings.smtp_oauth_redirect_uri}
-                              onClick={() => {
-                                const val = settings.smtp_oauth_redirect_uri || ''
-                                if (!val) return
-                                navigator.clipboard?.writeText(val)
-                                showSuccess(t('common.copiedToClipboard'))
-                              }}
-                            >
-                              <Copy size={14} className="mr-1.5" />
-                              {t('common.copy')}
-                            </Button>
-                          </div>
-                        </div>
-                      </DetailGrid>
-
-                      {/* Authorization status + actions */}
-                      {/* Unverified-app warning notice — only shown before authorization */}
-                      {!settings.has_oauth_refresh_token && ['google', 'microsoft', 'microsoft365'].includes(settings.smtp_oauth_provider || 'google') && (
-                        <div className="flex items-start gap-2 p-3 bg-status-info-op10 border border-status-info/30 rounded-lg text-xs text-text-secondary">
-                          <Warning size={16} className="shrink-0 mt-0.5 text-status-info" />
-                          <div className="space-y-1">
-                            <p className="font-medium text-text-primary">{t('settings.smtpOauthUnverifiedTitle')}</p>
-                            <p>{t('settings.smtpOauthUnverifiedBody')}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Authorization status + actions */}
-                      <div className="flex flex-wrap items-center gap-3 pt-1">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                          settings.has_oauth_refresh_token
-                            ? 'bg-status-success-op10 text-status-success'
-                            : 'bg-bg-tertiary text-text-tertiary'
-                        }`}>
-                          {settings.has_oauth_refresh_token
-                            ? <><CheckCircle size={13} />{t('settings.smtpOauthStatusAuthorized')}</>
-                            : <><XCircle size={13} />{t('settings.smtpOauthStatusNotAuthorized')}</>
-                          }
-                        </span>
-
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleSmtpOAuthAuthorize}
-                          disabled={!settings.smtp_oauth_client_id || saving}
-                          title={oauthDirty ? t('settings.smtpOauthAutoSaveHint') : undefined}
-                        >
-                          <Key size={14} />
-                          {oauthDirty ? t('settings.smtpOauthSaveAndAuthorize') : t('settings.smtpOauthAuthorize')}
-                        </Button>
-
-                        {settings.has_oauth_refresh_token && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="danger-soft"
-                            onClick={handleSmtpOAuthRevoke}
-                          >
-                            <XCircle size={14} />
-                            {t('settings.smtpOauthRevoke')}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Options */}
-                <div className="border-t border-border pt-4 space-y-3">
-                  <DetailGrid>
-                    <div className="col-span-full md:col-span-1">
-                      <Input
-                        label={t('settings.fromEmail')}
-                        type="email"
-                        value={settings.smtp_from_email || ''}
-                        onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-                        placeholder={t('settings.fromEmailPlaceholder')}
-                      />
-                    </div>
-                  </DetailGrid>
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-                    <ToggleSwitch
-                      checked={settings.smtp_use_tls || false}
-                      onChange={(val) => updateSetting('smtp_use_tls', val)}
-                      label={t('settings.useTls')}
-                      size="sm"
-                    />
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-text-secondary">{t('settings.emailFormat')}:</span>
-                      {['html', 'text', 'both'].map(fmt => (
-                        <button
-                          key={fmt}
-                          type="button"
-                          onClick={() => updateSetting('smtp_content_type', fmt)}
-                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                            (settings.smtp_content_type || 'html') === fmt
-                              ? 'bg-accent-primary text-white'
-                              : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                          }`}
-                        >
-                          {t(`settings.emailFormat_${fmt}`)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Test result banner */}
-                {emailTestResult && (
-                  <div className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
-                    emailTestResult.success
-                      ? 'bg-status-success-op10 text-status-success'
-                      : 'bg-status-danger-op10 text-status-danger'
-                  }`}>
-                    {emailTestResult.success
-                      ? <CheckCircle size={18} className="shrink-0 mt-0.5" />
-                      : <WarningCircle size={18} className="shrink-0 mt-0.5" />
-                    }
-                    <span className="break-all">{emailTestResult.message}</span>
-                  </div>
-                )}
-
-                {/* Actions */}
-                {canWrite('settings') && (
-                  <div className="space-y-3 pt-1">
-                    <DetailGrid>
-                      <div className="col-span-full md:col-span-1">
-                        <Input
-                          label={t('settings.testRecipient')}
-                          type="email"
-                          value={settings._testRecipient || ''}
-                          onChange={(e) => updateSetting('_testRecipient', e.target.value)}
-                          placeholder={settings.smtp_from_email || 'admin@example.com'}
-                        />
-                      </div>
-                      <div className="col-span-full md:col-span-1 flex items-end gap-2">
-                        <Button type="button" variant="secondary" onClick={handleTestEmail} disabled={emailTesting}>
-                          {emailTesting ? <ArrowsClockwise size={16} className="animate-spin" /> : <Envelope size={16} />}
-                          {t('settings.testEmail')}
-                        </Button>
-                        <Button type="button" onClick={() => handleSave('email')} disabled={saving}>
-                          <FloppyDisk size={16} />
-                          {t('common.save')}
-                        </Button>
-                      </div>
-                    </DetailGrid>
-                  </div>
-                )}
-              </div>
-            </DetailSection>
-
-            {/* Email Template */}
-            <DetailSection title={t('settings.emailTemplate')} icon={EnvelopeSimple} iconClass="icon-bg-indigo">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm text-text-secondary">{t('settings.templateDescription')}</p>
-                <div className="relative group shrink-0">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setShowTemplateEditor(true)} disabled={isMobile}>
-                    <PencilSimple size={16} />
-                    {t('settings.editTemplate')}
-                  </Button>
-                  {isMobile && (
-                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-[11px] text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
-                      {t('settings.templateDesktopOnly')}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </DetailSection>
-
-            {showTemplateEditor && (
-              <EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} />
-            )}
-
-            <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-rose">
-              {!settings.smtp_host ? (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">
-                  <Warning size={20} className="text-status-warning shrink-0" />
-                  {t('settings.smtpRequiredForAlerts')}
-                </div>
-              ) : (
-              <div className="space-y-4">
-                <ToggleSwitch
-                  checked={expiryAlerts.enabled}
-                  onChange={(val) => setExpiryAlerts(prev => ({ ...prev, enabled: val }))}
-                  label={t('settings.enableExpiryAlerts')}
-                  size="sm"
-                />
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">
-                    {t('settings.alertDays')}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[90, 60, 30, 14, 7, 3, 1].map(d => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => {
-                          setExpiryAlerts(prev => ({
-                            ...prev,
-                            alert_days: prev.alert_days.includes(d)
-                              ? prev.alert_days.filter(x => x !== d)
-                              : [...prev.alert_days, d].sort((a, b) => b - a)
-                          }))
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          expiryAlerts.alert_days.includes(d)
-                            ? 'bg-accent-primary text-white'
-                            : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
-                        }`}
-                      >
-                        {d}d
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-text-tertiary mt-1">{t('settings.alertDaysHelp')}</p>
-                </div>
-                <TagsInput
-                  label={t('settings.alertRecipients')}
-                  value={expiryAlerts.recipients || []}
-                  onChange={(tags) => setExpiryAlerts(prev => ({ ...prev, recipients: tags }))}
-                  placeholder={t('settings.alertRecipientsPlaceholder')}
-                  helperText={t('settings.tagsInputHelp')}
-                  validate={(v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)}
-                />
-                <ToggleSwitch
-                  checked={expiryAlerts.include_revoked}
-                  onChange={(val) => setExpiryAlerts(prev => ({ ...prev, include_revoked: val }))}
-                  label={t('settings.includeRevoked')}
-                  size="sm"
-                />
-                {canWrite('settings') && (
-                  <div className="flex gap-2 pt-2">
-                    <Button type="button" variant="secondary" onClick={triggerExpiryCheck}>
-                      <Bell size={16} />
-                      {t('settings.checkNow')}
-                    </Button>
-                    <Button type="button" onClick={saveExpiryAlerts} disabled={saving}>
-                      <FloppyDisk size={16} />
-                      {t('common.saveChanges')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-              )}
-            </DetailSection>
-          </DetailContent>
+          <EmailSection
+            settings={settings}
+            updateSetting={updateSetting}
+            handleSave={handleSave}
+            saving={saving}
+            canWrite={canWrite}
+            isMobile={isMobile}
+            emailTestResult={emailTestResult}
+            emailTesting={emailTesting}
+            handleTestEmail={handleTestEmail}
+            oauthDirty={oauthDirty}
+            setOauthDirty={setOauthDirty}
+            oauthPresets={oauthPresets}
+            applyOAuthProviderPreset={applyOAuthProviderPreset}
+            handleSmtpOAuthAuthorize={handleSmtpOAuthAuthorize}
+            handleSmtpOAuthRevoke={handleSmtpOAuthRevoke}
+            expiryAlerts={expiryAlerts}
+            setExpiryAlerts={setExpiryAlerts}
+            saveExpiryAlerts={saveExpiryAlerts}
+            triggerExpiryCheck={triggerExpiryCheck}
+            showTemplateEditor={showTemplateEditor}
+            setShowTemplateEditor={setShowTemplateEditor}
+          />
         )
-
       case 'security':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={ShieldCheck}
-              title={t('common.securitySettings')}
-              subtitle={t('settings.securitySubtitle')}
-            />
-            <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-rose">
-              {encryptionStatus ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
-                      {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
-                    </Badge>
-                    {encryptionStatus.enabled && encryptionStatus.key_source && (
-                      <span className="text-xs text-text-tertiary">
-                        {t('settings.keySource')}: {encryptionStatus.key_file_path}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {encryptionStatus.total_keys > 0 && (
-                    <div className="flex gap-4 text-sm">
-                      <span className="text-text-secondary">
-                        {t('settings.encryptedKeys')}: <strong className="text-text-primary">{encryptionStatus.encrypted_count}</strong>
-                      </span>
-                      <span className="text-text-secondary">
-                        {t('settings.unencryptedKeys')}: <strong className="text-text-primary">{encryptionStatus.unencrypted_count}</strong>
-                      </span>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-text-secondary">{t('settings.encryptionDesc')}</p>
-
-                  {hasPermission('admin:system') && (
-                    <div>
-                      {!encryptionStatus.enabled ? (
-                        <Button 
-                          onClick={() => setShowEnableEncryptionModal(true)}
-                          variant="primary"
-                        >
-                          <LockKey size={16} />
-                          {t('settings.enableEncryption')}
-                        </Button>
-                      ) : (
-                        <Button 
-                          onClick={() => setShowDisableEncryptionModal(true)}
-                          variant="outline"
-                        >
-                          <Lock size={16} />
-                          {t('settings.disableEncryption')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <LoadingSpinner size="sm" />
-              )}
-            </DetailSection>
-            <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
-              <ToggleSwitch
-                checked={settings.enforce_2fa || false}
-                onChange={(val) => updateSetting('enforce_2fa', val)}
-                label={t('settings.enforce2fa')}
-                description={t('settings.enforce2faDesc')}
-              />
-            </DetailSection>
-            <DetailSection title={t('settings.passwordPolicy')} icon={Lock} iconClass="icon-bg-violet">
-              <div className="space-y-4">
-                <Input
-                  label={t('settings.minPasswordLength')}
-                  type="number"
-                  value={settings.min_password_length || 8}
-                  onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
-                  min="6"
-                  max="32"
-                />
-                <div className="space-y-2">
-                  <ToggleSwitch
-                    checked={settings.password_require_uppercase || false}
-                    onChange={(val) => updateSetting('password_require_uppercase', val)}
-                    label={t('settings.requireUppercase')}
-                    size="sm"
-                  />
-                  <ToggleSwitch
-                    checked={settings.password_require_numbers || false}
-                    onChange={(val) => updateSetting('password_require_numbers', val)}
-                    label={t('settings.requireNumbers')}
-                    size="sm"
-                  />
-                  <ToggleSwitch
-                    checked={settings.password_require_special || false}
-                    onChange={(val) => updateSetting('password_require_special', val)}
-                    label={t('settings.requireSpecial')}
-                    size="sm"
-                  />
-                </div>
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.anomalyDetection')} icon={Warning} iconClass="icon-bg-orange"
-              badge={anomalies.length > 0 ? anomalies.length : null}
-              badgeColor={anomalies.length > 0 ? 'warning' : undefined}
-            >
-              <div className="space-y-3">
-                {anomaliesLoading ? (
-                  <LoadingSpinner size="sm" />
-                ) : anomalies.length === 0 ? (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-status-success-op10">
-                    <CheckCircle size={20} weight="fill" className="text-status-success" />
-                    <div>
-                      <div className="text-sm font-medium text-text-primary">{t('settings.noAnomalies')}</div>
-                      <div className="text-xs text-text-secondary">{t('settings.noAnomaliesDesc')}</div>
-                    </div>
-                  </div>
-                ) : (
-                  anomalies.map((anomaly, i) => (
-                    <div key={i} className={`p-3 rounded-lg flex items-start gap-3 ${anomaly.details?.severity === 'high' ? 'bg-status-danger-op10' : 'bg-status-warning-op10'}`}>
-                      <Warning size={18} weight="fill" className={anomaly.details?.severity === 'high' ? 'text-status-danger' : 'text-status-warning'} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-text-primary">{anomaly.details?.type || t('settings.unknownAnomaly')}</div>
-                        <div className="text-xs text-text-secondary">{anomaly.details?.message}</div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
-                          <span className="flex items-center gap-1">
-                            <Clock size={12} />
-                            {formatDate(anomaly.timestamp)}
-                          </span>
-                          {anomaly.details?.ip && (
-                            <span className="flex items-center gap-1">
-                              <Globe size={12} />
-                              {anomaly.details.ip}
-                            </span>
-                          )}
-                          {anomaly.details?.user_id && (
-                            <span className="flex items-center gap-1">
-                              <User size={12} />
-                              #{anomaly.details.user_id}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                <Button type="button" variant="secondary" size="sm" onClick={loadAnomalies} loading={anomaliesLoading}>
-                  <ArrowsClockwise size={14} />
-                  {t('common.refresh')}
-                </Button>
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.sessionRateLimits')} icon={Timer} iconClass="icon-bg-teal">
-              <DetailGrid>
-                <div className="col-span-full md:col-span-1">
-                  <Input
-                    label={t('settings.sessionDuration')}
-                    type="number"
-                    value={Math.round((settings.session_max_lifetime || 86400) / 3600)}
-                    onChange={(e) => updateSetting('session_max_lifetime', parseInt(e.target.value) * 3600)}
-                    min="1"
-                    max="720"
-                    helperText={t('settings.sessionDurationHelper')}
-                  />
-                </div>
-                <div className="col-span-full md:col-span-1">
-                  <Input
-                    label={t('settings.apiRateLimit')}
-                    type="number"
-                    value={settings.api_rate_limit || 60}
-                    onChange={(e) => updateSetting('api_rate_limit', parseInt(e.target.value))}
-                    min="10"
-                    max="1000"
-                  />
-                </div>
-              </DetailGrid>
-              {hasPermission('admin:system') && (
-                <div className="pt-4">
-                  <Button type="button" onClick={() => handleSave('security')} disabled={saving}>
-                    <FloppyDisk size={16} />
-                    {t('common.saveChanges')}
-                  </Button>
-                </div>
-              )}
-            </DetailSection>
-            <DetailSection title={t('settings.mtls.title')} icon={ShieldCheck} iconClass="icon-bg-violet" badge={<ExperimentalBadge />}>
-              {mtlsLoading ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <div className="space-y-4">
-                  <ToggleSwitch
-                    checked={mtlsSettings.enabled || false}
-                    onChange={(val) => setMtlsSettings(prev => ({ ...prev, enabled: val }))}
-                    label={t('settings.mtls.enable')}
-                    size="sm"
-                  />
-                  {mtlsSettings.enabled && (
-                    <>
-                      <Select
-                        label={t('settings.mtls.trustedCA')}
-                        value={mtlsSettings.trusted_ca_id || ''}
-                        onChange={(val) => setMtlsSettings(prev => ({ ...prev, trusted_ca_id: val }))}
-                        placeholder={t('settings.mtls.selectCA')}
-                        options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({
-                          value: ca.refid,
-                          label: ca.descr || ca.subject || ca.refid,
-                        }))}
-                      />
-                      <ToggleSwitch
-                        checked={mtlsSettings.required || false}
-                        onChange={(val) => setMtlsSettings(prev => ({ ...prev, required: val }))}
-                        label={t('settings.mtls.required')}
-                        size="sm"
-                      />
-                      {mtlsSettings.required && (
-                        <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
-                          <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
-                          <span>{t('settings.mtls.requiredWarning')}</span>
-                        </div>
-                      )}
-                      <p className="text-xs text-text-tertiary">{t('settings.mtls.restartNote')}</p>
-                    </>
-                  )}
-                  {hasPermission('admin:system') && (
-                    <Button type="button" onClick={handleMtlsSave} disabled={mtlsSaving} loading={mtlsSaving}>
-                      <FloppyDisk size={16} />
-                      {t('common.saveChanges')}
-                    </Button>
-                  )}
-                </div>
-              )}
-            </DetailSection>
-          </DetailContent>
+          <SecuritySection
+            settings={settings}
+            updateSetting={updateSetting}
+            handleSave={handleSave}
+            saving={saving}
+            hasPermission={hasPermission}
+            encryptionStatus={encryptionStatus}
+            setShowEnableEncryptionModal={setShowEnableEncryptionModal}
+            setShowDisableEncryptionModal={setShowDisableEncryptionModal}
+            anomalies={anomalies}
+            anomaliesLoading={anomaliesLoading}
+            loadAnomalies={loadAnomalies}
+            mtlsSettings={mtlsSettings}
+            setMtlsSettings={setMtlsSettings}
+            mtlsLoading={mtlsLoading}
+            mtlsSaving={mtlsSaving}
+            handleMtlsSave={handleMtlsSave}
+            cas={cas}
+          />
         )
-
       case 'sso':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={Key}
-              title={t('common.sso')}
-              subtitle={t('sso.subtitle')}
-            />
-
-            <HelpCard variant="info" title={t('sso.helpTitle')} className="mb-4">
-              {t('sso.helpDescription')}
-            </HelpCard>
-
-            {ssoLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* One card per provider type */}
-                {[
-                  { type: 'ldap', label: t('sso.ldap'), icon: Database, color: 'icon-bg-blue', desc: t('sso.providerDescriptions.ldap') },
-                  { type: 'oauth2', label: t('sso.oauth2'), icon: Globe, color: 'icon-bg-teal', desc: t('sso.providerDescriptions.oauth2') },
-                  { type: 'saml', label: t('sso.saml'), icon: Shield, color: 'icon-bg-violet', desc: t('sso.providerDescriptions.saml') },
-                ].map(({ type, label, icon: Icon, color, desc }) => {
-                  const provider = ssoProviders.find(p => p.provider_type === type)
-                  return (
-                    <div key={type} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-                          <Icon size={20} weight="bold" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-text-primary">{label}</span>
-                            {provider ? (
-                              <>
-                                <Badge variant={provider.enabled ? 'success' : 'secondary'} size="sm">
-                                  {provider.enabled ? t('common.enabled') : t('common.disabled')}
-                                </Badge>
-                                {provider.is_default && (
-                                  <Badge variant="primary" size="sm">{t('sso.default')}</Badge>
-                                )}
-                              </>
-                            ) : (
-                              <Badge variant="secondary" size="sm">{t('sso.notConfigured')}</Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-text-secondary">
-                            {provider ? (provider.display_name || provider.name) : desc}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {provider ? (
-                          <>
-                            <Button type="button" size="sm" variant="secondary" onClick={() => handleSsoTest(provider)} disabled={ssoTesting} title={t('sso.testConnection')}>
-                              {ssoTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-                            </Button>
-                            <Button type="button" size="sm" variant="secondary" onClick={() => handleSsoToggle(provider)} title={provider.enabled ? t('sso.disable') : t('sso.enable')}>
-                              <Power size={14} />
-                            </Button>
-                            <Button type="button" size="sm" variant="secondary" onClick={() => handleSsoEdit(provider)} title={t('common.edit')}>
-                              <PencilSimple size={14} />
-                            </Button>
-                            <Button type="button" size="sm" variant="danger" onClick={() => setSsoConfirmDelete(provider)} title={t('common.delete')}>
-                              <Trash size={14} />
-                            </Button>
-                          </>
-                        ) : (
-                          hasPermission('admin:system') && (
-                            <Button type="button" size="sm" onClick={() => handleSsoCreate(type)}>
-                              <Plus size={14} />
-                              {t('sso.configure')}
-                            </Button>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </DetailContent>
+          <SsoSection
+            ssoProviders={ssoProviders}
+            ssoLoading={ssoLoading}
+            ssoTesting={ssoTesting}
+            handleSsoCreate={handleSsoCreate}
+            handleSsoEdit={handleSsoEdit}
+            handleSsoToggle={handleSsoToggle}
+            handleSsoTest={handleSsoTest}
+            setSsoConfirmDelete={setSsoConfirmDelete}
+            hasPermission={hasPermission}
+          />
         )
-
       case 'backup':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={Database}
-              title={t('settings.helpBackup')}
-              subtitle={t('settings.backupSubtitle')}
-            />
-            <DetailSection title={t('settings.automaticBackups')} icon={Database} iconClass="icon-bg-emerald">
-              <div className="space-y-4">
-                <ToggleSwitch
-                  checked={settings.auto_backup_enabled || false}
-                  onChange={(val) => updateSetting('auto_backup_enabled', val)}
-                  label={t('settings.enableAutoBackups')}
-                  description={t('settings.autoBackupsDesc')}
-                />
-
-                {settings.auto_backup_enabled && (
-                  <>
-                    <Select
-                      label={t('settings.backupFrequency')}
-                      options={[
-                        { value: 'daily', label: t('settings.daily') },
-                        { value: 'weekly', label: t('settings.weekly') },
-                        { value: 'monthly', label: t('settings.monthly') },
-                      ]}
-                      value={settings.backup_frequency || 'daily'}
-                      onChange={(val) => updateSetting('backup_frequency', val)}
-                    />
-                    <Input
-                      label={t('settings.autoBackupPassword')}
-                      type="password"
-                      noAutofill
-                      value={settings.backup_password || ''}
-                      onChange={(e) => updateSetting('backup_password', e.target.value)}
-                      placeholder={t('settings.min12Characters')}
-                      helperText={t('settings.autoBackupPasswordHelper')}
-                      showStrength
-                    />
-                    <Input
-                      label={t('settings.retentionPeriod')}
-                      type="number"
-                      value={settings.backup_retention_days || 30}
-                      onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
-                      min="1"
-                      max="365"
-                    />
-                  </>
-                )}
-
-                {hasPermission('admin:system') && (
-                  <div className="flex gap-2">
-                    <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
-                      <FloppyDisk size={16} />
-                      {t('settings.saveSettings')}
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={() => setShowBackupModal(true)}>
-                      <Database size={16} />
-                      {t('settings.createBackup')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </DetailSection>
-
-            <DetailSection title={t('settings.availableBackups')} icon={Download} iconClass="icon-bg-emerald">
-              {backups.length === 0 ? (
-                <div className="p-6 text-center">
-                  <p className="text-sm text-text-secondary">{t('settings.noBackups')}</p>
-                  <p className="text-xs text-text-tertiary mt-1">{t('settings.noBackupsHint')}</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {backups.map((backup) => (
-                    <div key={backup.filename} className="flex items-center justify-between p-3 bg-tertiary-50 border border-white/5 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">{backup.filename}</p>
-                        <div className="flex gap-4 mt-1">
-                          <p className="text-xs text-text-secondary">{backup.size}</p>
-                          <p className="text-xs text-text-secondary">{backup.created_at}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="button" size="sm" variant="secondary" onClick={() => handleDownloadBackup(backup.filename)}>
-                          <Download size={14} />
-                        </Button>
-                        <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteBackup(backup.filename)}>
-                          <Trash size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </DetailSection>
-
-            <DetailSection title={t('settings.restoreFromBackup')} icon={UploadSimple} iconClass="icon-bg-orange">
-              <div>
-                <p className="text-xs text-text-secondary mb-4">{t('settings.restoreFromBackupDesc')}</p>
-                <FileUpload
-                  accept=".ucmbkp,.tar.gz"
-                  onFileSelect={(file) => { setRestoreFile(file); setShowRestoreModal(true) }}
-                  helperText={t('settings.selectBackupFile')}
-                />
-              </div>
-            </DetailSection>
-          </DetailContent>
+          <BackupSection
+            settings={settings}
+            updateSetting={updateSetting}
+            handleSave={handleSave}
+            saving={saving}
+            hasPermission={hasPermission}
+            backups={backups}
+            setShowBackupModal={setShowBackupModal}
+            setShowRestoreModal={setShowRestoreModal}
+            setRestoreFile={setRestoreFile}
+            handleDownloadBackup={handleDownloadBackup}
+            handleDeleteBackup={handleDeleteBackup}
+          />
         )
-
       case 'audit':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={ListBullets}
-              title={t('settings.auditTitle')}
-              subtitle={t('settings.auditSubtitle')}
-            />
-            <DetailSection title={t('settings.auditLogging')} icon={ListBullets} iconClass="icon-bg-orange">
-              <div className="space-y-4">
-                <ToggleSwitch
-                  checked={settings.audit_enabled || true}
-                  onChange={(val) => updateSetting('audit_enabled', val)}
-                  label={t('settings.enableAuditLogging')}
-                  description={t('settings.enableAuditLoggingDesc')}
-                />
-
-                <Input
-                  label={t('settings.logRetention')}
-                  type="number"
-                  value={settings.audit_retention_days || 90}
-                  onChange={(e) => updateSetting('audit_retention_days', parseInt(e.target.value))}
-                  min="7"
-                  max="730"
-                  disabled={!settings.audit_enabled}
-                />
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.eventsToLog')} icon={Eye} iconClass="icon-bg-orange">
-              <div className="space-y-2">
-                {[
-                  { key: 'userLoginLogout', label: t('settings.eventUserLoginLogout') },
-                  { key: 'certIssueRevoke', label: t('settings.eventCertIssueRevoke') },
-                  { key: 'caCreateDelete', label: t('settings.eventCaCreateDelete') },
-                  { key: 'settingsChanges', label: t('settings.eventSettingsChanges') },
-                  { key: 'userManagement', label: t('common.eventUserManagement') },
-                ].map(event => (
-                  <label key={event.key} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={true}
-                      disabled={!settings.audit_enabled}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{event.label}</span>
-                  </label>
-                ))}
-                {hasPermission('admin:system') && (
-                  <div className="pt-4">
-                    <Button type="button" onClick={() => handleSave('audit')} disabled={saving}>
-                      <FloppyDisk size={16} />
-                      {t('common.saveChanges')}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </DetailSection>
-            <DetailSection title={t('settings.remoteSyslog')} icon={Globe} iconClass="icon-bg-purple">
-              <div className="space-y-4">
-                <p className="text-xs text-text-secondary">{t('settings.remoteSyslogDesc')}</p>
-                <ToggleSwitch
-                  checked={syslogConfig.enabled}
-                  onChange={(val) => updateSyslogConfig('enabled', val)}
-                  label={t('settings.enableSyslog')}
-                />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label={t('settings.syslogHost')}
-                    value={syslogConfig.host}
-                    onChange={(e) => updateSyslogConfig('host', e.target.value)}
-                    placeholder="syslog.example.com"
-                  />
-                  <Input
-                    label={t('settings.syslogPort')}
-                    type="number"
-                    value={syslogConfig.port}
-                    onChange={(e) => updateSyslogConfig('port', parseInt(e.target.value) || 514)}
-                    min="1"
-                    max="65535"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select
-                    label={t('settings.syslogProtocol')}
-                    value={syslogConfig.protocol}
-                    onChange={(e) => updateSyslogConfig('protocol', e.target.value)}
-                    options={[
-                      { value: 'udp', label: 'UDP' },
-                      { value: 'tcp', label: 'TCP' },
-                    ]}
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-text-primary mb-2">{t('settings.syslogCategories')}</p>
-                    <p className="text-xs text-text-tertiary mb-3">{t('settings.syslogCategoriesHelp')}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {[
-                        { value: 'certificate', label: t('settings.syslogCatCertificates') },
-                        { value: 'ca', label: t('settings.syslogCatCAs') },
-                        { value: 'csr', label: t('settings.syslogCatCSRs') },
-                        { value: 'user', label: t('settings.syslogCatUsers') },
-                        { value: 'acme', label: 'ACME' },
-                        { value: 'scep', label: 'SCEP' },
-                        { value: 'system', label: t('settings.syslogCatSystem') },
-                      ].map(cat => (
-                        <label key={cat.value} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={(syslogConfig.categories || []).includes(cat.value)}
-                            onChange={(e) => {
-                              const cats = syslogConfig.categories || []
-                              updateSyslogConfig('categories', e.target.checked
-                                ? [...cats, cat.value]
-                                : cats.filter(c => c !== cat.value)
-                              )
-                            }}
-                            className="rounded border-border bg-bg-tertiary"
-                          />
-                          <span className="text-sm text-text-primary">{cat.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {syslogConfig.protocol === 'tcp' && (
-                  <ToggleSwitch
-                    checked={syslogConfig.tls}
-                    onChange={(val) => updateSyslogConfig('tls', val)}
-                    label={t('settings.syslogTls')}
-                    size="sm"
-                  />
-                )}
-                {hasPermission('admin:system') && (
-                  <div className="flex gap-2">
-                    <Button type="button" onClick={handleSaveSyslog} loading={syslogSaving}>
-                      <FloppyDisk size={16} />
-                      {t('common.saveChanges')}
-                    </Button>
-                    {syslogConfig.enabled && syslogConfig.host && (
-                      <Button type="button" variant="secondary" onClick={handleTestSyslog} loading={syslogTesting}>
-                        <Lightning size={16} />
-                        {t('settings.syslogTest')}
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </DetailSection>
-          </DetailContent>
+          <AuditSection
+            settings={settings}
+            updateSetting={updateSetting}
+            handleSave={handleSave}
+            saving={saving}
+            hasPermission={hasPermission}
+            syslogConfig={syslogConfig}
+            updateSyslogConfig={updateSyslogConfig}
+            syslogSaving={syslogSaving}
+            syslogTesting={syslogTesting}
+            handleSaveSyslog={handleSaveSyslog}
+            handleTestSyslog={handleTestSyslog}
+          />
         )
-
       case 'database':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={HardDrives}
-              title={t('settings.helpDatabase')}
-              subtitle={t('settings.databaseSubtitle')}
-            />
-            <DatabaseBackendSection />
-            <DetailSection title={t('settings.databaseStatistics')} icon={HardDrives} iconClass="icon-bg-teal">
-              <DetailGrid>
-                <DetailField
-                  label={t('settings.totalCertificates')}
-                  value={dbStats?.certificates || '-'}
-                />
-                <DetailField
-                  label={t('common.cas')}
-                  value={dbStats?.cas || '-'}
-                />
-                <DetailField
-                  label={t('settings.databaseSize')}
-                  value={dbStats?.size || '-'}
-                />
-                <DetailField
-                  label={t('settings.lastOptimized')}
-                  value={dbStats?.last_optimized && dbStats.last_optimized !== 'Never' ? formatDate(dbStats.last_optimized) : '-'}
-                />
-              </DetailGrid>
-            </DetailSection>
-
-            <DetailSection title={t('settings.maintenance')} icon={Gear} iconClass="icon-bg-teal">
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-3">
-                  <Button type="button" size="sm" variant="secondary" onClick={handleOptimizeDb}>
-                    <Database size={16} />
-                    {t('settings.optimizeDatabase')}
-                  </Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={handleIntegrityCheck}>
-                    <ShieldCheck size={16} />
-                    {t('settings.integrityCheck')}
-                  </Button>
-                  <Button type="button" size="sm" variant="secondary" onClick={handleExportDb}>
-                    <Download size={16} />
-                    {t('settings.exportDatabase')}
-                  </Button>
-                </div>
-              </div>
-            </DetailSection>
-
-            <DetailSection title={t('settings.dangerZone')} icon={WarningCircle} iconClass="icon-bg-orange" className="mt-4">
-              <div className="p-4 status-danger-bg status-danger-border border rounded-lg">
-                <h4 className="text-sm font-semibold text-status-danger mb-2">⚠️ {t('settings.databaseReset')}</h4>
-                <p className="text-xs text-text-secondary mb-3">
-                  {t('settings.databaseResetDesc')}
-                </p>
-                <Button type="button" variant="danger" size="sm" onClick={handleResetDb}>
-                  <Trash size={16} />
-                  {t('settings.resetDatabase')}
-                </Button>
-              </div>
-            </DetailSection>
-          </DetailContent>
+          <DatabaseSection
+            dbStats={dbStats}
+            handleOptimizeDb={handleOptimizeDb}
+            handleIntegrityCheck={handleIntegrityCheck}
+            handleExportDb={handleExportDb}
+            handleResetDb={handleResetDb}
+          />
         )
-
       case 'https':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={Lock}
-              title={t('settings.httpsTitle')}
-              subtitle={t('settings.httpsSubtitle')}
-              badge={httpsInfo?.type && (
-                <Badge variant={httpsInfo?.type === 'CA-Signed' ? 'success' : httpsInfo?.type === 'Self-Signed' ? 'warning' : 'secondary'}>
-                  {httpsInfo?.type}
-                </Badge>
-              )}
-            />
-            <DetailSection title={t('settings.currentCertificate')} icon={Certificate} iconClass="icon-bg-emerald">
-              <DetailGrid>
-                <DetailField
-                  label={t('common.commonName')}
-                  value={httpsInfo?.common_name || window.location.hostname}
-                />
-                <DetailField
-                  label={t('common.issuer')}
-                  value={httpsInfo?.issuer || '-'}
-                />
-                <DetailField
-                  label={t('common.validFrom')}
-                  value={formatDate(httpsInfo?.valid_from)}
-                />
-                <DetailField
-                  label={t('common.validUntil')}
-                  value={formatDate(httpsInfo?.valid_to)}
-                />
-                <DetailField
-                  label={t('settings.fingerprintSha256')}
-                  value={httpsInfo?.fingerprint || '-'}
-                  mono
-                  copyable
-                  fullWidth
-                />
-              </DetailGrid>
-            </DetailSection>
-
-            <DetailSection title={t('settings.useUCMCert')} icon={Certificate} iconClass="icon-bg-violet">
-              <div className="space-y-4">
-                <p className="text-xs text-text-secondary">
-                  {t('settings.useUcmCertificateDesc')}
-                </p>
-                {selectedHttpsCert ? (
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-accent-primary/30 bg-accent-primary/5">
-                    <Certificate size={20} className="text-accent-primary shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-text-primary truncate">
-                        {selectedHttpsCert.common_name || t('common.certificate')}
-                      </div>
-                      <div className="text-xs text-text-secondary">
-                        {t('common.expires')} {formatDate(selectedHttpsCert.valid_to)}
-                      </div>
-                    </div>
-                    <Button type="button" variant="ghost" size="xs" onClick={() => setSelectedHttpsCert(null)} aria-label={t('common.clear')}>
-                      ×
-                    </Button>
-                  </div>
-                ) : null}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowCertPicker(true)}
-                  >
-                    <MagnifyingGlass size={16} />
-                    {t('settings.chooseCertificate')}
-                  </Button>
-                  <Button 
-                    variant="primary" 
-                    size="sm"
-                    onClick={handleApplyUcmCert}
-                    disabled={!selectedHttpsCert}
-                  >
-                    <ShieldCheck size={16} />
-                    {t('settings.applySelectedCertificate')}
-                  </Button>
-                </div>
-              </div>
-            </DetailSection>
-
-            <DetailSection title={t('settings.regenerateCert')} icon={ArrowsClockwise} iconClass="icon-bg-emerald">
-              <div className="space-y-3">
-                <p className="text-xs text-text-secondary">
-                  {t('settings.regenerateCertificateDesc')}
-                </p>
-                <Button type="button" variant="secondary" size="sm" onClick={handleRegenerateHttpsCert}>
-                  <Key size={16} />
-                  {t('settings.regenerateSelfSigned')}
-                </Button>
-              </div>
-            </DetailSection>
-
-            <DetailSection title={t('settings.applyCustomCert')} icon={Lock} iconClass="icon-bg-amber">
-              <div className="space-y-3">
-                <p className="text-xs text-text-secondary">
-                  {t('settings.applyCustomCertificateDesc')}
-                </p>
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowHttpsImportModal(true)}
-                >
-                  <UploadSimple size={16} className="mr-2" />
-                  {t('common.importCertificate')}
-                </Button>
-              </div>
-            </DetailSection>
-          </DetailContent>
+          <HttpsSection
+            httpsInfo={httpsInfo}
+            selectedHttpsCert={selectedHttpsCert}
+            setSelectedHttpsCert={setSelectedHttpsCert}
+            setShowCertPicker={setShowCertPicker}
+            handleApplyUcmCert={handleApplyUcmCert}
+            handleRegenerateHttpsCert={handleRegenerateHttpsCert}
+            setShowHttpsImportModal={setShowHttpsImportModal}
+          />
         )
-
       case 'updates':
-        return (
-          <DetailContent>
-            <DetailHeader
-              icon={Rocket}
-              title={t('settings.updatesTitle')}
-              subtitle={t('settings.updatesSubtitle')}
-            />
-            <UpdateChecker />
-          </DetailContent>
-        )
-
+        return <UpdatesSection />
       case 'webhooks':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={Bell}
-              title={t('webhooks.title')}
-              subtitle={t('webhooks.subtitle')}
-            />
-
-            <HelpCard variant="info" title={t('webhooks.helpTitle')} className="mb-4">
-              {t('webhooks.helpDescription')}
-            </HelpCard>
-
-            {webhooksLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-              </div>
-            ) : webhooks.length === 0 ? (
-              <EmptyState
-                icon={Bell}
-                title={t('webhooks.noWebhooks')}
-                description={t('webhooks.noWebhooksDescription')}
-                action={{ label: t('webhooks.addWebhook'), onClick: handleWebhookCreate }}
-              />
-            ) : (
-              <DetailSection title={t('webhooks.configuredWebhooks')} icon={Bell} iconClass="icon-bg-rose">
-                <div className="space-y-3">
-                  {webhooks.map(webhook => (
-                    <div key={webhook.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-lg bg-accent-primary-op10 flex items-center justify-center flex-shrink-0">
-                          <Bell size={20} className="text-accent-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-text-primary truncate">{webhook.name}</span>
-                            <Badge variant={webhook.enabled ? 'success' : 'secondary'} size="sm">
-                              {webhook.enabled ? t('common.enabled') : t('common.disabled')}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-text-secondary truncate">{webhook.url}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            {(webhook.events || []).slice(0, 3).map(ev => (
-                              <Badge key={ev} variant="outline" size="sm">{WEBHOOK_EVENT_LABELS[ev] || ev}</Badge>
-                            ))}
-                            {(webhook.events || []).length > 3 && (
-                              <Badge variant="outline" size="sm">+{webhook.events.length - 3}</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                        <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookTest(webhook)} disabled={webhookTesting === webhook.id}>
-                          {webhookTesting === webhook.id ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-                        </Button>
-                        <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookToggle(webhook)}>
-                          <Lightning size={14} />
-                        </Button>
-                        <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookEdit(webhook)}>
-                          <PencilSimple size={14} />
-                        </Button>
-                        <Button type="button" size="sm" variant="danger" onClick={() => setWebhookConfirmDelete(webhook)}>
-                          <Trash size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {hasPermission('admin:system') && (
-                    <div className="pt-2">
-                      <Button type="button" onClick={handleWebhookCreate}>
-                        <Plus size={16} />
-                        {t('webhooks.addWebhook')}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </DetailSection>
-            )}
-          </DetailContent>
+          <WebhooksSection
+            webhooks={webhooks}
+            webhooksLoading={webhooksLoading}
+            webhookTesting={webhookTesting}
+            handleWebhookCreate={handleWebhookCreate}
+            handleWebhookEdit={handleWebhookEdit}
+            handleWebhookToggle={handleWebhookToggle}
+            handleWebhookTest={handleWebhookTest}
+            setWebhookConfirmDelete={setWebhookConfirmDelete}
+            hasPermission={hasPermission}
+          />
         )
-
       case 'ct':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={Eye}
-              title={t('settings.ct')}
-              subtitle={t('settings.ctDescription')}
-            />
-
-            {ctLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-              </div>
-            ) : (
-              <DetailSection title={t('settings.ct')} icon={Eye} iconClass="icon-bg-cyan">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-text-primary mb-2 block">{t('settings.ctLogUrls')}</label>
-                    {ctSettings.log_urls?.length > 0 && (
-                      <div className="space-y-2 mb-3">
-                        {ctSettings.log_urls.map((url, i) => (
-                          <div key={i} className="flex items-center gap-2 p-2 bg-tertiary-50 border border-border rounded-lg">
-                            <span className="flex-1 text-xs font-mono text-text-secondary truncate">{url}</span>
-                            <Button type="button" size="sm" variant="danger" onClick={() => handleCtRemoveLogUrl(i)}>
-                              <Trash size={14} />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Input
-                        value={ctNewLogUrl}
-                        onChange={(e) => setCtNewLogUrl(e.target.value)}
-                        placeholder="https://ct.googleapis.com/logs/argon2025h1/"
-                        className="flex-1"
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCtAddLogUrl() } }}
-                      />
-                      <Button type="button" variant="secondary" onClick={handleCtAddLogUrl}>
-                        <Plus size={14} />
-                        {t('settings.ctAddLogUrl')}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <ToggleSwitch
-                    label={t('settings.ctAutoSubmit')}
-                    checked={ctSettings.auto_submit}
-                    onChange={(val) => setCtSettings(prev => ({ ...prev, auto_submit: val }))}
-                  />
-
-                  <ToggleSwitch
-                    label={t('settings.ctEnabled')}
-                    checked={ctSettings.enabled}
-                    onChange={(val) => setCtSettings(prev => ({ ...prev, enabled: val }))}
-                  />
-
-                  <div className="flex justify-end pt-4 border-t border-border">
-                    <Button type="button" onClick={handleCtSave} disabled={ctSaving}>
-                      {ctSaving ? <ArrowsClockwise size={14} className="animate-spin mr-1" /> : <FloppyDisk size={14} className="mr-1" />}
-                      {t('common.save')}
-                    </Button>
-                  </div>
-                </div>
-              </DetailSection>
-            )}
-          </DetailContent>
+          <CTSection
+            ctSettings={ctSettings}
+            setCtSettings={setCtSettings}
+            ctLoading={ctLoading}
+            ctSaving={ctSaving}
+            ctNewLogUrl={ctNewLogUrl}
+            setCtNewLogUrl={setCtNewLogUrl}
+            handleCtSave={handleCtSave}
+            handleCtAddLogUrl={handleCtAddLogUrl}
+            handleCtRemoveLogUrl={handleCtRemoveLogUrl}
+          />
         )
-
       case 'microsoftCA':
         return (
-          <DetailContent>
-            <DetailHeader
-              icon={WindowsLogo}
-              title={t('msca.title')}
-              subtitle={t('msca.subtitle')}
-              badge={<ExperimentalBadge />}
-            />
-
-            <HelpCard variant="info" title={t('msca.helpTitle')} className="mb-4">
-              <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:my-1 [&>ul]:my-1 [&>ul]:pl-4">
-                <ReactMarkdown>{t('msca.helpDescription')}</ReactMarkdown>
-              </div>
-            </HelpCard>
-
-            {mscaLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-accent-primary-op30 border-t-accent-primary rounded-full animate-spin" />
-              </div>
-            ) : mscaConnections.length === 0 ? (
-              <div className="text-center py-12">
-                <WindowsLogo size={48} className="mx-auto text-text-tertiary mb-3" />
-                <p className="text-text-secondary mb-1">{t('msca.noConnections')}</p>
-                <p className="text-xs text-text-tertiary mb-4">{t('msca.noConnectionsDesc')}</p>
-                {hasPermission('admin:system') && (
-                  <Button type="button" onClick={handleMscaCreate}>
-                    <Plus size={14} /> {t('msca.addConnection')}
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {hasPermission('admin:system') && (
-                  <div className="flex justify-end mb-2">
-                    <Button type="button" size="sm" onClick={handleMscaCreate}>
-                      <Plus size={14} /> {t('msca.addConnection')}
-                    </Button>
-                  </div>
-                )}
-                {mscaConnections.map(conn => (
-                  <div key={conn.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center icon-bg-indigo">
-                        <WindowsLogo size={20} weight="bold" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-text-primary">{conn.name}</span>
-                          <Badge variant={conn.enabled ? 'success' : 'secondary'} size="sm">
-                            {conn.enabled ? t('common.enabled') : t('common.disabled')}
-                          </Badge>
-                          <Badge variant="outline" size="sm">{conn.auth_method}</Badge>
-                        </div>
-                        <p className="text-xs text-text-secondary">
-                          {conn.server} {conn.ca_name ? `· ${conn.ca_name}` : ''} · {t('msca.defaultTemplate')}: {conn.default_template}
-                        </p>
-                        {conn.last_test_at && (
-                          <p className="text-xs text-text-tertiary">
-                            {t('msca.testConnection')}: {conn.last_test_result === 'success' ? '✓' : '✗'} {formatDate(conn.last_test_at)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaTest(conn)} disabled={mscaTesting} title={t('msca.testConnection')}>
-                        {mscaTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
-                      </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaToggle(conn)} title={conn.enabled ? t('common.disable') : t('common.enable')}>
-                        <Power size={14} />
-                      </Button>
-                      <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaEdit(conn)} title={t('common.edit')}>
-                        <PencilSimple size={14} />
-                      </Button>
-                      <Button type="button" size="sm" variant="danger" onClick={() => setMscaConfirmDelete(conn)} title={t('common.delete')}>
-                        <Trash size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </DetailContent>
+          <MicrosoftCASection
+            mscaConnections={mscaConnections}
+            mscaLoading={mscaLoading}
+            mscaTesting={mscaTesting}
+            handleMscaCreate={handleMscaCreate}
+            handleMscaEdit={handleMscaEdit}
+            handleMscaToggle={handleMscaToggle}
+            handleMscaTest={handleMscaTest}
+            setMscaConfirmDelete={setMscaConfirmDelete}
+            hasPermission={hasPermission}
+          />
         )
-
       case 'about':
         return <AboutSection />
 
