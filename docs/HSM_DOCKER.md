@@ -30,6 +30,54 @@ docker run -d --name ucm -p 8443:8443 \
 | `HSM_AUTO_INIT` | `true` | Auto-create a default SoftHSM token on first start |
 | `HSM_PIN` | *(random)* | PIN for the auto-initialized token |
 | `HSM_SO_PIN` | *(random)* | SO PIN for the auto-initialized token |
+| `UCM_ALLOW_RUNTIME_PIP` | *(unset)* | Set to `1` to enable the in-app "Install dependencies" button (HSM page). Disabled by default since v2.142 — see below. |
+
+## Runtime PKCS#11 dependency installer
+
+Since **v2.142**, `POST /api/v2/hsm/install-dependencies` (the "Install dependencies" button on the HSM page) is **disabled by default** and returns:
+
+```json
+HTTP/1.1 403 Forbidden
+{
+  "success": false,
+  "error": "Runtime pip install is disabled. Set UCM_ALLOW_RUNTIME_PIP=1 to opt in, or install the dependency via your system package manager."
+}
+```
+
+This closes a remote-code-installation surface in default deployments. Two ways to install missing PKCS#11 packages:
+
+**Recommended — bake into the image / system package**
+```dockerfile
+# Dockerfile derivative
+FROM neyslim/ultimate-ca-manager:2.142
+USER root
+RUN apt-get update && apt-get install -y python3-pkcs11 && rm -rf /var/lib/apt/lists/*
+USER ucm
+```
+
+```bash
+# DEB / RPM
+sudo apt install python3-pkcs11           # Debian/Ubuntu
+sudo dnf install python3-PyKCS11          # Fedora/RHEL
+sudo systemctl restart ucm
+```
+
+**Opt-in — runtime pip install from the UI**
+```yaml
+# docker-compose.yml
+services:
+  ucm:
+    image: neyslim/ultimate-ca-manager:2.142
+    environment:
+      - UCM_ALLOW_RUNTIME_PIP=1
+```
+
+```ini
+# /etc/default/ucm or systemd drop-in (DEB/RPM)
+UCM_ALLOW_RUNTIME_PIP=1
+```
+
+Then click **Install dependencies** on the HSM page. The opt-in is per-deployment — UCM never enables it implicitly.
 
 ## Manual Token Management
 
