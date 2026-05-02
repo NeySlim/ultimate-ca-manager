@@ -15,18 +15,28 @@ beforeAll(() => {
 })
 
 // ── Mock all services (prevent real API calls) ─────────────────────
+const mockApiClientInstance = {
+  get: vi.fn().mockResolvedValue({ data: [] }),
+  post: vi.fn().mockResolvedValue({ data: {} }),
+  put: vi.fn().mockResolvedValue({ data: {} }),
+  patch: vi.fn().mockResolvedValue({ data: {} }),
+  delete: vi.fn().mockResolvedValue({ data: {} }),
+  upload: vi.fn().mockResolvedValue({ data: {} }),
+  request: vi.fn().mockResolvedValue({ data: {} }),
+  setCsrfToken: vi.fn(),
+  clearCsrfToken: vi.fn(),
+}
+
 vi.mock('../../services/apiClient', () => ({
-  apiClient: {
-    get: vi.fn().mockResolvedValue({ data: [] }),
-    post: vi.fn().mockResolvedValue({ data: {} }),
-    put: vi.fn().mockResolvedValue({ data: {} }),
-    patch: vi.fn().mockResolvedValue({ data: {} }),
+  apiClient: mockApiClientInstance,
+  buildQueryString: vi.fn().mockReturnValue(''),
+  createCRUDService: (_endpoint) => ({
+    getAll: vi.fn().mockResolvedValue({ data: [] }),
+    getById: vi.fn().mockResolvedValue({ data: {} }),
+    create: vi.fn().mockResolvedValue({ data: {} }),
+    update: vi.fn().mockResolvedValue({ data: {} }),
     delete: vi.fn().mockResolvedValue({ data: {} }),
-    upload: vi.fn().mockResolvedValue({ data: {} }),
-    request: vi.fn().mockResolvedValue({ data: {} }),
-    setCsrfToken: vi.fn(),
-    clearCsrfToken: vi.fn(),
-  }
+  }),
 }))
 
 // Mock i18next
