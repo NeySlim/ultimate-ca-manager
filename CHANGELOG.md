@@ -9,6 +9,48 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.142] - 2026-05-02
+
+### Security
+- **EST `/cacerts`, `/simpleenroll`, `/simplereenroll`, `/serverkeygen`, `/csrattrs` now enforce `est_enabled` on every request** and short-circuit with `503 EST disabled` instead of falling through to the SPA. The `/serverkeygen` body is also size-capped and stricter about content negotiation.
+- **EST and SCEP mTLS client certificates are only honoured when the request comes from a trusted reverse proxy** (`security.trusted_proxies`). Direct hits without TLS termination by UCM no longer accept proxy-injected client cert headers.
+- **mTLS login route gated behind trusted-proxy check.** Same protection as EST/SCEP — header-based mTLS is rejected unless the request originates from a trusted proxy.
+- **2FA backup codes are now hashed at rest** (Argon2id) and consumed atomically; plaintext codes are returned only at generation time and never stored.
+- **Approval quorum is race-safe and idempotent.** Concurrent approvals on the same request can no longer over-approve; double-submits are deduplicated.
+- **On-demand CRL generation is serialised per-CA** with a per-CA lock and `503 Retry-After: 5` under contention — closes a CPU/IO DoS vector when many clients hit `/cdp/<ca>.crl` simultaneously.
+- **Outbound webhooks revalidate the resolved IP at delivery time** (DNS-rebinding window closed) and reject cloud-metadata IPs (`169.254.169.254`, GCP/Azure/Alibaba equivalents) and loopback. RFC1918 / `.lan` / `.local` targets remain allowed by design (UCM is on-prem).
+- **SSO/IdP, ACME proxy and webhook URL fields all share the same SSRF helper** (`validate_url_not_cloud_metadata`) — cloud metadata is blocked everywhere.
+- **CSV bulk user-import capped at 5 MB / 10 000 rows** with `413` on overflow.
+- **Runtime HSM `pip install` disabled by default**, returns `403` with a hint to set `UCM_ALLOW_RUNTIME_PIP=1` or install the dependency via the system package manager.
+- **SCEP CSRs no longer copy arbitrary KU/EKU bits** — only a whitelist (`digitalSignature`, `keyEncipherment`, `serverAuth`, `clientAuth`) is honoured.
+- **SCEP RFC 8894 P0/P1/P2 hardening** — stricter PKCS#7 parsing, transaction-ID validation, signed/encrypted response envelope checks; iOS/macOS enrollment fixes (#102).
+- **ACME account private keys encrypted at rest** with the application key.
+- **Password change endpoint ignores client-supplied `force_change`** (only operators can clear that flag).
+- **CSRF token entropy increased**; password hash algorithm tightened; database migration identifiers validated against an allow-list.
+- **`ProxyFix` is opt-in** via `security.trusted_proxies` — prevents unauthenticated `X-Forwarded-For` spoofing on direct deployments.
+- **Filesystem session directory is now created/enforced at mode `0o700`** and the application refuses to boot if it has group/world-readable bits.
+- **EST audit lines use the trusted-proxy-aware client IP** instead of the raw socket address.
+
+### Added
+- `utils/trusted_proxy.py` — shared `is_request_from_trusted_proxy()` / `client_ip()` / `reject_untrusted_proxy_headers()` helpers used by EST, SCEP, mTLS login and audit.
+- `utils/ssrf_protection.py` — single source of truth for `validate_url_not_cloud_metadata` and `validate_host_not_cloud_metadata`, used by webhooks, SSO, ACME proxy, OPNsense import.
+- `utils/safe_commit.py`, `utils/require_json_body`, `utils/parse_request_pagination`, `utils/safe_call`, `utils/audit_event` — small composable helpers applied across `api/v2/*` to remove boilerplate and silence intermittent rollback bugs.
+- `useCRUDPage` frontend hook covering 4 list/create/edit pages.
+
+### Changed
+- **Massive backend modularisation.** `system.py` (1556 l), `certificates.py` (2220 l), `cas.py` (1245 l), `ssh_cas.py` (1607 l), `database_admin` (817 l), `discovery_service`, `pdf_generator`, `scep_service` (981 l), `acme_service` (1456 l → 7 mixins ≤350 l), `trust_store` (1487 l), `ca_service` (788 l), `restore_mixin`, `notification_service`, `audit_service`, `crl_service`, `ssh_cert_service`, `msca_service`, `account.py`, `acme.py`, `tools.py`, `acme_client.py`, `users.py`, `settings.py`, `opnsense_import` and `models/__init__.py` were split into focused submodules. Behaviour is unchanged; module size, test isolation and review surface improve.
+- **Frontend modularisation.** `CAsPage`, `CertificatesPage`, `DiscoveryPage`, `ACMEPage`, `SettingsPage` and `SsoProviderForm` split into per-section sub-components under `pages/<feature>/`.
+- All `api/v2/*` `db.session.commit()` calls now go through `safe_commit()` — consistent rollback + error logging on every write path.
+
+### Fixed
+- **PKCS12/PFX export now honours the `include_chain` flag** (#100). Previously the CA chain was always included, regardless of the request.
+- **Dashboard chart cards no longer overflow the grid** and System Health gained an internal scrollbar (#99).
+- iOS/macOS SCEP enrollment regressions (#102).
+
+### Internal
+- ~20 test files de-duplicated against `conftest.py`; pre-commit i18n + 461 frontend + 1613 backend tests gate every commit.
+- RC validated end-to-end on Debian (`pve:8445`), Fedora (`fedor:8443`) and Docker (`pve:8444`): smoke API 8/8 and Playwright use-cases 10/10 on all three targets.
+
 ## [2.141] - 2026-04-29
 
 ### Fixed
