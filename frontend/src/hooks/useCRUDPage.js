@@ -30,7 +30,7 @@ export function useCRUDPage({ loadFn, loadErrorMsg = 'Failed to load data' }) {
     } finally {
       setLoading(false)
     }
-  }, []) // intentionally empty deps — loadFn is stable (wrapped in useCallback in caller)
+  }, [loadFn, showError, loadErrorMsg])
 
   useEffect(() => { loadData() }, [loadData])
 

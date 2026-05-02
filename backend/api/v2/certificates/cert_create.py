@@ -22,6 +22,7 @@ from services.notification_service import NotificationService
 from security.encryption import decrypt_private_key
 from websocket.emitters import on_certificate_issued
 from utils.datetime_utils import utc_now, utc_isoformat
+from utils.db_transaction import safe_commit
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -439,7 +440,9 @@ def create_certificate():
         )
 
         db.session.add(db_cert)
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to create certificate")
+        if not ok:
+            return err
 
         # Audit log
         try:

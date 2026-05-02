@@ -196,13 +196,21 @@ def login():
     csrf_token = None
     if HAS_CSRF:
         csrf_token = CSRFProtection.generate_token(user.id)
-    
+
+    # Include role + permissions so frontend AuthContext can populate
+    # immediately on login (matches /verify response contract)
+    from auth.permissions import get_role_permissions
+    permissions = get_role_permissions(user.role)
+
     return success_response(
         data={
             'user': {
                 'id': user.id,
-                'username': user.username
+                'username': user.username,
+                'role': user.role
             },
+            'role': user.role,
+            'permissions': permissions,
             'csrf_token': csrf_token,
             'force_password_change': user.force_password_change or False
         },
