@@ -6,6 +6,7 @@ from flask import Blueprint, request, Response, current_app
 from models import db, CA, Certificate
 from services.ca_service import CAService
 from services.audit_service import AuditService
+from utils.trusted_proxy import client_ip
 from datetime import datetime
 import base64
 import hmac
@@ -242,7 +243,7 @@ def simple_enroll():
             resource_type='certificate',
             resource_name=csr.subject.rfc4514_string(),
             username=username,
-            details=f'EST enrollment from {request.remote_addr}'
+            details=f'EST enrollment from {client_ip()}'
         )
         db.session.add(log)
         db.session.commit()
@@ -340,7 +341,7 @@ def simple_reenroll():
             resource_type='certificate',
             resource_name=csr.subject.rfc4514_string(),
             username='mtls-client',
-            details=f'EST re-enrollment via mTLS from {request.remote_addr}'
+            details=f'EST re-enrollment via mTLS from {client_ip()}'
         )
         db.session.add(log)
         db.session.commit()
@@ -460,7 +461,7 @@ def server_keygen():
 
     # Capture remote IP for audit BEFORE any failure path so denials
     # are visible too.
-    remote_ip = request.remote_addr or 'unknown'
+    remote_ip = client_ip()
     auth_method = 'mtls' if _trusted_client_cert() else 'basic'
 
     try:
