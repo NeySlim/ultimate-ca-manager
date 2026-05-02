@@ -413,59 +413,98 @@ def get_approval(request_id):
 @bp.route('/api/v2/approvals/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:approvals'])
 def approve_request(request_id):
-    """Approve a request — triggers certificate issuance if fully approved"""
-    approval = ApprovalRequest.query.get_or_404(request_id)
-    
-    if approval.status != 'pending':
-        return error_response(f"Request is already {approval.status}", 400)
-    
+    """Approve a request — triggers certificate issuance if fully approved.
+
+    Race-safe: takes a row-level lock on the approval (Postgres SELECT
+    ... FOR UPDATE; harmless no-op on SQLite which serialises writes
+    anyway) so concurrent reviewers cannot both flip status='approved'
+    and trigger duplicate certificate issuance. Also enforces:
+      * one vote per user (idempotency for double-clicks / multiple tabs)
+      * single issuance via approval.certificate_id sentinel
+    """
     data = request.get_json() or {}
     user = g.current_user if hasattr(g, 'current_user') else None
     user_id = getattr(user, 'id', None)
     username = getattr(user, 'username', None) or 'system'
 
+    # Drop any stale identity-map copy so with_for_update actually
+    # re-reads the row inside the lock.
+    db.session.expire_all()
+    approval = (
+        ApprovalRequest.query
+        .with_for_update()
+        .filter_by(id=request_id)
+        .first()
+    )
+    if approval is None:
+        return error_response('Approval request not found', 404)
+
+    if approval.status != 'pending':
+        return error_response(f"Request is already {approval.status}", 400)
+
     # Prevent self-approval
     if user_id and approval.requester_id == user_id:
         return error_response("Cannot approve your own request", 403)
+
+    # Idempotency: same user must not vote twice (covers double-click,
+    # multiple tabs, replay). Anonymous/system votes (user_id is None)
+    # bypass this check — these only happen for backfill/automation.
+    if user_id is not None:
+        existing_votes = approval.get_approvals()
+        if any(v.get('user_id') == user_id for v in existing_votes):
+            return error_response('You have already voted on this request', 409)
 
     approval.add_approval(
         user_id=user_id,
         username=username,
         action='approve',
-        comment=data.get('comment')
+        comment=data.get('comment'),
     )
-    
-    ok, _err = safe_commit(logger, "Failed to approve request")
-    if not ok:
-        return _err
-    
-    result = approval.to_dict()
-    
-    # If fully approved and has stored request data, issue the certificate
-    if approval.status == 'approved' and approval.request_data:
+
+    # Issue the certificate inside the SAME transaction so the row
+    # lock is held until certificate_id is set. A concurrent approver
+    # blocked on the lock will re-read status='approved' and bail.
+    issued_cert = None
+    issue_error = None
+    if approval.status == 'approved' and approval.request_data and approval.certificate_id is None:
         try:
-            cert_data = _issue_approved_certificate(approval)
-            if cert_data:
-                result['certificate'] = cert_data
-                result['certificate_issued'] = True
+            issued_cert = _issue_approved_certificate(approval)
+            if issued_cert:
                 logger.info(f"Certificate issued for approval #{approval.id}")
         except Exception as e:
             logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}")
-            result['certificate_issued'] = False
-            result['issue_error'] = 'Certificate issuance failed. Check server logs.'
-    
+            issue_error = 'Certificate issuance failed. Check server logs.'
+            db.session.rollback()
+            # Re-fetch + re-record the vote without issuance so the
+            # approver's action is not lost.
+            approval = ApprovalRequest.query.with_for_update().filter_by(id=request_id).first()
+            if approval and approval.status == 'pending':
+                approval.add_approval(
+                    user_id=user_id,
+                    username=username,
+                    action='approve',
+                    comment=data.get('comment'),
+                )
+
+    ok, _err = safe_commit(logger, "Failed to approve request")
+    if not ok:
+        return _err
+
+    result = approval.to_dict()
+    if issued_cert is not None:
+        result['certificate'] = issued_cert
+        result['certificate_issued'] = True
+    elif issue_error is not None:
+        result['certificate_issued'] = False
+        result['issue_error'] = issue_error
+
     return success_response(data=result, message="Approval recorded")
 
 
 @bp.route('/api/v2/approvals/<int:request_id>/reject', methods=['POST'])
 @require_auth(['write:approvals'])
 def reject_request(request_id):
-    """Reject a request"""
-    approval = ApprovalRequest.query.get_or_404(request_id)
-    
-    if approval.status != 'pending':
-        return error_response(f"Request is already {approval.status}", 400)
-    
+    """Reject a request (race-safe, single vote per user)"""
     data = request.get_json() or {}
     user = g.current_user if hasattr(g, 'current_user') else None
     user_id = getattr(user, 'id', None)
@@ -474,17 +513,35 @@ def reject_request(request_id):
     if not data.get('comment'):
         return error_response("Rejection reason is required", 400)
 
+    db.session.expire_all()
+    approval = (
+        ApprovalRequest.query
+        .with_for_update()
+        .filter_by(id=request_id)
+        .first()
+    )
+    if approval is None:
+        return error_response('Approval request not found', 404)
+
+    if approval.status != 'pending':
+        return error_response(f"Request is already {approval.status}", 400)
+
+    if user_id is not None:
+        existing_votes = approval.get_approvals()
+        if any(v.get('user_id') == user_id for v in existing_votes):
+            return error_response('You have already voted on this request', 409)
+
     approval.add_approval(
         user_id=user_id,
         username=username,
         action='reject',
-        comment=data.get('comment')
+        comment=data.get('comment'),
     )
-    
+
     ok, _err = safe_commit(logger, "Failed to reject request")
     if not ok:
         return _err
-    
+
     return success_response(data=approval.to_dict(), message="Request rejected")
 
 
