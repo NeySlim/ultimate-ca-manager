@@ -317,12 +317,12 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
             continue
         try:
             mod = _load_module(path)
-            if getattr(mod, "pg_compatible", False) and hasattr(mod, "upgrade"):
-                mod.upgrade(engine)
-                print("✓")
-            else:
-                print("(SQLite-only — skipped)")
             with engine.begin() as conn:
+                if getattr(mod, "pg_compatible", False) and hasattr(mod, "upgrade"):
+                    mod.upgrade(conn)
+                    print("✓")
+                else:
+                    print("(SQLite-only — skipped)")
                 conn.execute(
                     text(
                         "INSERT INTO _migrations (name) VALUES (:n) "
