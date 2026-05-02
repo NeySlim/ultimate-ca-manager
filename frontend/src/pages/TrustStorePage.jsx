@@ -22,7 +22,7 @@ import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate, cn , downloadBlob} from '../lib/utils'
 export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -238,24 +238,14 @@ export default function TrustStorePage() {
     if (!cert?.certificate_pem) return
     
     const blob = new Blob([cert.certificate_pem], { type: 'application/x-pem-file' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${cert.name.replace(/\s+/g, '_')}.pem`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `${cert.name.replace(/\s+/g, '_')}.pem`)
   }
 
   const handleExportBundle = async (format = 'pem') => {
     try {
       const response = await truststoreService.exportBundle(format, 'all')
       const blob = response instanceof Blob ? response : response?.data instanceof Blob ? response.data : new Blob([response?.data || response], { type: 'application/x-pem-file' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `truststore-bundle.${format}`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `truststore-bundle.${format}`)
       showSuccess(t('trustStore.bundleExported'))
     } catch (error) {
       showError(error.message || t('trustStore.exportFailed'))

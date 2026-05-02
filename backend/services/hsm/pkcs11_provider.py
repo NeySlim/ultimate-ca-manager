@@ -13,6 +13,7 @@ from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
 )
+from utils.request_helpers import safe_call
 
 logger = logging.getLogger(__name__)
 
@@ -126,10 +127,7 @@ class Pkcs11Provider(BaseHsmProvider):
     def disconnect(self) -> None:
         """Close session"""
         if self._session:
-            try:
-                self._session.close()
-            except Exception:
-                pass
+            safe_call(self._session.close)
         self._session = None
         self._token = None
         self._lib = None

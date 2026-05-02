@@ -12,3 +12,4 @@ export { useFloatingWindow, EDGES, EDGE_CURSORS, EDGE_STYLES } from './useFloati
 export { useClipboard } from './useClipboard'
 export { usePersistedFilters } from './usePersistedFilters'
 export { usePersistedState } from './usePersistedState'
+export { useCRUDPage } from './useCRUDPage'

@@ -13,27 +13,11 @@ Tests all dashboard endpoints:
 Uses shared conftest fixtures: app, client, auth_client, create_ca, create_cert.
 """
 import json
+from tests.conftest import get_json, assert_success, assert_error
 
 CONTENT_JSON = 'application/json'
 STATS_OVERVIEW = '/api/v2/stats/overview'
 DASH = '/api/v2/dashboard'
-
-
-def get_json(response):
-    return json.loads(response.data)
-
-
-def assert_success(response, status=200):
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-    data = json.loads(response.data)
-    return data.get('data', data)
-
-
-def assert_error(response, status):
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-
 
 # ============================================================
 # Auth Required — authenticated endpoints must reject unauthed

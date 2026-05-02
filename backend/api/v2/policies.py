@@ -5,6 +5,7 @@ Manages certificate policies and approval workflows.
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, CA, Certificate
 from models.policy import CertificatePolicy, ApprovalRequest
 from datetime import datetime, timedelta
@@ -188,7 +189,9 @@ def _issue_approved_certificate(approval):
     
     # Link approval to issued cert
     approval.certificate_id = db_cert.id
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to link approval to certificate")
+    if not ok:
+        return _err
     
     logger.info(f"Certificate CN={data['cn']} issued via approval #{approval.id}")
     
@@ -312,7 +315,9 @@ def update_policy(policy_id):
     if 'notification_emails' in data:
         policy.notification_emails = json.dumps(data['notification_emails'])
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update policy")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='update',
@@ -430,7 +435,9 @@ def approve_request(request_id):
         comment=data.get('comment')
     )
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to approve request")
+    if not ok:
+        return _err
     
     result = approval.to_dict()
     
@@ -474,7 +481,9 @@ def reject_request(request_id):
         comment=data.get('comment')
     )
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to reject request")
+    if not ok:
+        return _err
     
     return success_response(data=approval.to_dict(), message="Request rejected")
 

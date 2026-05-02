@@ -6,10 +6,14 @@ SCEP Management Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
 from datetime import datetime, timezone
 import secrets
+import logging
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('scep_v2', __name__)
 
@@ -63,7 +67,9 @@ def update_scep_config():
     if 'challenge_validity' in data:
         set_config('scep_challenge_validity', str(data['challenge_validity']))
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update SCEP configuration")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='scep_config_update',
@@ -109,7 +115,9 @@ def approve_scep_request(request_id):
     scep_req.approved_by = username
     scep_req.approved_at = datetime.now(timezone.utc)
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to approve SCEP request")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='scep_approve',
@@ -147,7 +155,9 @@ def reject_scep_request(request_id):
     scep_req.approved_by = username
     scep_req.approved_at = datetime.now(timezone.utc)
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to reject SCEP request")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='scep_reject',
@@ -208,7 +218,9 @@ def regenerate_challenge_password(ca_id):
     # Generate a secure random challenge password
     new_challenge = secrets.token_urlsafe(24)
     set_config(f'scep_challenge_{ca_id}', new_challenge)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to regenerate SCEP challenge")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='scep_challenge_regenerate',

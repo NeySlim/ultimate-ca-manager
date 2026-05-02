@@ -20,7 +20,7 @@ import {
 import { sshCertificatesService, sshCasService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, useClipboard, usePersistedState } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate , downloadBlob} from '../lib/utils'
 
 // ============= CONSTANTS =============
 
@@ -235,12 +235,7 @@ export default function SSHCertificatesPage() {
       const res = await sshCertificatesService.export(cert.id)
       const text = typeof res === 'string' ? res : (res.data?.certificate || res.data || JSON.stringify(res))
       const blob = new Blob([text], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${cert.key_id || t('sshCertificates.export.filename')}-cert.pub`
-      a.click()
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${cert.key_id || t('sshCertificates.export.filename')}-cert.pub`)
       showSuccess(t('sshCertificates.export.success'))
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
@@ -1136,14 +1131,7 @@ function GeneratedResultView({ result, onClose }) {
 
   const handleDownload = (content, filename) => {
     const blob = new Blob([content], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
   }
 
   const keyId = result.key_id || 'ssh_cert'

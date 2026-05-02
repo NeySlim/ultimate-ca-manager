@@ -120,7 +120,7 @@ def handle_get_ca_cert():
         # application/x-x509-ca-ra-cert is only correct when a separate RA cert
         # exists (distinct from the CA cert); UCM uses the CA itself as the RA,
         # so that content-type causes Apple clients to fail validation looking for
-        # dedicated RA signing/encryption certs that aren't there.
+        # dedicated RA signing/encryption certs that aren't there (-67731).
         ca_cert_der = service.get_ca_cert()
         response = make_response(ca_cert_der)
         response.headers['Content-Type'] = 'application/x-x509-ca-cert'

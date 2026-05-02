@@ -1174,6 +1174,14 @@ tr.row-selected td:first-child {
   border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent);
 }
 
+.border-status-warning-op40 {
+  border-color: color-mix(in srgb, var(--accent-warning) 40%, transparent);
+}
+
+.border-status-info-op30 {
+  border-color: color-mix(in srgb, var(--accent-info) 30%, transparent);
+}
+
 .divide-border-op30 > :not([hidden]) ~ :not([hidden]) {
   border-color: color-mix(in srgb, var(--border) 30%, transparent);
 }

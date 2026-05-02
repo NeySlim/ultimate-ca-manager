@@ -22,7 +22,7 @@ import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate, cn , downloadBlob} from '../lib/utils'
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showInfo } = useNotification()
@@ -247,12 +247,7 @@ export default function CRLOCSPPage() {
     if (!selectedCRL?.crl_pem) return
     
     const blob = new Blob([selectedCRL.crl_pem], { type: 'application/x-pem-file' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${selectedCA?.descr || 'crl'}.crl`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, `${selectedCA?.descr || 'crl'}.crl`)
   }
 
   const copyToClipboard = (text) => {

@@ -14,28 +14,9 @@ Uses shared conftest fixtures: app, client, auth_client, create_user.
 import pytest
 import json
 import pyotp
+from tests.conftest import get_json, assert_success, assert_error
 
 CONTENT_JSON = 'application/json'
-
-
-def get_json(response):
-    """Parse JSON response, return dict."""
-    return json.loads(response.data)
-
-
-def assert_success(response, status=200):
-    """Assert response is successful and return parsed data."""
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-    data = json.loads(response.data)
-    return data.get('data', data)
-
-
-def assert_error(response, status):
-    """Assert response is an error with given status code."""
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-
 
 def post_json(client, url, data):
     return client.post(url, data=json.dumps(data), content_type=CONTENT_JSON)

@@ -7,6 +7,7 @@ from flask import Blueprint, request, g, Response
 import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.db_transaction import safe_commit
 from utils.file_validation import validate_upload, JSON_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from models import db
@@ -553,7 +554,9 @@ def import_template():
                 db.session.add(template)
                 imported.append(template.name)
         
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to import templates")
+        if not ok:
+            return _err
         
         AuditService.log_action(
             action='template_import',

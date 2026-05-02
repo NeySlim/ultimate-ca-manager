@@ -1,28 +1,10 @@
 /**
  * Templates Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, createCRUDService } from './apiClient'
 
 export const templatesService = {
-  async getAll() {
-    return apiClient.get('/templates')
-  },
-
-  async getById(id) {
-    return apiClient.get(`/templates/${id}`)
-  },
-
-  async create(data) {
-    return apiClient.post('/templates', data)
-  },
-
-  async update(id, data) {
-    return apiClient.put(`/templates/${id}`, data)
-  },
-
-  async delete(id) {
-    return apiClient.delete(`/templates/${id}`)
-  },
+  ...createCRUDService('templates'),
 
   async duplicate(id) {
     return apiClient.post(`/templates/${id}/duplicate`)
@@ -44,7 +26,6 @@ export const templatesService = {
     return apiClient.upload('/templates/import', formData)
   },
 
-  // Bulk operations
   async bulkDelete(ids) {
     return apiClient.post('/templates/bulk/delete', { ids })
   }

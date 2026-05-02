@@ -3,11 +3,15 @@ ACME Local Domains API Routes
 Manages domain-to-CA mappings for the Local ACME server.
 """
 import re
+import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, AcmeLocalDomain, CA
 from services.audit_service import AuditService
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('acme_local_domains', __name__)
 
@@ -65,7 +69,9 @@ def create_local_domain():
     )
     
     db.session.add(domain)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to create local ACME domain")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='acme_local_domain_create',
@@ -104,7 +110,9 @@ def update_local_domain(domain_id):
     if 'auto_approve' in data:
         domain.auto_approve = bool(data['auto_approve'])
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update local ACME domain")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='acme_local_domain_update',
@@ -129,7 +137,9 @@ def delete_local_domain(domain_id):
     domain_name = domain.domain
     
     db.session.delete(domain)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to delete local ACME domain")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='acme_local_domain_delete',

@@ -17,7 +17,7 @@ import {
 import { reportsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { cn, formatDate } from '../lib/utils'
+import { cn, formatDate , downloadBlob} from '../lib/utils'
 
 const REPORT_ICONS = {
   certificate_inventory: Certificate,
@@ -161,14 +161,7 @@ export default function ReportsPage() {
       }
       const mimeType = format === 'csv' ? 'text/csv' : 'application/json'
       const blob = new Blob([content], { type: mimeType })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ucm-report-${reportType}.${format}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `ucm-report-${reportType}.${format}`)
 
       showSuccess(t('reports.downloaded'))
     } catch (err) {
@@ -246,14 +239,7 @@ export default function ReportsPage() {
       setGeneratingPdf(true)
       const response = await reportsService.downloadExecutivePDF()
       const blob = response instanceof Blob ? response : new Blob([response], { type: 'application/pdf' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ucm-executive-report-${new Date().toISOString().slice(0, 10)}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `ucm-executive-report-${new Date().toISOString().slice(0, 10)}.pdf`)
       showSuccess(t('reports.pdfGenerated'))
     } catch (err) {
       showError(t('reports.pdfFailed'))
@@ -268,14 +254,7 @@ export default function ReportsPage() {
       const options = templateKey ? { template: templateKey } : { sections: selectedSections }
       const response = await reportsService.generateCustomPDF(options)
       const blob = response instanceof Blob ? response : new Blob([response], { type: 'application/pdf' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ucm-report-${templateKey || 'custom'}-${new Date().toISOString().slice(0, 10)}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `ucm-report-${templateKey || 'custom'}-${new Date().toISOString().slice(0, 10)}.pdf`)
       showSuccess(t('reports.pdfGenerated'))
     } catch (err) {
       showError(t('reports.pdfFailed'))

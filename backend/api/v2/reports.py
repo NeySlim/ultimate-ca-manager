@@ -5,6 +5,7 @@ Endpoints for generating and scheduling reports.
 from flask import Blueprint, request, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from services.report_service import ReportService
 from models import db, SystemConfig
@@ -284,7 +285,9 @@ def update_schedule_settings():
             }
             _set_config(f'report_schedule_{report_key}', json.dumps(config_val))
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to save report schedule settings")
+    if not ok:
+        return _err
     return get_schedule_settings()
 
 

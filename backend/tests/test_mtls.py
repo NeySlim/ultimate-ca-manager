@@ -9,11 +9,7 @@ Uses shared fixtures from conftest.py:
 """
 import pytest
 import json
-
-
-def get_json(response):
-    return json.loads(response.data)
-
+from tests.conftest import get_json
 
 def _post(client, url, data=None):
     return client.post(

@@ -15,26 +15,10 @@ Tests all webhook endpoints:
 Uses shared conftest fixtures: app, client, auth_client.
 """
 import json
+from tests.conftest import get_json, assert_success, assert_error
 
 CONTENT_JSON = 'application/json'
 WH = '/api/v2/webhooks'
-
-
-def get_json(response):
-    return json.loads(response.data)
-
-
-def assert_success(response, status=200):
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-    data = json.loads(response.data)
-    return data.get('data', data)
-
-
-def assert_error(response, status):
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-
 
 def post_json(client, url, data):
     return client.post(url, data=json.dumps(data), content_type=CONTENT_JSON)
