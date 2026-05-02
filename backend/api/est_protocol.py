@@ -29,13 +29,57 @@ def _get_est_ca():
     return CA.query.filter_by(refid=ca_refid.value).first()
 
 
+def _trusted_client_cert():
+    """
+    Return the PEM client certificate ONLY when it can be trusted.
+
+    Sources:
+      - request.environ['peercert'] (native gunicorn TLS) — always safe.
+      - SSL_CLIENT_CERT / SSL_CLIENT_VERIFY (reverse proxy) — only when
+        the immediate peer is a trusted proxy AND verify == 'SUCCESS'.
+
+    Without this gate any attacker who can reach gunicorn directly (or
+    poison the header through a mis-configured proxy) can forge an
+    arbitrary client certificate and obtain a signed cert from the EST
+    CA.
+    """
+    # Native TLS: gunicorn populates request.environ['peercert'] only after
+    # validating the chain against the configured CA — safe to trust.
+    if request.environ.get('peercert'):
+        return request.environ['peercert']
+
+    from utils.trusted_proxy import is_request_from_trusted_proxy
+    if not is_request_from_trusted_proxy():
+        # Untrusted peer is sending SSL_CLIENT_CERT — likely a spoof.
+        if request.environ.get('SSL_CLIENT_CERT') or request.headers.get('X-SSL-Client-Cert'):
+            logger.warning(
+                "EST: ignoring SSL_CLIENT_CERT from untrusted peer %s",
+                request.remote_addr,
+            )
+        return None
+
+    verify = (
+        request.environ.get('SSL_CLIENT_VERIFY')
+        or request.headers.get('X-SSL-Client-Verify')
+        or ''
+    ).upper()
+    if verify and verify != 'SUCCESS':
+        logger.warning("EST: SSL_CLIENT_VERIFY=%s — refusing client cert", verify)
+        return None
+
+    return (
+        request.environ.get('SSL_CLIENT_CERT')
+        or request.headers.get('X-SSL-Client-Cert')
+    )
+
+
 def _authenticate_est_client():
     """
     Authenticate EST client via mTLS or HTTP Basic Auth.
     Returns (authenticated: bool, username: str or None)
     """
-    # Check for client certificate (mTLS)
-    client_cert = request.environ.get('SSL_CLIENT_CERT')
+    # Check for client certificate (mTLS) — only trust when verified
+    client_cert = _trusted_client_cert()
     if client_cert:
         # Client authenticated via mTLS
         return True, 'mtls-client'
@@ -200,7 +244,7 @@ def simple_reenroll():
     Does NOT accept HTTP Basic Auth (unlike simpleenroll).
     """
     # Re-enrollment requires mTLS only (RFC 7030 §3.3.2)
-    client_cert = request.environ.get('SSL_CLIENT_CERT')
+    client_cert = _trusted_client_cert()
     if not client_cert:
         return Response(
             'Client certificate required for re-enrollment',
