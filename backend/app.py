@@ -96,15 +96,42 @@ def create_app(config_name=None):
     app.logger.setLevel(_log_level)
     # ─────────────────────────────────────────────────────────────
     
-    # Reverse proxy support (handles X-Forwarded-* headers)
-    # Safe to enable even without proxy - only activates if headers present
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=1,      # X-Forwarded-For (client IP)
-        x_proto=1,    # X-Forwarded-Proto (http/https)
-        x_host=1,     # X-Forwarded-Host (original host)
-        x_prefix=1    # X-Forwarded-Prefix (URL prefix)
-    )
+    # Reverse proxy support (handles X-Forwarded-* headers).
+    #
+    # SECURITY: ProxyFix(x_for=1) trusts the rightmost X-Forwarded-For hop.
+    # Without an actual trusted proxy in front, ANY client can spoof the
+    # header to rotate their apparent IP and bypass the brute-force login
+    # rate limiter or pollute audit logs. We therefore default to OFF and
+    # require the operator to opt in via UCM_BEHIND_PROXY=1 (or equivalently
+    # set UCM_TRUSTED_PROXY_HOPS to the number of trusted hops). Containers
+    # behind nginx-proxy-manager / traefik / k8s ingress should set this.
+    _trusted_hops = os.getenv('UCM_TRUSTED_PROXY_HOPS')
+    if _trusted_hops is not None:
+        try:
+            _trusted_hops = max(0, int(_trusted_hops))
+        except (TypeError, ValueError):
+            _trusted_hops = 0
+    elif os.getenv('UCM_BEHIND_PROXY', '').lower() in ('1', 'true', 'yes', 'on'):
+        _trusted_hops = 1
+    else:
+        _trusted_hops = 0
+
+    if _trusted_hops > 0:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=_trusted_hops,
+            x_proto=_trusted_hops,
+            x_host=_trusted_hops,
+            x_prefix=_trusted_hops,
+        )
+        app.logger.info(
+            f"ProxyFix enabled (trusting {_trusted_hops} X-Forwarded-* hop(s))"
+        )
+    else:
+        app.logger.info(
+            "ProxyFix disabled (set UCM_BEHIND_PROXY=1 when running behind a "
+            "trusted reverse proxy)"
+        )
     
     # Validate secrets at runtime (not during package installation)
     try:
