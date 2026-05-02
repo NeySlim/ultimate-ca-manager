@@ -25,10 +25,19 @@ def change_password():
 
     current_password = data.get('current_password')
     new_password = data.get('new_password')
-    force_change = data.get('force_change', False)
+
+    # NOTE: whether to skip current_password verification is decided ENTIRELY
+    # server-side from User.force_password_change. The client must NOT be able
+    # to influence this — a stolen session on a non-force-change user could
+    # otherwise rotate the password without knowing the current one.
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
+
+    skip_current_check = bool(user.force_password_change)
 
     # Validation
-    if not force_change and not current_password:
+    if not skip_current_check and not current_password:
         return error_response('Current password is required', 400)
 
     if not new_password:
@@ -47,15 +56,10 @@ def change_password():
     if not re.search(r'[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/~`]', new_password):
         return error_response('Password must contain at least one special character', 400)
 
-    user = User.query.get(g.current_user.id)
-    if not user:
-        return error_response('User not found', 404)
-
-    # Skip current password check only if force_password_change is set
-    if force_change and user.force_password_change:
-        pass
-    elif not current_password or not check_password_hash(user.password_hash, current_password):
-        return error_response('Current password is incorrect', 401)
+    # Skip current-password verification only when the SERVER says so
+    if not skip_current_check:
+        if not current_password or not check_password_hash(user.password_hash, current_password):
+            return error_response('Current password is incorrect', 401)
 
     # Update password
     user.password_hash = generate_password_hash(new_password)
