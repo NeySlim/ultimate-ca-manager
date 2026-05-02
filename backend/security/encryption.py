@@ -122,28 +122,29 @@ class KeyEncryption:
         if not data:
             return data
         
+        # Step 1: probe whether data is base64-encoded with our marker.
+        # PEM blobs (and any other non-base64 string) will fail b64decode here
+        # — that's our "not encrypted by us, pass through" signal.
         try:
             decoded = base64.b64decode(data)
-            
-            if not decoded.startswith(ENCRYPTED_MARKER):
-                return data
-            
-            if not self._enabled:
-                logger.error("Cannot decrypt: encryption key not available")
-                raise ValueError("Encryption key not configured")
-            
+        except Exception:
+            return data
+        
+        if not decoded.startswith(ENCRYPTED_MARKER):
+            return data
+        
+        if not self._enabled:
+            logger.error("Cannot decrypt: encryption key not available")
+            raise ValueError("Encryption key not configured")
+        
+        # Step 2: actual decryption — only failures here are real errors.
+        try:
             encrypted_data = decoded[len(ENCRYPTED_MARKER):]
             decrypted = self._fernet.decrypt(encrypted_data)
             return base64.b64encode(decrypted).decode('utf-8')
-            
         except InvalidToken:
             logger.error("Decryption failed: Invalid token (wrong key?)")
             raise ValueError("Failed to decrypt private key - wrong encryption key")
-        except ValueError:
-            raise
-        except Exception as e:
-            logger.debug(f"Data not encrypted or decryption skipped: {e}")
-            return data
     
     def is_encrypted(self, data: str) -> bool:
         if not data:
