@@ -142,8 +142,11 @@ class AcmeClientService:
         config = SystemConfig.query.filter_by(key=config_key).first()
         
         if config:
+            # Stored value may be encrypted (ENC:...) or legacy plain PEM —
+            # decrypt_private_key() is transparent for both cases.
+            from security.encryption import decrypt_private_key
             self.account_key = serialization.load_pem_private_key(
-                config.value.encode(),
+                decrypt_private_key(config.value).encode(),
                 password=None,
                 backend=default_backend()
             )
@@ -158,10 +161,14 @@ class AcmeClientService:
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption()
             ).decode()
-            
+
+            # Encrypt at rest with the master key (no-op if encryption disabled)
+            from security.encryption import encrypt_private_key
+            stored_value = encrypt_private_key(pem)
+
             db.session.add(SystemConfig(
                 key=config_key,
-                value=pem,
+                value=stored_value,
                 description=f"ACME client account key ({self.environment})"
             ))
             try:

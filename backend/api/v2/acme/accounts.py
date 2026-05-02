@@ -105,16 +105,18 @@ def create_acme_account():
 
         jwk_thumbprint = _b64url(hashlib.sha256(thumbprint_keys.encode()).digest())
 
-        # Store the private key in system_config for later use
+        # Store the private key in system_config for later use.
+        # Encrypted at rest with the master key (no-op if encryption disabled).
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption()
         ).decode()
+        from security.encryption import encrypt_private_key
         config_key = f'acme.account.{account_id}.private_key'
         db.session.add(SystemConfig(
             key=config_key,
-            value=pem,
+            value=encrypt_private_key(pem),
             description=f'Private key for ACME account {account_id}'
         ))
 
