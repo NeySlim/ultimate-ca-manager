@@ -14,10 +14,28 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('est', __name__, url_prefix='/.well-known/est')
 
+
+@bp.before_request
+def _enforce_est_enabled():
+    """RFC 7030: when EST is administratively disabled, every endpoint
+    under /.well-known/est MUST behave as if not configured. Returning
+    503 also keeps clients from believing the service is silently
+    available."""
+    if not _est_enabled():
+        return Response('EST disabled', status=503)
+
+
 # Content types
 PKCS7_MIME = 'application/pkcs7-mime'
 PKCS10_MIME = 'application/pkcs10'
 MULTIPART_MIXED = 'multipart/mixed'
+
+
+def _est_enabled():
+    """Return True iff EST protocol is enabled in SystemConfig."""
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key='est_enabled').first()
+    return bool(row and (row.value or '').lower() == 'true')
 
 
 def _get_est_ca():
