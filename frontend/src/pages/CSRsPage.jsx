@@ -17,12 +17,11 @@ import {
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
-import { csrsService, casService, templatesService, mscaService } from '../services'
-import { apiClient } from '../services/apiClient'
+import { csrsService, casService, templatesService, mscaService, ekuService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
-import { extractData, formatDate, cn } from '../lib/utils'
+import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 export default function CSRsPage() {
   const { t } = useTranslation()
@@ -57,7 +56,7 @@ export default function CSRsPage() {
   const [knownEkus, setKnownEkus] = useState([])
   useEffect(() => {
     let cancelled = false
-    apiClient.get('/eku/known')
+    ekuService.getKnown()
       .then((resp) => { if (!cancelled) setKnownEkus(resp?.data?.ekus || resp?.ekus || []) })
       .catch(() => {})
     return () => { cancelled = true }
@@ -339,11 +338,7 @@ export default function CSRsPage() {
   const handleDownload = async (id, filename) => {
     try {
       const blob = await csrsService.download(id)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename || 'csr.pem'
-      a.click()
+      downloadBlob(blob, filename || 'csr.pem')
       showSuccess(t('common.downloadSuccess'))
     } catch (error) {
       showError(error.message || t('csrs.downloadFailed'))

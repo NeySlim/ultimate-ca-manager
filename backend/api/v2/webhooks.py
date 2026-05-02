@@ -5,6 +5,7 @@ Endpoints for managing webhook configurations.
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db
 from services.webhook_service import WebhookEndpoint, WebhookService
@@ -76,7 +77,9 @@ def create_webhook():
     )
     
     db.session.add(endpoint)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to create webhook")
+    if not ok:
+        return _err
     
     return success_response(data=endpoint.to_dict(), message="Webhook created")
 
@@ -115,7 +118,9 @@ def update_webhook(endpoint_id):
             return error_response('Custom headers must be an object', 400)
         endpoint.custom_headers = json.dumps(data['custom_headers'])
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update webhook")
+    if not ok:
+        return _err
     return success_response(data=endpoint.to_dict(), message="Webhook updated")
 
 
@@ -125,7 +130,9 @@ def delete_webhook(endpoint_id):
     """Delete webhook endpoint"""
     endpoint = WebhookEndpoint.query.get_or_404(endpoint_id)
     db.session.delete(endpoint)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to delete webhook")
+    if not ok:
+        return _err
     return success_response(message="Webhook deleted")
 
 
@@ -135,7 +142,9 @@ def toggle_webhook(endpoint_id):
     """Enable/disable webhook endpoint"""
     endpoint = WebhookEndpoint.query.get_or_404(endpoint_id)
     endpoint.enabled = not endpoint.enabled
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to toggle webhook")
+    if not ok:
+        return _err
     
     status = "enabled" if endpoint.enabled else "disabled"
     return success_response(data=endpoint.to_dict(), message=f"Webhook {status}")
@@ -159,7 +168,9 @@ def regenerate_secret(endpoint_id):
     """Regenerate webhook secret"""
     endpoint = WebhookEndpoint.query.get_or_404(endpoint_id)
     endpoint.secret = secrets.token_urlsafe(32)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to regenerate webhook secret")
+    if not ok:
+        return _err
     
     return success_response(
         data={'secret': endpoint.secret},

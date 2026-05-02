@@ -25,6 +25,7 @@ from services.cert_service import CertificateService
 from services.certificate_parser import CertificateParser
 from utils.file_naming import cert_key_path
 from utils.response import success_response, error_response, created_response
+from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 
 logger = logging.getLogger(__name__)
@@ -121,7 +122,9 @@ def update_mtls_settings():
         _set_mtls_config('mtls_trusted_ca_id', ca_id)
         changes.append(f"trusted_ca_id={ca_id}")
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update mTLS settings")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mtls_settings_update',
@@ -231,7 +234,9 @@ def create_mtls_certificate():
             enabled=True,
         )
         db.session.add(auth_cert)
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to import mTLS certificate")
+        if not ok:
+            return _err
 
         AuditService.log_action(
             action='mtls_cert_create',
@@ -273,7 +278,9 @@ def delete_mtls_certificate(cert_id):
 
     serial = auth_cert.cert_serial
     db.session.delete(auth_cert)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to revoke mTLS certificate")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mtls_cert_delete',
@@ -445,7 +452,9 @@ def enroll_presented_certificate():
         enabled=True,
     )
     db.session.add(auth_cert)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to enroll mTLS certificate")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mtls_cert_enroll',
@@ -557,15 +566,16 @@ def enroll_import_certificate():
         cert_serial=serial,
         cert_subject=subject_dn,
         cert_issuer=issuer_dn,
-        cert_fingerprint=fingerprint,
-        cert_pem=pem_bytes,
+        cert_pem=cert_pem,
         name=cert_name,
         valid_from=valid_from,
         valid_until=valid_until,
         enabled=True,
     )
     db.session.add(auth_cert)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to issue mTLS certificate")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mtls_cert_import',
@@ -691,7 +701,9 @@ def assign_certificate():
         enabled=True,
     )
     db.session.add(auth_cert)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to assign mTLS certificate")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='mtls_cert_assign',

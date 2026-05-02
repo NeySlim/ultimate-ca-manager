@@ -6,6 +6,7 @@ TrustStore Management Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
+from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from models import db
 from models.truststore import TrustedCertificate
@@ -643,7 +644,9 @@ def add_ca_to_truststore(ca_refid):
     )
     
     db.session.add(trusted)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to add trusted certificate from CA")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='truststore.add_from_ca',

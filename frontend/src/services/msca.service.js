@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 const mscaService = {
   // Connections CRUD
@@ -42,7 +42,7 @@ const mscaService = {
 
   // List pending requests
   getPendingRequests: (mscaId) =>
-    apiClient.get(`/microsoft-cas/requests/pending${mscaId ? `?msca_id=${mscaId}` : ''}`),
+    apiClient.get(`/microsoft-cas/requests/pending${buildQueryString(mscaId ? { msca_id: mscaId } : {})}`),
 }
 
 export { mscaService }

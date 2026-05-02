@@ -16,27 +16,11 @@ import json
 import io
 import os
 import sys
+from tests.conftest import get_json, assert_success, assert_error
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 STRONG_PASSWORD = 'S3cure!Pass#99'
-
-
-def get_json(response):
-    return json.loads(response.data)
-
-
-def assert_success(response, status=200):
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-    data = json.loads(response.data)
-    return data.get('data', data)
-
-
-def assert_error(response, status):
-    assert response.status_code == status, \
-        f'Expected {status}, got {response.status_code}: {response.data[:500]}'
-
 
 # ============================================================
 # Password Policy (public)

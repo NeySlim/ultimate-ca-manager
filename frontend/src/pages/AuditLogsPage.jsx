@@ -48,7 +48,7 @@ import { useNotification } from '../contexts';
 import { usePermission, usePersistedState } from '../hooks';
 import auditService from '../services/audit.service';
 import { formatRelativeTime } from '../lib/ui';
-import { formatDate } from '../lib/utils';
+import { formatDate , downloadBlob} from '../lib/utils';
 // Action icons mapping
 const actionIcons = {
   login_success: SignIn,
@@ -190,12 +190,7 @@ export default function AuditLogsPage() {
       const blob = new Blob([typeof res === 'string' ? res : JSON.stringify(res, null, 2)], {
         type: format === 'csv' ? 'text/csv' : 'application/json'
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `audit_logs_${new Date().toISOString().slice(0, 10)}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `audit_logs_${new Date().toISOString().slice(0, 10)}.${format}`);
       
       showSuccess(t('common.exportedFormat', { format: format.toUpperCase() }));
     } catch (err) {

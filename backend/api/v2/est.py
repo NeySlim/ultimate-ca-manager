@@ -6,6 +6,7 @@ EST Management Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, SystemConfig, CA, AuditLog
 from services.audit_service import AuditService
 import logging
@@ -77,7 +78,9 @@ def update_est_config():
     if 'validity_days' in data:
         set_config('est_validity_days', str(data['validity_days']))
 
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update EST configuration")
+    if not ok:
+        return _err
 
     AuditService.log_action(
         action='est_config_update',

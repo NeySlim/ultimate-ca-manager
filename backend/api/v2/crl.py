@@ -5,6 +5,7 @@ CRL & OCSP Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.protocol_url import get_protocol_base_url
 from models import db, CA, AuditLog
 from models.crl import CRLMetadata
@@ -162,8 +163,10 @@ def toggle_auto_regen(ca_id):
             success=True
         )
         db.session.add(audit)
-        db.session.commit()
-        
+        ok, err = safe_commit(logger, 'Failed to update CRL settings')
+        if not ok:
+            return err
+
         return success_response(
             data=ca.to_dict(),
             message=f"Automatic CRL regeneration {'enabled' if enabled else 'disabled'}"
@@ -258,8 +261,10 @@ def configure_delta_crl(ca_id):
             success=True
         )
         
-        db.session.commit()
-        
+        ok, err = safe_commit(logger, 'Failed to update delta CRL settings')
+        if not ok:
+            return err
+
         return success_response(
             data={
                 'delta_crl_enabled': ca.delta_crl_enabled,

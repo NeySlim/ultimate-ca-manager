@@ -7,6 +7,7 @@ import requests
 import logging
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from utils.safe_requests import create_session
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from services.audit_service import AuditService
@@ -403,7 +404,9 @@ def import_items():
                 stats['certs_imported'] += 1
         
         # Commit all changes
-        db.session.commit()
+        ok, _err = safe_commit(logger, "Failed to import OPNsense data")
+        if not ok:
+            return _err
         
         AuditService.log_action(
             action='opnsense_import',

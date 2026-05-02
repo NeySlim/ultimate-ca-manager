@@ -12,18 +12,54 @@ logger = logging.getLogger(__name__)
 from api.v2.auth import bp as auth_bp
 from api.v2.auth_methods import bp as auth_methods_bp  # Multi-method auth
 from api.v2.account import bp as account_bp
+# CAs: import package (creates bp) then all route modules
 from api.v2.cas import bp as cas_bp
+from api.v2.cas import crud  # noqa: F401
+from api.v2.cas import import_  # noqa: F401
+from api.v2.cas import export  # noqa: F401
+from api.v2.cas import bulk  # noqa: F401
+from api.v2.cas import ocsp  # noqa: F401
+from api.v2.cas import certificates  # noqa: F401
+# Certificates: import package (creates bp) then all route modules
 from api.v2.certificates import bp as certificates_bp
+from api.v2.certificates import crud  # noqa: F401
+from api.v2.certificates import eku  # noqa: F401
+from api.v2.certificates import ct  # noqa: F401
+from api.v2.certificates import stats  # noqa: F401
+from api.v2.certificates import export  # noqa: F401
+from api.v2.certificates import bulk  # noqa: F401
+
 from api.v2.acme import bp as acme_bp
 from api.v2.scep import bp as scep_bp
 from api.v2.est import bp as est_bp
 from api.v2.tsa import bp as tsa_bp
+# Settings: import package (creates bp) then all route modules
 from api.v2.settings import bp as settings_bp
+from api.v2.settings import general  # noqa: F401
+from api.v2.settings import backup  # noqa: F401
+from api.v2.settings import email  # noqa: F401
+from api.v2.settings import notifications  # noqa: F401
+from api.v2.settings import ldap  # noqa: F401
+from api.v2.settings import webhooks  # noqa: F401
+# System: import package (creates bp) then all route modules
 from api.v2.system import bp as system_bp
+from api.v2.system import database  # noqa: F401
+from api.v2.system import https  # noqa: F401
+from api.v2.system import backup  # noqa: F401
+from api.v2.system import security  # noqa: F401
+from api.v2.system import audit  # noqa: F401
+from api.v2.system import alerts  # noqa: F401
+from api.v2.system import updates  # noqa: F401
+from api.v2.system import service  # noqa: F401
 from api.v2.dashboard import bp as dashboard_bp
 from api.v2.crl import bp as crl_bp
 from api.v2.csrs import bp as csrs_bp
+# Users: import package (creates bp) then all route modules
 from api.v2.users import bp as users_bp
+from api.v2.users import password  # noqa: F401
+from api.v2.users import crud  # noqa: F401
+from api.v2.users import management  # noqa: F401
+from api.v2.users import mtls  # noqa: F401
 from api.v2.templates import bp as templates_bp
 from api.v2.truststore import bp as truststore_bp
 from api.v2.import_opnsense import bp as import_opnsense_bp
@@ -39,6 +75,10 @@ from api.v2.smart_import import bp as smart_import_bp
 from api.v2.tools import tools_bp
 from api.v2.dns_providers import bp as dns_providers_bp
 from api.v2.acme_client import bp as acme_client_bp
+from api.v2.acme_client import settings as acme_client_settings  # noqa: F401
+from api.v2.acme_client import proxy as acme_client_proxy  # noqa: F401
+from api.v2.acme_client import orders as acme_client_orders  # noqa: F401
+from api.v2.acme_client import account as acme_client_account  # noqa: F401
 from api.v2.acme_domains import bp as acme_domains_bp
 from api.v2.acme_local_domains import bp as acme_local_domains_bp
 from api.v2.hsm import bp as hsm_bp
@@ -103,5 +143,5 @@ def register_api_v2(app):
     """Register all API v2 blueprints"""
     for blueprint in API_V2_BLUEPRINTS:
         app.register_blueprint(blueprint)
-    
+
     logger.info(f"Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")

@@ -17,7 +17,7 @@ import { userCertificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, usePersistedState } from '../hooks'
-import { formatDate, extractCN } from '../lib/utils'
+import { formatDate, extractCN , downloadBlob} from '../lib/utils'
 
 export default function UserCertificatesPage() {
   const { t } = useTranslation()
@@ -150,14 +150,7 @@ export default function UserCertificatesPage() {
         { password: (exportFormat === 'pkcs12' || exportFormat === 'jks') ? exportPassword : undefined }
       )
       const ext = { pkcs12: 'p12', jks: 'jks' }[exportFormat] || 'pem'
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${exportCert.name || 'certificate'}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      downloadBlob(blob, `${exportCert.name || 'certificate'}.${ext}`)
       showSuccess(t('userCertificates.exportSuccess'))
       setShowExportModal(false)
       setExportPassword('')

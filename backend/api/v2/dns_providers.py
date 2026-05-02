@@ -6,6 +6,7 @@ import json
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, DnsProvider
 from services.audit_service import AuditService
 from services.acme.dns_providers import (
@@ -87,7 +88,9 @@ def create_dns_provider():
     )
     
     db.session.add(provider)
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to create DNS provider")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='dns_provider_create',
@@ -161,7 +164,9 @@ def update_provider(provider_id):
             ).update({'is_default': False})
         provider.is_default = data['is_default']
     
-    db.session.commit()
+    ok, _err = safe_commit(logger, "Failed to update DNS provider")
+    if not ok:
+        return _err
     
     AuditService.log_action(
         action='dns_provider_update',

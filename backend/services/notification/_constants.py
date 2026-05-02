@@ -1,0 +1,8 @@
+CERT_EXPIRING = 'cert_expiring'
+CERT_ISSUED = 'cert_issued'
+CERT_REVOKED = 'cert_revoked'
+CRL_EXPIRING = 'crl_expiring'
+CA_CREATED = 'ca_created'
+SECURITY_ALERT = 'security_alert'
+PASSWORD_CHANGED = 'password_changed'
+DAILY_DIGEST = 'daily_digest'

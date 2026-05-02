@@ -95,7 +95,7 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('settings.certPickerSearch')}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary/30"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary-op30"
           />
         </div>
 
@@ -134,7 +134,7 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
                       onClick={() => setSelectedId(cert.id)}
                       className={`cursor-pointer border-b border-border transition-colors ${
                         isSelected
-                          ? 'bg-accent-primary/10 border-l-2 border-l-accent-primary'
+                          ? 'bg-accent-primary-op10 border-l-2 border-l-accent-primary'
                           : 'hover:bg-bg-secondary'
                       }`}
                     >
