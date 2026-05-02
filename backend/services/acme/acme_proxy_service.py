@@ -18,6 +18,7 @@ from cryptography.hazmat.backends import default_backend
 import josepy as jose
 
 from models import db, SystemConfig, DnsProvider
+from security.encryption import encrypt_private_key, decrypt_private_key
 from utils.datetime_utils import utc_isoformat
 
 logger = logging.getLogger(__name__)
@@ -82,9 +83,11 @@ class AcmeProxyService:
         """Load upstream account private key"""
         config = SystemConfig.query.filter_by(key='acme.proxy.account_key').first()
         if config:
-            # Load from DB
+            # Decrypt before loading — decrypt_private_key is a no-op if the
+            # value is already plaintext (e.g. written before encryption was
+            # enabled), so this is safe for existing installations.
             private_key = serialization.load_pem_private_key(
-                config.value.encode(),
+                decrypt_private_key(config.value).encode(),
                 password=None,
                 backend=default_backend()
             )
@@ -95,16 +98,18 @@ class AcmeProxyService:
                 key_size=2048,
                 backend=default_backend()
             )
-            # Save to DB
+            # Encrypt before saving — encrypt_private_key is a no-op if
+            # encryption is not configured, keeping behaviour identical for
+            # installations that do not use the key encryption feature.
             pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption()
             ).decode()
-            
+
             db.session.add(SystemConfig(
                 key='acme.proxy.account_key',
-                value=pem,
+                value=encrypt_private_key(pem),
                 description="Private key for ACME Proxy upstream account"
             ))
             try:
