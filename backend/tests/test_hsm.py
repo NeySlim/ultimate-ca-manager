@@ -303,15 +303,27 @@ class TestDependencies:
             assert 'installed' in dep
             assert isinstance(dep['installed'], bool)
 
-    def test_install_dependencies_missing_provider(self, auth_client):
+    def test_install_dependencies_missing_provider(self, auth_client, monkeypatch):
+        # Runtime pip install is disabled by default; opt in for the
+        # validation-path tests below.
+        monkeypatch.setenv('UCM_ALLOW_RUNTIME_PIP', '1')
         r = post_json(auth_client, f'{HSM_BASE}/dependencies/install', {})
         assert_error(r, 400)
 
-    def test_install_dependencies_invalid_provider(self, auth_client):
+    def test_install_dependencies_invalid_provider(self, auth_client, monkeypatch):
+        monkeypatch.setenv('UCM_ALLOW_RUNTIME_PIP', '1')
         r = post_json(auth_client, f'{HSM_BASE}/dependencies/install', {
             'provider': 'nonexistent'
         })
         assert_error(r, 400)
+
+    def test_install_dependencies_disabled_by_default(self, auth_client):
+        # Without UCM_ALLOW_RUNTIME_PIP the endpoint must refuse to
+        # shell out to pip even for an admin caller.
+        r = post_json(auth_client, f'{HSM_BASE}/dependencies/install', {
+            'provider': 'pkcs11'
+        })
+        assert_error(r, 403)
 
 
 # ============================================================
