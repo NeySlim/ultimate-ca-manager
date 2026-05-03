@@ -143,10 +143,10 @@ class AcmeClientService:
         
         if config:
             # Stored value may be encrypted (ENC:...) or legacy plain PEM —
-            # decrypt_private_key() is transparent for both cases.
-            from security.encryption import decrypt_private_key
+            # decrypt_text() is transparent for both cases.
+            from security.encryption import decrypt_text
             self.account_key = serialization.load_pem_private_key(
-                decrypt_private_key(config.value).encode(),
+                decrypt_text(config.value).encode(),
                 password=None,
                 backend=default_backend()
             )
@@ -162,9 +162,11 @@ class AcmeClientService:
                 encryption_algorithm=serialization.NoEncryption()
             ).decode()
 
-            # Encrypt at rest with the master key (no-op if encryption disabled)
-            from security.encryption import encrypt_private_key
-            stored_value = encrypt_private_key(pem)
+            # Encrypt at rest with the master key (no-op if encryption disabled).
+            # Use encrypt_text (not encrypt_private_key) — the latter expects
+            # base64-encoded input and crashes on raw PEM (regression #105).
+            from security.encryption import encrypt_text
+            stored_value = encrypt_text(pem)
 
             db.session.add(SystemConfig(
                 key=config_key,

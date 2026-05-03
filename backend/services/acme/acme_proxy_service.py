@@ -18,7 +18,7 @@ from cryptography.hazmat.backends import default_backend
 import josepy as jose
 
 from models import db, SystemConfig, DnsProvider
-from security.encryption import encrypt_private_key, decrypt_private_key
+from security.encryption import encrypt_text, decrypt_text
 from utils.datetime_utils import utc_isoformat
 
 logger = logging.getLogger(__name__)
@@ -83,11 +83,12 @@ class AcmeProxyService:
         """Load upstream account private key"""
         config = SystemConfig.query.filter_by(key='acme.proxy.account_key').first()
         if config:
-            # Decrypt before loading — decrypt_private_key is a no-op if the
-            # value is already plaintext (e.g. written before encryption was
-            # enabled), so this is safe for existing installations.
+            # Decrypt before loading — decrypt_text is a no-op if the value
+            # is already plaintext (e.g. written before encryption was
+            # enabled, or by pre-#105 versions), so this is safe for
+            # existing installations.
             private_key = serialization.load_pem_private_key(
-                decrypt_private_key(config.value).encode(),
+                decrypt_text(config.value).encode(),
                 password=None,
                 backend=default_backend()
             )
@@ -98,9 +99,9 @@ class AcmeProxyService:
                 key_size=2048,
                 backend=default_backend()
             )
-            # Encrypt before saving — encrypt_private_key is a no-op if
-            # encryption is not configured, keeping behaviour identical for
-            # installations that do not use the key encryption feature.
+            # Encrypt before saving — encrypt_text is a no-op if encryption
+            # is not configured, keeping behaviour identical for installations
+            # that do not use the key encryption feature.
             pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
@@ -109,7 +110,7 @@ class AcmeProxyService:
 
             db.session.add(SystemConfig(
                 key='acme.proxy.account_key',
-                value=encrypt_private_key(pem),
+                value=encrypt_text(pem),
                 description="Private key for ACME Proxy upstream account"
             ))
             try:

@@ -3,15 +3,20 @@
 Historically the ACME client account key (``acme.client.<env>.account_key``)
 and the server-side ACME account key (``acme.account.<id>.private_key``)
 were written as raw PEM into ``system_config.value``. They are now passed
-through ``security.encryption.encrypt_private_key()`` on write.
+through ``security.encryption.encrypt_text()`` on write.
 
 This migration walks the existing rows once and rewrites any plain PEM
 to the encrypted form. If encryption is disabled (no master.key, no
-KEY_ENCRYPTION_KEY env var), ``encrypt_private_key`` is a no-op so this
+KEY_ENCRYPTION_KEY env var), ``encrypt_text`` is a no-op so this
 migration is also a no-op — the rows just stay readable as before.
 
-Idempotent: ``encrypt_private_key`` already detects the ENC: marker and
+Idempotent: ``encrypt_text`` already detects the ENC: marker and
 returns the input unchanged, so re-running this migration is safe.
+
+⚠️ Earlier revisions of this migration used ``encrypt_private_key()``,
+which b64-decodes its input internally and therefore crashes on raw PEM.
+The fix is to use ``encrypt_text()`` (the right primitive for arbitrary
+text blobs).
 """
 
 import logging
@@ -21,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def upgrade(conn):
     try:
-        from security.encryption import encrypt_private_key, key_encryption
+        from security.encryption import encrypt_text, key_encryption
     except Exception as e:  # pragma: no cover — encryption module missing
         logger.warning(f"029: cannot import security.encryption ({e}); skipping")
         return
@@ -44,7 +49,7 @@ def upgrade(conn):
         value = row[1] if not hasattr(row, 'keys') else row['value']
         if not value:
             continue
-        new_value = encrypt_private_key(value)
+        new_value = encrypt_text(value)
         if new_value != value:
             conn.execute(
                 "UPDATE system_config SET value = ? WHERE key = ?",
@@ -60,7 +65,7 @@ def upgrade(conn):
 def downgrade(conn):
     # Best effort: decrypt back to plain PEM so old code can read them.
     try:
-        from security.encryption import decrypt_private_key, key_encryption
+        from security.encryption import decrypt_text, key_encryption
     except Exception:
         return
     if not getattr(key_encryption, 'is_enabled', False):
@@ -77,7 +82,7 @@ def downgrade(conn):
         if not value:
             continue
         try:
-            plain = decrypt_private_key(value)
+            plain = decrypt_text(value)
         except Exception:
             continue
         if plain != value:

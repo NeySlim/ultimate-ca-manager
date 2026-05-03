@@ -112,11 +112,11 @@ def create_acme_account():
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption()
         ).decode()
-        from security.encryption import encrypt_private_key
+        from security.encryption import encrypt_text
         config_key = f'acme.account.{account_id}.private_key'
         db.session.add(SystemConfig(
             key=config_key,
-            value=encrypt_private_key(pem),
+            value=encrypt_text(pem),
             description=f'Private key for ACME account {account_id}'
         ))
 

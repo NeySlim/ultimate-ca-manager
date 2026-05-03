@@ -240,6 +240,29 @@ def encrypt_private_key(encoded_data: str) -> str:
     return key_encryption.encrypt(encoded_data)
 
 
+def encrypt_text(plaintext: str) -> str:
+    """Encrypt arbitrary text (PEM, JSON, secrets) at rest.
+
+    Unlike :func:`encrypt_private_key`, this does NOT expect base64-encoded
+    input — use it for human-readable blobs (PEM keys, ACME proxy account
+    keys, LDAP bind passwords, etc.). No-op if encryption is disabled.
+    """
+    if not plaintext:
+        return plaintext
+    return key_encryption.encrypt_string(plaintext)
+
+
+def decrypt_text(data: str) -> str:
+    """Decrypt text encrypted with :func:`encrypt_text`.
+
+    Transparently passes through plaintext that was never encrypted (legacy
+    rows from before encryption was enabled).
+    """
+    if not data:
+        return data
+    return key_encryption.decrypt_string(data)
+
+
 def decrypt_all_keys(dry_run: bool = True) -> tuple:
     """
     Decrypt all encrypted private keys in database.
