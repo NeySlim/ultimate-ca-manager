@@ -9,6 +9,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.143] - 2026-05-03
+
+### Fixed
+- **PostgreSQL migration runner crashed on startup** when applying any pending migration written for the legacy `Engine` interface. `_run_pending_pg()` now opens a single transactional `Connection` via `engine.begin()` and passes it to `mod.upgrade(conn)`, matching the SQLite path and the migration module signatures (#103, #104). Without this fix, fresh PostgreSQL deployments couldn't boot past first start, and existing PG instances couldn't apply any future migration.
+- **ACME proxy account private key was stored in plaintext in `system_config`.** It is now encrypted at rest with the application key via `encrypt_private_key()` / `decrypt_private_key()`, and existing plaintext keys are migrated transparently on first read (#105).
+- **`KeyEncryption.decrypt()` no longer raises `binascii.Error` on PEM-formatted input** that was never encrypted in the first place. The probe now isolates base64 detection from Fernet decryption so legacy plaintext keys round-trip cleanly through the new ACME proxy decrypt path.
+
+### Changed
+- **Cross-target release validation now covers PostgreSQL** in addition to SQLite for every supported package (DEB, RPM, Docker). The PostgreSQL backend is now part of the mandatory pre-release smoke matrix because the #103 regression only manifested on PostgreSQL and would have shipped silently against a SQLite-only matrix.
+
 ## [2.142] - 2026-05-02
 
 ### Security
