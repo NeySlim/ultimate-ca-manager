@@ -30,5 +30,34 @@ def safe_commit(logger_instance, error_msg="Database operation failed"):
         return True, None
     except Exception as e:
         db.session.rollback()
-        logger_instance.error(f"{error_msg}: {e}")
+        logger_instance.error(f"{error_msg}: {e}", exc_info=True)
         return False, error_response(error_msg, 500)
+
+
+def commit_or_rollback(logger_instance, error_msg="Database operation failed"):
+    """
+    Service-layer variant of safe_commit().
+
+    Attempts db.session.commit(); on failure rolls back, logs with traceback,
+    and returns False. No Flask response (callers in services/auth handle
+    the failure however they need to).
+
+    Returns:
+        True   on success
+        False  on exception (session is rolled back, error logged with stacktrace)
+
+    Usage::
+
+        from utils.db_transaction import commit_or_rollback
+
+        api_key.last_used_at = utc_now()
+        if not commit_or_rollback(logger, "Failed to update api_key.last_used_at"):
+            return None
+    """
+    try:
+        db.session.commit()
+        return True
+    except Exception as e:
+        db.session.rollback()
+        logger_instance.error(f"{error_msg}: {e}", exc_info=True)
+        return False

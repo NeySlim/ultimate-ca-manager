@@ -9,6 +9,7 @@ from models.auth_certificate import AuthCertificate
 from services.certificate_parser import CertificateParser
 import logging
 from utils.datetime_utils import utc_now
+from utils.db_transaction import commit_or_rollback
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,9 @@ class MTLSAuthService:
         
         # Update last used timestamp
         auth_cert.last_used_at = utc_now()
-        db.session.commit()
+        if not commit_or_rollback(logger, "Failed to update auth_cert.last_used_at"):
+            # Non-critical telemetry — let auth proceed
+            pass
         
         logger.info(f"Certificate authentication successful: user={user.username}, serial={serial}")
         return user, auth_cert, ""
@@ -142,7 +145,8 @@ class MTLSAuthService:
         )
         
         db.session.add(auth_cert)
-        db.session.commit()
+        if not commit_or_rollback(logger, f"Failed to enroll mTLS certificate for user_id={user_id}"):
+            return False, "Failed to persist enrolled certificate", None
         
         logger.info(f"Certificate enrolled: user_id={user_id}, serial={cert_info['serial']}")
         return True, "Certificate enrolled successfully", auth_cert
@@ -171,7 +175,8 @@ class MTLSAuthService:
                 return False, "Not authorized to revoke this certificate"
         
         auth_cert.enabled = False
-        db.session.commit()
+        if not commit_or_rollback(logger, f"Failed to revoke auth_cert id={cert_id}"):
+            return False, "Failed to persist revocation"
         
         logger.info(f"Certificate revoked: id={cert_id}, serial={auth_cert.cert_serial}")
         return True, "Certificate revoked successfully"
@@ -201,7 +206,8 @@ class MTLSAuthService:
         
         serial = auth_cert.cert_serial
         db.session.delete(auth_cert)
-        db.session.commit()
+        if not commit_or_rollback(logger, f"Failed to delete auth_cert id={cert_id}"):
+            return False, "Failed to delete certificate"
         
         logger.info(f"Certificate deleted: id={cert_id}, serial={serial}")
         return True, "Certificate deleted successfully"

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from flask import request, jsonify, g, session, current_app
 from utils.datetime_utils import utc_now, utc_isoformat
+from utils.db_transaction import commit_or_rollback
 
 # Import models (will be created)
 try:
@@ -98,7 +99,9 @@ class AuthManager:
         
         # Update last_used timestamp
         api_key.last_used_at = utc_now()
-        db.session.commit()
+        if not commit_or_rollback(logger, "Failed to update api_key.last_used_at"):
+            # Don't fail the auth — last_used is non-critical telemetry
+            pass
         
         # Parse permissions from JSON
         try:
@@ -246,7 +249,8 @@ class AuthManager:
         )
 
         db.session.add(api_key)
-        db.session.commit()
+        if not commit_or_rollback(logger, "Failed to create api_key"):
+            raise RuntimeError("Failed to persist API key — see logs")
 
         # Return key - ONLY TIME WE SHOW IT!
         return {

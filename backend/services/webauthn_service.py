@@ -29,6 +29,7 @@ from models import db, User
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 import logging
 from utils.datetime_utils import utc_now
+from utils.db_transaction import commit_or_rollback
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,8 @@ class WebAuthnService:
             expires_at=utc_now() + timedelta(minutes=WebAuthnService.CHALLENGE_TIMEOUT_MINUTES)
         )
         db.session.add(challenge_record)
-        db.session.commit()
+        if not commit_or_rollback(logger, f"Failed to persist WebAuthn registration challenge for user_id={user.id}"):
+            return None
         
         # Get existing credentials to exclude
         existing_creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
@@ -229,7 +231,8 @@ class WebAuthnService:
             expires_at=utc_now() + timedelta(minutes=WebAuthnService.CHALLENGE_TIMEOUT_MINUTES)
         )
         db.session.add(challenge_record)
-        db.session.commit()
+        if not commit_or_rollback(logger, "Failed to persist WebAuthn authentication challenge"):
+            return None, None
         
         # Get user's credentials with transports
         credentials = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
@@ -346,7 +349,8 @@ class WebAuthnService:
                 return False, "Not authorized"
         
         db.session.delete(credential)
-        db.session.commit()
+        if not commit_or_rollback(logger, f"Failed to delete WebAuthn credential id={credential_id}"):
+            return False, "Failed to delete credential"
         
         logger.info(f"WebAuthn credential deleted: id={credential_id}")
         return True, "Credential deleted successfully"
@@ -365,7 +369,8 @@ class WebAuthnService:
                 return False, "Not authorized"
         
         credential.enabled = enabled
-        db.session.commit()
+        if not commit_or_rollback(logger, f"Failed to toggle WebAuthn credential id={credential_id}"):
+            return False, "Failed to update credential"
         
         action = "enabled" if enabled else "disabled"
         logger.info(f"WebAuthn credential {action}: id={credential_id}")
