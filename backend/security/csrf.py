@@ -185,8 +185,8 @@ def csrf_protect(f):
                     body = request.get_json(silent=True)
                     if body:
                         token = body.get('_csrf_token')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to extract CSRF token from request body for {request.path}: {e}")
         
         is_valid, error = CSRFProtection.validate_token(token, user_id)
         
@@ -241,8 +241,8 @@ def init_csrf_middleware(app):
                     body = request.get_json(silent=True)
                     if body:
                         token = body.get('_csrf_token')
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to extract CSRF token from request body for {request.path}: {e}")
         
         is_valid, error = CSRFProtection.validate_token(token, user_id)
         

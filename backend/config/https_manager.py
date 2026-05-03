@@ -12,7 +12,10 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 import socket
 import ipaddress
+import logging
 from utils.datetime_utils import utc_now
+
+logger = logging.getLogger(__name__)
 
 
 class HTTPSManager:
@@ -212,7 +215,8 @@ class HTTPSManager:
                 "not_valid_after": cert.not_valid_after_utc,
                 "is_expired": cert.not_valid_after_utc < datetime.now(timezone.utc),
             }
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to read certificate from {cert_path}: {e}", exc_info=True)
             return None
     
     @classmethod

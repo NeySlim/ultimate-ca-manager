@@ -151,8 +151,10 @@ class AuthManager:
                     )
                     session.clear()
                     return None
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    f"Malformed session login_time={login_time_str!r} for user={user.username}: {e}"
+                )
         
         # Check inactivity timeout (default 8h)
         last_activity_str = session.get('last_activity')
@@ -167,8 +169,10 @@ class AuthManager:
                     )
                     session.clear()
                     return None
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    f"Malformed session last_activity={last_activity_str!r} for user={user.username}: {e}"
+                )
         
         # Update last activity timestamp
         session['last_activity'] = now.isoformat()
@@ -192,8 +196,8 @@ class AuthManager:
             config = SystemConfig.query.filter_by(key='session_timeout').first()
             if config and config.value:
                 return int(config.value)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to read session_timeout from SystemConfig, using 8h default: {e}")
         return 28800  # 8 hours default
     
     @staticmethod
@@ -204,8 +208,8 @@ class AuthManager:
             config = SystemConfig.query.filter_by(key='session_max_lifetime').first()
             if config and config.value:
                 return int(config.value)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to read session_max_lifetime from SystemConfig, using 24h default: {e}")
         return 86400  # 24 hours default
     
     def create_api_key(self, user_id, name, permissions, expires_days=365):

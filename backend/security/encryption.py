@@ -107,6 +107,9 @@ class KeyEncryption:
             if decoded.startswith(ENCRYPTED_MARKER):
                 return data
         except Exception:
+            # Input is not base64 — fall through to encrypt path. Expected
+            # for raw text on the encrypt_text/decrypt_text path; not worth
+            # logging at info level (would be noisy on every PEM write).
             pass
         
         try:
@@ -170,8 +173,10 @@ class KeyEncryption:
             import pwd
             ucm_user = pwd.getpwnam('ucm')
             os.chown(MASTER_KEY_PATH, ucm_user.pw_uid, ucm_user.pw_gid)
-        except (KeyError, OSError):
-            pass  # ucm user doesn't exist (dev mode) or chown failed
+        except (KeyError, OSError) as e:
+            # ucm user doesn't exist (dev mode) or chown failed — running
+            # as root with stricter file perms is fine, just less ideal.
+            logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
         logger.info(f"🔑 Master key written to {MASTER_KEY_PATH}")
     
     @staticmethod

@@ -146,8 +146,8 @@ def consume_code(user: User, code: str) -> bool:
         # the up-to-date value.
         try:
             db.session.rollback()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("backup code consume: rollback after lost race failed: %s", e, exc_info=True)
         db.session.refresh(user)
         logger.info("backup code consume: optimistic lock lost for user_id=%s", user.id)
         return False

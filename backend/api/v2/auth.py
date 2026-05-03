@@ -55,7 +55,8 @@ def _get_lockout_settings():
         dur_cfg = SystemConfig.query.filter_by(key='lockout_duration').first()
         max_attempts = int(max_cfg.value) if max_cfg and max_cfg.value else DEFAULT_MAX_ATTEMPTS
         lockout_seconds = int(dur_cfg.value) if dur_cfg and dur_cfg.value else DEFAULT_LOCKOUT_SECONDS
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to read lockout config from SystemConfig, using defaults: {e}")
         max_attempts = DEFAULT_MAX_ATTEMPTS
         lockout_seconds = DEFAULT_LOCKOUT_SECONDS
     return max_attempts, lockout_seconds
@@ -106,7 +107,8 @@ def _record_failed_attempt(username):
                 username=username,
                 ip_address=ip_address
             )
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Non-blocking: failed to send account_locked notification for {username}: {e}", exc_info=True)
             pass  # Non-blocking
     
     try:
@@ -205,7 +207,8 @@ def login():
             ip_address=request.remote_addr or 'unknown',
             method='password'
         )
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Non-blocking: failed to emit on_user_login WebSocket event for {user.username}: {e}", exc_info=True)
         pass  # Non-blocking
     
     # Generate CSRF token
@@ -247,15 +250,15 @@ def logout():
     try:
         from services.audit_service import AuditService
         AuditService.log_auth('logout', username=username, details=f'User {username} logged out')
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Non-blocking: failed to audit-log logout for {username}: {e}", exc_info=True)
     
     # WebSocket event for logout
     try:
         from websocket.emitters import on_user_logout
         on_user_logout(username=username)
-    except Exception:
-        pass  # Non-blocking
+    except Exception as e:
+        logger.warning(f"Non-blocking: failed to emit on_user_logout WebSocket event for {username}: {e}", exc_info=True)
     
     session.clear()
     
@@ -340,7 +343,8 @@ def _is_email_configured():
         smtp_config = SystemConfig.query.filter_by(key='smtp_host').first()
         smtp_host = smtp_config.value if smtp_config else ''
         return bool(smtp_host and smtp_host.strip())
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Failed to read smtp_host SystemConfig, treating email as not configured: {e}")
         return False
 
 
@@ -421,7 +425,8 @@ def reset_password():
         is_valid, message = validate_password(new_password)
         if not is_valid:
             return error_response(message, 400)
-    except ImportError:
+    except ImportError as e:
+        logger.warning(f"Password policy module not available, skipping strength check: {e}")
         pass  # Password policy not available
     
     # Find user by token hash
@@ -461,8 +466,8 @@ def reset_password():
             details='Password reset via email',
             user_id=user.id
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Non-blocking: failed to audit-log password_reset for user {user.id}: {e}", exc_info=True)
     
     return success_response(message='Password has been reset successfully')
 

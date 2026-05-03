@@ -204,8 +204,10 @@ class EmailService:
             
             try:
                 db.session.commit()
-            except Exception:
-                pass
+            except Exception as e:
+                # EmailLog persistence failure must not mask the original send error.
+                db.session.rollback()
+                logger.warning(f"Failed to persist EmailLog (failure path): {e}", exc_info=True)
             
             return False, f"Failed to send email: {error_msg}"
     

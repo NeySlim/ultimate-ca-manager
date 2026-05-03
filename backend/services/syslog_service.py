@@ -177,11 +177,11 @@ class SyslogForwarder:
                     else:
                         sock.sendto(message, (self._host, self._port))
                     return True
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Syslog retry send failed (after socket reset): {e}", exc_info=True)
             return False
         except Exception as e:
-            logger.debug(f"Syslog send failed: {e}")
+            logger.debug(f"Syslog send failed: {e}", exc_info=True)
             return False
 
     def test_connection(self) -> dict:

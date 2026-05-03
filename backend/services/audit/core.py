@@ -78,8 +78,9 @@ class AuditCoreLoggingMixin:
                 from services.syslog_service import syslog_forwarder
                 if syslog_forwarder.is_enabled:
                     syslog_forwarder.send(audit_log)
-            except Exception:
-                pass
+            except Exception as e:
+                # Syslog forwarding must never break audit logging itself.
+                logger.warning(f"Syslog forward failed for audit_log id={audit_log.id}: {e}", exc_info=True)
 
             return audit_log
 
