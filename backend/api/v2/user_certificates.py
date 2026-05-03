@@ -15,7 +15,7 @@ from flask import Blueprint, Response, g, request
 
 from auth.unified import require_auth
 from models import CA, AuthCertificate, Certificate, User, db
-from security.encryption import decrypt_private_key
+from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from utils.response import error_response, no_content_response, success_response
@@ -314,7 +314,7 @@ def export_user_certificate(cert_id):
                 return error_response('Certificate has no private key for PKCS12 export', 400)
 
             x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem = base64.b64decode(decrypt_private_key(cert.prv))
+            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
 
             # Build CA chain
@@ -367,7 +367,7 @@ def export_user_certificate(cert_id):
             import time as _time
 
             x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem_data = base64.b64decode(decrypt_private_key(cert.prv))
+            key_pem_data = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
 
             cert_der = x509_cert.public_bytes(serialization.Encoding.DER)
@@ -424,7 +424,7 @@ def export_user_certificate(cert_id):
         filename = f"{filename_base}.crt"
 
         if include_key and cert.prv:
-            key_pem = base64.b64decode(decrypt_private_key(cert.prv))
+            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             if not result.endswith(b'\n'):
                 result += b'\n'
             result += key_pem

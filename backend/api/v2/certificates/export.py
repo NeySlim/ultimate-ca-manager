@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from models import Certificate, CA
 from utils.response import success_response, error_response
 from utils.sanitize import sanitize_filename
-from security.encryption import decrypt_private_key
+from utils.key_codec import load_pem_bytes
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -152,7 +152,7 @@ def export_certificate(cert_id):
         if export_format == 'key':
             if not certificate.prv:
                 return error_response('Certificate has no private key', 400)
-            key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             if password:
                 private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
                 key_pem = private_key.private_bytes(
@@ -173,7 +173,7 @@ def export_certificate(cert_id):
 
             # Include private key if requested
             if include_key and certificate.prv:
-                key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+                key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += key_pem
@@ -220,7 +220,7 @@ def export_certificate(cert_id):
                 return error_response('Certificate has no private key for PKCS12 export', 400)
 
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
 
             # Build CA chain if available and requested
@@ -293,7 +293,7 @@ def export_certificate(cert_id):
                 return error_response('Certificate has no private key for PFX export', 400)
 
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
 
             # Build CA chain if available and requested
@@ -335,7 +335,7 @@ def export_certificate(cert_id):
             import time
 
             cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            key_pem_data = base64.b64decode(decrypt_private_key(certificate.prv))
+            key_pem_data = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
 
             cert_der = cert_obj.public_bytes(serialization.Encoding.DER)

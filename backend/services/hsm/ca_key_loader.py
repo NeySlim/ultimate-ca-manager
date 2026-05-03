@@ -7,7 +7,7 @@ wrapper (when ``ca.hsm_key_id`` is set) that delegates to the HSM provider.
 
 Use this everywhere you previously did::
 
-    pem = base64.b64decode(decrypt_private_key(ca.prv))
+    pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
     private_key = serialization.load_pem_private_key(pem, password=None,
                                                      backend=default_backend())
 
@@ -16,7 +16,6 @@ so HSM-backed CAs work transparently.
 
 from __future__ import annotations
 
-import base64
 import logging
 
 from cryptography.hazmat.backends import default_backend
@@ -28,14 +27,9 @@ from services.hsm.hsm_private_key import (
     load_hsm_private_key,
     is_hsm_private_key,
 )
+from utils.key_codec import load_pem_bytes
 
 logger = logging.getLogger(__name__)
-
-try:
-    from security.encryption import decrypt_private_key
-except ImportError:  # pragma: no cover — encryption module always present
-    def decrypt_private_key(data):
-        return data
 
 
 def get_ca_signing_key(ca):
@@ -60,8 +54,7 @@ def get_ca_signing_key(ca):
             "(neither local nor HSM)"
         )
 
-    decrypted = decrypt_private_key(ca.prv)
-    pem = base64.b64decode(decrypted)
+    pem = load_pem_bytes(ca.prv, context=f"CA {getattr(ca, 'refid', ca.id)}")
     return serialization.load_pem_private_key(
         pem, password=None, backend=default_backend()
     )

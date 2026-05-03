@@ -18,7 +18,7 @@ from utils.response import success_response, error_response, created_response, n
 from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
 from services.audit_service import AuditService
-from security.encryption import decrypt_private_key
+from utils.key_codec import load_pem_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ def create_user_mtls_certificate(user_id):
             db.session.add(auth_cert)
             db.session.commit()
 
-            key_pem = base64.b64decode(decrypt_private_key(result.prv)).decode('utf-8') if result.prv else ''
+            key_pem = load_pem_bytes(result.prv, context=f"mTLS cert for user {user_id}").decode('utf-8') if result.prv else ''
 
             AuditService.log_action(
                 action='admin_mtls_generate',

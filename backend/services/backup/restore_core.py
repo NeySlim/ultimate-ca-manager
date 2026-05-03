@@ -359,8 +359,8 @@ class RestoreCoreMixin:
                     pass
             if ca.prv:
                 try:
-                    from security.encryption import decrypt_private_key
-                    prv_pem = base64.b64decode(decrypt_private_key(ca.prv))
+                    from utils.key_codec import load_pem_bytes
+                    prv_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
                     p = ca_key_path(ca)
                     Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
                     p.write_bytes(prv_pem)
@@ -390,8 +390,8 @@ class RestoreCoreMixin:
                     pass
             if cert.prv:
                 try:
-                    from security.encryption import decrypt_private_key
-                    prv_pem_bytes = base64.b64decode(decrypt_private_key(cert.prv))
+                    from utils.key_codec import load_pem_bytes
+                    prv_pem_bytes = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
                     p = cert_key_path(cert)
                     Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
                     p.write_bytes(prv_pem_bytes)

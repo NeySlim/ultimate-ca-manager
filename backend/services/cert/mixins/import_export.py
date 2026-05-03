@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from security.encryption import decrypt_private_key, encrypt_private_key
+    from utils.key_codec import load_pem_bytes
     HAS_ENCRYPTION = True
 except ImportError:
     HAS_ENCRYPTION = False
@@ -25,6 +26,9 @@ except ImportError:
 
     def encrypt_private_key(data):
         return data
+
+    def load_pem_bytes(prv, *, context="private key"):
+        return base64.b64decode(prv) if prv else b''
 
 
 class ImportExportMixin:
@@ -181,7 +185,7 @@ class ImportExportMixin:
             if not certificate.prv:
                 raise ValueError("Certificate has no private key")
 
-            key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             return TrustStoreService.export_pkcs12(
                 cert_pem, key_pem, password, certificate.descr
             )
@@ -224,7 +228,7 @@ class ImportExportMixin:
             if not certificate.prv:
                 raise ValueError("Certificate has no private key")
 
-            key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+            key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             return TrustStoreService.export_pkcs12(
                 cert_pem, key_pem, password, certificate.descr
             )
@@ -237,7 +241,7 @@ class ImportExportMixin:
             result = cert_pem
 
             if include_key and certificate.prv:
-                key_pem = base64.b64decode(decrypt_private_key(certificate.prv))
+                key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
                 # Ensure proper newline separation
                 if not result.endswith(b'\n'):
                     result += b'\n'

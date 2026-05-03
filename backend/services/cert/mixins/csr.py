@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from security.encryption import decrypt_private_key, encrypt_private_key
+    from utils.key_codec import load_pem_bytes
     HAS_ENCRYPTION = True
 except ImportError:
     HAS_ENCRYPTION = False
@@ -25,6 +26,9 @@ except ImportError:
 
     def encrypt_private_key(data):
         return data
+
+    def load_pem_bytes(prv, *, context="private key"):
+        return base64.b64decode(prv) if prv else b''
 
 
 class CSRMixin:
@@ -304,7 +308,7 @@ class CSRMixin:
                 f.write(cert_pem)
             if new_ca.prv:
                 key_path = ca_key_path(new_ca)
-                key_data = base64.b64decode(decrypt_private_key(new_ca.prv))
+                key_data = load_pem_bytes(new_ca.prv, context=f"CA {new_ca.id}")
                 with open(key_path, 'wb') as f:
                     f.write(key_data)
                 key_path.chmod(0o600)

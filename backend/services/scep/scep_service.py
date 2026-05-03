@@ -19,7 +19,7 @@ from cryptography.x509.oid import ExtensionOID
 
 from config.settings import Config
 from models import CA, Certificate, SCEPRequest, db
-from security.encryption import decrypt_private_key
+from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.file_naming import cert_cert_path
 
@@ -93,7 +93,7 @@ class SCEPService:
             base64.b64decode(self.ca.crt), default_backend()
         )
         self.ca_key = serialization.load_pem_private_key(
-            base64.b64decode(decrypt_private_key(self.ca.prv)),
+            load_pem_bytes(self.ca.prv, context=f"SCEP CA {self.ca.id}"),
             password=None,
             backend=default_backend(),
         )

@@ -24,7 +24,7 @@ def write_cert_files(cert) -> None:
     Errors are logged but never raised — a missing file is recoverable at
     the next startup via regenerate_all_files().
     """
-    from security.encryption import decrypt_private_key
+    from utils.key_codec import load_pem_bytes
 
     Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
     Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -39,7 +39,7 @@ def write_cert_files(cert) -> None:
     key_path = cert_key_path(cert)
     if not key_path.exists() and cert.prv:
         try:
-            key_pem = base64.b64decode(decrypt_private_key(cert.prv))
+            key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             key_path.write_bytes(key_pem)
             key_path.chmod(0o600)
         except Exception as e:
@@ -61,7 +61,7 @@ def write_ca_files(ca) -> None:
     Called immediately after a new CA is committed so the files are
     available on disk without waiting for the next service restart.
     """
-    from security.encryption import decrypt_private_key
+    from utils.key_codec import load_pem_bytes
 
     Config.CA_DIR.mkdir(parents=True, exist_ok=True)
     Config.PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -76,7 +76,7 @@ def write_ca_files(ca) -> None:
     key_path = ca_key_path(ca)
     if not key_path.exists() and ca.prv:
         try:
-            key_pem = base64.b64decode(decrypt_private_key(ca.prv))
+            key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
             key_path.write_bytes(key_pem)
             key_path.chmod(0o600)
         except Exception as e:
@@ -124,9 +124,8 @@ def regenerate_all_files():
 
         if not new_key.exists() and ca.prv:
             try:
-                from security.encryption import decrypt_private_key
-                prv_decrypted = decrypt_private_key(ca.prv)
-                key_pem = base64.b64decode(prv_decrypted)
+                from utils.key_codec import load_pem_bytes
+                key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
                 new_key.write_bytes(key_pem)
                 new_key.chmod(0o600)
                 stats['ca_keys'] += 1
@@ -177,9 +176,8 @@ def regenerate_all_files():
 
         if not new_key.exists() and cert.prv:
             try:
-                from security.encryption import decrypt_private_key
-                prv_decrypted = decrypt_private_key(cert.prv)
-                key_pem = base64.b64decode(prv_decrypted)
+                from utils.key_codec import load_pem_bytes
+                key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
                 new_key.write_bytes(key_pem)
                 new_key.chmod(0o600)
                 stats['cert_keys'] += 1
