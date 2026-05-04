@@ -982,6 +982,7 @@ export default function ACMEPage() {
         {activeTab === 'config' && (
           <ConfigTab
             acmeSettings={acmeSettings}
+            cas={cas}
             updateSetting={updateSetting}
             onSaveConfig={handleSaveConfig}
             saving={saving}
