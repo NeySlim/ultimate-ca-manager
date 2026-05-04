@@ -9,6 +9,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.145] - 2026-05-04
+
+### Fixed
+- **ACME Local server tab** — restored the `GET`/`PATCH /api/v2/acme/settings` endpoint and passed the missing `cas` prop to `ConfigTab`, fixing a `TypeError: Cannot read properties of undefined (reading 'map')` that crashed the Local ACME tab on click (#107).
+- **Boot import** — re-exported `commit_or_rollback` from `utils/db_transaction` (lost during a refactor) so the service starts cleanly.
+
 ## [2.144] - 2026-05-03
 
 ### Added
