@@ -445,3 +445,12 @@ jobs:
             artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Workaround: if the tag was re-pointed (e.g. retag after fix), softprops/action-gh-release
+      # does NOT overwrite the body of an existing release. Force-update it explicitly.
+      - name: Force-update release body
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          gh release edit "$TAG" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
