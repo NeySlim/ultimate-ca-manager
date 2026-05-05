@@ -9,6 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.146] - 2026-05-05
+
+### Fixed
+- **Release workflow** — validate stable tags against `main` and prerelease tags against `test`, and stamp `VERSION` / frontend package metadata before every frontend build so published DEB, RPM, and Docker artefacts embed the correct UI version (#108).
+
 ## [2.145] - 2026-05-04
 
 ### Fixed
