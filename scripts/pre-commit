@@ -67,6 +67,25 @@ else
     echo -e "${GREEN}✅${NC}"
 fi
 
+# ── 5. Backend static audit (undefined references + import smoke) ──
+echo -n "  Backend undefined refs... "
+if python3 "$ROOT/backend/scripts/audit_undefined_names.py" > /tmp/ucm-audit-refs.log 2>&1; then
+    echo -e "${GREEN}✅${NC}"
+else
+    echo -e "${RED}❌ Undefined references in backend (logger / helpers / imports)${NC}"
+    grep '^\[UNDEFINED\]' /tmp/ucm-audit-refs.log | sed 's/^/    /'
+    FAILED=1
+fi
+
+echo -n "  Backend module import smoke... "
+if cd "$ROOT/backend" && python3 scripts/audit_imports.py > /tmp/ucm-audit-imports.log 2>&1; then
+    echo -e "${GREEN}✅${NC}"
+else
+    echo -e "${RED}❌ Module import errors (NameError / ImportError at load time)${NC}"
+    tail -20 /tmp/ucm-audit-imports.log | sed 's/^/    /'
+    FAILED=1
+fi
+
 echo "========================"
 if [ $FAILED -ne 0 ]; then
     echo -e "${RED}❌ Pre-commit checks FAILED — fix issues before committing${NC}"

@@ -1,5 +1,6 @@
 from . import bp, VALID_ROLES, logger
-from flask import request
+from .connection_tests import _ldap_authenticate_user
+from flask import request, session
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
@@ -12,6 +13,7 @@ import ldap3
 from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
+import urllib.parse
 from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_role_from_mapping, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])

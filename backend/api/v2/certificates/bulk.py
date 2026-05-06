@@ -5,6 +5,9 @@ Certificates Bulk Operations Routes
 
 import base64
 import logging
+import os
+import subprocess
+import tempfile
 from datetime import timedelta
 from flask import request, g, Response
 from auth.unified import require_auth, has_permission

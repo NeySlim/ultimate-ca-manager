@@ -3,7 +3,7 @@ from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models.sso import SSOProvider
-from .helpers import _parse_json_field, _resolve_role_from_mapping, _resolve_role, _check_ldap_lockout, _clear_ldap_failed_attempts
+from .helpers import _parse_json_field, _resolve_role_from_mapping, _resolve_role, _check_ldap_lockout, _clear_ldap_failed_attempts, _decrypt_ldap_password, _build_ldap_tls
 import logging
 
 logger = logging.getLogger(__name__)

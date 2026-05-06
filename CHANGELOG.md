@@ -9,6 +9,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **SSO connection test endpoint crash** — `POST /api/v2/sso/providers/<id>/test` raised `NameError: name '_test_saml_connection' is not defined` (and the OAuth2/LDAP variants), making the "Test connection" button unusable for every SSO provider type. Discovered while smoke-testing v2.147 in production. Audit of the whole `api/v2/sso/` package surfaced six more files missing imports after the modular refactor — `connection_tests` (`http_requests`, `utc_isoformat`, `validate_url_not_cloud_metadata`), `ldap_routes` (`session`, `urllib`, `_ldap_authenticate_user`), `login_routes` (`http_requests`, `json`, `_get_ssl_verify`, `_cleanup_ssl_verify`, `_parse_json_field`, `_get_or_create_sso_user`, `_get_saml_auth`), `mapping_tests` (`_decrypt_ldap_password`, `_build_ldap_tls`), `saml_routes` (`safe_fromstring`, `utc_now`, `utc_isoformat`), plus `providers` itself. None of these endpoints were exercised by unit tests, so the regressions only surfaced on real production traffic.
+- **Project-wide static audit** — added `backend/scripts/audit_undefined_names.py` (AST-based detection of names referenced but never defined or imported, taking nested-tuple destructuring into account) and `backend/scripts/audit_imports.py` (smoke-imports every backend module to catch `NameError` / `ImportError` at load time before any HTTP request hits the route). Both checks are now wired into the pre-commit hook (`scripts/pre-commit`), so a refactor that drops an import is rejected at commit time instead of being discovered in production.
+- **`services/opnsense/parser.py` import crash** — the module imported `defusedxml.ElementTree as ET` then referenced `ET.Element` in type annotations, but `defusedxml.ElementTree` does not expose an `Element` class (`AttributeError` at import time). Now imports `Element` from the stdlib `xml.etree.ElementTree` for typing while keeping `defusedxml` for parsing. Caught by the new import-smoke audit.
+- **`api/v2/certificates/bulk.py` missing imports** — used `os`, `subprocess` and `tempfile` (PKCS#7 export via OpenSSL CLI fallback) without importing them. Caught by the new audit.
+
 ## [2.147] - 2026-05-06
 
 ### Fixed

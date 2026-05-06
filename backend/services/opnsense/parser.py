@@ -6,6 +6,7 @@ import logging
 from typing import Dict, List, Optional
 
 import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element  # noqa: type-only, defusedxml has no Element class
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
@@ -61,7 +62,7 @@ class ParserMixin:
 
         return result
 
-    def _parse_ca_element(self, ca_elem: ET.Element) -> Optional[Dict]:
+    def _parse_ca_element(self, ca_elem: Element) -> Optional[Dict]:
         """Parse individual CA element from XML."""
         try:
             ca_data = {}
@@ -95,7 +96,7 @@ class ParserMixin:
             logger.error(f"Failed to parse CA element: {e}")
             return None
 
-    def _parse_cert_element(self, cert_elem: ET.Element) -> Optional[Dict]:
+    def _parse_cert_element(self, cert_elem: Element) -> Optional[Dict]:
         """Parse individual certificate element from XML."""
         try:
             cert_data = {}
