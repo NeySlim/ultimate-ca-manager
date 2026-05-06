@@ -328,6 +328,15 @@ class LifecycleMixin:
         if not certificate:
             return False
 
+        # Clean up FK dependencies (ApprovalRequest.certificate_id has no cascade)
+        try:
+            from models import ApprovalRequest
+            ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
+        except Exception as e:
+            logger.error(f"Failed to clean approval requests for cert {cert_id}: {e}")
+            db.session.rollback()
+            return False
+
         # Delete files (cleanup old UUID names first, then new names)
         cleanup_old_files(certificate=certificate)
         cert_path = cert_cert_path(certificate)
@@ -343,7 +352,12 @@ class LifecycleMixin:
         AuditService.log_certificate('cert_deleted', certificate, f'Deleted certificate: {certificate.descr}')
 
         # Delete from database
-        db.session.delete(certificate)
-        db.session.commit()
+        try:
+            db.session.delete(certificate)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to delete certificate {cert_id}: {e}")
+            return False
 
         return True

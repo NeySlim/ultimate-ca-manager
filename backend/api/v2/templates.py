@@ -10,8 +10,9 @@ from utils.response import success_response, error_response, created_response, n
 from utils.db_transaction import safe_commit
 from utils.file_validation import validate_upload, JSON_EXTENSIONS
 from utils.sanitize import sanitize_filename
-from models import db
+from models import db, Certificate
 from models.certificate_template import CertificateTemplate
+from models.policy import CertificatePolicy
 from services.audit_service import AuditService
 from datetime import datetime
 import traceback
@@ -279,7 +280,19 @@ def delete_template(template_id):
     # Prevent deleting system templates
     if template.is_system:
         return error_response('Cannot delete system templates', 403)
-    
+
+    # Block deletion if template is referenced by certificates or policies (no FK cascade)
+    cert_count = Certificate.query.filter_by(template_id=template_id).count()
+    if cert_count > 0:
+        return error_response(
+            f'Cannot delete: template is used by {cert_count} certificate(s)', 409
+        )
+    policy_count = CertificatePolicy.query.filter_by(template_id=template_id).count()
+    if policy_count > 0:
+        return error_response(
+            f'Cannot delete: template is used by {policy_count} policy/policies', 409
+        )
+
     template_name = template.name
     
     try:
@@ -326,6 +339,14 @@ def bulk_delete_templates():
                 continue
             if template.is_system:
                 results['failed'].append({'id': template_id, 'error': 'Cannot delete system template'})
+                continue
+            cert_count = Certificate.query.filter_by(template_id=template_id).count()
+            if cert_count > 0:
+                results['failed'].append({'id': template_id, 'error': f'In use by {cert_count} certificate(s)'})
+                continue
+            policy_count = CertificatePolicy.query.filter_by(template_id=template_id).count()
+            if policy_count > 0:
+                results['failed'].append({'id': template_id, 'error': f'In use by {policy_count} policy/policies'})
                 continue
             template_name = template.name
             db.session.delete(template)
