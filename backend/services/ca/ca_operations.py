@@ -38,7 +38,12 @@ class CAOperationsMixin:
             raise ValueError("CA not found")
 
         ca.serial = (ca.serial or 0) + 1
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ca/ca_operations.py:41: {_commit_err}", exc_info=True)
+            raise
 
         return ca.serial
 

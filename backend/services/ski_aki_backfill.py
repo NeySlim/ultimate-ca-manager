@@ -90,7 +90,12 @@ def backfill_ski_aki():
             pass
 
     if stats['updated_cas'] or stats['updated_certs']:
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ski_aki_backfill.py:93: {_commit_err}", exc_info=True)
+            raise
         logger.info(f"SKI/AKI backfill: updated {stats['updated_cas']} CAs, {stats['updated_certs']} certificates")
     else:
         logger.debug("SKI/AKI backfill: all records up to date")
@@ -209,7 +214,12 @@ def backfill_ski_aki():
             stats['deduplicated'] += 1
 
     if stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']:
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ski_aki_backfill.py:212: {_commit_err}", exc_info=True)
+            raise
         logger.info(f"SKI/AKI chain repair: re-chained {stats['rechained_cas']} CAs, {stats['rechained_certs']} certs, deduplicated {stats['deduplicated']} CAs")
 
     # Phase 5: Populate subject_cn for certificates missing it
@@ -242,7 +252,12 @@ def backfill_ski_aki():
             stats.setdefault('populated_cn', 0)
             stats['populated_cn'] += 1
     if certs_missing_cn:
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ski_aki_backfill.py:245: {_commit_err}", exc_info=True)
+            raise
         if stats.get('populated_cn'):
             logger.info(f"SKI/AKI backfill: populated subject_cn for {stats['populated_cn']} certificates")
 

@@ -9,6 +9,9 @@ from datetime import datetime
 
 from models import db, CertificateTemplate
 from utils.datetime_utils import utc_now
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateService:
@@ -232,7 +235,12 @@ class TemplateService:
         )
         
         db.session.add(template)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/template_service.py:238: {_commit_err}", exc_info=True)
+            raise
         
         return template
     
@@ -282,7 +290,12 @@ class TemplateService:
         template.updated_by = username
         template.updated_at = utc_now()
         
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/template_service.py:288: {_commit_err}", exc_info=True)
+            raise
         
         return template
     
@@ -314,7 +327,12 @@ class TemplateService:
             raise ValueError(f"Cannot delete template: {in_use} certificate(s) using this template")
         
         db.session.delete(template)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/template_service.py:320: {_commit_err}", exc_info=True)
+            raise
         
         return True
     
@@ -376,5 +394,10 @@ class TemplateService:
                 db.session.add(template)
                 count += 1
         
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/template_service.py:382: {_commit_err}", exc_info=True)
+            raise
         return count

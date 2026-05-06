@@ -66,6 +66,11 @@ class CAcrudMixin:
 
         # Delete from database
         db.session.delete(ca)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ca/ca_crud.py:69: {_commit_err}", exc_info=True)
+            raise
 
         return True

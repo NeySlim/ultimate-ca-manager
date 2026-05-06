@@ -130,7 +130,12 @@ class HsmService:
         )
         
         db.session.add(provider)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/hsm/hsm_service.py:133: {_commit_err}", exc_info=True)
+            raise
         
         logger.info(f"Created HSM provider: {name} ({provider_type})")
         return provider
@@ -173,7 +178,12 @@ class HsmService:
             provider.error_message = None
         
         provider.updated_at = utc_now()
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/hsm/hsm_service.py:176: {_commit_err}", exc_info=True)
+            raise
         
         logger.info(f"Updated HSM provider: {provider.name}")
         return provider
@@ -198,7 +208,12 @@ class HsmService:
         
         name = provider.name
         db.session.delete(provider)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/hsm/hsm_service.py:201: {_commit_err}", exc_info=True)
+            raise
         
         logger.info(f"Deleted HSM provider: {name}")
         return True

@@ -115,7 +115,12 @@ class PolicyEvaluationService:
             expires_at=utc_now() + timedelta(days=7),
         )
         db.session.add(approval)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/policy_service.py:118: {_commit_err}", exc_info=True)
+            raise
         
         logger.info(
             f"Approval request #{approval.id} created for CN={request_data.get('cn')} "

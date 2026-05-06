@@ -45,7 +45,12 @@ class ProfilesMixin:
             profile.next_scan_at = datetime.now(timezone.utc) + timedelta(
                 minutes=profile.schedule_interval_minutes)
         db.session.add(profile)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/profiles.py:48: {_commit_err}", exc_info=True)
+            raise
         return profile.to_dict()
 
     def update_profile(self, profile_id: int, data: Dict) -> Optional[Dict]:
@@ -82,7 +87,12 @@ class ProfilesMixin:
         if profile.schedule_enabled and not profile.next_scan_at:
             profile.next_scan_at = datetime.now(timezone.utc) + timedelta(
                 minutes=profile.schedule_interval_minutes)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/profiles.py:85: {_commit_err}", exc_info=True)
+            raise
         return profile.to_dict()
 
     def delete_profile(self, profile_id: int) -> bool:
@@ -90,5 +100,10 @@ class ProfilesMixin:
         if not profile:
             return False
         db.session.delete(profile)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/profiles.py:93: {_commit_err}", exc_info=True)
+            raise
         return True

@@ -49,4 +49,9 @@ def save_import_config(base_url: str, username: str = None, password: str = None
         config_data["auth_method"] = "web"
 
     config.value = json.dumps(config_data)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as _commit_err:
+        db.session.rollback()
+        logger.error(f"Commit failed in services/opnsense/config.py:52: {_commit_err}", exc_info=True)
+        raise

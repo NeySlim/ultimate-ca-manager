@@ -100,7 +100,12 @@ class CSRMixin:
         )
 
         db.session.add(certificate)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/cert/mixins/csr.py:103: {_commit_err}", exc_info=True)
+            raise
 
         # Audit log
         from services.audit_service import AuditService
@@ -300,7 +305,12 @@ class CSRMixin:
             # Remove the certificate record — it's now a CA
             db.session.delete(certificate)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/cert/mixins/csr.py:303: {_commit_err}", exc_info=True)
+            raise
 
         # Audit log with centralized service
         from services.audit_service import AuditService

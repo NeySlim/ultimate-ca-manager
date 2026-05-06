@@ -31,7 +31,12 @@ class QueryMixin:
             except (socket.herror, socket.gaierror, OSError):
                 pass
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/query.py:34: {_commit_err}", exc_info=True)
+            raise
         return {'total': len(certs), 'updated': updated}
 
     def get_all(self, limit: int = 200, offset: int = 0,
@@ -96,7 +101,12 @@ class QueryMixin:
         if not row:
             return False
         db.session.delete(row)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/query.py:99: {_commit_err}", exc_info=True)
+            raise
         return True
 
     def delete_all(self, profile_id: int = None) -> int:
@@ -104,5 +114,10 @@ class QueryMixin:
         if profile_id:
             query = query.filter_by(scan_profile_id=profile_id)
         count = query.delete()
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/query.py:107: {_commit_err}", exc_info=True)
+            raise
         return count

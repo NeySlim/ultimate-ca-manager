@@ -60,7 +60,12 @@ class AutoRenewalService:
             else:
                 db.session.add(SystemConfig(key=db_key, value=db_value))
         
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/auto_renewal_service.py:63: {_commit_err}", exc_info=True)
+            raise
     
     @staticmethod
     def get_certificates_for_renewal():

@@ -150,7 +150,12 @@ class CASigningMixin:
 
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ca/ca_signing.py:153: {_commit_err}", exc_info=True)
+            raise
 
         logger.info(f"Signed CSR via {source}: CN={cn}, serial={serial}, CA={ca.descr}")
 

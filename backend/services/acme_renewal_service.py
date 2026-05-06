@@ -179,7 +179,12 @@ def renew_certificate(order) -> tuple:
     if new_cert and new_cert.not_after:
         order.expires_at = new_cert.not_after
     
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception as _commit_err:
+        db.session.rollback()
+        logger.error(f"Commit failed in services/acme_renewal_service.py:182: {_commit_err}", exc_info=True)
+        raise
     
     # Cleanup DNS records
     for domain, challenge_info in challenges.items():

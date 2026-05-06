@@ -208,7 +208,12 @@ class LifecycleMixin:
         )
 
         db.session.add(certificate)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/cert/mixins/lifecycle.py:211: {_commit_err}", exc_info=True)
+            raise
 
         # Audit log
         from services.audit_service import AuditService
@@ -280,7 +285,12 @@ class LifecycleMixin:
         certificate.revoked_at = utc_now()
         certificate.revoke_reason = reason
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/cert/mixins/lifecycle.py:283: {_commit_err}", exc_info=True)
+            raise
 
         # Audit log
         from services.audit_service import AuditService

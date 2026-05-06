@@ -311,7 +311,12 @@ class CACreationMixin:
         )
 
         db.session.add(ca)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/ca/ca_creation.py:314: {_commit_err}", exc_info=True)
+            raise
 
         # Audit log
         AuditService.log_ca('ca_imported', ca, f'Imported CA: {descr}')

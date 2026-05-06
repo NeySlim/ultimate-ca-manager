@@ -152,7 +152,12 @@ class CRLGenerationMixin:
                             f"{len(revoked_certs)} revoked certificates",
                             username=username)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/crl/generation.py:155: {_commit_err}", exc_info=True)
+            raise
 
         return crl_metadata
 

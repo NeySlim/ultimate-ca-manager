@@ -75,7 +75,12 @@ class RestoreCoreMixin:
         self._restore_settings(backup_data, results)
 
         # Commit after core entities
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/backup/restore_core.py:78: {_commit_err}", exc_info=True)
+            raise
 
         # Regenerate CA/cert files on disk
         self._regenerate_files()
@@ -112,7 +117,12 @@ class RestoreCoreMixin:
         self._restore_acme_client_orders(backup_data, results)
         self._restore_https_files(backup_data, results)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/backup/restore_core.py:115: {_commit_err}", exc_info=True)
+            raise
 
         return results
 

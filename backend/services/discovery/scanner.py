@@ -85,7 +85,12 @@ class ScannerMixin:
             resolve_dns=resolve_dns,
         )
         db.session.add(run)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/scanner.py:88: {_commit_err}", exc_info=True)
+            raise
         run_id = run.id
 
         # Launch background thread
@@ -175,7 +180,12 @@ class ScannerMixin:
                     last_progress = time.time()
                     # Update run record periodically
                     run.targets_scanned = scanned
-                    db.session.commit()
+                    try:
+                        db.session.commit()
+                    except Exception as _commit_err:
+                        db.session.rollback()
+                        logger.error(f"Commit failed in services/discovery/scanner.py:178: {_commit_err}", exc_info=True)
+                        raise
 
                 has_cert = 'fingerprint_sha256' in r
                 has_error = 'error' in r
@@ -206,7 +216,12 @@ class ScannerMixin:
             logger.info(f"SNI probing: {len(sni_jobs)} additional probes for scan {run_id}")
             total_with_sni = len(jobs) + len(sni_jobs)
             run.total_targets = total_with_sni
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as _commit_err:
+                db.session.rollback()
+                logger.error(f"Commit failed in services/discovery/scanner.py:209: {_commit_err}", exc_info=True)
+                raise
 
             with ThreadPoolExecutor(max_workers=max_workers) as pool:
                 sni_futures = {
@@ -313,7 +328,12 @@ class ScannerMixin:
         run.new_certs = new_certs
         run.changed_certs = changed_certs
         run.errors = errors_real
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/discovery/scanner.py:316: {_commit_err}", exc_info=True)
+            raise
 
         # Count expiring/expired certs for this profile
         expiring_certs = 0
@@ -333,7 +353,12 @@ class ScannerMixin:
                 profile.last_scan_at = now
                 if profile.schedule_enabled:
                     profile.next_scan_at = now + timedelta(minutes=profile.schedule_interval_minutes)
-                db.session.commit()
+                try:
+                    db.session.commit()
+                except Exception as _commit_err:
+                    db.session.rollback()
+                    logger.error(f"Commit failed in services/discovery/scanner.py:336: {_commit_err}", exc_info=True)
+                    raise
 
         summary = {
             'total_targets': len(jobs),
@@ -375,4 +400,9 @@ class ScannerMixin:
         if run:
             run.status = 'failed'
             run.completed_at = datetime.now(timezone.utc)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as _commit_err:
+                db.session.rollback()
+                logger.error(f"Commit failed in services/discovery/scanner.py:378: {_commit_err}", exc_info=True)
+                raise

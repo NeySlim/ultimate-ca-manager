@@ -136,7 +136,12 @@ class AuditQueryMixin:
     def cleanup_old_logs(retention_days: int = 90) -> int:
         cutoff = utc_now() - timedelta(days=retention_days)
         deleted = AuditLog.query.filter(AuditLog.timestamp < cutoff).delete()
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/audit/query.py:139: {_commit_err}", exc_info=True)
+            raise
         logger.info(f"Cleaned up {deleted} audit logs older than {retention_days} days")
         return deleted
 

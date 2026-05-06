@@ -129,7 +129,12 @@ class ImportExportMixin:
         )
 
         db.session.add(certificate)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in services/cert/mixins/import_export.py:132: {_commit_err}", exc_info=True)
+            raise
 
         # Audit log
         from services.audit_service import AuditService
