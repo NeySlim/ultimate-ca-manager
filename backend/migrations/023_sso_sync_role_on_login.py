@@ -53,21 +53,21 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'pro_sso_providers' not in set(insp.get_table_names()):
         logger.info("Migration 023: pro_sso_providers table absent, skipping")
         return
 
     cols = {c['name'] for c in insp.get_columns('pro_sso_providers')}
     if 'sync_role_on_login' not in cols:
-        with engine.begin() as conn:
-            conn.execute(text(
-                "ALTER TABLE pro_sso_providers "
-                "ADD COLUMN sync_role_on_login BOOLEAN NOT NULL DEFAULT FALSE"
-            ))
-            logger.info("Migration 023: added pro_sso_providers.sync_role_on_login")
+        conn.execute(text(
+            "ALTER TABLE pro_sso_providers "
+            "ADD COLUMN sync_role_on_login BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
+        logger.info("Migration 023: added pro_sso_providers.sync_role_on_login")
 
 
 def upgrade(conn):

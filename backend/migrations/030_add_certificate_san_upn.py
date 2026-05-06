@@ -32,10 +32,17 @@ def _upgrade_sqlite(conn):
     logger.info("030: added san_upn column to certificates table (SQLite)")
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    """Apply migration on PostgreSQL.
+
+    The runner already opens a transaction via ``with engine.begin() as conn``
+    and passes that Connection here. Calling ``conn.begin()`` (or
+    ``engine.begin()`` against an already-bound connection) raises
+    "transaction already begun". Use the passed connection directly.
+    """
     from sqlalchemy import inspect, text
 
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'certificates' not in set(insp.get_table_names()):
         logger.info("030: certificates table absent, skipping")
         return
@@ -45,8 +52,7 @@ def _upgrade_pg(engine):
         logger.info("030: san_upn column already present, skipping")
         return
 
-    with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE certificates ADD COLUMN san_upn TEXT"))
+    conn.execute(text("ALTER TABLE certificates ADD COLUMN san_upn TEXT"))
     logger.info("030: added san_upn column to certificates table (PostgreSQL)")
 
 

@@ -96,61 +96,61 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
 
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'users' not in set(insp.get_table_names()):
         logger.info("Migration 024: users table absent, skipping")
         return
 
     cols = {c['name'] for c in insp.get_columns('users')}
-    with engine.begin() as conn:
-        if 'auth_source' not in cols:
-            conn.execute(text(
-                "ALTER TABLE users ADD COLUMN auth_source VARCHAR(20) "
-                "NOT NULL DEFAULT 'local'"
-            ))
-            logger.info("Migration 024: added users.auth_source")
+    if 'auth_source' not in cols:
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN auth_source VARCHAR(20) "
+            "NOT NULL DEFAULT 'local'"
+        ))
+        logger.info("Migration 024: added users.auth_source")
 
-        if 'sso_provider_id' not in cols:
-            conn.execute(text(
-                "ALTER TABLE users ADD COLUMN sso_provider_id INTEGER "
-                "REFERENCES pro_sso_providers(id) ON DELETE SET NULL"
-            ))
-            logger.info("Migration 024: added users.sso_provider_id")
+    if 'sso_provider_id' not in cols:
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN sso_provider_id INTEGER "
+            "REFERENCES pro_sso_providers(id) ON DELETE SET NULL"
+        ))
+        logger.info("Migration 024: added users.sso_provider_id")
 
-        # Backfill SSO-provisioned users
-        providers = conn.execute(text(
-            "SELECT id, provider_type FROM pro_sso_providers WHERE enabled = TRUE"
+    # Backfill SSO-provisioned users
+    providers = conn.execute(text(
+        "SELECT id, provider_type FROM pro_sso_providers WHERE enabled = TRUE"
+    )).fetchall()
+    sole_provider = providers[0] if len(providers) == 1 else None
+    provider_types = {row[0]: row[1] for row in providers}
+
+    try:
+        session_rows = conn.execute(text(
+            "SELECT user_id, MAX(provider_id) FROM pro_sso_sessions GROUP BY user_id"
         )).fetchall()
-        sole_provider = providers[0] if len(providers) == 1 else None
-        provider_types = {row[0]: row[1] for row in providers}
+    except Exception:
+        session_rows = []
+    session_map = {row[0]: row[1] for row in session_rows if row[1] is not None}
 
-        try:
-            session_rows = conn.execute(text(
-                "SELECT user_id, MAX(provider_id) FROM pro_sso_sessions GROUP BY user_id"
-            )).fetchall()
-        except Exception:
-            session_rows = []
-        session_map = {row[0]: row[1] for row in session_rows if row[1] is not None}
+    sso_users = conn.execute(text(
+        "SELECT id FROM users WHERE password_hash = :h AND auth_source = 'local'"
+    ), {"h": SSO_PASSWORD_SENTINEL}).fetchall()
 
-        sso_users = conn.execute(text(
-            "SELECT id FROM users WHERE password_hash = :h AND auth_source = 'local'"
-        ), {"h": SSO_PASSWORD_SENTINEL}).fetchall()
+    for (uid,) in sso_users:
+        pid = session_map.get(uid) or (sole_provider[0] if sole_provider else None)
+        ptype = provider_types.get(pid) if pid else None
+        source = ptype if ptype in ('ldap', 'oauth2', 'saml') else 'local'
+        conn.execute(text(
+            "UPDATE users SET auth_source = :s, sso_provider_id = :p WHERE id = :u"
+        ), {"s": source, "p": pid, "u": uid})
 
-        for (uid,) in sso_users:
-            pid = session_map.get(uid) or (sole_provider[0] if sole_provider else None)
-            ptype = provider_types.get(pid) if pid else None
-            source = ptype if ptype in ('ldap', 'oauth2', 'saml') else 'local'
-            conn.execute(text(
-                "UPDATE users SET auth_source = :s, sso_provider_id = :p WHERE id = :u"
-            ), {"s": source, "p": pid, "u": uid})
-
-        if sso_users:
-            logger.info(
-                f"Migration 024: backfilled auth_source for {len(sso_users)} SSO user(s)"
-            )
+    if sso_users:
+        logger.info(
+            f"Migration 024: backfilled auth_source for {len(sso_users)} SSO user(s)"
+        )
 
 
 def upgrade(conn):

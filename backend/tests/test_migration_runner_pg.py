@@ -55,6 +55,45 @@ def test_run_pending_pg_uses_connection_not_engine():
 
 
 # ---------------------------------------------------------------------------
+# Static guard — every pg_compatible migration must NOT open a nested tx
+# (regression #111: `_upgrade_pg(engine)` did `with engine.begin() as conn`
+# but the runner now passes a Connection, raising "transaction already begun"
+# and breaking every PG upgrade to v2.149).
+# ---------------------------------------------------------------------------
+
+def test_pg_migrations_do_not_open_nested_transactions():
+    """All pg_compatible migrations must use the Connection passed by the
+    runner directly. They MUST NOT call ``engine.begin()`` / ``conn.begin()``
+    because the runner already opens the transaction.
+    """
+    import ast
+    import pathlib
+
+    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
+    offenders = []
+    for path in sorted(migrations_dir.glob("*.py")):
+        if path.name.startswith("__"):
+            continue
+        src = path.read_text()
+        if "pg_compatible = True" not in src:
+            continue
+        tree = ast.parse(src)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                if node.func.attr == "begin" and isinstance(node.func.value, ast.Name):
+                    if node.func.value.id in ("engine", "conn"):
+                        offenders.append(f"{path.name}:{node.lineno}")
+
+    assert not offenders, (
+        "Migration(s) call `.begin()` on the runner-supplied Connection. "
+        "The runner already opens `with engine.begin() as conn:` and passes "
+        "the Connection to upgrade(); calling .begin() again raises "
+        '"transaction already begun" and breaks PG upgrades (issue #111). '
+        f"Offenders: {offenders}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # End-to-end — PG CI job only
 # ---------------------------------------------------------------------------
 

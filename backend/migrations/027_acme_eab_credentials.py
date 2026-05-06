@@ -66,11 +66,11 @@ def _upgrade_sqlite(conn):
     logger.info(f"Migration 027: ensured {TABLE_NAME} table (SQLite)")
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import text
-    with engine.begin() as conn:
-        for stmt in [s.strip() for s in PG_SQL.split(';') if s.strip()]:
-            conn.execute(text(stmt))
+    for stmt in [s.strip() for s in PG_SQL.split(';') if s.strip()]:
+        conn.execute(text(stmt))
     logger.info(f"Migration 027: ensured {TABLE_NAME} table (PostgreSQL)")
 
 
@@ -87,5 +87,4 @@ def downgrade(conn):
         conn.commit()
     else:
         from sqlalchemy import text
-        with conn.begin() as c:
-            c.execute(text(f"DROP TABLE IF EXISTS {TABLE_NAME}"))
+        conn.execute(text(f"DROP TABLE IF EXISTS {TABLE_NAME}"))

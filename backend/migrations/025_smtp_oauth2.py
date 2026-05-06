@@ -62,23 +62,23 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
 
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'smtp_config' not in set(insp.get_table_names()):
         logger.info("Migration 025: smtp_config table absent, skipping")
         return
 
     cols = {c['name'] for c in insp.get_columns('smtp_config')}
-    with engine.begin() as conn:
-        for name, sqlite_type, _ in NEW_COLUMNS:
-            if name not in cols:
-                pg_type = PG_TYPE_MAP.get(sqlite_type, sqlite_type)
-                conn.execute(text(
-                    f"ALTER TABLE smtp_config ADD COLUMN {name} {pg_type}"
-                ))
-                logger.info(f"Migration 025: added smtp_config.{name}")
+    for name, sqlite_type, _ in NEW_COLUMNS:
+        if name not in cols:
+            pg_type = PG_TYPE_MAP.get(sqlite_type, sqlite_type)
+            conn.execute(text(
+                f"ALTER TABLE smtp_config ADD COLUMN {name} {pg_type}"
+            ))
+            logger.info(f"Migration 025: added smtp_config.{name}")
 
 
 def upgrade(conn):

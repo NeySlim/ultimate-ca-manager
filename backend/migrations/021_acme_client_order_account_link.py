@@ -73,29 +73,29 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
-    insp = inspect(engine)
+    insp = inspect(conn)
     existing = set(insp.get_table_names())
     if 'acme_client_orders' not in existing:
         logger.info("Migration 021: acme_client_orders absent, skipping")
         return
 
     cols = {c['name'] for c in insp.get_columns('acme_client_orders')}
-    with engine.begin() as conn:
-        if 'account_id' not in cols:
-            conn.execute(text(
-                "ALTER TABLE acme_client_orders ADD COLUMN account_id VARCHAR(64)"
-            ))
-            logger.info("Migration 021: added acme_client_orders.account_id")
-
-        if 'acme_accounts' in existing:
-            conn.execute(text(_BACKFILL_SQL))
-
+    if 'account_id' not in cols:
         conn.execute(text(
-            "CREATE INDEX IF NOT EXISTS ix_acme_client_orders_account_id "
-            "ON acme_client_orders(account_id)"
+            "ALTER TABLE acme_client_orders ADD COLUMN account_id VARCHAR(64)"
         ))
+        logger.info("Migration 021: added acme_client_orders.account_id")
+
+    if 'acme_accounts' in existing:
+        conn.execute(text(_BACKFILL_SQL))
+
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_acme_client_orders_account_id "
+        "ON acme_client_orders(account_id)"
+    ))
 
 
 def upgrade(conn):

@@ -65,14 +65,16 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # The runner already opens `with engine.begin() as conn:` — we get the
+    # Connection, not the Engine. Calling engine.begin() on it raises
+    # "transaction already begun" (issue #111).
     from sqlalchemy import inspect, text
-    insp = inspect(engine)
+    insp = inspect(conn)
     existing = set(insp.get_table_names())
     if 'acme_client_orders' not in existing or 'certificates' not in existing:
         return
-    with engine.begin() as conn:
-        conn.execute(text(_BACKFILL_SQL))
+    conn.execute(text(_BACKFILL_SQL))
 
 
 def upgrade(conn):

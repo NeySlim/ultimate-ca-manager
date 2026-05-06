@@ -106,26 +106,26 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
 
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'certificates' not in set(insp.get_table_names()):
         logger.info("Migration 027: certificates table absent, skipping")
         return
 
-    with engine.begin() as conn:
-        result = conn.execute(text(
-            "SELECT id, crt, san_dns, san_ip, san_email, san_uri FROM certificates"
-        ))
-        rows = result.fetchall()
+    result = conn.execute(text(
+        "SELECT id, crt, san_dns, san_ip, san_email, san_uri FROM certificates"
+    ))
+    rows = result.fetchall()
 
-        def update_fn(cert_id, dns, ip, email, uri):
-            conn.execute(text(
-                "UPDATE certificates SET san_dns=:dns, san_ip=:ip, san_email=:email, san_uri=:uri WHERE id=:id"
-            ), {"dns": json.dumps(dns), "ip": json.dumps(ip), "email": json.dumps(email), "uri": json.dumps(uri), "id": cert_id})
+    def update_fn(cert_id, dns, ip, email, uri):
+        conn.execute(text(
+            "UPDATE certificates SET san_dns=:dns, san_ip=:ip, san_email=:email, san_uri=:uri WHERE id=:id"
+        ), {"dns": json.dumps(dns), "ip": json.dumps(ip), "email": json.dumps(email), "uri": json.dumps(uri), "id": cert_id})
 
-        _backfill(rows, update_fn)
+    _backfill(rows, update_fn)
 
 
 def upgrade(conn):

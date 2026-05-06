@@ -44,21 +44,21 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
 
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'api_keys' not in set(insp.get_table_names()):
         logger.info("Migration 026: api_keys table absent, skipping")
         return
 
     cols = {c['name'] for c in insp.get_columns('api_keys')}
-    with engine.begin() as conn:
-        if COLUMN_NAME not in cols:
-            conn.execute(text(
-                f"ALTER TABLE api_keys ADD COLUMN {COLUMN_NAME} {PG_TYPE}"
-            ))
-            logger.info(f"Migration 026: added api_keys.{COLUMN_NAME}")
+    if COLUMN_NAME not in cols:
+        conn.execute(text(
+            f"ALTER TABLE api_keys ADD COLUMN {COLUMN_NAME} {PG_TYPE}"
+        ))
+        logger.info(f"Migration 026: added api_keys.{COLUMN_NAME}")
 
 
 def upgrade(conn):

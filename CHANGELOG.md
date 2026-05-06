@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **PostgreSQL upgrades crashed at boot on migration 030 (#111)** — `030_add_certificate_san_upn._upgrade_pg(engine)` opened `with engine.begin() as conn:` but the migration runner already passes the live, transactional `Connection` to `mod.upgrade(conn)` (fixed in #103/#104). Calling `.begin()` on an already-bound `Connection` raises `sqlalchemy.exc.InvalidRequestError: a transaction is already begun on this connection`, killing the boot of every PostgreSQL install upgrading to v2.149. Reported by @Hemsby. Migration 030 now uses the runner-supplied `Connection` directly. The same latent bug existed in eight earlier `pg_compatible` migrations (020, 021, 022, 023, 024, 025, 026, 027 EAB, 027 backfill SAN email) — they were invisible because previously applied installs never re-ran them, but a fresh PostgreSQL install would have hit the same crash on first migration. All nine are converted to the `_upgrade_pg(conn)` shape and use the supplied connection directly.
+- **Test guard against future regressions** — added `test_pg_migrations_do_not_open_nested_transactions` in `tests/test_migration_runner_pg.py` that AST-scans every `pg_compatible` migration and rejects any call to `engine.begin()` / `conn.begin()`. The pre-commit hook will catch any new migration that re-introduces the pattern. End-to-end check `test_pg_migration_runs_against_real_postgres` was rerun against a real PostgreSQL 15 container and passes.
+
 ## [2.149] - 2026-05-06
 
 ### Added

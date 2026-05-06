@@ -44,18 +44,18 @@ def _upgrade_sqlite(conn):
     conn.commit()
 
 
-def _upgrade_pg(engine):
+def _upgrade_pg(conn):
+    # Runner passes a Connection (already in transaction) — issue #111.
     from sqlalchemy import inspect, text
-    insp = inspect(engine)
+    insp = inspect(conn)
     if 'users' not in set(insp.get_table_names()):
         logger.info("Migration 022: users table absent, skipping")
         return
 
     cols = {c['name'] for c in insp.get_columns('users')}
     if 'preferences' not in cols:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE users ADD COLUMN preferences TEXT"))
-            logger.info("Migration 022: added users.preferences")
+        conn.execute(text("ALTER TABLE users ADD COLUMN preferences TEXT"))
+        logger.info("Migration 022: added users.preferences")
 
 
 def upgrade(conn):
