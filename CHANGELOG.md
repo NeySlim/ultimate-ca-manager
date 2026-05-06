@@ -9,6 +9,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.147] - 2026-05-06
+
 ### Fixed
 - **ACME account detail tabs** — Orders and Challenges counts always rendered as 0 and the Orders/Challenges tabs were empty. Frontend was reading `res.data.orders` / `res.data.challenges` but the API returns the array directly under `res.data`; backend endpoints `GET /api/v2/acme/accounts/<account_id>/{orders,challenges,deactivate}` and `GET|DELETE /api/v2/acme/accounts/<account_id>` were also using `Query.get(account_id)` against an integer primary key when `account_id` is the public string identifier, so every lookup returned 404 (#109).
 - **Local ACME history challenge type** — entries from the local ACME server always reported `challenge_type=http-01`. Now resolved from the first validated `AcmeChallenge` of the order so DNS-01 / TLS-ALPN-01 issuances are reported correctly (#109).
