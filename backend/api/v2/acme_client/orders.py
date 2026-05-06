@@ -96,8 +96,13 @@ def request_certificate():
     if challenge_type not in ['dns-01', 'http-01']:
         return error_response('Challenge type must be dns-01 or http-01', 400)
 
-    # Environment
-    environment = data.get('environment', 'staging')
+    # Environment — fall back to configured default, NOT hardcoded staging.
+    # Without this, a frontend race (modal opened before settings finished loading)
+    # silently downgrades a production-default install to staging (#26).
+    environment = data.get('environment')
+    if not environment:
+        env_cfg = SystemConfig.query.filter_by(key='acme.client.environment').first()
+        environment = env_cfg.value if env_cfg else 'staging'
     if environment not in ['staging', 'production']:
         return error_response('Environment must be staging or production', 400)
 
