@@ -1067,8 +1067,8 @@ export default function ACMEPage() {
           onSubmit={handleRequestCertificate}
           onCancel={() => setShowRequestModal(false)}
           dnsProviders={dnsProviders}
-          defaultEnvironment={clientSettings.default_environment || 'staging'}
-          defaultEmail={clientSettings.contact_email || ''}
+          defaultEnvironment={clientSettings.environment || 'staging'}
+          defaultEmail={clientSettings.email || ''}
         />
       </Modal>
       

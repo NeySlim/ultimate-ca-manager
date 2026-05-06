@@ -233,8 +233,8 @@ export default function LetsEncryptTab({
         <div className="space-y-3">
           <Select
             label={t('acme.defaultEnvironment')}
-            value={clientSettings.default_environment || 'staging'}
-            onChange={(val) => onUpdateClientSetting('default_environment', val)}
+            value={clientSettings.environment || 'staging'}
+            onChange={(val) => onUpdateClientSetting('environment', val)}
             disabled={!canWrite}
             options={[
               { value: 'staging', label: t('acme.staging') + ' (Test)' },
