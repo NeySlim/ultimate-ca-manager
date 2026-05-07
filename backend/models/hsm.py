@@ -6,11 +6,36 @@ Supports PKCS#11, Azure Key Vault, Google Cloud KMS, AWS CloudHSM
 from datetime import datetime
 import json
 from utils.datetime_utils import utc_now, utc_isoformat
+from utils.encryption import encrypt_if_needed, decrypt_if_needed, is_encrypted
 
 try:
     from models import db
 except ImportError:
     db = None
+
+
+# Field names whose values are credentials and MUST be encrypted at rest /
+# masked in API responses. Exact-match set (case-insensitive) so non-secret
+# fields whose names happen to contain a sensitive substring (e.g.
+# pkcs11 "token_label", gcp "key_ring") are NOT inadvertently encrypted.
+_SENSITIVE_KEYS = frozenset({
+    'pin', 'user_pin',
+    'password', 'hsm_password',
+    'secret', 'client_secret',
+    'token',                       # openbao token (NOT token_label)
+    'service_account_json',        # gcp — contains private_key
+    'private_key',
+    'credential', 'access_key_secret',
+})
+# Values the frontend echoes back when an operator did NOT re-type a password
+# (must be preserved as-is, NOT encrypted, NOT stored).
+_MASK_SENTINELS = ('***', '********')
+
+
+def _is_sensitive_key(key: str) -> bool:
+    if not key:
+        return False
+    return key.lower() in _SENSITIVE_KEYS
 
 
 class HsmProvider(db.Model if db else object):
@@ -77,7 +102,7 @@ class HsmProvider(db.Model if db else object):
                 # Mask sensitive fields
                 masked_config = {}
                 for key, value in config.items():
-                    if any(s in key.lower() for s in ['password', 'secret', 'pin', 'key', 'token', 'credential']):
+                    if _is_sensitive_key(key):
                         masked_config[key] = '********' if value else None
                     else:
                         masked_config[key] = value
@@ -142,15 +167,46 @@ class HsmProvider(db.Model if db else object):
         return result
     
     def get_config(self):
-        """Get parsed configuration"""
+        """Get parsed configuration with sensitive fields decrypted."""
         try:
-            return json.loads(self.config)
+            raw = json.loads(self.config)
         except (json.JSONDecodeError, TypeError):
             return {}
-    
+        if not isinstance(raw, dict):
+            return {}
+        decrypted = {}
+        for k, v in raw.items():
+            if _is_sensitive_key(k) and isinstance(v, str) and v:
+                # decrypt_if_needed is a no-op on plaintext (legacy rows pre-v2.152)
+                decrypted[k] = decrypt_if_needed(v)
+            else:
+                decrypted[k] = v
+        return decrypted
+
     def set_config(self, config_dict):
-        """Set configuration from dict"""
-        self.config = json.dumps(config_dict)
+        """Set configuration: encrypt sensitive fields, drop mask sentinels."""
+        if not isinstance(config_dict, dict):
+            self.config = json.dumps({})
+            return
+        out = {}
+        existing = self.get_config() if self.config else {}
+        for k, v in config_dict.items():
+            if _is_sensitive_key(k):
+                # Frontend echoed back a masked sentinel without re-typing the
+                # secret -> preserve the existing (encrypted) value, do NOT
+                # overwrite with '***'.
+                if isinstance(v, str) and v in _MASK_SENTINELS:
+                    if k in existing and existing[k]:
+                        out[k] = encrypt_if_needed(existing[k])
+                    # else: drop, no value to keep
+                    continue
+                if isinstance(v, str) and v:
+                    out[k] = encrypt_if_needed(v)
+                else:
+                    out[k] = v
+            else:
+                out[k] = v
+        self.config = json.dumps(out)
     
     def __repr__(self):
         return f'<HsmProvider {self.name} ({self.type})>'

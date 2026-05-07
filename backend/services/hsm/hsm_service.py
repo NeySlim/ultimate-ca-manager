@@ -124,10 +124,11 @@ class HsmService:
         provider = HsmProvider(
             name=name,
             type=provider_type,
-            config=json.dumps(config),
+            config='{}',
             status='unknown',
             created_by=created_by
         )
+        provider.set_config(config or {})
         
         db.session.add(provider)
         try:
@@ -171,8 +172,11 @@ class HsmService:
                 raise ValueError(f"Provider with name '{name}' already exists")
             provider.name = name
         
-        if config:
-            provider.config = json.dumps(config)
+        if config is not None:
+            # set_config encrypts sensitive fields and drops mask sentinels
+            # ('***'/'********') so an operator updating non-secret fields
+            # via the UI doesn't wipe stored credentials.
+            provider.set_config(config)
             # Reset status when config changes
             provider.status = 'unknown'
             provider.error_message = None
@@ -574,13 +578,14 @@ class HsmService:
             provider = HsmProvider(
                 name='SoftHSM-Default',
                 type='pkcs11',
-                config=json.dumps({
-                    'library_path': lib_path,
-                    'token_label': 'UCM-Default',
-                    'pin': pin,
-                }),
+                config='{}',
                 status='connected',
             )
+            provider.set_config({
+                'library_path': lib_path,
+                'token_label': 'UCM-Default',
+                'pin': pin,
+            })
             db.session.add(provider)
             db.session.commit()
             logger.info("Auto-registered SoftHSM provider 'SoftHSM-Default'")

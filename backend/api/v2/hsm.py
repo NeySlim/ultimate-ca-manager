@@ -13,13 +13,27 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from services.hsm import HsmService
 from services.hsm.base_provider import HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
-from models import db
+from models import db, CA
 from models.hsm import HsmProvider, HsmKey
 from services.audit_service import AuditService
 import logging
 
 bp = Blueprint('hsm_v2', __name__)
 logger = logging.getLogger(__name__)
+
+
+# Maximum data payload accepted by /keys/<id>/sign (after base64 decode).
+# 1 MiB is well above any legitimate signing input (hash, CSR digest, JWS
+# payload) and prevents an authenticated operator from flooding the HSM.
+MAX_SIGN_INPUT_BYTES = 1 * 1024 * 1024
+
+
+def _audit_user():
+    """Return (user_id, username) for AuditService.log_action calls."""
+    user = getattr(g, 'current_user', None)
+    if user is None:
+        return None, None
+    return getattr(user, 'id', None), getattr(user, 'username', None)
 
 
 # =============================================================================
@@ -79,8 +93,8 @@ def create_provider():
         return error_response('Config must be an object', 400)
     
     try:
-        user_id = getattr(g, 'user', {}).get('id') if hasattr(g, 'user') else None
-        
+        user_id, username = _audit_user()
+
         provider = HsmService.create_provider(
             name=name,
             provider_type=provider_type,
@@ -94,7 +108,9 @@ def create_provider():
             resource_id=provider.id,
             resource_name=name,
             details=f'Created HSM provider: {name} ({provider_type})',
-            success=True
+            success=True,
+            user_id=user_id,
+            username=username,
         )
         
         return created_response(data=provider.to_dict())
@@ -104,6 +120,16 @@ def create_provider():
         return error_response('Invalid provider configuration', 400)
     except Exception as e:
         logger.exception(f"Failed to create HSM provider: {name}")
+        user_id, username = _audit_user()
+        AuditService.log_action(
+            action='hsm_provider_created',
+            resource_type='hsm_provider',
+            resource_name=name,
+            details=f'Create failed: {e}',
+            success=False,
+            user_id=user_id,
+            username=username,
+        )
         return error_response('Failed to create provider', 500)
 
 
@@ -158,13 +184,16 @@ def update_provider(provider_id):
             config=config
         )
         
+        user_id, username = _audit_user()
         AuditService.log_action(
             action='hsm_provider_updated',
             resource_type='hsm_provider',
             resource_id=provider_id,
             resource_name=updated.name,
             details=f'Updated HSM provider: {updated.name}',
-            success=True
+            success=True,
+            user_id=user_id,
+            username=username,
         )
         
         return success_response(data=updated.to_dict(include_config=True))
@@ -174,6 +203,17 @@ def update_provider(provider_id):
         return error_response('Invalid provider configuration', 400)
     except Exception as e:
         logger.exception(f"Failed to update HSM provider: {provider_id}")
+        user_id, username = _audit_user()
+        AuditService.log_action(
+            action='hsm_provider_updated',
+            resource_type='hsm_provider',
+            resource_id=provider_id,
+            resource_name=provider.name,
+            details=f'Update failed: {e}',
+            success=False,
+            user_id=user_id,
+            username=username,
+        )
         return error_response('Failed to update provider', 500)
 
 
@@ -186,26 +226,57 @@ def delete_provider(provider_id):
         return error_response('Provider not found', 404)
     
     name = provider.name
-    
+
+    # Block deletion if any CA still references a key from this provider.
+    # Without this check the cascade-delete on hsm_keys would orphan the CA's
+    # hsm_key_id FK and break signing on the next request.
+    bound_cas = (
+        db.session.query(CA.id, CA.descr)
+        .join(HsmKey, CA.hsm_key_id == HsmKey.id)
+        .filter(HsmKey.provider_id == provider_id)
+        .all()
+    )
+    if bound_cas:
+        names = ', '.join(f"#{cid} {cdesc or ''}".strip() for cid, cdesc in bound_cas[:5])
+        more = '' if len(bound_cas) <= 5 else f' (+{len(bound_cas) - 5} more)'
+        return error_response(
+            f"Cannot delete provider: {len(bound_cas)} CA(s) still use its keys: {names}{more}",
+            409,
+        )
+
     try:
         HsmService.delete_provider(provider_id)
-        
+
+        user_id, username = _audit_user()
         AuditService.log_action(
             action='hsm_provider_deleted',
             resource_type='hsm_provider',
             resource_id=provider_id,
             resource_name=name,
             details=f'Deleted HSM provider: {name}',
-            success=True
+            success=True,
+            user_id=user_id,
+            username=username,
         )
-        
+
         return no_content_response()
-        
+
     except ValueError as e:
         logger.warning(f"HSM provider delete validation error: {e}")
         return error_response('Invalid request', 400)
     except Exception as e:
         logger.exception(f"Failed to delete HSM provider: {provider_id}")
+        user_id, username = _audit_user()
+        AuditService.log_action(
+            action='hsm_provider_deleted',
+            resource_type='hsm_provider',
+            resource_id=provider_id,
+            resource_name=name,
+            details=f'Delete failed: {e}',
+            success=False,
+            user_id=user_id,
+            username=username,
+        )
         return error_response('Failed to delete provider', 500)
 
 
@@ -226,7 +297,9 @@ def test_provider(provider_id):
             resource_id=provider_id,
             resource_name=provider.name,
             details=f"HSM test: {'success' if result.get('success') else 'failed'}",
-            success=result.get('success', False)
+            success=result.get('success', False),
+            user_id=_audit_user()[0],
+            username=_audit_user()[1],
         )
         
         return success_response(data=result)
@@ -256,7 +329,9 @@ def sync_provider_keys(provider_id):
             resource_id=provider_id,
             resource_name=provider.name,
             details=f"Synced keys: +{result['added']} -{result['removed']} ={result['unchanged']}",
-            success=True
+            success=True,
+            user_id=_audit_user()[0],
+            username=_audit_user()[1],
         )
         
         return success_response(data=result)
@@ -369,7 +444,9 @@ def generate_key(provider_id):
             resource_id=key.id,
             resource_name=label,
             details=f'Generated HSM key: {label} ({algorithm}) in {provider.name}',
-            success=True
+            success=True,
+            user_id=_audit_user()[0],
+            username=_audit_user()[1],
         )
         
         return created_response(data=key.to_dict())
@@ -407,21 +484,34 @@ def delete_key(key_id):
     
     label = key.label
     provider_name = key.provider.name
-    
+
+    # Block deletion if any CA still references this key.
+    bound = CA.query.filter_by(hsm_key_id=key_id).all()
+    if bound:
+        names = ', '.join(f"#{c.id} {c.descr or ''}".strip() for c in bound[:5])
+        more = '' if len(bound) <= 5 else f' (+{len(bound) - 5} more)'
+        return error_response(
+            f"Cannot delete key: {len(bound)} CA(s) depend on it: {names}{more}",
+            409,
+        )
+
     try:
         HsmService.delete_key(key_id)
-        
+
+        user_id, username = _audit_user()
         AuditService.log_action(
             action='hsm_key_deleted',
             resource_type='hsm_key',
             resource_id=key_id,
             resource_name=label,
             details=f'Deleted HSM key: {label} from {provider_name}',
-            success=True
+            success=True,
+            user_id=user_id,
+            username=username,
         )
-        
+
         return no_content_response()
-        
+
     except HsmError as e:
         logger.error(f"HSM key deletion error: {e}")
         return error_response('HSM key deletion error', 500)
@@ -479,35 +569,76 @@ def sign_data(key_id):
     
     if not data_b64:
         return error_response('Data is required (base64-encoded)', 400)
-    
+
+    if not isinstance(data_b64, str):
+        return error_response('Data must be a base64-encoded string', 400)
+
+    # Cheap pre-decode size guard: base64 expands ~4/3, so reject anything
+    # whose decoded form would exceed MAX_SIGN_INPUT_BYTES before we hand it
+    # to the HSM driver.
+    if len(data_b64) > MAX_SIGN_INPUT_BYTES * 2:
+        return error_response(
+            f'Data too large (max {MAX_SIGN_INPUT_BYTES} bytes after base64 decode)',
+            413,
+        )
+
     try:
         import base64
-        data_bytes = base64.b64decode(data_b64)
+        data_bytes = base64.b64decode(data_b64, validate=True)
     except Exception:
         return error_response('Invalid base64 data', 400)
-    
+
+    if len(data_bytes) > MAX_SIGN_INPUT_BYTES:
+        return error_response(
+            f'Data too large (max {MAX_SIGN_INPUT_BYTES} bytes)',
+            413,
+        )
+
+    user_id, username = _audit_user()
     try:
         signature = HsmService.sign(key_id, data_bytes, algorithm)
-        
+
         import base64
         signature_b64 = base64.b64encode(signature).decode('ascii')
-        
+
         AuditService.log_action(
             action='hsm_key_used_sign',
             resource_type='hsm_key',
             resource_id=key_id,
             resource_name=key.label,
             details=f'Signed {len(data_bytes)} bytes with {key.label}',
-            success=True
+            success=True,
+            user_id=user_id,
+            username=username,
         )
-        
+
         return success_response(data={'signature': signature_b64})
-        
+
     except HsmError as e:
         logger.error(f"HSM signing error: {e}")
+        AuditService.log_action(
+            action='hsm_key_used_sign',
+            resource_type='hsm_key',
+            resource_id=key_id,
+            resource_name=key.label,
+            details=f'Sign failed: {e}',
+            success=False,
+            user_id=user_id,
+            username=username,
+        )
         return error_response('HSM signing operation failed', 500)
     except Exception as e:
         logger.exception(f"Failed to sign with HSM key: {key_id}")
+        AuditService.log_action(
+            action='hsm_key_used_sign',
+            resource_type='hsm_key',
+            resource_id=key_id,
+            resource_name=key.label,
+            details=f'Sign failed: {e}',
+            success=False,
+            user_id=user_id,
+            username=username,
+        )
         return error_response('Failed to sign data', 500)
 
 
