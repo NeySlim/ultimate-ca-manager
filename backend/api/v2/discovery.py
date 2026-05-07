@@ -16,6 +16,43 @@ bp = Blueprint('discovery', __name__)
 import re
 _VALID_TARGET_RE = re.compile(r'^[a-zA-Z0-9._:\-\[\]/]+$')
 
+_MAX_TARGETS_PROFILE = 1000
+_MAX_TARGETS_ADHOC = 500
+_MAX_PORTS = 100
+_MAX_SUBNET_HOSTS = 1024  # /22 IPv4 equivalent — covers v4 AND v6
+
+
+def _validate_targets(targets, cap):
+    if not isinstance(targets, list) or not targets:
+        return False, "Targets must be a non-empty list"
+    if len(targets) > cap:
+        return False, f"Maximum {cap} targets per scan"
+    for t in targets:
+        if not isinstance(t, str) or not _VALID_TARGET_RE.match(t.strip()):
+            return False, "Invalid target format: targets must be hostnames, IPs, or CIDR notation"
+    return True, None
+
+
+def _validate_ports(ports):
+    if not isinstance(ports, list) or not ports:
+        return False, "Ports must be a non-empty list"
+    if len(ports) > _MAX_PORTS:
+        return False, f"Maximum {_MAX_PORTS} ports per scan"
+    for p in ports:
+        if not isinstance(p, int) or isinstance(p, bool) or p < 1 or p > 65535:
+            return False, "Ports must be integers between 1 and 65535"
+    return True, None
+
+
+def _validate_subnet(cidr):
+    try:
+        net = ipaddress.ip_network(cidr, strict=False)
+    except (ValueError, TypeError):
+        return None, "Invalid subnet notation"
+    if net.num_addresses > _MAX_SUBNET_HOSTS:
+        return None, f"Subnet too large (max {_MAX_SUBNET_HOSTS} addresses)"
+    return net, None
+
 
 def _safe_int(val, default, lo=None, hi=None):
     """Safely cast to int with bounds. Returns default on invalid input."""
@@ -73,14 +110,13 @@ def create_profile():
     data = request.get_json()
     if not data or not data.get('name'):
         return error_response("Profile name is required", 400)
-    if not data.get('targets') or not isinstance(data['targets'], list):
-        return error_response("Targets must be a non-empty list", 400)
-    if len(data['targets']) > 1000:
-        return error_response("Maximum 1000 targets per profile", 400)
-    # SEC-10: Validate target format
-    for t in data['targets']:
-        if not isinstance(t, str) or not _VALID_TARGET_RE.match(t.strip()):
-            return error_response(f"Invalid target format: targets must be hostnames, IPs, or CIDR notation", 400)
+    ok, err = _validate_targets(data.get('targets'), _MAX_TARGETS_PROFILE)
+    if not ok:
+        return error_response(err, 400)
+    if 'ports' in data:
+        ok, err = _validate_ports(data['ports'])
+        if not ok:
+            return error_response(err, 400)
     svc = _get_service()
     try:
         profile = svc.create_profile(data)
@@ -112,6 +148,14 @@ def update_profile(profile_id):
     data = request.get_json()
     if not data:
         return error_response("No data provided", 400)
+    if 'targets' in data:
+        ok, err = _validate_targets(data['targets'], _MAX_TARGETS_PROFILE)
+        if not ok:
+            return error_response(err, 400)
+    if 'ports' in data:
+        ok, err = _validate_ports(data['ports'])
+        if not ok:
+            return error_response(err, 400)
     svc = _get_service()
     profile = svc.update_profile(profile_id, data)
     if not profile:
@@ -179,20 +223,20 @@ def ad_hoc_scan():
 
     if not targets and not subnet:
         return error_response("Provide either 'targets' or 'subnet'", 400)
-    if targets and len(targets) > 500:
-        return error_response("Maximum 500 targets per ad-hoc scan", 400)
-    # SEC-10: Validate target format
-    for t in targets:
-        if not isinstance(t, str) or not _VALID_TARGET_RE.match(t.strip()):
-            return error_response("Invalid target format: targets must be hostnames, IPs, or CIDR notation", 400)
+
+    ok, err = _validate_ports(ports)
+    if not ok:
+        return error_response(err, 400)
+
+    if targets:
+        ok, err = _validate_targets(targets, _MAX_TARGETS_ADHOC)
+        if not ok:
+            return error_response(err, 400)
 
     if subnet:
-        try:
-            net = ipaddress.ip_network(subnet, strict=False)
-            if net.prefixlen < 22:
-                return error_response("Subnet too large (max /22)", 400)
-        except ValueError:
-            return error_response("Invalid subnet notation", 400)
+        _net, err = _validate_subnet(subnet)
+        if err:
+            return error_response(err, 400)
 
     svc = _get_service()
     username = g.current_user.username if hasattr(g, 'current_user') else 'unknown'
@@ -338,9 +382,10 @@ def export_discovered():
 
     fmt = request.args.get('format', 'csv')
     profile_id = request.args.get('profile_id', type=int)
-    status = request.args.get('status')
+    status_list = request.args.getlist('status')
     svc = _get_service()
-    items, total = svc.get_all(limit=10000, offset=0, profile_id=profile_id, status=status)
+    items, total = svc.get_all(limit=10000, offset=0, profile_id=profile_id,
+                               status=status_list if status_list else None)
 
     if fmt == 'json':
         import json
