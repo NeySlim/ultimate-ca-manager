@@ -7,6 +7,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils.encryption import encrypt_if_needed
 from models import db
 from services.webhook_service import WebhookEndpoint, WebhookService
 import json
@@ -16,6 +17,45 @@ logger = logging.getLogger(__name__)
 import secrets
 
 bp = Blueprint('webhooks', __name__)
+
+
+# Forbidden custom headers — would let the operator override security-critical
+# fields (Stripe-style attack: replace HMAC, inject Authorization, MITM via Host).
+_FORBIDDEN_HEADER_PREFIXES = ('x-ucm-',)
+_FORBIDDEN_HEADERS = {
+    'content-type', 'user-agent', 'host', 'authorization',
+    'cookie', 'content-length',
+}
+_MAX_EVENTS = 64
+_VALID_EVENTS_LITERAL_STAR = '*'
+
+
+def _validate_events(events):
+    if not isinstance(events, list):
+        return False, 'Events must be an array'
+    if len(events) > _MAX_EVENTS:
+        return False, f'Too many events (max {_MAX_EVENTS})'
+    valid = set(WebhookService.ALL_EVENTS) | {_VALID_EVENTS_LITERAL_STAR}
+    for ev in events:
+        if not isinstance(ev, str):
+            return False, 'Event names must be strings'
+        if ev not in valid:
+            return False, f'Unknown event: {ev}'
+    return True, None
+
+
+def _validate_custom_headers(headers):
+    if headers is None or headers == {}:
+        return True, None
+    if not isinstance(headers, dict):
+        return False, 'Custom headers must be an object'
+    for k, v in headers.items():
+        if not isinstance(k, str) or not isinstance(v, str):
+            return False, 'Header names and values must be strings'
+        kl = k.lower()
+        if kl in _FORBIDDEN_HEADERS or any(kl.startswith(p) for p in _FORBIDDEN_HEADER_PREFIXES):
+            return False, f'Header "{k}" is reserved and cannot be overridden'
+    return True, None
 
 
 @bp.route('/api/v2/webhooks', methods=['GET'])
@@ -60,16 +100,26 @@ def create_webhook():
         return error_response("Webhook URL must not target cloud metadata services or loopback", 400)
     
     events = data.get('events', ['*'])
-    if not isinstance(events, list):
-        return error_response('Events must be an array', 400)
-    custom_headers = data.get('custom_headers', {})
-    if custom_headers and not isinstance(custom_headers, dict):
-        return error_response('Custom headers must be an object', 400)
-    
+    ok, err = _validate_events(events)
+    if not ok:
+        return error_response(err, 400)
+    custom_headers = data.get('custom_headers') or {}
+    ok, err = _validate_custom_headers(custom_headers)
+    if not ok:
+        return error_response(err, 400)
+
+    # Reject empty-string secret (would silently disable HMAC)
+    secret_in = data.get('secret')
+    if secret_in is not None and not isinstance(secret_in, str):
+        return error_response('Secret must be a string', 400)
+    if isinstance(secret_in, str) and not secret_in.strip():
+        return error_response('Secret cannot be empty (omit field for auto-generation)', 400)
+    secret_value = secret_in or secrets.token_urlsafe(32)
+
     endpoint = WebhookEndpoint(
         name=data['name'],
         url=url,
-        secret=data.get('secret') or secrets.token_urlsafe(32),
+        secret=encrypt_if_needed(secret_value),
         events=json.dumps(events),
         ca_filter=data.get('ca_filter'),
         enabled=data.get('enabled', True),
@@ -104,19 +154,24 @@ def update_webhook(endpoint_id):
             return error_response("Webhook URL must not target cloud metadata services or loopback", 400)
         endpoint.url = url
     if 'secret' in data:
-        endpoint.secret = data['secret']
+        secret_in = data['secret']
+        if not isinstance(secret_in, str) or not secret_in.strip():
+            return error_response('Secret must be a non-empty string', 400)
+        endpoint.secret = encrypt_if_needed(secret_in)
     if 'events' in data:
-        if not isinstance(data['events'], list):
-            return error_response('Events must be an array', 400)
+        ok, err = _validate_events(data['events'])
+        if not ok:
+            return error_response(err, 400)
         endpoint.events = json.dumps(data['events'])
     if 'ca_filter' in data:
         endpoint.ca_filter = data['ca_filter']
     if 'enabled' in data:
         endpoint.enabled = data['enabled']
     if 'custom_headers' in data:
-        if data['custom_headers'] and not isinstance(data['custom_headers'], dict):
-            return error_response('Custom headers must be an object', 400)
-        endpoint.custom_headers = json.dumps(data['custom_headers'])
+        ok, err = _validate_custom_headers(data['custom_headers'])
+        if not ok:
+            return error_response(err, 400)
+        endpoint.custom_headers = json.dumps(data['custom_headers'] or {})
     
     ok, _err = safe_commit(logger, "Failed to update webhook")
     if not ok:
@@ -167,13 +222,15 @@ def test_webhook(endpoint_id):
 def regenerate_secret(endpoint_id):
     """Regenerate webhook secret"""
     endpoint = WebhookEndpoint.query.get_or_404(endpoint_id)
-    endpoint.secret = secrets.token_urlsafe(32)
+    new_secret = secrets.token_urlsafe(32)
+    endpoint.secret = encrypt_if_needed(new_secret)
     ok, _err = safe_commit(logger, "Failed to regenerate webhook secret")
     if not ok:
         return _err
-    
+
+    # Return plaintext one time so the operator can configure their receiver
     return success_response(
-        data={'secret': endpoint.secret},
+        data={'secret': new_secret},
         message="Secret regenerated"
     )
 

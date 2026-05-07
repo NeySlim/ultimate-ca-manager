@@ -4,6 +4,7 @@ Sends HTTP notifications for certificate lifecycle events.
 """
 from datetime import datetime
 from models import db, SystemConfig
+from utils.encryption import decrypt_if_needed
 import requests
 import json
 import hmac
@@ -12,6 +13,32 @@ import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
+
+
+# Headers that the operator-supplied custom_headers MUST NOT override
+# (defence in depth — the API layer already filters these on write).
+_RESERVED_HEADER_KEYS = {
+    'content-type', 'user-agent', 'host', 'authorization',
+    'cookie', 'content-length',
+}
+_RESERVED_HEADER_PREFIXES = ('x-ucm-',)
+
+
+def _safe_custom_headers(custom: dict) -> dict:
+    """Strip any reserved/security-critical headers from operator input."""
+    if not isinstance(custom, dict):
+        return {}
+    out = {}
+    for k, v in custom.items():
+        if not isinstance(k, str):
+            continue
+        kl = k.lower()
+        if kl in _RESERVED_HEADER_KEYS:
+            continue
+        if any(kl.startswith(p) for p in _RESERVED_HEADER_PREFIXES):
+            continue
+        out[k] = v
+    return out
 
 
 class WebhookEndpoint(db.Model):
@@ -124,21 +151,22 @@ class WebhookService:
                 'data': payload
             }
             body_json = json.dumps(body, default=str)
-            
-            # Build headers
-            headers = {
+
+            # Custom headers FIRST, so security/identity headers below override
+            # whatever the operator put in (defence in depth).
+            headers = {}
+            headers.update(_safe_custom_headers(endpoint.get_headers()))
+            headers.update({
                 'Content-Type': 'application/json',
                 'User-Agent': 'UCM-Webhook/2.0',
                 'X-UCM-Event': event_type,
-            }
-            
-            # Add custom headers
-            headers.update(endpoint.get_headers())
-            
+            })
+
             # Add HMAC signature if secret configured
-            if endpoint.secret:
+            secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
+            if secret_plain:
                 signature = hmac.new(
-                    endpoint.secret.encode(),
+                    secret_plain.encode(),
                     body_json.encode(),
                     hashlib.sha256
                 ).hexdigest()
@@ -209,16 +237,19 @@ class WebhookService:
                 'data': test_payload
             }
             body_json = json.dumps(body)
-            
-            headers = {
+
+            headers = {}
+            headers.update(_safe_custom_headers(endpoint.get_headers()))
+            headers.update({
                 'Content-Type': 'application/json',
                 'User-Agent': 'UCM-Webhook/2.0',
                 'X-UCM-Event': 'test',
-            }
-            
-            if endpoint.secret:
+            })
+
+            secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
+            if secret_plain:
                 signature = hmac.new(
-                    endpoint.secret.encode(),
+                    secret_plain.encode(),
                     body_json.encode(),
                     hashlib.sha256
                 ).hexdigest()

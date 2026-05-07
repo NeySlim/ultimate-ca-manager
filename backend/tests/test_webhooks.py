@@ -100,7 +100,7 @@ class TestWebhookCRUD:
         r = post_json(auth_client, WH, {
             'name': 'Test Hook',
             'url': 'https://hook.example.com/test',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         data = assert_success(r)
         assert data.get('name') == 'Test Hook'
@@ -127,7 +127,7 @@ class TestWebhookCRUD:
         r = post_json(auth_client, WH, {
             'name': 'Update Test',
             'url': 'https://hook.example.com/update-test',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         created = assert_success(r)
         wh_id = created['id']
@@ -144,7 +144,7 @@ class TestWebhookCRUD:
         r = post_json(auth_client, WH, {
             'name': 'Toggle Test',
             'url': 'https://hook.example.com/toggle-test',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         created = assert_success(r)
         wh_id = created['id']
@@ -159,7 +159,7 @@ class TestWebhookCRUD:
         r = post_json(auth_client, WH, {
             'name': 'Webhook Test Target',
             'url': 'https://hook.example.com/test-target',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         created = assert_success(r)
         wh_id = created['id']
@@ -173,7 +173,7 @@ class TestWebhookCRUD:
         r = post_json(auth_client, WH, {
             'name': 'Secret Regen Test',
             'url': 'https://hook.example.com/regen-test',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         created = assert_success(r)
         wh_id = created['id']
@@ -186,7 +186,7 @@ class TestWebhookCRUD:
         r = post_json(auth_client, WH, {
             'name': 'Delete Test',
             'url': 'https://hook.example.com/delete-test',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         created = assert_success(r)
         wh_id = created['id']
@@ -209,14 +209,14 @@ class TestWebhookValidation:
     def test_create_missing_name(self, auth_client):
         r = post_json(auth_client, WH, {
             'url': 'https://hook.example.com/no-name',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         assert_error(r, 400)
 
     def test_create_missing_url(self, auth_client):
         r = post_json(auth_client, WH, {
             'name': 'No URL Hook',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         assert_error(r, 400)
 
@@ -224,7 +224,7 @@ class TestWebhookValidation:
         r = post_json(auth_client, WH, {
             'name': 'Bad URL Hook',
             'url': 'ftp://not-http.example.com',
-            'events': ['certificate.created']
+            'events': ['certificate.issued']
         })
         assert_error(r, 400)
 
