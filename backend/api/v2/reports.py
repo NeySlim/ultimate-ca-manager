@@ -64,6 +64,8 @@ def generate_report():
     params = data.get('params', {})
     if params and not isinstance(params, dict):
         return error_response('Params must be an object', 400)
+    if isinstance(params, dict) and len(params) > 50:
+        return error_response('Too many parameters (max 50)', 400)
     
     try:
         report = ReportService.generate_report(report_type, params)
