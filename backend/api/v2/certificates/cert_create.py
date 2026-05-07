@@ -160,30 +160,48 @@ def create_certificate():
         key_type = data.get('key_type', 'RSA')
         key_size = data.get('key_size', '2048')
 
-        # Validate RSA key size
-        if key_type.upper() not in ('EC', 'ECDSA'):
-            if int(key_size) < 2048:
-                return error_response('RSA key size must be at least 2048 bits', 400)
+        # Whitelist allowed RSA sizes / EC curves (security: prevent weak or absurdly large keys)
+        ALLOWED_RSA = (2048, 3072, 4096)
+        ALLOWED_CURVES = {'secp256r1', 'prime256v1', 'secp384r1', 'secp521r1'}
 
         if key_type.upper() in ('EC', 'ECDSA'):
-            # Map key_size to curve name if needed
             curve_map = {
                 '256': 'secp256r1', 'prime256v1': 'secp256r1', 'secp256r1': 'secp256r1',
                 '384': 'secp384r1', 'secp384r1': 'secp384r1',
                 '521': 'secp521r1', 'secp521r1': 'secp521r1',
             }
-            curve_name = curve_map.get(str(key_size), data.get('curve', 'secp256r1'))
+            ks_str = str(key_size).strip()
+            # If key_size looks like a curve name but isn't a known one, reject (don't silently fallback)
+            if ks_str and (ks_str.lower().startswith(('secp', 'prime', 'p-', 'p2', 'p3', 'p5')) or ks_str.isdigit()):
+                if ks_str not in curve_map:
+                    return error_response(
+                        f"Unsupported EC curve '{ks_str}'. Allowed: {sorted(ALLOWED_CURVES)}", 400)
+                curve_name = curve_map[ks_str]
+            else:
+                curve_name = data.get('curve', 'secp256r1')
+            if curve_name not in ALLOWED_CURVES:
+                return error_response(
+                    f"Unsupported EC curve '{curve_name}'. Allowed: {sorted(ALLOWED_CURVES)}", 400)
             curves = {
                 'secp256r1': ec.SECP256R1(),
+                'prime256v1': ec.SECP256R1(),
                 'secp384r1': ec.SECP384R1(),
                 'secp521r1': ec.SECP521R1(),
             }
-            curve = curves.get(curve_name, ec.SECP256R1())
+            curve = curves[curve_name]
             new_key = ec.generate_private_key(curve, default_backend())
         else:
+            try:
+                key_size_int = int(key_size)
+            except (TypeError, ValueError):
+                return error_response(
+                    f"Invalid key_size '{key_size}'. Allowed RSA sizes: {list(ALLOWED_RSA)}", 400)
+            if key_size_int not in ALLOWED_RSA:
+                return error_response(
+                    f"RSA key_size {key_size_int} not allowed. Allowed: {list(ALLOWED_RSA)}", 400)
             new_key = rsa.generate_private_key(
                 public_exponent=65537,
-                key_size=int(key_size),
+                key_size=key_size_int,
                 backend=default_backend()
             )
 
@@ -204,11 +222,24 @@ def create_certificate():
 
         subject = x509.Name(subject_attrs)
 
-        # Validity
-        validity_days = data.get('validity_days', 365)
+        # Validity (cap 1..3650 days; reject 0/negative/non-int)
+        MAX_VALIDITY_DAYS = 3650  # ~10 years; CA/B Forum is 398 for public TLS, 3650 OK for internal PKI
+        try:
+            validity_days = int(data.get('validity_days', 365))
+        except (TypeError, ValueError):
+            return error_response("validity_days must be an integer (1..3650)", 400)
+        if validity_days < 1 or validity_days > MAX_VALIDITY_DAYS:
+            return error_response(
+                f"validity_days must be between 1 and {MAX_VALIDITY_DAYS}", 400)
         now = utc_now()
         not_before = now
         not_after = now + timedelta(days=validity_days)
+
+        # Cert validity must not exceed CA cert validity
+        ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
+        if not_after > ca_not_after:
+            return error_response(
+                f"validity_days exceeds CA expiration ({ca_not_after.isoformat()})", 400)
 
         # Build certificate
         builder = x509.CertificateBuilder()

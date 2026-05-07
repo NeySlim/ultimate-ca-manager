@@ -89,13 +89,19 @@ def renew_certificate(cert_id):
                 backend=default_backend()
             )
 
-        # Calculate new validity (same duration as original, starting now)
+        # Calculate new validity (same duration as original, starting now; cap 1..3650)
         orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
         validity_days = orig_duration.days if orig_duration.days > 0 else 365
+        if validity_days > 3650:
+            validity_days = 3650
 
         now = utc_now()
         not_before = now
         not_after = now + timedelta(days=validity_days)
+        # Don't exceed CA expiration
+        ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
+        if not_after > ca_not_after:
+            not_after = ca_not_after
 
         # Build new certificate with same subject and extensions
         builder = x509.CertificateBuilder()

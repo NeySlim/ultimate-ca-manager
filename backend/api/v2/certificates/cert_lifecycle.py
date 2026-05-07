@@ -138,30 +138,33 @@ def unhold_certificate(cert_id):
         db.session.commit()
 
         # Audit log
-        AuditService.log(
-            action='certificate.unheld',
+        AuditService.log_action(
+            action='certificate_unheld',
             resource_type='certificate',
-            resource_id=cert.id,
+            resource_id=str(cert.id),
             resource_name=cert.descr or cert.refid,
-            username=username,
-            details=f'Certificate hold removed, restored to valid status'
+            details='Certificate hold removed, restored to valid status',
+            success=True
         )
 
         # Regenerate CRL for the issuing CA
         try:
-            if cert.ca_id:
-                from services.crl_service import CRLService
-                CRLService.generate_crl(cert.ca_id, username=username)
-                logger.info(f"Regenerated CRL for CA {cert.ca_id} after unhold")
+            if cert.caref:
+                ca = CA.query.filter_by(refid=cert.caref).first()
+                if ca:
+                    from services.crl_service import CRLService
+                    CRLService.generate_crl(ca.id, username=username)
+                    logger.info(f"Regenerated CRL for CA {ca.id} after unhold")
         except Exception as e:
             logger.warning(f"Failed to regenerate CRL after unhold: {e}")
 
         # Invalidate OCSP cache for this cert
         try:
-            OCSPResponse.query.filter_by(cert_serial=cert.serial).delete()
-            db.session.commit()
+            if cert.serial_number:
+                OCSPResponse.query.filter_by(cert_serial=cert.serial_number).delete()
+                db.session.commit()
         except Exception:
-            pass
+            db.session.rollback()
 
         return success_response(
             data=cert.to_dict(),

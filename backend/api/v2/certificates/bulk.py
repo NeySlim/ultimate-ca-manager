@@ -114,7 +114,13 @@ def bulk_renew_certificates():
 
             orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
             validity_days = orig_duration.days if orig_duration.days > 0 else 365
+            if validity_days > 3650:
+                validity_days = 3650
             now = utc_now()
+            not_after = now + timedelta(days=validity_days)
+            ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
+            if not_after > ca_not_after:
+                not_after = ca_not_after
 
             builder = (x509.CertificateBuilder()
                 .subject_name(orig_cert.subject)
@@ -122,7 +128,7 @@ def bulk_renew_certificates():
                 .public_key(new_key.public_key())
                 .serial_number(x509.random_serial_number())
                 .not_valid_before(now)
-                .not_valid_after(now + timedelta(days=validity_days)))
+                .not_valid_after(not_after))
 
             for ext in orig_cert.extensions:
                 if ext.oid in (ExtensionOID.AUTHORITY_KEY_IDENTIFIER, ExtensionOID.SUBJECT_KEY_IDENTIFIER):
@@ -143,7 +149,7 @@ def bulk_renew_certificates():
             cert.prv = base64.b64encode(new_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption())).decode()
             cert.serial_number = format(new_cert.serial_number, 'x')
             cert.valid_from = now
-            cert.valid_to = now + timedelta(days=validity_days)
+            cert.valid_to = not_after
             cert.revoked = False
             cert.revoked_at = None
             cert.revoke_reason = None
