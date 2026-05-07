@@ -17,6 +17,18 @@ from services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 
+def _is_last_active_admin(user):
+    """True iff this user is the only remaining active admin."""
+    if not user or user.role != 'admin' or not user.active:
+        return False
+    others = User.query.filter(
+        User.id != user.id,
+        User.role == 'admin',
+        User.active.is_(True),
+    ).count()
+    return others == 0
+
+
 @bp.route('/api/v2/users/<int:user_id>/reset-password', methods=['POST'])
 @require_auth(['write:users'])
 def reset_user_password(user_id):
@@ -40,6 +52,13 @@ def reset_user_password(user_id):
 
     if not data.get('new_password'):
         return error_response('New password is required', 400)
+
+    # SECURITY: Self-reset must prove knowledge of the current password
+    # (otherwise a stolen session = silent password rotation = full takeover)
+    if g.current_user.id == user_id:
+        current = data.get('current_password') or data.get('old_password')
+        if not current or not user.check_password(current):
+            return error_response('Current password is required', 400)
 
     # SECURITY: Validate password strength
     is_valid, error_msg = validate_password_strength(data['new_password'])
@@ -98,6 +117,10 @@ def toggle_user_status(user_id):
     user = User.query.get(user_id)
     if not user:
         return error_response('User not found', 404)
+
+    # Preserve at least one active admin (toggling the last admin off = lockout)
+    if user.active and _is_last_active_admin(user):
+        return error_response('Cannot deactivate the last active admin', 409)
 
     # Toggle status
     user.active = not user.active

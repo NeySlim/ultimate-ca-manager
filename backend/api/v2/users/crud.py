@@ -14,6 +14,18 @@ from services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 
+def _is_last_active_admin(user):
+    """True iff this user is the only remaining active admin."""
+    if not user or user.role != 'admin' or not user.active:
+        return False
+    others = User.query.filter(
+        User.id != user.id,
+        User.role == 'admin',
+        User.active.is_(True),
+    ).count()
+    return others == 0
+
+
 @bp.route('/api/v2/users', methods=['GET'])
 @require_auth(['read:users'])
 def list_users():
@@ -221,6 +233,12 @@ def update_user(user_id):
         valid_roles = ['admin', 'operator', 'auditor', 'viewer']
         if data['role'] not in valid_roles:
             return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
+        # Block self-demotion away from admin (operator-level lockout risk)
+        if g.current_user.id == user_id and user.role == 'admin' and data['role'] != 'admin':
+            return error_response('Cannot demote your own admin account', 403)
+        # Preserve at least one active admin
+        if user.role == 'admin' and data['role'] != 'admin' and _is_last_active_admin(user):
+            return error_response('Cannot demote the last active admin', 409)
         user.role = data['role']
 
     # SECURITY: Only admins can assign custom roles
@@ -242,7 +260,14 @@ def update_user(user_id):
     if 'active' in data:
         if g.current_user.role != 'admin':
             return error_response('Only admins can change active status', 403)
-        user.active = bool(data['active'])
+        new_active = bool(data['active'])
+        # Block self-disable (lockout risk)
+        if g.current_user.id == user_id and not new_active:
+            return error_response('Cannot disable your own account', 403)
+        # Preserve at least one active admin
+        if not new_active and _is_last_active_admin(user):
+            return error_response('Cannot disable the last active admin', 409)
+        user.active = new_active
 
     # Update password if provided
     if 'password' in data and data['password']:
@@ -250,6 +275,12 @@ def update_user(user_id):
         is_valid, error_msg = validate_password_strength(data['password'])
         if not is_valid:
             return error_response(error_msg, 400)
+        # SECURITY: Self-password change requires current-password proof
+        # (defends against stolen-cookie / XSS account takeover)
+        if g.current_user.id == user_id:
+            current = data.get('current_password') or data.get('old_password')
+            if not current or not user.check_password(current):
+                return error_response('Current password is required', 400)
         user.set_password(data['password'])
 
     try:
@@ -292,6 +323,10 @@ def delete_user(user_id):
     user = db.session.get(User, user_id)
     if not user:
         return error_response('User not found', 404)
+
+    # Preserve at least one active admin (deactivating last admin = lockout)
+    if _is_last_active_admin(user):
+        return error_response('Cannot deactivate the last active admin', 409)
 
     # Soft delete
     username = user.username
@@ -349,6 +384,9 @@ def bulk_delete_users():
             user = db.session.get(User, user_id)
             if not user:
                 results['failed'].append({'id': user_id, 'error': 'Not found'})
+                continue
+            if _is_last_active_admin(user):
+                results['failed'].append({'id': user_id, 'error': 'Cannot deactivate the last active admin'})
                 continue
             user.active = False
             db.session.commit()
