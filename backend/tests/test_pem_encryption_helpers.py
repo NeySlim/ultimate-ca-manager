@@ -139,11 +139,13 @@ def test_decrypt_text_passes_legacy_plaintext_through(encryption_enabled):
     assert decrypt_text(pem) == pem
 
 
-def test_encrypt_text_is_noop_when_encryption_disabled(monkeypatch):
+def test_encrypt_text_is_noop_when_encryption_disabled(monkeypatch, tmp_path):
     """When KeyEncryption isn't enabled, encrypt_text must not transform input
     (so existing installs without master.key keep working)."""
     from security import encryption as enc_mod
     monkeypatch.delenv("KEY_ENCRYPTION_KEY", raising=False)
+    # Point MASTER_KEY_PATH to a nonexistent file so _initialize() falls through
+    monkeypatch.setattr(enc_mod, "MASTER_KEY_PATH", tmp_path / "nope.key")
     # Force a reload with no key material
     enc_mod.KeyEncryption().reload()
     assert not enc_mod.KeyEncryption().is_enabled

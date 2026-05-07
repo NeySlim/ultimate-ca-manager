@@ -101,7 +101,12 @@ class TestAccountKeyBinding:
             key = svc._get_account_key()
             assert key is not None
             assert svc.account.account_key  # populated
-            assert svc.account.account_key.startswith(('ENC:', '-----BEGIN'))
+            # encrypt_text returns base64(ENC:fernet_token) when enabled, raw PEM otherwise.
+            from security.encryption import key_encryption
+            if key_encryption.is_enabled:
+                assert key_encryption.is_string_encrypted(svc.account.account_key)
+            else:
+                assert svc.account.account_key.startswith('-----BEGIN')
             # Legacy SystemConfig keys MUST NOT be created by the new flow
             legacy = SystemConfig.query.filter_by(
                 key='acme.client.staging.account_key'
