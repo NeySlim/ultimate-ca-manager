@@ -120,13 +120,34 @@ def new_account():
     The proxy stores client accounts locally for JWS verification on
     subsequent requests, while using a shared upstream account for
     actual certificate issuance.
+
+    Issue #112: enforce local UCM EAB policy here, BEFORE creating the
+    account. Upstream LE doesn't require EAB so we cannot rely on it.
     """
+    from models import SystemConfig
+
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
     if not jwk:
         return proxy_error("malformed", "Missing JWK in protected header")
+
+    # === EAB enforcement (issue #112) ===
+    eab_data = payload.get('externalAccountBinding') if isinstance(payload, dict) else None
+    eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
+    eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
+
+    if eab_required and not eab_data:
+        return proxy_error('externalAccountRequired',
+                           'External account binding required', 400)
+
+    if eab_data:
+        acme_svc = AcmeService()
+        eab_valid, eab_err = acme_svc.validate_eab(eab_data, jwk)
+        if not eab_valid:
+            return proxy_error('malformed',
+                               f'Invalid external account binding: {eab_err}', 400)
 
     try:
         acme_svc = AcmeService()
@@ -135,6 +156,18 @@ def new_account():
             contact=payload.get("contact", []),
             terms_of_service_agreed=payload.get("termsOfServiceAgreed", False)
         )
+
+        # Mark EAB credential as used (one-shot binding)
+        if eab_data and is_new:
+            try:
+                eab_protected = json.loads(
+                    base64.urlsafe_b64decode(eab_data['protected'] + '==')
+                )
+                eab_kid = eab_protected.get('kid', '')
+                if eab_kid:
+                    acme_svc.mark_eab_used(eab_kid, account.account_id)
+            except Exception as e:
+                logger.warning(f"Could not mark EAB credential used: {e}")
 
         acct_url = f"{request.scheme}://{request.host}/acme/proxy/acct/{account.account_id}"
 

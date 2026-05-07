@@ -375,9 +375,11 @@ def new_account():
     service = get_acme_service()
     
     try:
-        # Parse JWS (JSON Web Signature)
-        jws_data = request.get_json()
-        
+        # Parse JWS (JSON Web Signature). force=True so we accept
+        # application/jose+json (RFC 8555 §6.2). silent=True so empty/
+        # invalid body returns None instead of raising 500.
+        jws_data = request.get_json(force=True, silent=True)
+
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         

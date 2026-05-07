@@ -376,16 +376,28 @@ class AcmeProxyService:
     # --- Proxy Methods ---
 
     def get_directory(self):
-        """Return proxy directory"""
+        """Return proxy directory.
+
+        Override upstream meta.externalAccountRequired with local UCM EAB
+        policy so clients (win-acme, certbot, acme.sh) know they MUST send
+        an externalAccountBinding when registering against this proxy.
+        Issue #112: previously the proxy passed upstream's meta as-is, which
+        for Let's Encrypt does not require EAB, so clients sent registrations
+        without EAB and were accepted.
+        """
+        from models import SystemConfig
         self._ensure_directory()
-        # Map upstream keys to proxy URLs
+        meta = dict(self.directory.get('meta', {}))
+        eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
+        eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
+        meta['externalAccountRequired'] = eab_required
         return {
             "newNonce": f"{self.base_url}/acme/proxy/new-nonce",
             "newAccount": f"{self.base_url}/acme/proxy/new-account",
             "newOrder": f"{self.base_url}/acme/proxy/new-order",
             "revokeCert": f"{self.base_url}/acme/proxy/revoke-cert",
             "keyChange": f"{self.base_url}/acme/proxy/key-change",
-            "meta": self.directory.get('meta', {})
+            "meta": meta,
         }
 
     def new_nonce(self):
