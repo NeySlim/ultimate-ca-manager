@@ -192,7 +192,14 @@ def cleanup_logs():
         retention_days: Days to keep (default: 90, min: 30)
     """
     data = request.json or {}
-    retention_days = max(data.get('retention_days', 90), 30)
+    raw = data.get('retention_days', 90)
+    try:
+        retention_days = int(raw)
+    except (TypeError, ValueError):
+        return error_response("retention_days must be an integer", 400)
+    # Floor: 30 days (don't let an operator wipe yesterday's audit trail).
+    # Ceiling: 3650 days (10 years; anything higher is effectively "never").
+    retention_days = max(30, min(retention_days, 3650))
     
     deleted = AuditService.cleanup_old_logs(retention_days=retention_days)
     

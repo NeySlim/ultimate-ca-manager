@@ -4,6 +4,7 @@ from typing import Optional
 from flask import request, g, has_request_context
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
+from utils.trusted_proxy import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +33,11 @@ class AuditCoreLoggingMixin:
             ip_address = None
             user_agent = None
             if in_request:
-                ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
-                if ip_address and ',' in ip_address:
-                    ip_address = ip_address.split(',')[0].strip()
+                # Use trusted-proxy gating: only honor X-Forwarded-For when
+                # the immediate peer is in UCM_TRUSTED_PROXIES. Prevents
+                # spoofed XFF from arbitrary clients ending up in the audit
+                # trail as if it were the real source.
+                ip_address = client_ip()
                 user_agent = request.headers.get('User-Agent', '')[:500]
 
             if not username:
@@ -102,7 +105,12 @@ class AuditCoreLoggingMixin:
             return {'valid': True, 'checked': 0, 'errors': []}
 
         errors = []
-        prev_hash = '0' * 64
+        # The first log in the verified range may NOT chain back to the
+        # genesis (prev_hash = '0' * 64) when audit cleanup has purged
+        # earlier records. Treat its stored prev_hash as the chain anchor
+        # for this verification window — we can only attest integrity
+        # of records that still exist.
+        prev_hash = logs[0].prev_hash or '0' * 64
 
         for log in logs:
             if not log.entry_hash:

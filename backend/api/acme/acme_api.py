@@ -31,16 +31,15 @@ def _audit_acme(action: str, *, resource_type: str, resource_id, details: str = 
     """
     try:
         from services.audit_service import AuditService
-        ip = (request.headers.get('X-Forwarded-For')
-              or request.remote_addr or '').split(',')[0].strip()
+        # IP/UA are auto-captured by AuditService from the request context
+        # via utils.trusted_proxy.client_ip() — only honors X-Forwarded-For
+        # when the immediate peer is a configured trusted proxy.
         AuditService.log_action(
             username='acme',
             action=action,
             resource_type=resource_type,
             resource_id=str(resource_id) if resource_id is not None else None,
             details=details,
-            ip_address=ip or None,
-            user_agent=request.headers.get('User-Agent'),
             success=success,
         )
     except Exception as audit_err:  # pragma: no cover - audit must never break ACME
