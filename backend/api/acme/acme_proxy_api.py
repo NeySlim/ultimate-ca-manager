@@ -256,6 +256,8 @@ def authz(authz_id):
 
         data, _ = result
         return proxy_response(data)
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
     except RuntimeError as e:
         logger.warning(f"ACME proxy authz: {e}")
         return proxy_error("unsupportedIdentifier", str(e))
@@ -278,6 +280,8 @@ def challenge(chall_id):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
     except RuntimeError as e:
         logger.warning(f"ACME proxy challenge: {e}")
         detail = str(e)
@@ -310,6 +314,8 @@ def get_order(order_id):
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
         return resp
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
     except Exception as e:
         logger.error(f"ACME proxy get-order error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)
@@ -321,6 +327,20 @@ def finalize(order_id):
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
+
+    # Extract requester account_id from JWS kid for ownership check
+    requester_account_id = None
+    try:
+        jws_data = request.get_json(silent=True) or {}
+        protected_b64 = jws_data.get('protected', '')
+        if protected_b64:
+            protected_b64 += '=' * (-len(protected_b64) % 4)
+            protected = json.loads(base64.urlsafe_b64decode(protected_b64))
+            kid = protected.get('kid', '')
+            if kid:
+                requester_account_id = kid.rstrip('/').rsplit('/', 1)[-1]
+    except Exception:
+        pass
 
     try:
         csr_b64 = payload.get('csr')
@@ -334,12 +354,17 @@ def finalize(order_id):
         csr_pem = csr_obj.public_bytes(serialization.Encoding.PEM).decode()
 
         svc = get_proxy_service()
-        data = svc.finalize_order(order_id, csr_pem)
+        data = svc.finalize_order(order_id, csr_pem,
+                                  requester_account_id=requester_account_id)
 
         order_url = f"{request.scheme}://{request.host}/acme/proxy/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
         return resp
+    except PermissionError as e:
+        return proxy_error("unauthorized", str(e), 403)
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
     except Exception as e:
         logger.error(f"ACME proxy finalize error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)
@@ -367,6 +392,8 @@ def cert(cert_id):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
     except Exception as e:
         logger.error(f"ACME proxy cert error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)

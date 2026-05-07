@@ -62,6 +62,33 @@ class AcmeProxyService:
         config = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
         return config.value if config and config.value else self.DEFAULT_UPSTREAM
 
+    def _decode_proxy_id(self, id_b64: str) -> str:
+        """Decode a client-supplied proxy ID (base64url of upstream URL) and
+        validate that the URL targets the configured upstream ACME host.
+
+        This prevents SSRF / credential-relay attacks where a malicious client
+        crafts an ID that decodes to an arbitrary URL — `_post_with_account`
+        would otherwise sign a JWS with the upstream account key and POST it
+        to that URL, leaking credentials.
+        """
+        from urllib.parse import urlparse
+        try:
+            id_b64_padded = id_b64 + '=' * (-len(id_b64) % 4)
+            url = base64.urlsafe_b64decode(id_b64_padded).decode('utf-8', errors='strict')
+        except Exception:
+            raise ValueError("Invalid proxy ID encoding")
+        parsed = urlparse(url)
+        if parsed.scheme not in ('https',):
+            raise ValueError("Proxy ID does not target https")
+        upstream_host = urlparse(self.upstream_directory_url).hostname
+        if not upstream_host or parsed.hostname != upstream_host:
+            logger.warning(
+                "ACME proxy: rejected ID with foreign host %s (expected %s)",
+                parsed.hostname, upstream_host
+            )
+            raise ValueError("Proxy ID host does not match upstream ACME server")
+        return url
+
     @staticmethod
     def _get_verify_ssl() -> bool:
         """Get proxy upstream TLS verification setting (default: True)."""
@@ -525,9 +552,8 @@ class AcmeProxyService:
         from api.v2.acme_domains import find_provider_for_domain
         from models import AcmeClientOrder
         
-        # Fix padding
-        authz_id_b64 += '=' * (4 - len(authz_id_b64) % 4)
-        authz_url = base64.urlsafe_b64decode(authz_id_b64).decode()
+        # Fix padding + validate upstream host (anti-SSRF)
+        authz_url = self._decode_proxy_id(authz_id_b64)
         
         resp = self._post_with_account(authz_url, "")
         
@@ -614,8 +640,7 @@ class AcmeProxyService:
         from api.v2.acme_domains import find_provider_for_domain
         from models import AcmeClientOrder
         
-        chall_id_b64_padded = chall_id_b64 + '=' * (4 - len(chall_id_b64) % 4)
-        chall_url = base64.urlsafe_b64decode(chall_id_b64_padded).decode()
+        chall_url = self._decode_proxy_id(chall_id_b64)
         
         # Fetch the challenge to get token and status
         resp = self._post_with_account(chall_url, "")
@@ -839,8 +864,7 @@ class AcmeProxyService:
 
     def get_order(self, order_id_b64):
         """Get order status (POST-as-GET)"""
-        order_id_b64_padded = order_id_b64 + '=' * (4 - len(order_id_b64) % 4)
-        order_url = base64.urlsafe_b64decode(order_id_b64_padded).decode()
+        order_url = self._decode_proxy_id(order_id_b64)
         
         resp = self._post_with_account(order_url, "")
         if resp.status_code != 200:
@@ -865,10 +889,28 @@ class AcmeProxyService:
             
         return order
 
-    def finalize_order(self, order_id_b64, csr_pem):
-        """Proxy finalize"""
-        order_id_b64 += '=' * (4 - len(order_id_b64) % 4)
-        order_url = base64.urlsafe_b64decode(order_id_b64).decode()
+    def finalize_order(self, order_id_b64, csr_pem, requester_account_id=None):
+        """Proxy finalize.
+
+        If requester_account_id is provided, verify it matches the local
+        AcmeClientOrder.account_id (set when the order was created from this
+        same client's JWK thumbprint). Mismatch → PermissionError → ACME 403.
+        """
+        from models import AcmeClientOrder
+
+        order_url = self._decode_proxy_id(order_id_b64)
+
+        if requester_account_id:
+            local_order = AcmeClientOrder.query.filter_by(
+                upstream_order_url=order_url, is_proxy_order=True
+            ).first()
+            if local_order and local_order.account_id and \
+                    local_order.account_id != requester_account_id:
+                logger.warning(
+                    "ACME proxy finalize: account %s tried to finalize order owned by %s",
+                    requester_account_id, local_order.account_id
+                )
+                raise PermissionError("Order does not belong to this account")
         
         # ACME expects CSR in base64url-encoded DER (without headers) inside JSON
         # We assume csr_pem comes from our API handler which decoded the client's JWS
@@ -929,8 +971,7 @@ class AcmeProxyService:
         from services.acme.dns_providers import create_provider
         from services.cert_service import CertificateService
         
-        cert_id_b64_padded = cert_id_b64 + '=' * (4 - len(cert_id_b64) % 4)
-        cert_url = base64.urlsafe_b64decode(cert_id_b64_padded).decode()
+        cert_url = self._decode_proxy_id(cert_id_b64)
         
         resp = self._post_with_account(cert_url, "")
         
