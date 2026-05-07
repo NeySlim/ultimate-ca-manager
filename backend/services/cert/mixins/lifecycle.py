@@ -306,18 +306,22 @@ class LifecycleMixin:
                 # Log error but don't fail revocation
                 AuditService.log_ca('crl_auto_generation_failed', ca, f'Failed to auto-generate CRL after revocation: {str(e)}', success=False)
 
-        # Invalidate OCSP cache if CA has OCSP enabled
+        # Invalidate OCSP cache if CA has OCSP enabled (RFC 6960 §2.2:
+        # revocation MUST take effect immediately for new responses).
         if ca and ca.ocsp_enabled:
             try:
                 from models import OCSPResponse
-                # Delete cached OCSP response for this certificate
-                OCSPResponse.query.filter_by(
-                    ca_id=ca.id,
-                    cert_serial=certificate.serial
-                ).delete()
-                db.session.commit()
-                logger.info(f"Invalidated OCSP cache for certificate {certificate.refid}")
+                from utils.serial_format import serial_to_hex
+                serial_hex = serial_to_hex(certificate.serial_number)
+                if serial_hex:
+                    OCSPResponse.query.filter_by(
+                        ca_id=ca.id,
+                        cert_serial=serial_hex
+                    ).delete()
+                    db.session.commit()
+                    logger.info(f"Invalidated OCSP cache for certificate {certificate.refid}")
             except Exception as e:
+                db.session.rollback()
                 logger.error(f"Failed to invalidate OCSP cache: {e}")
 
         return certificate

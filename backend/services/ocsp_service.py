@@ -171,6 +171,23 @@ class OCSPService:
             except x509.ExtensionNotFound:
                 logger.warning(f"Delegated responder cert {responder_cert_id} has no EKU extension")
                 return None, None
+
+            # RFC 6960 §4.2.2.2.1: a delegated responder cert SHOULD include
+            # the id-pkix-ocsp-nocheck extension so clients know not to
+            # check its revocation status (which would loop). We refuse to
+            # use a responder cert without it — clients will reject the
+            # response anyway and fall through to the CA-signed path is
+            # preferable to silently producing unverifiable responses.
+            try:
+                resp_cert.extensions.get_extension_for_oid(
+                    x509.ObjectIdentifier('1.3.6.1.5.5.7.48.1.5')
+                )
+            except x509.ExtensionNotFound:
+                logger.warning(
+                    f"Delegated responder cert {responder_cert_id} missing "
+                    f"id-pkix-ocsp-nocheck extension; refusing to use it"
+                )
+                return None, None
             
             # Load responder private key
             try:
@@ -223,9 +240,13 @@ class OCSPService:
             signing_cert = responder_cert if use_delegated else ca_cert
             signing_key = responder_key if use_delegated else ca_key
             
-            # Find certificate in database
+            # Find certificate in database. RFC 6960 sends the serial as an
+            # ASN.1 INTEGER; UCM stores serials as the decimal string form
+            # (Certificate.serial_number) while the OCSP cache uses the
+            # lowercase hex form. Convert accordingly.
+            cert_serial_dec = str(cert_serial)
             cert_serial_hex = format(cert_serial, 'x')
-            certificate = Certificate.query.filter_by(serial_number=cert_serial_hex).first()
+            certificate = Certificate.query.filter_by(serial_number=cert_serial_dec).first()
             
             # Determine certificate status
             if not certificate:
@@ -294,7 +315,13 @@ class OCSPService:
             builder = builder.responder_id(
                 ocsp.OCSPResponderEncoding.HASH, signing_cert
             )
-            
+
+            # RFC 6960 §4.2.2.3: when signed by a delegated responder, the
+            # response MUST include the responder's certificate so the
+            # client can verify the signature without a separate fetch.
+            if use_delegated:
+                builder = builder.certificates([signing_cert])
+
             # Add nonce if provided (replay protection)
             if request_nonce:
                 builder = builder.add_extension(

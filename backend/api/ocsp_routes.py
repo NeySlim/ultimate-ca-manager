@@ -121,7 +121,10 @@ def _process_ocsp_request(request_der: bytes) -> Response:
         return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
 
     cert_serial_hex = format(cert_serial, 'x')
-    cached = ocsp_service.get_cached_response(ca.id, cert_serial_hex)
+    # RFC 6960 §4.4.1: when client sends a nonce, the response MUST include
+    # the same nonce. A cached response holds the nonce of an earlier
+    # request, so we cannot reuse it here — regenerate fresh.
+    cached = None if request_nonce else ocsp_service.get_cached_response(ca.id, cert_serial_hex)
     if cached:
         resp = Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
         _add_cache_headers(resp, request_nonce)
@@ -181,38 +184,38 @@ def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):
                 if computed_name_hash != issuer_name_hash:
                     continue
 
-                # Issuer key hash (over BIT STRING of subject public key, no tag/length)
-                pk_der = ca_cert.public_key().public_bytes(
-                    encoding=serialization.Encoding.DER,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                )
-                # Extract the SubjectPublicKey BIT STRING contents per RFC 6960
-                # cryptography exposes this directly via tbs_certificate_bytes? Use SPKI parsing:
+                # Issuer key hash — RFC 6960 §4.1.1: SHA hash of the
+                # subjectPublicKey BIT STRING value (i.e. the contents of
+                # the BIT STRING, *not* the full SubjectPublicKeyInfo).
                 from cryptography.hazmat.primitives.asymmetric import rsa, ec
                 pubkey = ca_cert.public_key()
                 if isinstance(pubkey, rsa.RSAPublicKey):
-                    spki = pubkey.public_bytes(
+                    spki_value = pubkey.public_bytes(
                         encoding=serialization.Encoding.DER,
                         format=serialization.PublicFormat.PKCS1,
                     )
+                elif isinstance(pubkey, ec.EllipticCurvePublicKey):
+                    # X9.62 uncompressed point — the BIT STRING contents
+                    # for an EC SubjectPublicKey.
+                    spki_value = pubkey.public_bytes(
+                        encoding=serialization.Encoding.X962,
+                        format=serialization.PublicFormat.UncompressedPoint,
+                    )
                 else:
-                    # Generic: hash full SubjectPublicKeyInfo (some implementations do this)
-                    spki = pk_der
+                    # Ed25519/Ed448: BIT STRING contents are the raw key
+                    spki_value = pubkey.public_bytes(
+                        encoding=serialization.Encoding.Raw,
+                        format=serialization.PublicFormat.Raw,
+                    )
                 d2 = hashes.Hash(algo)
-                d2.update(spki)
+                d2.update(spki_value)
                 computed_key_hash = d2.finalize()
-                # Accept either SPKI hash or PKCS1/raw hash — implementations vary
-                d3 = hashes.Hash(algo)
-                d3.update(pk_der)
-                computed_key_hash_spki = d3.finalize()
 
-                if issuer_key_hash in (computed_key_hash, computed_key_hash_spki):
-                    return ca
-                # Some clients hash the full SPKI; if name matches and key
-                # doesn't, still return ca (name is unique per CA in UCM).
-                logger.debug(
-                    f"OCSP: name hash matched for CA {ca.refid} but key hash differs; accepting on name match"
-                )
+                if issuer_key_hash != computed_key_hash:
+                    # Both name AND key hash MUST match (CertID identity).
+                    # Re-keyed CAs share the subject DN but differ in keys —
+                    # accepting on name alone would mis-route the response.
+                    continue
                 return ca
             except Exception as e:
                 logger.debug(f"OCSP: failed to parse CA cert {ca.refid}: {e}")

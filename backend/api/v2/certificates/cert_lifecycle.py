@@ -158,11 +158,14 @@ def unhold_certificate(cert_id):
         except Exception as e:
             logger.warning(f"Failed to regenerate CRL after unhold: {e}")
 
-        # Invalidate OCSP cache for this cert
+        # Invalidate OCSP cache for this cert (cache uses hex serial — RFC 6960 §2.2)
         try:
             if cert.serial_number:
-                OCSPResponse.query.filter_by(cert_serial=cert.serial_number).delete()
-                db.session.commit()
+                from utils.serial_format import serial_to_hex
+                serial_hex = serial_to_hex(cert.serial_number)
+                if serial_hex:
+                    OCSPResponse.query.filter_by(cert_serial=serial_hex).delete()
+                    db.session.commit()
         except Exception:
             db.session.rollback()
 
