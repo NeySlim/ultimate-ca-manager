@@ -527,7 +527,10 @@ class AcmeEabCredential(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     kid = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    hmac_key_b64 = db.Column(db.Text, nullable=False)
+    # Encrypted at rest via Fernet (utils.encryption). Column name preserved
+    # for backwards compatibility — older rows stored plaintext base64 are
+    # transparently returned by decrypt_if_needed().
+    _hmac_key_b64 = db.Column('hmac_key_b64', db.Text, nullable=False)
     label = db.Column(db.String(255))
     created_by_user_id = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
@@ -537,6 +540,28 @@ class AcmeEabCredential(db.Model):
     revoked_at = db.Column(db.DateTime)
     revoked_by_user_id = db.Column(db.Integer)
     status = db.Column(db.String(20), default='active', nullable=False, index=True)
+
+    # --- Encrypted property accessor ---
+
+    @property
+    def hmac_key_b64(self):
+        if not self._hmac_key_b64:
+            return None
+        try:
+            from utils.encryption import decrypt_if_needed
+            return decrypt_if_needed(self._hmac_key_b64)
+        except Exception:
+            return self._hmac_key_b64
+
+    @hmac_key_b64.setter
+    def hmac_key_b64(self, value):
+        if value:
+            # Fail-closed: never silently store the HMAC secret in plaintext
+            # if encryption is unavailable.
+            from utils.encryption import encrypt_if_needed
+            self._hmac_key_b64 = encrypt_if_needed(value)
+        else:
+            self._hmac_key_b64 = None
 
     @property
     def is_usable(self):
