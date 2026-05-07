@@ -135,15 +135,28 @@ def create_ca():
         if not is_valid:
             return error_response(error, 400)
 
-        # Determine key type
+        # Determine key type — whitelist algorithms and parameters to prevent
+        # DoS (huge RSA key generation) and unsupported curves.
+        ALLOWED_RSA_SIZES = {2048, 3072, 4096}
+        ALLOWED_EC_CURVES = {'prime256v1', 'secp384r1', 'secp521r1'}
         key_type = '2048'  # Default
         if data.get('keyAlgo') == 'RSA':
-            key_size = int(data.get('keySize') or 2048)
-            if key_size < 2048:
-                return error_response('RSA key size must be at least 2048 bits', 400)
+            try:
+                key_size = int(data.get('keySize') or 2048)
+            except (TypeError, ValueError):
+                return error_response('Invalid RSA key size', 400)
+            if key_size not in ALLOWED_RSA_SIZES:
+                return error_response(
+                    f'RSA key size must be one of {sorted(ALLOWED_RSA_SIZES)}', 400
+                )
             key_type = str(key_size)
         elif data.get('keyAlgo') == 'ECDSA':
-            key_type = data.get('keySize') or 'prime256v1'
+            curve = data.get('keySize') or 'prime256v1'
+            if curve not in ALLOWED_EC_CURVES:
+                return error_response(
+                    f'ECDSA curve must be one of {sorted(ALLOWED_EC_CURVES)}', 400
+                )
+            key_type = curve
 
         # ----- HSM key selection (Issue #77.3) -----
         hsm_provider_id = data.get('hsm_provider_id') or data.get('hsmProviderId')
@@ -188,11 +201,26 @@ def create_ca():
 
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
 
+        # Validate validity period — cap at 50 years (CA/B Forum max for roots
+        # is 25y; leave headroom for offline roots while preventing unbounded
+        # values like 10000 years). Use explicit None check so 0 is rejected
+        # (not silently replaced by the default).
+        raw_validity = data.get('validityYears')
+        if raw_validity is None or raw_validity == '':
+            validity_years = 10
+        else:
+            try:
+                validity_years = int(raw_validity)
+            except (TypeError, ValueError):
+                return error_response('Invalid validityYears', 400)
+        if not 1 <= validity_years <= 50:
+            return error_response('validityYears must be between 1 and 50', 400)
+
         ca = CAService.create_internal_ca(
             descr=data.get('description') or data.get('commonName'),
             dn=dn,
             key_type=key_type,
-            validity_days=int(data.get('validityYears') or 10) * 365,
+            validity_days=validity_years * 365,
             caref=caref,
             username=username,
             path_length=data.get('pathLength'),

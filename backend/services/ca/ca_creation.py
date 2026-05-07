@@ -82,7 +82,18 @@ class CACreationMixin:
 
         if use_hsm:
             if hsm_key_id:
-                hsm_key = HsmKey.query.get(hsm_key_id)
+                # Lock the HSM key row to serialise concurrent CA creations
+                # binding the same key. The DB also enforces uq_ca_hsm_key_id
+                # (migration 032) as a defense-in-depth safety net.
+                try:
+                    hsm_key = (
+                        HsmKey.query.filter_by(id=hsm_key_id)
+                        .with_for_update()
+                        .one_or_none()
+                    )
+                except Exception:
+                    # SQLite has no row-level locks; fall back to plain lookup.
+                    hsm_key = HsmKey.query.get(hsm_key_id)
                 if not hsm_key:
                     raise ValueError(f"HSM key {hsm_key_id} not found")
                 if CA.query.filter_by(hsm_key_id=hsm_key.id).first():
