@@ -62,23 +62,89 @@ def list_custom_roles():
     roles = CustomRole.query.all()
     return success_response(data=[r.to_dict() for r in roles])
 
+RESERVED_ROLE_NAMES = {'admin', 'operator', 'viewer'}
+MAX_ROLE_NAME_LEN = 64
+MAX_ROLE_DESC_LEN = 500
+MAX_ROLE_PERMS = 200
+
+
+def _validate_role_payload(data, *, partial=False):
+    """Returns (cleaned_dict, error_response_or_None).
+
+    Validates name (length, charset, reserved), description length,
+    and permissions (list of strings, capped, whitelisted against
+    AVAILABLE_PERMISSIONS keys + wildcard 'action:*' / '*').
+    """
+    cleaned = {}
+
+    if 'name' in data or not partial:
+        name = (data.get('name') or '').strip()
+        if not name:
+            return None, error_response("Role name is required", 400)
+        if len(name) > MAX_ROLE_NAME_LEN:
+            return None, error_response(f"Role name too long (max {MAX_ROLE_NAME_LEN})", 400)
+        if name.lower() in RESERVED_ROLE_NAMES:
+            return None, error_response(f"'{name}' is a reserved built-in role name", 409)
+        # Charset: alnum, dash, underscore, space — no control chars / quotes
+        import re as _re
+        if not _re.fullmatch(r'[A-Za-z0-9 _\-]+', name):
+            return None, error_response("Role name contains invalid characters", 400)
+        cleaned['name'] = name
+
+    if 'description' in data:
+        desc = data.get('description') or ''
+        if not isinstance(desc, str):
+            return None, error_response("description must be a string", 400)
+        if len(desc) > MAX_ROLE_DESC_LEN:
+            return None, error_response(f"description too long (max {MAX_ROLE_DESC_LEN})", 400)
+        cleaned['description'] = desc
+
+    if 'permissions' in data:
+        perms = data.get('permissions') or []
+        if not isinstance(perms, list):
+            return None, error_response("permissions must be a list", 400)
+        if len(perms) > MAX_ROLE_PERMS:
+            return None, error_response(f"Too many permissions (max {MAX_ROLE_PERMS})", 400)
+        valid_keys = set(AVAILABLE_PERMISSIONS) if isinstance(AVAILABLE_PERMISSIONS, (list, set, tuple)) else set(AVAILABLE_PERMISSIONS.keys())
+        for p in perms:
+            if not isinstance(p, str) or not p.strip():
+                return None, error_response("permissions must be non-empty strings", 400)
+            if len(p) > 100:
+                return None, error_response("permission too long", 400)
+            # Allow exact whitelist match, full wildcard '*', or 'action:*'
+            if p == '*' or p in valid_keys:
+                continue
+            if ':' in p and p.endswith(':*'):
+                continue
+            return None, error_response(f"Unknown permission: {p}", 400)
+        cleaned['permissions'] = perms
+
+    if 'inherits_from' in data:
+        inh = data.get('inherits_from')
+        if inh is not None and not isinstance(inh, int):
+            return None, error_response("inherits_from must be an integer role id", 400)
+        cleaned['inherits_from'] = inh
+
+    return cleaned, None
+
+
 @bp.route('/api/v2/rbac/roles', methods=['POST'])
 @require_auth(['admin:users'])
 def create_custom_role():
     """Create a custom role"""
-    data = request.get_json()
-    
-    if not data.get('name'):
-        return error_response("Role name is required", 400)
-    
-    if CustomRole.query.filter_by(name=data['name']).first():
+    data = request.get_json() or {}
+    cleaned, err = _validate_role_payload(data, partial=False)
+    if err:
+        return err
+
+    if CustomRole.query.filter(db.func.lower(CustomRole.name) == cleaned['name'].lower()).first():
         return error_response("Role already exists", 409)
-    
+
     role = CustomRole(
-        name=data['name'],
-        description=data.get('description', ''),
-        permissions=data.get('permissions', []),
-        inherits_from=data.get('inherits_from')  # Parent role ID
+        name=cleaned['name'],
+        description=cleaned.get('description', ''),
+        permissions=cleaned.get('permissions', []),
+        inherits_from=cleaned.get('inherits_from')
     )
     db.session.add(role)
     try:
@@ -111,16 +177,31 @@ def get_custom_role(role_id):
 def update_custom_role(role_id):
     """Update a custom role"""
     role = CustomRole.query.get_or_404(role_id)
-    data = request.get_json()
-    
-    if 'name' in data:
-        role.name = data['name']
-    if 'description' in data:
-        role.description = data['description']
-    if 'permissions' in data:
-        role.permissions = data['permissions']
-    if 'inherits_from' in data:
-        role.inherits_from = data['inherits_from']
+    data = request.get_json() or {}
+
+    if getattr(role, 'is_system', False):
+        return error_response("System roles cannot be modified", 403)
+
+    cleaned, err = _validate_role_payload(data, partial=True)
+    if err:
+        return err
+
+    if 'name' in cleaned and cleaned['name'].lower() != role.name.lower():
+        clash = CustomRole.query.filter(
+            db.func.lower(CustomRole.name) == cleaned['name'].lower(),
+            CustomRole.id != role_id,
+        ).first()
+        if clash:
+            return error_response("Role name already exists", 409)
+
+    if 'name' in cleaned:
+        role.name = cleaned['name']
+    if 'description' in cleaned:
+        role.description = cleaned['description']
+    if 'permissions' in cleaned:
+        role.permissions = cleaned['permissions']
+    if 'inherits_from' in cleaned:
+        role.inherits_from = cleaned['inherits_from']
     
     try:
         db.session.commit()
