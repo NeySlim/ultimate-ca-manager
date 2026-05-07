@@ -23,6 +23,25 @@ from utils.key_codec import load_pem_bytes
 
 logger = logging.getLogger(__name__)
 
+# Cap password length to keep PKCS12/PFX/JKS encryption bounded — empirically
+# BestAvailableEncryption + pyjks degrade quickly past a few hundred bytes.
+_MIN_EXPORT_PASSWORD = 4
+_MAX_EXPORT_PASSWORD = 256
+
+
+def _validate_export_password(password):
+    """Return error string or None."""
+    if password is None or password == '':
+        return None
+    if not isinstance(password, str):
+        return 'password must be a string'
+    if not _MIN_EXPORT_PASSWORD <= len(password) <= _MAX_EXPORT_PASSWORD:
+        return (
+            f'password length must be between {_MIN_EXPORT_PASSWORD} '
+            f'and {_MAX_EXPORT_PASSWORD} characters'
+        )
+    return None
+
 
 @bp.route('/api/v2/cas/export', methods=['GET', 'POST'])
 @require_auth(['read:cas'])
@@ -124,6 +143,11 @@ def export_ca(ca_id):
         # HSM-backed CAs cannot export their private key — it never leaves the HSM
         if ca.uses_hsm:
             return error_response('Cannot export HSM-backed key', 409)
+
+    # Cap export password length (PKCS12/PFX/JKS or PEM-encrypted key)
+    pw_err = _validate_export_password(password)
+    if pw_err:
+        return error_response(pw_err, 400)
 
     try:
         cert_pem = base64.b64decode(ca.crt)

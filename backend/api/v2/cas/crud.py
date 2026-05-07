@@ -36,6 +36,54 @@ def _needs_protocol_url(current_url):
     return current_url.startswith('https://')
 
 
+# ---- Validation helpers (defense-in-depth: values land in extensions of
+# every issued certificate, so we cap length, charset and list size). ----
+_MAX_URL_LEN = 2048
+_MAX_URLS_PER_FIELD = 8
+_MAX_DESCR_LEN = 255
+_MAX_DESCRIPTION_LEN = 1024
+_MAX_OID_LEN = 100
+_MAX_NAME_CONSTRAINTS = 32
+_MAX_NAME_CONSTRAINT_LEN = 255
+_MAX_SIA_URLS = 8
+_MAX_PATH_LENGTH = 32
+_OID_RE = re.compile(r'^[0-2](\.\d+)+$')
+
+
+def _validate_protocol_url(url, field):
+    """Validate a single AIA/CDP/OCSP/CPS URL: scheme + length cap."""
+    if url is None or url == '':
+        return None  # allowed: clears the field
+    if not isinstance(url, str):
+        return f'{field} must be a string'
+    if len(url) > _MAX_URL_LEN:
+        return f'{field} too long (max {_MAX_URL_LEN} chars)'
+    lo = url.lower()
+    if not (lo.startswith('http://') or lo.startswith('https://')):
+        return f'{field} must use http:// or https:// (RFC 5280)'
+    return None
+
+
+def _normalize_url_list(value, field):
+    """Accept str or list; return (list_or_none, error_str_or_none)."""
+    if value is None:
+        return None, None
+    if isinstance(value, str):
+        value = [value] if value else []
+    if not isinstance(value, list):
+        return None, f'{field} must be a string or array of strings'
+    if len(value) > _MAX_URLS_PER_FIELD:
+        return None, f'{field} accepts at most {_MAX_URLS_PER_FIELD} URLs'
+    cleaned = []
+    for u in value:
+        err = _validate_protocol_url(u, field)
+        if err:
+            return None, err
+        if u:
+            cleaned.append(u)
+    return cleaned, None
+
+
 @bp.route('/api/v2/cas', methods=['GET'])
 @require_auth(['read:cas'])
 def list_cas():
@@ -45,6 +93,12 @@ def list_cas():
     """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 20
+    if per_page > 100:
+        per_page = 100
     paginated = 'page' in request.args or 'per_page' in request.args
     search = request.args.get('search', '')
     ca_type = request.args.get('type', '')
@@ -216,20 +270,90 @@ def create_ca():
         if not 1 <= validity_years <= 50:
             return error_response('validityYears must be between 1 and 50', 400)
 
+        # Cap description (stored in CA.descr, ends up in UI + audit logs)
+        description = data.get('description') or data.get('commonName')
+        if description and len(description) > _MAX_DESCRIPTION_LEN:
+            return error_response(
+                f'description too long (max {_MAX_DESCRIPTION_LEN} chars)', 400
+            )
+
+        # Validate optional X.509 extension parameters (defense-in-depth: these
+        # land in the cert and must be sane integers / bounded lists).
+        path_length = data.get('pathLength')
+        if path_length is not None and path_length != '':
+            try:
+                path_length = int(path_length)
+            except (TypeError, ValueError):
+                return error_response('pathLength must be an integer', 400)
+            if not 0 <= path_length <= _MAX_PATH_LENGTH:
+                return error_response(
+                    f'pathLength must be between 0 and {_MAX_PATH_LENGTH}', 400
+                )
+        else:
+            path_length = None
+
+        inhibit_any_policy = data.get('inhibitAnyPolicy')
+        if inhibit_any_policy is not None and inhibit_any_policy != '':
+            try:
+                inhibit_any_policy = int(inhibit_any_policy)
+            except (TypeError, ValueError):
+                return error_response('inhibitAnyPolicy must be an integer', 400)
+            if not 0 <= inhibit_any_policy <= _MAX_PATH_LENGTH:
+                return error_response(
+                    f'inhibitAnyPolicy must be between 0 and {_MAX_PATH_LENGTH}', 400
+                )
+        else:
+            inhibit_any_policy = None
+
+        for pc_field in ('policyConstraintsRequire', 'policyConstraintsInhibit'):
+            pc_val = data.get(pc_field)
+            if pc_val is not None and pc_val != '':
+                try:
+                    pc_int = int(pc_val)
+                except (TypeError, ValueError):
+                    return error_response(f'{pc_field} must be an integer', 400)
+                if not 0 <= pc_int <= _MAX_PATH_LENGTH:
+                    return error_response(
+                        f'{pc_field} must be between 0 and {_MAX_PATH_LENGTH}', 400
+                    )
+                data[pc_field] = pc_int
+
+        # Cap NameConstraints lists (count + per-item length)
+        for nc_field in ('nameConstraintsPermitted', 'nameConstraintsExcluded'):
+            nc_val = data.get(nc_field)
+            if nc_val is None:
+                continue
+            if not isinstance(nc_val, list):
+                return error_response(f'{nc_field} must be an array', 400)
+            if len(nc_val) > _MAX_NAME_CONSTRAINTS:
+                return error_response(
+                    f'{nc_field} accepts at most {_MAX_NAME_CONSTRAINTS} entries', 400
+                )
+            for item in nc_val:
+                if not isinstance(item, str) or len(item) > _MAX_NAME_CONSTRAINT_LEN:
+                    return error_response(
+                        f'{nc_field} entries must be strings ≤ {_MAX_NAME_CONSTRAINT_LEN} chars', 400
+                    )
+
+        # Validate SIA URLs (same rules as AIA/CDP/OCSP)
+        sia_urls_validated, sia_err = _normalize_url_list(data.get('siaUrls'), 'siaUrls')
+        if sia_err:
+            return error_response(sia_err, 400)
+
         ca = CAService.create_internal_ca(
-            descr=data.get('description') or data.get('commonName'),
+            descr=description,
             dn=dn,
             key_type=key_type,
             validity_days=validity_years * 365,
             caref=caref,
             username=username,
-            path_length=data.get('pathLength'),
+            path_length=path_length,
             name_constraints_permitted=data.get('nameConstraintsPermitted'),
             name_constraints_excluded=data.get('nameConstraintsExcluded'),
             policy_constraints_require=data.get('policyConstraintsRequire'),
             policy_constraints_inhibit=data.get('policyConstraintsInhibit'),
-            inhibit_any_policy=data.get('inhibitAnyPolicy'),
-            sia_urls=data.get('siaUrls'),
+            inhibit_any_policy=inhibit_any_policy,
+            sia_urls=sia_urls_validated,
             hsm_provider_id=int(hsm_provider_id) if hsm_provider_id else None,
             hsm_key_id=int(hsm_key_id) if hsm_key_id else None,
             hsm_key_label=hsm_key_label,
@@ -349,54 +473,106 @@ def update_ca(ca_id):
 
     data = request.json or {}
 
+    # Track which fields actually changed for the audit log
+    changed = []
+
     # Update allowed fields
     if 'name' in data:
-        ca.descr = data['name']
+        new_name = data['name']
+        if new_name is not None and not isinstance(new_name, str):
+            return error_response('name must be a string', 400)
+        if new_name and len(new_name) > _MAX_DESCR_LEN:
+            return error_response(f'name too long (max {_MAX_DESCR_LEN} chars)', 400)
+        if new_name != ca.descr:
+            ca.descr = new_name
+            changed.append('name')
     if 'ocsp_enabled' in data:
-        ca.ocsp_enabled = bool(data['ocsp_enabled'])
+        new_val = bool(data['ocsp_enabled'])
+        if new_val != bool(ca.ocsp_enabled):
+            changed.append('ocsp_enabled')
+        ca.ocsp_enabled = new_val
         primary_ocsp = ca.get_primary_ocsp_url()
         if ca.ocsp_enabled and _needs_protocol_url(primary_ocsp):
             base_url = get_protocol_base_url()
             if not base_url:
                 return error_response('Cannot auto-generate OCSP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.set_ocsp_urls([f"{base_url}/ocsp"])
-    if 'ocsp_url' in data:
-        ca.set_ocsp_urls([data['ocsp_url']] if isinstance(data['ocsp_url'], str) else data['ocsp_url'])
-    if 'ocsp_urls' in data:
-        ca.set_ocsp_urls(data['ocsp_urls'])
+    for field, setter in (
+        ('ocsp_url', ca.set_ocsp_urls),
+        ('ocsp_urls', ca.set_ocsp_urls),
+    ):
+        if field in data:
+            urls, err = _normalize_url_list(data[field], field)
+            if err:
+                return error_response(err, 400)
+            setter(urls or [])
+            changed.append(field)
     if 'cdp_enabled' in data:
-        ca.cdp_enabled = bool(data['cdp_enabled'])
+        new_val = bool(data['cdp_enabled'])
+        if new_val != bool(ca.cdp_enabled):
+            changed.append('cdp_enabled')
+        ca.cdp_enabled = new_val
         primary_cdp = ca.get_primary_cdp_url()
         if ca.cdp_enabled and _needs_protocol_url(primary_cdp):
             base_url = get_protocol_base_url()
             if not base_url:
                 return error_response('Cannot auto-generate CDP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.set_cdp_urls([f"{base_url}/cdp/{ca.refid}.crl"])
-    if 'cdp_url' in data:
-        ca.set_cdp_urls([data['cdp_url']] if isinstance(data['cdp_url'], str) else data['cdp_url'])
-    if 'cdp_urls' in data:
-        ca.set_cdp_urls(data['cdp_urls'])
+    for field, setter in (
+        ('cdp_url', ca.set_cdp_urls),
+        ('cdp_urls', ca.set_cdp_urls),
+    ):
+        if field in data:
+            urls, err = _normalize_url_list(data[field], field)
+            if err:
+                return error_response(err, 400)
+            setter(urls or [])
+            changed.append(field)
     if 'aia_ca_issuers_enabled' in data:
-        ca.aia_ca_issuers_enabled = bool(data['aia_ca_issuers_enabled'])
+        new_val = bool(data['aia_ca_issuers_enabled'])
+        if new_val != bool(ca.aia_ca_issuers_enabled):
+            changed.append('aia_ca_issuers_enabled')
+        ca.aia_ca_issuers_enabled = new_val
         primary_aia = ca.get_primary_aia_url()
         if ca.aia_ca_issuers_enabled and _needs_protocol_url(primary_aia):
             base_url = get_protocol_base_url()
             if not base_url:
                 return error_response('Cannot auto-generate AIA URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.set_aia_urls([f"{base_url}/ca/{ca.refid}.cer"])
-    if 'aia_ca_issuers_url' in data:
-        ca.set_aia_urls([data['aia_ca_issuers_url']] if isinstance(data['aia_ca_issuers_url'], str) else data['aia_ca_issuers_url'])
-    if 'aia_ca_issuers_urls' in data:
-        ca.set_aia_urls(data['aia_ca_issuers_urls'])
+    for field, setter in (
+        ('aia_ca_issuers_url', ca.set_aia_urls),
+        ('aia_ca_issuers_urls', ca.set_aia_urls),
+    ):
+        if field in data:
+            urls, err = _normalize_url_list(data[field], field)
+            if err:
+                return error_response(err, 400)
+            setter(urls or [])
+            changed.append(field)
     # CPS fields
     if 'cps_enabled' in data:
-        ca.cps_enabled = bool(data['cps_enabled'])
+        new_val = bool(data['cps_enabled'])
+        if new_val != bool(ca.cps_enabled):
+            changed.append('cps_enabled')
+        ca.cps_enabled = new_val
     if 'cps_uri' in data:
+        err = _validate_protocol_url(data['cps_uri'] or '', 'cps_uri')
+        if err and data['cps_uri']:
+            return error_response(err, 400)
         ca.cps_uri = data['cps_uri']
+        changed.append('cps_uri')
     if 'cps_oid' in data:
-        ca.cps_oid = data['cps_oid'] or '2.5.29.32.0'
+        oid = (data['cps_oid'] or '').strip()
+        if oid:
+            if len(oid) > _MAX_OID_LEN or not _OID_RE.match(oid):
+                return error_response('cps_oid must be a valid OID (e.g. 2.5.29.32.0)', 400)
+        ca.cps_oid = oid or '2.5.29.32.0'
+        changed.append('cps_oid')
     if 'is_active' in data:
-        ca.is_active = bool(data['is_active'])
+        new_val = bool(data['is_active'])
+        if new_val != bool(getattr(ca, 'is_active', None)):
+            changed.append('is_active')
+        ca.is_active = new_val
 
     try:
         db.session.commit()
@@ -407,7 +583,7 @@ def update_ca(ca_id):
             resource_type='ca',
             resource_id=ca_id,
             resource_name=ca.descr,
-            details=f'CA {ca.descr} settings updated',
+            details=f'CA {ca.descr} updated: {", ".join(changed) if changed else "no changes"}',
             success=True
         )
 

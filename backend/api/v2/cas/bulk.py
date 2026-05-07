@@ -17,6 +17,9 @@ from models import CA, Certificate, db
 
 logger = logging.getLogger(__name__)
 
+# Cap bulk operations to keep latency bounded and prevent DoS via huge id lists.
+_MAX_BULK_IDS = 100
+
 
 @bp.route('/api/v2/cas/bulk/delete', methods=['POST'])
 @require_auth(['delete:cas'])
@@ -28,6 +31,10 @@ def bulk_delete_cas():
         return error_response('ids array required', 400)
 
     ids = data['ids']
+    if not isinstance(ids, list):
+        return error_response('ids must be an array', 400)
+    if len(ids) > _MAX_BULK_IDS:
+        return error_response(f'Too many ids (max {_MAX_BULK_IDS} per request)', 400)
     results = {'success': [], 'failed': []}
 
     for ca_id in ids:
@@ -86,8 +93,14 @@ def bulk_export_cas():
     if not data or not data.get('ids'):
         return error_response('ids array required', 400)
 
+    ids = data['ids']
+    if not isinstance(ids, list):
+        return error_response('ids must be an array', 400)
+    if len(ids) > _MAX_BULK_IDS:
+        return error_response(f'Too many ids (max {_MAX_BULK_IDS} per request)', 400)
+
     export_format = data.get('format', 'pem').lower()
-    cas = CA.query.filter(CA.id.in_(data['ids']), CA.crt.isnot(None)).all()
+    cas = CA.query.filter(CA.id.in_(ids), CA.crt.isnot(None)).all()
 
     if not cas:
         return error_response('No CAs found', 404)

@@ -54,11 +54,15 @@ def set_ocsp_responder(ca_id):
         return error_response('CA not found', 404)
 
     data = request.get_json()
-    cert_id = data.get('certificate_id')
+    cert_id = data.get('certificate_id') if data else None
     if not cert_id:
         return error_response('certificate_id is required', 400)
+    try:
+        cert_id = int(cert_id)
+    except (TypeError, ValueError):
+        return error_response('certificate_id must be an integer', 400)
 
-    cert = Certificate.query.get(int(cert_id))
+    cert = Certificate.query.get(cert_id)
     if not cert:
         return error_response('Certificate not found', 404)
 

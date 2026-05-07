@@ -22,6 +22,12 @@ def list_ca_certificates(ca_id):
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 20
+    if per_page > 100:
+        per_page = 100
 
     # Filter by CA refid
     query = Certificate.query.filter_by(caref=ca.refid).order_by(Certificate.created_at.desc())
