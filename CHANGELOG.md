@@ -9,6 +9,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.151] - 2026-05-07
+
+### Fixed
+- **ACME proxy did not enforce External Account Binding (#112)** — when `acme_eab_required` was enabled, the proxy directory at `/acme/proxy/directory` advertised upstream Let's Encrypt's `meta` as-is (which does not require EAB), so clients like win-acme reported "server does not indicate that this is required" and proceeded to register an account without an `externalAccountBinding`. The proxy `POST /acme/proxy/new-account` likewise never inspected the payload for an EAB field and accepted any registration. The proxy now (1) overrides `meta.externalAccountRequired` with the local UCM policy in its directory, and (2) validates the `externalAccountBinding` JWS in `/new-account` exactly like the local server, rejecting registrations without a valid HMAC binding when EAB is required.
+- **Local `/acme/new-account` returned 500 on empty body** — `request.get_json()` raised on requests with `Content-Type: application/jose+json` and an empty body instead of producing a clean `400 malformed`. Now uses `force=True, silent=True` so empty/invalid payloads return the documented ACME error.
+- **ACME admin UI 404 on account detail (#113)** — the admin routes `GET/DELETE /api/v2/acme/accounts/<id>`, `POST .../deactivate`, `GET .../orders`, `GET .../challenges` only resolved by numeric primary key, but the UI passes the public `account_id` string. New `resolve_acme_account()` helper accepts either form and is used by all five admin routes; protocol routes (RFC 8555) are unchanged.
+- **`refactor(acme): bind directory_url to account key via AcmeClientAccount table`** — landed in this release: the on-disk account key file is now selected by joining `AcmeAccount.directory_url` to the matching `AcmeClientAccount` row, removing the previous heuristic that looked up the key by directory URL string match alone.
+
+### Tests
+- **`tests/conftest.py::create_user`** — made the factory idempotent on session-DB collisions, so a test that re-uses a user hint (or a sharded CI re-run) no longer fails with HTTP 500 on the second create. The full backend suite (1676 + 209 ACME + frontend 461) is green on all three distros.
+
 ## [2.150] - 2026-05-07
 
 ### Fixed
