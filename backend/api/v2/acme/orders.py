@@ -8,7 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_isoformat
 
-from . import bp, logger
+from . import bp, logger, resolve_acme_account
 
 
 @bp.route('/api/v2/acme/orders', methods=['GET'])
@@ -65,7 +65,9 @@ def list_account_orders(account_id):
     Issue #71: previously only local orders were shown, leaving proxy users
     unable to see their certificate history from the account detail.
     """
-    account = AcmeAccount.query.filter_by(account_id=account_id).first_or_404()
+    account = resolve_acme_account(account_id)
+    if not account:
+        return error_response('Account not found', 404)
 
     orders = AcmeOrder.query.filter_by(account_id=account.account_id).order_by(
         AcmeOrder.created_at.desc()
@@ -121,8 +123,10 @@ def list_account_orders(account_id):
 @bp.route('/api/v2/acme/accounts/<string:account_id>/challenges', methods=['GET'])
 @require_auth(['read:acme'])
 def list_account_challenges(account_id):
-    """List challenges for a specific ACME account"""
-    account = AcmeAccount.query.filter_by(account_id=account_id).first_or_404()
+    """List challenges for a specific ACME account (accepts numeric PK or RFC 8555 account_id)"""
+    account = resolve_acme_account(account_id)
+    if not account:
+        return error_response('Account not found', 404)
 
     # Get all orders for this account
     orders = AcmeOrder.query.filter_by(account_id=account.account_id).all()

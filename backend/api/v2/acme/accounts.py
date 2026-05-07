@@ -14,7 +14,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 
-from . import bp, logger
+from . import bp, logger, resolve_acme_account
 
 
 @bp.route('/api/v2/acme/accounts', methods=['GET'])
@@ -158,8 +158,8 @@ def create_acme_account():
 @bp.route('/api/v2/acme/accounts/<string:account_id>/deactivate', methods=['POST'])
 @require_auth(['write:acme'])
 def deactivate_acme_account(account_id):
-    """Deactivate an ACME account"""
-    acc = AcmeAccount.query.filter_by(account_id=account_id).first()
+    """Deactivate an ACME account (accepts numeric PK or RFC 8555 account_id)"""
+    acc = resolve_acme_account(account_id)
     if not acc:
         return error_response('Account not found', 404)
 
@@ -184,8 +184,8 @@ def deactivate_acme_account(account_id):
 @bp.route('/api/v2/acme/accounts/<string:account_id>', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_account(account_id):
-    """Get single ACME account details"""
-    acc = AcmeAccount.query.filter_by(account_id=account_id).first()
+    """Get single ACME account details (accepts numeric PK or RFC 8555 account_id)"""
+    acc = resolve_acme_account(account_id)
     if not acc:
         return error_response('Account not found', 404)
 
@@ -203,8 +203,9 @@ def get_acme_account(account_id):
 @bp.route('/api/v2/acme/accounts/<string:account_id>', methods=['DELETE'])
 @require_auth(['delete:acme'])
 def delete_acme_account(account_id):
-    """Delete an ACME account and its related orders/authorizations/challenges"""
-    acc = AcmeAccount.query.filter_by(account_id=account_id).first()
+    """Delete an ACME account and its related orders/authorizations/challenges
+    (accepts numeric PK or RFC 8555 account_id)"""
+    acc = resolve_acme_account(account_id)
     if not acc:
         return error_response('Account not found', 404)
 
