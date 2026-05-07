@@ -246,7 +246,12 @@ class OCSPService:
             # lowercase hex form. Convert accordingly.
             cert_serial_dec = str(cert_serial)
             cert_serial_hex = format(cert_serial, 'x')
-            certificate = Certificate.query.filter_by(serial_number=cert_serial_dec).first()
+            # DB has historical mixed format (decimal vs lowercase hex). Try both.
+            certificate = (
+                Certificate.query.filter_by(serial_number=cert_serial_dec).first()
+                or Certificate.query.filter_by(serial_number=cert_serial_hex).first()
+                or Certificate.query.filter_by(serial_number=cert_serial_hex.upper()).first()
+            )
             
             # Determine certificate status
             if not certificate:

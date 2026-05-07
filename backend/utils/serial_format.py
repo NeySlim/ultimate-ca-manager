@@ -15,6 +15,32 @@ reported as ``good`` immediately).
 from __future__ import annotations
 
 
+def serial_to_int(serial: str | int | None) -> int | None:
+    """Return the integer form of a certificate serial.
+
+    Mirrors ``serial_to_hex`` (DB has historical hex/decimal mix). Returns
+    ``None`` for falsy or unparseable inputs (caller decides how to handle).
+    """
+    if serial is None or serial == '':
+        return None
+    if isinstance(serial, int):
+        return serial
+    s = str(serial).replace(':', '').strip()
+    if s.lower().startswith('0x'):
+        s = s[2:]
+    # Decimal first (canonical, recent code uses str(int))
+    try:
+        return int(s, 10)
+    except ValueError:
+        pass
+    # Hex fallback (legacy rows; safe because hex strings of real serials
+    # almost always contain a-f letters which fail int(s, 10) above)
+    try:
+        return int(s, 16)
+    except ValueError:
+        return None
+
+
 def serial_to_hex(serial: str | int | None) -> str:
     """Return the lowercase hex form of a certificate serial.
 
@@ -25,17 +51,7 @@ def serial_to_hex(serial: str | int | None) -> str:
         return ''
     if isinstance(serial, int):
         return format(serial, 'x')
-    s = str(serial).strip()
-    # Already hex?
-    if s.lower().startswith('0x'):
-        s = s[2:]
-    # Try decimal first (DB canonical form)
-    try:
-        return format(int(s, 10), 'x')
-    except ValueError:
-        pass
-    # Fall back to hex parsing
-    try:
-        return format(int(s, 16), 'x')
-    except ValueError:
-        return s.lower()
+    n = serial_to_int(serial)
+    if n is None:
+        return str(serial).lower()
+    return format(n, 'x')

@@ -11,6 +11,7 @@ from cryptography.x509.oid import ExtensionOID
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
 from utils.datetime_utils import utc_now
+from utils.serial_format import serial_to_int
 from ._constants import REASON_MAP
 from .query import CRLQueryMixin
 
@@ -57,15 +58,18 @@ class CRLGenerationMixin:
             if not cert.serial_number:
                 continue
 
-            try:
-                serial_int = int(cert.serial_number.replace(':', ''), 16)
-                if serial_int.bit_length() > 159:
-                    logger.warning(
-                        f"CRL: serial {cert.serial_number} exceeds 159 bits "
-                        f"({serial_int.bit_length()} bits), truncating for CRL entry"
-                    )
-                    serial_int = serial_int & ((1 << 159) - 1)
-            except (ValueError, AttributeError):
+            serial_int = serial_to_int(cert.serial_number)
+            if serial_int is None or serial_int <= 0:
+                logger.warning(f"CRL: skipping cert {cert.id} with unparseable serial {cert.serial_number!r}")
+                continue
+            if serial_int.bit_length() > 159:
+                # RFC 5280 §4.1.2.2 caps serials at 20 octets (≤159 bits effective).
+                # A cert issued above this bound is itself non-conformant; we cannot
+                # safely truncate (it would change the identity), so skip and log.
+                logger.error(
+                    f"CRL: cert {cert.id} serial exceeds 159 bits "
+                    f"({serial_int.bit_length()} bits); skipping — revocation NOT in CRL"
+                )
                 continue
 
             revoked_builder = x509.RevokedCertificateBuilder()
@@ -212,11 +216,14 @@ class CRLGenerationMixin:
         for cert in revoked_certs:
             if not cert.serial_number:
                 continue
-            try:
-                serial_int = int(cert.serial_number.replace(':', ''), 16)
-                if serial_int.bit_length() > 159:
-                    serial_int = serial_int & ((1 << 159) - 1)
-            except (ValueError, AttributeError):
+            serial_int = serial_to_int(cert.serial_number)
+            if serial_int is None or serial_int <= 0:
+                logger.warning(f"Delta CRL: skipping cert {cert.id} with unparseable serial {cert.serial_number!r}")
+                continue
+            if serial_int.bit_length() > 159:
+                logger.error(
+                    f"Delta CRL: cert {cert.id} serial exceeds 159 bits; skipping — revocation NOT in delta CRL"
+                )
                 continue
 
             revoked_builder = x509.RevokedCertificateBuilder()

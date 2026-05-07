@@ -10,6 +10,7 @@ import logging
 
 from models import db, CA
 from services.crl_service import CRLService
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +73,19 @@ def get_crl(ca_ref):
     # Get latest CRL from database
     crl_meta = CRLService.get_latest_crl(ca.id)
 
-    if not crl_meta or not crl_meta.crl_der:
-        # No CRL in DB — try to generate one if CA has a private key.
+    # RFC 5280 §5.1.2.5 — relying parties may reject CRLs past nextUpdate.
+    # If we hold the signing key, regenerate proactively.
+    needs_regen = False
+    if crl_meta and crl_meta.next_update:
+        nu = crl_meta.next_update
+        # Compare in UTC; DB stores naive UTC.
+        now_naive = utc_now().replace(tzinfo=None) if utc_now().tzinfo else utc_now()
+        nu_naive = nu.replace(tzinfo=None) if getattr(nu, 'tzinfo', None) else nu
+        if nu_naive <= now_naive:
+            needs_regen = True
+
+    if not crl_meta or not crl_meta.crl_der or needs_regen:
+        # No CRL in DB or it's expired — try to generate one if CA can sign.
         if ca.has_private_key and ca.cdp_enabled:
             lock = _crl_lock_for(ca.id)
             acquired = lock.acquire(timeout=_CRL_GEN_TIMEOUT_SECONDS)
@@ -92,18 +104,29 @@ def get_crl(ca_ref):
             try:
                 # Re-check the cache: the request that held the lock
                 # before us may have just populated it.
-                crl_meta = CRLService.get_latest_crl(ca.id)
-                if not crl_meta or not crl_meta.crl_der:
+                fresh = CRLService.get_latest_crl(ca.id)
+                fresh_expired = (
+                    fresh and fresh.next_update
+                    and (fresh.next_update.replace(tzinfo=None) if getattr(fresh.next_update, 'tzinfo', None) else fresh.next_update)
+                        <= (utc_now().replace(tzinfo=None) if utc_now().tzinfo else utc_now())
+                )
+                if not fresh or not fresh.crl_der or fresh_expired:
                     try:
                         crl_meta = CRLService.generate_crl(ca.id)
                     except Exception as e:
                         logger.error(
                             f"CDP: failed to generate CRL for CA {ca.refid}: {e}"
                         )
-                        abort(404)
+                        if not crl_meta or not crl_meta.crl_der:
+                            abort(404)
+                        # Fall through with the (expired) cached CRL rather
+                        # than 404'ing relying parties — better stale than
+                        # nothing per RFC 5280 §6.3.3 step (a).
+                else:
+                    crl_meta = fresh
             finally:
                 lock.release()
-        else:
+        elif not crl_meta or not crl_meta.crl_der:
             abort(404)
 
     return Response(
