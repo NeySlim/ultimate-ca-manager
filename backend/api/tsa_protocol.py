@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('tsa', __name__)
 
+# RFC 3161 TimeStampReq is a small DER struct (~ a few hundred bytes for a
+# SHA-512 digest + nonce + policy). 64 KB is generous and prevents DoS via
+# multi-megabyte garbage being ASN.1-parsed.
+MAX_TSA_BODY_BYTES = 64 * 1024
+
 
 @bp.route('/tsa', methods=['POST'])
 def timestamp_request():
@@ -26,8 +31,17 @@ def timestamp_request():
     if 'timestamp-query' not in content_type and 'application/octet-stream' not in content_type:
         response = make_response('Invalid content type', 400)
         return response
-    
-    tsp_request = request.data
+
+    # Cap body size up-front
+    cl = request.content_length
+    if cl is not None and cl > MAX_TSA_BODY_BYTES:
+        response = make_response('Request body too large', 413)
+        return response
+
+    tsp_request = request.get_data(cache=False)
+    if len(tsp_request) > MAX_TSA_BODY_BYTES:
+        response = make_response('Request body too large', 413)
+        return response
     if not tsp_request:
         response = make_response('Empty request', 400)
         return response

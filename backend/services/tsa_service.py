@@ -19,6 +19,19 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+
+# RFC 5035 / RFC 3161 §2.4.2: register signing-certificate-v2 attribute OID
+# into asn1crypto's CMS attribute map. asn1crypto >=1.5 ships ESSCertIDv2 and
+# SigningCertificateV2 types but does not register the attribute OID itself.
+_SIGNING_CERT_V2_OID = '1.2.840.113549.1.9.16.2.47'
+if _SIGNING_CERT_V2_OID not in cms.CMSAttributeType._map:
+    cms.CMSAttributeType._map[_SIGNING_CERT_V2_OID] = 'signing_certificate_v2'
+
+    class _SetOfSigningCertificateV2(core.SetOf):
+        _child_spec = tsp.SigningCertificateV2
+
+    cms.CMSAttribute._oid_specs['signing_certificate_v2'] = _SetOfSigningCertificateV2
+
 HASH_OIDS = {
     '2.16.840.1.101.3.4.2.1': 'sha256',
     '2.16.840.1.101.3.4.2.2': 'sha384',
@@ -47,14 +60,24 @@ class TSAService:
 
             version = req['version'].native
             if version != 'v1':
-                return self._error_resp(2, 'Unsupported version'), 200
+                # RFC 3161 §2.4.2: rejection + badRequest(2)
+                return self._error_resp('rejection', 'badRequest',
+                                        'Unsupported version'), 200
 
             msg_imprint = req['message_imprint']
             hash_oid = msg_imprint['hash_algorithm']['algorithm'].dotted
             if hash_oid not in HASH_OIDS:
-                return self._error_resp(0, f'Unsupported hash: {hash_oid}'), 200
+                # RFC 3161 §2.4.2: rejection + badAlg(0)
+                return self._error_resp('rejection', 'badAlg',
+                                        f'Unsupported hash: {hash_oid}'), 200
 
             digest = msg_imprint['hashed_message'].native
+            # RFC 3161 §2.4.1: hashed_message length MUST match hash algorithm
+            expected_len = {'sha256': 32, 'sha384': 48, 'sha512': 64}[HASH_OIDS[hash_oid]]
+            if len(digest) != expected_len:
+                return self._error_resp('rejection', 'badDataFormat',
+                                        'Message imprint length mismatch'), 200
+
             nonce = req['nonce'].native if req['nonce'].native is not None else None
             cert_req = req['cert_req'].native
 
@@ -66,7 +89,8 @@ class TSAService:
 
         except Exception as e:
             logger.error(f"TSA request processing error: {e}", exc_info=True)
-            return self._error_resp(2, 'Internal error'), 200
+            return self._error_resp('rejection', 'systemFailure',
+                                    'Internal error'), 200
 
     def _build_tst_info(self, hash_oid: str, digest: bytes,
                         nonce: Optional[int] = None) -> tsp.TSTInfo:
@@ -101,6 +125,20 @@ class TSAService:
 
         # Build SignedAttributes (required per CMS when content type != data)
         TST_INFO_OID = '1.2.840.113549.1.9.16.1.4'
+
+        # RFC 3161 §2.4.2 + RFC 5035: TSA SignerInfo MUST contain either
+        # ESSCertID (signing-certificate, SHA-1 only) or ESSCertIDv2
+        # (signing-certificate-v2, SHA-256+) to bind the TSA cert to the
+        # signature and prevent cert-substitution attacks. We use v2.
+        cert_sha256 = hashlib.sha256(cert_der).digest()
+        ess_cert_id_v2 = tsp.ESSCertIDv2({
+            'hash_algorithm': {'algorithm': 'sha256'},
+            'cert_hash': cert_sha256,
+        })
+        signing_cert_v2 = tsp.SigningCertificateV2({
+            'certs': [ess_cert_id_v2],
+        })
+
         signed_attrs = cms.CMSAttributes([
             cms.CMSAttribute({
                 'type': 'content_type',
@@ -109,6 +147,10 @@ class TSAService:
             cms.CMSAttribute({
                 'type': 'message_digest',
                 'values': [core.OctetString(content_digest)],
+            }),
+            cms.CMSAttribute({
+                'type': 'signing_certificate_v2',
+                'values': [signing_cert_v2],
             }),
         ])
 
@@ -168,17 +210,32 @@ class TSAService:
 
         return resp.dump()
 
-    def _error_resp(self, status: int, message: str) -> bytes:
-        """Build error TimeStampResp (status only, no token)"""
-        status_map = {0: 'granted', 2: 'rejection', 5: 'system_failure'}
-        status_info = tsp.PKIStatusInfo({
-            'status': status_map.get(status, 'rejection'),
+    def _error_resp(self, status: str, fail_info: Optional[str], message: str) -> bytes:
+        """Build error TimeStampResp (PKIStatusInfo only, no token).
+
+        RFC 3161 §2.4.2: TimeStampResp ::= SEQUENCE {
+            status         PKIStatusInfo,
+            timeStampToken TimeStampToken OPTIONAL
+        }
+        On error, timeStampToken is omitted entirely. PKIFailureInfo (BIT STRING)
+        carries the specific failure reason: badAlg(0), badRequest(2),
+        badDataFormat(5), timeNotAvailable(14), unacceptedPolicy(15),
+        unacceptedExtension(16), addInfoNotAvailable(17), systemFailure(25).
+        """
+        psi_fields = {
+            'status': status,
             'status_string': [message],
-        })
-        # asn1crypto doesn't handle optional time_stamp_token properly,
-        # so we build the SEQUENCE manually: just PKIStatusInfo, no token
+        }
+        if fail_info:
+            psi_fields['fail_info'] = {fail_info}
+        status_info = tsp.PKIStatusInfo(psi_fields)
+        # asn1crypto's TimeStampResp schema marks time_stamp_token as
+        # required, so we hand-build the SEQUENCE wrapper with PKIStatusInfo
+        # as the only element (which is RFC-compliant).
         status_der = status_info.dump()
         total_len = len(status_der)
         if total_len < 128:
             return b'\x30' + bytes([total_len]) + status_der
-        return b'\x30\x81' + bytes([total_len]) + status_der
+        if total_len < 256:
+            return b'\x30\x81' + bytes([total_len]) + status_der
+        return b'\x30\x82' + total_len.to_bytes(2, 'big') + status_der
