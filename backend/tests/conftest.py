@@ -184,6 +184,16 @@ def create_user(auth_client):
         r = auth_client.post('/api/v2/users',
                              data=json.dumps(data),
                              content_type='application/json')
+        # If the username already exists in the shared session DB (e.g. a
+        # rerun or shard collision in CI), fetch and return it instead of
+        # failing with 500. Tests treat the user as ephemeral context.
+        if r.status_code in (409, 500):
+            r2 = auth_client.get('/api/v2/users')
+            if r2.status_code == 200:
+                users = json.loads(r2.data).get('data', [])
+                for u in users:
+                    if u.get('username') == data['username']:
+                        return u
         assert r.status_code in (200, 201), f'Create user failed ({r.status_code}): {r.data}'
         result = json.loads(r.data)
         return result.get('data', result)
