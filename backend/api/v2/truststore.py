@@ -26,6 +26,18 @@ from utils.datetime_utils import utc_now, utc_isoformat
 logger = logging.getLogger(__name__)
 
 
+# Hardening — whitelist purposes and cap sizes
+_VALID_PURPOSES = {'root_ca', 'intermediate_ca', 'system', 'custom', 'code_signing', 'email'}
+_MAX_PEM_BYTES = 256 * 1024   # 256 KB — well above any X.509 cert
+_MAX_SYNC_LIMIT = 1000
+
+
+def _validate_purpose(purpose):
+    if purpose not in _VALID_PURPOSES:
+        return False, f'Invalid purpose. Allowed: {", ".join(sorted(_VALID_PURPOSES))}'
+    return True, None
+
+
 def parse_certificate(pem_data):
     """
     Parse certificate and extract details
@@ -113,6 +125,10 @@ def import_trusted_certificate():
     purpose = request.form.get('purpose', 'custom')
     description = request.form.get('description', '')
     notes = request.form.get('notes', '')
+
+    ok, err = _validate_purpose(purpose)
+    if not ok:
+        return error_response(err, 400)
     
     try:
         # Try PEM first
@@ -234,6 +250,16 @@ def add_trusted_certificate():
         return error_response('Name is required', 400)
     if not data.get('certificate_pem'):
         return error_response('Certificate PEM is required', 400)
+
+    # Cap PEM size to prevent DoS via large payloads
+    pem = data['certificate_pem']
+    if isinstance(pem, str) and len(pem.encode('utf-8', errors='ignore')) > _MAX_PEM_BYTES:
+        return error_response(f'Certificate PEM too large (max {_MAX_PEM_BYTES // 1024} KB)', 413)
+
+    # Whitelist purpose
+    ok, err = _validate_purpose(data.get('purpose', 'custom'))
+    if not ok:
+        return error_response(err, 400)
     
     # Parse certificate
     try:
@@ -349,7 +375,12 @@ def sync_trust_store():
     """
     data = request.get_json() or {}
     source = data.get('source', 'system')
-    limit = data.get('limit', 50)
+    try:
+        limit = int(data.get('limit', 50))
+    except (TypeError, ValueError):
+        return error_response('limit must be an integer', 400)
+    if limit < 1 or limit > _MAX_SYNC_LIMIT:
+        return error_response(f'limit must be between 1 and {_MAX_SYNC_LIMIT}', 400)
     
     CA_BUNDLE_PATH = '/etc/ssl/certs/ca-certificates.crt'
     
@@ -627,6 +658,10 @@ def add_ca_to_truststore(ca_refid):
     
     body = request.get_json(silent=True) or {}
     purpose = body.get('purpose', 'root_ca' if ca.is_root else 'intermediate_ca')
+
+    ok, err = _validate_purpose(purpose)
+    if not ok:
+        return error_response(err, 400)
     
     trusted = TrustedCertificate(
         name=ca.common_name or ca.descr or cert_info['subject'],
