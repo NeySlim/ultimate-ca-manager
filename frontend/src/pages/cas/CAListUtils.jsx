@@ -63,8 +63,9 @@ export function CAInfoLine({ ca, isMobile, t }) {
   )
 }
 
-/** Status pill badge */
-export function StatusBadge({ status }) {
+/** Status pill badge. Hidden when CA is offline (OfflineBadge takes over). */
+export function StatusBadge({ status, offline = false }) {
+  if (offline) return null
   return (
     <span className={cn(
       'shrink-0 px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',

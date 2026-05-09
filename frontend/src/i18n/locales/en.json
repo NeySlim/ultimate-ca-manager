@@ -425,7 +425,8 @@
     "scanNetwork": "Scan network",
     "generateReport": "Generate report",
     "healthStatus": "Health status",
-    "remove": "Remove"
+    "remove": "Remove",
+    "continue": "Continue"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "Delete CA",
     "deleteFailed": "Failed to delete CA",
     "exportFailed": "Failed to export CA",
-    "passwordTooShort": "Password must be at least 4 characters",
+    "passwordTooShort": "Password must be at least 12 characters",
     "exportedAs": "CA exported as {{format}}",
     "createFailed": "Failed to create CA",
     "unnamedCA": "Unnamed CA",
@@ -805,17 +806,12 @@
     "daysLeft": "{{count}} days left",
     "daysLeft_one": "{{count}} day left",
     "offline": "Offline",
-    "offlineReason": "Reason",
     "offlinePassword": "Password",
     "offlineMode": "Offline Mode",
     "offlinePasswordProtected": "Password Protected",
     "offlineFileExported": "Key File Exported",
     "takeOffline": "Take Offline",
-    "takeOfflineConfirm": "Are you sure you want to take this CA offline? No certificates will be signed while the CA is offline.",
-    "reason": "Reason for taking offline",
-    "enterPassword": "Enter password to restore CA",
     "restore": "Restore CA",
-    "restoreConfirm": "This CA was taken offline with key file export. The key is no longer available — restoring will re-enable signing only if you re-import the key. Continue?",
     "offlineFailed": "Failed to take CA offline",
     "restoreFailed": "Failed to restore CA",
     "descriptionPlaceholder": "Optional description for this CA",
@@ -853,7 +849,32 @@
       "hsmBacked": "HSM-backed",
       "hsmKey": "HSM Key",
       "exportBlockedHsm": "HSM-backed key cannot be exported"
-    }
+    },
+    "offlineExplain": {
+      "title": "What does taking a CA offline do?",
+      "body": "An offline CA cannot sign new certificates or CRLs until restored. Use this for root CAs that should only be brought online for ceremonies.",
+      "bullet1": "All certificate signing is blocked",
+      "bullet2": "CRL generation is blocked",
+      "bullet3": "Existing certificates remain valid"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "Encrypt the private key in the database with your password. The CA stays in UCM and is restored by entering the password.",
+      "fileExported": "Export the encrypted private key as a file and remove it from the database. UCM no longer holds the key — store the file in a safe place."
+    },
+    "offlineFileExportedWarning": "After download, the private key will be permanently removed from this UCM instance. You must keep the downloaded file safe — it is the only copy.",
+    "offlinePasswordHint": "Minimum 12 characters. This password encrypts the private key.",
+    "offlinePasswordConfirm": "Confirm password",
+    "passwordMismatch": "Passwords do not match",
+    "takeOfflineAndDownload": "Take offline & download key",
+    "restoreExplain": {
+      "title": "Restore CA",
+      "passwordProtected": "This CA was taken offline with password protection. Enter the password to decrypt the private key and restore signing.",
+      "fileExported": "This CA was taken offline with key file export. Upload the encrypted key file and enter its password to restore signing."
+    },
+    "offlineKeyFile": "Encrypted key file",
+    "offlineKeyFilePick": "Choose key file",
+    "offlineKeyFileTooLarge": "Key file is too large (max 256 KB)",
+    "restorePasswordHint": "The password used when the CA was taken offline."
   },
   "csrs": {
     "uploadCSR": "Upload CSR",

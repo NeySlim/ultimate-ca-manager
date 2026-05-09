@@ -425,7 +425,8 @@
     "scanNetwork": "Escanear rede",
     "generateReport": "Gerar relatório",
     "healthStatus": "Estado de saúde",
-    "remove": "Remover"
+    "remove": "Remover",
+    "continue": "Continuar"
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "Eliminar AC",
     "deleteFailed": "Falha ao eliminar AC",
     "exportFailed": "Falhado para export AC",
-    "passwordTooShort": "Palavra-passe deve ser em least 4 characters",
+    "passwordTooShort": "A senha deve ter pelo menos 12 caracteres",
     "exportedAs": "AC exported as {{format}}",
     "createFailed": "Falha ao criar AC",
     "unnamedCA": "Unnamed AC",
@@ -805,17 +806,12 @@
     "daysLeft": "{{count}} dias restantes",
     "daysLeft_one": "{{count}} dia restante",
     "offline": "Offline",
-    "offlineReason": "Motivo",
     "offlinePassword": "Senha",
     "offlineMode": "Modo offline",
     "offlinePasswordProtected": "Protegido por senha",
     "offlineFileExported": "Arquivo de chave exportado",
     "takeOffline": "Colocar offline",
-    "takeOfflineConfirm": "Tem certeza que deseja colocar esta CA offline? Nenhum certificado será assinado enquanto a CA estiver offline.",
-    "reason": "Motivo para colocar offline",
-    "enterPassword": "Digite a senha para restaurar a CA",
     "restore": "Restaurar CA",
-    "restoreConfirm": "Esta CA foi colocada offline com exportação de chave. A chave não está mais disponível — a restauração reativará a assinatura apenas se você reimportar a chave. Continuar?",
     "offlineFailed": "Falha ao colocar CA offline",
     "restoreFailed": "Falha ao restaurar CA",
     "descriptionPlaceholder": "Descrição opcional para esta CA",
@@ -853,7 +849,32 @@
       "hsmBacked": "Apoiada por HSM",
       "hsmKey": "Chave HSM",
       "exportBlockedHsm": "A chave apoiada por HSM não pode ser exportada"
-    }
+    },
+    "offlineExplain": {
+      "title": "O que faz colocar uma CA offline?",
+      "body": "Uma CA offline não pode assinar novos certificados nem CRLs até ser restaurada. Use para CAs raiz que devem ser colocadas online apenas em cerimônias.",
+      "bullet1": "Toda assinatura de certificados é bloqueada",
+      "bullet2": "A geração de CRL é bloqueada",
+      "bullet3": "Os certificados existentes permanecem válidos"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "Cifra a chave privada no banco de dados com sua senha. A CA permanece no UCM e é restaurada digitando a senha.",
+      "fileExported": "Exporta a chave privada cifrada como arquivo e a remove do banco de dados. O UCM não guarda mais a chave — armazene o arquivo em local seguro."
+    },
+    "offlineFileExportedWarning": "Após o download, a chave privada será removida permanentemente desta instância UCM. Mantenha o arquivo baixado em segurança — é a única cópia.",
+    "offlinePasswordHint": "Mínimo de 12 caracteres. Esta senha cifra a chave privada.",
+    "offlinePasswordConfirm": "Confirmar senha",
+    "passwordMismatch": "As senhas não coincidem",
+    "takeOfflineAndDownload": "Colocar offline e baixar chave",
+    "restoreExplain": {
+      "title": "Restaurar CA",
+      "passwordProtected": "Esta CA foi colocada offline com proteção por senha. Digite a senha para decifrar a chave privada e restaurar a assinatura.",
+      "fileExported": "Esta CA foi colocada offline com exportação de arquivo de chave. Faça upload do arquivo de chave cifrado e digite a senha para restaurar a assinatura."
+    },
+    "offlineKeyFile": "Arquivo de chave cifrado",
+    "offlineKeyFilePick": "Escolher arquivo de chave",
+    "offlineKeyFileTooLarge": "Arquivo de chave muito grande (máx. 256 KB)",
+    "restorePasswordHint": "A senha usada quando a CA foi colocada offline."
   },
   "csrs": {
     "uploadCSR": "Carregar CSR",

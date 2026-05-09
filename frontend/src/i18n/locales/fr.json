@@ -562,7 +562,7 @@
     "deleteCAButton": "Supprimer l'AC",
     "deleteFailed": "Échec de la suppression de l'AC",
     "exportFailed": "Échec de l'exportation de l'AC",
-    "passwordTooShort": "Le mot de passe doit contenir au moins 4 caractères",
+    "passwordTooShort": "Le mot de passe doit contenir au moins 12 caractères",
     "exportedAs": "AC exportée en {{format}}",
     "createFailed": "Échec de la création de l'AC",
     "unnamedCA": "AC sans nom",
@@ -575,17 +575,12 @@
     "daysLeft": "{{count}} jours restants",
     "daysLeft_one": "{{count}} jour restant",
     "offline": "Hors ligne",
-    "offlineReason": "Raison",
     "offlinePassword": "Mot de passe",
     "offlineMode": "Mode hors ligne",
     "offlinePasswordProtected": "Protégé par mot de passe",
     "offlineFileExported": "Fichier de clé exporté",
     "takeOffline": "Mettre hors ligne",
-    "takeOfflineConfirm": "Êtes-vous sûr de vouloir mettre cette CA hors ligne ? Aucun certificat ne sera signé pendant que la CA est hors ligne.",
-    "reason": "Raison de la mise hors ligne",
-    "enterPassword": "Entrez le mot de passe pour restaurer la CA",
     "restore": "Restaurer la CA",
-    "restoreConfirm": "Cette AC a été mise hors ligne avec exportation de la clé. La clé n'est plus disponible — la restauration réactivera la signature uniquement si vous réimportez la clé. Continuer ?",
     "offlineFailed": "Échec de la mise hors ligne de la CA",
     "restoreFailed": "Échec de la restauration de la CA",
     "descriptionPlaceholder": "Description optionnelle pour cette AC",
@@ -623,7 +618,32 @@
       "hsmBacked": "Adossé HSM",
       "hsmKey": "Clé HSM",
       "exportBlockedHsm": "La clé adossée HSM ne peut pas être exportée"
-    }
+    },
+    "offlineExplain": {
+      "title": "Que fait la mise hors ligne d'une AC ?",
+      "body": "Une AC hors ligne ne peut plus signer de nouveaux certificats ni de CRL jusqu'à sa restauration. À utiliser pour les AC racines qui ne sont remises en ligne que pour des cérémonies.",
+      "bullet1": "Toute signature de certificat est bloquée",
+      "bullet2": "La génération de CRL est bloquée",
+      "bullet3": "Les certificats existants restent valides"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "Chiffre la clé privée dans la base de données avec votre mot de passe. L'AC reste dans UCM et se restaure en saisissant le mot de passe.",
+      "fileExported": "Exporte la clé privée chiffrée sous forme de fichier et la retire de la base. UCM ne conserve plus la clé — conservez le fichier en lieu sûr."
+    },
+    "offlineFileExportedWarning": "Après le téléchargement, la clé privée sera définitivement supprimée de cette instance UCM. Vous devez conserver le fichier téléchargé en lieu sûr — c'est la seule copie.",
+    "offlinePasswordHint": "Minimum 12 caractères. Ce mot de passe chiffre la clé privée.",
+    "offlinePasswordConfirm": "Confirmez le mot de passe",
+    "passwordMismatch": "Les mots de passe ne correspondent pas",
+    "takeOfflineAndDownload": "Mettre hors ligne et télécharger la clé",
+    "restoreExplain": {
+      "title": "Restaurer l'AC",
+      "passwordProtected": "Cette AC a été mise hors ligne avec protection par mot de passe. Saisissez le mot de passe pour déchiffrer la clé privée et restaurer la signature.",
+      "fileExported": "Cette AC a été mise hors ligne avec export du fichier de clé. Téléversez le fichier de clé chiffré et saisissez son mot de passe pour restaurer la signature."
+    },
+    "offlineKeyFile": "Fichier de clé chiffré",
+    "offlineKeyFilePick": "Choisir le fichier de clé",
+    "offlineKeyFileTooLarge": "Fichier de clé trop volumineux (max 256 Ko)",
+    "restorePasswordHint": "Le mot de passe utilisé lors de la mise hors ligne de l'AC."
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -1164,7 +1184,8 @@
     "scanNetwork": "Scanner le réseau",
     "generateReport": "Générer un rapport",
     "healthStatus": "État de santé",
-    "remove": "Supprimer"
+    "remove": "Supprimer",
+    "continue": "Continuer"
   },
   "compare": {
     "title": "Comparer les certificats",

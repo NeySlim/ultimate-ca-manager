@@ -425,7 +425,8 @@
     "scanNetwork": "Scansiona rete",
     "generateReport": "Genera report",
     "healthStatus": "Stato di salute",
-    "remove": "Rimuovi"
+    "remove": "Rimuovi",
+    "continue": "Continua"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "Elimina CA",
     "deleteFailed": "Eliminazione CA fallita",
     "exportFailed": "Esportazione CA fallita",
-    "passwordTooShort": "La password deve essere di almeno 4 caratteri",
+    "passwordTooShort": "La password deve contenere almeno 12 caratteri",
     "exportedAs": "CA esportata come {{format}}",
     "createFailed": "Creazione CA fallita",
     "unnamedCA": "CA Senza Nome",
@@ -805,17 +806,12 @@
     "daysLeft": "{{count}} giorni rimanenti",
     "daysLeft_one": "{{count}} giorno rimanente",
     "offline": "Offline",
-    "offlineReason": "Motivo",
     "offlinePassword": "Password",
     "offlineMode": "Modalità offline",
     "offlinePasswordProtected": "Protetto da password",
     "offlineFileExported": "File chiave esportato",
     "takeOffline": "Metti offline",
-    "takeOfflineConfirm": "Sei sicuro di voler mettere questa CA offline? Nessun certificato verrà firmato mentre la CA è offline.",
-    "reason": "Motivo della messa offline",
-    "enterPassword": "Inserisci la password per ripristinare la CA",
     "restore": "Ripristina CA",
-    "restoreConfirm": "Questa CA è stata messa offline con esportazione della chiave. La chiave non è più disponibile: il ripristino abiliterà la firma solo se la chiave viene reimportata. Continuare?",
     "offlineFailed": "Errore nella messa offline della CA",
     "restoreFailed": "Errore nel ripristino della CA",
     "descriptionPlaceholder": "Descrizione opzionale per questa CA",
@@ -853,7 +849,32 @@
       "hsmBacked": "Supportata da HSM",
       "hsmKey": "Chiave HSM",
       "exportBlockedHsm": "La chiave supportata da HSM non può essere esportata"
-    }
+    },
+    "offlineExplain": {
+      "title": "Cosa significa mettere una CA offline?",
+      "body": "Una CA offline non può firmare nuovi certificati né CRL fino al ripristino. Usalo per CA radice che devono essere portate online solo per cerimonie.",
+      "bullet1": "Tutta la firma dei certificati è bloccata",
+      "bullet2": "La generazione delle CRL è bloccata",
+      "bullet3": "I certificati esistenti restano validi"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "Cifra la chiave privata nel database con la tua password. La CA rimane in UCM e si ripristina inserendo la password.",
+      "fileExported": "Esporta la chiave privata cifrata come file e la rimuove dal database. UCM non conserva più la chiave — custodisci il file in luogo sicuro."
+    },
+    "offlineFileExportedWarning": "Dopo il download, la chiave privata verrà rimossa definitivamente da questa istanza UCM. Devi conservare il file scaricato al sicuro — è l'unica copia.",
+    "offlinePasswordHint": "Minimo 12 caratteri. Questa password cifra la chiave privata.",
+    "offlinePasswordConfirm": "Conferma password",
+    "passwordMismatch": "Le password non corrispondono",
+    "takeOfflineAndDownload": "Metti offline e scarica chiave",
+    "restoreExplain": {
+      "title": "Ripristina CA",
+      "passwordProtected": "Questa CA è stata messa offline con protezione tramite password. Inserisci la password per decifrare la chiave privata e ripristinare la firma.",
+      "fileExported": "Questa CA è stata messa offline con esportazione del file chiave. Carica il file chiave cifrato e inserisci la sua password per ripristinare la firma."
+    },
+    "offlineKeyFile": "File chiave cifrato",
+    "offlineKeyFilePick": "Scegli file chiave",
+    "offlineKeyFileTooLarge": "File chiave troppo grande (max 256 KB)",
+    "restorePasswordHint": "La password usata quando la CA è stata messa offline."
   },
   "csrs": {
     "uploadCSR": "Carica CSR",

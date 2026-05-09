@@ -425,7 +425,8 @@
     "scanNetwork": "ネットワークスキャン",
     "generateReport": "レポート生成",
     "healthStatus": "ヘルスステータス",
-    "remove": "削除"
+    "remove": "削除",
+    "continue": "続行"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "CAを削除",
     "deleteFailed": "CAの削除に失敗しました",
     "exportFailed": "CAのエクスポートに失敗しました",
-    "passwordTooShort": "パスワードは4文字以上である必要があります",
+    "passwordTooShort": "パスワードは 12 文字以上である必要があります",
     "exportedAs": "CAを{{format}}としてエクスポートしました",
     "createFailed": "CAの作成に失敗しました",
     "unnamedCA": "名称未設定のCA",
@@ -805,17 +806,12 @@
     "daysLeft": "残り{{count}}日",
     "daysLeft_one": "{{count}} day left",
     "offline": "オフライン",
-    "offlineReason": "理由",
     "offlinePassword": "パスワード",
     "offlineMode": "オフラインモード",
     "offlinePasswordProtected": "パスワード保護",
     "offlineFileExported": "キーファイルのエクスポート",
     "takeOffline": "オフラインにする",
-    "takeOfflineConfirm": "このCAをオフラインにしてもよろしいですか？CAがオフラインの間、証明書は発行されません。",
-    "reason": "オフラインにする理由",
-    "enterPassword": "CAを復元するためのパスワードを入力してください",
     "restore": "CAを復元",
-    "restoreConfirm": "このCAはキーファイルのエクスポートでオフラインにされました。キーは利用できません。復元するとキーを再インポートした場合にのみ署名が再開されます。続行しますか？",
     "offlineFailed": "CAのオフライン化に失敗しました",
     "restoreFailed": "CAの復元に失敗しました",
     "descriptionPlaceholder": "このCAの任意の説明",
@@ -853,7 +849,32 @@
       "hsmBacked": "HSM バック",
       "hsmKey": "HSM 鍵",
       "exportBlockedHsm": "HSM バックの鍵はエクスポートできません"
-    }
+    },
+    "offlineExplain": {
+      "title": "CA をオフラインにすると何が起きますか?",
+      "body": "オフラインの CA は復元するまで新しい証明書や CRL に署名できません。式典のときだけオンラインにするルート CA に使用します。",
+      "bullet1": "すべての証明書署名がブロックされます",
+      "bullet2": "CRL の生成がブロックされます",
+      "bullet3": "既存の証明書は有効なままです"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "データベース内の秘密鍵をパスワードで暗号化します。CA は UCM に残り、パスワードを入力すると復元されます。",
+      "fileExported": "暗号化された秘密鍵をファイルとしてエクスポートし、データベースから削除します。UCM は鍵を保持しません — ファイルを安全に保管してください。"
+    },
+    "offlineFileExportedWarning": "ダウンロード後、秘密鍵はこの UCM インスタンスから完全に削除されます。ダウンロードしたファイルは安全に保管してください — これが唯一のコピーです。",
+    "offlinePasswordHint": "最低 12 文字。このパスワードで秘密鍵を暗号化します。",
+    "offlinePasswordConfirm": "パスワード（確認）",
+    "passwordMismatch": "パスワードが一致しません",
+    "takeOfflineAndDownload": "オフラインにして鍵をダウンロード",
+    "restoreExplain": {
+      "title": "CA を復元",
+      "passwordProtected": "この CA はパスワード保護でオフラインにされました。パスワードを入力して秘密鍵を復号し、署名を復元します。",
+      "fileExported": "この CA は鍵ファイルエクスポートでオフラインにされました。暗号化された鍵ファイルをアップロードし、パスワードを入力して署名を復元します。"
+    },
+    "offlineKeyFile": "暗号化された鍵ファイル",
+    "offlineKeyFilePick": "鍵ファイルを選択",
+    "offlineKeyFileTooLarge": "鍵ファイルが大きすぎます（最大 256 KB）",
+    "restorePasswordHint": "CA をオフラインにしたときに使用したパスワード。"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

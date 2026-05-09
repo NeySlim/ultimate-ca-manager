@@ -46,7 +46,7 @@ export function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
                 </span>
                 <TypeBadge type={ca.type} isMobile={isMobile} t={t} />
                 <HsmBadge ca={ca} t={t} />
-                <StatusBadge status={ca.status} />
+                <StatusBadge status={ca.status} offline={ca.offline} />
                 <OfflineBadge ca={ca} t={t} />
               </div>
               {/* Row 2 */}
