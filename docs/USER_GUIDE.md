@@ -92,6 +92,29 @@ UCM uses a 3-panel layout:
 - Tree view shows parent-child relationships
 - Click any CA to see its details and issued certificates
 
+### Taking a CA Offline
+
+Offline mode prevents a CA from signing anything (CSRs, certificates, intermediate CAs, new CRLs). Useful for Root CAs that should only be brought online during planned signing events.
+
+1. Open the CA detail panel
+2. Click **Take Offline**
+3. Confirm, then enter and confirm an **offline password** (12+ chars, mixed case, digit, symbol — same policy as user passwords)
+4. Choose a mode:
+   - **Keep in UCM** — key stays in the database, re-wrapped under your password (plus the master key on top). Restore = enter password.
+   - **Download file** — key is exported as a password-encrypted PKCS#8 PEM and **deleted from UCM**. Restore = re-upload file + password. The downloaded file is the only copy — store it safely.
+
+The CA list shows an **Offline** badge while offline. Existing CRLs continue to be served via CDP; new CRLs cannot be signed until restore.
+
+### Restoring an Offline CA
+
+1. Open the offline CA's detail panel
+2. Click **Restore**
+3. Enter the offline password
+4. If the CA was exported to file, also select the previously downloaded `.key.pem` file
+5. The CA returns to its previous status and resumes signing
+
+⚠️ Lose the password (or the file in file-exported mode) and the CA is unrecoverable — there is no master override.
+
 ---
 
 ## CSR Management

@@ -295,6 +295,27 @@ Second consolidated audit. Operator-transparent unless noted.
 | **Decoder tools** | `tools/decode-csr` and `tools/decode-cert` capped at 256 KiB → `413` | None |
 | **Users** | Self-change requires current password; `≥1 active admin` invariant enforced | None |
 
+### 12. CA Offline Mode (v2.153)
+
+Operators can now take any CA offline to prevent unauthorized signing. Two modes are exposed:
+
+| Mode | Where the key lives | Restore input |
+|------|--------------------|---------------|
+| `password_protected` | UCM database, re-wrapped with `BestAvailableEncryption(password)` (PKCS#8) under the existing master-key wrap (two layers at rest) | Password only |
+| `file_exported` | Returned to the operator as a single-layer password-encrypted PKCS#8 PEM; `ca.prv` set to `NULL` in the database | Password + re-uploaded `.key.pem` |
+
+Threat model:
+- **Stolen DB only** — `password_protected` keys remain encrypted under both the master key and the offline password. `file_exported` keys are absent entirely.
+- **Stolen DB + master key** — `password_protected` keys still require the offline password. `file_exported` keys are absent.
+- **Stolen offline file** — useless without the password (PKCS#8 password-encrypted; standard cryptography library hardening).
+- **Forgotten password** — no recovery. The CA is unrecoverable. This is by design.
+
+Sign/issue/CRL paths gate on `ca.offline` (see `services/ca/ca_signing.py:31`, `csrs.py:689`, `services/cert/mixins/csr.py`, `crl.py:97`). The `update_ca` endpoint can no longer flip the `offline` flag — only the dedicated `take_offline` / `restore` endpoints do, both of which require the password.
+
+Audit actions: `ca.offline.password_protected`, `ca.offline.file_exported`, `ca.restore.password_protected`, `ca.restore.file_exported`. The legacy free-text "offline reason" field is no longer collected — the mode IS the audit record.
+
+Password policy for the offline password is the same as the user password policy (12+ chars, mixed classes, no 4+ sequential).
+
 ---
 
 ## Security Best Practices
