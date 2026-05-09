@@ -9,6 +9,8 @@ import {
   CATypeIcon
 } from '../../components'
 import { ExportModal } from '../../components/ExportModal'
+import { TakeOfflineModal } from '../../components/cas/TakeOfflineModal'
+import { RestoreModal } from '../../components/cas/RestoreModal'
 import { formatDate } from '../../lib/utils'
 import { useNotification } from '../../contexts/NotificationContext'
 
@@ -18,7 +20,8 @@ import { useNotification } from '../../contexts/NotificationContext'
 
 export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
-  const { showPrompt } = useNotification()
+  const [showOfflineModal, setShowOfflineModal] = useState(false)
+  const [showRestoreModal, setShowRestoreModal] = useState(false)
   return (
     <>
     <div className="p-3 space-y-3">
@@ -52,28 +55,15 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
             <ShieldWarning size={16} />
             <span className="text-xs font-medium">{t('cas.offline')}</span>
           </div>
-          {ca.offline_reason && (
-            <p className="text-xs text-text-tertiary mt-1">{ca.offline_reason}</p>
-          )}
           {canWrite('cas') && (
             <Button
               type="button"
               size="xs"
               variant="secondary"
               className="mt-1.5"
-              onClick={async () => {
-                const pw = await showPrompt(t('cas.enterPassword'), {
-                  title: t('cas.restore'),
-                  type: 'password',
-                  placeholder: t('common.password'),
-                  confirmText: t('cas.restore')
-                })
-                if (pw) {
-                  onExport('restore', pw)
-                }
-              }}
+              onClick={() => setShowRestoreModal(true)}
             >
-              {t('cas.offline.restore')}
+              {t('cas.restore')}
             </Button>
           )}
         </div>
@@ -83,7 +73,9 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
       <CompactStats stats={[
         { icon: Certificate, value: t('cas.certificateCount', { count: ca.certs || 0 }) },
         { icon: Clock, value: ca.valid_to ? formatDate(ca.valid_to, 'short') : '—' },
-        { badge: ca.status, badgeVariant: ca.status === 'Active' ? 'success' : 'danger' }
+        ca.offline
+          ? { badge: t('cas.offline'), badgeVariant: 'warning' }
+          : { badge: ca.status, badgeVariant: ca.status === 'Active' ? 'success' : 'danger' }
       ]} />
 
       {/* Export + Delete Actions */}
@@ -96,19 +88,9 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
             type="button"
             size="xs"
             variant="danger"
-            onClick={async () => {
-              const reason = await showPrompt(t('cas.reason'), {
-                title: t('cas.takeOffline'),
-                type: 'text',
-                placeholder: t('cas.reason'),
-                confirmText: t('cas.takeOffline')
-              })
-              if (reason !== null) {
-                onExport('offline', reason || '')
-              }
-            }}
+            onClick={() => setShowOfflineModal(true)}
           >
-            <ShieldWarning size={12} className="sm:w-3.5 sm:h-3.5" /> {t('cas.offline.takeOffline')}
+            <ShieldWarning size={12} className="sm:w-3.5 sm:h-3.5" /> {t('cas.takeOffline')}
           </Button>
         )}
         {canDelete('cas') && (
@@ -177,6 +159,18 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
       canExportKey={canWrite('cas') && !ca.uses_hsm}
       isHsmBacked={!!ca.uses_hsm}
       onExport={onExport}
+    />
+
+    <TakeOfflineModal
+      open={showOfflineModal}
+      onClose={() => setShowOfflineModal(false)}
+      ca={ca}
+    />
+
+    <RestoreModal
+      open={showRestoreModal}
+      onClose={() => setShowRestoreModal(false)}
+      ca={ca}
     />
     </>
   )

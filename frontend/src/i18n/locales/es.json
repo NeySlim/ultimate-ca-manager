@@ -425,7 +425,8 @@
     "scanNetwork": "Escanear red",
     "generateReport": "Generar informe",
     "healthStatus": "Estado de salud",
-    "remove": "Eliminar"
+    "remove": "Eliminar",
+    "continue": "Continuar"
   },
   "commandPalette": {
     "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "Eliminar CA",
     "deleteFailed": "Error to eliminar CA",
     "exportFailed": "Error to exportar CA",
-    "passwordTooShort": "Contraseña must be at least 4 characters",
+    "passwordTooShort": "La contraseña debe tener al menos 12 caracteres",
     "exportedAs": "CA exportared as {{format}}",
     "createFailed": "Error to crear CA",
     "unnamedCA": "Unnombred CA",
@@ -805,17 +806,12 @@
     "daysLeft": "{{count}} días restantes",
     "daysLeft_one": "{{count}} día restante",
     "offline": "Desconectado",
-    "offlineReason": "Motivo",
     "offlinePassword": "Contraseña",
     "offlineMode": "Modo desconectado",
     "offlinePasswordProtected": "Protegido por contraseña",
     "offlineFileExported": "Archivo de clave exportado",
     "takeOffline": "Desconectar",
-    "takeOfflineConfirm": "¿Está seguro de que desea desconectar esta CA? No se firmarán certificados mientras la CA esté desconectada.",
-    "reason": "Motivo de la desconexión",
-    "enterPassword": "Ingrese la contraseña para restaurar la CA",
     "restore": "Restaurar CA",
-    "restoreConfirm": "Esta CA se puso fuera de línea con exportación de clave. La clave ya no está disponible; la restauración reactivará la firma solo si vuelve a importar la clave. ¿Continuar?",
     "offlineFailed": "Error al desconectar la CA",
     "restoreFailed": "Error al restaurar la CA",
     "descriptionPlaceholder": "Descripción opcional para esta CA",
@@ -853,7 +849,32 @@
       "hsmBacked": "Respaldada por HSM",
       "hsmKey": "Clave HSM",
       "exportBlockedHsm": "La clave respaldada por HSM no se puede exportar"
-    }
+    },
+    "offlineExplain": {
+      "title": "¿Qué hace poner una CA fuera de línea?",
+      "body": "Una CA fuera de línea no puede firmar nuevos certificados ni CRL hasta su restauración. Úselo para CA raíz que solo deben ponerse en línea para ceremonias.",
+      "bullet1": "Toda firma de certificados está bloqueada",
+      "bullet2": "La generación de CRL está bloqueada",
+      "bullet3": "Los certificados existentes siguen siendo válidos"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "Cifra la clave privada en la base de datos con su contraseña. La CA permanece en UCM y se restaura introduciendo la contraseña.",
+      "fileExported": "Exporta la clave privada cifrada como archivo y la elimina de la base de datos. UCM ya no conserva la clave — guarde el archivo en lugar seguro."
+    },
+    "offlineFileExportedWarning": "Tras la descarga, la clave privada se eliminará permanentemente de esta instancia UCM. Debe conservar el archivo descargado a salvo — es la única copia.",
+    "offlinePasswordHint": "Mínimo 12 caracteres. Esta contraseña cifra la clave privada.",
+    "offlinePasswordConfirm": "Confirmar contraseña",
+    "passwordMismatch": "Las contraseñas no coinciden",
+    "takeOfflineAndDownload": "Poner fuera de línea y descargar clave",
+    "restoreExplain": {
+      "title": "Restaurar CA",
+      "passwordProtected": "Esta CA se puso fuera de línea con protección por contraseña. Introduzca la contraseña para descifrar la clave privada y restaurar la firma.",
+      "fileExported": "Esta CA se puso fuera de línea con exportación de archivo de clave. Suba el archivo de clave cifrado e introduzca su contraseña para restaurar la firma."
+    },
+    "offlineKeyFile": "Archivo de clave cifrado",
+    "offlineKeyFilePick": "Elegir archivo de clave",
+    "offlineKeyFileTooLarge": "El archivo de clave es demasiado grande (máx. 256 KB)",
+    "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea."
   },
   "csrs": {
     "uploadCSR": "Subir CSR",

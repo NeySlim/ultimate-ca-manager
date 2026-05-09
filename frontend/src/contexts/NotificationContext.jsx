@@ -64,7 +64,6 @@ export function NotificationProvider({ children }) {
         title: options.title || 'Input Required',
         placeholder: options.placeholder || '',
         type: options.type || 'text',
-        options: options.options || [],
         confirmText: options.confirmText || 'OK',
         cancelText: options.cancelText || 'Cancel',
         resolve
@@ -74,9 +73,7 @@ export function NotificationProvider({ children }) {
 
   const handlePrompt = (result) => {
     if (promptDialog) {
-      const isSelect = promptDialog.type === 'select'
-      const value = isSelect ? promptValue : (result ? promptValue : null)
-      promptDialog.resolve(result ? value : null)
+      promptDialog.resolve(result ? promptValue : null)
       setPromptDialog(null)
       setPromptValue('')
     }

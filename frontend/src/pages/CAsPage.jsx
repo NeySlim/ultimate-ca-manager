@@ -221,27 +221,9 @@ export default function CAsPage() {
     }
   }
 
-  const handleOffline = async (ca, reason) => {
-    try {
-      await casService.takeOffline(ca.id, { reason })
-      showSuccess(t('messages.success.offline.ca'))
-      loadCAs()
-      if (selectedCA?.id === ca.id) setSelectedCA(null)
-    } catch (error) {
-      showError(error.message || t('cas.offlineFailed'))
-    }
-  }
-
-  const handleRestore = async (ca, password) => {
-    try {
-      await casService.restore(ca.id, { password })
-      showSuccess(t('messages.success.restore.ca'))
-      loadCAs()
-      if (selectedCA?.id === ca.id) setSelectedCA(null)
-    } catch (error) {
-      showError(error.message || t('cas.restoreFailed'))
-    }
-  }
+  // CA offline / restore are driven by TakeOfflineModal / RestoreModal in
+  // CADetailsPanel — they call casService directly and dispatch
+  // 'ucm:data-changed' which this page already listens to.
 
   // Check if intermediate CA is orphan
   const isOrphanIntermediate = useCallback((ca) => {
@@ -407,11 +389,7 @@ export default function CAsPage() {
             ca={selectedCA}
             canWrite={canWrite}
             canDelete={canDelete}
-            onExport={(format, options) => {
-              if (format === 'offline') return handleOffline(selectedCA, options)
-              if (format === 'restore') return handleRestore(selectedCA, options)
-              return handleExport(selectedCA, format, options)
-            }}
+            onExport={(format, options) => handleExport(selectedCA, format, options)}
             onDelete={() => handleDelete(selectedCA.id)}
             t={t}
           />

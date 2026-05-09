@@ -425,7 +425,8 @@
     "scanNetwork": "扫描网络",
     "generateReport": "生成报告",
     "healthStatus": "健康状态",
-    "remove": "移除"
+    "remove": "移除",
+    "continue": "继续"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "删除 CA",
     "deleteFailed": "删除 CA 失败",
     "exportFailed": "导出 CA 失败",
-    "passwordTooShort": "密码长度至少为 4 个字符",
+    "passwordTooShort": "密码必须至少 12 个字符",
     "exportedAs": "CA 已导出为 {{format}}",
     "createFailed": "创建 CA 失败",
     "unnamedCA": "未命名 CA",
@@ -805,17 +806,12 @@
     "daysLeft": "剩余{{count}}天",
     "daysLeft_one": "{{count}} day left",
     "offline": "离线",
-    "offlineReason": "原因",
     "offlinePassword": "密码",
     "offlineMode": "离线模式",
     "offlinePasswordProtected": "密码保护",
     "offlineFileExported": "密钥文件已导出",
     "takeOffline": "设为离线",
-    "takeOfflineConfirm": "确定要将此CA设为离线吗？CA离线期间将不会签发任何证书。",
-    "reason": "设为离线的原因",
-    "enterPassword": "输入密码以恢复CA",
     "restore": "恢复CA",
-    "restoreConfirm": "此CA通过密钥文件导出设为离线。密钥已不可用——恢复后仅在重新导入密钥时才能重新启用签名。继续吗？",
     "offlineFailed": "将CA设为离线失败",
     "restoreFailed": "恢复CA失败",
     "descriptionPlaceholder": "此CA的可选描述",
@@ -853,7 +849,32 @@
       "hsmBacked": "HSM 支持",
       "hsmKey": "HSM 密钥",
       "exportBlockedHsm": "无法导出由 HSM 支持的密钥"
-    }
+    },
+    "offlineExplain": {
+      "title": "将 CA 设为离线会做什么？",
+      "body": "离线的 CA 在恢复之前无法签发新证书或 CRL。适用于仅在仪式时上线的根 CA。",
+      "bullet1": "所有证书签发被阻止",
+      "bullet2": "CRL 生成被阻止",
+      "bullet3": "现有证书仍然有效"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "使用您的密码加密数据库中的私钥。CA 仍在 UCM 中，输入密码即可恢复。",
+      "fileExported": "将加密的私钥导出为文件并从数据库中删除。UCM 不再持有该密钥 — 请妥善保管文件。"
+    },
+    "offlineFileExportedWarning": "下载后，私钥将从此 UCM 实例中永久删除。您必须妥善保管下载的文件 — 它是唯一的副本。",
+    "offlinePasswordHint": "至少 12 个字符。此密码用于加密私钥。",
+    "offlinePasswordConfirm": "确认密码",
+    "passwordMismatch": "密码不一致",
+    "takeOfflineAndDownload": "设为离线并下载密钥",
+    "restoreExplain": {
+      "title": "恢复 CA",
+      "passwordProtected": "此 CA 以密码保护方式离线。请输入密码以解密私钥并恢复签发。",
+      "fileExported": "此 CA 以密钥文件导出方式离线。请上传加密的密钥文件并输入密码以恢复签发。"
+    },
+    "offlineKeyFile": "加密的密钥文件",
+    "offlineKeyFilePick": "选择密钥文件",
+    "offlineKeyFileTooLarge": "密钥文件过大（最大 256 KB）",
+    "restorePasswordHint": "将 CA 设为离线时使用的密码。"
   },
   "csrs": {
     "uploadCSR": "上传CSR",

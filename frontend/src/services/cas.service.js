@@ -46,12 +46,35 @@ export const casService = {
     }, { responseType: 'blob' })
   },
 
-  async takeOffline(id, data = {}) {
-    return apiClient.post(`/cas/${id}/offline`, data)
+  /**
+   * Take a CA offline.
+   * - mode 'password_protected': returns JSON (CA payload)
+   * - mode 'file_exported': returns a Blob (encrypted .key file to save locally)
+   */
+  async takeOffline(id, { password, mode = 'password_protected' } = {}) {
+    if (mode === 'file_exported') {
+      return apiClient.post(
+        `/cas/${id}/offline`,
+        { password, mode },
+        { responseType: 'blob' }
+      )
+    }
+    return apiClient.post(`/cas/${id}/offline`, { password, mode })
   },
 
-  async restore(id, data = {}) {
-    return apiClient.post(`/cas/${id}/restore`, data)
+  /**
+   * Restore an offline CA.
+   * - password_protected: pass { password }
+   * - file_exported: pass { password, keyFile: File }
+   */
+  async restore(id, { password, keyFile } = {}) {
+    if (keyFile) {
+      const fd = new FormData()
+      fd.append('password', password || '')
+      fd.append('key_file', keyFile)
+      return apiClient.upload(`/cas/${id}/restore`, fd)
+    }
+    return apiClient.post(`/cas/${id}/restore`, { password })
   },
 
   async getCertificates(id, filters = {}) {

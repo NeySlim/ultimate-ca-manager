@@ -574,26 +574,17 @@ def update_ca(ca_id):
         if new_val != bool(getattr(ca, 'is_active', None)):
             changed.append('is_active')
         ca.is_active = new_val
-    if 'offline' in data:
-        new_val = bool(data['offline'])
-        if new_val != bool(ca.offline):
-            changed.append('offline')
-        ca.offline = new_val
-    if 'offline_reason' in data:
-        reason = data['offline_reason']
-        if reason is not None and isinstance(reason, str) and len(reason) > _MAX_DESCRIPTION_LEN:
-            return error_response(f'offline_reason too long (max {_MAX_DESCRIPTION_LEN} chars)', 400)
-        ca.offline_reason = reason
-        if 'offline' in data and data['offline'] and not reason:
-            changed.append('offline_reason')
-    if 'offline_mode' in data:
-        new_val = data['offline_mode']
-        allowed_modes = (None, 'password_protected', 'file_exported')
-        if new_val not in allowed_modes:
-            return error_response(f'Invalid offline_mode: must be one of {allowed_modes}', 400)
-        if new_val != ca.offline_mode:
-            changed.append('offline_mode')
-        ca.offline_mode = new_val
+    # Offline state is mutated EXCLUSIVELY through the dedicated /offline and
+    # /restore endpoints (they enforce password complexity + real key
+    # encryption / decryption). Silently ignore any attempt to set
+    # offline/offline_reason/offline_mode through the generic update path.
+    for forbidden in ('offline', 'offline_reason', 'offline_mode'):
+        if forbidden in data:
+            logger.warning(
+                "Ignoring attempt to mutate '%s' through PUT /api/v2/cas/%s "
+                "(use /offline or /restore instead)",
+                forbidden, ca_id
+            )
 
     try:
         db.session.commit()
@@ -686,28 +677,93 @@ def delete_ca(ca_id):
 
 @bp.route('/api/v2/cas/<int:ca_id>/offline', methods=['POST'])
 @require_auth(['write:cas'])
-@require_json_body
 def take_ca_offline(ca_id):
-    """Take a CA offline."""
+    """Take a CA offline by encrypting its private key with a user-supplied
+    password.
+
+    Two modes:
+
+    - ``password_protected`` (default): the key is re-encrypted with the user
+      password (PKCS#8 + ``BestAvailableEncryption``) and stored back in the
+      DB under the master-key wrap. Restore needs the same password.
+    - ``file_exported``: same key encryption is returned to the caller as a
+      ``.key`` file download and **removed** from the DB. Restore needs the
+      file uploaded back together with the password.
+
+    Body (JSON): ``{password: str, mode: 'password_protected'|'file_exported'}``
+    """
+    from security.password_policy import validate_password
+    from security.encryption import (
+        decrypt_private_key, encrypt_private_key,
+    )
+    from utils.key_codec import load_pem_bytes, store_pem_bytes
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+    from flask import Response
+
     ca = CA.query.get(ca_id)
     if not ca:
         return error_response('CA not found', 404)
 
-    data = g.json_data or {}
-    reason = data.get('reason', '')
-    if reason and isinstance(reason, str) and len(reason) > _MAX_DESCRIPTION_LEN:
-        return error_response(f'reason too long (max {_MAX_DESCRIPTION_LEN} chars)', 400)
+    if ca.offline:
+        return error_response('CA is already offline', 409)
+
+    if not ca.prv:
+        return error_response(
+            'CA has no in-DB private key to take offline (HSM-backed or '
+            'externally-stored CAs cannot be taken offline through this flow)',
+            400
+        )
+
+    # Accept JSON OR multipart (multipart unused for offline today, kept
+    # symmetric with /restore which DOES need multipart for file_exported)
+    data = request.get_json(silent=True) or {}
+    password = (data.get('password') or '').strip()
     mode = data.get('mode', 'password_protected')
+
     if mode not in ('password_protected', 'file_exported'):
-        mode = 'password_protected'
-    old_mode = ca.offline_mode
-    old_reason = ca.offline_reason
-    old_offline = ca.offline
+        return error_response(
+            "Invalid mode: must be 'password_protected' or 'file_exported'", 400
+        )
+
+    # Password complexity (canonical UCM policy)
+    ok, errs = validate_password(password)
+    if not ok:
+        return error_response(
+            'Password does not meet complexity requirements: ' + '; '.join(errs),
+            400
+        )
+
+    # Load + re-encrypt the private key
+    try:
+        master_decrypted = decrypt_private_key(ca.prv)
+        if not master_decrypted:
+            raise ValueError('CA private key is empty after master decryption')
+        pem_bytes = load_pem_bytes(master_decrypted.encode() if isinstance(master_decrypted, str) else master_decrypted,
+                                   context=f"CA {ca_id}")
+        priv = serialization.load_pem_private_key(
+            pem_bytes, password=None, backend=default_backend()
+        )
+        encrypted_pem = priv.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.BestAvailableEncryption(password.encode('utf-8')),
+        )
+    except Exception as e:
+        logger.error(f"take_ca_offline: failed to encrypt key for CA {ca_id}: {e}")
+        return error_response('Failed to encrypt CA private key', 500)
 
     try:
+        if mode == 'password_protected':
+            # Store user-encrypted PEM under master-key wrap (defense-in-depth)
+            ca.prv = encrypt_private_key(store_pem_bytes(encrypted_pem))
+        else:  # file_exported
+            # Wipe key from DB; caller receives the only copy as a download
+            ca.prv = None
+
         ca.offline = True
-        ca.offline_reason = reason
         ca.offline_mode = mode
+        ca.offline_reason = None  # legacy field, no longer collected
         db.session.commit()
 
         AuditService.log_action(
@@ -715,47 +771,118 @@ def take_ca_offline(ca_id):
             resource_type='ca',
             resource_id=ca_id,
             resource_name=ca.descr,
-            details=f"CA taken offline: mode={mode}, reason={reason or 'none'}",
+            details=f"CA taken offline: mode={mode}",
             success=True
         )
+
+        if mode == 'file_exported':
+            from utils.sanitize import sanitize_filename
+            fname = f"{sanitize_filename(ca.descr or ca.refid or f'ca-{ca_id}')}-offline.key"
+            return Response(
+                encrypted_pem,
+                mimetype='application/x-pem-file',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{fname}"',
+                    'X-UCM-Offline-Mode': 'file_exported',
+                }
+            )
+
         return success_response(data=ca.to_dict(), message='CA taken offline')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to take CA offline: {e}")
+        logger.error(f"take_ca_offline: DB write failed for CA {ca_id}: {e}")
         return error_response('Failed to take CA offline', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/restore', methods=['POST'])
 @require_auth(['write:cas'])
-@require_json_body
 def restore_ca(ca_id):
-    """Restore a CA to online state."""
+    """Restore an offline CA back to online state.
+
+    - ``password_protected``: JSON ``{password}``. The DB-stored key is
+      decrypted with the password; on success it is re-stored unencrypted
+      (under the master-key wrap) and the CA is marked online.
+    - ``file_exported``: multipart ``password`` field + ``key_file`` upload
+      of the previously downloaded encrypted PEM. Same verification, same
+      re-storage path.
+    """
+    from security.encryption import decrypt_private_key, encrypt_private_key
+    from utils.key_codec import load_pem_bytes, store_pem_bytes
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+
     ca = CA.query.get(ca_id)
     if not ca:
         return error_response('CA not found', 404)
 
-    data = g.json_data or {}
-    mode = data.get('mode', ca.offline_mode or 'password_protected')
+    if not ca.offline:
+        return error_response('CA is not offline', 409)
 
-    if mode == 'password_protected':
-        password = data.get('password')
-        if not password:
-            return error_response('Password required for password-protected CA', 400)
-        try:
-            from security.encryption import decrypt_private_key
-            from utils.key_codec import load_pem_bytes
-            decrypted = decrypt_private_key(ca.prv)
-            pem_bytes = load_pem_bytes(decrypted.encode(), context=f"CA {ca_id}")
-            if len(pem_bytes) < 64:
-                raise ValueError("Key too short, password likely incorrect")
-        except Exception as e:
-            logger.warning(f"CA offline restore: password verification failed for CA {ca_id}: {e}")
-            return error_response('Invalid password', 401)
+    mode = ca.offline_mode or 'password_protected'
 
+    # Detect transport: multipart for file upload, JSON otherwise.
+    if request.content_type and request.content_type.startswith('multipart/'):
+        password = (request.form.get('password') or '').strip()
+        upload = request.files.get('key_file')
+    else:
+        body = request.get_json(silent=True) or {}
+        password = (body.get('password') or '').strip()
+        upload = None
+
+    if not password:
+        return error_response('Password is required', 400)
+
+    # Obtain the encrypted PEM bytes
     try:
+        if mode == 'password_protected':
+            if not ca.prv:
+                return error_response(
+                    'CA has no in-DB encrypted key — was it taken offline as '
+                    'file_exported? Use the file upload flow.',
+                    409
+                )
+            wrapped = decrypt_private_key(ca.prv)
+            encrypted_pem = load_pem_bytes(
+                wrapped.encode() if isinstance(wrapped, str) else wrapped,
+                context=f"CA {ca_id}"
+            )
+        else:  # file_exported
+            if upload is None:
+                return error_response(
+                    'Encrypted key file is required (field name: key_file)', 400
+                )
+            encrypted_pem = upload.read()
+            if not encrypted_pem or len(encrypted_pem) > 256 * 1024:
+                return error_response('Uploaded key file is empty or too large', 400)
+    except Exception as e:
+        logger.error(f"restore_ca: failed to load encrypted PEM for CA {ca_id}: {e}")
+        return error_response('Failed to read encrypted CA key', 500)
+
+    # Verify password by attempting decryption
+    try:
+        priv = serialization.load_pem_private_key(
+            encrypted_pem, password=password.encode('utf-8'),
+            backend=default_backend()
+        )
+    except (ValueError, TypeError) as e:
+        # cryptography raises ValueError on bad password / malformed PEM
+        logger.warning(f"restore_ca: password rejected for CA {ca_id}: {e}")
+        return error_response('Invalid password or corrupted key file', 401)
+    except Exception as e:
+        logger.error(f"restore_ca: unexpected error decrypting key for CA {ca_id}: {e}")
+        return error_response('Failed to decrypt CA key', 500)
+
+    # Re-serialize unencrypted, re-wrap with master key, store
+    try:
+        plain_pem = priv.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        ca.prv = encrypt_private_key(store_pem_bytes(plain_pem))
         ca.offline = False
-        ca.offline_reason = None
         ca.offline_mode = None
+        ca.offline_reason = None
         db.session.commit()
 
         AuditService.log_action(
@@ -763,11 +890,11 @@ def restore_ca(ca_id):
             resource_type='ca',
             resource_id=ca_id,
             resource_name=ca.descr,
-            details=f"CA restored to online state (was mode={mode})",
+            details=f"CA restored from offline (mode={mode})",
             success=True
         )
         return success_response(data=ca.to_dict(), message='CA restored to online state')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to restore CA: {e}")
+        logger.error(f"restore_ca: DB write failed for CA {ca_id}: {e}")
         return error_response('Failed to restore CA', 500)

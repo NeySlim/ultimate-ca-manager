@@ -425,7 +425,8 @@
     "scanNetwork": "Netzwerk scannen",
     "generateReport": "Bericht generieren",
     "healthStatus": "Gesundheitsstatus",
-    "remove": "Entfernen"
+    "remove": "Entfernen",
+    "continue": "Weiter"
   },
   "commandPalette": {
     "searchPlaceholder": "Befehle, Zertifikate, CAs, Benutzer suchen...",
@@ -792,7 +793,7 @@
     "deleteCAButton": "CA löschen",
     "deleteFailed": "Fehler beim Löschen der CA",
     "exportFailed": "Fehler beim Exportieren der CA",
-    "passwordTooShort": "Passwort muss mindestens 4 Zeichen lang sein",
+    "passwordTooShort": "Passwort muss mindestens 12 Zeichen lang sein",
     "exportedAs": "CA als {{format}} exportiert",
     "createFailed": "Fehler beim Erstellen der CA",
     "unnamedCA": "Unbenannte CA",
@@ -805,17 +806,12 @@
     "daysLeft": "{{count}} Tage übrig",
     "daysLeft_one": "{{count}} Tag übrig",
     "offline": "Offline",
-    "offlineReason": "Begründung",
     "offlinePassword": "Passwort",
     "offlineMode": "Offline-Modus",
     "offlinePasswordProtected": "Passwortgeschützt",
     "offlineFileExported": "Schlüsseldatei exportiert",
     "takeOffline": "Offline schalten",
-    "takeOfflineConfirm": "Sind Sie sicher, dass Sie diese CA offline schalten möchten? Während die CA offline ist, werden keine Zertifikate ausgestellt.",
-    "reason": "Begründung für die Offline-Schaltung",
-    "enterPassword": "Passwort zur Wiederherstellung der CA eingeben",
     "restore": "CA wiederherstellen",
-    "restoreConfirm": "Diese CA wurde mit Schlüsselauslagerung offline geschaltet. Der Schlüssel ist nicht mehr verfügbar — die Wiederherstellung ermöglicht das Signieren nur, wenn Sie den Schlüssel wieder importieren. Fortsetzen?",
     "offlineFailed": "Fehler beim Offline-Schalten der CA",
     "restoreFailed": "Fehler bei der Wiederherstellung der CA",
     "descriptionPlaceholder": "Optionale Beschreibung für diese CA",
@@ -853,7 +849,32 @@
       "hsmBacked": "HSM-gesichert",
       "hsmKey": "HSM-Schlüssel",
       "exportBlockedHsm": "HSM-gesicherter Schlüssel kann nicht exportiert werden"
-    }
+    },
+    "offlineExplain": {
+      "title": "Was bewirkt das Offline-Schalten einer CA?",
+      "body": "Eine Offline-CA kann bis zur Wiederherstellung keine neuen Zertifikate oder CRLs signieren. Geeignet für Root-CAs, die nur für Zeremonien online gebracht werden sollen.",
+      "bullet1": "Jegliche Zertifikatssignierung ist blockiert",
+      "bullet2": "CRL-Erzeugung ist blockiert",
+      "bullet3": "Bestehende Zertifikate bleiben gültig"
+    },
+    "offlineModeDesc": {
+      "passwordProtected": "Verschlüsselt den privaten Schlüssel mit Ihrem Passwort in der Datenbank. Die CA bleibt in UCM und wird durch Passworteingabe wiederhergestellt.",
+      "fileExported": "Exportiert den verschlüsselten privaten Schlüssel als Datei und entfernt ihn aus der Datenbank. UCM hält den Schlüssel nicht mehr — bewahren Sie die Datei sicher auf."
+    },
+    "offlineFileExportedWarning": "Nach dem Download wird der private Schlüssel dauerhaft aus dieser UCM-Instanz entfernt. Bewahren Sie die heruntergeladene Datei sicher auf — sie ist die einzige Kopie.",
+    "offlinePasswordHint": "Mindestens 12 Zeichen. Dieses Passwort verschlüsselt den privaten Schlüssel.",
+    "offlinePasswordConfirm": "Passwort bestätigen",
+    "passwordMismatch": "Passwörter stimmen nicht überein",
+    "takeOfflineAndDownload": "Offline schalten & Schlüssel herunterladen",
+    "restoreExplain": {
+      "title": "CA wiederherstellen",
+      "passwordProtected": "Diese CA wurde mit Passwortschutz offline geschaltet. Geben Sie das Passwort ein, um den privaten Schlüssel zu entschlüsseln und die Signierung wiederherzustellen.",
+      "fileExported": "Diese CA wurde mit Schlüsseldatei-Export offline geschaltet. Laden Sie die verschlüsselte Schlüsseldatei hoch und geben Sie das Passwort ein, um die Signierung wiederherzustellen."
+    },
+    "offlineKeyFile": "Verschlüsselte Schlüsseldatei",
+    "offlineKeyFilePick": "Schlüsseldatei wählen",
+    "offlineKeyFileTooLarge": "Schlüsseldatei zu groß (max 256 KB)",
+    "restorePasswordHint": "Das beim Offline-Schalten der CA verwendete Passwort."
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",
