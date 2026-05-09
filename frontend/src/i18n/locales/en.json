@@ -815,6 +815,7 @@
     "reason": "Reason for taking offline",
     "enterPassword": "Enter password to restore CA",
     "restore": "Restore CA",
+    "restoreConfirm": "This CA was taken offline with key file export. The key is no longer available — restoring will re-enable signing only if you re-import the key. Continue?",
     "offlineFailed": "Failed to take CA offline",
     "restoreFailed": "Failed to restore CA",
     "descriptionPlaceholder": "Optional description for this CA",

@@ -585,6 +585,7 @@
     "reason": "Raison de la mise hors ligne",
     "enterPassword": "Entrez le mot de passe pour restaurer la CA",
     "restore": "Restaurer la CA",
+    "restoreConfirm": "Cette AC a été mise hors ligne avec exportation de la clé. La clé n'est plus disponible — la restauration réactivera la signature uniquement si vous réimportez la clé. Continuer ?",
     "offlineFailed": "Échec de la mise hors ligne de la CA",
     "restoreFailed": "Échec de la restauration de la CA",
     "descriptionPlaceholder": "Description optionnelle pour cette AC",

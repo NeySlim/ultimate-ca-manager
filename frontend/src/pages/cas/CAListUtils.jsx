@@ -108,8 +108,8 @@ export function OfflineBadge({ ca, t }) {
   const mode = ca.offline_mode || 'password_protected'
   const reason = ca.offline_reason || ''
   const modeLabel = mode === 'file_exported'
-    ? t('cas.offline.fileExported')
-    : t('cas.offline.passwordProtected')
+    ? t('cas.offlineFileExported')
+    : t('cas.offlinePasswordProtected')
   return (
     <span
       className={cn(
@@ -118,7 +118,7 @@ export function OfflineBadge({ ca, t }) {
       )}
       title={reason || modeLabel}
     >
-      ⚠ {t('cas.offline.offline')}
+      ⚠ {t('cas.offline')}
     </span>
   )
 }

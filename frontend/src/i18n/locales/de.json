@@ -815,6 +815,7 @@
     "reason": "Begründung für die Offline-Schaltung",
     "enterPassword": "Passwort zur Wiederherstellung der CA eingeben",
     "restore": "CA wiederherstellen",
+    "restoreConfirm": "Diese CA wurde mit Schlüsselauslagerung offline geschaltet. Der Schlüssel ist nicht mehr verfügbar — die Wiederherstellung ermöglicht das Signieren nur, wenn Sie den Schlüssel wieder importieren. Fortsetzen?",
     "offlineFailed": "Fehler beim Offline-Schalten der CA",
     "restoreFailed": "Fehler bei der Wiederherstellung der CA",
     "descriptionPlaceholder": "Optionale Beschreibung für diese CA",

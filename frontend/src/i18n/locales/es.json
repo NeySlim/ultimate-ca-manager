@@ -815,6 +815,7 @@
     "reason": "Motivo de la desconexión",
     "enterPassword": "Ingrese la contraseña para restaurar la CA",
     "restore": "Restaurar CA",
+    "restoreConfirm": "Esta CA se puso fuera de línea con exportación de clave. La clave ya no está disponible; la restauración reactivará la firma solo si vuelve a importar la clave. ¿Continuar?",
     "offlineFailed": "Error al desconectar la CA",
     "restoreFailed": "Error al restaurar la CA",
     "descriptionPlaceholder": "Descripción opcional para esta CA",

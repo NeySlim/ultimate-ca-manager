@@ -815,6 +815,7 @@
     "reason": "Motivo della messa offline",
     "enterPassword": "Inserisci la password per ripristinare la CA",
     "restore": "Ripristina CA",
+    "restoreConfirm": "Questa CA è stata messa offline con esportazione della chiave. La chiave non è più disponibile: il ripristino abiliterà la firma solo se la chiave viene reimportata. Continuare?",
     "offlineFailed": "Errore nella messa offline della CA",
     "restoreFailed": "Errore nel ripristino della CA",
     "descriptionPlaceholder": "Descrizione opzionale per questa CA",

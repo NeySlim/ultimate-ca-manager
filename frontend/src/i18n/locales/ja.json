@@ -815,6 +815,7 @@
     "reason": "オフラインにする理由",
     "enterPassword": "CAを復元するためのパスワードを入力してください",
     "restore": "CAを復元",
+    "restoreConfirm": "このCAはキーファイルのエクスポートでオフラインにされました。キーは利用できません。復元するとキーを再インポートした場合にのみ署名が再開されます。続行しますか？",
     "offlineFailed": "CAのオフライン化に失敗しました",
     "restoreFailed": "CAの復元に失敗しました",
     "descriptionPlaceholder": "このCAの任意の説明",

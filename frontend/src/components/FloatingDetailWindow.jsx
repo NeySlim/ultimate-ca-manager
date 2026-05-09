@@ -192,9 +192,19 @@ export function FloatingDetailWindow({ windowInfo }) {
       confirmText: t('cas.takeOffline')
     })
     if (reason === null) return
+    const mode = await showPrompt(t('cas.offlineMode'), {
+      title: t('cas.offlineMode'),
+      type: 'select',
+      options: [
+        { value: 'password_protected', label: t('cas.offlinePasswordProtected') },
+        { value: 'file_exported', label: t('cas.offlineFileExported') }
+      ],
+      confirmText: t('common.confirm')
+    })
+    if (mode === null) return
     try {
-      await casService.takeOffline(windowInfo.entityId, { reason: reason || '' })
-      showSuccess(t('messages.success.offline.ca'))
+      await casService.takeOffline(windowInfo.entityId, { reason: reason || '', mode })
+      showSuccess(t('messages.success.create.caOffline'))
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
     } catch (err) {
@@ -203,20 +213,41 @@ export function FloatingDetailWindow({ windowInfo }) {
   }
 
   const handleRestore = async () => {
-    const pw = await showPrompt(t('cas.enterPassword'), {
-      title: t('cas.restore'),
-      type: 'password',
-      placeholder: t('common.password'),
-      confirmText: t('cas.restore')
-    })
-    if (!pw) return
-    try {
-      await casService.restore(windowInfo.entityId, { password: pw })
-      showSuccess(t('messages.success.restore.ca'))
-      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
-      closeWindow(windowInfo.id)
-    } catch (err) {
-      showError(err.message || t('cas.restoreFailed'))
+    const offlineMode = data?.offline_mode || 'password_protected'
+    if (offlineMode === 'password_protected') {
+      const pw = await showPrompt(t('cas.enterPassword'), {
+        title: t('cas.restore'),
+        type: 'password',
+        placeholder: t('common.password'),
+        confirmText: t('cas.restore')
+      })
+      if (!pw) return
+      try {
+        await casService.restore(windowInfo.entityId, { mode: offlineMode, password: pw })
+        showSuccess(t('messages.success.create.caRestored'))
+        window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
+        closeWindow(windowInfo.id)
+      } catch (err) {
+        showError(err.message || t('cas.restoreFailed'))
+      }
+    } else {
+      const confirmed = await showConfirm(
+        t('cas.restoreConfirm', 'This CA was taken offline with key file export. The key is no longer available — restoring will re-enable signing only if you re-import the key. Continue?'),
+        {
+          title: t('cas.restore'),
+          confirmText: t('cas.restore'),
+          variant: 'warning'
+        }
+      )
+      if (!confirmed) return
+      try {
+        await casService.restore(windowInfo.entityId, { mode: offlineMode })
+        showSuccess(t('messages.success.create.caRestored'))
+        window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
+        closeWindow(windowInfo.id)
+      } catch (err) {
+        showError(err.message || t('cas.restoreFailed'))
+      }
     }
   }
 

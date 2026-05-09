@@ -815,6 +815,7 @@
     "reason": "设为离线的原因",
     "enterPassword": "输入密码以恢复CA",
     "restore": "恢复CA",
+    "restoreConfirm": "此CA通过密钥文件导出设为离线。密钥已不可用——恢复后仅在重新导入密钥时才能重新启用签名。继续吗？",
     "offlineFailed": "将CA设为离线失败",
     "restoreFailed": "恢复CA失败",
     "descriptionPlaceholder": "此CA的可选描述",

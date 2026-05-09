@@ -2467,6 +2467,11 @@ input:focus, select:focus, textarea:focus {
   color: var(--icon-violet-text);
 }
 
+.badge-bg-gray {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
 /* Alert/info backgrounds */
 .alert-bg-amber {
   background: var(--icon-amber-bg);
