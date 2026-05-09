@@ -9,7 +9,20 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
-- **CA offline mode** — take a CA offline to prevent signing new certificates, with two modes: password-protected (private key encrypted, restore requires the password) or file-exported (key removed from DB, restore from file). Public endpoints (CDP, OCSP) continue serving cached data. All signing paths gated: CSR sign, EST, mTLS, HSM. Sub-CAs independent of parent CA offline state.
+## [2.153] - 2026-05-10
+
+Adds CA offline mode (closes [#106](https://github.com/NeySlim/ultimate-ca-manager/issues/106)).
+Validated 6/6 across SQLite and PostgreSQL on Debian, RHEL/Fedora, and Docker.
+
+### Added
+- **CA offline mode** — take any CA offline to block signing while keeping the public certificate usable for chain validation, CDP and OCSP. Two modes:
+  - **Password-protected** — private key re-wrapped with a user-supplied password (PKCS#8) on top of the existing master-key wrap, restore requires the password.
+  - **File-exported** — private key returned as a password-encrypted PKCS#8 PEM and removed from the database, restore requires re-uploading the file plus the password.
+- Sign/issue/CRL paths gate on `ca.offline` (`csrs.py`, `services/cert/mixins/csr.py`, `services/ca/ca_signing.py`, `crl.py`). The legacy `update_ca` backdoor is closed — only the dedicated take-offline / restore endpoints can flip the flag.
+- Frontend: `TakeOfflineModal`, `RestoreModal`, offline-aware `StatusBadge` + dedicated `OfflineBadge` across all 4 CA list views, action buttons in `CADetailsPanel` and the floating detail window.
+- Audit actions: `ca.offline.password_protected`, `ca.offline.file_exported`, `ca.restore.password_protected`, `ca.restore.file_exported`.
+- In-app help, GitHub wiki page (`CA-Offline-Mode`), and documentation in `USER_GUIDE.md` + `SECURITY.md` threat model.
+- Migration `034_add_ca_offline.py` adds `offline`, `offline_reason`, `offline_mode` columns.
 
 ## [2.152] - 2026-05-08
 
