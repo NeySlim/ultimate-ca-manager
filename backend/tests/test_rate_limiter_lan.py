@@ -27,7 +27,12 @@ def fresh_rl(monkeypatch):
         for k, v in (env or {}).items():
             monkeypatch.setenv(k, v)
         import security.rate_limiter as mod
+        # Preserve any pre-existing _rate_limiter instance across reload so
+        # middleware closures registered by app startup don't break.
+        preserved = getattr(mod, '_rate_limiter', None)
         importlib.reload(mod)
+        if preserved is not None:
+            mod._rate_limiter = preserved
         # Reset class-level cached state
         mod.RateLimitConfig._limits_loaded = False
         mod.RateLimitConfig._enabled = None

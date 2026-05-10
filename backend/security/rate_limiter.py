@@ -376,8 +376,9 @@ class RateLimiter:
                 self._buckets.clear()
 
 
-# Global rate limiter instance
-_rate_limiter: Optional[RateLimiter] = None
+# Global rate limiter instance — preserved across importlib.reload() so tests
+# that reload this module don't wipe out the instance held by middleware closures.
+_rate_limiter: Optional[RateLimiter] = globals().get('_rate_limiter')
 
 
 def get_rate_limiter() -> RateLimiter:
@@ -404,7 +405,7 @@ def init_rate_limiter(app=None) -> RateLimiter:
             if ip and ',' in ip:
                 ip = ip.split(',')[0].strip()
             
-            allowed, info = _rate_limiter.check_rate_limit(ip, request.path)
+            allowed, info = get_rate_limiter().check_rate_limit(ip, request.path)
             
             if not allowed:
                 from services.audit_service import AuditService
