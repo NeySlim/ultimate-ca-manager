@@ -9,6 +9,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.154] - 2026-05-10
+
+Fixes OPNsense 26.1.x certificate import (closes [#114](https://github.com/NeySlim/ultimate-ca-manager/issues/114)).
+Validated 6/6 across SQLite and PostgreSQL on Debian, RHEL/Fedora, and Docker.
+
+### Fixed
+- **OPNsense import** — three bugs prevented the API-based import path from working against OPNsense 26.1.x:
+  - Frontend service did not unwrap `success_response.data`, so the items list was empty after `Connect` and the `Import Selected` button never rendered.
+  - Backend stored OPNsense `uuid` as UCM `refid`, breaking the `caref` linkage between certificates and their CA (OPNsense uses the 13-char `refid` as cross-reference, not the 36-char `uuid`).
+  - Imported private keys were stored raw instead of going through `store_pem_bytes()`, bypassing encryption-at-rest.
+- Importer now performs a 2-pass import (CAs before certificates), resolves `caref` against in-flight CAs, extracts SAN/SKI/AKI/serial, falls back to `crt_payload`/`prv_payload` when `crt`/`prv` are absent, and treats an empty selection as "import all".
+- Added regression test `test_opnsense_import.py` covering refid storage, caref linkage, and encrypted private-key round-trip.
+
 ## [2.153] - 2026-05-10
 
 Adds CA offline mode (closes [#106](https://github.com/NeySlim/ultimate-ca-manager/issues/106)).
