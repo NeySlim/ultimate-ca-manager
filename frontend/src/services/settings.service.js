@@ -113,5 +113,18 @@ export const settingsService = {
 
   async updateCTSettings(data) {
     return apiClient.patch('/settings/ct', data)
+  },
+
+  // Generic certificate auto-renewal
+  async getAutoRenewalSettings() {
+    return apiClient.get('/settings/auto-renewal')
+  },
+
+  async updateAutoRenewalSettings(data) {
+    return apiClient.patch('/settings/auto-renewal', data)
+  },
+
+  async runAutoRenewalNow() {
+    return apiClient.post('/settings/auto-renewal/run')
   }
 }

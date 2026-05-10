@@ -41,6 +41,7 @@ from api.v2.settings import email  # noqa: F401
 from api.v2.settings import notifications  # noqa: F401
 from api.v2.settings import ldap  # noqa: F401
 from api.v2.settings import webhooks  # noqa: F401
+from api.v2.settings import auto_renewal  # noqa: F401
 # System: import package (creates bp) then all route modules
 from api.v2.system import bp as system_bp
 from api.v2.system import database  # noqa: F401

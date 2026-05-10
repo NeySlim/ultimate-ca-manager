@@ -13,7 +13,7 @@ import {
   Plus, PencilSimple, TestTube, Lightning, Globe, Shield, CheckCircle, XCircle, MagnifyingGlass,
   Bell, Copy, Power, ArrowClockwise, LockKey, Warning, User, GithubLogo,
   Plugs, UsersThree, UserPlus, TreeStructure, CaretDown, Play,
-  WindowsLogo
+  WindowsLogo, ClockClockwise
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -57,6 +57,7 @@ import UpdatesSection from './settings/UpdatesSection'
 import WebhooksSection from './settings/WebhooksSection'
 import CTSection from './settings/CTSection'
 import MicrosoftCASection from './settings/MicrosoftCASection'
+import AutoRenewalSection from './settings/AutoRenewalSection'
 import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 
@@ -74,6 +75,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
   { id: 'ct', labelKey: 'settings.tabs.ct', icon: Eye, color: 'icon-bg-cyan' },
+  { id: 'autoRenewal', labelKey: 'settings.tabs.autoRenewal', icon: ClockClockwise, color: 'icon-bg-emerald' },
   { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', icon: WindowsLogo, color: 'icon-bg-indigo' },
   { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-sky' },
 ]
@@ -193,6 +195,19 @@ export default function SettingsPage() {
   const [ctSaving, setCtSaving] = useState(false)
   const [ctNewLogUrl, setCtNewLogUrl] = useState('')
 
+  // Auto-renewal state
+  const [arSettings, setArSettings] = useState({
+    enabled: false,
+    days_before_expiry: 30,
+    renewal_sources: ['scep', 'acme', 'est'],
+    notify_on_renewal: true,
+    notify_on_failure: true,
+    notify_emails: [],
+  })
+  const [arLoading, setArLoading] = useState(false)
+  const [arSaving, setArSaving] = useState(false)
+  const [arRunning, setArRunning] = useState(false)
+
   // All settings categories (SSO now integrated directly)
   const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
@@ -211,6 +226,7 @@ export default function SettingsPage() {
     loadSyslogConfig()
     loadMtlsSettings()
     loadCtSettings()
+    loadAutoRenewalSettings()
     systemService.getServiceStatus().then(r => setIsDocker(r.data?.is_docker || false)).catch(() => {})
   }, [])
 
@@ -717,6 +733,50 @@ export default function SettingsPage() {
 
   const handleCtRemoveLogUrl = (index) => {
     setCtSettings(prev => ({ ...prev, log_urls: prev.log_urls.filter((_, i) => i !== index) }))
+  }
+
+  // Auto-renewal
+  const loadAutoRenewalSettings = async () => {
+    setArLoading(true)
+    try {
+      const response = await settingsService.getAutoRenewalSettings()
+      if (response.data) setArSettings(response.data)
+    } catch {
+      // keep defaults silently
+    } finally {
+      setArLoading(false)
+    }
+  }
+
+  const handleArSave = async () => {
+    setArSaving(true)
+    try {
+      const response = await settingsService.updateAutoRenewalSettings(arSettings)
+      if (response.data) setArSettings(response.data)
+      showSuccess(t('settings.autoRenewalSettingsUpdated'))
+    } catch (error) {
+      showError(error.message || t('settings.autoRenewalSettingsFailed'))
+    } finally {
+      setArSaving(false)
+    }
+  }
+
+  const handleArRunNow = async () => {
+    setArRunning(true)
+    try {
+      const response = await settingsService.runAutoRenewalNow()
+      const stats = response.data || {}
+      showSuccess(
+        t('settings.autoRenewalRunSuccess', {
+          renewed: stats.renewed || 0,
+          failed: stats.failed || 0,
+        })
+      )
+    } catch (error) {
+      showError(error.message || t('settings.autoRenewalRunFailed'))
+    } finally {
+      setArRunning(false)
+    }
   }
 
   const handleSave = async (section) => {
@@ -1237,6 +1297,18 @@ export default function SettingsPage() {
             handleCtSave={handleCtSave}
             handleCtAddLogUrl={handleCtAddLogUrl}
             handleCtRemoveLogUrl={handleCtRemoveLogUrl}
+          />
+        )
+      case 'autoRenewal':
+        return (
+          <AutoRenewalSection
+            arSettings={arSettings}
+            setArSettings={setArSettings}
+            arLoading={arLoading}
+            arSaving={arSaving}
+            arRunning={arRunning}
+            handleArSave={handleArSave}
+            handleArRunNow={handleArRunNow}
           />
         )
       case 'microsoftCA':
