@@ -896,14 +896,18 @@ describe('opnsenseService', () => {
 
   it('test → POST /import/opnsense/test', async () => {
     const config = { host: '192.168.1.1', port: 443 }
-    await opnsenseService.test(config)
+    mockApiClient.post.mockResolvedValueOnce({ data: { items: [], stats: { cas: 0, certificates: 0 } } })
+    const result = await opnsenseService.test(config)
     expect(mockApiClient.post).toHaveBeenCalledWith('/import/opnsense/test', config)
+    expect(result).toEqual({ items: [], stats: { cas: 0, certificates: 0 } })
   })
 
   it('import → POST /import/opnsense/import', async () => {
     const config = { host: '192.168.1.1', items: ['ca1'] }
-    await opnsenseService.import(config)
+    mockApiClient.post.mockResolvedValueOnce({ data: { imported: { cas: 1, certificates: 0 }, skipped: 0 } })
+    const result = await opnsenseService.import(config)
     expect(mockApiClient.post).toHaveBeenCalledWith('/import/opnsense/import', config)
+    expect(result).toEqual({ imported: { cas: 1, certificates: 0 }, skipped: 0 })
   })
 })
 

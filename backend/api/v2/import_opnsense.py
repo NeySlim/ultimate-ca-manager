@@ -2,12 +2,19 @@
 OPNsense Import API
 Handles testing connection and importing CAs/Certs from OPNsense
 """
-from flask import Blueprint, request, g
-import requests
+import base64
+import json
 import logging
+import requests
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.x509.oid import ExtensionOID
+from flask import Blueprint, request
 from auth.unified import require_auth
+from models import db, CA, Certificate
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.key_codec import store_pem_bytes
 from utils.safe_requests import create_session
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from services.audit_service import AuditService
@@ -16,6 +23,107 @@ from services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('import_opnsense', __name__)
+
+
+def _clean(value):
+    return value.strip() if isinstance(value, str) else value
+
+
+def _item_id(row):
+    return row.get('uuid') or row.get('refid') or ''
+
+
+def _refid(row):
+    # OPNsense references certificates by refid/caref internally. uuid is only
+    # the MVC API row identifier and must not be stored as UCM's refid.
+    return row.get('refid') or row.get('uuid') or ''
+
+
+def _display_name(row, default):
+    return row.get('descr') or row.get('name') or row.get('commonname') or default
+
+
+def _encoded_cert(row):
+    if row.get('crt'):
+        return row.get('crt')
+    if row.get('crt_payload'):
+        return base64.b64encode(row['crt_payload'].encode('utf-8')).decode('ascii')
+    return ''
+
+
+def _encoded_private_key(row):
+    if row.get('prv'):
+        return store_pem_bytes(row.get('prv'))
+    if row.get('prv_payload'):
+        return store_pem_bytes(row['prv_payload'].encode('utf-8'))
+    return None
+
+
+def _parse_cert(encoded_crt):
+    info = {
+        'subject': '',
+        'issuer': '',
+        'serial_number': '',
+        'valid_from': None,
+        'valid_to': None,
+        'ski': None,
+        'aki': None,
+        'san_dns': [],
+        'san_ip': [],
+        'san_email': [],
+        'san_uri': [],
+    }
+    if not encoded_crt:
+        return info
+
+    try:
+        cert_pem = base64.b64decode(encoded_crt)
+        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        info.update({
+            'subject': cert.subject.rfc4514_string(),
+            'issuer': cert.issuer.rfc4514_string(),
+            'serial_number': str(cert.serial_number),
+            'valid_from': cert.not_valid_before_utc.replace(tzinfo=None),
+            'valid_to': cert.not_valid_after_utc.replace(tzinfo=None),
+        })
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+            info['ski'] = ext.value.key_identifier.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+            if ext.value.key_identifier:
+                info['aki'] = ext.value.key_identifier.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            for name in ext.value:
+                if isinstance(name, x509.DNSName):
+                    info['san_dns'].append(name.value)
+                elif isinstance(name, x509.IPAddress):
+                    info['san_ip'].append(str(name.value))
+                elif isinstance(name, x509.RFC822Name):
+                    info['san_email'].append(name.value)
+                elif isinstance(name, x509.UniformResourceIdentifier):
+                    info['san_uri'].append(name.value)
+        except x509.ExtensionNotFound:
+            pass
+    except Exception as e:
+        logger.warning(f"Failed to parse OPNsense certificate: {e}")
+    return info
+
+
+def _fetch_rows(session, base_url, api_key, api_secret, resource):
+    response = session.get(
+        f"{base_url}/api/trust/{resource}/search",
+        auth=(api_key, api_secret),
+        timeout=10
+    )
+    if response.status_code != 200:
+        raise requests.HTTPError(f"API returned status {response.status_code}")
+    return response.json().get('rows') or []
 
 
 @bp.route('/api/v2/import/opnsense/test', methods=['POST'])
@@ -53,13 +161,13 @@ def test_connection():
         }
     }
     """
-    data = request.get_json()
+    data = request.get_json() or {}
     
     # Extract connection details
-    host = data.get('host')
+    host = _clean(data.get('host'))
     port = data.get('port', 443)
-    api_key = data.get('api_key')
-    api_secret = data.get('api_secret')
+    api_key = _clean(data.get('api_key'))
+    api_secret = _clean(data.get('api_secret'))
     verify_ssl = data.get('verify_ssl', False)
     
     logger.info(f"OpnSense test connection: host={host}, port={port}, verify_ssl={verify_ssl}")
@@ -79,69 +187,50 @@ def test_connection():
     base_url = f"https://{host}:{port}"
     
     try:
-        # Test API connection
         session = create_session(verify_ssl=verify_ssl)
-        
-        # Try to fetch trust items from OPNsense API
-        # This endpoint retrieves all CAs and certificates from the trust store
-        response = session.get(
-            f"{base_url}/api/trust/ca/search",
-            auth=(api_key, api_secret),
-            timeout=10
-        )
-        
-        if response.status_code != 200:
-            return error_response(f"API returned status {response.status_code}", 400)
-        
-        # Parse CAs
-        ca_data = response.json()
+
         items = []
-        cas_count = 0
+
+        ca_rows = _fetch_rows(session, base_url, api_key, api_secret, 'ca')
+        for row in ca_rows:
+            item_id = _item_id(row)
+            if not item_id:
+                continue
+            items.append({
+                "id": item_id,
+                "refid": _refid(row),
+                "type": "CA",
+                "name": _display_name(row, 'Unknown CA'),
+                "subject": row.get('commonname') or row.get('name') or '',
+                "issuer": row.get('caref', ''),
+                "validUntil": row.get('valid_to') or row.get('validto_time') or '',
+                "serialNumber": row.get('serial', ''),
+                "selected": True
+            })
+
+        cert_rows = _fetch_rows(session, base_url, api_key, api_secret, 'cert')
+        for row in cert_rows:
+            item_id = _item_id(row)
+            if not item_id:
+                continue
+            items.append({
+                "id": item_id,
+                "refid": _refid(row),
+                "type": "Certificate",
+                "name": _display_name(row, 'Unknown Certificate'),
+                "subject": row.get('commonname') or row.get('name') or '',
+                "issuer": row.get('caref', ''),
+                "validUntil": row.get('valid_to') or row.get('validto_time') or '',
+                "serialNumber": row.get('serial', ''),
+                "selected": True
+            })
         
-        if 'rows' in ca_data:
-            for row in ca_data['rows']:
-                items.append({
-                    "id": row.get('uuid', ''),
-                    "type": "CA",
-                    "name": row.get('descr', 'Unknown CA'),
-                    "subject": row.get('caref', ''),
-                    "issuer": row.get('issuer', ''),
-                    "validUntil": row.get('validto_time', ''),
-                    "serialNumber": row.get('serial', ''),
-                    "selected": True
-                })
-                cas_count += 1
-        
-        # Fetch certificates
-        cert_response = session.get(
-            f"{base_url}/api/trust/cert/search",
-            auth=(api_key, api_secret),
-            timeout=10
-        )
-        
-        certs_count = 0
-        if cert_response.status_code == 200:
-            cert_data = cert_response.json()
-            if 'rows' in cert_data:
-                for row in cert_data['rows']:
-                    items.append({
-                        "id": row.get('uuid', ''),
-                        "type": "Certificate",
-                        "name": row.get('descr', 'Unknown Certificate'),
-                        "subject": row.get('subject', ''),
-                        "issuer": row.get('issuer', ''),
-                        "validUntil": row.get('validto_time', ''),
-                        "serialNumber": row.get('serial', ''),
-                        "selected": True
-                    })
-                    certs_count += 1
-        
-        logger.info(f"OpnSense test successful: {cas_count} CAs, {certs_count} certificates")
+        logger.info(f"OpnSense test successful: {len(ca_rows)} CAs, {len(cert_rows)} certificates")
         return success_response(data={
             "items": items,
             "stats": {
-                "cas": cas_count,
-                "certificates": certs_count
+                "cas": len(ca_rows),
+                "certificates": len(cert_rows)
             }
         })
     
@@ -184,13 +273,13 @@ def import_items():
         "errors": []
     }
     """
-    data = request.get_json()
+    data = request.get_json() or {}
     
     # Extract connection details
-    host = data.get('host')
+    host = _clean(data.get('host'))
     port = data.get('port', 443)
-    api_key = data.get('api_key')
-    api_secret = data.get('api_secret')
+    api_key = _clean(data.get('api_key'))
+    api_secret = _clean(data.get('api_secret'))
     verify_ssl = data.get('verify_ssl', False)
     items = data.get('items', [])
     
@@ -207,17 +296,9 @@ def import_items():
         logger.warning(f"OPNsense SSRF blocked: {e}")
         return error_response("OPNsense host must not target cloud metadata services or loopback", 400)
     
-    # Allow empty items array to import all
     if items is None:
         logger.warning("OpnSense import failed: no items specified")
         return error_response("No items selected for import", 400)
-    
-    # Import logic
-    from models import db, CA, Certificate
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
-    import base64
-    import json
     
     # Fetch data from OPNsense
     session = create_session(verify_ssl=verify_ssl)
@@ -232,99 +313,94 @@ def import_items():
     }
     
     try:
-        # Fetch CAs
-        ca_response = session.get(
-            f"{base_url}/api/trust/ca/search",
-            auth=(api_key, api_secret),
-            timeout=10
-        )
-        
-        # Fetch certificates
-        cert_response = session.get(
-            f"{base_url}/api/trust/cert/search",
-            auth=(api_key, api_secret),
-            timeout=10
-        )
-        
-        # Build lookup by UUID
+        ca_rows = _fetch_rows(session, base_url, api_key, api_secret, 'ca')
+        cert_rows = _fetch_rows(session, base_url, api_key, api_secret, 'cert')
+
+        selected_ids = set(items)
+        if not selected_ids:
+            selected_ids = {_item_id(row) for row in ca_rows + cert_rows if _item_id(row)}
+
         all_cas = {}
         all_certs = {}
+
+        for row in ca_rows:
+            all_cas[_item_id(row)] = row
+
+        for row in cert_rows:
+            all_certs[_item_id(row)] = row
         
-        if ca_response.status_code == 200:
-            ca_data = ca_response.json()
-            if 'rows' in ca_data:
-                for row in ca_data['rows']:
-                    all_cas[row.get('uuid')] = row
-        
-        if cert_response.status_code == 200:
-            cert_data = cert_response.json()
-            if 'rows' in cert_data:
-                for row in cert_data['rows']:
-                    all_certs[row.get('uuid')] = row
-        
-        # Import selected items
-        for item_id in items:
-            if item_id in all_cas:
-                # Import CA
-                ca_data = all_cas[item_id]
-                
-                # Check if already exists by refid
-                existing = CA.query.filter_by(refid=item_id).first()
-                if existing:
-                    stats['cas_skipped'] += 1
-                    continue
-                
-                # Check for duplicate by description (same CA, different refid from OPNsense)
-                duplicate_by_name = CA.query.filter_by(
-                    descr=ca_data.get('descr'),
-                    imported_from='opnsense'
-                ).first()
-                
-                if duplicate_by_name:
-                    # Skip duplicate - same CA already imported with different refid
-                    stats['cas_skipped'] += 1
-                    stats['errors'].append(f"CA '{ca_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
-                    continue
-                
-                # Parse certificate
-                try:
-                    crt_pem = base64.b64decode(ca_data.get('crt', ''))
-                    x509_cert = x509.load_pem_x509_certificate(crt_pem, default_backend())
-                    
-                    subject = x509_cert.subject.rfc4514_string()
-                    issuer = x509_cert.issuer.rfc4514_string()
-                    valid_from = x509_cert.not_valid_before
-                    valid_to = x509_cert.not_valid_after
-                except Exception:
-                    subject = ''
-                    issuer = ''
-                    valid_from = None
-                    valid_to = None
-                
-                # Create CA
-                ca = CA(
-                    refid=item_id,
-                    descr=ca_data.get('descr', 'Imported from OPNsense'),
-                    crt=ca_data.get('crt', ''),
-                    prv=ca_data.get('prv'),
-                    serial=0,
-                    subject=subject,
-                    issuer=issuer,
-                    valid_from=valid_from,
-                    valid_to=valid_to,
-                    imported_from='opnsense',
-                    created_by='import'
-                )
-                
-                db.session.add(ca)
-                stats['cas_imported'] += 1
+        # Import CAs first so certificate caref links can resolve in the same transaction.
+        for item_id in selected_ids:
+            if item_id not in all_cas:
+                continue
+
+            ca_data = all_cas[item_id]
+            ca_refid = _refid(ca_data)
+            crt = _encoded_cert(ca_data)
+
+            if not ca_refid or not crt:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{_display_name(ca_data, item_id)}' is missing refid or certificate data")
+                continue
             
-            elif item_id in all_certs:
+            # Check if already exists by refid
+            existing = CA.query.filter_by(refid=ca_refid).first()
+            if existing:
+                stats['cas_skipped'] += 1
+                continue
+            
+            # Check for duplicate by description (same CA, different refid from OPNsense)
+            duplicate_by_name = CA.query.filter_by(
+                descr=ca_data.get('descr'),
+                imported_from='opnsense'
+            ).first()
+            
+            if duplicate_by_name:
+                # Skip duplicate - same CA already imported with different refid
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{ca_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
+                continue
+            
+            cert_info = _parse_cert(crt)
+            try:
+                serial = int(ca_data.get('serial') or 0)
+            except (TypeError, ValueError):
+                serial = 0
+             
+            # Create CA
+            ca = CA(
+                refid=ca_refid,
+                descr=_display_name(ca_data, 'Imported from OPNsense'),
+                crt=crt,
+                prv=_encoded_private_key(ca_data),
+                serial=serial,
+                subject=cert_info['subject'],
+                issuer=cert_info['issuer'],
+                serial_number=cert_info['serial_number'],
+                ski=cert_info['ski'],
+                valid_from=cert_info['valid_from'],
+                valid_to=cert_info['valid_to'],
+                imported_from='opnsense',
+                created_by='import'
+            )
+            
+            db.session.add(ca)
+            stats['cas_imported'] += 1
+
+        for item_id in selected_ids:
+            if item_id in all_certs:
                 # Import Certificate
                 cert_data = all_certs[item_id]
+                cert_refid = _refid(cert_data)
+                crt = _encoded_cert(cert_data)
+
+                if not cert_refid or not crt:
+                    stats['certs_skipped'] += 1
+                    stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}' is missing refid or certificate data")
+                    continue
                 
                 # Check if already exists by refid
-                existing = Certificate.query.filter_by(refid=item_id).first()
+                existing = Certificate.query.filter_by(refid=cert_refid).first()
                 if existing:
                     stats['certs_skipped'] += 1
                     continue
@@ -341,61 +417,30 @@ def import_items():
                     stats['errors'].append(f"Certificate '{cert_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
                     continue
                 
-                # Parse certificate
-                san_dns_list = []
-                san_ip_list = []
-                san_email_list = []
-                san_uri_list = []
-                subject = ''
-                issuer = ''
-                serial_number = ''
-                valid_from = None
-                valid_to = None
-                
-                try:
-                    crt_pem = base64.b64decode(cert_data.get('crt', ''))
-                    x509_cert = x509.load_pem_x509_certificate(crt_pem, default_backend())
-                    
-                    subject = x509_cert.subject.rfc4514_string()
-                    issuer = x509_cert.issuer.rfc4514_string()
-                    serial_number = str(x509_cert.serial_number)
-                    valid_from = x509_cert.not_valid_before
-                    valid_to = x509_cert.not_valid_after
-                    
-                    # Extract SANs
-                    try:
-                        ext = x509_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-                        for name in ext.value:
-                            if isinstance(name, x509.DNSName):
-                                san_dns_list.append(name.value)
-                            elif isinstance(name, x509.IPAddress):
-                                san_ip_list.append(str(name.value))
-                            elif isinstance(name, x509.RFC822Name):
-                                san_email_list.append(name.value)
-                            elif isinstance(name, x509.UniformResourceIdentifier):
-                                san_uri_list.append(name.value)
-                    except x509.ExtensionNotFound:
-                        pass
-                except Exception:
-                    pass
-                
+                cert_info = _parse_cert(crt)
+                caref = cert_data.get('caref') or None
+                if caref and not CA.query.filter_by(refid=caref).first():
+                    caref = None
+                 
                 # Create certificate
                 cert = Certificate(
-                    refid=item_id,
-                    descr=cert_data.get('descr', 'Imported from OPNsense'),
-                    caref=cert_data.get('caref'),
-                    crt=cert_data.get('crt', ''),
-                    prv=cert_data.get('prv'),
-                    cert_type='server_cert',
-                    subject=subject,
-                    issuer=issuer,
-                    serial_number=serial_number,
-                    valid_from=valid_from,
-                    valid_to=valid_to,
-                    san_dns=json.dumps(san_dns_list) if san_dns_list else None,
-                    san_ip=json.dumps(san_ip_list) if san_ip_list else None,
-                    san_email=json.dumps(san_email_list) if san_email_list else None,
-                    san_uri=json.dumps(san_uri_list) if san_uri_list else None,
+                    refid=cert_refid,
+                    descr=_display_name(cert_data, 'Imported from OPNsense'),
+                    caref=caref,
+                    crt=crt,
+                    prv=_encoded_private_key(cert_data),
+                    cert_type=cert_data.get('cert_type') or cert_data.get('type') or 'server_cert',
+                    subject=cert_info['subject'],
+                    issuer=cert_info['issuer'],
+                    serial_number=cert_info['serial_number'],
+                    aki=cert_info['aki'],
+                    ski=cert_info['ski'],
+                    valid_from=cert_info['valid_from'],
+                    valid_to=cert_info['valid_to'],
+                    san_dns=json.dumps(cert_info['san_dns']) if cert_info['san_dns'] else None,
+                    san_ip=json.dumps(cert_info['san_ip']) if cert_info['san_ip'] else None,
+                    san_email=json.dumps(cert_info['san_email']) if cert_info['san_email'] else None,
+                    san_uri=json.dumps(cert_info['san_uri']) if cert_info['san_uri'] else None,
                     imported_from='opnsense',
                     created_by='import'
                 )
