@@ -94,6 +94,64 @@ def test_pg_migrations_do_not_open_nested_transactions():
 
 
 # ---------------------------------------------------------------------------
+# Static guard — every migration numbered >= 020 MUST declare pg_compatible.
+# Issue #115: migrations 031-034 shipped without `pg_compatible = True` and
+# were silently marked applied on PostgreSQL without executing, leaving the
+# schema out of sync with the models.
+# ---------------------------------------------------------------------------
+
+def test_modern_migrations_declare_pg_compatible():
+    """Every migration file numbered >= 020 must declare `pg_compatible = True`.
+
+    Migrations 000-019 are SQLite-only by design (predate PG support) and are
+    silently skipped on PostgreSQL. From 020 onward, every migration MUST be
+    multi-backend or it will silently no-op on PG and corrupt the schema.
+    """
+    import pathlib
+    import re
+
+    migrations_dir = pathlib.Path(__file__).resolve().parent.parent / "migrations"
+    offenders = []
+    for path in sorted(migrations_dir.glob("*.py")):
+        if path.name.startswith("__"):
+            continue
+        # Extract leading numeric index
+        m = re.match(r"^(\d+)_", path.name)
+        if not m:
+            continue
+        idx = int(m.group(1))
+        if idx < 20:
+            continue
+        src = path.read_text()
+        if "pg_compatible = True" not in src and "pg_compatible=True" not in src:
+            offenders.append(path.name)
+
+    assert not offenders, (
+        "Migration(s) numbered >= 020 must declare `pg_compatible = True` "
+        "(silent-skip on PG corrupts the schema — issue #115). "
+        f"Offenders: {offenders}"
+    )
+
+
+def test_runner_rejects_modern_migration_without_pg_compatible():
+    """The runner must raise (return False) when a migration numbered >= 020
+    lacks `pg_compatible = True`, instead of silently marking it applied.
+    """
+    import migration_runner
+
+    src = inspect.getsource(migration_runner._run_pending_pg)
+    # Must reference the threshold and refuse to continue.
+    assert "PG_COMPATIBLE_REQUIRED_FROM" in src, (
+        "Runner must check PG_COMPATIBLE_REQUIRED_FROM threshold; "
+        "silent-skip caused issue #115."
+    )
+    assert "return False" in src, (
+        "Runner must return False (hard fail) on missing pg_compatible "
+        "for modern migrations, not silently skip."
+    )
+
+
+# ---------------------------------------------------------------------------
 # End-to-end — PG CI job only
 # ---------------------------------------------------------------------------
 

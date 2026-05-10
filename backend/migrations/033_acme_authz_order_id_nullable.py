@@ -1,21 +1,29 @@
-"""
-Migration 027: Make acme_authorizations.order_id nullable for pre-authz
+"""Migration 033: make acme_authorizations.order_id nullable for pre-authz.
 
 RFC 8555 §7.4.1 newAuthz endpoint allows a client to create a standalone
 authorization (no order yet). Migration 016 added account_id but its
 docstring's "make order_id nullable" promise was never implemented because
-SQLite has no ALTER COLUMN. This migration recreates the table.
+SQLite has no ALTER COLUMN. This migration recreates the table on SQLite
+and drops the NOT NULL constraint on PostgreSQL.
+
+Dual-backend (SQLite + PostgreSQL).
 """
+import logging
+import sqlite3
+
+logger = logging.getLogger(__name__)
+pg_compatible = True
 
 
-def upgrade(conn):
+def _upgrade_sqlite(conn):
     cursor = conn.execute("PRAGMA table_info(acme_authorizations)")
     cols = {row[1]: row for row in cursor.fetchall()}
     if 'order_id' not in cols:
+        logger.info("[033] acme_authorizations.order_id absent, skipping")
         return
     # row layout: cid, name, type, notnull, dflt, pk
     if cols['order_id'][3] == 0:
-        # already nullable
+        logger.info("[033] order_id already nullable, skipping")
         return
 
     conn.executescript("""
@@ -44,6 +52,35 @@ def upgrade(conn):
             ON acme_authorizations (authorization_id);
     """)
     conn.commit()
+    logger.info("[033] acme_authorizations.order_id made nullable (SQLite)")
+
+
+def _upgrade_pg(conn):
+    from sqlalchemy import inspect, text
+
+    insp = inspect(conn)
+    if 'acme_authorizations' not in set(insp.get_table_names()):
+        logger.info("[033] acme_authorizations absent, skipping (fresh PG)")
+        return
+
+    cols = {c['name']: c for c in insp.get_columns('acme_authorizations')}
+    if 'order_id' not in cols:
+        logger.info("[033] acme_authorizations.order_id absent, skipping")
+        return
+
+    if cols['order_id'].get('nullable', True):
+        logger.info("[033] order_id already nullable, skipping")
+        return
+
+    conn.execute(text("ALTER TABLE acme_authorizations ALTER COLUMN order_id DROP NOT NULL"))
+    logger.info("[033] acme_authorizations.order_id made nullable (PostgreSQL)")
+
+
+def upgrade(conn):
+    if isinstance(conn, sqlite3.Connection):
+        _upgrade_sqlite(conn)
+    else:
+        _upgrade_pg(conn)
 
 
 def downgrade(conn):
