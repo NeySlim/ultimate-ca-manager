@@ -175,6 +175,15 @@ export default function SettingsPage() {
   const [encryptionConfirmText, setEncryptionConfirmText] = useState('')
   const [encryptionChecks, setEncryptionChecks] = useState({ backup: false, keyFile: false, lostKeys: false })
 
+  // Master-key backup modal — shown immediately after enable-encryption succeeds.
+  // Holds the freshly-generated key so the user can download it BEFORE leaving
+  // the page. Without this backup, losing /etc/ucm/master.key = losing every
+  // encrypted private key in the DB.
+  const [showBackupKeyModal, setShowBackupKeyModal] = useState(false)
+  const [backupKeyMaterial, setBackupKeyMaterial] = useState(null)
+  const [backupKeyDownloaded, setBackupKeyDownloaded] = useState(false)
+  const [backupKeyConfirmed, setBackupKeyConfirmed] = useState(false)
+
   // Anomaly detection state
   const [anomalies, setAnomalies] = useState([])
   const [anomaliesLoading, setAnomaliesLoading] = useState(false)
@@ -589,16 +598,65 @@ export default function SettingsPage() {
   const handleEnableEncryption = async () => {
     setEncryptionLoading(true)
     try {
-      await settingsService.enableEncryption()
+      const response = await settingsService.enableEncryption()
       showSuccess(t('settings.encryptionEnabled'))
       setShowEnableEncryptionModal(false)
       setEncryptionConfirmText('')
       setEncryptionChecks({ backup: false, keyFile: false, lostKeys: false })
       await loadEncryptionStatus()
+
+      // CRITICAL: prompt the operator to back up the master key right now.
+      // The plaintext key is only available in this response; once the user
+      // leaves this page we lose the chance to surface it cleanly.
+      const masterKey = response?.data?.master_key
+      if (masterKey) {
+        setBackupKeyMaterial(masterKey)
+        setBackupKeyDownloaded(false)
+        setBackupKeyConfirmed(false)
+        setShowBackupKeyModal(true)
+      }
     } catch (error) {
       showError(error.message || t('settings.encryptionEnableFailed'))
     } finally {
       setEncryptionLoading(false)
+    }
+  }
+
+  const handleDownloadMasterKey = () => {
+    if (!backupKeyMaterial) return
+    try {
+      const blob = new Blob([backupKeyMaterial + '\n'], { type: 'application/octet-stream' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'ucm-master.key'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      setBackupKeyDownloaded(true)
+    } catch (e) {
+      showError(t('settings.masterKeyDownloadFailed'))
+    }
+  }
+
+  // Standalone backup (button in encryption status section, after enable).
+  // Fetches the key from the server (admin already has FS access) and
+  // triggers the same browser download as post-enable.
+  const handleDownloadExistingMasterKey = async () => {
+    try {
+      const blob = await settingsService.downloadMasterKey()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'ucm-master.key'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showSuccess(t('settings.masterKeyDownloaded'))
+    } catch (e) {
+      showError(e.message || t('settings.masterKeyDownloadFailed'))
     }
   }
 
@@ -1190,6 +1248,7 @@ export default function SettingsPage() {
             encryptionStatus={encryptionStatus}
             setShowEnableEncryptionModal={setShowEnableEncryptionModal}
             setShowDisableEncryptionModal={setShowDisableEncryptionModal}
+            handleDownloadExistingMasterKey={handleDownloadExistingMasterKey}
             anomalies={anomalies}
             anomaliesLoading={anomaliesLoading}
             loadAnomalies={loadAnomalies}
@@ -1664,6 +1723,89 @@ export default function SettingsPage() {
         variant="danger"
         loading={encryptionLoading}
       />
+
+      {/* Backup Master Key Modal — shown immediately after enabling encryption.
+          Operator MUST download the key + confirm storage before closing. */}
+      <Modal
+        open={showBackupKeyModal}
+        onClose={() => {
+          // Disallow dismiss without explicit confirmation. Closing without
+          // backup is the #1 cause of "I lost my master.key" support tickets.
+          if (backupKeyConfirmed) {
+            setShowBackupKeyModal(false)
+            setBackupKeyMaterial(null)
+            setBackupKeyDownloaded(false)
+            setBackupKeyConfirmed(false)
+          }
+        }}
+        title={t('settings.masterKeyBackupTitle')}
+        size="md"
+        showClose={backupKeyConfirmed}
+      >
+        <div className="p-4 space-y-4">
+          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger/30">
+            <div className="flex items-start gap-2">
+              <WarningCircle size={20} className="text-status-danger flex-shrink-0 mt-0.5" weight="fill" />
+              <div className="text-sm text-text-primary">
+                <p className="font-semibold mb-1">{t('settings.masterKeyBackupCritical')}</p>
+                <p className="text-text-secondary">{t('settings.masterKeyBackupDesc')}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-sm text-text-secondary space-y-2">
+            <p>{t('settings.masterKeyBackupInstructions')}</p>
+            <ul className="list-disc list-inside text-xs space-y-1 pl-2">
+              <li>{t('settings.masterKeyBackupTip1')}</li>
+              <li>{t('settings.masterKeyBackupTip2')}</li>
+              <li>{t('settings.masterKeyBackupTip3')}</li>
+            </ul>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              type="button"
+              variant={backupKeyDownloaded ? 'outline' : 'primary'}
+              onClick={handleDownloadMasterKey}
+            >
+              <Download size={16} />
+              {backupKeyDownloaded
+                ? t('settings.masterKeyDownloadAgain')
+                : t('settings.masterKeyDownloadNow')}
+            </Button>
+          </div>
+
+          <label className={`flex items-start gap-2 cursor-pointer p-3 rounded-lg border ${backupKeyDownloaded ? 'border-border bg-bg-tertiary' : 'border-border/50 bg-bg-tertiary/40 opacity-60'}`}>
+            <input
+              type="checkbox"
+              checked={backupKeyConfirmed}
+              onChange={(e) => setBackupKeyConfirmed(e.target.checked)}
+              disabled={!backupKeyDownloaded}
+              className="rounded border-border bg-bg-tertiary mt-0.5"
+            />
+            <span className="text-sm text-text-primary">
+              {t('settings.masterKeyBackupConfirm')}
+            </span>
+          </label>
+
+          <div className="flex justify-end pt-4 border-t border-border">
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!backupKeyConfirmed}
+              onClick={() => {
+                setShowBackupKeyModal(false)
+                setBackupKeyMaterial(null)
+                setBackupKeyDownloaded(false)
+                setBackupKeyConfirmed(false)
+              }}
+            >
+              <CheckCircle size={16} />
+              {t('common.done')}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Smart Import Modal for HTTPS certificate */}
       <SmartImportModal

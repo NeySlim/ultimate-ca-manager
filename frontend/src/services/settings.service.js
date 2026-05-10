@@ -88,6 +88,12 @@ export const settingsService = {
     return apiClient.post('/system/security/disable-encryption')
   },
 
+  async downloadMasterKey() {
+    return apiClient.get('/system/security/master-key/download', {
+      responseType: 'blob'
+    })
+  },
+
   // Security Anomalies
   async getSecurityAnomalies() {
     return apiClient.get('/system/security/anomalies')

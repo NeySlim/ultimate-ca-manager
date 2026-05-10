@@ -370,6 +370,42 @@ class TestDisableEncryption:
         assert r.status_code == 401
 
 
+class TestDownloadMasterKey:
+    """GET /system/security/master-key/download — backup the master key file."""
+
+    def test_auth_required(self, client):
+        r = client.get('/api/v2/system/security/master-key/download')
+        assert r.status_code == 401
+
+    def test_returns_400_when_encryption_disabled(self, auth_client, monkeypatch):
+        from security import encryption as enc
+        monkeypatch.setattr(enc.key_encryption, '_enabled', False, raising=False)
+        r = auth_client.get('/api/v2/system/security/master-key/download')
+        assert r.status_code == 400
+
+    def test_returns_409_when_key_source_is_env(self, auth_client, monkeypatch):
+        from security import encryption as enc
+        monkeypatch.setattr(enc.key_encryption, '_enabled', True, raising=False)
+        monkeypatch.setattr(enc.key_encryption, '_key_source', 'env', raising=False)
+        r = auth_client.get('/api/v2/system/security/master-key/download')
+        assert r.status_code == 409
+
+    def test_returns_key_with_attachment_headers(self, auth_client, monkeypatch, tmp_path):
+        from security import encryption as enc
+        fake_key = tmp_path / 'master.key'
+        fake_key.write_bytes(b'-----BEGIN UCM MASTER KEY-----\nDEADBEEF\n-----END UCM MASTER KEY-----\n')
+        monkeypatch.setattr(enc.key_encryption, '_enabled', True, raising=False)
+        monkeypatch.setattr(enc.key_encryption, '_key_source', 'file', raising=False)
+        monkeypatch.setattr(enc, 'MASTER_KEY_PATH', fake_key)
+        r = auth_client.get('/api/v2/system/security/master-key/download')
+        assert r.status_code == 200
+        assert r.mimetype == 'application/octet-stream'
+        assert 'attachment' in r.headers.get('Content-Disposition', '')
+        assert 'ucm-master.key' in r.headers.get('Content-Disposition', '')
+        assert 'no-store' in r.headers.get('Cache-Control', '')
+        assert b'BEGIN UCM MASTER KEY' in r.data
+
+
 class TestEncryptAllKeys:
     """POST /system/security/encrypt-all-keys — DANGEROUS."""
 

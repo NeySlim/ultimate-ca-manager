@@ -3,9 +3,10 @@ System Security Operations
 """
 
 from . import bp
-from flask import request, current_app
+from flask import request, current_app, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.trusted_proxy import client_ip
 from models import CA, Certificate, db
 from services.audit_service import AuditService
 from pathlib import Path
@@ -92,6 +93,16 @@ def enable_encryption():
         # Encrypt all existing keys
         encrypted, skipped, errors = do_encrypt(dry_run=False)
 
+        # Read the freshly-written key so the caller can immediately download
+        # a backup. This is the ONLY chance to surface it cleanly: if the
+        # operator never backs it up and later loses /etc/ucm/master.key,
+        # every encrypted private key in the DB becomes unrecoverable.
+        try:
+            from security.encryption import MASTER_KEY_PATH
+            master_key_pem = MASTER_KEY_PATH.read_text().strip()
+        except Exception:
+            master_key_pem = None
+
         AuditService.log_action(
             action='encryption_enabled',
             resource_type='system',
@@ -107,7 +118,9 @@ def enable_encryption():
                 'key_file': str(KeyEncryption.key_file_exists() and '/etc/ucm/master.key'),
                 'encrypted': encrypted,
                 'skipped': skipped,
-                'errors': errors
+                'errors': errors,
+                'master_key': master_key_pem,
+                'backup_required': True,
             }
         )
 
@@ -127,6 +140,66 @@ def enable_encryption():
         logger.error(f"Failed to enable encryption: {e}")
         KeyEncryption.remove_key_file()
         return error_response("Failed to enable encryption", 500)
+
+
+@bp.route('/api/v2/system/security/master-key/download', methods=['GET'])
+@require_auth(['admin:system'])
+def download_master_key():
+    """
+    Download the current master key file as plain text.
+
+    SECURITY:
+    - admin:system only
+    - audited (every download logged with IP)
+    - returned as application/octet-stream attachment named ucm-master.key
+    - never cached (no-store)
+
+    Use case: operator just enabled encryption (or wants to back up an
+    existing key). Without this file, ALL encrypted private keys in the DB
+    are unrecoverable after a host migration / Docker container recreate.
+    """
+    try:
+        from security.encryption import key_encryption, MASTER_KEY_PATH
+
+        if not key_encryption.is_enabled:
+            return error_response("Encryption is not enabled — no master key to download", 400)
+
+        if key_encryption.key_source != 'file' or not MASTER_KEY_PATH.exists():
+            return error_response(
+                "Master key is not stored as a file (likely loaded from "
+                "KEY_ENCRYPTION_KEY env var) — backup must be done manually.",
+                409
+            )
+
+        try:
+            key_bytes = MASTER_KEY_PATH.read_bytes()
+        except PermissionError:
+            return error_response(
+                f"Permission denied reading {MASTER_KEY_PATH}. "
+                "Check that the UCM service user owns it.", 403
+            )
+
+        AuditService.log_action(
+            action='master_key_downloaded',
+            resource_type='system',
+            resource_name='Master Key',
+            details=f'Master key downloaded for backup from {client_ip()}',
+            success=True,
+        )
+
+        return Response(
+            key_bytes,
+            mimetype='application/octet-stream',
+            headers={
+                'Content-Disposition': 'attachment; filename="ucm-master.key"',
+                'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+                'Pragma': 'no-cache',
+                'X-Content-Type-Options': 'nosniff',
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to download master key: {e}")
+        return error_response("Failed to download master key", 500)
 
 
 @bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])

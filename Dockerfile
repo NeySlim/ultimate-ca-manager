@@ -86,6 +86,15 @@ ENV PATH="/opt/ucm/venv/bin:$PATH" \
 EXPOSE 8443
 EXPOSE 8080
 
+# Declare persistent volumes.
+# /etc/ucm holds master.key — the symmetric key that decrypts every private
+# key in the database. If the container is recreated without this volume
+# bind-mounted, master.key is destroyed and ALL encrypted CAs / certs / ACME
+# / SSH-CA private keys in the DB become unrecoverable. ALWAYS bind-mount
+# /etc/ucm to a host path or named volume before enabling encryption.
+# /opt/ucm/data holds the SQLite DB, CA files, sessions, backups.
+VOLUME ["/etc/ucm", "/opt/ucm/data"]
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f -k https://127.0.0.1:8443/health || exit 1

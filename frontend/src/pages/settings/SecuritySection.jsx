@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User } from '@phosphor-icons/react'
+import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User, Download } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
   return (
     <DetailContent>
@@ -51,13 +51,24 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                     {t('settings.enableEncryption')}
                   </Button>
                 ) : (
-                  <Button 
-                    onClick={() => setShowDisableEncryptionModal(true)}
-                    variant="outline"
-                  >
-                    <Lock size={16} />
-                    {t('settings.disableEncryption')}
-                  </Button>
+                  <div className="flex gap-2 flex-wrap">
+                    {encryptionStatus.key_source === 'file' && handleDownloadExistingMasterKey && (
+                      <Button
+                        onClick={handleDownloadExistingMasterKey}
+                        variant="primary"
+                      >
+                        <Download size={16} />
+                        {t('settings.backupMasterKey')}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => setShowDisableEncryptionModal(true)}
+                      variant="outline"
+                    >
+                      <Lock size={16} />
+                      {t('settings.disableEncryption')}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
