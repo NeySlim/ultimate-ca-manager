@@ -9,6 +9,22 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.155] - 2026-05-10
+
+Auto-renewal UI, PostgreSQL migration recovery (closes [#115](https://github.com/NeySlim/ultimate-ca-manager/issues/115)), LAN-friendly rate limiting, and master-key backup safeguards.
+Validated 6/6 across SQLite and PostgreSQL on Debian, RHEL/Fedora, and Docker.
+
+### Added
+- **Auto-renewal settings UI** — dedicated section in Settings to configure global renewal threshold, retry policy, scheduler interval, and per-CA overrides. Backend endpoints `GET/PUT /api/v2/settings/auto-renewal` with full validation.
+- **Master-key backup UX** — new `GET /api/v2/system/security/master-key/download` endpoint (admin-only, audited). `enable-encryption` now returns the master key inline (one-time) with `backup_required: true`. Settings → Security shows a "Back Up Master Key" action when the key is file-sourced. A confirm-gated modal forces the operator to download and acknowledge before dismissal. The endpoint returns 409 when the key is supplied via environment variable (operator must back it up out-of-band).
+- Dockerfile now declares `VOLUME ["/etc/ucm", "/opt/ucm/data"]` so master.key survives container recreation when no explicit bind mount is provided.
+
+### Fixed
+- **PostgreSQL migrations** ([#115](https://github.com/NeySlim/ultimate-ca-manager/issues/115)) — migrations 029, 031, 032, 033, 034 are now dual-backend (SQLite + PostgreSQL). Adds reconcile migration `035_reconcile_pg_schema.py` to repair PG instances that booted on a SQLite-only release. The migration runner now refuses to start in strict mode if SQLite-only migrations would be skipped on PostgreSQL past the 020 boundary.
+
+### Changed
+- **Rate limiter** — LAN clients (RFC1918 + loopback) bypass rate limits by default (`RATE_LIMIT_TRUST_LAN=true`). Standard tier raised from 300/min to 600/min and from 60 burst to 100, removing false positives on busy on-prem deployments.
+
 ## [2.154] - 2026-05-10
 
 Fixes OPNsense 26.1.x certificate import (closes [#114](https://github.com/NeySlim/ultimate-ca-manager/issues/114)).
