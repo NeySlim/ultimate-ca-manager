@@ -2,6 +2,7 @@
 Webhook Service - UCM
 Sends HTTP notifications for certificate lifecycle events.
 """
+import base64
 from datetime import datetime
 from models import db, SystemConfig
 from utils.encryption import decrypt_if_needed
@@ -44,41 +45,72 @@ def _safe_custom_headers(custom: dict) -> dict:
 class WebhookEndpoint(db.Model):
     """Webhook endpoint configuration"""
     __tablename__ = 'webhook_endpoints'
-    
+
+    VALID_AUTH_TYPES = ('none', 'bearer', 'basic', 'api_key', 'custom')
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     url = db.Column(db.String(500), nullable=False)
     secret = db.Column(db.String(255))  # For HMAC signature
-    
+
     # Events to send
     events = db.Column(db.Text, default='[]')  # JSON array of event types
-    
+
     # Filtering
     ca_filter = db.Column(db.String(100))  # Only for specific CA refid
-    
+
     # Status
     enabled = db.Column(db.Boolean, default=True)
     last_success = db.Column(db.DateTime)
     last_failure = db.Column(db.DateTime)
     failure_count = db.Column(db.Integer, default=0)
-    
+
     # Headers (JSON)
     custom_headers = db.Column(db.Text, default='{}')
-    
+
     created_at = db.Column(db.DateTime, default=utc_now)
-    
+
+    # Auth fields (migration 036)
+    auth_type = db.Column(db.String(20), nullable=False, default='none')
+    _auth_token = db.Column(db.Text, nullable=True)
+    auth_username = db.Column(db.String(255), nullable=True)
+    auth_header_name = db.Column(db.String(100), nullable=True)
+
+    @property
+    def auth_token(self):
+        if not self._auth_token:
+            return None
+        try:
+            from utils.encryption import decrypt_if_needed
+            return decrypt_if_needed(self._auth_token)
+        except Exception:
+            logger.error(f"Failed to decrypt auth_token for webhook {self.id}")
+            return self._auth_token
+
+    @auth_token.setter
+    def auth_token(self, value):
+        if not value:
+            self._auth_token = None
+            return
+        try:
+            from utils.encryption import encrypt_if_needed
+            self._auth_token = encrypt_if_needed(value)
+        except Exception:
+            logger.error(f"Failed to encrypt auth_token for webhook {self.id}")
+            self._auth_token = value
+
     def get_events(self):
         try:
             return json.loads(self.events) if self.events else []
         except Exception:
             return []
-    
+
     def get_headers(self):
         try:
             return json.loads(self.custom_headers) if self.custom_headers else {}
         except Exception:
             return {}
-    
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -91,7 +123,106 @@ class WebhookEndpoint(db.Model):
             'last_failure': utc_isoformat(self.last_failure),
             'failure_count': self.failure_count,
             'created_at': utc_isoformat(self.created_at),
+            # Auth fields — token is NEVER included, only the boolean sentinel
+            'auth_type': self.auth_type or 'none',
+            'auth_token_set': bool(self._auth_token),
+            'auth_username': self.auth_username,
+            'auth_header_name': self.auth_header_name,
         }
+
+
+_MAX_AUTH_TOKEN_BYTES = 8192
+
+
+def _build_auth_header(webhook) -> dict:
+    """Return dict of headers to merge into the outbound request.
+
+    Returns {} for auth_type='none' or any misconfiguration (fail open
+    from a transport perspective — the receiver will reject the request
+    if auth is required, making the misconfiguration visible in logs).
+    Never logs header *values*.
+    """
+    auth_type = (webhook.auth_type or 'none').strip().lower()
+
+    if auth_type == 'none':
+        return {}
+
+    if auth_type not in WebhookEndpoint.VALID_AUTH_TYPES:
+        logger.error(f"Webhook {getattr(webhook, 'id', '?')}: unknown auth_type '{auth_type}'")
+        return {}
+
+    token = webhook.auth_token
+    if token and len(token.encode('utf-8')) > _MAX_AUTH_TOKEN_BYTES:
+        logger.error(
+            f"Webhook {getattr(webhook, 'id', '?')}: auth_token exceeds "
+            f"{_MAX_AUTH_TOKEN_BYTES}-byte cap — dropping auth header"
+        )
+        return {}
+
+    if auth_type == 'bearer':
+        if not token:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: bearer auth_type but no token stored"
+            )
+            return {}
+        return {'Authorization': f'Bearer {token}'}
+
+    if auth_type == 'basic':
+        username = webhook.auth_username or ''
+        if not username:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: basic auth_type but auth_username is empty"
+            )
+            return {}
+        if ':' in username:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: basic auth_username contains ':' — invalid"
+            )
+            return {}
+        if not token:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: basic auth_type but no token (password) stored"
+            )
+            return {}
+        encoded = base64.b64encode(f'{username}:{token}'.encode('utf-8')).decode('ascii')
+        return {'Authorization': f'Basic {encoded}'}
+
+    if auth_type == 'api_key':
+        header_name = webhook.auth_header_name or ''
+        if not header_name:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: api_key auth_type but auth_header_name is empty"
+            )
+            return {}
+        if header_name.lower() == 'authorization':
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: api_key auth_header_name must not be 'Authorization'"
+            )
+            return {}
+        if not token:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: api_key auth_type but no token stored"
+            )
+            return {}
+        return {header_name: token}
+
+    if auth_type == 'custom':
+        header_name = webhook.auth_header_name or ''
+        if not header_name:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: custom auth_type but auth_header_name is empty"
+            )
+            return {}
+        if not token:
+            logger.error(
+                f"Webhook {getattr(webhook, 'id', '?')}: custom auth_type but no token stored"
+            )
+            return {}
+        return {header_name: token}
+
+    # Unreachable given the membership check above, but defensive
+    logger.error(f"Webhook {getattr(webhook, 'id', '?')}: unhandled auth_type '{auth_type}'")
+    return {}
 
 
 class WebhookService:
@@ -156,6 +287,10 @@ class WebhookService:
             # whatever the operator put in (defence in depth).
             headers = {}
             headers.update(_safe_custom_headers(endpoint.get_headers()))
+            # Auth headers come after custom_headers so they always win,
+            # but before UCM identity headers so HMAC signature is last.
+            auth_headers = _build_auth_header(endpoint)
+            headers.update(auth_headers)
             headers.update({
                 'Content-Type': 'application/json',
                 'User-Agent': 'UCM-Webhook/2.0',
@@ -240,6 +375,8 @@ class WebhookService:
 
             headers = {}
             headers.update(_safe_custom_headers(endpoint.get_headers()))
+            auth_headers = _build_auth_header(endpoint)
+            headers.update(auth_headers)
             headers.update({
                 'Content-Type': 'application/json',
                 'User-Agent': 'UCM-Webhook/2.0',
