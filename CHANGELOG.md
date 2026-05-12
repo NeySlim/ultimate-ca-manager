@@ -9,6 +9,21 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.156] - 2026-05-12
+
+### Added
+- **Webhook custom authentication** (#116) — five auth types per webhook: `none`, `bearer`, `basic`, `api_key`, `custom`. Tokens encrypted at rest, never returned in API responses (only `auth_token_set` boolean). PUT semantics: omitted token preserves existing, null clears, empty string is rejected.
+- Migration 036 adds `auth_type`, `auth_token` (encrypted), `auth_username`, `auth_header_name` columns to `webhooks` (dual-backend SQLite + PostgreSQL).
+- Webhook form UI: auth type selector with conditional fields (token, username, header name), live request-preview pane with token masking, explicit clear-token control.
+- Audit events: `webhook.auth_configured`, `webhook.auth_disabled`, `webhook.auth_token_rotated`, `webhook.auth_token_invalid`.
+- 18 backend integration tests + 20 frontend tests covering all 5 auth types, PUT semantics, validation errors, and token masking.
+- Webhook auth documentation in settings help page (all 9 languages).
+
+### Security
+- `Authorization` header value blocked when `auth_type=api_key` (forces operator to use bearer/basic for that scheme).
+- Token capped at 8192 bytes.
+- Tokens stored using the same encrypted-property pattern as other secrets (master key in `/etc/ucm/master.key`).
+
 ## [2.155] - 2026-05-10
 
 Auto-renewal UI, PostgreSQL migration recovery (closes [#115](https://github.com/NeySlim/ultimate-ca-manager/issues/115)), LAN-friendly rate limiting, and master-key backup safeguards.
