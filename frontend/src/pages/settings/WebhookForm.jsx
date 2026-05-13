@@ -152,20 +152,33 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
       return
     }
 
-    // Build payload — handle auth_token semantics:
-    // - cleared explicitly → null (backend clears token)
-    // - new value typed → include it
-    // - empty and not cleared → omit (backend preserves existing)
-    const { auth_token_set: _ignored, auth_token_cleared, auth_token, ...rest } = formData
+    // Build payload — handle auth field semantics:
+    // Empty strings ("") trigger 400 from backend ("cannot be empty, use null to clear").
+    // Convert empty strings → null so the backend clears the field.
+    const { auth_token_set: _ignored, auth_token_cleared, auth_token, auth_username, auth_header_name, ...rest } = formData
 
     const payload = { ...rest }
 
+    // auth_token: cleared → null, new value → include, otherwise omit (preserve)
     if (auth_token_cleared) {
       payload.auth_token = null
     } else if (auth_token.length > 0) {
       payload.auth_token = auth_token
     }
-    // else: auth_token omitted → server keeps existing
+
+    // auth_username: empty → null (clear), non-empty → include, otherwise omit
+    if (auth_username.trim().length > 0) {
+      payload.auth_username = auth_username
+    } else {
+      payload.auth_username = null
+    }
+
+    // auth_header_name: same logic as auth_username
+    if (auth_header_name.trim().length > 0) {
+      payload.auth_header_name = auth_header_name
+    } else {
+      payload.auth_header_name = null
+    }
 
     onSave(payload)
   }

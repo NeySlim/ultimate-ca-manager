@@ -57,7 +57,11 @@ describe('WebhookForm — auth section', () => {
     fireEvent.submit(container.querySelector('form'))
 
     expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ auth_type: 'none' })
+      expect.objectContaining({
+        auth_type: 'none',
+        auth_username: null,
+        auth_header_name: null,
+      })
     )
   })
 
@@ -74,6 +78,9 @@ describe('WebhookForm — auth section', () => {
     expect(payload).not.toHaveProperty('auth_token')
     expect(payload).not.toHaveProperty('auth_token_set')
     expect(payload).not.toHaveProperty('auth_token_cleared')
+    // Empty strings are converted to null (backend rejects "")
+    expect(payload.auth_username).toBeNull()
+    expect(payload.auth_header_name).toBeNull()
   })
 
   it('shows "token set" hint when editing a webhook with auth_token_set=true', () => {
