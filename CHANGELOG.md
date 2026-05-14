@@ -9,6 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.157] - 2026-05-13
+
+### Fixed
+- Webhook form: empty `auth_username` and `auth_header_name` fields now sent as `null` instead of `""`, preventing 400 validation errors when the field is optional for the selected auth type (#117).
+
 ## [2.156] - 2026-05-12
 
 ### Added
