@@ -167,6 +167,11 @@ class SSHCAService:
         # Set default TTL based on type
         if default_ttl is None:
             default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
+        else:
+            default_ttl = int(default_ttl)
+
+        if max_ttl is not None:
+            max_ttl = int(max_ttl)
 
         # Default extensions for user CAs
         if default_extensions is None and ca_type == 'user':
@@ -291,6 +296,9 @@ class SSHCAService:
         allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment', 'owner_group_id'}
         for field, value in kwargs.items():
             if field in allowed_fields:
+                # Cast TTL fields to int to prevent str/int comparison errors
+                if field in ('default_ttl', 'max_ttl') and value is not None:
+                    value = int(value)
                 setattr(ca, field, value)
 
         if 'default_extensions' in kwargs:

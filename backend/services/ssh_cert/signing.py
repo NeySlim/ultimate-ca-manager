@@ -49,11 +49,12 @@ class SSHCertificateSigningMixin:
         subject_fingerprint = SSHCertificateUtilsMixin._compute_fingerprint(public_key)
 
         if validity_seconds is None:
-            validity_seconds = ca.default_ttl or 86400
+            validity_seconds = int(ca.default_ttl) if ca.default_ttl else 86400
 
-        if ca.max_ttl and ca.max_ttl > 0:
-            if validity_seconds > ca.max_ttl:
-                validity_seconds = ca.max_ttl
+        if ca.max_ttl:
+            max_ttl = int(ca.max_ttl)
+            if max_ttl > 0 and validity_seconds > max_ttl:
+                validity_seconds = max_ttl
 
         now_ts = int(time.time())
         valid_after = now_ts

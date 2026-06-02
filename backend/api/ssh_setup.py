@@ -56,7 +56,7 @@ def get_public_setup_script(refid):
                             status=400, mimetype='text/x-shellscript')
 
         # Reuse the script generators from the authenticated endpoint
-        from api.v2.ssh_cas import _generate_setup_script
+        from api.v2.ssh.setup_scripts import _generate_setup_script
         script = _generate_setup_script(ca, pub_key, ca_type, hostname, platform)
 
         safe_name = ca.descr.replace(' ', '_').replace('"', '').replace("'", '')
