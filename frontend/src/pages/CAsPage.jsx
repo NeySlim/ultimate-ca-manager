@@ -22,6 +22,7 @@ import { OrgView } from './cas/OrgView'
 import { ColumnsView } from './cas/ColumnsView'
 import { ListView } from './cas/ListView'
 import { CADetailsPanel } from './cas/CADetailsPanel'
+import { ManageTemplatePinsModal } from '../components/cas/ManageTemplatePinsModal'
 import { ChainRepairBar } from './cas/ChainRepairBar'
 import { CreateCAModal } from './cas/CreateCAModal'
 
@@ -40,6 +41,8 @@ export default function CAsPage() {
   const [cas, setCAs] = useState([])
   const [selectedCA, setSelectedCA] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showPinsModal, setShowPinsModal] = useState(false)
+  const [pinsModalCA, setPinsModalCA] = useState(null)
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
   const [showImportModal, setShowImportModal] = useState(false)
   
@@ -86,6 +89,21 @@ export default function CAsPage() {
     window.addEventListener('ucm:data-changed', handler)
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [])
+
+  // Handle open pins modal event from floating window
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.caId) {
+        const ca = cas.find(c => c.id === e.detail.caId)
+        if (ca) {
+          setPinsModalCA(ca)
+          setShowPinsModal(true)
+        }
+      }
+    }
+    window.addEventListener('ucm:open-pins-modal', handler)
+    return () => window.removeEventListener('ucm:open-pins-modal', handler)
+  }, [cas])
 
   // Handle selected param from navigation
   useEffect(() => {
@@ -564,6 +582,14 @@ export default function CAsPage() {
           setShowImportModal(false)
           loadCAs()
         }}
+      />
+
+      {/* Manage Template Pins Modal */}
+      <ManageTemplatePinsModal
+        open={showPinsModal}
+        onOpenChange={setShowPinsModal}
+        ca={pinsModalCA}
+        t={t}
       />
       
     </>

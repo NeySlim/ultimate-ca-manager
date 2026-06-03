@@ -1,6 +1,6 @@
 /**
  * CADetails Component
- * 
+ *
  * Reusable component for displaying Certificate Authority details.
  * Uses global Compact components for consistent styling.
  */
@@ -8,13 +8,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAppTimezone } from '../stores/timezoneStore'
 import { formatDate as formatDateUtil } from '../lib/utils'
-import { 
-  Certificate, 
-  Key, 
-  Lock, 
-  Clock, 
+import {
+  Certificate,
+  Key,
+  Lock,
+  Clock,
   Calendar,
-  Download, 
+  Download,
   Trash,
   Copy,
   CheckCircle,
@@ -26,7 +26,8 @@ import {
   Hash,
   Fingerprint,
   TreeStructure,
-  Link
+  Link,
+  PushPin
 } from '@phosphor-icons/react'
 import { Badge, CATypeIcon } from './Badge'
 import { Button } from './Button'
@@ -34,13 +35,13 @@ import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { CertificateExtensions } from './CertificateExtensions'
 import { cn } from '../lib/utils'
 
-// Format date helper — delegates to shared util
+// Format date helper - delegates to shared util
 function formatDate(dateStr) {
-  if (!dateStr) return '—'
+  if (!dateStr) return '-'
   return formatDateUtil(dateStr)
 }
 
-export function CADetails({ 
+export function CADetails({
   ca,
   onExport,
   onDelete,
@@ -53,23 +54,23 @@ export function CADetails({
   const { t } = useTranslation()
   const [showFullPem, setShowFullPem] = useState(false)
   const [pemCopied, setPemCopied] = useState(false)
-  
+
   if (!ca) return null
-  
+
   // Determine status
   const getStatus = () => {
     if (ca.status === 'Expired') return 'expired'
     if (ca.days_remaining !== null && ca.days_remaining <= 30) return 'expiring'
     return 'valid'
   }
-  
+
   const status = getStatus()
   const statusConfig = {
     valid: { variant: 'success', label: t('common.active') },
     expiring: { variant: 'warning', label: t('common.detailsExpiring') },
     expired: { variant: 'danger', label: t('common.expired') }
   }
-  
+
   return (
     <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", embedded && "space-y-3 p-3")}>
       {!embedded && <>
@@ -93,7 +94,7 @@ export function CADetails({
           )}
         </div>
       </div>
-      
+
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-2">
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
@@ -119,7 +120,7 @@ export function CADetails({
           <div className="text-xs font-medium text-text-primary">{ca.certs || 0}</div>
         </div>
       </div>
-      
+
       {/* Days Remaining Indicator */}
       {ca.days_remaining !== null && (
         <div className={cn(
@@ -137,13 +138,18 @@ export function CADetails({
           )}
         </div>
       )}
-      
+
       {/* Actions */}
       {showActions && (
         <div className="flex gap-2 flex-wrap">
           {onExport && (
             <Button type="button" size="sm" variant="secondary" onClick={onExport}>
               <Download size={14} /> {t('common.export')}
+            </Button>
+          )}
+          {canWrite && (
+            <Button type="button" size="sm" variant="secondary" onClick={() => window.dispatchEvent(new CustomEvent('ucm:open-pins-modal', { detail: { caId: ca.id } }))}>
+              <PushPin size={14} /> {t('templates.managePins')}
             </Button>
           )}
           {onDelete && canDelete && (
@@ -170,7 +176,7 @@ export function CADetails({
           <span className="text-2xs text-text-secondary">{ca.certs || 0} {t('common.certificatesShort')}</span>
         </div>
       )}
-      
+
       {/* Subject Information */}
       <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
@@ -183,7 +189,7 @@ export function CADetails({
           <CompactField icon={Envelope} label={t('common.email')} value={ca.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
-      
+
       {/* Issuer (if intermediate) */}
       {!ca.is_root && ca.issuer && (
         <CompactSection title={t('common.issuer')} icon={TreeStructure} iconClass="icon-bg-orange">
@@ -192,7 +198,7 @@ export function CADetails({
           </CompactGrid>
         </CompactSection>
       )}
-      
+
       {/* Validity Period */}
       <CompactSection title={t('common.validity')} icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
@@ -200,7 +206,7 @@ export function CADetails({
           <CompactField icon={Calendar} label={t('common.validUntil')} value={formatDate(ca.valid_to)} />
         </CompactGrid>
       </CompactSection>
-      
+
       {/* Technical Details */}
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
@@ -239,7 +245,7 @@ export function CADetails({
           </CompactGrid>
         </CompactSection>
       )}
-      
+
       {/* CRL/OCSP Configuration */}
       {(ca.cdp_enabled || ca.ocsp_enabled) && (
         <CompactSection title={t('details.revocationConfig')} icon={Link} iconClass="icon-bg-cyan">
@@ -253,7 +259,7 @@ export function CADetails({
           </CompactGrid>
         </CompactSection>
       )}
-      
+
       {/* X.509 Extensions */}
       <CertificateExtensions extensions={ca.extensions} defaultOpen={false} />
 
@@ -264,7 +270,7 @@ export function CADetails({
           <CompactField icon={Fingerprint} label="SHA-1" value={ca.thumbprint_sha1} mono copyable />
         </CompactGrid>
       </CompactSection>
-      
+
       {/* PEM */}
       {showPem && ca.pem && (
         <CompactSection title={t('details.pemCertificate')} icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
@@ -280,10 +286,10 @@ export function CADetails({
             )}
           </div>
           <div className="flex gap-2 mt-2">
-            <Button 
+            <Button
               type="button"
-              size="sm" 
-              variant="ghost" 
+              size="sm"
+              variant="ghost"
               onClick={(e) => {
                 e.stopPropagation()
                 setShowFullPem(!showFullPem)
@@ -291,9 +297,9 @@ export function CADetails({
             >
               {showFullPem ? t('details.showLess') : t('details.showFull')}
             </Button>
-            <Button 
+            <Button
               type="button"
-              size="sm" 
+              size="sm"
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation()
@@ -308,7 +314,7 @@ export function CADetails({
           </div>
         </CompactSection>
       )}
-      
+
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>

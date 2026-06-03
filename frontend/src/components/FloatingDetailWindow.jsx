@@ -6,7 +6,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Certificate, ShieldCheck, Fingerprint, Trash, X, ArrowsClockwise, ShieldWarning } from '@phosphor-icons/react'
+import { Certificate, ShieldCheck, Fingerprint, Trash, X, ArrowsClockwise, ShieldWarning, PushPin } from '@phosphor-icons/react'
 import { FloatingWindow } from './ui/FloatingWindow'
 import { CertificateDetails } from './CertificateDetails'
 import { CADetails } from './CADetails'
@@ -204,6 +204,10 @@ export function FloatingDetailWindow({ windowInfo }) {
     closeWindow(windowInfo.id)
   }
 
+  const handleManagePins = () => {
+    window.dispatchEvent(new CustomEvent('ucm:open-pins-modal', { detail: { caId: windowInfo.entityId } }))
+  }
+
   const title = data ? config.getTitle(data) : t('common.loading')
   const subtitle = data ? (windowInfo.type === 'ca' ? t(config.getSubtitle(data)) : config.getSubtitle(data)) : ''
 
@@ -224,6 +228,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     onUnhold: isCert && canWrite('certificates') && data.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold') ? handleUnhold : null,
     onOffline: isCA && canWrite('cas') && !data.offline ? handleOffline : null,
     onRestore: isCA && canWrite('cas') && data.offline ? handleRestore : null,
+    onManagePins: isCA && canWrite('cas') ? handleManagePins : null,
     onDelete: canDelete(resource) ? handleDelete : null,
     t,
   } : null
@@ -253,7 +258,14 @@ export function FloatingDetailWindow({ windowInfo }) {
         <>
           <ActionBar {...actionBarProps} />
           <div className="flex-1 overflow-y-auto p-0">
-            <DetailContent type={windowInfo.type} data={data} />
+            <DetailContent 
+              type={windowInfo.type} 
+              data={data}
+              canWrite={canWrite}
+              canDelete={canDelete}
+              onExport={handleExport}
+              onDelete={handleDelete}
+            />
           </div>
         </>
       ) : (
@@ -286,7 +298,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 /**
  * DetailContent — Renders the appropriate detail view based on entity type
  */
-function DetailContent({ type, data }) {
+function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete }) {
   if (type === 'certificate' || type === 'user_certificate') {
     return (
       <CertificateDetails
@@ -303,9 +315,13 @@ function DetailContent({ type, data }) {
     return (
       <CADetails
         ca={data}
-        showActions={false}
+        showActions={true}
         showPem={true}
         embedded={true}
+        canWrite={canWrite('cas')}
+        canDelete={canDelete('cas')}
+        onExport={onExport}
+        onDelete={onDelete}
       />
     )
   }
@@ -327,7 +343,7 @@ function DetailContent({ type, data }) {
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityName, onRenew, onRevoke, onUnhold, onOffline, onRestore, onDelete, t }) {
+function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityName, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
@@ -339,6 +355,14 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
         <Certificate size={14} weight="duotone" />
         {t('export.title', 'Export')}
       </button>
+
+      {/* Manage Pins — CA only */}
+      {onManagePins && (
+        <button onClick={onManagePins} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
+          <PushPin size={14} weight="duotone" />
+          {t('templates.managePins', 'Manage Pins')}
+        </button>
+      )}
 
       {/* Renew */}
       {onRenew && (
