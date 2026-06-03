@@ -9,6 +9,21 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.159] - 2026-06-03
+
+### Added
+- **CA-template pinning** (#118) — pin templates to specific CAs for quick access in certificate issuance form. Pinned templates appear with pushpin icon at top of dropdown, with option to show all templates. Backend API endpoints for pin/unpin operations, migration 037 adds `ca_template_pins` table.
+- Manage Pins button in CA floating window action bar for quick access to template pinning modal.
+
+### Fixed
+- Template pinning UI: replaced emoji with PushPin icon from phosphor-icons for consistency.
+- i18n interpolation in "Show all X templates" button now correctly displays template count.
+- FloatingDetailWindow: fixed canWrite/canDelete props passing to CADetails component, preventing ReferenceError.
+- CA details floating window now properly displays action buttons (Export, Manage Pins, Take Offline, Delete).
+
+### Security
+- Updated frontend dependencies to fix security vulnerabilities: engine.io-client (moderate), picomatch (high), brace-expansion (moderate), @vitest/coverage-v8 (critical).
+
 ## [2.158] - 2026-06-03
 
 ### Fixed
