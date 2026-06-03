@@ -318,7 +318,12 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
               { value: '', label: t('certificates.noTemplate') },
               ...filteredTemplates.map(tpl => ({ 
                 value: String(tpl.id), 
-                label: tpl.is_pinned ? `${tpl.name} 📌` : tpl.name 
+                label: tpl.is_pinned ? (
+                  <span className="flex items-center gap-2">
+                    {tpl.name}
+                    <PushPin size={14} className="text-accent-primary shrink-0" weight="fill" />
+                  </span>
+                ) : tpl.name
               }))
             ]}
           />
@@ -328,7 +333,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
               onClick={() => setShowAllTemplates(!showAllTemplates)}
               className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
             >
-              {showAllTemplates ? t('templates.showPinnedOnly') : t('templates.showAllTemplates')}
+              {showAllTemplates ? t('templates.showPinnedOnly') : t('templates.showAllTemplates', { count: templates.length })}
             </button>
           )}
         </div>
