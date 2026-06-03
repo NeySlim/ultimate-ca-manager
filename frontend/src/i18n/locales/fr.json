@@ -2632,7 +2632,18 @@
     "subtitle_other": "{{count}} modèles",
     "subtitle": "{{count}} modèles de certificats",
     "validityDays": "{{count}} jours",
-    "validityDays_one": "{{count}} jour"
+    "validityDays_one": "{{count}} jour",
+    "showAllTemplates": "Afficher tous les {{count}} modèles",
+    "showPinnedOnly": "Afficher uniquement les épinglés",
+    "pinToCA": "Épingler à la CA",
+    "unpinFromCA": "Détacher de la CA",
+    "pinned": "Épinglé",
+    "noPinnedTemplates": "Aucun modèle épinglé pour cette CA",
+    "managePins": "Gérer les épinglages CA",
+    "pinSuccess": "Modèle épinglé à la CA",
+    "unpinSuccess": "Modèle détaché de la CA",
+    "selectCA": "Sélectionner une autorité de certification",
+    "pinnedCount": "{{count}} sur {{total}} modèles épinglés"
   },
   "time": {
     "today": "Aujourd'hui",

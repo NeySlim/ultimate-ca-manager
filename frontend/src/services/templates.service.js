@@ -28,5 +28,22 @@ export const templatesService = {
 
   async bulkDelete(ids) {
     return apiClient.post('/templates/bulk/delete', { ids })
+  },
+
+  // CA-Template pinning methods
+  async getForCA(caId) {
+    return apiClient.get(`/templates?ca_id=${caId}`)
+  },
+
+  async pinToCA(caId, templateId) {
+    return apiClient.post(`/cas/${caId}/templates/${templateId}/pin`)
+  },
+
+  async unpinFromCA(caId, templateId) {
+    return apiClient.delete(`/cas/${caId}/templates/${templateId}/pin`)
+  },
+
+  async getForCAWithPinStatus(caId) {
+    return apiClient.get(`/cas/${caId}/templates`)
   }
 }

@@ -10,10 +10,11 @@ from utils.response import success_response, error_response, created_response, n
 from utils.db_transaction import safe_commit
 from utils.file_validation import validate_upload, JSON_EXTENSIONS
 from utils.sanitize import sanitize_filename
-from models import db, Certificate
+from models import db, Certificate, CA
 from models.certificate_template import CertificateTemplate
 from models.policy import CertificatePolicy
 from services.audit_service import AuditService
+from services.template_service import TemplateService
 from datetime import datetime
 import traceback
 
@@ -78,11 +79,39 @@ def list_templates():
     - type: Filter by template_type
     - active: Filter by is_active (true/false)
     - search: Search name, description
+    - ca_id: If provided, returns all templates with is_pinned flag for this CA
     """
     type_list = request.args.getlist('type')
     active_str = request.args.get('active')
     search = request.args.get('search', '').strip()
+    ca_id = request.args.get('ca_id', type=int)
     
+    # If ca_id is provided, return templates with pin status
+    if ca_id:
+        # Verify CA exists
+        ca = CA.query.get(ca_id)
+        if not ca:
+            return error_response('CA not found', 404)
+        
+        try:
+            templates = TemplateService.get_templates_with_pin_status(ca_id, active_only=(active_str != 'false'))
+            
+            # Apply additional filters if provided
+            if type_list:
+                templates = [t for t in templates if t['template_type'] in type_list]
+            
+            if search:
+                search_lower = search.lower()
+                templates = [t for t in templates if 
+                           search_lower in t['name'].lower() or 
+                           search_lower in (t.get('description') or '').lower()]
+            
+            return success_response(data=templates)
+        except Exception as e:
+            logger.error(f"Failed to list templates with pin status for CA {ca_id}: {e}")
+            return error_response('Failed to list templates', 500)
+    
+    # Original behavior: return all templates without pin status
     query = CertificateTemplate.query
     
     if type_list:
@@ -668,3 +697,120 @@ def import_template():
         logger.error(traceback.format_exc())
         logger.error(f'Import failed: {e}')
         return error_response('Import failed', 500)
+
+
+# ============================================================================
+# CA-Template Pinning Endpoints
+# ============================================================================
+
+@bp.route('/api/v2/cas/<int:ca_id>/templates', methods=['GET'])
+@require_auth(['read:cas', 'read:templates'])
+def list_templates_with_pin_status(ca_id):
+    """
+    List all templates with pin status for a specific CA
+    
+    GET /api/v2/cas/{ca_id}/templates
+    
+    Returns all templates with is_pinned flag indicating which are pinned to this CA.
+    """
+    # Verify CA exists
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    try:
+        templates = TemplateService.get_templates_with_pin_status(ca_id)
+        
+        return success_response(
+            data={
+                'ca_id': ca_id,
+                'ca_name': ca.descr,
+                'templates': templates
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to list templates with pin status for CA {ca_id}: {e}")
+        return error_response('Failed to list templates', 500)
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/templates/<int:template_id>/pin', methods=['POST'])
+@require_auth(['write:cas', 'write:templates'])
+def pin_template_to_ca(ca_id, template_id):
+    """
+    Pin a template to a specific CA
+    
+    POST /api/v2/cas/{ca_id}/templates/{template_id}/pin
+    
+    When a CA has pinned templates, only those templates will be shown by default
+    in the certificate creation form (with a "Show all" toggle available).
+    """
+    username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+    
+    try:
+        pin = TemplateService.pin_template_to_ca(ca_id, template_id, username)
+        
+        # Get template and CA names for audit
+        template = CertificateTemplate.query.get(template_id)
+        ca = CA.query.get(ca_id)
+        
+        AuditService.log_action(
+            action='template_pinned_to_ca',
+            resource_type='template',
+            resource_id=str(template_id),
+            resource_name=template.name if template else f'Template {template_id}',
+            details=f'Pinned template "{template.name if template else template_id}" to CA "{ca.descr if ca else ca_id}"',
+            success=True,
+            username=username
+        )
+        
+        return created_response(
+            data=pin.to_dict(),
+            message=f'Template pinned to CA successfully'
+        )
+        
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"Failed to pin template {template_id} to CA {ca_id}: {e}")
+        return error_response('Failed to pin template to CA', 500)
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/templates/<int:template_id>/pin', methods=['DELETE'])
+@require_auth(['write:cas', 'write:templates'])
+def unpin_template_from_ca(ca_id, template_id):
+    """
+    Unpin a template from a specific CA
+    
+    DELETE /api/v2/cas/{ca_id}/templates/{template_id}/pin
+    
+    Removes the pin relationship between the template and CA.
+    """
+    username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+    
+    try:
+        success = TemplateService.unpin_template_from_ca(ca_id, template_id)
+        
+        if not success:
+            return error_response('Template is not pinned to this CA', 404)
+        
+        # Get template and CA names for audit
+        template = CertificateTemplate.query.get(template_id)
+        ca = CA.query.get(ca_id)
+        
+        AuditService.log_action(
+            action='template_unpinned_from_ca',
+            resource_type='template',
+            resource_id=str(template_id),
+            resource_name=template.name if template else f'Template {template_id}',
+            details=f'Unpinned template "{template.name if template else template_id}" from CA "{ca.descr if ca else ca_id}"',
+            success=True,
+            username=username
+        )
+        
+        return success_response(
+            message=f'Template unpinned from CA successfully'
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to unpin template {template_id} from CA {ca_id}: {e}")
+        return error_response('Failed to unpin template from CA', 500)

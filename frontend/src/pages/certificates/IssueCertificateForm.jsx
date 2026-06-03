@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Certificate, X, Plus, CaretDown, CaretUp } from '@phosphor-icons/react'
+import { Certificate, X, Plus, CaretDown, CaretUp, PushPin } from '@phosphor-icons/react'
 import { Button, Select, Input, DatePicker, EkuMultiSelect } from '../../components'
 import { templatesService, ekuService } from '../../services'
 
@@ -9,6 +9,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [showSubject, setShowSubject] = useState(false)
   const [validityMode, setValidityMode] = useState('days') // 'days' or 'date'
+  const [showAllTemplates, setShowAllTemplates] = useState(false)
 
   const [formData, setFormData] = useState({
     ca_id: '',
@@ -58,6 +59,36 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       setTemplates(Array.isArray(list) ? list.filter(t => t.template_type !== 'ca') : [])
     }).catch(() => {})
   }, [])
+
+  // Reload templates with pin status when CA changes
+  useEffect(() => {
+    if (!formData.ca_id) return
+    
+    templatesService.getForCA(formData.ca_id).then(res => {
+      const list = res?.data || res || []
+      setTemplates(Array.isArray(list) ? list.filter(t => t.template_type !== 'ca') : [])
+    }).catch(() => {})
+  }, [formData.ca_id])
+
+  // Filter templates based on pin status and showAllTemplates toggle
+  const filteredTemplates = useMemo(() => {
+    if (!formData.ca_id) return templates
+    
+    const pinnedTemplates = templates.filter(t => t.is_pinned)
+    
+    // If there are pinned templates and showAllTemplates is false, show only pinned
+    if (pinnedTemplates.length > 0 && !showAllTemplates) {
+      return pinnedTemplates
+    }
+    
+    // Otherwise show all templates
+    return templates
+  }, [templates, formData.ca_id, showAllTemplates])
+
+  // Check if there are any pinned templates for the current CA
+  const hasPinnedTemplates = useMemo(() => {
+    return templates.some(t => t.is_pinned)
+  }, [templates])
 
   // Apply re-key initial data
   useEffect(() => {
@@ -276,17 +307,31 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
       {/* Template selection */}
-      {templates.length > 0 && (
-        <Select
-          label={t('certificates.templateOptional')}
-          value={selectedTemplate}
-          onChange={handleTemplateChange}
-          placeholder={t('certificates.noTemplate')}
-          options={[
-            { value: '', label: t('certificates.noTemplate') },
-            ...templates.map(tpl => ({ value: String(tpl.id), label: tpl.name }))
-          ]}
-        />
+      {filteredTemplates.length > 0 && (
+        <div className="space-y-2">
+          <Select
+            label={t('certificates.templateOptional')}
+            value={selectedTemplate}
+            onChange={handleTemplateChange}
+            placeholder={t('certificates.noTemplate')}
+            options={[
+              { value: '', label: t('certificates.noTemplate') },
+              ...filteredTemplates.map(tpl => ({ 
+                value: String(tpl.id), 
+                label: tpl.is_pinned ? `${tpl.name} 📌` : tpl.name 
+              }))
+            ]}
+          />
+          {hasPinnedTemplates && (
+            <button
+              type="button"
+              onClick={() => setShowAllTemplates(!showAllTemplates)}
+              className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+            >
+              {showAllTemplates ? t('templates.showPinnedOnly') : t('templates.showAllTemplates')}
+            </button>
+          )}
+        </div>
       )}
 
       {/* CA + Cert Type row */}

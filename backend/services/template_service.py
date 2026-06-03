@@ -7,7 +7,7 @@ import uuid
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-from models import db, CertificateTemplate
+from models import db, CertificateTemplate, CA, CATemplatePin
 from utils.datetime_utils import utc_now
 import logging
 
@@ -374,6 +374,141 @@ class TemplateService:
             "dn": rendered_dn,
             "extensions": extensions
         }
+    
+    @staticmethod
+    def pin_template_to_ca(ca_id: int, template_id: int, username: str) -> CATemplatePin:
+        """
+        Pin a template to a specific CA
+        
+        Args:
+            ca_id: CA ID
+            template_id: Template ID
+            username: User creating the pin
+            
+        Returns:
+            Created CATemplatePin object
+            
+        Raises:
+            ValueError: If CA or template not found, or already pinned
+        """
+        # Verify CA exists
+        ca = CA.query.get(ca_id)
+        if not ca:
+            raise ValueError(f"CA with id {ca_id} not found")
+        
+        # Verify template exists
+        template = CertificateTemplate.query.get(template_id)
+        if not template:
+            raise ValueError(f"Template with id {template_id} not found")
+        
+        # Check if already pinned
+        existing = CATemplatePin.query.filter_by(ca_id=ca_id, template_id=template_id).first()
+        if existing:
+            raise ValueError(f"Template {template_id} is already pinned to CA {ca_id}")
+        
+        # Create pin
+        pin = CATemplatePin(
+            ca_id=ca_id,
+            template_id=template_id,
+            created_by=username,
+            created_at=utc_now()
+        )
+        
+        db.session.add(pin)
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in pin_template_to_ca: {_commit_err}", exc_info=True)
+            raise
+        
+        logger.info(f"Pinned template {template_id} to CA {ca_id} by {username}")
+        return pin
+    
+    @staticmethod
+    def unpin_template_from_ca(ca_id: int, template_id: int) -> bool:
+        """
+        Unpin a template from a CA
+        
+        Args:
+            ca_id: CA ID
+            template_id: Template ID
+            
+        Returns:
+            True if unpinned, False if pin didn't exist
+        """
+        pin = CATemplatePin.query.filter_by(ca_id=ca_id, template_id=template_id).first()
+        if not pin:
+            return False
+        
+        db.session.delete(pin)
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Commit failed in unpin_template_from_ca: {_commit_err}", exc_info=True)
+            raise
+        
+        logger.info(f"Unpinned template {template_id} from CA {ca_id}")
+        return True
+    
+    @staticmethod
+    def get_pinned_templates_for_ca(ca_id: int, active_only: bool = True) -> List[CertificateTemplate]:
+        """
+        Get all templates pinned to a specific CA
+        
+        Args:
+            ca_id: CA ID
+            active_only: Only return active templates
+            
+        Returns:
+            List of CertificateTemplate objects
+        """
+        query = db.session.query(CertificateTemplate).join(
+            CATemplatePin,
+            CertificateTemplate.id == CATemplatePin.template_id
+        ).filter(CATemplatePin.ca_id == ca_id)
+        
+        if active_only:
+            query = query.filter(CertificateTemplate.is_active == True)
+        
+        return query.order_by(CertificateTemplate.name).all()
+    
+    @staticmethod
+    def get_templates_with_pin_status(ca_id: int, active_only: bool = True) -> List[Dict[str, Any]]:
+        """
+        Get all templates with pin status for a specific CA
+        
+        Args:
+            ca_id: CA ID
+            active_only: Only return active templates
+            
+        Returns:
+            List of dicts with template data and is_pinned flag
+        """
+        # Get all templates
+        templates_query = CertificateTemplate.query
+        if active_only:
+            templates_query = templates_query.filter_by(is_active=True)
+        
+        templates = templates_query.order_by(
+            CertificateTemplate.is_system.desc(),
+            CertificateTemplate.name
+        ).all()
+        
+        # Get pinned template IDs for this CA
+        pinned_ids = set(
+            pin.template_id for pin in CATemplatePin.query.filter_by(ca_id=ca_id).all()
+        )
+        
+        # Build result with is_pinned flag
+        result = []
+        for template in templates:
+            template_dict = template.to_dict()
+            template_dict['is_pinned'] = template.id in pinned_ids
+            result.append(template_dict)
+        
+        return result
     
     @staticmethod
     def seed_system_templates() -> int:

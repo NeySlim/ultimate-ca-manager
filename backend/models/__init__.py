@@ -31,6 +31,7 @@ from models.policy import CertificatePolicy, ApprovalRequest
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from models.msca import MicrosoftCA, MSCARequest
 from models.discovered_certificate import ScanProfile, ScanRun, DiscoveredCertificate
+from models.ca_template_pin import CATemplatePin
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -48,4 +49,5 @@ __all__ = [
     "HsmProvider", "HsmKey",
     "ScanProfile", "ScanRun", "DiscoveredCertificate",
     "SSHCertificateAuthority", "SSHCertificate",
+    "CATemplatePin",
 ]

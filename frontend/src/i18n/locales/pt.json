@@ -999,7 +999,18 @@
     "subtitle_other": "{{count}} modelos",
     "subtitle": "{{count}} modelos de certificados",
     "validityDays": "{{count}} dias",
-    "validityDays_one": "{{count}} dia"
+    "validityDays_one": "{{count}} dia",
+    "showAllTemplates": "Show all {{count}} templates",
+    "showPinnedOnly": "Show pinned only",
+    "pinToCA": "Pin to CA",
+    "unpinFromCA": "Unpin from CA",
+    "pinned": "Pinned",
+    "noPinnedTemplates": "No pinned templates for this CA",
+    "managePins": "Manage CA Pins",
+    "pinSuccess": "Template pinned to CA",
+    "unpinSuccess": "Template unpinned from CA",
+    "selectCA": "Select a Certificate Authority",
+    "pinnedCount": "{{count}} of {{total}} templates pinned"
   },
   "users": {
     "createUser": "Criar utilizador",

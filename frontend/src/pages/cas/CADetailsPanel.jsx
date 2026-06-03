@@ -2,7 +2,7 @@
  * CAs Page — detail panel for selected CA (mobile slide-over)
  */
 import { useState } from 'react'
-import { Download, Trash, Certificate, Clock, ShieldWarning, ShieldCheck } from '@phosphor-icons/react'
+import { Download, Trash, Certificate, Clock, ShieldWarning, ShieldCheck, PushPin } from '@phosphor-icons/react'
 import {
   Badge, Button,
   CompactSection, CompactGrid, CompactField, CompactStats,
@@ -11,6 +11,7 @@ import {
 import { ExportModal } from '../../components/ExportModal'
 import { TakeOfflineModal } from '../../components/cas/TakeOfflineModal'
 import { RestoreModal } from '../../components/cas/RestoreModal'
+import { ManageTemplatePinsModal } from '../../components/cas/ManageTemplatePinsModal'
 import { formatDate } from '../../lib/utils'
 import { useNotification } from '../../contexts/NotificationContext'
 
@@ -22,8 +23,15 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
   const [showExportModal, setShowExportModal] = useState(false)
   const [showOfflineModal, setShowOfflineModal] = useState(false)
   const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [showPinsModal, setShowPinsModal] = useState(false)
   return (
     <>
+    <ManageTemplatePinsModal
+      open={showPinsModal}
+      onOpenChange={setShowPinsModal}
+      ca={ca}
+      t={t}
+    />
     <div className="p-3 space-y-3">
       {/* Header */}
       <div className="flex items-center gap-2">
@@ -83,6 +91,11 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
         <Button type="button" size="xs" variant="secondary" onClick={() => setShowExportModal(true)}>
           <Download size={14} /> {t('export.title')}
         </Button>
+        {canWrite('cas') && (
+          <Button type="button" size="xs" variant="secondary" onClick={() => setShowPinsModal(true)}>
+            <PushPin size={14} /> {t('templates.managePins')}
+          </Button>
+        )}
         {canWrite('cas') && !ca.offline && (
           <Button
             type="button"
