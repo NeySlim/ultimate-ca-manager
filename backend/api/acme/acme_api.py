@@ -680,7 +680,7 @@ def new_authz():
         
         response_data = {
             "status": auth.status,
-            "identifier": json.loads(auth.identifier),
+            "identifier": auth.identifier_obj,
             "challenges": challenges,
             "expires": auth.expires.isoformat() + 'Z'
         }
@@ -1031,7 +1031,7 @@ def authorization_info(authorization_id: str):
     
     response_data = {
         "status": auth.status,
-        "identifier": json.loads(auth.identifier),
+        "identifier": auth.identifier_obj,
         "challenges": challenges,
         "expires": auth.expires.isoformat() + 'Z'
     }

@@ -134,12 +134,7 @@ def list_account_challenges(account_id):
     data = []
     for order in orders:
         for authz in order.authorizations:
-            # identifier is JSON: {"type": "dns", "value": "example.com"}
-            try:
-                ident = json.loads(authz.identifier) if isinstance(authz.identifier, str) else authz.identifier
-                domain = ident.get('value', '') if isinstance(ident, dict) else str(authz.identifier)
-            except Exception:
-                domain = str(authz.identifier)
+            domain = authz.identifier_value or str(authz.identifier)
             for challenge in authz.challenges:
                 data.append({
                     'id': challenge.id,

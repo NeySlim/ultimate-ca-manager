@@ -322,13 +322,8 @@ class OrderMixin:
         under the apex obtain a wildcard cert covering the entire zone.
         """
         # Detect wildcard from stored identifier JSON
-        is_wildcard = False
-        try:
-            ident = json.loads(auth.identifier) if isinstance(auth.identifier, str) else auth.identifier
-            value = (ident or {}).get('value', '') if isinstance(ident, dict) else ''
-            is_wildcard = isinstance(value, str) and value.startswith('*.')
-        except Exception:
-            is_wildcard = bool(getattr(auth, 'wildcard', False))
+        value = auth.identifier_value
+        is_wildcard = isinstance(value, str) and value.startswith('*.')
 
         # DNS-01 Challenge — always offered
         dns_token = secrets.token_urlsafe(32)

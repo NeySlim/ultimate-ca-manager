@@ -30,8 +30,7 @@ class ChallengeMixin:
         
         # Get identifier from authorization
         auth = challenge.authorization
-        identifier = json.loads(auth.identifier)
-        domain = identifier.get("value", "")
+        domain = auth.identifier_value if auth else ""
         
         # Compute key authorization
         key_authz = self._compute_key_authorization(
@@ -112,8 +111,7 @@ class ChallengeMixin:
         
         # Get identifier from authorization
         auth = challenge.authorization
-        identifier = json.loads(auth.identifier)
-        domain = identifier.get("value", "")
+        domain = auth.identifier_value if auth else ""
         
         # Compute key authorization
         key_authz = self._compute_key_authorization(
@@ -212,8 +210,7 @@ class ChallengeMixin:
         import socket
         
         auth = challenge.authorization
-        identifier = json.loads(auth.identifier)
-        domain = identifier.get("value", "")
+        domain = auth.identifier_value if auth else ""
         
         # Compute key authorization hash
         key_authz = self._compute_key_authorization(
