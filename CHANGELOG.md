@@ -9,6 +9,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.160] - 2026-06-04
+
+### Fixed
+- ACME challenge responses no longer fail with an internal error when auditing an authorization identifier stored as JSON.
+- Hardened ACME authorization identifier handling across challenge validation, authorization responses, wildcard detection, and ACME admin views.
+
 ## [2.159] - 2026-06-03
 
 ### Added
