@@ -146,10 +146,30 @@ class AcmeAuthorization(db.Model):
     # Relationships
     order = db.relationship('AcmeOrder', back_populates='authorizations')
     challenges = db.relationship('AcmeChallenge', back_populates='authorization', lazy='dynamic', cascade='all, delete-orphan')
+
+    @property
+    def identifier_obj(self):
+        """Return identifier as a dict: {'type': 'dns', 'value': 'example.com'}."""
+        if isinstance(self.identifier, dict):
+            return self.identifier
+        try:
+            return json.loads(self.identifier or '{}')
+        except (TypeError, ValueError):
+            return {}
+
+    @property
+    def identifier_value(self):
+        """Return the ACME identifier value (domain) for audit/logging code."""
+        return self.identifier_obj.get('value', '')
+
+    @property
+    def identifier_type(self):
+        """Return the ACME identifier type (usually 'dns')."""
+        return self.identifier_obj.get('type', '')
     
     def to_dict(self):
         """Convert to ACME authorization object"""
-        identifier_obj = json.loads(self.identifier) if isinstance(self.identifier, str) else self.identifier
+        identifier_obj = self.identifier_obj
         
         result = {
             'identifier': identifier_obj,

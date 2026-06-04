@@ -1513,3 +1513,25 @@ class TestAcmeEabAuth:
 
     def test_eab_credential_delete_requires_auth(self, client):
         assert client.delete('/api/v2/acme/eab-credentials/1').status_code == 401
+
+
+class TestAcmeAuthorizationModel:
+    """Regression tests for ACME authorization identifier helpers."""
+
+    def test_identifier_value_parses_json_identifier(self):
+        from models.acme_models import AcmeAuthorization
+
+        authz = AcmeAuthorization(identifier=json.dumps({"type": "dns", "value": "example.com"}))
+
+        assert authz.identifier_obj == {"type": "dns", "value": "example.com"}
+        assert authz.identifier_type == "dns"
+        assert authz.identifier_value == "example.com"
+
+    def test_identifier_value_handles_malformed_identifier(self):
+        from models.acme_models import AcmeAuthorization
+
+        authz = AcmeAuthorization(identifier="not-json")
+
+        assert authz.identifier_obj == {}
+        assert authz.identifier_type == ""
+        assert authz.identifier_value == ""
