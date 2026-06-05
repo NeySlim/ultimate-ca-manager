@@ -100,9 +100,12 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          # Normalize semver for npm: 2.161-rc1 -> 2.161.0-rc1
+          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
           printf '%s' "$VERSION" > VERSION
           export VERSION
-          node -e "const fs=require('fs'); const v=process.env.VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
+          export STAMP_VERSION
+          node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
 
       - name: Build frontend
         run: |
@@ -171,9 +174,10 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
+          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
           printf '%s' "$VERSION" > VERSION
-          export VERSION
-          node -e "const fs=require('fs'); const v=process.env.VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
+          export VERSION STAMP_VERSION
+          node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
 
       - name: Build frontend
         run: |
@@ -255,9 +259,10 @@ jobs:
       - name: Stamp release version
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
+          STAMP_VERSION=$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+)-([a-zA-Z0-9]+)/\1.0-\2/')
           printf '%s' "$VERSION" > VERSION
-          export VERSION
-          node -e "const fs=require('fs'); const v=process.env.VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
+          export VERSION STAMP_VERSION
+          node -e "const fs=require('fs'); const v=process.env.STAMP_VERSION; for (const f of ['frontend/package.json','frontend/package-lock.json']) { const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=v; if (p.packages && p.packages['']) p.packages[''].version=v; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n'); }"
 
       - name: Build frontend
         run: |
