@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash, LockKey, Copy, Clock, Warning } from '@phosphor-icons/react'
+import { Plus, Trash, LockKey, Copy, Clock, Warning, Pencil, Check, X } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { Button, Badge, Card, Input, Select, Modal } from '../../components'
 import { acmeService } from '../../services'
@@ -20,11 +20,19 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
   const [eabLabel, setEabLabel] = useState('')
   const [eabExpiresInDays, setEabExpiresInDays] = useState('')
 
+  // Notes editing state
+  const [editingNotesId, setEditingNotesId] = useState(null)
+  const [editingNotesValue, setEditingNotesValue] = useState('')
+
   useEffect(() => {
+    loadCredentials()
+  }, [])
+
+  const loadCredentials = () => {
     acmeService.listEabCredentials()
       .then(res => setEabCredentials(res.data || []))
       .catch(() => {})
-  }, [])
+  }
 
   const filteredEabCredentials = useMemo(() => {
     if (!eabFilterStatus) return eabCredentials
@@ -68,6 +76,51 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       setEabCredentials(list.data || [])
     } catch (error) {
       showError(error.message || t('acme.eab.revokeFailed'))
+    }
+  }
+
+  // Permanent delete for used/revoked credentials
+  const handleDeleteEabCredential = async (cred) => {
+    const confirmed = await showConfirm(
+      t('acme.eab.confirmDelete', { kid: cred.kid }),
+      {
+        title: t('acme.eab.deleteTitle'),
+        confirmText: t('acme.eab.delete'),
+        variant: 'danger'
+      }
+    )
+    if (!confirmed) return
+    try {
+      await acmeService.deleteEabCredential(cred.id)
+      showSuccess(t('acme.eab.deletedSuccess'))
+      const list = await acmeService.listEabCredentials()
+      setEabCredentials(list.data || [])
+    } catch (error) {
+      showError(error.message || t('acme.eab.deleteFailed'))
+    }
+  }
+
+  // Notes editing
+  const startEditingNotes = (cred) => {
+    setEditingNotesId(cred.id)
+    setEditingNotesValue(cred.notes || '')
+  }
+
+  const cancelEditingNotes = () => {
+    setEditingNotesId(null)
+    setEditingNotesValue('')
+  }
+
+  const saveNotes = async (credId) => {
+    try {
+      await acmeService.patchEabCredential(credId, { notes: editingNotesValue || null })
+      showSuccess(t('acme.eab.notesSaved'))
+      const list = await acmeService.listEabCredentials()
+      setEabCredentials(list.data || [])
+      setEditingNotesId(null)
+      setEditingNotesValue('')
+    } catch (error) {
+      showError(error.message || t('acme.eab.notesSaveFailed'))
     }
   }
 
@@ -129,7 +182,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
           ) : (
             <div className="divide-y divide-border">
               {filteredEabCredentials.map(cred => (
-                <div key={cred.id} className="p-4 flex items-center justify-between gap-3 hover:bg-tertiary-op40">
+                <div key={cred.id} className="p-4 flex items-start justify-between gap-3 hover:bg-tertiary-op40">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{cred.label || t('acme.eab.unlabeled')}</span>
@@ -171,18 +224,95 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
                         <> · {t('acme.eab.revokedAt')}: {formatDate(cred.revoked_at)}</>
                       )}
                     </div>
+
+                    {/* Notes */}
+                    {editingNotesId === cred.id ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Input
+                          placeholder={t('acme.eab.notesPlaceholder')}
+                          value={editingNotesValue}
+                          onChange={(e) => setEditingNotesValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveNotes(cred.id)
+                            if (e.key === 'Escape') cancelEditingNotes()
+                          }}
+                          className="text-xs"
+                          autoFocus
+                        />
+                        <Button type="button" variant="ghost" size="sm" onClick={() => saveNotes(cred.id)} title={t('common.save')}>
+                          <Check size={14} className="text-green-500" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={cancelEditingNotes} title={t('common.cancel')}>
+                          <X size={14} className="text-text-tertiary" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex items-start gap-1.5">
+                        {cred.notes ? (
+                          <>
+                            <span className="text-xs text-text-tertiary whitespace-pre-wrap break-words">{cred.notes}</span>
+                            {canWrite && (
+                              <button
+                                type="button"
+                                className="shrink-0 text-text-tertiary hover:text-accent-primary mt-0.5"
+                                onClick={() => startEditingNotes(cred)}
+                                title={t('acme.eab.editNotesTitle')}
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          canWrite && (
+                            <button
+                              type="button"
+                              className="text-xs text-text-tertiary hover:text-accent-primary"
+                              onClick={() => startEditingNotes(cred)}
+                            >
+                              + {t('acme.eab.notesPlaceholder')}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {canDelete && cred.status === 'active' && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRevokeEabCredential(cred)}
-                      title={t('acme.eab.revoke')}
-                    >
-                      <Trash size={14} />
-                    </Button>
-                  )}
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1 shrink-0">
+                    {canDelete && cred.status === 'active' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRevokeEabCredential(cred)}
+                        title={t('acme.eab.revoke')}
+                      >
+                        <Trash size={14} className="text-yellow-500" />
+                      </Button>
+                    )}
+                    {canDelete && cred.status === 'revoked' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteEabCredential(cred)}
+                        title={t('acme.eab.delete')}
+                      >
+                        <Trash size={14} className="text-red-500" />
+                      </Button>
+                    )}
+                    {canDelete && cred.status === 'used' && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteEabCredential(cred)}
+                        title={t('acme.eab.delete')}
+                      >
+                        <Trash size={14} className="text-red-500" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

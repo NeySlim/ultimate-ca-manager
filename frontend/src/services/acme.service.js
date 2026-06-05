@@ -78,6 +78,14 @@ export const acmeService = {
     return apiClient.get(`/acme/eab-credentials/${id}`)
   },
 
+  async patchEabCredential(id, data) {
+    return apiClient.patch(`/acme/eab-credentials/${id}`, data)
+  },
+
+  async deleteEabCredential(id) {
+    return apiClient.delete(`/acme/eab-credentials/${id}`)
+  },
+
   async revokeEabCredential(id) {
     return apiClient.delete(`/acme/eab-credentials/${id}`)
   },

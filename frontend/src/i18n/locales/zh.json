@@ -1372,7 +1372,17 @@
       "secretTitle": "EAB 凭据已生成",
       "secretWarningTitle": "现在保存 HMAC 密钥",
       "secretWarning": "HMAC 密钥仅此一次显示。关闭此对话框后将无法找回。",
-      "secretConfirm": "我已保存凭据"
+      "secretConfirm": "我已保存凭据",
+      "notes": "备注",
+      "notesPlaceholder": "添加备注...",
+      "notesSaved": "备注已保存",
+      "notesSaveFailed": "保存备注失败",
+      "editNotesTitle": "编辑备注",
+      "confirmDelete": "永久删除 EAB 凭据 {{kid}}？此操作无法撤销。",
+      "deleteTitle": "删除 EAB 凭据",
+      "delete": "删除",
+      "deletedSuccess": "EAB 凭据已删除",
+      "deleteFailed": "删除 EAB 凭据失败"
     }
   },
   "scep": {

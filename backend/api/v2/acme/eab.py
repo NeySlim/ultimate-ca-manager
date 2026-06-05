@@ -11,7 +11,7 @@ from flask import request, g
 from models import db, AcmeEabCredential, SystemConfig
 from services.audit_service import AuditService
 from auth.unified import require_auth
-from utils.response import success_response, error_response
+from utils.response import success_response, error_response, no_content_response
 
 from . import bp, logger
 
@@ -142,23 +142,70 @@ def get_eab_credential(cred_id):
     return success_response(data=cred.to_dict())
 
 
+@bp.route('/api/v2/acme/eab-credentials/<int:cred_id>', methods=['PATCH'])
+@require_auth(['write:acme'])
+def patch_eab_credential(cred_id):
+    """Patch mutable EAB credential fields (notes)."""
+    cred = AcmeEabCredential.query.get(cred_id)
+    if not cred:
+        return error_response('EAB credential not found', 404)
+
+    data = request.get_json() or {}
+    if 'notes' in data:
+        cred.notes = (data['notes'] or '').strip() or None
+
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to patch EAB credential {cred_id}: {e}")
+        return error_response('Failed to update EAB credential', 500)
+
+    AuditService.log_action(
+        action='acme.eab_credential.update',
+        resource_type='acme_eab_credential',
+        resource_id=str(cred_id),
+        details=f'Updated EAB credential kid={cred.kid}'
+    )
+    return success_response(data=cred.to_dict(), message='EAB credential updated')
+
+
 @bp.route('/api/v2/acme/eab-credentials/<int:cred_id>', methods=['DELETE'])
 @require_auth(['delete:acme'])
 def revoke_eab_credential(cred_id):
-    """Revoke an EAB credential.
+    """Revoke or permanently delete an EAB credential.
 
-    We mark it ``revoked`` rather than hard-delete so audit / UI history
-    keeps the binding visible. The credential becomes unusable
-    immediately for future registrations.
+    * Active credentials are revoked (status -> 'revoked') rather than
+      hard-deleted so audit / UI history keeps the binding visible.
+    * Used or already-revoked credentials can be permanently deleted.
     """
     from utils.datetime_utils import utc_now as _utc_now
     cred = AcmeEabCredential.query.get(cred_id)
     if not cred:
         return error_response('EAB credential not found', 404)
-    if cred.status == 'revoked':
-        return success_response(data=cred.to_dict(), message='Already revoked')
 
     user_id = getattr(g, 'user_id', None) or (getattr(g, 'current_user', None).id if getattr(g, 'current_user', None) else None)
+
+    # Permanent delete for used/revoked credentials
+    if cred.status in ('used', 'revoked'):
+        AuditService.log_action(
+            action='acme.eab_credential.delete',
+            resource_type='acme_eab_credential',
+            resource_id=str(cred_id),
+            details=f'Deleted EAB credential kid={cred.kid} (was {cred.status})'
+        )
+        db.session.delete(cred)
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to delete EAB credential {cred_id}: {e}")
+            return error_response('Failed to delete EAB credential', 500)
+        return no_content_response()
+
+    # Soft-revoke for active credentials
+    if cred.status == 'revoked':
+        return success_response(data=cred.to_dict(), message='Already revoked')
 
     cred.status = 'revoked'
     cred.revoked_at = _utc_now()

@@ -1372,7 +1372,17 @@
       "secretTitle": "Credenziale EAB generata",
       "secretWarningTitle": "Salva la chiave HMAC ora",
       "secretWarning": "Questa è l'unica volta che la chiave HMAC verrà mostrata. Dopo aver chiuso questa finestra non sarà più recuperabile.",
-      "secretConfirm": "Ho salvato le credenziali"
+      "secretConfirm": "Ho salvato le credenziali",
+      "notes": "Note",
+      "notesPlaceholder": "Aggiungi note...",
+      "notesSaved": "Note salvate",
+      "notesSaveFailed": "Salvataggio note fallito",
+      "editNotesTitle": "Modifica note",
+      "confirmDelete": "Eliminare definitivamente la credenziale EAB {{kid}}? Questa azione non può essere annullata.",
+      "deleteTitle": "Elimina credenziale EAB",
+      "delete": "Elimina",
+      "deletedSuccess": "Credenziale EAB eliminata",
+      "deleteFailed": "Eliminazione credenziale EAB fallita"
     }
   },
   "scep": {

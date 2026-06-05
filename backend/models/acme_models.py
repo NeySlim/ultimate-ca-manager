@@ -560,6 +560,7 @@ class AcmeEabCredential(db.Model):
     revoked_at = db.Column(db.DateTime)
     revoked_by_user_id = db.Column(db.Integer)
     status = db.Column(db.String(20), default='active', nullable=False, index=True)
+    notes = db.Column(db.Text, nullable=True)
 
     # --- Encrypted property accessor ---
 
@@ -597,6 +598,7 @@ class AcmeEabCredential(db.Model):
             'kid': self.kid,
             'label': self.label,
             'status': self.status,
+            'notes': self.notes,
             'created_at': utc_isoformat(self.created_at),
             'expires_at': utc_isoformat(self.expires_at) if self.expires_at else None,
             'used_at': utc_isoformat(self.used_at) if self.used_at else None,

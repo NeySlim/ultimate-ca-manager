@@ -1372,7 +1372,17 @@
       "secretTitle": "EAB 資格情報を生成しました",
       "secretWarningTitle": "今すぐ HMAC キーを保存してください",
       "secretWarning": "HMAC キーが表示されるのはこの一度だけです。このダイアログを閉じると取得できなくなります。",
-      "secretConfirm": "資格情報を保存しました"
+      "secretConfirm": "資格情報を保存しました",
+      "notes": "メモ",
+      "notesPlaceholder": "メモを追加...",
+      "notesSaved": "メモを保存しました",
+      "notesSaveFailed": "メモの保存に失敗しました",
+      "editNotesTitle": "メモを編集",
+      "confirmDelete": "EAB資格 {{kid}} を完全に削除しますか？この操作は元に戻せません。",
+      "deleteTitle": "EAB資格を削除",
+      "delete": "削除",
+      "deletedSuccess": "EAB資格を削除しました",
+      "deleteFailed": "EAB資格の削除に失敗しました"
     }
   },
   "scep": {

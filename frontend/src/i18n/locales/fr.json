@@ -415,7 +415,17 @@
       "secretTitle": "Identifiant EAB généré",
       "secretWarningTitle": "Sauvegardez la clé HMAC maintenant",
       "secretWarning": "C'est la seule fois où la clé HMAC sera affichée. Après fermeture de cette boîte de dialogue, elle ne pourra plus être récupérée.",
-      "secretConfirm": "J'ai sauvegardé les identifiants"
+      "secretConfirm": "J'ai sauvegardé les identifiants",
+      "notes": "Notes",
+      "notesPlaceholder": "Ajouter des notes...",
+      "notesSaved": "Notes sauvegardées",
+      "notesSaveFailed": "Échec de la sauvegarde des notes",
+      "editNotesTitle": "Modifier les notes",
+      "confirmDelete": "Supprimer définitivement le justificatif EAB {{kid}} ? Cette action est irréversible.",
+      "deleteTitle": "Supprimer le justificatif EAB",
+      "delete": "Supprimer",
+      "deletedSuccess": "Justificatif EAB supprimé",
+      "deleteFailed": "Échec de la suppression du justificatif EAB"
     }
   },
   "audit": {

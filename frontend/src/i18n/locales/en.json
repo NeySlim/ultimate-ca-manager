@@ -1372,7 +1372,17 @@
       "secretTitle": "EAB Credential Generated",
       "secretWarningTitle": "Save the HMAC key now",
       "secretWarning": "This is the only time the HMAC key will be shown. After closing this dialog it cannot be retrieved.",
-      "secretConfirm": "I've saved the credentials"
+      "secretConfirm": "I've saved the credentials",
+      "notes": "Notes",
+      "notesPlaceholder": "Add notes...",
+      "notesSaved": "Notes saved",
+      "notesSaveFailed": "Failed to save notes",
+      "editNotesTitle": "Edit notes",
+      "confirmDelete": "Permanently delete EAB credential {{kid}}? This cannot be undone.",
+      "deleteTitle": "Delete EAB Credential",
+      "delete": "Delete",
+      "deletedSuccess": "EAB credential deleted",
+      "deleteFailed": "Failed to delete EAB credential"
     }
   },
   "scep": {

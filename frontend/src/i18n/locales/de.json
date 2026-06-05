@@ -1372,7 +1372,17 @@
       "secretTitle": "EAB-Anmeldedaten generiert",
       "secretWarningTitle": "Speichern Sie den HMAC-Schlüssel jetzt",
       "secretWarning": "Dies ist das einzige Mal, dass der HMAC-Schlüssel angezeigt wird. Nach dem Schließen dieses Dialogs kann er nicht mehr abgerufen werden.",
-      "secretConfirm": "Ich habe die Anmeldedaten gespeichert"
+      "secretConfirm": "Ich habe die Anmeldedaten gespeichert",
+      "notes": "Notizen",
+      "notesPlaceholder": "Notizen hinzufügen...",
+      "notesSaved": "Notizen gespeichert",
+      "notesSaveFailed": "Notizen konnten nicht gespeichert werden",
+      "editNotesTitle": "Notizen bearbeiten",
+      "confirmDelete": "EAB-Credential {{kid}} endgültig löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteTitle": "EAB-Credential löschen",
+      "delete": "Löschen",
+      "deletedSuccess": "EAB-Credential gelöscht",
+      "deleteFailed": "EAB-Credential konnte nicht gelöscht werden"
     }
   },
   "scep": {
