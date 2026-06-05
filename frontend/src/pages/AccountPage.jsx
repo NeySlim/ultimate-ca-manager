@@ -158,7 +158,11 @@ export default function AccountPage() {
       showSuccess(t('messages.success.other.passwordChanged'))
       setShowPasswordModal(false)
     } catch (error) {
-      showError(error.message || t('messages.errors.updateFailed.generic'))
+      if (error.data?.details?.i18n_key) {
+        showError(t(error.data.details.i18n_key, error.data.details.i18n_values || {}))
+      } else {
+        showError(error.message || t('messages.errors.updateFailed.generic'))
+      }
     }
   }
 

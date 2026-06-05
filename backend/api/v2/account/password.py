@@ -1,3 +1,4 @@
+import json
 import logging
 
 from flask import request, g
@@ -48,7 +49,9 @@ def change_password():
     if not (is_admin and is_admin_bypass_enabled()):
         is_valid, errors = validate_password(new_password)
         if not is_valid:
-            return error_response(errors[0], 400)
+            first = errors[0]
+            return error_response(first.get('message', 'Invalid password'), 400,
+                                  details={'i18n_key': first.get('key'), 'i18n_values': first.get('values', {})})
 
     # Skip current-password verification only when the SERVER says so
     if not skip_current_check:

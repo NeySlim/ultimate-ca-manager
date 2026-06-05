@@ -22,31 +22,37 @@ class TestPasswordPolicy:
         """Password shorter than 8 chars should fail"""
         valid, errors = validate_password("Ab1@")
         assert valid is False
-        assert any('at least' in e for e in errors)
+        # errors is now list of dicts; check message field
+        msgs = [e.get('message', '') if isinstance(e, dict) else str(e) for e in errors]
+        assert any('at least' in m for m in msgs)
         
     def test_reject_no_uppercase(self):
         """Password without uppercase should fail"""
         valid, errors = validate_password("weakpass1@")
         assert valid is False
-        assert any('uppercase' in e for e in errors)
+        msgs = [e.get('message', '') if isinstance(e, dict) else str(e) for e in errors]
+        assert any('uppercase' in m for m in msgs)
         
     def test_reject_no_lowercase(self):
         """Password without lowercase should fail"""
         valid, errors = validate_password("WEAKPASS1@")
         assert valid is False
-        assert any('lowercase' in e for e in errors)
+        msgs = [e.get('message', '') if isinstance(e, dict) else str(e) for e in errors]
+        assert any('lowercase' in m for m in msgs)
         
     def test_reject_no_digit(self):
         """Password without digit should fail"""
         valid, errors = validate_password("WeakPass@!")
         assert valid is False
-        assert any('digit' in e for e in errors)
+        msgs = [e.get('message', '') if isinstance(e, dict) else str(e) for e in errors]
+        assert any('digit' in m for m in msgs)
         
     def test_reject_no_special(self):
         """Password without special char should fail"""
         valid, errors = validate_password("WeakPass1")
         assert valid is False
-        assert any('special' in e for e in errors)
+        msgs = [e.get('message', '') if isinstance(e, dict) else str(e) for e in errors]
+        assert any('special' in m for m in msgs)
         
     def test_password_strength_score(self):
         """Strength score should reflect complexity"""

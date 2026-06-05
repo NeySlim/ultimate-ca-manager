@@ -4120,5 +4120,26 @@
     "preset": "预设",
     "savePreset": "保存预设",
     "managePresets": "管理预设"
+  },
+  "password_policy": {
+    "required": "需要密码",
+    "minLength": "密码必须至少包含 {{min_length}} 个字符",
+    "maxLength": "密码不能超过 {{max_length}} 个字符",
+    "uppercase": "密码必须至少包含一个大写字母",
+    "lowercase": "密码必须至少包含一个小写字母",
+    "digit": "密码必须至少包含一个数字",
+    "special": "密码必须至少包含一个特殊字符 ({{special_chars}})",
+    "common": "密码太常见，请选择更安全的密码",
+    "username": "密码不能包含您的用户名",
+    "similar": "密码与用户名太相似",
+    "sequential": "密码不能包含4个或更多连续字符",
+    "repeated": "密码不能包含4个或更多重复字符",
+    "rules": {
+      "minLength": "至少 {{min_length}} 个字符",
+      "uppercase": "至少一个大写字母 (A-Z)",
+      "lowercase": "至少一个小写字母 (a-z)",
+      "digit": "至少一个数字 (0-9)",
+      "special": "至少一个特殊字符 ({{special_chars}})"
+    }
   }
 }

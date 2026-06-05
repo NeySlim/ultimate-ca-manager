@@ -2,31 +2,45 @@
  * ForcePasswordChange Component - Modal to force password change
  * Shown after login if force_password_change flag is set
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Lock, Warning, SkipForward } from '@phosphor-icons/react'
 import { Modal, Button, Input } from '../components'
 import { useAuth, useNotification } from '../contexts'
-import { accountService } from '../services'
+import { accountService, usersService } from '../services'
 
 export function ForcePasswordChange({ onComplete }) {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [loading, setLoading] = useState(false)
+  const [policy, setPolicy] = useState(null)
   const [formData, setFormData] = useState({
     new_password: '',
     confirm_password: ''
   })
   const [errors, setErrors] = useState({})
 
+  // Load password policy from backend
+  useEffect(() => {
+    usersService.getPasswordPolicy().then((res) => {
+      setPolicy(res.data)
+    }).catch(() => {
+      // Fallback to defaults if policy endpoint unavailable
+      setPolicy({ min_length: 8 })
+    })
+  }, [])
+
   const validate = () => {
     const newErrors = {}
     
     if (!formData.new_password) {
       newErrors.new_password = t('password.newRequired')
-    } else if (formData.new_password.length < 8) {
-      newErrors.new_password = t('password.minLength')
+    } else {
+      const minLen = policy?.min_length || 8
+      if (formData.new_password.length < minLen) {
+        newErrors.new_password = t('password.minLength')
+      }
     }
     
     if (formData.new_password !== formData.confirm_password) {
@@ -52,9 +66,13 @@ export function ForcePasswordChange({ onComplete }) {
       showSuccess(t('password.changeSuccess'))
       onComplete?.()
     } catch (error) {
-      showError(error.message || t('password.changeFailed'))
-      if (error.message?.includes('current')) {
-        setErrors({ current_password: t('password.incorrect') })
+      if (error.data?.details?.i18n_key) {
+        showError(t(error.data.details.i18n_key, error.data.details.i18n_values || {}))
+      } else {
+        showError(error.message || t('password.changeFailed'))
+        if (error.message?.includes('current')) {
+          setErrors({ current_password: t('password.incorrect') })
+        }
       }
     } finally {
       setLoading(false)

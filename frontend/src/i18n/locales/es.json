@@ -4120,5 +4120,26 @@
     "preset": "Preajuste",
     "savePreset": "Guardar preajuste",
     "managePresets": "Gestionar preajustes"
+  },
+  "password_policy": {
+    "required": "Se requiere una contraseña",
+    "minLength": "La contraseña debe tener al menos {{min_length}} caracteres",
+    "maxLength": "La contraseña no debe tener más de {{max_length}} caracteres",
+    "uppercase": "La contraseña debe contener al menos una letra mayúscula",
+    "lowercase": "La contraseña debe contener al menos una letra minúscula",
+    "digit": "La contraseña debe contener al menos un dígito",
+    "special": "La contraseña debe contener al menos un carácter especial ({{special_chars}})",
+    "common": "Contraseña demasiado común, elija una más fuerte",
+    "username": "La contraseña no puede contener su nombre de usuario",
+    "similar": "La contraseña es demasiado similar al nombre de usuario",
+    "sequential": "La contraseña no puede contener 4 o más caracteres secuenciales",
+    "repeated": "La contraseña no puede contener 4 o más caracteres repetidos",
+    "rules": {
+      "minLength": "Al menos {{min_length}} caracteres",
+      "uppercase": "Al menos una letra mayúscula (A-Z)",
+      "lowercase": "Al menos una letra minúscula (a-z)",
+      "digit": "Al menos un dígito (0-9)",
+      "special": "Al menos un carácter especial ({{special_chars}})"
+    }
   }
 }

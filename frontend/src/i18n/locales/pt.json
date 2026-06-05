@@ -4120,5 +4120,26 @@
     "preset": "Predefinição",
     "savePreset": "Salvar predefinição",
     "managePresets": "Gerenciar predefinições"
+  },
+  "password_policy": {
+    "required": "A senha é obrigatória",
+    "minLength": "A senha deve conter pelo menos {{min_length}} caracteres",
+    "maxLength": "A senha não deve conter mais de {{max_length}} caracteres",
+    "uppercase": "A senha deve conter pelo menos uma letra maiúscula",
+    "lowercase": "A senha deve conter pelo menos uma letra minúscula",
+    "digit": "A senha deve conter pelo menos um dígito",
+    "special": "A senha deve conter pelo menos um caractere especial ({{special_chars}})",
+    "common": "Senha muito comum, escolha uma mais forte",
+    "username": "A senha não pode conter seu nome de usuário",
+    "similar": "A senha é muito parecida com o nome de usuário",
+    "sequential": "A senha não pode conter 4 ou mais caracteres sequenciais",
+    "repeated": "A senha não pode conter 4 ou mais caracteres repetidos",
+    "rules": {
+      "minLength": "Pelo menos {{min_length}} caracteres",
+      "uppercase": "Pelo menos uma letra maiúscula (A-Z)",
+      "lowercase": "Pelo menos uma letra minúscula (a-z)",
+      "digit": "Pelo menos um dígito (0-9)",
+      "special": "Pelo menos um caractere especial ({{special_chars}})"
+    }
   }
 }

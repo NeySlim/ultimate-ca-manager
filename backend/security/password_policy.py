@@ -95,7 +95,7 @@ def validate_password(
     password: str,
     policy: Optional[PasswordPolicy] = None,
     username: Optional[str] = None
-) -> Tuple[bool, List[str]]:
+) -> Tuple[bool, List[dict]]:
     """
     Validate password against policy.
 
@@ -105,7 +105,8 @@ def validate_password(
         username: Optional username to check against
 
     Returns:
-        Tuple of (is_valid, list_of_errors)
+        Tuple of (is_valid, list_of_error_dicts)
+        Each error dict: {'key': i18n_key, 'message': human_readable}
     """
     if policy is None:
         policy = load_policy_from_config()
@@ -113,34 +114,61 @@ def validate_password(
     errors = []
 
     if not password:
-        return False, ["Password is required"]
+        return False, [{
+            'key': 'password_policy.required',
+            'message': 'Password is required'
+        }]
 
     # Length checks
     if len(password) < policy.min_length:
-        errors.append(f"Password must be at least {policy.min_length} characters")
+        errors.append({
+            'key': 'password_policy.minLength',
+            'values': {'min_length': policy.min_length},
+            'message': f"Password must be at least {policy.min_length} characters"
+        })
 
     if len(password) > policy.max_length:
-        errors.append(f"Password must be at most {policy.max_length} characters")
+        errors.append({
+            'key': 'password_policy.maxLength',
+            'values': {'max_length': policy.max_length},
+            'message': f"Password must be at most {policy.max_length} characters"
+        })
 
     # Character class checks
     if policy.require_uppercase and not re.search(r'[A-Z]', password):
-        errors.append("Password must contain at least one uppercase letter")
+        errors.append({
+            'key': 'password_policy.uppercase',
+            'message': 'Password must contain at least one uppercase letter'
+        })
 
     if policy.require_lowercase and not re.search(r'[a-z]', password):
-        errors.append("Password must contain at least one lowercase letter")
+        errors.append({
+            'key': 'password_policy.lowercase',
+            'message': 'Password must contain at least one lowercase letter'
+        })
 
     if policy.require_digit and not re.search(r'\d', password):
-        errors.append("Password must contain at least one digit")
+        errors.append({
+            'key': 'password_policy.digit',
+            'message': 'Password must contain at least one digit'
+        })
 
     if policy.require_special:
         # Escape special regex chars
         escaped_chars = re.escape(policy.special_chars)
         if not re.search(f'[{escaped_chars}]', password):
-            errors.append(f"Password must contain at least one special character ({policy.special_chars})")
+            errors.append({
+                'key': 'password_policy.special',
+                'values': {'special_chars': policy.special_chars},
+                'message': f"Password must contain at least one special character ({policy.special_chars})"
+            })
 
     # Blacklist check (case-insensitive)
     if password.lower() in [p.lower() for p in policy.blacklist]:
-        errors.append("Password is too common, please choose a stronger one")
+        errors.append({
+            'key': 'password_policy.common',
+            'message': 'Password is too common, please choose a stronger one'
+        })
 
     # Username similarity check
     if username:
@@ -148,18 +176,30 @@ def validate_password(
         password_lower = password.lower()
 
         if username_lower in password_lower:
-            errors.append("Password cannot contain your username")
+            errors.append({
+                'key': 'password_policy.username',
+                'message': 'Password cannot contain your username'
+            })
 
         if password_lower in username_lower and len(password) < len(username):
-            errors.append("Password is too similar to username")
+            errors.append({
+                'key': 'password_policy.similar',
+                'message': 'Password is too similar to username'
+            })
 
     # Sequential character check (e.g., 'abc', '123', 'qwe')
     if _has_sequential_chars(password, 4):
-        errors.append("Password cannot contain 4 or more sequential characters")
+        errors.append({
+            'key': 'password_policy.sequential',
+            'message': 'Password cannot contain 4 or more sequential characters'
+        })
 
     # Repeated character check (e.g., 'aaaa')
     if _has_repeated_chars(password, 4):
-        errors.append("Password cannot contain 4 or more repeated characters")
+        errors.append({
+            'key': 'password_policy.repeated',
+            'message': 'Password cannot contain 4 or more repeated characters'
+        })
 
     return len(errors) == 0, errors
 
@@ -292,10 +332,10 @@ def get_password_strength(password: str) -> dict:
 
 def get_policy_requirements(policy: Optional[PasswordPolicy] = None) -> dict:
     """
-    Get human-readable policy requirements.
+    Get human-readable policy requirements with i18n keys.
 
     Returns:
-        Dictionary describing password requirements
+        Dictionary with min/max length and i18n rules
     """
     if policy is None:
         policy = load_policy_from_config()
@@ -303,21 +343,34 @@ def get_policy_requirements(policy: Optional[PasswordPolicy] = None) -> dict:
     requirements = {
         'min_length': policy.min_length,
         'max_length': policy.max_length,
-        'rules': []
+        'rules': [
+            {'key': 'password_policy.rules.minLength', 'values': {'min_length': policy.min_length}},
+            {'key': 'password_policy.rules.uppercase'},
+            {'key': 'password_policy.rules.lowercase'},
+            {'key': 'password_policy.rules.digit'},
+            {'key': 'password_policy.rules.special', 'values': {'special_chars': policy.special_chars}},
+        ]
     }
 
-    requirements['rules'].append(f"At least {policy.min_length} characters")
-
-    if policy.require_uppercase:
-        requirements['rules'].append("At least one uppercase letter (A-Z)")
-
-    if policy.require_lowercase:
-        requirements['rules'].append("At least one lowercase letter (a-z)")
-
-    if policy.require_digit:
-        requirements['rules'].append("At least one number (0-9)")
-
-    if policy.require_special:
-        requirements['rules'].append(f"At least one special character ({policy.special_chars})")
+    if not policy.require_uppercase:
+        requirements['rules'] = [
+            r for r in requirements['rules']
+            if r['key'] != 'password_policy.rules.uppercase'
+        ]
+    if not policy.require_lowercase:
+        requirements['rules'] = [
+            r for r in requirements['rules']
+            if r['key'] != 'password_policy.rules.lowercase'
+        ]
+    if not policy.require_digit:
+        requirements['rules'] = [
+            r for r in requirements['rules']
+            if r['key'] != 'password_policy.rules.digit'
+        ]
+    if not policy.require_special:
+        requirements['rules'] = [
+            r for r in requirements['rules']
+            if r['key'] != 'password_policy.rules.special'
+        ]
 
     return requirements

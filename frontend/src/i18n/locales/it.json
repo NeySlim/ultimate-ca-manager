@@ -4120,5 +4120,26 @@
     "preset": "Preimpostazione",
     "savePreset": "Salva preimpostazione",
     "managePresets": "Gestisci preimpostazioni"
+  },
+  "password_policy": {
+    "required": "La password è obbligatoria",
+    "minLength": "La password deve contenere almeno {{min_length}} caratteri",
+    "maxLength": "La password non deve contenere più di {{max_length}} caratteri",
+    "uppercase": "La password deve contenere almeno una lettera maiuscola",
+    "lowercase": "La password deve contenere almeno una lettera minuscola",
+    "digit": "La password deve contenere almeno una cifra",
+    "special": "La password deve contenere almeno un carattere speciale ({{special_chars}})",
+    "common": "Password troppo comune, sceglierne una più sicura",
+    "username": "La password non può contenere il nome utente",
+    "similar": "La password è troppo simile al nome utente",
+    "sequential": "La password non può contenere 4 o più caratteri consecutivi",
+    "repeated": "La password non può contenere 4 o più caratteri ripetuti",
+    "rules": {
+      "minLength": "Almeno {{min_length}} caratteri",
+      "uppercase": "Almeno una lettera maiuscola (A-Z)",
+      "lowercase": "Almeno una lettera minuscola (a-z)",
+      "digit": "Almeno una cifra (0-9)",
+      "special": "Almeno un carattere speciale ({{special_chars}})"
+    }
   }
 }

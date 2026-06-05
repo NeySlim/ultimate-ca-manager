@@ -729,8 +729,10 @@ def take_ca_offline(ca_id):
     # Password complexity (canonical UCM policy)
     ok, errs = validate_password(password)
     if not ok:
+        # errs is now list of dicts with 'key' and 'message' fields
+        msgs = [e.get('message', str(e)) if isinstance(e, dict) else str(e) for e in errs]
         return error_response(
-            'Password does not meet complexity requirements: ' + '; '.join(errs),
+            'Password does not meet complexity requirements: ' + '; '.join(msgs),
             400
         )
 

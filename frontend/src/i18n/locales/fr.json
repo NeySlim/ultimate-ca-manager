@@ -4123,5 +4123,26 @@
     "preset": "Préréglage",
     "savePreset": "Sauvegarder le préréglage",
     "managePresets": "Gérer les préréglages"
+  },
+  "password_policy": {
+    "required": "Le mot de passe est requis",
+    "minLength": "Le mot de passe doit contenir au moins {{min_length}} caractères",
+    "maxLength": "Le mot de passe doit contenir au maximum {{max_length}} caractères",
+    "uppercase": "Le mot de passe doit contenir au moins une majuscule",
+    "lowercase": "Le mot de passe doit contenir au moins une minuscule",
+    "digit": "Le mot de passe doit contenir au moins un chiffre",
+    "special": "Le mot de passe doit contenir au moins un caractère spécial ({{special_chars}})",
+    "common": "Mot de passe trop courant, choisissez-en un plus complexe",
+    "username": "Le mot de passe ne peut pas contenir votre nom d'utilisateur",
+    "similar": "Le mot de passe est trop similaire au nom d'utilisateur",
+    "sequential": "Le mot de passe ne peut pas contenir 4 caractères séquentiels ou plus",
+    "repeated": "Le mot de passe ne peut pas contenir 4 caractères répétés ou plus",
+    "rules": {
+      "minLength": "Au moins {{min_length}} caractères",
+      "uppercase": "Au moins une majuscule (A-Z)",
+      "lowercase": "Au moins une minuscule (a-z)",
+      "digit": "Au moins un chiffre (0-9)",
+      "special": "Au moins un caractère spécial ({{special_chars}})"
+    }
   }
 }
