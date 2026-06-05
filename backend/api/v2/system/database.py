@@ -6,6 +6,7 @@ from . import bp
 from flask import Blueprint, request, current_app, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, Certificate, CA, CRL, OCSPResponse, SystemConfig
 from services.audit_service import AuditService
 from pathlib import Path
@@ -211,10 +212,11 @@ def reset_db():
             force_password_change=True
         )
         db.session.add(admin)
-        db.session.commit()
+        ok, err = safe_commit(logger, "Database reset failed")
+        if not ok:
+            return err
 
         return success_response(message="Database reset successfully. Default admin user created.")
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Database reset failed: {e}")
         return error_response("Database reset failed")

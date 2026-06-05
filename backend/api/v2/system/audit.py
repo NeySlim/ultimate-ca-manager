@@ -6,6 +6,7 @@ from . import bp
 from flask import request, current_app
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db
 from services.audit_service import AuditService
 from services.retention_service import RetentionPolicy, cleanup_audit_logs as do_cleanup
@@ -103,7 +104,9 @@ def update_syslog_config():
         set_config('syslog_protocol', protocol)
         set_config('syslog_tls', str(tls).lower())
         set_config('syslog_categories', ','.join(categories) if categories else '')
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to update syslog config")
+        if not ok:
+            return err
 
         # Reconfigure forwarder
         syslog_forwarder.configure(

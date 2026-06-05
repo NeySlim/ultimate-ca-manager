@@ -10,6 +10,7 @@ import traceback
 import uuid
 
 from auth.unified import require_auth
+from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from services.import_service import (
@@ -106,7 +107,9 @@ def import_ca():
             existing_ca.valid_from = cert_info['valid_from']
             existing_ca.valid_to = cert_info['valid_to']
 
-            db.session.commit()
+            ok, err = safe_commit(logger, "Failed to update CA")
+            if not ok:
+                return err
             AuditService.log_action(
                 action='ca_updated',
                 resource_type='ca',
@@ -138,7 +141,9 @@ def import_ca():
         )
 
         db.session.add(ca)
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to import CA")
+        if not ok:
+            return err
         AuditService.log_action(
             action='ca_imported',
             resource_type='ca',

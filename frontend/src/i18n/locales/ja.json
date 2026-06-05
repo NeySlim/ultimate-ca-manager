@@ -3501,7 +3501,8 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore、証明書 + 鍵",
-    "jksNote": "JKSには常に秘密鍵が含まれます"
+    "jksNote": "JKSには常に秘密鍵が含まれます",
+    "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください"
   },
   "userCertificates": {
     "title": "ユーザー証明書",

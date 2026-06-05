@@ -3501,7 +3501,8 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore，证书 + 密钥",
-    "jksNote": "JKS 始终包含私钥"
+    "jksNote": "JKS 始终包含私钥",
+    "pkcs12PasswordPrompt": "请输入 PKCS#12 文件的密码"
   },
   "userCertificates": {
     "title": "用户证书",

@@ -21,6 +21,7 @@ from cryptography.x509.oid import ExtensionOID
 from models import Certificate, CA, db
 from services.cert_service import CertificateService
 from services.audit_service import AuditService
+from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_now
 from utils.key_codec import load_pem_bytes
@@ -153,7 +154,10 @@ def bulk_renew_certificates():
             cert.revoked = False
             cert.revoked_at = None
             cert.revoke_reason = None
-            db.session.commit()
+            ok, err = safe_commit(logger, f"Bulk renew failed for cert {cert_id}")
+            if not ok:
+                results['failed'].append({'id': cert_id, 'error': 'Renewal failed'})
+                continue
             results['success'].append(cert_id)
         except Exception as e:
             db.session.rollback()
@@ -195,7 +199,10 @@ def bulk_delete_certificates():
             ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
 
             db.session.delete(cert)
-            db.session.commit()
+            ok, err = safe_commit(logger, f"Bulk delete failed for cert {cert_id}")
+            if not ok:
+                results['failed'].append({'id': cert_id, 'error': 'Deletion failed'})
+                continue
             results['success'].append(cert_id)
         except Exception as e:
             db.session.rollback()

@@ -6,6 +6,7 @@ import json
 import traceback
 from flask import request
 from auth.unified import require_auth
+from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, db
@@ -111,7 +112,9 @@ def import_certificate():
                 existing_ca.valid_to = cert_info['valid_to']
                 existing_ca.ski = cert_info.get('ski')
 
-                db.session.commit()
+                ok, err = safe_commit(logger, "Failed to update CA")
+                if not ok:
+                    return err
                 AuditService.log_action(
                     action='ca_updated',
                     resource_type='ca',
@@ -143,7 +146,9 @@ def import_certificate():
             )
 
             db.session.add(ca)
-            db.session.commit()
+            ok, err = safe_commit(logger, "Failed to import CA")
+            if not ok:
+                return err
             AuditService.log_action(
                 action='ca_imported',
                 resource_type='ca',
@@ -192,7 +197,9 @@ def import_certificate():
                 if ca:
                     existing_cert.caref = ca.refid
 
-            db.session.commit()
+            ok, err = safe_commit(logger, "Failed to update certificate")
+            if not ok:
+                return err
             AuditService.log_action(
                 action='certificate_updated',
                 resource_type='certificate',
@@ -248,7 +255,9 @@ def import_certificate():
         )
 
         db.session.add(certificate)
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to import certificate")
+        if not ok:
+            return err
         AuditService.log_action(
             action='certificate_imported',
             resource_type='certificate',

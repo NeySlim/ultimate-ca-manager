@@ -3501,7 +3501,8 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, сертифікат + ключ",
-    "jksNote": "JKS завжди включає приватний ключ"
+    "jksNote": "JKS завжди включає приватний ключ",
+    "pkcs12PasswordPrompt": "Введіть пароль для файла PKCS#12"
   },
   "userCertificates": {
     "title": "Сертифікати користувачів",

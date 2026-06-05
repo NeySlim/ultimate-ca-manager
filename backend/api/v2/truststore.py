@@ -165,9 +165,10 @@ def import_trusted_certificate():
         )
         
         db.session.add(trusted_cert)
-        db.session.commit()
-        
-        from services.audit_service import AuditService
+        ok, err = safe_commit(logger, "Failed to add certificate to trust store")
+        if not ok:
+            return err
+
         AuditService.log_action(
             action='truststore_import',
             resource_type='truststore',
@@ -390,104 +391,99 @@ def sync_trust_store():
     if not os.path.exists(CA_BUNDLE_PATH):
         return error_response(f'System CA bundle not found at {CA_BUNDLE_PATH}', 404)
     
-    try:
-        # Read and parse CA bundle
-        with open(CA_BUNDLE_PATH, 'r') as f:
-            bundle_content = f.read()
-        
-        # Split into individual certificates
-        certs_pem = []
-        current_cert = []
-        in_cert = False
-        
-        for line in bundle_content.split('\n'):
-            if '-----BEGIN CERTIFICATE-----' in line:
-                in_cert = True
-                current_cert = [line]
-            elif '-----END CERTIFICATE-----' in line:
-                current_cert.append(line)
-                certs_pem.append('\n'.join(current_cert))
-                in_cert = False
-                current_cert = []
-            elif in_cert:
-                current_cert.append(line)
-        
-        new_count = 0
-        skipped_count = 0
-        error_count = 0
-        
-        for pem in certs_pem[:limit]:
-            try:
-                cert_details = parse_certificate(pem)
-                
-                # Check if already exists
-                existing = TrustedCertificate.query.filter_by(
-                    fingerprint_sha256=cert_details['fingerprint_sha256']
-                ).first()
-                
-                if existing:
-                    skipped_count += 1
-                    continue
-                
-                # Extract CN for name
-                subject = cert_details['subject']
-                cn = None
-                for part in subject.split(','):
-                    if part.strip().startswith('CN='):
-                        cn = part.strip()[3:]
-                        break
-                
-                name = cn or f"System CA {cert_details['fingerprint_sha256'][:8]}"
-                
-                trusted_cert = TrustedCertificate(
-                    name=name,
-                    description='Imported from system CA bundle',
-                    certificate_pem=pem,
-                    fingerprint_sha256=cert_details['fingerprint_sha256'],
-                    fingerprint_sha1=cert_details['fingerprint_sha1'],
-                    subject=cert_details['subject'],
-                    issuer=cert_details['issuer'],
-                    serial_number=cert_details['serial_number'],
-                    not_before=cert_details['not_before'],
-                    not_after=cert_details['not_after'],
-                    purpose='system',
-                    added_by='system_sync',
-                    notes='Auto-imported from /etc/ssl/certs/ca-certificates.crt'
-                )
-                
-                db.session.add(trusted_cert)
-                new_count += 1
-                
-            except Exception as e:
-                error_count += 1
+    # Read and parse CA bundle
+    with open(CA_BUNDLE_PATH, 'r') as f:
+        bundle_content = f.read()
+
+    # Split into individual certificates
+    certs_pem = []
+    current_cert = []
+    in_cert = False
+
+    for line in bundle_content.split('\n'):
+        if '-----BEGIN CERTIFICATE-----' in line:
+            in_cert = True
+            current_cert = [line]
+        elif '-----END CERTIFICATE-----' in line:
+            current_cert.append(line)
+            certs_pem.append('\n'.join(current_cert))
+            in_cert = False
+            current_cert = []
+        elif in_cert:
+            current_cert.append(line)
+
+    new_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    for pem in certs_pem[:limit]:
+        try:
+            cert_details = parse_certificate(pem)
+
+            # Check if already exists
+            existing = TrustedCertificate.query.filter_by(
+                fingerprint_sha256=cert_details['fingerprint_sha256']
+            ).first()
+
+            if existing:
+                skipped_count += 1
                 continue
-        
-        db.session.commit()
-        
-        from services.audit_service import AuditService
-        AuditService.log_action(
-            action='truststore_sync',
-            resource_type='truststore',
-            resource_name='System CA Bundle',
-            details=f'Synced {new_count} new certificates from system',
-            success=True
-        )
-        
-        return success_response(
-            message=f'Trust store synchronized: {new_count} new, {skipped_count} already exist',
-            data={
-                'source': source,
-                'total_found': len(certs_pem),
-                'new_count': new_count,
-                'skipped_count': skipped_count,
-                'error_count': error_count
-            }
-        )
-        
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f'Failed to sync trust store: {e}')
-        return error_response('Failed to sync trust store', 500)
+
+            # Extract CN for name
+            subject = cert_details['subject']
+            cn = None
+            for part in subject.split(','):
+                if part.strip().startswith('CN='):
+                    cn = part.strip()[3:]
+                    break
+
+            name = cn or f"System CA {cert_details['fingerprint_sha256'][:8]}"
+
+            trusted_cert = TrustedCertificate(
+                name=name,
+                description='Imported from system CA bundle',
+                certificate_pem=pem,
+                fingerprint_sha256=cert_details['fingerprint_sha256'],
+                fingerprint_sha1=cert_details['fingerprint_sha1'],
+                subject=cert_details['subject'],
+                issuer=cert_details['issuer'],
+                serial_number=cert_details['serial_number'],
+                not_before=cert_details['not_before'],
+                not_after=cert_details['not_after'],
+                purpose='system',
+                added_by='system_sync',
+                notes='Auto-imported from /etc/ssl/certs/ca-certificates.crt'
+            )
+
+            db.session.add(trusted_cert)
+            new_count += 1
+
+        except Exception as e:
+            error_count += 1
+            continue
+
+    ok, err = safe_commit(logger, "Failed to sync trust store")
+    if not ok:
+        return err
+
+    AuditService.log_action(
+        action='truststore_sync',
+        resource_type='truststore',
+        resource_name='System CA Bundle',
+        details=f'Synced {new_count} new certificates from system',
+        success=True
+    )
+
+    return success_response(
+        message=f'Trust store synchronized: {new_count} new, {skipped_count} already exist',
+        data={
+            'source': source,
+            'total_found': len(certs_pem),
+            'new_count': new_count,
+            'skipped_count': skipped_count,
+            'error_count': error_count
+        }
+    )
 
 
 @bp.route('/api/v2/truststore/export', methods=['GET'])
