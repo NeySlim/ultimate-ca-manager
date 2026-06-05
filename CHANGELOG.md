@@ -9,6 +9,23 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.161] - 2026-06-05
+
+### Added
+- **CI semver normalization** — RC tags (`2.161-rc1`) are auto-normalized to valid semver (`2.161.0-rc1`) for `npm ci` in build workflows.
+- **EAB credential notes** (#120) — free-form notes column on `acme_eab_credentials` table (migration 038), editable in ACME EAB tab.
+
+### Changed
+- **CI pipeline hardened** — `npm ci` now works reliably on RC tags; lockfile integrity preserved (no more blanket `sed` corruption).
+
+### Fixed
+- Password validation centralized in `security/password_policy.py`, enforced across all user-facing endpoints.
+- All `db.session.commit()` calls wrapped in `safe_commit()` — prevents 500 crashes from IntegrityError.
+- Certificate Discovery profile field name mismatches (`schedule_enabled`, `schedule_interval_minutes`).
+- Discovery profile list not refreshing after create/update.
+- GitHub code scanning alerts: `react-router` → `6.30.4`, batch-updated Python dependencies.
+- Frontend quality check: removed React 18 false-positive hook provider tests (479 tests clean).
+
 ## [2.160] - 2026-06-04
 
 ### Fixed
