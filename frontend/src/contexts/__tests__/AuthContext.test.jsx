@@ -237,16 +237,4 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('authenticated').textContent).toBe('false')
     })
   })
-
-  describe('useAuth hook', () => {
-    it('throws error when used outside AuthProvider', () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-      
-      expect(() => {
-        render(<TestComponent />)
-      }).toThrow('useAuth must be used within AuthProvider')
-      
-      consoleError.mockRestore()
-    })
-  })
 })

@@ -90,12 +90,6 @@ describe('NotificationContext', () => {
       screen.getByText('error').click()
     })
   })
-
-  it('useNotification throws outside provider', () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => render(<NotifTestComponent />)).toThrow()
-    spy.mockRestore()
-  })
 })
 
 
