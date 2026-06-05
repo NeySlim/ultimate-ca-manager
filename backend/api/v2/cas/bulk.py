@@ -11,6 +11,7 @@ import os
 import logging
 
 from auth.unified import require_auth
+from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from services.audit_service import AuditService
 from models import CA, Certificate, db
@@ -65,7 +66,10 @@ def bulk_delete_cas():
             OCSPResponse.query.filter_by(ca_id=ca_id).delete()
 
             db.session.delete(ca)
-            db.session.commit()
+            ok, err = safe_commit(logger, f"Failed to delete CA {ca_id}")
+            if not ok:
+                results['failed'].append({'id': ca_id, 'error': 'Deletion failed'})
+                continue
             results['success'].append(ca_id)
         except Exception as e:
             db.session.rollback()

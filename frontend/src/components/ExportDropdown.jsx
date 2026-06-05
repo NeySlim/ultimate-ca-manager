@@ -81,7 +81,7 @@ export function ExportDropdown({
         onClick: async () => {
           if (config.options.password) {
             // Prompt for PKCS12 password
-            const password = await showPrompt('Enter password for PKCS#12 file:', {
+            const password = await showPrompt(t('export.pkcs12PasswordPrompt'), {
               title: 'Export PKCS#12',
               type: 'password',
               placeholder: 'Password',

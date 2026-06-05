@@ -23,6 +23,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from security.encryption import encrypt_private_key
 from utils.datetime_utils import utc_now
+from utils.db_transaction import safe_commit
 
 bp = Blueprint('csrs_v2', __name__)
 logger = logging.getLogger(__name__)
@@ -333,8 +334,10 @@ def upload_csr():
         )
         
         db.session.add(new_cert)
-        db.session.commit()
-        
+        ok, err = safe_commit(logger, "Failed to upload CSR")
+        if not ok:
+            return err
+
         # Audit log
         AuditService.log_action(
             action='csr_uploaded',
@@ -343,19 +346,18 @@ def upload_csr():
             resource_name=cn,
             details=f'CSR uploaded: {subject_str}'
         )
-        
+
         # Return CSR-friendly format
         result = new_cert.to_dict()
         result['status'] = 'Pending'
         result['cn'] = cn
         result['department'] = ou
-        
+
         return created_response(
             data=result,
             message='CSR uploaded successfully'
         )
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Failed to upload CSR: {e}")
         return error_response('Failed to upload CSR', 500)
 
@@ -454,8 +456,10 @@ def import_csr():
         )
         
         db.session.add(cert)
-        db.session.commit()
-        
+        ok, err = safe_commit(logger, "Import failed")
+        if not ok:
+            return err
+
         # Audit log
         AuditService.log_action(
             action='csr_imported',
@@ -465,14 +469,13 @@ def import_csr():
             details=f'Imported CSR: {cert.descr}',
             success=True
         )
-        
+
         return created_response(
             data=cert.to_dict(),
             message=f'CSR "{cert.descr}" imported successfully'
         )
-        
+
     except Exception as e:
-        db.session.rollback()
         logger.error(f"CSR Import Error: {e}", exc_info=True)
         return error_response('Import failed', 500)
 
@@ -603,8 +606,10 @@ def upload_csr_private_key(csr_id):
         key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
         csr.prv = encrypt_private_key(key_encoded)
         
-        db.session.commit()
-        
+        ok, err = safe_commit(logger, "Failed to upload private key")
+        if not ok:
+            return err
+
         # Audit log
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         AuditService.log_action(
@@ -615,14 +620,13 @@ def upload_csr_private_key(csr_id):
             details=f'Private key uploaded by {username}',
             success=True
         )
-        
+
         return success_response(
             data=csr.to_dict(),
             message='Private key uploaded successfully'
         )
-        
+
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Failed to upload private key: {e}")
         return error_response('Failed to upload private key', 500)
 

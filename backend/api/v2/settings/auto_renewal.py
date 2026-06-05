@@ -12,6 +12,7 @@ from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, SystemConfig
+from utils.db_transaction import safe_commit
 from services.audit_service import AuditService
 from services.auto_renewal_service import AutoRenewalService
 import json
@@ -110,31 +111,28 @@ def update_auto_renewal_settings():
         data['notify_emails'] = cleaned
 
     # Persist
-    try:
-        if 'enabled' in data:
-            set_config('auto_renewal_enabled', 'true' if _bool(data['enabled']) else 'false')
-        if 'days_before_expiry' in data:
-            set_config('auto_renewal_days', str(data['days_before_expiry']))
-        if 'renewal_sources' in data:
-            set_config('auto_renewal_sources', json.dumps(data['renewal_sources']))
-        if 'notify_on_renewal' in data:
-            set_config(
-                'auto_renewal_notify_on_renewal',
-                'true' if _bool(data['notify_on_renewal']) else 'false',
-            )
-        if 'notify_on_failure' in data:
-            set_config(
-                'auto_renewal_notify_on_failure',
-                'true' if _bool(data['notify_on_failure']) else 'false',
-            )
-        if 'notify_emails' in data:
-            set_config('auto_renewal_notify_emails', json.dumps(data['notify_emails']))
+    if 'enabled' in data:
+        set_config('auto_renewal_enabled', 'true' if _bool(data['enabled']) else 'false')
+    if 'days_before_expiry' in data:
+        set_config('auto_renewal_days', str(data['days_before_expiry']))
+    if 'renewal_sources' in data:
+        set_config('auto_renewal_sources', json.dumps(data['renewal_sources']))
+    if 'notify_on_renewal' in data:
+        set_config(
+            'auto_renewal_notify_on_renewal',
+            'true' if _bool(data['notify_on_renewal']) else 'false',
+        )
+    if 'notify_on_failure' in data:
+        set_config(
+            'auto_renewal_notify_on_failure',
+            'true' if _bool(data['notify_on_failure']) else 'false',
+        )
+    if 'notify_emails' in data:
+        set_config('auto_renewal_notify_emails', json.dumps(data['notify_emails']))
 
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Failed to update auto-renewal settings: {e}")
-        return error_response('Failed to update auto-renewal settings', 500)
+    ok, err = safe_commit(logger, "Failed to update auto-renewal settings")
+    if not ok:
+        return err
 
     AuditService.log_action(
         action='settings_update',

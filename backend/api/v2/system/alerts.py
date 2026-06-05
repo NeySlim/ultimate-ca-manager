@@ -6,6 +6,7 @@ from . import bp
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
@@ -56,7 +57,9 @@ def update_expiry_alert_settings():
         if 'recipients' in data:
             config.recipients = _json.dumps(list(data['recipients']))
 
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to update expiry alert settings")
+        if not ok:
+            return err
 
         result = {
             'enabled': config.enabled,
@@ -66,7 +69,6 @@ def update_expiry_alert_settings():
         }
         return success_response(message="Expiry alert settings updated", data=result)
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Failed to update expiry alert settings: {e}")
         return error_response("Failed to update settings", 500)
 

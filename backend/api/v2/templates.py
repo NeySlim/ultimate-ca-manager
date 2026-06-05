@@ -407,29 +407,27 @@ def bulk_delete_templates():
     results = {'success': [], 'failed': []}
 
     for template_id in ids:
-        try:
-            template = CertificateTemplate.query.get(template_id)
-            if not template:
-                results['failed'].append({'id': template_id, 'error': 'Not found'})
-                continue
-            if template.is_system:
-                results['failed'].append({'id': template_id, 'error': 'Cannot delete system template'})
-                continue
-            cert_count = Certificate.query.filter_by(template_id=template_id).count()
-            if cert_count > 0:
-                results['failed'].append({'id': template_id, 'error': f'In use by {cert_count} certificate(s)'})
-                continue
-            policy_count = CertificatePolicy.query.filter_by(template_id=template_id).count()
-            if policy_count > 0:
-                results['failed'].append({'id': template_id, 'error': f'In use by {policy_count} policy/policies'})
-                continue
-            template_name = template.name
-            db.session.delete(template)
-            db.session.commit()
-            results['success'].append(template_id)
-        except Exception as e:
-            db.session.rollback()
-            results['failed'].append({'id': template_id, 'error': 'Delete failed'})
+        template = CertificateTemplate.query.get(template_id)
+        if not template:
+            results['failed'].append({'id': template_id, 'error': 'Not found'})
+            continue
+        if template.is_system:
+            results['failed'].append({'id': template_id, 'error': 'Cannot delete system template'})
+            continue
+        cert_count = Certificate.query.filter_by(template_id=template_id).count()
+        if cert_count > 0:
+            results['failed'].append({'id': template_id, 'error': f'In use by {cert_count} certificate(s)'})
+            continue
+        policy_count = CertificatePolicy.query.filter_by(template_id=template_id).count()
+        if policy_count > 0:
+            results['failed'].append({'id': template_id, 'error': f'In use by {policy_count} policy/policies'})
+            continue
+        template_name = template.name
+        db.session.delete(template)
+        ok, err = safe_commit(logger, f"Delete template {template_id}")
+        if not ok:
+            return err
+        results['success'].append(template_id)
 
     AuditService.log_action(
         action='templates_bulk_deleted',

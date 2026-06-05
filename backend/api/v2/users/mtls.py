@@ -188,7 +188,9 @@ def create_user_mtls_certificate(user_id):
                 enabled=True,
             )
             db.session.add(auth_cert)
-            db.session.commit()
+            ok, err = safe_commit(logger, "Assign mTLS certificate")
+            if not ok:
+                return err
 
             key_pem = load_pem_bytes(result.prv, context=f"mTLS cert for user {user_id}").decode('utf-8') if result.prv else ''
 

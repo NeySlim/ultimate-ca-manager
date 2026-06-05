@@ -17,6 +17,7 @@ from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
+from utils.db_transaction import safe_commit
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
@@ -650,7 +651,9 @@ def delete_ca(ca_id):
             logger.info(f"Deleted {crl_count} CRL(s) and {ocsp_count} OCSP response(s) for CA {ca_name}")
 
         db.session.delete(ca)
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to delete CA")
+        if not ok:
+            return err
 
         # Audit log
         AuditService.log_action(
@@ -766,7 +769,9 @@ def take_ca_offline(ca_id):
         ca.offline = True
         ca.offline_mode = mode
         ca.offline_reason = None  # legacy field, no longer collected
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to take CA offline")
+        if not ok:
+            return err
 
         AuditService.log_action(
             action='ca_offline',

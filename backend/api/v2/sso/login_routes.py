@@ -4,6 +4,7 @@ from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from flask import request, redirect, session, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
@@ -251,7 +252,9 @@ def sso_callback(provider_type):
                     expires_at=utc_now() + timedelta(hours=8)
                 )
                 db.session.add(sso_session)
-            db.session.commit()
+            ok, err = safe_commit(logger, "SSO login failed - session save error")
+            if not ok:
+                return redirect('/login?error=callback_error')
 
             # Establish Flask session (clear first to prevent session fixation)
             _sso_now = utc_now()
@@ -364,7 +367,9 @@ def sso_callback(provider_type):
                     expires_at=utc_now() + timedelta(hours=8)
                 )
                 db.session.add(sso_session)
-            db.session.commit()
+            ok, err = safe_commit(logger, "SSO login failed - session save error")
+            if not ok:
+                return redirect('/login?error=callback_error')
 
             # Establish Flask session (clear first to prevent session fixation)
             _saml_now = utc_now()

@@ -3501,7 +3501,8 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, certificato + chiave",
-    "jksNote": "JKS include sempre la chiave privata"
+    "jksNote": "JKS include sempre la chiave privata",
+    "pkcs12PasswordPrompt": "Inserisci la password per il file PKCS#12"
   },
   "userCertificates": {
     "title": "Certificati Utente",

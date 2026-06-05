@@ -12,6 +12,7 @@ from models.msca import MicrosoftCA, MSCARequest
 from services.msca_service import MicrosoftCAService
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
+from utils.db_transaction import safe_commit
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,10 @@ def create_connection():
             msca.kerberos_keytab_path = data.get('kerberos_keytab_path', '').strip() or None
 
         db.session.add(msca)
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to create connection")
+        if not ok:
+            _audit('msca.create', None, f"name={name} error=commit failed", success=False)
+            return err
 
         _audit('msca.create', msca,
                f"auth={auth_method} server={server} ssl={msca.use_ssl}/verify={msca.verify_ssl}")
@@ -140,7 +144,6 @@ def create_connection():
         return created_response(data=msca.to_dict(), message="Microsoft CA connection created")
 
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Failed to create MS CA connection: {e}")
         _audit('msca.create', None, f"name={name} error={e}", success=False)
         return error_response("Failed to create connection", 500)
@@ -241,13 +244,15 @@ def update_connection(msca_id):
             if 'kerberos_keytab_path' in data:
                 msca.kerberos_keytab_path = data['kerberos_keytab_path'].strip() or None
 
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to update connection")
+        if not ok:
+            _audit('msca.update', msca, "error=commit failed", success=False)
+            return err
         _audit('msca.update', msca, f"fields={sorted(data.keys())}")
         logger.info(f"Microsoft CA connection updated: {msca.name}")
         return success_response(data=msca.to_dict(), message="Connection updated")
 
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Failed to update MS CA connection: {e}")
         _audit('msca.update', msca, f"error={e}", success=False)
         return error_response("Failed to update connection", 500)
@@ -648,10 +653,11 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
             msca_req.status = 'issued'
             msca_req.issued_at = utc_now()
 
-        db.session.commit()
+        ok, err = safe_commit(logger, "Failed to import MS CA signed certificate")
+        if not ok:
+            raise
         logger.info(f"Imported MS CA signed certificate: {cn} (id={cert.id})")
 
     except Exception as e:
-        db.session.rollback()
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)
         raise

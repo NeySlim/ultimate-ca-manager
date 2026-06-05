@@ -7,6 +7,7 @@ from models import db, CA, Certificate
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from utils.trusted_proxy import client_ip
+from utils.db_transaction import safe_commit
 from datetime import datetime
 import base64
 import hmac
@@ -289,7 +290,8 @@ def simple_enroll():
             details=f'EST enrollment from {client_ip()}'
         )
         db.session.add(log)
-        db.session.commit()
+        if not safe_commit(logger, "EST enrollment commit failed"):
+            pass
         
         # Return PKCS#7 with certificate + CA chain (RFC 7030 §4.2.3)
         from cryptography.hazmat.primitives.serialization import pkcs7
@@ -391,7 +393,8 @@ def simple_reenroll():
             details=f'EST re-enrollment via mTLS from {client_ip()}'
         )
         db.session.add(log)
-        db.session.commit()
+        if not safe_commit(logger, "EST re-enrollment commit failed"):
+            pass
         
         from cryptography.hazmat.primitives.serialization import pkcs7
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())

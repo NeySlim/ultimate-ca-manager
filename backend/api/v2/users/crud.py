@@ -8,6 +8,7 @@ import logging
 
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response
+from utils.db_transaction import safe_commit
 from models import db, User
 from services.audit_service import AuditService
 
@@ -148,33 +149,29 @@ def create_user():
     )
     user.set_password(data['password'])
 
-    try:
-        db.session.add(user)
-        db.session.commit()
-
-        AuditService.log_action(
-            action='user_create',
-            resource_type='user',
-            resource_id=str(user.id),
-            resource_name=user.username,
-            details=f'Created user: {user.username} (role: {role})',
-            success=True
-        )
-
-        try:
-            from websocket.emitters import on_user_created
-            on_user_created(user.id, user.username, g.current_user.username)
-        except Exception:
-            pass
-
-        return created_response(
-            data=user.to_dict(),
-            message=f'User {user.username} created successfully'
-        )
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Failed to create user: {e}", exc_info=True)
+    db.session.add(user)
+    if not safe_commit(logger, "Failed to create user"):
         return error_response('Failed to create user', 500)
+
+    AuditService.log_action(
+        action='user_create',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Created user: {user.username} (role: {role})',
+        success=True
+    )
+
+    try:
+        from websocket.emitters import on_user_created
+        on_user_created(user.id, user.username, g.current_user.username)
+    except Exception:
+        pass
+
+    return created_response(
+        data=user.to_dict(),
+        message=f'User {user.username} created successfully'
+    )
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['GET'])
@@ -377,24 +374,21 @@ def bulk_delete_users():
     results = {'success': [], 'failed': []}
 
     for user_id in ids:
-        try:
-            if g.current_user.id == user_id:
-                results['failed'].append({'id': user_id, 'error': 'Cannot delete your own account'})
-                continue
-            user = db.session.get(User, user_id)
-            if not user:
-                results['failed'].append({'id': user_id, 'error': 'Not found'})
-                continue
-            if _is_last_active_admin(user):
-                results['failed'].append({'id': user_id, 'error': 'Cannot deactivate the last active admin'})
-                continue
-            user.active = False
-            db.session.commit()
-            results['success'].append(user_id)
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to delete user {user_id}: {e}")
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+        if g.current_user.id == user_id:
+            results['failed'].append({'id': user_id, 'error': 'Cannot delete your own account'})
+            continue
+        user = db.session.get(User, user_id)
+        if not user:
+            results['failed'].append({'id': user_id, 'error': 'Not found'})
+            continue
+        if _is_last_active_admin(user):
+            results['failed'].append({'id': user_id, 'error': 'Cannot deactivate the last active admin'})
+            continue
+        user.active = False
+        if not safe_commit(logger, f"Deactivate user {user_id}"):
+            results['failed'].append({'id': user_id, 'error': 'Deactivation failed'})
+            continue
+        results['success'].append(user_id)
 
     AuditService.log_action(
         action='users_bulk_deactivated',
