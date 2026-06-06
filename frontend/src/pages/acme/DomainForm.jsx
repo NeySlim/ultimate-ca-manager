@@ -8,7 +8,7 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
     domain: domain?.domain || '',
-    dns_provider_id: domain?.dns_provider_id || (dnsProviders[0]?.id || ''),
+    dns_provider_id: (domain?.dns_provider_id?.toString?.() ?? dnsProviders[0]?.id?.toString() ?? ''),
     issuing_ca_id: domain?.issuing_ca_id?.toString() || '',
     is_wildcard_allowed: domain?.is_wildcard_allowed ?? true,
     auto_approve: domain?.auto_approve ?? false,
@@ -19,8 +19,11 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
   const handleSubmit = (e) => {
     e.preventDefault()
     onSubmit({
-      ...formData,
-      issuing_ca_id: formData.issuing_ca_id || null,
+      domain: formData.domain,
+      dns_provider_id: formData.dns_provider_id ? parseInt(formData.dns_provider_id, 10) : null,
+      issuing_ca_id: formData.issuing_ca_id ? parseInt(formData.issuing_ca_id, 10) : null,
+      is_wildcard_allowed: formData.is_wildcard_allowed,
+      auto_approve: formData.auto_approve,
     })
   }
 
@@ -39,7 +42,7 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
       <Select
         label={t('acme.provider')}
         value={formData.dns_provider_id}
-        onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: parseInt(val) }))}
+        onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: val }))}
         options={dnsProviders.map(p => ({
           value: p.id.toString(),
           label: `${p.name} (${p.provider_type})`
@@ -50,7 +53,7 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
       <Select
         label={t('acme.issuingCA')}
         value={formData.issuing_ca_id}
-        onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val ? parseInt(val) : '' }))}
+        onChange={(val) => setFormData(prev => ({ ...prev, issuing_ca_id: val }))}
         options={[
           { value: '', label: t('acme.useDefaultCA') },
           ...signingCas.map(ca => ({
