@@ -19,10 +19,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **CI pipeline hardened** — `npm ci` now works reliably on RC tags; lockfile integrity preserved (no more blanket `sed` corruption).
 
 ### Fixed
-- Password validation centralized in `security/password_policy.py`, enforced across all user-facing endpoints.
+- Password policy centralization (#121) — all validation moved to `security/password_policy.py`, enforced across login, password change, account creation, and force-change flows. Admin bypass retained.
+- Discovery profiles (#122) — corrected field name mismatches (`schedule_enabled`, `schedule_interval_minutes`) in `DiscoveryPage.jsx` and `ProfileDetailPanel.jsx`; profile list now refreshes after create/update.
 - All `db.session.commit()` calls wrapped in `safe_commit()` — prevents 500 crashes from IntegrityError.
-- Certificate Discovery profile field name mismatches (`schedule_enabled`, `schedule_interval_minutes`).
-- Discovery profile list not refreshing after create/update.
+- GitHub code scanning alerts: `react-router` → `6.30.4`, batch-updated Python dependencies.
+- Frontend quality check: removed React 18 false-positive hook provider tests (479 tests clean).
 - GitHub code scanning alerts: `react-router` → `6.30.4`, batch-updated Python dependencies.
 - Frontend quality check: removed React 18 false-positive hook provider tests (479 tests clean).
 
