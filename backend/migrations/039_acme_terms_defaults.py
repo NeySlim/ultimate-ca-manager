@@ -20,8 +20,8 @@ def _seed_sqlite(conn):
     ).fetchone()[0]
     if existing == 0:
         conn.execute(
-            "INSERT INTO system_config (key, value, description, created_at) "
-            "VALUES ('acme.terms_of_service', ?, 'ACME Terms of Service (title + body, JSON)', datetime('now'))",
+            "INSERT INTO system_config (key, value, description) "
+            "VALUES ('acme.terms_of_service', ?, 'ACME Terms of Service (title + body, JSON)')",
             (json.dumps(DEFAULT_TOS),)
         )
         conn.commit()
@@ -35,8 +35,8 @@ def _seed_pg(conn):
     ).scalar()
     if has_key == 0:
         conn.execute(
-            text("INSERT INTO system_config (key, value, description, created_at) "
-                 "VALUES ('acme.terms_of_service', :val, 'ACME Terms of Service (title + body, JSON)', NOW())"),
+            text("INSERT INTO system_config (key, value, description) "
+                 "VALUES ('acme.terms_of_service', :val, 'ACME Terms of Service (title + body, JSON)')"),
             {"val": json.dumps(DEFAULT_TOS)}
         )
         logger.info("[039] seeded default ACME ToS (PostgreSQL)")
