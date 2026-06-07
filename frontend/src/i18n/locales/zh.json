@@ -1383,7 +1383,12 @@
       "delete": "删除",
       "deletedSuccess": "EAB 凭据已删除",
       "deleteFailed": "删除 EAB 凭据失败"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "服务条款（留空隐藏）",
+    "termsOfServiceBodyPlaceholder": "在此输入条款...\n\n支持：**加粗**, *斜体*, [链接](url), - 列表\n\n空行分隔段落。",
+    "termsOfServiceHelper": "纯文本，支持 Markdown 格式。空行分隔段落。",
+    "termsOfServicePreview": "预览",
+    "termsOfServiceUrl": "服务条款 URL"
   },
   "scep": {
     "title": "SCEP协议",

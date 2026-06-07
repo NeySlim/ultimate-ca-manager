@@ -1383,7 +1383,12 @@
       "delete": "Löschen",
       "deletedSuccess": "EAB-Credential gelöscht",
       "deleteFailed": "EAB-Credential konnte nicht gelöscht werden"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "Nutzungsbedingungen (leer lassen zum Ausblenden)",
+    "termsOfServiceBodyPlaceholder": "Schreiben Sie hier Ihre Bedingungen...\n\nUnterstützt: **Fett**, *Kursiv*, [Links](url), - Listen\n\nLeerzeilen für Absätze verwenden.",
+    "termsOfServiceHelper": "Klartext mit Markdown-ähnlicher Formatierung. Leerzeilen für Absätze verwenden.",
+    "termsOfServicePreview": "Vorschau",
+    "termsOfServiceUrl": "URL der Nutzungsbedingungen"
   },
   "scep": {
     "title": "SCEP-Protokoll",

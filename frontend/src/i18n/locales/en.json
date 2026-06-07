@@ -1383,7 +1383,12 @@
       "delete": "Delete",
       "deletedSuccess": "EAB credential deleted",
       "deleteFailed": "Failed to delete EAB credential"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "Terms of Service (leave empty to hide)",
+    "termsOfServiceBodyPlaceholder": "Write your terms here...\n\nSupports: **bold**, *italic*, [links](url), - lists\n\nUse double empty lines for paragraphs.",
+    "termsOfServiceHelper": "Plain text with markdown-like formatting. Use empty lines for paragraphs.",
+    "termsOfServicePreview": "Preview",
+    "termsOfServiceUrl": "Terms of Service URL"
   },
   "scep": {
     "title": "SCEP Protocol",

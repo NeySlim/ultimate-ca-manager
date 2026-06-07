@@ -373,6 +373,73 @@ def directory():
     return acme_response(directory_data)
 
 
+@acme_bp.route('/terms', methods=['GET'])
+def terms_of_service():
+    """Serve ACME Terms of Service content (RFC 8555 Section 7.1.1).
+    
+    Returns HTML-rendered terms stored in SystemConfig.
+    Format: plain text with paragraph breaks (double newline).
+    """
+    from models import SystemConfig
+    
+    tos_cfg = SystemConfig.query.filter_by(key='acme.terms_of_service').first()
+    
+    if tos_cfg and tos_cfg.value:
+        try:
+            data = json.loads(tos_cfg.value)
+        except (json.JSONDecodeError, TypeError):
+            data = {'title': '', 'body': ''}
+    else:
+        data = {'title': '', 'body': ''}
+    
+    title = data.get('title', '')
+    body = data.get('body', '')
+    
+    # Render body: paragraphs separated by double newline,
+    # auto-linkify URLs and email addresses
+    paragraphs = []
+    if body:
+        for block in body.split('\n\n'):
+            block = block.strip()
+            if block:
+                # Auto-linkify URLs and emails
+                import re
+                block = re.sub(
+                    r'(https?://[^\s<>()]+)',
+                    r'<a href="\1" target="_blank" rel="noopener">\1</a>',
+                    block
+                )
+                # Convert single newlines within paragraph to <br>
+                block = block.replace('\n', '<br>')
+                paragraphs.append(block)
+    
+    title_html = title.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    updated = utc_now().strftime('%B %d, %Y')
+    paragraphs_html = ''.join(f'<p>{p}</p>' for p in paragraphs)
+    title_html_tag = f'<h1>{title_html}</h1>' if title_html else ''
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title_html if title_html else 'Terms of Service'}</title>
+<style>
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:800px;margin:0 auto;padding:2rem;background:#f5f5f5;color:#1a1a1a}}
+h1{{font-size:1.8rem;margin-bottom:.5rem}}
+p,li{{line-height:1.7;margin-bottom:1rem}}
+a{{color:#2563eb}}
+.updated{{font-size:.85rem;color:#666;margin-bottom:1.5rem}}
+</style></head>
+<body>
+{title_html_tag}
+<div class="updated">Last updated: {updated}</div>
+{paragraphs_html}
+</body></html>"""
+    
+    response = acme_response({'html': html, 'raw': body})
+    response.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return response
+
+
 # ==================== Nonce Management ====================
 
 @acme_bp.route('/new-nonce', methods=['GET', 'HEAD'])

@@ -1,4 +1,5 @@
 """ACME settings and stats routes"""
+import json
 from flask import request
 from models import db, AcmeOrder, SystemConfig, CA, Certificate
 from services.audit_service import AuditService
@@ -92,9 +93,20 @@ def get_acme_settings():
     # Get settings from SystemConfig
     enabled_cfg = SystemConfig.query.filter_by(key='acme.enabled').first()
     ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+    tos_cfg = SystemConfig.query.filter_by(key='acme.terms_of_service').first()
 
     enabled = enabled_cfg.value == 'true' if enabled_cfg else True
     ca_id = ca_id_cfg.value if ca_id_cfg else None
+
+    # Parse ToS config
+    terms_of_service = {}
+    if tos_cfg and tos_cfg.value:
+        try:
+            terms_of_service = json.loads(tos_cfg.value)
+        except (json.JSONDecodeError, TypeError):
+            terms_of_service = {'title': '', 'body': ''}
+    else:
+        terms_of_service = {'title': '', 'body': ''}
 
     # Revoke on renewal setting
     revoke_on_renewal_cfg = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
@@ -122,6 +134,7 @@ def get_acme_settings():
         'contact_email': 'admin@ucm.local',
         'revoke_on_renewal': revoke_on_renewal,
         'superseded_count': superseded_count,
+        'terms_of_service': terms_of_service,
     })
 
 
@@ -154,6 +167,21 @@ def update_acme_settings():
             revoke_cfg = SystemConfig(key='acme.revoke_on_renewal', description='Revoke old certificate after ACME renewal')
             db.session.add(revoke_cfg)
         revoke_cfg.value = 'true' if data['revoke_on_renewal'] else 'false'
+
+    # Update Terms of Service
+    if 'terms_of_service' in data:
+        tos_cfg = SystemConfig.query.filter_by(key='acme.terms_of_service').first()
+        if not tos_cfg:
+            tos_cfg = SystemConfig(key='acme.terms_of_service', description='ACME Terms of Service (title + body, JSON)')
+            db.session.add(tos_cfg)
+        tos_value = data['terms_of_service']
+        if tos_value and (tos_value.get('title') or tos_value.get('body')):
+            tos_cfg.value = json.dumps({
+                'title': (tos_value.get('title') or '').strip()[:200],
+                'body': (tos_value.get('body') or '').strip()[:10000],
+            })
+        else:
+            tos_cfg.value = json.dumps({'title': '', 'body': ''})
 
     ok, _err = safe_commit(logger, "Failed to update ACME settings")
     if not ok:

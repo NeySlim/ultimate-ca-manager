@@ -1383,7 +1383,12 @@
       "delete": "Elimina",
       "deletedSuccess": "Credenziale EAB eliminata",
       "deleteFailed": "Eliminazione credenziale EAB fallita"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "Termini di Servizio (lasciare vuoto per nascondere)",
+    "termsOfServiceBodyPlaceholder": "Scrivi i tuoi termini qui...\n\nSupporta: **grassetto**, *corsivo*, [link](url), - elenchi\n\nUsa righe vuote per i paragrafi.",
+    "termsOfServiceHelper": "Testo semplice con formattazione tipo markdown. Usa righe vuote per i paragrafi.",
+    "termsOfServicePreview": "Anteprima",
+    "termsOfServiceUrl": "URL dei Termini di Servizio"
   },
   "scep": {
     "title": "Protocollo SCEP",

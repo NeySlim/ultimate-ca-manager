@@ -1383,7 +1383,12 @@
       "delete": "削除",
       "deletedSuccess": "EAB資格を削除しました",
       "deleteFailed": "EAB資格の削除に失敗しました"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "利用規約（空白で非表示）",
+    "termsOfServiceBodyPlaceholder": "ここに規約を入力...\n\n対応：**太字**, *斜体*, [リンク](url), - リスト\n\n段落には空行を使用。",
+    "termsOfServiceHelper": "マークダウン風フォーマットのプレーンテキスト。段落には空行を使用。",
+    "termsOfServicePreview": "プレビュー",
+    "termsOfServiceUrl": "利用規約URL"
   },
   "scep": {
     "title": "SCEPプロトコル",

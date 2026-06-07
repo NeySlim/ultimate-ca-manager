@@ -426,7 +426,12 @@
       "delete": "Supprimer",
       "deletedSuccess": "Justificatif EAB supprimé",
       "deleteFailed": "Échec de la suppression du justificatif EAB"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "Titre des CGU (laisser vide pour masquer)",
+    "termsOfServiceBodyPlaceholder": "Rédigez vos conditions ici...\n\nSupporte : **gras**, *italique*, [liens](url), - listes\n\nUtilisez des lignes vides pour les paragraphes.",
+    "termsOfServiceHelper": "Texte brut avec formatage type markdown. Utilisez des lignes vides pour les paragraphes.",
+    "termsOfServicePreview": "Aperçu",
+    "termsOfServiceUrl": "URL des CGU"
   },
   "audit": {
     "event": "Événement",

@@ -1383,7 +1383,12 @@
       "delete": "Excluir",
       "deletedSuccess": "Credencial EAB excluída",
       "deleteFailed": "Falha ao excluir credencial EAB"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "Termos de Serviço (deixe vazio para ocultar)",
+    "termsOfServiceBodyPlaceholder": "Escreva seus termos aqui...\n\nSuporta: **negrito**, *itálico*, [links](url), - listas\n\nUse linhas vazias para parágrafos.",
+    "termsOfServiceHelper": "Texto simples com formatação tipo markdown. Use linhas vazias para parágrafos.",
+    "termsOfServicePreview": "Pré-visualização",
+    "termsOfServiceUrl": "URL dos Termos de Serviço"
   },
   "scep": {
     "title": "Protocolo SCEP",

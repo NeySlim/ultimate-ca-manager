@@ -1383,7 +1383,12 @@
       "delete": "Видалити",
       "deletedSuccess": "Облікові дані EAB видалено",
       "deleteFailed": "Не вдалося видалити облікові дані EAB"
-    }
+    },
+    "termsOfServiceTitlePlaceholder": "Умови надання послуг (залиште порожнім для приховування)",
+    "termsOfServiceBodyPlaceholder": "Напишіть свої умови тут...\n\nПідтримує: **жирний**, *курсив*, [посилання](url), - списки\n\nВикористовуйте порожні рядки для абзаців.",
+    "termsOfServiceHelper": "Простий текст із форматуванням типу markdown. Використовуйте порожні рядки для абзаців.",
+    "termsOfServicePreview": "Попередній перегляд",
+    "termsOfServiceUrl": "URL Умов надання послуг"
   },
   "scep": {
     "title": "Протокол SCEP",
