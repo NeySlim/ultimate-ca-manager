@@ -99,14 +99,14 @@ def get_acme_settings():
     ca_id = ca_id_cfg.value if ca_id_cfg else None
 
     # Parse ToS config
-    terms_of_service = {}
+    terms_of_service = {'title': 'Terms of Service', 'body': 'By using this ACME server, you agree to these terms.\n\n1. No abusive or unlawful use.\n2. Rate limits apply — excessive requests may be temporarily blocked.\n3. Accounts that violate these terms may be revoked.'}
     if tos_cfg and tos_cfg.value:
         try:
-            terms_of_service = json.loads(tos_cfg.value)
+            parsed = json.loads(tos_cfg.value)
+            if parsed and (parsed.get('title') or parsed.get('body')):
+                terms_of_service = parsed
         except (json.JSONDecodeError, TypeError):
-            terms_of_service = {'title': '', 'body': ''}
-    else:
-        terms_of_service = {'title': '', 'body': ''}
+            pass
 
     # Revoke on renewal setting
     revoke_on_renewal_cfg = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
