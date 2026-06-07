@@ -8,15 +8,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
-## [Unreleased]
+## [2.163] - 2026-06-07
 
 ### Added
-- **ACME Terms of Service** (#120 point 4) — `GET /acme/terms` public endpoint returns HTML-rendered ToS (RFC 8555 §7.1.1). Settings API (`GET/PATCH /api/v2/acme/settings`) manages title + body JSON. Frontend ConfigTab has scrollable preview card + edit modal with live preview. Default ToS seeded (3 simple rules, English).
-
-## [2.163-rc1] - 2026-06-07
-
-### Added
-- **ACME Terms of Service** (#120 point 4) — `GET /acme/terms` public endpoint returns HTML-rendered ToS (RFC 8555 §7.1.1). Settings API (`GET/PATCH /api/v2/acme/settings`) manages title + body JSON. Frontend ConfigTab has scrollable preview card + edit modal with live preview. Default ToS seeded (3 simple rules, English). Migration 039 seeds default ToS on fresh installs.
+- **ACME Terms of Service** (#120 point 4) — `GET /acme/terms` public endpoint returns HTML-rendered ToS (RFC 8555 §7.1.1). Settings API (`GET/PATCH /api/v2/acme/settings`) manages title + body JSON. Frontend ConfigTab has scrollable preview card + edit modal with live preview. Migration 039 seeds default ToS on fresh installs.
 
 ### Fixed
 - **ACME /acme/terms endpoint** — returns raw `text/html` instead of JSON wrapper. No more escaped characters in HTML.
