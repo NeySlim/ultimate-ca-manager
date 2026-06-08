@@ -8,7 +8,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
-## [Unreleased]
+## [2.164] - 2026-06-08
 
 ### Fixed
 - **Netcup DNS** — read-modify-write on `create_txt_record` (no more zone overwrite), nested subdomain resolution (`_split_domain_and_host`), deletion uses internal record IDs.
