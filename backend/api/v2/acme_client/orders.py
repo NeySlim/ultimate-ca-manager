@@ -172,10 +172,15 @@ def request_certificate():
         # Set up DNS challenges if using dns-01
         challenge_info = {}
         challenge_warning = None
+        auto_poll_result = None
         if challenge_type == 'dns-01':
             setup_success, setup_message, challenge_info = client.setup_dns_challenge(order)
             if not setup_success:
                 challenge_warning = setup_message
+            else:
+                # Auto-poll: wait for DNS propagation, verify challenges,
+                # and finalize when the order becomes 'ready'.
+                auto_poll_result = _auto_poll_and_finalize(client, order)
 
         response_data = {
             'order': order.to_dict(),
@@ -183,6 +188,8 @@ def request_certificate():
         }
         if challenge_warning:
             response_data['challenge_warning'] = challenge_warning
+        if auto_poll_result:
+            response_data['auto_poll'] = auto_poll_result
 
         return success_response(
             data=response_data,
@@ -405,3 +412,85 @@ def renew_order(order_id):
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
         return error_response('Renewal failed', 500)
+
+
+def _auto_poll_and_finalize(client, order) -> dict:
+    """Wait for DNS propagation, verify challenges, poll until ready, auto-finalize.
+
+    Mirrors the renewal service flow (DNS wait → verify → poll → finalize)
+    but inline during the initial certificate request. Returns a status dict
+    that the caller embeds in the API response.
+    """
+    import time
+
+    result = {
+        'dns_propagation_wait': False,
+        'challenge_submitted': False,
+        'polling_status': None,
+        'finalized': False,
+        'certificate_id': None,
+        'error': None,
+    }
+
+    try:
+        challenges = order.challenges_dict
+        if not challenges:
+            result['error'] = 'No challenges for this order'
+            return result
+
+        # 1. Wait for DNS propagation (same delay as renewal service)
+        logger.info('Waiting 30s for DNS propagation...')
+        time.sleep(30)
+        result['dns_propagation_wait'] = True
+
+        # 2. Submit challenges for validation
+        for domain in challenges:
+            success, msg = client.verify_challenge(order, domain)
+            if success:
+                result['challenge_submitted'] = True
+                logger.info(f'Challenge submitted for {domain}')
+            else:
+                logger.warning(f'Challenge submission failed for {domain}: {msg}')
+
+        # 3. Poll order status until ready/valid/invalid or timeout
+        max_wait = 120  # seconds
+        poll_interval = 5
+        elapsed = 0
+        while elapsed < max_wait:
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+
+            le_status, le_data = client.check_order_status(order)
+            result['polling_status'] = le_status
+            logger.info(f'ACME order {order.id} status after {elapsed}s: {le_status}')
+
+            if le_status in ('ready', 'valid'):
+                # 4. Auto-finalize
+                fin_success, fin_msg, cert_id = client.finalize_order(order)
+                if fin_success:
+                    result['finalized'] = True
+                    result['certificate_id'] = cert_id
+                    logger.info(f'Auto-finalized order {order.id}, cert ID: {cert_id}')
+                    # Clean up DNS records
+                    try:
+                        client.cleanup_dns_challenge(order)
+                    except Exception as cleanup_err:
+                        logger.warning(f'DNS cleanup after auto-finalize: {cleanup_err}')
+                else:
+                    result['error'] = fin_msg
+                    logger.warning(f'Auto-finalize failed: {fin_msg}')
+                break
+
+            if le_status == 'invalid':
+                result['error'] = f'Order became invalid: {le_data.get("error", {}).get("detail", "Unknown")}'
+                break
+
+            if elapsed >= max_wait:
+                result['error'] = f'Timeout after {max_wait}s (status: {le_status})'
+                break
+
+    except Exception as e:
+        result['error'] = str(e)
+        logger.error(f'Auto-poll error for order {order.id}: {e}')
+
+    return result

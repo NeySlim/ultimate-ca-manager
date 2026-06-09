@@ -36,13 +36,15 @@ def validate_password_strength(password, username=None):
     if HAS_PASSWORD_POLICY:
         is_valid, errors = validate_password(password, username=username)
         if not is_valid:
-            return False, errors[0] if errors else "Invalid password"
+            first = errors[0] if errors else {'message': 'Invalid password'}
+            return False, first.get('message', 'Invalid password') if isinstance(first, dict) else str(first)
         return True, None
 
     # Fallback: use validate_password with default policy (same rules)
     is_valid, errors = validate_password(password, username=username)
     if not is_valid:
-        return False, errors[0] if errors else "Invalid password"
+        first = errors[0] if errors else {'message': 'Invalid password'}
+        return False, first.get('message', 'Invalid password') if isinstance(first, dict) else str(first)
     return True, None
 
 

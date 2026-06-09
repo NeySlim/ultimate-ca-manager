@@ -422,9 +422,10 @@ def reset_password():
     # Validate password strength
     try:
         from security.password_policy import validate_password
-        is_valid, message = validate_password(new_password)
+        is_valid, errors = validate_password(new_password)
         if not is_valid:
-            return error_response(message, 400)
+            first = errors[0] if errors else {'message': 'Invalid password'}
+            return error_response(first.get('message', 'Invalid password'), 400)
     except ImportError as e:
         logger.warning(f"Password policy module not available, skipping strength check: {e}")
         pass  # Password policy not available

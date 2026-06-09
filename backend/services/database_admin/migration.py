@@ -262,9 +262,9 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         _db.metadata.create_all(target_engine)
 
         # Create _migrations table on target (not part of SQLAlchemy metadata).
-        # Use a backend-appropriate auto-increment primary key — plain
-        # "INTEGER PRIMARY KEY" auto-increments on SQLite but NOT on
-        # PostgreSQL, where it would force callers to supply an id.
+        # Isolate in its own transaction so it commits BEFORE the main data copy
+        # begins — if the FK-disabling step fails, we don't lose track that the
+        # schema was created.
         target_is_pg = target_url.startswith("postgresql")
         source_is_pg = str(source_engine.url).startswith("postgresql")
         if target_is_pg:
@@ -283,8 +283,8 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
                     applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """
-        with target_engine.begin() as dst:
-            dst.execute(text(migrations_ddl))
+        with target_engine.begin() as _mig_tx:
+            _mig_tx.execute(text(migrations_ddl))
 
         # Copy each table
         # Pre-fetch inspectors before opening transactions (SQLite locking)
@@ -303,7 +303,27 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
             # Falls back gracefully if the PG user is not a superuser
             # (session_replication_role is superuser-only) — in that case we
             # rely on the topological order computed above.
-            fk_disabled = _try_disable_fks(dst, target_is_pg)
+            #
+            # CRITICAL: if SET session_replication_role fails, psycopg2 marks
+            # the connection as "in failed transaction". We MUST rollback to
+            # clear that state, otherwise every subsequent statement in this
+            # transaction block gets InFailedSqlTransaction (issue #126).
+            try:
+                if target_is_pg:
+                    dst.execute(text("SET session_replication_role = 'replica'"))
+                    fk_disabled = True
+                else:
+                    dst.execute(text("PRAGMA foreign_keys = OFF"))
+                    fk_disabled = True
+            except Exception as e:
+                logger.warning(
+                    f"Could not disable FK checks ({_short_err(str(e))}); "
+                    "falling back to topological insert order."
+                )
+                # Clear the failed-transaction state so the rest of this
+                # transaction block can proceed normally.
+                dst.rollback()
+                fk_disabled = False
 
             for table_name in src_table_names:
                 if table_name.startswith("_") and table_name != "_migrations":
