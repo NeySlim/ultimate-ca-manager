@@ -13,6 +13,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 - **SSH CA setup** — strip embedded newlines from public key before shell embedding (fixes `curl | sudo bash` failures).
 
+
+
+### Fixed
+- **SSH CA setup** — strip embedded newlines from public key before shell embedding (fixes `curl | sudo bash` failures).
+
 ## [2.164] - 2026-06-08
 
 ### Fixed
