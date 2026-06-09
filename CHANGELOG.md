@@ -10,18 +10,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
-### Fixed
-- **SSH CA setup** — strip embedded newlines from public key before shell embedding (fixes `curl | sudo bash` failures).
+## [2.165] - 2026-06-09
 
-
-
-### Fixed
-- **SSH CA setup** — strip embedded newlines from public key before shell embedding (fixes `curl | sudo bash` failures).
-
-## [Unreleased]
+### Added
+- **ACME DNS-01 auto-poll** — after TXT record creation, automatically wait for DNS propagation (30s), submit challenges, poll ACME status every 5s, and auto-finalize when order is ready (#127).
 
 ### Fixed
-- **SSH CA setup** — strip embedded newlines from public key before shell embedding (fixes `curl | sudo bash` failures).
+- **Database migration** — rollback connection after FK disable failure to prevent `InFailedSqlTransaction` when non-superuser runs SQLite → PostgreSQL migration (#126).
+- **SSH CA setup script** — remove backslash-quotes from `CA_PUB_KEY` template that caused bash to execute the key as a command (`not found`) (#125).
+- **Password complexity error** — `validate_password()` returns `List[dict]` but callers were passing the raw dict to `error_response()`, displaying `[object Object]` in the UI (#128).
+- **SSH CA setup** — strip newlines from public key before embedding in shell script.
+- **ACME DNS** — Netcup read-modify-write + nested subdomain resolution; Cloudflare scoped token `test_connection` fix.
 
 ## [2.164] - 2026-06-08
 
