@@ -140,7 +140,7 @@ else
 fi
 
 # --- Step 2: Write CA public key ---
-CA_PUB_KEY=\'{pub_key}\'
+CA_PUB_KEY='{pub_key}'
 
 info "Writing CA public key to: $CA_KEY_FILE"
 if [ "$DRY_RUN" = true ]; then
@@ -394,7 +394,7 @@ else
 fi
 
 # --- Step 2: Write CA public key ---
-CA_PUB_KEY=\'{pub_key}\'
+CA_PUB_KEY='{pub_key}'
 
 info "Writing CA public key to: $CA_KEY_FILE"
 if [ "$DRY_RUN" = true ]; then
