@@ -10,6 +10,20 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.167] - 2026-06-10
+
+### Added
+- **ACME IP address certificates (RFC 8738)** — the local ACME server can issue certificates for IPv4 and IPv6 identifiers. Only HTTP-01 and TLS-ALPN-01 are offered (DNS-01 is excluded per spec); TLS-ALPN-01 uses the reverse-DNS form as SNI; the issued certificate carries an `iPAddress` SAN; mixed DNS + IP orders are supported (#131).
+- **LDAP required groups & disabled-account handling** — restrict SSO/LDAP login to members of configured required groups, reject disabled accounts, plus login hardening (#129).
+
+### Fixed
+- **ACME HTTP-01 for IPv6** — bracket IPv6 literals in challenge URLs per RFC 3986 (previously `InvalidURL`).
+- **Rate limiter** — exempt RFC1918/loopback/link-local peers from the per-endpoint login limits, matching the global LAN-trust bypass; brute-force protection remains enforced via account lockout.
+- **In-app help** — corrected ACME help section ordering across all locales and documented IP-certificate support.
+
+### Changed
+- **CI** — GitHub Actions bumped to Node 24 runtimes.
+
 ## [2.166] - 2026-06-10
 
 ### Fixed
