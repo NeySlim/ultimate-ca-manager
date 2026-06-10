@@ -37,16 +37,6 @@ export default {
         ]
       },
       {
-        title: 'Multi-CA-Auflösung',
-        content: 'Wenn ein ACME-Client ein Zertifikat anfordert, löst UCM die signierende CA in dieser Reihenfolge auf:',
-        items: [
-          '1. Lokale Domänenzuordnung — exakter Domänenabgleich, dann übergeordnete Domäne',
-          '2. DNS-Domänenzuordnung — prüft die für den DNS-Anbieter konfigurierte ausstellende CA',
-          '3. Globaler Standard — die in der ACME-Serverkonfiguration festgelegte CA',
-          '4. Erste verfügbare CA mit einem privaten Schlüssel',
-        ]
-      },
-      {
         title: 'EAB-Credentials (serverseitig)',
         content: 'Wenn UCM als ACME-Server fungiert, erlaubt External Account Binding (RFC 8555 §7.3.4) das Erfordern vorab ausgegebener Credentials, bevor Clients Konten registrieren können:',
         items: [
@@ -73,7 +63,16 @@ export default {
           { label: 'Immer blockiert', text: 'Cloud-Metadata-IPs (169.254.169.254, fd00:ec2::254 usw.) werden bedingungslos blockiert' },
         ]
       },
-
+      {
+        title: 'Multi-CA-Auflösung',
+        content: 'Wenn ein ACME-Client ein Zertifikat anfordert, löst UCM die signierende CA in dieser Reihenfolge auf:',
+        items: [
+          '1. Lokale Domänenzuordnung — exakter Domänenabgleich, dann übergeordnete Domäne',
+          '2. DNS-Domänenzuordnung — prüft die für den DNS-Anbieter konfigurierte ausstellende CA',
+          '3. Globaler Standard — die in der ACME-Serverkonfiguration festgelegte CA',
+          '4. Erste verfügbare CA mit einem privaten Schlüssel',
+        ]
+      },
       {
         title: 'Zertifikate für IP-Adressen (RFC 8738)',
         content: 'Der lokale ACME-Server kann Zertifikate für IPv4- und IPv6-Adressen ausstellen, nicht nur für DNS-Namen. Verwenden Sie den Identifier-Typ „ip“ in der Bestellung.',
@@ -84,7 +83,7 @@ export default {
           { label: 'Ausgestellter SAN', text: 'Das Zertifikat enthält einen iPAddress-SAN; gemischte DNS- + IP-Bestellungen werden unterstützt' },
           { label: 'Interne IPs', text: 'RFC1918- und Loopback-Adressen werden sofort validiert — UCMs primäres Bereitstellungsmodell' },
         ]
-      },
+      }
     ],
     tips: [
       'ACME-Directory-URL: https://ihr-server:port/acme/directory',

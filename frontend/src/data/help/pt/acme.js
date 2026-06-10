@@ -26,13 +26,14 @@ export default {
         ]
       },
       {
-        title: 'Resolução Multi-CA',
-        content: 'Quando um cliente ACME solicita um certificado, o UCM resolve a CA assinante nesta ordem:',
+        title: 'Proxy ACME',
         items: [
-          '1. Mapeamento de Domínio Local — correspondência exata do domínio, depois domínio pai',
-          '2. Mapeamento de Domínio DNS — verifica a CA emissora configurada para o provedor DNS',
-          '3. Padrão global — a CA definida na configuração do servidor ACME',
-          '4. Primeira CA disponível com chave privada',
+          { label: 'CA upstream', text: 'Selecione uma predefinição (Let\'s Encrypt Production/Staging) ou insira uma URL de diretório ACME personalizada para qualquer CA RFC 8555' },
+          { label: 'Estado da conta', text: 'Mostra se o UCM está registrado na CA upstream. As contas são registradas automaticamente na primeira solicitação de proxy' },
+          { label: 'Testar conexão', text: 'Verifica a conectividade com a CA upstream e se são necessárias credenciais EAB' },
+          { label: 'Redefinir conta', text: 'Limpa as credenciais de conta upstream salvas para forçar novo registro (use após mudar a CA upstream)' },
+          { label: 'Credenciais EAB', text: 'Credenciais de External Account Binding para CAs que as exigem (ex.: ZeroSSL, Google Trust)' },
+          { label: 'Desafios DNS', text: 'O UCM lida com desafios DNS-01 em nome dos clientes usando os provedores DNS configurados' },
         ]
       },
       {
@@ -62,7 +63,27 @@ export default {
           { label: 'Sempre bloqueado', text: 'IPs de metadados cloud (169.254.169.254, fd00:ec2::254, etc.) são bloqueados incondicionalmente' },
         ]
       },
-
+      {
+        title: 'Resolução Multi-CA',
+        content: 'Quando um cliente ACME solicita um certificado, o UCM resolve a CA assinante nesta ordem:',
+        items: [
+          '1. Mapeamento de Domínio Local — correspondência exata do domínio, depois domínio pai',
+          '2. Mapeamento de Domínio DNS — verifica a CA emissora configurada para o provedor DNS',
+          '3. Padrão global — a CA definida na configuração do servidor ACME',
+          '4. Primeira CA disponível com chave privada',
+        ]
+      },
+      {
+        title: 'Certificados de endereço IP (RFC 8738)',
+        content: 'O servidor ACME local pode emitir certificados para endereços IPv4 e IPv6, não apenas nomes DNS. Use o tipo de identificador « ip » no pedido.',
+        items: [
+          { label: 'Identificador', text: 'Pedido com { "type": "ip", "value": "192.0.2.10" } (IPv4) ou um literal IPv6 como 2001:db8::1' },
+          { label: 'Desafios', text: 'Apenas HTTP-01 e TLS-ALPN-01 são oferecidos — DNS-01 é proibido para identificadores IP conforme RFC 8738' },
+          { label: 'SNI TLS-ALPN-01', text: 'A validação usa a forma reverse-DNS (in-addr.arpa / ip6.arpa) como hostname SNI' },
+          { label: 'SAN emitido', text: 'O certificado contém um SAN iPAddress; pedidos mistos DNS + IP são suportados' },
+          { label: 'IPs internos', text: 'Endereços RFC1918 e loopback validam nativamente — o modelo de implantação principal do UCM' },
+        ]
+      }
     ],
     tips: [
       'URL do diretório ACME: https://seu-servidor:porta/acme/directory',

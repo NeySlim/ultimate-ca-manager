@@ -37,16 +37,6 @@ export default {
         ]
       },
       {
-        title: '多 CA 解析',
-        content: '当 ACME 客户端请求证书时，UCM 按以下顺序解析签名 CA：',
-        items: [
-          '1. 本地域名映射——精确域名匹配，然后父域名',
-          '2. DNS 域名映射——检查为 DNS 提供商配置的签发 CA',
-          '3. 全局默认——ACME 服务器配置中设置的 CA',
-          '4. 第一个拥有私钥的可用 CA',
-        ]
-      },
-      {
         title: 'EAB 凭据(服务器端)',
         content: '当 UCM 作为 ACME 服务器时,External Account Binding(RFC 8555 §7.3.4)允许在客户端注册账户之前要求预先发行的凭据:',
         items: [
@@ -73,7 +63,16 @@ export default {
           { label: '始终阻止', text: '云元数据 IP(169.254.169.254、fd00:ec2::254 等)无条件阻止' },
         ]
       },
-
+      {
+        title: '多 CA 解析',
+        content: '当 ACME 客户端请求证书时，UCM 按以下顺序解析签名 CA：',
+        items: [
+          '1. 本地域名映射——精确域名匹配，然后父域名',
+          '2. DNS 域名映射——检查为 DNS 提供商配置的签发 CA',
+          '3. 全局默认——ACME 服务器配置中设置的 CA',
+          '4. 第一个拥有私钥的可用 CA',
+        ]
+      },
       {
         title: 'IP 地址证书 (RFC 8738)',
         content: '本地 ACME 服务器不仅可以为 DNS 名称签发证书，还可以为 IPv4 和 IPv6 地址签发证书。在订单中使用标识符类型“ip”。',
@@ -84,7 +83,7 @@ export default {
           { label: '签发的 SAN', text: '证书包含 iPAddress SAN；支持 DNS + IP 混合订单' },
           { label: '内部 IP', text: 'RFC1918 和环回地址开箱即可验证 — UCM 的主要部署模式' },
         ]
-      },
+      }
     ],
     tips: [
       'ACME 目录 URL：https://your-server:port/acme/directory',

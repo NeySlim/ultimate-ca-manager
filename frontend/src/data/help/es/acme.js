@@ -37,16 +37,6 @@ export default {
         ]
       },
       {
-        title: 'Resolución multi-CA',
-        content: 'Cuando un cliente ACME solicita un certificado, UCM resuelve la CA firmante en este orden:',
-        items: [
-          '1. Mapeo de dominio local — coincidencia exacta de dominio, luego dominio padre',
-          '2. Mapeo de dominio DNS — verifica la CA emisora configurada para el proveedor DNS',
-          '3. Predeterminado global — la CA establecida en la configuración del servidor ACME',
-          '4. Primera CA disponible con clave privada',
-        ]
-      },
-      {
         title: 'Credenciales EAB (lado servidor)',
         content: 'Cuando UCM actúa como servidor ACME, External Account Binding (RFC 8555 §7.3.4) permite exigir credenciales pre-emitidas antes de que los clientes registren cuentas:',
         items: [
@@ -73,7 +63,16 @@ export default {
           { label: 'Siempre bloqueado', text: 'Las IP de metadatos cloud (169.254.169.254, fd00:ec2::254, etc.) se bloquean incondicionalmente' },
         ]
       },
-
+      {
+        title: 'Resolución multi-CA',
+        content: 'Cuando un cliente ACME solicita un certificado, UCM resuelve la CA firmante en este orden:',
+        items: [
+          '1. Mapeo de dominio local — coincidencia exacta de dominio, luego dominio padre',
+          '2. Mapeo de dominio DNS — verifica la CA emisora configurada para el proveedor DNS',
+          '3. Predeterminado global — la CA establecida en la configuración del servidor ACME',
+          '4. Primera CA disponible con clave privada',
+        ]
+      },
       {
         title: 'Certificados de dirección IP (RFC 8738)',
         content: 'El servidor ACME local puede emitir certificados para direcciones IPv4 e IPv6, no solo nombres DNS. Use el tipo de identificador « ip » en el pedido.',
@@ -84,7 +83,7 @@ export default {
           { label: 'SAN emitido', text: 'El certificado lleva un SAN iPAddress; se admiten pedidos mixtos DNS + IP' },
           { label: 'IP internas', text: 'Las direcciones RFC1918 y loopback se validan de forma nativa — el modelo de despliegue principal de UCM' },
         ]
-      },
+      }
     ],
     tips: [
       'URL del directorio ACME: https://tu-servidor:puerto/acme/directory',
