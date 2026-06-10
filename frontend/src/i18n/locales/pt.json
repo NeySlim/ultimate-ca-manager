@@ -569,7 +569,9 @@
     "resetFailed": "Falha ao redefinir. O link pode ter expirado.",
     "resetting": "Redefinindo...",
     "checkEmailDescBefore": "Se existir uma conta com",
-    "checkEmailDescAfter": ", você receberá um link para redefinir em breve."
+    "checkEmailDescAfter": ", você receberá um link para redefinir em breve.",
+    "accountDisabled": "Esta conta foi desativada",
+    "samlValidationFailed": "A autenticação SAML falhou"
   },
   "dashboard": {
     "goodMorning": "Bom dia",
@@ -2617,6 +2619,10 @@
     "spMetadataXmlDesc": "Forneça esta URL ao seu IdP para configuração automática do SP",
     "attributeRoleMappingSection": "Mapeamento de atributos e funções",
     "groupsRolesSection": "Grupos e mapeamento de funções",
+    "requiredGroups": "Grupos obrigatórios (negação padrão)",
+    "requiredGroupsHelp": "Lista de grupos LDAP/AD separados por vírgulas. Os usuários devem pertencer a pelo menos um grupo para fazer login. Deixe vazio para permitir todos os usuários autenticados.",
+    "requiredGroupsPlaceholder": "ex.: PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "Atributo de estado da conta",
     "provisioningSection": "Provisionamento de usuários",
     "userSearchSection": "Pesquisa de usuários",
     "testConnection": "Testar conexão",
@@ -2665,7 +2671,8 @@
     },
     "syncRoleOnLogin": "Sincronizar a função do SSO em cada login",
     "syncRoleOnLoginHelp": "Quando ativado, a função é ressincronizada a partir do mapeamento de funções a cada login. Usuários sem correspondência mantêm sua função UCM. Quando desativado (padrão), a função é definida apenas na criação do usuário e depois gerenciada no UCM.",
-    "defaultRoleHelp": "Aplicado apenas quando um usuário é criado automaticamente no primeiro login."
+    "defaultRoleHelp": "Aplicado apenas quando um usuário é criado automaticamente no primeiro login.",
+    "accountStatusAttrHelp": "Atributo LDAP que indica se uma conta está desativada. Valores comuns: 'description', 'userAccountControl', 'accountStatus'. Deixe vazio para desativar esta verificação."
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

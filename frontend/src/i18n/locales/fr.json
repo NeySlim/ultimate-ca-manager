@@ -541,7 +541,9 @@
     "resetFailed": "Échec de la réinitialisation. Le lien a peut-être expiré.",
     "resetting": "Réinitialisation...",
     "checkEmailDescBefore": "Si un compte existe avec",
-    "checkEmailDescAfter": ", vous recevrez un lien de réinitialisation sous peu."
+    "checkEmailDescAfter": ", vous recevrez un lien de réinitialisation sous peu.",
+    "accountDisabled": "Ce compte a été désactivé",
+    "samlValidationFailed": "L'authentification SAML a échoué"
   },
   "cas": {
     "parentCA": "AC parente",
@@ -2552,6 +2554,10 @@
     "connectionSection": "Connexion",
     "userSearchSection": "Recherche utilisateur",
     "groupsRolesSection": "Groupes et mapping des rôles",
+    "requiredGroups": "Groupes requis (refus par défaut)",
+    "requiredGroupsHelp": "Liste de groupes LDAP/AD séparés par des virgules. Les utilisateurs doivent appartenir à au moins un groupe pour se connecter. Laisser vide pour autoriser tous les utilisateurs authentifiés.",
+    "requiredGroupsPlaceholder": "ex. : PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "Attribut d'état du compte",
     "provisioningSection": "Provisionnement utilisateur",
     "idpSection": "Fournisseur d'identité (IdP)",
     "spSection": "Endpoints Service Provider (SP)",
@@ -2589,7 +2595,8 @@
     },
     "syncRoleOnLogin": "Synchroniser le rôle depuis le SSO à chaque connexion",
     "syncRoleOnLoginHelp": "Si activé, le rôle est re-synchronisé depuis votre mappage de rôles à chaque connexion. Les utilisateurs sans correspondance gardent leur rôle UCM. Si désactivé (par défaut), le rôle est défini uniquement à la création de l'utilisateur puis géré dans UCM.",
-    "defaultRoleHelp": "Appliqué uniquement à la création automatique d'un utilisateur lors de sa première connexion."
+    "defaultRoleHelp": "Appliqué uniquement à la création automatique d'un utilisateur lors de sa première connexion.",
+    "accountStatusAttrHelp": "Attribut LDAP qui indique si un compte est désactivé. Valeurs courantes : 'description', 'userAccountControl', 'accountStatus'. Laisser vide pour désactiver cette vérification."
   },
   "templates": {
     "template": "Modèle",

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play } from '@phosphor-icons/react'
+import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play, ShieldWarning } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge, LoadingSpinner, CompactSection } from '../../../components'
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import MappingEditor from '../MappingEditor'
@@ -150,12 +150,31 @@ export default function SsoLdapFields({
             <Input label={t('sso.emailAttr')} value={formData.ldap_email_attr} onChange={e => handleChange('ldap_email_attr', e.target.value)} placeholder="mail" />
             <Input label={t('sso.fullnameAttr')} value={formData.ldap_fullname_attr} onChange={e => handleChange('ldap_fullname_attr', e.target.value)} placeholder={formData._directoryType === 'ad' ? 'displayName' : 'cn'} />
           </div>
+          <Input
+            label={t('sso.accountStatusAttr')}
+            value={formData.account_status_attr || ''}
+            onChange={e => handleChange('account_status_attr', e.target.value)}
+            placeholder={formData._directoryType === 'ad' ? 'userAccountControl' : 'accountStatus'}
+          />
         </div>
       </CompactSection>
 
       {/* Groups & Role Mapping */}
       <CompactSection title={t('sso.groupsRolesSection')} icon={UsersThree} collapsible defaultOpen={false}>
         <div className="space-y-3">
+          {/* Default-deny: Required groups */}
+          <div className="p-3 rounded-lg border border-border bg-bg-tertiary">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldWarning size={16} className="text-amber-500" />
+              <p className="text-sm font-medium text-text-secondary">{t('sso.requiredGroups')}</p>
+            </div>
+            <p className="text-xs text-text-muted mb-2">{t('sso.requiredGroupsHelp')}</p>
+            <Input
+              value={formData.ldap_required_groups || ''}
+              onChange={e => handleChange('ldap_required_groups', e.target.value)}
+              placeholder={t('sso.requiredGroupsPlaceholder')}
+            />
+          </div>
           <Input
             label={t('sso.groupFilter')}
             value={formData.ldap_group_filter}

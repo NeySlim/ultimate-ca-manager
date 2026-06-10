@@ -65,13 +65,24 @@ def change_password():
     if not ok:
         return _err
 
+    # SECURITY: Invalidate all active sessions after password change
+    # This forces re-authentication across all devices/browsers
+    from models.user import UserSession
+    sessions_deleted = UserSession.query.filter_by(user_id=user.id).delete()
+    if sessions_deleted > 0:
+        ok, _err = safe_commit(logger, "Failed to invalidate user sessions after password change")
+        if not ok:
+            logger.warning(f"Failed to delete {sessions_deleted} sessions for user {user.username}")
+        else:
+            logger.info(f"Invalidated {sessions_deleted} sessions for user {user.username} after password change")
+
     # Audit log
     AuditService.log_action(
         action='password_change',
         resource_type='user',
         resource_id=str(user.id),
         resource_name=user.username,
-        details=f'Password changed by user: {user.username}',
+        details=f'Password changed by user: {user.username} ({sessions_deleted} sessions invalidated)',
         success=True
     )
 

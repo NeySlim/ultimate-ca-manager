@@ -9,6 +9,28 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# Shared lockout helpers (used by auth.py, auth_methods.py, sso/*)
+# ============================================================================
+
+def _get_lockout_settings():
+    """Read lockout settings from DB config, fallback to defaults.
+    
+    Returns:
+        tuple: (max_attempts, lockout_seconds)
+    """
+    from models import SystemConfig
+    try:
+        max_cfg = SystemConfig.query.filter_by(key='max_login_attempts').first()
+        dur_cfg = SystemConfig.query.filter_by(key='lockout_duration').first()
+        max_attempts = int(max_cfg.value) if max_cfg and max_cfg.value else 5
+        lockout_seconds = int(dur_cfg.value) if dur_cfg and dur_cfg.value else 900
+    except Exception:
+        max_attempts = 5
+        lockout_seconds = 900
+    return max_attempts, lockout_seconds
+
 def _get_ssl_verify(provider, protocol):
     """Get SSL verification parameter for requests library.
 
@@ -96,14 +118,14 @@ def _parse_json_field(value):
     """Parse a JSON field that may be a string, double-encoded string, or dict/list."""
     if not value:
         return {}
-    if isinstance(value, dict):
+    if isinstance(value, (dict, list)):
         return value
     if isinstance(value, str):
         try:
             parsed = json.loads(value)
             if isinstance(parsed, str):
                 parsed = json.loads(parsed)
-            return parsed if isinstance(parsed, dict) else {}
+            return parsed if isinstance(parsed, (dict, list)) else {}
         except (json.JSONDecodeError, TypeError):
             return {}
     return {}
@@ -114,17 +136,10 @@ def _parse_json_field(value):
 
 
 def _get_ldap_lockout_settings():
-    """Read lockout settings from DB config, fallback to defaults"""
-    from models import SystemConfig
-    try:
-        max_cfg = SystemConfig.query.filter_by(key='max_login_attempts').first()
-        dur_cfg = SystemConfig.query.filter_by(key='lockout_duration').first()
-        max_attempts = int(max_cfg.value) if max_cfg and max_cfg.value else 5
-        lockout_seconds = int(dur_cfg.value) if dur_cfg and dur_cfg.value else 900
-    except Exception:
-        max_attempts = 5
-        lockout_seconds = 900
-    return max_attempts, lockout_seconds
+    """Read lockout settings from DB config, fallback to defaults.
+    Uses shared function from helpers.
+    """
+    return _get_lockout_settings()
 
 
 def _check_ldap_lockout(username):

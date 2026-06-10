@@ -329,6 +329,12 @@ def delete_user(user_id):
     username = user.username
     user.active = False
 
+    # SECURITY: Invalidate all active sessions immediately
+    from models.user import UserSession
+    sessions_deleted = UserSession.query.filter_by(user_id=user_id).delete()
+    if sessions_deleted > 0:
+        logger.info(f"Invalidated {sessions_deleted} sessions for deactivated user {username}")
+
     try:
         db.session.commit()
         AuditService.log_action(
@@ -336,7 +342,7 @@ def delete_user(user_id):
             resource_type='user',
             resource_id=str(user_id),
             resource_name=username,
-            details=f'Deactivated user: {username}',
+            details=f'Deactivated user: {username} ({sessions_deleted} sessions invalidated)',
             success=True
         )
 
@@ -372,6 +378,7 @@ def bulk_delete_users():
 
     ids = data['ids']
     results = {'success': [], 'failed': []}
+    total_sessions_invalidated = 0
 
     for user_id in ids:
         if g.current_user.id == user_id:
@@ -384,6 +391,12 @@ def bulk_delete_users():
         if _is_last_active_admin(user):
             results['failed'].append({'id': user_id, 'error': 'Cannot deactivate the last active admin'})
             continue
+        
+        # SECURITY: Invalidate all active sessions before deactivation
+        from models.user import UserSession
+        sessions_deleted = UserSession.query.filter_by(user_id=user_id).delete()
+        total_sessions_invalidated += sessions_deleted
+        
         user.active = False
         if not safe_commit(logger, f"Deactivate user {user_id}"):
             results['failed'].append({'id': user_id, 'error': 'Deactivation failed'})
@@ -395,7 +408,7 @@ def bulk_delete_users():
         resource_type='user',
         resource_id=','.join(str(i) for i in results['success']),
         resource_name=f'{len(results["success"])} users',
-        details=f'Bulk deactivated {len(results["success"])} users',
+        details=f'Bulk deactivated {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)',
         success=True
     )
 

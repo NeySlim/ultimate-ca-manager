@@ -569,7 +569,9 @@
     "resetFailed": "Error al restablecer. El enlace puede haber expirado.",
     "resetting": "Restableciendo...",
     "checkEmailDescBefore": "Si existe una cuenta con",
-    "checkEmailDescAfter": ", recibirá un enlace para restablecer en breve."
+    "checkEmailDescAfter": ", recibirá un enlace para restablecer en breve.",
+    "accountDisabled": "Esta cuenta ha sido deshabilitada",
+    "samlValidationFailed": "La autenticación SAML falló"
   },
   "dashboard": {
     "goodMorning": "Buenos días",
@@ -2617,6 +2619,10 @@
     "spMetadataXmlDesc": "Proporcione esta URL a su IdP para la configuración automática del SP",
     "attributeRoleMappingSection": "Mapeo de atributos y roles",
     "groupsRolesSection": "Grupos y mapeo de roles",
+    "requiredGroups": "Grupos requeridos (denegación por defecto)",
+    "requiredGroupsHelp": "Lista de grupos LDAP/AD separados por comas. Los usuarios deben pertenecer al menos a un grupo para iniciar sesión. Dejar vacío para permitir todos los usuarios autenticados.",
+    "requiredGroupsPlaceholder": "ej., PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "Atributo de estado de cuenta",
     "provisioningSection": "Aprovisionamiento de usuarios",
     "userSearchSection": "Búsqueda de usuarios",
     "testConnection": "Probar conexión",
@@ -2665,7 +2671,8 @@
     },
     "syncRoleOnLogin": "Sincronizar el rol desde SSO en cada inicio de sesión",
     "syncRoleOnLoginHelp": "Si está activado, el rol se vuelve a sincronizar desde su asignación de roles en cada inicio de sesión. Los usuarios sin coincidencia conservan su rol de UCM. Si está desactivado (predeterminado), el rol se establece solo al crear el usuario y luego se gestiona en UCM.",
-    "defaultRoleHelp": "Se aplica solo cuando un usuario se crea automáticamente en su primer inicio de sesión."
+    "defaultRoleHelp": "Se aplica solo cuando un usuario se crea automáticamente en su primer inicio de sesión.",
+    "accountStatusAttrHelp": "Atributo LDAP que indica si una cuenta está deshabilitada. Valores comunes: 'description', 'userAccountControl', 'accountStatus'. Dejar vacío para desactivar esta verificación."
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",
