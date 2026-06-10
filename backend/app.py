@@ -37,6 +37,27 @@ limiter = Limiter(
 )
 
 
+@limiter.request_filter
+def _rate_limit_lan_exempt():
+    """Bypass flask-limiter for LAN/loopback/link-local peers.
+
+    UCM is a LAN-deployed PKI: RFC1918, loopback and link-local clients are
+    the primary use case, not an attack vector. This mirrors the LAN-trust
+    bypass in security.rate_limiter (v2.155) so the per-endpoint login limits
+    (`@limiter.limit(...)`) don't lock out internal clients (or CI runners on
+    127.0.0.1). Gated by RATE_LIMIT_TRUST_LAN (default: true). The key is the
+    immediate peer (get_remote_address), so a spoofed X-Forwarded-For cannot
+    be used to gain the exemption.
+    """
+    try:
+        from security.rate_limiter import _is_lan_ip, _get_env_bool
+        if not _get_env_bool('RATE_LIMIT_TRUST_LAN', True):
+            return False
+        return _is_lan_ip(get_remote_address())
+    except Exception:
+        return False
+
+
 def create_app(config_name=None):
     """Application factory"""
     app = Flask(__name__, 
