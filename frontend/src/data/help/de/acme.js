@@ -74,6 +74,17 @@ export default {
         ]
       },
 
+      {
+        title: 'Zertifikate für IP-Adressen (RFC 8738)',
+        content: 'Der lokale ACME-Server kann Zertifikate für IPv4- und IPv6-Adressen ausstellen, nicht nur für DNS-Namen. Verwenden Sie den Identifier-Typ „ip“ in der Bestellung.',
+        items: [
+          { label: 'Identifier', text: 'Bestellung mit { "type": "ip", "value": "192.0.2.10" } (IPv4) oder einem IPv6-Literal wie 2001:db8::1' },
+          { label: 'Challenges', text: 'Nur HTTP-01 und TLS-ALPN-01 werden angeboten — DNS-01 ist für IP-Identifier gemäß RFC 8738 verboten' },
+          { label: 'TLS-ALPN-01 SNI', text: 'Die Validierung verwendet die Reverse-DNS-Form (in-addr.arpa / ip6.arpa) als SNI-Hostname' },
+          { label: 'Ausgestellter SAN', text: 'Das Zertifikat enthält einen iPAddress-SAN; gemischte DNS- + IP-Bestellungen werden unterstützt' },
+          { label: 'Interne IPs', text: 'RFC1918- und Loopback-Adressen werden sofort validiert — UCMs primäres Bereitstellungsmodell' },
+        ]
+      },
     ],
     tips: [
       'ACME-Directory-URL: https://ihr-server:port/acme/directory',
@@ -282,6 +293,32 @@ acme.sh --issue \\
 \`\`\`
 
 > ⚠ Für internen ACME-Betrieb müssen Clients der UCM-CA vertrauen. Installieren Sie das Root-CA-Zertifikat im Vertrauensspeicher des Clients.
+## Zertifikate für IP-Adressen (RFC 8738)
+
+Der lokale ACME-Server kann Zertifikate für **IP-Adressen** (IPv4 und IPv6) ausstellen, nicht nur für DNS-Namen. Nützlich für interne Dienste, Appliances und direkt per IP adressierte Hosts.
+
+### Ein IP-Zertifikat bestellen
+Verwenden Sie den Identifier-Typ \`ip\` in der ACME-Bestellung:
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+Gemischte DNS- + IP-Bestellungen werden ebenfalls unterstützt.
+
+### Validierung
+- **HTTP-01** und **TLS-ALPN-01** sind die einzigen Challenges für IP-Identifier. **DNS-01 ist** für IPs durch RFC 8738 **verboten**.
+- **HTTP-01** verbindet sich direkt mit der IP (IPv6-Literale werden in Klammern gesetzt, z. B. \`http://[2001:db8::1]/...\`).
+- **TLS-ALPN-01** verwendet die Reverse-DNS-Form der IP (\`in-addr.arpa\` / \`ip6.arpa\`) als SNI-Hostname.
+
+### Ausgestelltes Zertifikat
+Das signierte Zertifikat enthält für jede validierte IP einen **iPAddress**-SubjectAltName-Eintrag.
+
+> 💡 Interne Adressen (RFC1918, Loopback) werden sofort validiert — UCMs primäres Bereitstellungsmodell. Cloud-Metadaten-IPs bleiben blockiert.
+
 `
   }
 }

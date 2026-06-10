@@ -74,6 +74,17 @@ export default {
         ]
       },
 
+      {
+        title: 'Certificats d\'adresse IP (RFC 8738)',
+        content: 'Le serveur ACME local peut émettre des certificats pour des adresses IPv4 et IPv6, pas seulement des noms DNS. Utilisez le type d\'identifiant « ip » dans la commande.',
+        items: [
+          { label: 'Identifiant', text: 'Commande avec { "type": "ip", "value": "192.0.2.10" } (IPv4) ou un littéral IPv6 comme 2001:db8::1' },
+          { label: 'Défis', text: 'Seuls HTTP-01 et TLS-ALPN-01 sont proposés — DNS-01 est interdit pour les identifiants IP selon RFC 8738' },
+          { label: 'SNI TLS-ALPN-01', text: 'La validation utilise la forme reverse-DNS (in-addr.arpa / ip6.arpa) comme nom d\'hôte SNI' },
+          { label: 'SAN émis', text: 'Le certificat porte un SAN iPAddress ; les commandes mixtes DNS + IP sont prises en charge' },
+          { label: 'IP internes', text: 'Les adresses RFC1918 et loopback se valident nativement — le mode de déploiement principal de UCM' },
+        ]
+      },
     ],
     tips: [
       'URL du répertoire ACME : https://votre-serveur:port/acme/directory',
@@ -282,6 +293,32 @@ acme.sh --issue \\
 \`\`\`
 
 > ⚠ Pour ACME interne, les clients doivent faire confiance à la CA UCM. Installez le certificat de la CA racine dans le magasin de confiance du client.
+## Certificats d'adresse IP (RFC 8738)
+
+Le serveur ACME local peut émettre des certificats pour des **adresses IP** (IPv4 et IPv6), pas seulement des noms DNS. Utile pour les services internes, les équipements et les hôtes adressés directement par IP.
+
+### Commander un certificat IP
+Utilisez le type d'identifiant \`ip\` dans la commande ACME :
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+Les commandes mixtes DNS + IP sont également prises en charge.
+
+### Validation
+- **HTTP-01** et **TLS-ALPN-01** sont les seuls défis proposés pour les identifiants IP. **DNS-01 est interdit** pour les IP par la RFC 8738.
+- **HTTP-01** se connecte directement à l'IP (les littéraux IPv6 sont entre crochets, ex. \`http://[2001:db8::1]/...\`).
+- **TLS-ALPN-01** utilise la forme reverse-DNS de l'IP (\`in-addr.arpa\` / \`ip6.arpa\`) comme nom d'hôte SNI.
+
+### Certificat émis
+Le certificat signé contient une entrée SubjectAltName **iPAddress** pour chaque IP validée.
+
+> 💡 Les adresses internes (RFC1918, loopback) se valident nativement — le mode de déploiement principal de UCM. Les IP de métadonnées cloud restent bloquées.
+
 `
   }
 }

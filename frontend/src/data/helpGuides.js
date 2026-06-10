@@ -899,6 +899,32 @@ Browse all certificate issuance orders:
 - Signing CA used
 - Issuance timestamp
 
+## IP Address Certificates (RFC 8738)
+
+The local ACME server can issue certificates for **IP addresses** (IPv4 and IPv6), not only DNS names. This is useful for internal services, appliances, and hosts addressed directly by IP.
+
+### Ordering an IP certificate
+Use the \`ip\` identifier type in the ACME order:
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+Mixed DNS + IP orders are also supported.
+
+### Validation
+- **HTTP-01** and **TLS-ALPN-01** are the only challenges offered for IP identifiers. **DNS-01 is forbidden** for IPs by RFC 8738.
+- **HTTP-01** connects directly to the IP (IPv6 literals are bracketed, e.g. \`http://[2001:db8::1]/...\`).
+- **TLS-ALPN-01** uses the reverse-DNS form of the IP (\`in-addr.arpa\` / \`ip6.arpa\`) as the SNI hostname.
+
+### Issued certificate
+The signed certificate contains an **iPAddress** SubjectAltName entry for each validated IP.
+
+> 💡 Internal addresses (RFC1918, loopback) validate out of the box — UCM's primary deployment model. Cloud-metadata IPs remain blocked.
+
 ## Using certbot
 
 \`\`\`

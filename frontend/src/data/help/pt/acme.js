@@ -271,6 +271,32 @@ acme.sh --issue \\
 \`\`\`
 
 > ⚠ Para ACME interno, os clientes devem confiar na CA do UCM. Instale o certificado da CA Raiz no armazenamento de confiança do cliente.
+## Certificados de endereço IP (RFC 8738)
+
+O servidor ACME local pode emitir certificados para **endereços IP** (IPv4 e IPv6), não apenas nomes DNS. Útil para serviços internos, appliances e hosts endereçados diretamente por IP.
+
+### Pedir um certificado IP
+Use o tipo de identificador \`ip\` no pedido ACME:
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+Pedidos mistos DNS + IP também são suportados.
+
+### Validação
+- **HTTP-01** e **TLS-ALPN-01** são os únicos desafios oferecidos para identificadores IP. **DNS-01 é proibido** para IPs pela RFC 8738.
+- **HTTP-01** conecta-se diretamente ao IP (literais IPv6 ficam entre colchetes, ex. \`http://[2001:db8::1]/...\`).
+- **TLS-ALPN-01** usa a forma reverse-DNS do IP (\`in-addr.arpa\` / \`ip6.arpa\`) como hostname SNI.
+
+### Certificado emitido
+O certificado assinado contém uma entrada SubjectAltName **iPAddress** para cada IP validado.
+
+> 💡 Endereços internos (RFC1918, loopback) validam nativamente — o modelo de implantação principal do UCM. IPs de metadados cloud permanecem bloqueados.
+
 `
   }
 }

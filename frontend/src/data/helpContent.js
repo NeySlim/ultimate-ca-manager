@@ -543,6 +543,18 @@ export const helpContent = {
           '4. First available CA with a private key',
         ]
       },
+      {
+        title: 'IP Address Certificates (RFC 8738)',
+        icon: Globe,
+        content: 'The local ACME server can issue certificates for IPv4 and IPv6 addresses, not just DNS names. Use the "ip" identifier type in the order.',
+        items: [
+          { label: 'Identifier', text: 'Order with { "type": "ip", "value": "192.0.2.10" } (IPv4) or an IPv6 literal like 2001:db8::1' },
+          { label: 'Challenges', text: 'Only HTTP-01 and TLS-ALPN-01 are offered — DNS-01 is forbidden for IP identifiers per RFC 8738' },
+          { label: 'TLS-ALPN-01 SNI', text: 'Validation uses the reverse-DNS form (in-addr.arpa / ip6.arpa) as the SNI hostname' },
+          { label: 'Issued SAN', text: 'The certificate carries an iPAddress SAN; mixed DNS + IP orders are supported' },
+          { label: 'Internal IPs', text: 'RFC1918 and loopback addresses validate out of the box — UCM\'s primary deployment model' },
+        ]
+      },
     ],
     tips: [
       'ACME directory URL: https://your-server:port/acme/directory',

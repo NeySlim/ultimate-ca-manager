@@ -74,6 +74,17 @@ export default {
         ]
       },
 
+      {
+        title: 'IP 地址证书 (RFC 8738)',
+        content: '本地 ACME 服务器不仅可以为 DNS 名称签发证书，还可以为 IPv4 和 IPv6 地址签发证书。在订单中使用标识符类型“ip”。',
+        items: [
+          { label: '标识符', text: '使用 { "type": "ip", "value": "192.0.2.10" }（IPv4）或像 2001:db8::1 这样的 IPv6 字面量下单' },
+          { label: '质询', text: '仅提供 HTTP-01 和 TLS-ALPN-01 — 根据 RFC 8738，IP 标识符禁止使用 DNS-01' },
+          { label: 'TLS-ALPN-01 SNI', text: '验证使用反向 DNS 形式（in-addr.arpa / ip6.arpa）作为 SNI 主机名' },
+          { label: '签发的 SAN', text: '证书包含 iPAddress SAN；支持 DNS + IP 混合订单' },
+          { label: '内部 IP', text: 'RFC1918 和环回地址开箱即可验证 — UCM 的主要部署模式' },
+        ]
+      },
     ],
     tips: [
       'ACME 目录 URL：https://your-server:port/acme/directory',
@@ -282,6 +293,32 @@ acme.sh --issue \\
 \`\`\`
 
 > ⚠ 对于内部 ACME，客户端必须信任 UCM CA。在客户端的信任存储中安装根 CA 证书。
+## IP 地址证书 (RFC 8738)
+
+本地 ACME 服务器不仅可以为 DNS 名称签发证书，还可以为 **IP 地址**（IPv4 和 IPv6）签发证书。适用于内部服务、设备以及直接通过 IP 寻址的主机。
+
+### 订购 IP 证书
+在 ACME 订单中使用标识符类型 \`ip\`：
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+也支持 DNS + IP 混合订单。
+
+### 验证
+- 对于 IP 标识符，仅提供 **HTTP-01** 和 **TLS-ALPN-01** 质询。根据 RFC 8738，IP **禁止使用 DNS-01**。
+- **HTTP-01** 直接连接到 IP（IPv6 字面量需加方括号，例如 \`http://[2001:db8::1]/...\`）。
+- **TLS-ALPN-01** 使用 IP 的反向 DNS 形式（\`in-addr.arpa\` / \`ip6.arpa\`）作为 SNI 主机名。
+
+### 签发的证书
+签名后的证书为每个已验证的 IP 包含一个 **iPAddress** SubjectAltName 条目。
+
+> 💡 内部地址（RFC1918、环回）开箱即可验证 — UCM 的主要部署模式。云元数据 IP 仍被阻止。
+
 `
   }
 }

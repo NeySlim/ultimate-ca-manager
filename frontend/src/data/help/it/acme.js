@@ -74,6 +74,17 @@ export default {
         ]
       },
 
+      {
+        title: 'Certificati per indirizzi IP (RFC 8738)',
+        content: 'Il server ACME locale può emettere certificati per indirizzi IPv4 e IPv6, non solo nomi DNS. Usa il tipo di identificatore « ip » nell\'ordine.',
+        items: [
+          { label: 'Identificatore', text: 'Ordine con { "type": "ip", "value": "192.0.2.10" } (IPv4) o un letterale IPv6 come 2001:db8::1' },
+          { label: 'Sfide', text: 'Sono offerti solo HTTP-01 e TLS-ALPN-01 — DNS-01 è vietato per gli identificatori IP secondo RFC 8738' },
+          { label: 'SNI TLS-ALPN-01', text: 'La validazione usa la forma reverse-DNS (in-addr.arpa / ip6.arpa) come hostname SNI' },
+          { label: 'SAN emesso', text: 'Il certificato contiene un SAN iPAddress; sono supportati ordini misti DNS + IP' },
+          { label: 'IP interne', text: 'Gli indirizzi RFC1918 e loopback si validano nativamente — il modello di deployment principale di UCM' },
+        ]
+      },
     ],
     tips: [
       'URL directory ACME: https://your-server:port/acme/directory',
@@ -282,6 +293,32 @@ acme.sh --issue \\
 \`\`\`
 
 > ⚠ Per ACME interno, i client devono fidarsi della CA UCM. Installa il certificato della CA Root nel trust store del client.
+## Certificati per indirizzi IP (RFC 8738)
+
+Il server ACME locale può emettere certificati per **indirizzi IP** (IPv4 e IPv6), non solo nomi DNS. Utile per servizi interni, appliance e host indirizzati direttamente tramite IP.
+
+### Ordinare un certificato IP
+Usa il tipo di identificatore \`ip\` nell'ordine ACME:
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+Sono supportati anche ordini misti DNS + IP.
+
+### Validazione
+- **HTTP-01** e **TLS-ALPN-01** sono le uniche sfide offerte per gli identificatori IP. **DNS-01 è vietato** per gli IP dalla RFC 8738.
+- **HTTP-01** si connette direttamente all'IP (i letterali IPv6 sono tra parentesi quadre, es. \`http://[2001:db8::1]/...\`).
+- **TLS-ALPN-01** usa la forma reverse-DNS dell'IP (\`in-addr.arpa\` / \`ip6.arpa\`) come hostname SNI.
+
+### Certificato emesso
+Il certificato firmato contiene una voce SubjectAltName **iPAddress** per ogni IP validato.
+
+> 💡 Gli indirizzi interni (RFC1918, loopback) si validano nativamente — il modello di deployment principale di UCM. Gli IP di metadati cloud restano bloccati.
+
 `
   }
 }

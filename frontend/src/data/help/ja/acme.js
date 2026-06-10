@@ -74,6 +74,17 @@ export default {
         ]
       },
 
+      {
+        title: 'IPアドレス証明書 (RFC 8738)',
+        content: 'ローカルACMEサーバーはDNS名だけでなく、IPv4およびIPv6アドレスの証明書を発行できます。注文で識別子タイプ「ip」を使用します。',
+        items: [
+          { label: '識別子', text: '{ "type": "ip", "value": "192.0.2.10" }（IPv4）または 2001:db8::1 のようなIPv6リテラルで注文' },
+          { label: 'チャレンジ', text: 'HTTP-01とTLS-ALPN-01のみが提供されます — RFC 8738によりIP識別子ではDNS-01は禁止されています' },
+          { label: 'TLS-ALPN-01 SNI', text: '検証では逆引きDNS形式（in-addr.arpa / ip6.arpa）をSNIホスト名として使用します' },
+          { label: '発行されるSAN', text: '証明書にはiPAddress SANが含まれます。DNS + IPの混在注文に対応しています' },
+          { label: '内部IP', text: 'RFC1918およびループバックアドレスはそのまま検証されます — UCMの主要な導入モデルです' },
+        ]
+      },
     ],
     tips: [
       'ACMEディレクトリURL: https://your-server:port/acme/directory',
@@ -282,6 +293,32 @@ acme.sh --issue \\
 \`\`\`
 
 > ⚠ 内部ACMEの場合、クライアントはUCM CAを信頼する必要があります。ルートCA証明書をクライアントのトラストストアにインストールしてください。
+## IPアドレス証明書 (RFC 8738)
+
+ローカルACMEサーバーはDNS名だけでなく、**IPアドレス**（IPv4およびIPv6）の証明書を発行できます。内部サービス、アプライアンス、IPで直接アドレス指定されるホストに便利です。
+
+### IP証明書の注文
+ACME注文で識別子タイプ \`ip\` を使用します：
+\`\`\`json
+{
+  "identifiers": [
+    { "type": "ip", "value": "192.0.2.10" },
+    { "type": "ip", "value": "2001:db8::1" }
+  ]
+}
+\`\`\`
+DNS + IP の混在注文も対応しています。
+
+### 検証
+- IP識別子に対して提供される検証は **HTTP-01** と **TLS-ALPN-01** のみです。RFC 8738 により IP では **DNS-01 は禁止** されています。
+- **HTTP-01** は IP に直接接続します（IPv6リテラルは角括弧で囲まれます。例：\`http://[2001:db8::1]/...\`）。
+- **TLS-ALPN-01** は IP の逆引きDNS形式（\`in-addr.arpa\` / \`ip6.arpa\`）を SNI ホスト名として使用します。
+
+### 発行される証明書
+署名された証明書には、検証された各IPに対する **iPAddress** SubjectAltName エントリが含まれます。
+
+> 💡 内部アドレス（RFC1918、ループバック）はそのまま検証されます — UCMの主要な導入モデルです。クラウドメタデータIPは引き続きブロックされます。
+
 `
   }
 }
