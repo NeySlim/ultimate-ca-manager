@@ -2,7 +2,7 @@ from . import bp
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from .helpers import _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password
+from .helpers import _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
@@ -13,6 +13,61 @@ from utils.datetime_utils import utc_isoformat
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
+
+
+def _check_account_disabled(conn, user_entry, user_dn, provider, safe_username):
+    """Check if the LDAP user account is disabled.
+
+    AD: checks userAccountControl bit 2 (ACCOUNTDISABLE = 2).
+    OpenLDAP: checks accountStatus attribute (value 'inactive' or 'negative').
+    Also checks custom attribute if provider.account_status_attr is set.
+
+    Returns True if the account is disabled, False otherwise.
+    """
+    try:
+        # 1. Check custom attribute first (if explicitly configured)
+        if provider.account_status_attr:
+            attr_val = getattr(user_entry, provider.account_status_attr, None)
+            if attr_val is not None:
+                val = str(attr_val).lower().strip()
+                if val in ('disabled', 'inactive', 'negative', 'no', '0'):
+                    logger.info(f"LDAP account disabled via {provider.account_status_attr}={attr_val} for {safe_username}")
+                    return True
+
+        # 2. AD: check userAccountControl bit 2 (ACCOUNTDISABLE)
+        uac = getattr(user_entry, 'userAccountControl', None)
+        if uac is not None:
+            try:
+                uac_val = int(uac)
+                # ACCOUNTDISABLE = 0x0002 (bit 2)
+                if uac_val & 0x0002:
+                    logger.info(f"AD account disabled (uac={uac_val}) for {safe_username}")
+                    return True
+            except (ValueError, TypeError):
+                pass
+
+        # 3. OpenLDAP: check accountStatus attribute
+        #    Common values: 'active', 'inactive', 'negative', 'suspended'
+        acct_status = getattr(user_entry, 'accountStatus', None)
+        if acct_status is not None:
+            status = str(acct_status).lower().strip()
+            if status in ('inactive', 'negative', 'disabled', 'suspended'):
+                logger.info(f"OpenLDAP account disabled (status={status}) for {safe_username}")
+                return True
+
+        # 4. Check for 'userAccountControl' string attribute (some LDAP servers)
+        uac_str = getattr(user_entry, 'userAccountControl', None)
+        if uac_str is not None and not isinstance(uac_str, int):
+            val = str(uac_str).lower()
+            if val in ('disabled', 'inactive', 'negative'):
+                logger.info(f"LDAP account disabled (uac_str={val}) for {safe_username}")
+                return True
+
+    except Exception as e:
+        logger.warning(f"Failed to check account disabled status for {safe_username}: {e}")
+
+    return False
+
 
 def _test_ldap_connection(provider):
     """Test LDAP connection"""
@@ -88,14 +143,18 @@ def _ldap_authenticate_user(provider, username, password):
 
         # Search for user with escaped filter
         user_filter = provider.ldap_user_filter.replace('{username}', safe_username)
+        # Fetch disabled-check attributes so _check_account_disabled works
+        extra_attrs = []
+        if provider.account_status_attr:
+            extra_attrs.append(provider.account_status_attr)
         conn.search(
             provider.ldap_base_dn,
             user_filter,
-            attributes=[
+            attributes=list(set([
                 provider.ldap_username_attr,
                 provider.ldap_email_attr,
                 provider.ldap_fullname_attr
-            ]
+            ] + extra_attrs))
         )
 
         if not conn.entries:
@@ -181,6 +240,43 @@ def _ldap_authenticate_user(provider, username, password):
                     logger.info(f"LDAP {member_attr} groups for {username}: {groups}")
             except Exception as e:
                 logger.warning(f"Failed to fetch LDAP groups for {username}: {e}")
+
+        # ── Check for disabled account ─────────────────────────────────────
+        disabled = _check_account_disabled(
+            conn, user_entry, user_dn, provider, safe_username
+        )
+        if disabled:
+            conn.unbind()
+            return None, 'account_disabled'
+
+        # ── Check required groups (default-deny) ───────────────────────────
+        required_groups = _parse_json_field(provider.ldap_required_groups or '{}')
+        if required_groups:
+            # Support both list and dict formats for backward compatibility
+            if isinstance(required_groups, dict):
+                group_list = list(required_groups.keys())
+            elif isinstance(required_groups, list):
+                group_list = required_groups
+            else:
+                group_list = []
+
+            if group_list and groups:
+                # Check if user belongs to ANY of the required groups
+                allowed = any(g in groups for g in group_list)
+                if not allowed:
+                    logger.info(
+                        f"LDAP login denied for {username}: not in required groups {group_list}, "
+                        f"user groups: {groups}"
+                    )
+                    conn.unbind()
+                    return None, 'group_denied'
+            elif group_list and not groups:
+                logger.info(
+                    f"LDAP login denied for {username}: no groups fetched, "
+                    f"required groups: {group_list}"
+                )
+                conn.unbind()
+                return None, 'group_denied'
 
         # Return user info
         return {

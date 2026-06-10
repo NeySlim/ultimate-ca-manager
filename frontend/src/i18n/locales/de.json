@@ -569,7 +569,9 @@
     "resetFailed": "Zurücksetzen fehlgeschlagen. Der Link ist möglicherweise abgelaufen.",
     "resetting": "Zurücksetzen...",
     "checkEmailDescBefore": "Wenn ein Konto mit",
-    "checkEmailDescAfter": " existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen."
+    "checkEmailDescAfter": " existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen.",
+    "accountDisabled": "Dieses Konto wurde deaktiviert",
+    "samlValidationFailed": "SAML-Authentifizierung fehlgeschlagen"
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
@@ -2617,6 +2619,10 @@
     "spMetadataXmlDesc": "Geben Sie diese URL Ihrem IdP für die automatische SP-Konfiguration",
     "attributeRoleMappingSection": "Attribut- & Rollenzuordnung",
     "groupsRolesSection": "Gruppen & Rollenzuordnung",
+    "requiredGroups": "Erforderliche Gruppen (Standard: verweigern)",
+    "requiredGroupsHelp": "Kommagetrennte Liste der LDAP/AD-Gruppen. Benutzer müssen Mitglied mindestens einer Gruppe sein, um sich anzumelden. Leer lassen, um alle authentifizierten Benutzer zuzulassen.",
+    "requiredGroupsPlaceholder": "z.B. PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "Kontostatus-Attribut",
     "provisioningSection": "Benutzerbereitstellung",
     "userSearchSection": "Benutzersuche",
     "testConnection": "Verbindung testen",
@@ -2665,7 +2671,8 @@
     },
     "syncRoleOnLogin": "Rolle bei jeder Anmeldung vom SSO synchronisieren",
     "syncRoleOnLoginHelp": "Wenn aktiviert, wird die Rolle bei jeder Anmeldung aus dem Rollen-Mapping neu synchronisiert. Benutzer ohne Mapping-Treffer behalten ihre UCM-Rolle. Wenn deaktiviert (Standard), wird die Rolle nur bei der Erstellung des Benutzers gesetzt und danach in UCM verwaltet.",
-    "defaultRoleHelp": "Wird nur angewendet, wenn ein Benutzer bei der ersten Anmeldung automatisch angelegt wird."
+    "defaultRoleHelp": "Wird nur angewendet, wenn ein Benutzer bei der ersten Anmeldung automatisch angelegt wird.",
+    "accountStatusAttrHelp": "LDAP-Attribut, das angibt, ob ein Konto deaktiviert ist. Häufige Werte: 'description', 'userAccountControl', 'accountStatus'. Leer lassen, um diese Prüfung zu deaktivieren."
   },
   "notifications": {
     "certificateIssued": "Zertifikat ausgestellt: {{name}}",

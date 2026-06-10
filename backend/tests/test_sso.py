@@ -570,7 +570,7 @@ class TestParseJsonField:
             from api.v2.sso import _parse_json_field
             assert _parse_json_field('not json') == {}
 
-    def test_parse_json_array_returns_empty(self, app):
+    def test_parse_json_array_returns_list(self, app):
         with app.app_context():
             from api.v2.sso import _parse_json_field
-            assert _parse_json_field('[1, 2, 3]') == {}
+            assert _parse_json_field('[1, 2, 3]') == [1, 2, 3]

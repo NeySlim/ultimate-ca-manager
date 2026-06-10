@@ -238,6 +238,20 @@ def sso_callback(provider_type):
             if not user:
                 return redirect(f'/login?error={error_code or "user_creation_failed"}')
 
+            # SECURITY: Block disabled accounts (admin can disable SSO users locally)
+            if not user.active:
+                logger.warning(f"OAuth2 login blocked: user {username} is disabled")
+                AuditService.log_action(
+                    action='login_failure',
+                    resource_type='user',
+                    resource_id=user.id,
+                    resource_name=username,
+                    details=f'OAuth2 SSO login blocked: user disabled (via {provider.name})',
+                    success=False,
+                    username=username
+                )
+                return redirect('/login?error=account_disabled')
+
             # Create or update SSO session for audit
             session_id = userinfo.get('sub', username)
             sso_session = SSOSession.query.filter_by(session_id=session_id).first()
@@ -353,6 +367,20 @@ def sso_callback(provider_type):
 
             if not user:
                 return redirect(f'/login?error={error_code or "user_creation_failed"}')
+
+            # SECURITY: Block disabled accounts (admin can disable SSO users locally)
+            if not user.active:
+                logger.warning(f"SAML login blocked: user {username} is disabled")
+                AuditService.log_action(
+                    action='login_failure',
+                    resource_type='user',
+                    resource_id=user.id,
+                    resource_name=username,
+                    details=f'SAML SSO login blocked: user disabled (via {provider.name})',
+                    success=False,
+                    username=username
+                )
+                return redirect('/login?error=account_disabled')
 
             # Track SSO session
             sso_session = SSOSession.query.filter_by(session_id=name_id).first()

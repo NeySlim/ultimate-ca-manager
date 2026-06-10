@@ -171,6 +171,8 @@ export default function LoginPage() {
         'user_creation_failed': t('auth.ssoUserCreationFailed'),
         'auto_create_disabled': t('auth.ssoAutoCreateDisabled'),
         'callback_error': t('auth.ssoCallbackError'),
+        'account_disabled': t('auth.accountDisabled'),
+        'saml_validation_failed': t('auth.samlValidationFailed'),
       }
       showError(errorMessages[error] || t('auth.ssoError'))
     }

@@ -569,7 +569,9 @@
     "resetFailed": "リセットに失敗しました。リンクの期限が切れている可能性があります。",
     "resetting": "リセット中...",
     "checkEmailDescBefore": "",
-    "checkEmailDescAfter": "のアカウントが存在する場合、パスワードリセットリンクが送信されます。"
+    "checkEmailDescAfter": "のアカウントが存在する場合、パスワードリセットリンクが送信されます。",
+    "accountDisabled": "このアカウントは無効化されています",
+    "samlValidationFailed": "SAML認証に失敗しました"
   },
   "dashboard": {
     "goodMorning": "おはようございます",
@@ -2617,6 +2619,10 @@
     "spMetadataXmlDesc": "自動SP設定のためにこのURLをIdPに提供してください",
     "attributeRoleMappingSection": "属性とロールマッピング",
     "groupsRolesSection": "グループとロールマッピング",
+    "requiredGroups": "必須グループ（デフォルト拒否）",
+    "requiredGroupsHelp": "LDAP/ADグループのカンマ区切りリスト。ユーザーはログインするために少なくとも1つのグループに属している必要があります。すべての認証済みユーザーを許可する場合は空にしてください。",
+    "requiredGroupsPlaceholder": "例: PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "アカウント状態属性",
     "provisioningSection": "ユーザープロビジョニング",
     "userSearchSection": "ユーザー検索",
     "testConnection": "接続テスト",
@@ -2665,7 +2671,8 @@
     },
     "syncRoleOnLogin": "ログインごとに SSO からロールを同期",
     "syncRoleOnLoginHelp": "有効にすると、ログインごとにロールマッピングからロールが再同期されます。マッピングに一致しないユーザーは UCM のロールを保持します。無効（デフォルト）の場合、ロールはユーザー作成時にのみ設定され、その後は UCM で管理されます。",
-    "defaultRoleHelp": "初回ログイン時にユーザーが自動作成される場合にのみ適用されます。"
+    "defaultRoleHelp": "初回ログイン時にユーザーが自動作成される場合にのみ適用されます。",
+    "accountStatusAttrHelp": "アカウントが無効化されているかどうかを示すLDAP属性。一般的な値： 'description'、 'userAccountControl'、 'accountStatus'。このチェックを無効にするには空白にしてください。"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",

@@ -18,6 +18,13 @@ from utils.db_transaction import safe_commit
 from models import User, db
 from services.mtls_auth_service import MTLSAuthService
 from services.webauthn_service import WebAuthnService
+
+# Import limiter for rate limiting login attempts
+try:
+    from app import limiter
+    HAS_LIMITER = True
+except ImportError:
+    HAS_LIMITER = False
 from services.certificate_parser import CertificateParser
 from datetime import datetime, timedelta
 import logging
@@ -57,17 +64,11 @@ _WEBAUTHN_FAILED = {}      # key: username, value: {'count': int, 'locked_until'
 
 
 def _get_2fa_lockout_settings():
-    """Read lockout settings from DB config, fallback to defaults"""
-    from models import SystemConfig
-    try:
-        max_cfg = SystemConfig.query.filter_by(key='max_login_attempts').first()
-        dur_cfg = SystemConfig.query.filter_by(key='lockout_duration').first()
-        max_attempts = int(max_cfg.value) if max_cfg and max_cfg.value else 5
-        lockout_seconds = int(dur_cfg.value) if dur_cfg and dur_cfg.value else 900
-    except Exception:
-        max_attempts = 5
-        lockout_seconds = 900
-    return max_attempts, lockout_seconds
+    """Read lockout settings from DB config, fallback to defaults.
+    Uses shared function from sso.helpers.
+    """
+    from api.v2.sso.helpers import _get_lockout_settings
+    return _get_lockout_settings()
 
 
 def _check_2fa_lockout(key: str, tracker: dict) -> bool:
@@ -101,10 +102,10 @@ def _clear_2fa_failures(key: str, tracker: dict):
 def detect_auth_methods():
     """
     Detect available authentication methods.
-    
+
     GET: Global methods + mTLS cert status (no username needed)
     POST with {"username": "xxx"}: User-specific (WebAuthn credential count, etc.)
-    
+
     If the mTLS middleware already auto-logged the user in (session exists),
     returns mtls_status='auto_logged_in' so the frontend can skip the login form.
     """
@@ -182,28 +183,33 @@ def detect_auth_methods():
 
 
 @bp.route('/api/v2/auth/login/password', methods=['POST'])
+@limiter.limit("5/minute")
 def login_password():
     """
     Password-based login
-    
+
     POST /api/v2/auth/login/password
     Body: {"username": "admin", "password": "xxx"}
-    
+
     Returns session cookie + user info
     """
     from services.audit_service import AuditService
-    
+
     data = request.json
-    
+
     if not data or not data.get('username') or not data.get('password'):
         return error_response('Username and password required', 400)
-    
-    username = data['username']
-    password = data['password']
-    
+
+    # Input validation - prevent DoS and normalize input
+    username = str(data['username']).strip()[:255]  # Max 255 chars
+    password = str(data['password'])[:4096]  # OWASP recommends max 4096 for password
+
+    if not username:
+        return error_response('Username and password required', 400)
+
     # Find user
     user = User.query.filter_by(username=username).first()
-    
+
     if not user or not user.active:
         AuditService.log_action(
             action='login_failure',
@@ -213,10 +219,9 @@ def login_password():
             username=username
         )
         return error_response('Invalid credentials', 401)
-    
-    # Check account lockout (5 failed attempts = 15 min lockout)
-    MAX_FAILED = 5
-    LOCKOUT_MINUTES = 15
+
+    # Check account lockout (using centralized settings)
+    max_attempts, lockout_seconds = _get_2fa_lockout_settings()
     if user.locked_until and utc_now() < user.locked_until:
         return error_response('Account temporarily locked. Try again later.', 429)
     if user.locked_until and utc_now() >= user.locked_until:
@@ -225,14 +230,14 @@ def login_password():
         ok, _err = safe_commit(logger, "Failed to clear account lockout")
         if not ok:
             return _err
-    
+
     # Verify password
     if not user.check_password(password):
         # Increment failed login counter
         user.failed_logins = (user.failed_logins or 0) + 1
-        if user.failed_logins >= MAX_FAILED:
-            user.locked_until = utc_now() + timedelta(minutes=LOCKOUT_MINUTES)
-            logger.warning(f"Account {username} locked after {MAX_FAILED} failed attempts")
+        if user.failed_logins >= max_attempts:
+            user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
+            logger.warning(f"Account {username} locked after {max_attempts} failed attempts")
         ok, _err = safe_commit(logger, "Failed to record failed login")
         if not ok:
             return _err
@@ -245,7 +250,7 @@ def login_password():
             username=username
         )
         return error_response('Invalid credentials', 401)
-    
+
     # Update login stats
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
@@ -253,15 +258,15 @@ def login_password():
     ok, _err = safe_commit(logger, "Failed to update login stats")
     if not ok:
         return _err
-    
-    # Check if 2FA is enabled — require TOTP verification before creating session — require TOTP verification before creating session
+
+    # Check if 2FA is enabled - require TOTP verification before creating session - require TOTP verification before creating session
     if user.totp_confirmed:
         session.clear()
         session['pending_2fa_user_id'] = user.id
         session['pending_2fa_username'] = user.username
         session['pending_2fa_method'] = 'password'
         session.permanent = True
-        
+
         AuditService.log_action(
             action='login_2fa_required',
             resource_type='user',
@@ -271,7 +276,7 @@ def login_password():
             success=True,
             username=username
         )
-        
+
         return success_response(
             data={
                 'requires_2fa': True,
@@ -279,8 +284,8 @@ def login_password():
             },
             message='2FA verification required'
         )
-    
-    # No 2FA — create full session
+
+    # No 2FA - create full session
     now = utc_now()
     session.clear()
     session['user_id'] = user.id
@@ -289,11 +294,11 @@ def login_password():
     session['login_time'] = now.isoformat()
     session['last_activity'] = now.isoformat()
     session.permanent = True
-    
+
     # Get permissions
     from auth.permissions import get_role_permissions
     permissions = get_role_permissions(user.role)
-    
+
     # Audit log success
     AuditService.log_action(
         action='login_success',
@@ -304,14 +309,14 @@ def login_password():
         success=True,
         username=username
     )
-    
+
     logger.info(f"✅ Password login successful: {user.username}")
-    
+
     # Generate CSRF token
     csrf_token = None
     if HAS_CSRF:
         csrf_token = CSRFProtection.generate_token(user.id)
-    
+
     return success_response(
         data={
             'user': {
@@ -334,47 +339,51 @@ def login_password():
 
 
 @bp.route('/api/v2/auth/login/2fa', methods=['POST'])
+@limiter.limit("10/minute")
 def login_2fa():
     """
     Complete login with TOTP 2FA code
-    
+
     POST /api/v2/auth/login/2fa
     Body: {"code": "123456"}
-    
+
     Requires a pending 2FA session (from password login)
     """
     import pyotp
     from auth.permissions import get_role_permissions
     from services.audit_service import AuditService
-    
+
     # Check for pending 2FA session
     pending_user_id = session.get('pending_2fa_user_id')
     pending_username = session.get('pending_2fa_username')
     auth_method = session.get('pending_2fa_method', 'password')
-    
+
     if not pending_user_id:
         return error_response('No pending 2FA verification', 401)
-    
+
     # SEC-03: Brute-force protection on 2FA
     lockout_key = str(pending_user_id)
     if _check_2fa_lockout(lockout_key, _2fa_failed_attempts):
         return error_response('Too many failed attempts. Try again later.', 429)
-    
+
     data = request.json
-    code = data.get('code') if data else None
-    
-    if not code:
+    if not data or not data.get('code'):
         return error_response('Verification code required', 400)
-    
+
+    # Input validation - TOTP codes are 6-10 digits
+    code = str(data['code']).strip().upper()[:10]  # Max 10 chars
+    if not code or len(code) < 6:
+        return error_response('Invalid verification code format', 400)
+
     user = User.query.get(pending_user_id)
     if not user or not user.active:
         session.clear()
         return error_response('Invalid credentials', 401)
-    
+
     # Verify TOTP code
     totp = pyotp.TOTP(user.totp_secret)
     if not totp.verify(str(code), valid_window=1):
-        # Check recovery codes — atomic verify-and-consume to prevent
+        # Check recovery codes - atomic verify-and-consume to prevent
         # double-spend (two parallel logins replaying the same code).
         from utils.backup_codes import consume_code, count_remaining
         if user.backup_codes and consume_code(user, code):
@@ -400,8 +409,8 @@ def login_2fa():
             )
             _record_2fa_failure(lockout_key, _2fa_failed_attempts)
             return error_response('Invalid verification code', 401)
-    
-    # 2FA verified — create full session
+
+    # 2FA verified - create full session
     _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
     now = utc_now()
     session.clear()
@@ -411,9 +420,9 @@ def login_2fa():
     session['login_time'] = now.isoformat()
     session['last_activity'] = now.isoformat()
     session.permanent = True
-    
+
     permissions = get_role_permissions(user.role)
-    
+
     AuditService.log_action(
         action='login_success',
         resource_type='user',
@@ -423,13 +432,13 @@ def login_2fa():
         success=True,
         username=user.username
     )
-    
+
     logger.info(f"✅ 2FA login successful: {user.username}")
-    
+
     csrf_token = None
     if HAS_CSRF:
         csrf_token = CSRFProtection.generate_token(user.id)
-    
+
     return success_response(
         data={
             'user': {
@@ -451,22 +460,23 @@ def login_2fa():
     )
 
 @bp.route('/api/v2/auth/login/mtls', methods=['POST'])
+@limiter.limit("10/minute")
 def login_mtls():
     """
     mTLS (client certificate) login
-    
+
     Certificate must be presented in request (via reverse proxy headers or native TLS)
-    
+
     Returns session cookie + user info
     """
     # Extract certificate info
     cert_info = None
     try:
-        # Native gunicorn TLS — already validated against the configured CA.
+        # Native gunicorn TLS - already validated against the configured CA.
         if request.environ.get('peercert'):
             cert_info = CertificateParser.extract_from_flask_native(request.environ['peercert'])
         else:
-            # Reverse-proxy headers — only honor when the immediate peer is
+            # Reverse-proxy headers - only honor when the immediate peer is
             # in UCM_TRUSTED_PROXIES (default: loopback). Without this gate
             # any caller who can reach gunicorn directly can spoof
             # X-SSL-Client-* headers and forge mTLS authentication.
@@ -489,16 +499,16 @@ def login_mtls():
     except Exception as e:
         logger.error(f"Error extracting certificate: {e}")
         return error_response('Failed to extract client certificate', 500)
-    
+
     if not cert_info:
         return error_response('No client certificate presented', 401)
-    
+
     # Authenticate certificate
     user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
-    
-    if not user:
-        return error_response(error or 'Certificate authentication failed', 401)
-    
+
+    if not user or not user.active:
+        return error_response('Certificate authentication failed', 401)
+
     # Update login stats
     user.last_login = utc_now()
     user.login_count = (user.login_count or 0) + 1
@@ -506,7 +516,7 @@ def login_mtls():
     ok, _err = safe_commit(logger, "Failed to update login stats")
     if not ok:
         return _err
-    
+
     # Create session
     now = utc_now()
     session.clear()
@@ -517,18 +527,30 @@ def login_mtls():
     session['login_time'] = now.isoformat()
     session['last_activity'] = now.isoformat()
     session.permanent = True
-    
+
     # Get permissions
     from auth.permissions import get_role_permissions
     permissions = get_role_permissions(user.role)
-    
+
     logger.info(f"✅ mTLS login successful: {user.username} (cert: {auth_cert.cert_serial})")
-    
+
+    # Audit log success
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='login_success',
+        resource_type='user',
+        resource_id=user.id,
+        resource_name=user.username,
+        details=f'mTLS login successful for {user.username} (cert: {auth_cert.cert_serial})',
+        success=True,
+        username=user.username
+    )
+
     # Generate CSRF token
     csrf_token = None
     if HAS_CSRF:
         csrf_token = CSRFProtection.generate_token(user.id)
-    
+
     return success_response(
         data={
             'user': {
@@ -543,6 +565,7 @@ def login_mtls():
             'permissions': permissions,
             'auth_method': 'mtls',
             'csrf_token': csrf_token,
+            'force_password_change': user.force_password_change or False,
             'certificate': {
                 'serial': auth_cert.cert_serial,
                 'name': auth_cert.name
@@ -554,42 +577,43 @@ def login_mtls():
 
 
 @bp.route('/api/v2/auth/login/webauthn/start', methods=['POST'])
+@limiter.limit("10/minute")
 def webauthn_start():
     """
     Start WebAuthn authentication
-    
+
     POST /api/v2/auth/login/webauthn/start
     Body: {"username": "admin"}  # Optional for resident keys
-    
+
     Returns challenge options for navigator.credentials.get()
     """
     data = request.json or {}
     username = data.get('username')
-    
+
     if not username:
         return error_response('Username required', 400)
-    
+
     # Find user
     user = User.query.filter_by(username=username).first()
     if not user or not user.active:
         return error_response('WebAuthn authentication not available', 401)
-    
+
     # Check if user has WebAuthn credentials
     from models.webauthn import WebAuthnCredential
     creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
     if not creds:
         return error_response('WebAuthn authentication not available', 401)
-    
+
     # Generate authentication options
     try:
         hostname = request.host
         options, user_id = WebAuthnService.generate_authentication_options(username, hostname)
-        
+
         if not options:
             return error_response('Failed to generate WebAuthn options', 500)
-        
+
         logger.info(f"WebAuthn auth started for: {user.username}")
-        
+
         return success_response(
             data={
                 'options': options,
@@ -602,44 +626,51 @@ def webauthn_start():
 
 
 @bp.route('/api/v2/auth/login/webauthn/verify', methods=['POST'])
+@limiter.limit("5/minute")
 def webauthn_verify():
     """
     Verify WebAuthn authentication response
-    
+
     POST /api/v2/auth/login/webauthn/verify
     Body: {
         "username": "admin",
         "response": {...}  # From navigator.credentials.get()
     }
-    
+
     Returns session cookie + user info
     """
     data = request.json
-    
+
     if not data or not data.get('username') or not data.get('response'):
         return error_response('Username and response required', 400)
-    
-    username = data['username']
+
+    # Input validation - prevent DoS and normalize input
+    username = str(data['username']).strip()[:255]  # Max 255 chars
     credential_response = data['response']
-    
+
+    if not username:
+        return error_response('Username and response required', 400)
+
+    # Validate credential_response is a dict and not too large
+    if not isinstance(credential_response, dict) or len(str(credential_response)) > 50000:
+        return error_response('Invalid WebAuthn response format', 400)
+
     # SEC-04: Brute-force protection on WebAuthn
     if _check_2fa_lockout(username, _WEBAUTHN_FAILED):
         return error_response('Too many failed attempts. Try again later.', 429)
-    
+
     # Find user
     user = User.query.filter_by(username=username).first()
     if not user or not user.active:
         return error_response('Invalid credentials', 401)
-    
-    # Verify authentication response
     try:
         from services.audit_service import AuditService
-        
+
         hostname = request.host
         success, message, auth_user = WebAuthnService.verify_authentication(
             user.id, credential_response, hostname
         )
-        
+
         if not success or not auth_user:
             AuditService.log_action(
                 action='login_failure',
@@ -651,7 +682,7 @@ def webauthn_verify():
             )
             _record_2fa_failure(username, _WEBAUTHN_FAILED)
             return error_response('WebAuthn verification failed', 401)
-        
+
         # Update login stats
         _clear_2fa_failures(username, _WEBAUTHN_FAILED)
         user.last_login = utc_now()
@@ -660,7 +691,7 @@ def webauthn_verify():
         ok, _err = safe_commit(logger, "Failed to update login stats")
         if not ok:
             return _err
-        
+
         # Create session
         now = utc_now()
         session.clear()
@@ -670,11 +701,11 @@ def webauthn_verify():
         session['login_time'] = now.isoformat()
         session['last_activity'] = now.isoformat()
         session.permanent = True
-        
+
         # Get permissions
         from auth.permissions import get_role_permissions
         permissions = get_role_permissions(user.role)
-        
+
         # Audit log success
         AuditService.log_action(
             action='login_success',
@@ -685,14 +716,14 @@ def webauthn_verify():
             success=True,
             username=username
         )
-        
+
         logger.info(f"✅ WebAuthn login successful: {user.username}")
-        
+
         # Generate CSRF token
         csrf_token = None
         if HAS_CSRF:
             csrf_token = CSRFProtection.generate_token(user.id)
-        
+
         return success_response(
             data={
                 'user': {
@@ -707,6 +738,7 @@ def webauthn_verify():
                 'permissions': permissions,
                 'auth_method': 'webauthn',
                 'csrf_token': csrf_token,
+                'force_password_change': user.force_password_change or False,
                 **_get_display_settings()
             },
             message='Login successful via WebAuthn'

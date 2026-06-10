@@ -140,6 +140,8 @@ def create_provider():
         provider.ldap_username_attr = data.get('ldap_username_attr', 'uid')
         provider.ldap_email_attr = data.get('ldap_email_attr', 'mail')
         provider.ldap_fullname_attr = data.get('ldap_fullname_attr', 'cn')
+        provider.ldap_required_groups = data.get('ldap_required_groups')
+        provider.account_status_attr = data.get('account_status_attr')
 
     # JSON fields - normalize to ensure clean JSON string storage
     if data.get('attribute_mapping'):
@@ -253,6 +255,17 @@ def update_provider(provider_id=None, provider_type_name=None):
                       'ldap_fullname_attr', 'ldap_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
+        # ldap_required_groups: normalize list → JSON string (null = clear)
+        if 'ldap_required_groups' in data:
+            val = data['ldap_required_groups']
+            if val is None:
+                provider.ldap_required_groups = None
+            elif isinstance(val, list):
+                provider.ldap_required_groups = json.dumps(val)
+            elif isinstance(val, str):
+                provider.ldap_required_groups = val or None
+        if 'account_status_attr' in data:
+            provider.account_status_attr = data['account_status_attr'] or None
         # ca_bundle: only update if string PEM content (ignore bool from to_dict round-trip)
         if 'ldap_ca_bundle' in data and isinstance(data['ldap_ca_bundle'], str):
             provider.ldap_ca_bundle = data['ldap_ca_bundle'] or None

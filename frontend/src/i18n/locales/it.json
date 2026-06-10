@@ -569,7 +569,9 @@
     "resetFailed": "Reimpostazione fallita. Il link potrebbe essere scaduto.",
     "resetting": "Reimpostazione...",
     "checkEmailDescBefore": "Se esiste un account con",
-    "checkEmailDescAfter": ", riceverai un link per reimpostare a breve."
+    "checkEmailDescAfter": ", riceverai un link per reimpostare a breve.",
+    "accountDisabled": "Questo account è stato disabilitato",
+    "samlValidationFailed": "Autenticazione SAML fallita"
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
@@ -2617,6 +2619,10 @@
     "spMetadataXmlDesc": "Fornisci questo URL al tuo IdP per la configurazione automatica del SP",
     "attributeRoleMappingSection": "Mappatura attributi e ruoli",
     "groupsRolesSection": "Gruppi e mappatura ruoli",
+    "requiredGroups": "Gruppi richiesti (negazione predefinita)",
+    "requiredGroupsHelp": "Elenco separato da virgole di gruppi LDAP/AD. Gli utenti devono appartenere ad almeno un gruppo per accedere. Lasciare vuoto per consentire tutti gli utenti autenticati.",
+    "requiredGroupsPlaceholder": "es. PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "Attributo stato account",
     "provisioningSection": "Provisioning utenti",
     "userSearchSection": "Ricerca utenti",
     "testConnection": "Testa connessione",
@@ -2665,7 +2671,8 @@
     },
     "syncRoleOnLogin": "Sincronizza il ruolo da SSO ad ogni accesso",
     "syncRoleOnLoginHelp": "Se abilitato, il ruolo viene risincronizzato dalla mappatura dei ruoli ad ogni accesso. Gli utenti senza corrispondenza mantengono il loro ruolo UCM. Se disabilitato (predefinito), il ruolo viene impostato solo alla creazione dell'utente e poi gestito in UCM.",
-    "defaultRoleHelp": "Applicato solo quando un utente viene creato automaticamente al primo accesso."
+    "defaultRoleHelp": "Applicato solo quando un utente viene creato automaticamente al primo accesso.",
+    "accountStatusAttrHelp": "Attributo LDAP che indica se un account è disabilitato. Valori comuni: 'description', 'userAccountControl', 'accountStatus'. Lasciare vuoto per disabilitare questo controllo."
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",

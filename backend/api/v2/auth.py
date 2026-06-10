@@ -49,18 +49,11 @@ DEFAULT_LOCKOUT_SECONDS = 900  # 15 minutes
 
 
 def _get_lockout_settings():
-    """Read lockout settings from DB config, fallback to defaults"""
-    from models import SystemConfig
-    try:
-        max_cfg = SystemConfig.query.filter_by(key='max_login_attempts').first()
-        dur_cfg = SystemConfig.query.filter_by(key='lockout_duration').first()
-        max_attempts = int(max_cfg.value) if max_cfg and max_cfg.value else DEFAULT_MAX_ATTEMPTS
-        lockout_seconds = int(dur_cfg.value) if dur_cfg and dur_cfg.value else DEFAULT_LOCKOUT_SECONDS
-    except Exception as e:
-        logger.warning(f"Failed to read lockout config from SystemConfig, using defaults: {e}")
-        max_attempts = DEFAULT_MAX_ATTEMPTS
-        lockout_seconds = DEFAULT_LOCKOUT_SECONDS
-    return max_attempts, lockout_seconds
+    """Read lockout settings from DB config, fallback to defaults.
+    Uses shared function from sso.helpers.
+    """
+    from api.v2.sso.helpers import _get_lockout_settings as shared_get_lockout
+    return shared_get_lockout()
 
 
 def _check_account_lockout(username):
@@ -135,107 +128,11 @@ def _clear_failed_attempts(username):
 @bp.route('/api/v2/auth/login', methods=['POST'])
 def login():
     """
-    Login endpoint - Rate limited to 5 per minute
-    Returns session cookie.
-    
-    POST /api/auth/login
-    Body: {"username": "admin", "password": "xxx"}
+    Legacy login endpoint - delegates to auth_methods.login_password()
+    which has proper 2FA checks and uses SystemConfig lockout settings
     """
-    # Rate limiting handled by account lockout below (User.locked_until)
-    
-    data = request.json
-    
-    if not data or not data.get('username') or not data.get('password'):
-        return error_response('Username and password required', 400)
-    
-    username = data['username'].strip()
-    password = data['password']
-    
-    # SECURITY: Check account lockout
-    if _check_account_lockout(username):
-        return error_response('Account temporarily locked. Try again later.', 429)
-    
-    # Get client info for anomaly detection
-    client_ip = request.remote_addr or 'unknown'
-    user_agent = request.headers.get('User-Agent', 'unknown')
-    
-    # Find user
-    user = User.query.filter_by(username=username).first()
-    
-    if not user or not user.active:
-        _record_failed_attempt(username)
-        # Record failed login for anomaly detection
-        if HAS_ANOMALY:
-            get_anomaly_detector().record_login(0, client_ip, user_agent, success=False)
-        return error_response('Invalid credentials', 401)
-    
-    # Verify password (assumes User has check_password method)
-    if not user.check_password(password):
-        _record_failed_attempt(username)
-        # Record failed login for anomaly detection
-        if HAS_ANOMALY:
-            get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=False)
-        return error_response('Invalid credentials', 401)
-    
-    # Clear failed attempts on success
-    _clear_failed_attempts(username)
-    
-    # Record successful login for anomaly detection
-    anomalies = []
-    if HAS_ANOMALY:
-        anomalies = get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=True)
-    
-    # SECURITY: Regenerate session ID to prevent session fixation
-    session.clear()
-    
-    # Create new session with regenerated ID
-    now = utc_now()
-    session['user_id'] = user.id
-    session['username'] = user.username
-    session['login_time'] = now.isoformat()
-    session['last_activity'] = now.isoformat()
-    session.permanent = True
-    session.modified = True
-    
-    # Log successful login
-    current_app.logger.info(f"User {user.username} logged in successfully")
-    
-    # WebSocket event for login
-    try:
-        from websocket.emitters import on_user_login
-        on_user_login(
-            username=user.username,
-            ip_address=request.remote_addr or 'unknown',
-            method='password'
-        )
-    except Exception as e:
-        logger.warning(f"Non-blocking: failed to emit on_user_login WebSocket event for {user.username}: {e}", exc_info=True)
-        pass  # Non-blocking
-    
-    # Generate CSRF token
-    csrf_token = None
-    if HAS_CSRF:
-        csrf_token = CSRFProtection.generate_token(user.id)
-
-    # Include role + permissions so frontend AuthContext can populate
-    # immediately on login (matches /verify response contract)
-    from auth.permissions import get_role_permissions
-    permissions = get_role_permissions(user.role)
-
-    return success_response(
-        data={
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'role': user.role
-            },
-            'role': user.role,
-            'permissions': permissions,
-            'csrf_token': csrf_token,
-            'force_password_change': user.force_password_change or False
-        },
-        message='Login successful'
-    )
+    from api.v2.auth_methods import login_password
+    return login_password()
 
 
 @bp.route('/api/v2/auth/logout', methods=['POST'])
@@ -350,6 +247,7 @@ def _is_email_configured():
 
 
 @bp.route('/api/v2/auth/forgot-password', methods=['POST'])
+@limiter.limit("3/hour")
 def forgot_password():
     """
     Request password reset - sends email with reset link
@@ -406,6 +304,7 @@ def forgot_password():
 
 
 @bp.route('/api/v2/auth/reset-password', methods=['POST'])
+@limiter.limit("5/hour")
 def reset_password():
     """
     Reset password using token from email
@@ -431,6 +330,10 @@ def reset_password():
     user = User.query.filter_by(password_reset_token=token_hash).first()
     
     if not user:
+        return error_response('Invalid or expired reset token', 400)
+    
+    # Check if user is active
+    if not user.active:
         return error_response('Invalid or expired reset token', 400)
     
     if user.password_reset_expires < utc_now():

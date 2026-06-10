@@ -61,6 +61,15 @@ class SSOProvider(db.Model):
     ldap_fullname_attr = db.Column(db.String(100), default='cn')
     ldap_group_member_attr = db.Column(db.String(100), default='member')  # member, uniqueMember, or memberOf
     
+    # Default-deny: if set, user must belong to at least one of these groups
+    # to be allowed to login. Empty/None = no restriction (all authenticated users allowed).
+    ldap_required_groups = db.Column(db.Text)  # JSON array of group names
+    
+    # LDAP account status attribute for detecting disabled accounts.
+    # AD: 'userAccountControl' (bit 2 = disabled). OpenLDAP: 'accountStatus'.
+    # None = auto-detect based on vendor heuristics.
+    account_status_attr = db.Column(db.String(100))
+    
     # Attribute mapping (JSON)
     attribute_mapping = db.Column(db.Text)  # {"username": "...", "email": "...", "role": "..."}
     
@@ -190,6 +199,8 @@ class SSOProvider(db.Model):
                 'ldap_email_attr': self.ldap_email_attr,
                 'ldap_fullname_attr': self.ldap_fullname_attr,
                 'ldap_bind_password': '***' if self.ldap_bind_password else None,
+                'ldap_required_groups': self.ldap_required_groups or '',
+                'account_status_attr': self.account_status_attr,
             })
             if include_secrets:
                 data['ldap_bind_password'] = self.ldap_bind_password

@@ -569,7 +569,9 @@
     "resetFailed": "重置失败。链接可能已过期。",
     "resetting": "重置中...",
     "checkEmailDescBefore": "如果存在与",
-    "checkEmailDescAfter": " 关联的账户，您将很快收到密码重置链接。"
+    "checkEmailDescAfter": " 关联的账户，您将很快收到密码重置链接。",
+    "accountDisabled": "此帐户已被禁用",
+    "samlValidationFailed": "SAML 身份验证失败"
   },
   "dashboard": {
     "goodMorning": "早上好",
@@ -2617,6 +2619,10 @@
     "spMetadataXmlDesc": "将此URL提供给您的IdP以进行自动SP配置",
     "attributeRoleMappingSection": "属性和角色映射",
     "groupsRolesSection": "组和角色映射",
+    "requiredGroups": "必需组（默认拒绝）",
+    "requiredGroupsHelp": "以逗号分隔的 LDAP/AD 组列表。用户必须属于至少一个组才能登录。留空则允许所有已认证用户。",
+    "requiredGroupsPlaceholder": "例如：PKI-Admins, PKI-Users, pki-viewers",
+    "accountStatusAttr": "账户状态属性",
     "provisioningSection": "用户配置",
     "userSearchSection": "用户搜索",
     "testConnection": "测试连接",
@@ -2665,7 +2671,8 @@
     },
     "syncRoleOnLogin": "每次登录时从 SSO 同步角色",
     "syncRoleOnLoginHelp": "启用后，每次登录时都会从您的角色映射重新同步角色。没有匹配映射的用户将保留其 UCM 角色。禁用时（默认），角色仅在创建用户时设置，之后在 UCM 中管理。",
-    "defaultRoleHelp": "仅在首次登录时自动创建用户时应用。"
+    "defaultRoleHelp": "仅在首次登录时自动创建用户时应用。",
+    "accountStatusAttrHelp": "指示帐户是否被禁用的 LDAP 属性。常见值：'description'、'userAccountControl'、'accountStatus'。留空以禁用此检查。"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",

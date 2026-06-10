@@ -8,6 +8,13 @@ from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
+
+# Import limiter for rate limiting login attempts
+try:
+    from app import limiter
+    HAS_LIMITER = True
+except ImportError:
+    HAS_LIMITER = False
 from datetime import timedelta
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
@@ -17,6 +24,7 @@ import urllib.parse
 from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_role_from_mapping, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
+@limiter.limit("5/minute")
 def ldap_login():
     """
     Direct LDAP authentication.
@@ -24,11 +32,16 @@ def ldap_login():
     """
 
     data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+
+    if not data or not data.get('username') or not data.get('password'):
+        return error_response("Username and password required", 400)
+
+    # Input validation - prevent DoS and normalize input
+    username = str(data.get('username')).strip()[:255]  # Max 255 chars
+    password = str(data.get('password'))[:4096]  # OWASP recommends max 4096 for password
     provider_id = data.get('provider_id')
 
-    if not username or not password:
+    if not username:
         return error_response("Username and password required", 400)
 
     # Check account lockout before attempting LDAP auth
@@ -52,8 +65,32 @@ def ldap_login():
     user_info, error = _ldap_authenticate_user(provider, username, password)
 
     if error:
+        if error == 'account_disabled':
+            # Account exists but is disabled in LDAP — don't count as
+            # failed login attempt (not a wrong password).
+            AuditService.log_action(
+                action='login_failure',
+                resource_type='user',
+                details=f'LDAP account disabled for {username}',
+                success=False,
+                username=username
+            )
+            return error_response("This account has been disabled in Active Directory / LDAP", 403)
+
+        if error == 'group_denied':
+            # Authenticated but not in required groups — don't count as
+            # failed login attempt.
+            AuditService.log_action(
+                action='login_failure',
+                resource_type='user',
+                details=f'LDAP login denied: not in required groups for {username}',
+                success=False,
+                username=username
+            )
+            return error_response("Access denied: you are not a member of the required group(s)", 403)
+
+        # Generic auth failure (wrong password, etc.)
         _record_ldap_failed_attempt(username)
-        # SEC-11: Audit log failed LDAP attempt
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
@@ -80,6 +117,20 @@ def ldap_login():
                 f"LDAP login refused for '{username}': automatic account creation disabled"
             )
         return error_response("Invalid credentials", 401)
+
+    # SECURITY: Block disabled accounts (admin can disable LDAP users locally)
+    if not user.active:
+        logger.warning(f"LDAP login blocked: user {username} is disabled")
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            resource_id=user.id,
+            resource_name=user.username,
+            details=f'LDAP login blocked: user disabled (via {provider.name})',
+            success=False,
+            username=username
+        )
+        return error_response("This account has been disabled", 403)
 
     # Clear failed attempts on successful login
     _clear_ldap_failed_attempts(username)
@@ -144,10 +195,19 @@ def ldap_login():
 
     return success_response(
         data={
-            'user': user.to_dict(),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'role': user.role,
+                'active': user.active
+            },
             'role': user.role,
             'permissions': permissions,
+            'auth_method': 'ldap',
             'csrf_token': csrf_token,
+            'force_password_change': user.force_password_change or False,
             'timezone': tz_row.value if tz_row else 'UTC',
             'date_format': df_row.value if df_row else 'short',
             'show_time': st_row.value != 'false' if st_row else True,
