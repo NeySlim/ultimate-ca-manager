@@ -320,28 +320,35 @@ class OrderMixin:
         MUST NOT be validated via HTTP-01 or TLS-ALPN-01 — only DNS-01.
         Offering the others would let an attacker who controls a single host
         under the apex obtain a wildcard cert covering the entire zone.
+        
+        RFC 8738: IP identifiers MUST NOT be validated via DNS-01 — only
+        HTTP-01 and TLS-ALPN-01.
         """
-        # Detect wildcard from stored identifier JSON
+        # Detect identifier type and wildcard status
+        identifier_type = auth.identifier_type
         value = auth.identifier_value
         is_wildcard = isinstance(value, str) and value.startswith('*.')
+        is_ip = identifier_type == 'ip'
 
-        # DNS-01 Challenge — always offered
-        dns_token = secrets.token_urlsafe(32)
-        dns_challenge = AcmeChallenge(
-            authorization_id=auth.authorization_id,
-            type="dns-01",
-            status=status,
-            token=dns_token,
-            url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
-            validated=validated
-        )
-        auth.challenges.append(dns_challenge)
+        # DNS-01 Challenge — DNS identifiers only (RFC 8738 forbids DNS-01 for IPs)
+        if not is_ip:
+            dns_token = secrets.token_urlsafe(32)
+            dns_challenge = AcmeChallenge(
+                authorization_id=auth.authorization_id,
+                type="dns-01",
+                status=status,
+                token=dns_token,
+                url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
+                validated=validated
+            )
+            auth.challenges.append(dns_challenge)
 
         if is_wildcard:
             # Per RFC 8555 §8.4 — wildcard MUST be DNS-01 only
+            # Note: wildcards are only valid for DNS identifiers, not IPs
             return
 
-        # HTTP-01 Challenge (non-wildcard only)
+        # HTTP-01 Challenge (DNS non-wildcard + IP identifiers)
         http_token = secrets.token_urlsafe(32)
         http_challenge = AcmeChallenge(
             authorization_id=auth.authorization_id,
@@ -353,7 +360,7 @@ class OrderMixin:
         )
         auth.challenges.append(http_challenge)
 
-        # TLS-ALPN-01 Challenge (RFC 8737) — non-wildcard only
+        # TLS-ALPN-01 Challenge (RFC 8737/8738) — DNS non-wildcard + IP identifiers
         tls_token = secrets.token_urlsafe(32)
         tls_challenge = AcmeChallenge(
             authorization_id=auth.authorization_id,

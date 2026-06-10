@@ -727,8 +727,18 @@ def new_authz():
         if not identifier or 'type' not in identifier or 'value' not in identifier:
             return acme_error('malformed', 'Valid identifier required')
         
-        if identifier['type'] != 'dns':
+        # Support both DNS (RFC 8555) and IP (RFC 8738) identifiers
+        if identifier['type'] not in ('dns', 'ip'):
             return acme_error('unsupportedIdentifier', f'Identifier type {identifier["type"]} not supported')
+        
+        # Validate IP address format for IP identifiers (RFC 8738)
+        if identifier['type'] == 'ip':
+            from utils.acme_ip import validate_ip_address
+            is_valid, result = validate_ip_address(identifier['value'])
+            if not is_valid:
+                return acme_error('malformed', result)
+            # Normalize to canonical form
+            identifier['value'] = result
         
         auth = service.create_pre_authorization(account_id, identifier)
         
@@ -822,6 +832,24 @@ def new_order():
         identifiers = payload.get('identifiers', [])
         if not identifiers:
             return acme_error('malformed', 'At least one identifier required')
+        
+        # Validate all identifiers (RFC 8555 + RFC 8738)
+        from utils.acme_ip import validate_ip_address
+        for identifier in identifiers:
+            if not identifier or 'type' not in identifier or 'value' not in identifier:
+                return acme_error('malformed', 'Valid identifier required')
+            
+            # Support both DNS (RFC 8555) and IP (RFC 8738) identifiers
+            if identifier['type'] not in ('dns', 'ip'):
+                return acme_error('unsupportedIdentifier', f'Identifier type {identifier["type"]} not supported')
+            
+            # Validate IP address format for IP identifiers (RFC 8738)
+            if identifier['type'] == 'ip':
+                is_valid, result = validate_ip_address(identifier['value'])
+                if not is_valid:
+                    return acme_error('malformed', result)
+                # Normalize to canonical form
+                identifier['value'] = result
         
         # Parse optional dates
         not_before = payload.get('notBefore')
