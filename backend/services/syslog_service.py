@@ -3,8 +3,10 @@ Remote Syslog Forwarder for Audit Logs
 Forwards audit events to a remote syslog server via UDP, TCP, or TCP+TLS.
 """
 
+import re
 import socket
 import ssl
+import time
 import logging
 import logging.handlers
 import json
@@ -27,6 +29,22 @@ SEVERITY_MAP = {
     'emerg': 0, 'alert': 1, 'crit': 2, 'err': 3,
     'warning': 4, 'notice': 5, 'info': 6, 'debug': 7,
 }
+
+# How long the resolved HOSTNAME is cached before re-reading system_name
+_HOSTNAME_CACHE_TTL = 300
+
+
+def _sd_escape(value) -> str:
+    """Escape a STRUCTURED-DATA PARAM-VALUE (RFC 5424 §6.3.3: \\, \" and ])."""
+    return str(value).replace('\\', '\\\\').replace('"', '\\"').replace(']', '\\]')
+
+
+def _sanitize_hostname(name) -> str:
+    """Coerce a value into a valid RFC 5424 HOSTNAME (printable US-ASCII, no spaces, ≤255)."""
+    if not name:
+        return ''
+    name = re.sub(r'[^\x21-\x7e]+', '-', str(name).strip()).strip('-')
+    return name[:255]
 
 
 class SyslogForwarder:
@@ -52,7 +70,32 @@ class SyslogForwarder:
         self._tls_verify = True
         self._categories = list(self.ALL_CATEGORIES)  # all enabled by default
         self._socket = None
+        self._hostname = ''
+        self._hostname_resolved_at = 0.0
         self._initialized = True
+
+    def _resolve_hostname(self) -> str:
+        """Resolve the syslog HOSTNAME field: system_name setting → machine hostname → NILVALUE.
+
+        Cached for a few minutes so each audit event doesn't re-query the config.
+        """
+        now = time.time()
+        if self._hostname and now - self._hostname_resolved_at < _HOSTNAME_CACHE_TTL:
+            return self._hostname
+
+        name = ''
+        try:
+            from models import SystemConfig
+            cfg = SystemConfig.query.filter_by(key='system_name').first()
+            name = _sanitize_hostname(cfg.value if cfg else '')
+        except Exception:
+            pass
+        if not name:
+            name = _sanitize_hostname(safe_call(socket.gethostname))
+
+        self._hostname = name or '-'
+        self._hostname_resolved_at = now
+        return self._hostname
 
     def configure(self, enabled=False, host='', port=514, protocol='udp',
                   tls=False, tls_verify=True, categories=None):
@@ -69,6 +112,9 @@ class SyslogForwarder:
         self._tls = tls and self._protocol == 'tcp'
         self._tls_verify = tls_verify
         self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
+        # Force re-resolution of the HOSTNAME field on next send
+        self._hostname = ''
+        self._hostname_resolved_at = 0.0
 
         if self._enabled and self._host:
             logger.info(f"📡 Syslog forwarder configured: {self._protocol.upper()}://{self._host}:{self._port} "
@@ -116,27 +162,29 @@ class SyslogForwarder:
         pri = (facility_code * 8) + severity_code
 
         timestamp = audit_log.timestamp.strftime('%Y-%m-%dT%H:%M:%S.%fZ') if audit_log.timestamp else utc_now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-        hostname = '-'
+        hostname = self._resolve_hostname()
 
         # Structured data
         sd_parts = []
         if audit_log.action:
-            sd_parts.append(f'action="{audit_log.action}"')
+            sd_parts.append(f'action="{_sd_escape(audit_log.action)}"')
         if audit_log.username:
-            sd_parts.append(f'user="{audit_log.username}"')
+            sd_parts.append(f'user="{_sd_escape(audit_log.username)}"')
         if audit_log.ip_address:
-            sd_parts.append(f'ip="{audit_log.ip_address}"')
+            sd_parts.append(f'ip="{_sd_escape(audit_log.ip_address)}"')
         if audit_log.resource_type:
-            sd_parts.append(f'resource_type="{audit_log.resource_type}"')
+            sd_parts.append(f'resource_type="{_sd_escape(audit_log.resource_type)}"')
         if audit_log.resource_id:
-            sd_parts.append(f'resource_id="{audit_log.resource_id}"')
+            sd_parts.append(f'resource_id="{_sd_escape(audit_log.resource_id)}"')
         if audit_log.resource_name:
-            sd_parts.append(f'resource_name="{audit_log.resource_name}"')
+            sd_parts.append(f'resource_name="{_sd_escape(audit_log.resource_name)}"')
         sd_parts.append(f'success="{audit_log.success}"')
 
-        sd = f'[ucm@0 {" ".join(sd_parts)}]' if sd_parts else '-'
+        sd = f'[ucm@0 {" ".join(sd_parts)}]'
 
         msg_text = audit_log.details or f'{audit_log.action}'
+        # Newlines would break RFC 6587 non-transparent TCP framing
+        msg_text = ' '.join(str(msg_text).splitlines())
         message = f'<{pri}>1 {timestamp} {hostname} UCM - - {sd} {msg_text}'
 
         if self._protocol == 'tcp':
@@ -199,7 +247,8 @@ class SyslogForwarder:
             facility_code = FACILITY_MAP['local0']
             pri = (facility_code * 8) + SEVERITY_MAP['info']
             timestamp = utc_now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-            message = f'<{pri}>1 {timestamp} - UCM - - [ucm@0 action="test"] UCM syslog test message'
+            hostname = self._resolve_hostname()
+            message = f'<{pri}>1 {timestamp} {hostname} UCM - - [ucm@0 action="test"] UCM syslog test message'
 
             if self._protocol == 'tcp':
                 sock.sendall((message + '\n').encode('utf-8'))
