@@ -46,6 +46,11 @@ def _backup_current_db() -> Optional[Path]:
     from urllib.parse import urlparse
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    # Raw DB copies hold password hashes and config — owner-only access
+    try:
+        os.chmod(BACKUP_DIR, 0o700)
+    except OSError:
+        pass
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     db_uri = Config.SQLALCHEMY_DATABASE_URI
 
@@ -55,6 +60,10 @@ def _backup_current_db() -> Optional[Path]:
             return None
         dst = BACKUP_DIR / f"ucm-sqlite-{timestamp}.db"
         shutil.copy2(src, dst)
+        try:
+            os.chmod(dst, 0o600)
+        except OSError:
+            pass
         return dst
     else:
         # PostgreSQL: use pg_dump
@@ -96,6 +105,10 @@ def _backup_current_db() -> Optional[Path]:
                 logger.error(f"pg_dump failed: {result.stderr.decode() if result.stderr else 'Unknown error'}")
                 return None
 
+            try:
+                os.chmod(output, 0o600)
+            except OSError:
+                pass
             logger.info(f"PostgreSQL backup created: {output}")
             return output
 

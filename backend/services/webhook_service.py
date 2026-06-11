@@ -263,14 +263,33 @@ class WebhookService:
             subscribed_events = endpoint.get_events()
             if event_type not in subscribed_events and '*' not in subscribed_events:
                 continue
-            
+
             # Check CA filter
             if endpoint.ca_filter and ca_refid and endpoint.ca_filter != ca_refid:
                 continue
-            
-            # Send webhook
-            WebhookService._send_webhook(endpoint, event_type, payload)
+
+            # One failing endpoint must not break delivery to the others
+            # nor the business operation that triggered the event
+            try:
+                WebhookService._send_webhook(endpoint, event_type, payload)
+            except Exception as e:
+                logger.error(f"Webhook delivery failed for {endpoint.name}: {e}")
     
+    @staticmethod
+    def _record_result(endpoint: WebhookEndpoint, success: bool):
+        """Persist delivery bookkeeping; never let a commit failure propagate."""
+        if success:
+            endpoint.last_success = utc_now()
+            endpoint.failure_count = 0
+        else:
+            endpoint.last_failure = utc_now()
+            endpoint.failure_count = (endpoint.failure_count or 0) + 1
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Webhook bookkeeping commit failed for {endpoint.name}: {e}")
+
     @staticmethod
     def _send_webhook(endpoint: WebhookEndpoint, event_type: str, payload: dict):
         """Send single webhook to endpoint"""
@@ -322,30 +341,22 @@ class WebhookService:
             )
             
             if response.ok:
-                endpoint.last_success = utc_now()
-                endpoint.failure_count = 0
                 logger.info(f"Webhook sent to {endpoint.name}: {event_type}")
             else:
-                endpoint.last_failure = utc_now()
-                endpoint.failure_count += 1
                 logger.warning(f"Webhook failed for {endpoint.name}: {response.status_code}")
-            
-            db.session.commit()
-            
+            WebhookService._record_result(endpoint, response.ok)
+
         except requests.RequestException as e:
-            endpoint.last_failure = utc_now()
-            endpoint.failure_count += 1
-            db.session.commit()
             logger.error(f"Webhook error for {endpoint.name}: {e}")
+            WebhookService._record_result(endpoint, False)
         except ValueError as e:
             # Raised by safe_request_post when the URL targets cloud
             # metadata or loopback, or fails DNS resolution.
-            endpoint.last_failure = utc_now()
-            endpoint.failure_count += 1
-            db.session.commit()
             logger.warning(f"Webhook URL rejected for {endpoint.name}: {e}")
+            WebhookService._record_result(endpoint, False)
         except Exception as e:
             logger.error(f"Unexpected webhook error: {e}")
+            WebhookService._record_result(endpoint, False)
     
     @staticmethod
     def test_endpoint(endpoint_id: int) -> tuple:

@@ -44,9 +44,22 @@ class BaseDnsProvider(ABC):
         for key in self.REQUIRED_CREDENTIALS:
             if not self.credentials.get(key):
                 missing.append(key)
-        
+
         if missing:
             raise ValueError(f"Missing required credentials: {', '.join(missing)}")
+
+    def redact_secrets(self, message) -> str:
+        """Replace credential values in *message* with '***'.
+
+        Providers that send secrets as URL query parameters must pass any
+        requests exception text through this before logging or returning it —
+        ConnectionError/Timeout messages embed the full URL.
+        """
+        msg = str(message)
+        for value in self.credentials.values():
+            if isinstance(value, str) and len(value) >= 6 and value in msg:
+                msg = msg.replace(value, '***')
+        return msg
     
     @abstractmethod
     def create_txt_record(

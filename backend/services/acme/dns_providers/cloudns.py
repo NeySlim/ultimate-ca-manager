@@ -41,8 +41,9 @@ class ClouDnsDnsProvider(BaseDnsProvider):
                 return False, data.get('statusDescription', 'Unknown error')
             return True, data
         except requests.RequestException as e:
-            logger.error(f"ClouDNS API error: {e}")
-            return False, str(e)
+            msg = self.redact_secrets(e)
+            logger.error(f"ClouDNS API error: {msg}")
+            return False, msg
     
     def _post(self, path, params=None):
         p = self._auth_params()
@@ -55,7 +56,7 @@ class ClouDnsDnsProvider(BaseDnsProvider):
                 return False, data.get('statusDescription', 'Unknown error')
             return True, data
         except requests.RequestException as e:
-            return False, str(e)
+            return False, self.redact_secrets(e)
     
     def _find_zone(self, domain):
         success, result = self._request('/dns/list-zones.json', {'page': 1, 'rows-per-page': 100})

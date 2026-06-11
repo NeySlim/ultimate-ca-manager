@@ -17,38 +17,31 @@ class MicrosoftCAConnectionMixin:
         import certsrv
 
         server = msca.server
+        temp_files = []
 
-        cafile = None
-        if not msca.verify_ssl:
-            cafile = None
-        elif msca.ca_bundle:
+        def _write_temp(content):
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pem', mode='w')
-            tmp.write(msca.ca_bundle)
+            tmp.write(content or '')
             tmp.close()
-            cafile = tmp.name
+            temp_files.append(tmp.name)
+            return tmp.name
 
         try:
-            if msca.auth_method == 'certificate':
-                cert_file = tempfile.NamedTemporaryFile(
-                    delete=False, suffix='.pem', mode='w'
-                )
-                cert_file.write(msca.client_cert_pem or '')
-                cert_file.close()
+            cafile = None
+            if msca.verify_ssl and msca.ca_bundle:
+                cafile = _write_temp(msca.ca_bundle)
 
-                key_file = tempfile.NamedTemporaryFile(
-                    delete=False, suffix='.pem', mode='w'
-                )
-                key_file.write(msca.client_key_pem or '')
-                key_file.close()
+            if msca.auth_method == 'certificate':
+                cert_path = _write_temp(msca.client_cert_pem)
+                key_path = _write_temp(msca.client_key_pem)
 
                 client = certsrv.Certsrv(
                     server=server,
-                    username=cert_file.name,
-                    password=key_file.name,
+                    username=cert_path,
+                    password=key_path,
                     auth_method='cert',
                     cafile=cafile,
                 )
-                client._temp_files = [cert_file.name, key_file.name]
 
             elif msca.auth_method == 'kerberos':
                 try:
@@ -74,7 +67,6 @@ class MicrosoftCAConnectionMixin:
                 client.session.auth = HTTPKerberosAuth(
                     mutual_authentication=OPTIONAL
                 )
-                client._temp_files = []
 
             elif msca.auth_method == 'basic':
                 client = certsrv.Certsrv(
@@ -84,7 +76,6 @@ class MicrosoftCAConnectionMixin:
                     auth_method='basic',
                     cafile=cafile,
                 )
-                client._temp_files = []
 
             else:
                 raise ValueError(f"Unsupported auth method: {msca.auth_method}")
@@ -92,15 +83,14 @@ class MicrosoftCAConnectionMixin:
             if not msca.verify_ssl:
                 client.session.verify = False
 
-            if cafile:
-                client._temp_files.append(cafile)
-
+            client._temp_files = temp_files
             return client
 
         except Exception:
-            if isinstance(cafile, str):
+            # Client cert/key PEMs land in temp files — never leave them behind
+            for f in temp_files:
                 try:
-                    os.unlink(cafile)
+                    os.unlink(f)
                 except OSError:
                     pass
             raise
@@ -143,7 +133,11 @@ class MicrosoftCAConnectionMixin:
 
             msca.last_test_at = utc_now()
             msca.last_test_result = 'success' if permissions_ok else 'partial'
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as commit_err:
+                db.session.rollback()
+                logger.error(f"MS CA test result commit failed: {commit_err}")
 
             result = {
                 'success': True,
@@ -159,7 +153,11 @@ class MicrosoftCAConnectionMixin:
             logger.error(f"MS CA connection test failed for '{msca.name}': {e}")
             msca.last_test_at = utc_now()
             msca.last_test_result = f'failed: {str(e)[:200]}'
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as commit_err:
+                db.session.rollback()
+                logger.error(f"MS CA test result commit failed: {commit_err}")
             return {'success': False, 'error': str(e)}
         finally:
             if client:

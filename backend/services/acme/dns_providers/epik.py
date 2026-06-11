@@ -34,7 +34,7 @@ class EpikDnsProvider(BaseDnsProvider):
                 return False, body.get('message', 'Unknown error')
             return True, body
         except requests.RequestException as e:
-            return False, str(e)
+            return False, self.redact_secrets(e)
     
     def create_txt_record(self, domain: str, record_name: str, record_value: str, ttl: int = 300) -> Tuple[bool, str]:
         host = self.get_relative_record_name(record_name, domain)

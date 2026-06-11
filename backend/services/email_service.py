@@ -15,6 +15,11 @@ from services import smtp_oauth
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_header_value(value) -> str:
+    """Strip CR/LF to prevent SMTP header injection (subjects may embed cert CNs)."""
+    return str(value).replace('\r', ' ').replace('\n', ' ').strip()
+
+
 def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
     """Authenticate against SMTP using either password or XOAUTH2.
 
@@ -66,6 +71,7 @@ class EmailService:
         if not all([config.smtp_host, config.smtp_port, config.smtp_from]):
             return False, "SMTP configuration incomplete (host, port, from required)"
         
+        server = None
         try:
             # Try to connect
             if config.smtp_use_ssl:
@@ -74,19 +80,24 @@ class EmailService:
                 server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=10)
                 if config.smtp_use_tls:
                     server.starttls()
-            
+
             # Login if credentials provided
             _smtp_authenticate(server, config)
-            
-            server.quit()
+
             return True, "SMTP connection successful"
-            
+
         except smtplib.SMTPAuthenticationError as e:
             return False, f"SMTP authentication failed: {str(e)}"
         except smtplib.SMTPConnectError as e:
             return False, f"SMTP connection failed: {str(e)}"
         except Exception as e:
             return False, f"SMTP error: {str(e)}"
+        finally:
+            if server:
+                try:
+                    server.quit()
+                except Exception:
+                    pass
     
     @staticmethod
     def send_email(
@@ -118,9 +129,12 @@ class EmailService:
         if not config or not config.enabled:
             return False, "SMTP is not configured or disabled"
         
+        recipients = [r for r in (_sanitize_header_value(r) for r in recipients) if r]
         if not recipients:
             return False, "No recipients specified"
-        
+
+        subject = _sanitize_header_value(subject)
+
         try:
             # Determine content type from config
             content_type = getattr(config, 'smtp_content_type', 'html') or 'html'
@@ -145,25 +159,33 @@ class EmailService:
                 msg.attach(MIMEText(body_html, 'html', 'utf-8'))
             
             msg['Subject'] = subject
-            msg['From'] = f"{config.smtp_from_name} <{config.smtp_from}>" if config.smtp_from_name else config.smtp_from
+            from_name = _sanitize_header_value(config.smtp_from_name) if config.smtp_from_name else ''
+            msg['From'] = f"{from_name} <{config.smtp_from}>" if from_name else config.smtp_from
             msg['To'] = ", ".join(recipients)
             msg['Date'] = utc_now().strftime('%a, %d %b %Y %H:%M:%S +0000')
-            
+
             # Connect and send
-            if config.smtp_use_ssl:
-                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=30)
-            else:
-                server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=30)
-                if config.smtp_use_tls:
-                    server.starttls()
-            
-            # Login if credentials provided
-            _smtp_authenticate(server, config)
-            
-            # Send to all recipients
-            server.sendmail(config.smtp_from, recipients, msg.as_string())
-            server.quit()
-            
+            server = None
+            try:
+                if config.smtp_use_ssl:
+                    server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=30)
+                else:
+                    server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=30)
+                    if config.smtp_use_tls:
+                        server.starttls()
+
+                # Login if credentials provided
+                _smtp_authenticate(server, config)
+
+                # Send to all recipients
+                server.sendmail(config.smtp_from, recipients, msg.as_string())
+            finally:
+                if server:
+                    try:
+                        server.quit()
+                    except Exception:
+                        pass
+
             # Log success for each recipient
             for recipient in recipients:
                 log = NotificationLog(
@@ -177,9 +199,14 @@ class EmailService:
                     sent_at=utc_now()
                 )
                 db.session.add(log)
-            
-            db.session.commit()
-            
+
+            try:
+                db.session.commit()
+            except Exception as log_err:
+                # The email DID go out — a logging failure must not flip the result
+                db.session.rollback()
+                logger.warning(f"Failed to persist EmailLog (success path): {log_err}", exc_info=True)
+
             logger.info(f"Email sent successfully to {len(recipients)} recipient(s): {subject}")
             return True, f"Email sent to {len(recipients)} recipient(s)"
             
