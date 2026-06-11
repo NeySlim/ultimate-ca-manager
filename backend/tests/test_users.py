@@ -388,16 +388,14 @@ class TestDeleteUser:
         r = client.delete('/api/v2/users/999')
         assert r.status_code == 401
 
-    def test_delete_user_soft(self, auth_client, create_user):
+    def test_delete_user_hard(self, auth_client, create_user):
         user = create_user(username='tu_del', email='tu_del@test.local')
         uid = user['id']
         r = auth_client.delete(f'/api/v2/users/{uid}')
         assert r.status_code == 200
-        # Verify soft-deleted (still retrievable but inactive)
+        # Verify hard-deleted (no longer retrievable)
         r2 = auth_client.get(f'/api/v2/users/{uid}')
-        if r2.status_code == 200:
-            data = get_json(r2)['data']
-            assert data['active'] is False
+        assert r2.status_code == 404
 
     def test_cannot_delete_self(self, auth_client):
         # Admin is user id 1
@@ -431,6 +429,9 @@ class TestBulkDelete:
         data = assert_success(r)
         assert u1['id'] in data['success']
         assert u2['id'] in data['success']
+        # Verify hard-deleted (no longer retrievable)
+        assert auth_client.get(f"/api/v2/users/{u1['id']}").status_code == 404
+        assert auth_client.get(f"/api/v2/users/{u2['id']}").status_code == 404
 
     def test_bulk_delete_missing_ids(self, auth_client):
         r = auth_client.post('/api/v2/users/bulk/delete',

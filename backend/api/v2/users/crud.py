@@ -27,6 +27,85 @@ def _is_last_active_admin(user):
     return others == 0
 
 
+def _pending_approvals_count(user_id):
+    """Number of pending approval requests owned by this user (blocks hard delete)."""
+    try:
+        from models import ApprovalRequest
+        return ApprovalRequest.query.filter_by(
+            requester_id=user_id, status='pending'
+        ).count()
+    except Exception:
+        return 0
+
+
+def _purge_user_dependencies(user_id):
+    """Clean up all FK dependencies before hard-deleting a user.
+
+    Critical pending approvals must be checked by the caller first
+    (see _pending_approvals_count). Closed approvals are removed here.
+    Returns the number of invalidated sessions for audit detail.
+    """
+    from models.user import UserSession
+    sessions_deleted = UserSession.query.filter_by(user_id=user_id).delete()
+
+    # WebAuthn credentials + challenges
+    try:
+        from models import WebAuthnCredential, WebAuthnChallenge
+        WebAuthnCredential.query.filter_by(user_id=user_id).delete()
+        WebAuthnChallenge.query.filter_by(user_id=user_id).delete()
+    except Exception as e:
+        logger.debug(f"WebAuthn cleanup skipped for user {user_id}: {e}")
+
+    # mTLS auth certificates
+    try:
+        from models import AuthCertificate
+        AuthCertificate.query.filter_by(user_id=user_id).delete()
+    except Exception as e:
+        logger.debug(f"AuthCertificate cleanup skipped for user {user_id}: {e}")
+
+    # SSO sessions
+    try:
+        from models import SSOSession
+        SSOSession.query.filter_by(user_id=user_id).delete()
+    except Exception as e:
+        logger.debug(f"SSOSession cleanup skipped for user {user_id}: {e}")
+
+    # API keys
+    try:
+        from models import APIKey
+        APIKey.query.filter_by(user_id=user_id).delete()
+    except Exception as e:
+        logger.debug(f"APIKey cleanup skipped for user {user_id}: {e}")
+
+    # Group memberships
+    try:
+        from models import GroupMember
+        GroupMember.query.filter_by(user_id=user_id).delete()
+    except Exception as e:
+        logger.debug(f"GroupMember cleanup skipped for user {user_id}: {e}")
+
+    # Closed approval requests (pending ones block deletion upstream)
+    try:
+        from models import ApprovalRequest
+        ApprovalRequest.query.filter(
+            ApprovalRequest.requester_id == user_id,
+            ApprovalRequest.status != 'pending',
+        ).delete(synchronize_session=False)
+    except Exception as e:
+        logger.debug(f"ApprovalRequest cleanup skipped for user {user_id}: {e}")
+
+    # HSM providers created_by → NULL (nullable FK, preserve the provider)
+    try:
+        from models import HsmProvider
+        HsmProvider.query.filter_by(created_by=user_id).update(
+            {'created_by': None}, synchronize_session=False
+        )
+    except Exception as e:
+        logger.debug(f"HsmProvider cleanup skipped for user {user_id}: {e}")
+
+    return sessions_deleted
+
+
 @bp.route('/api/v2/users', methods=['GET'])
 @require_auth(['read:users'])
 def list_users():
@@ -304,8 +383,8 @@ def update_user(user_id):
 @require_auth(['delete:users'])
 def delete_user(user_id):
     """
-    Delete user (soft delete - set active=False)
-    Admin only.
+    Permanently delete a user and clean up FK dependencies.
+    Admin only. Use the activate/deactivate toggle for soft state.
 
     DELETE /api/v2/users/{user_id}
     """
@@ -321,44 +400,49 @@ def delete_user(user_id):
     if not user:
         return error_response('User not found', 404)
 
-    # Preserve at least one active admin (deactivating last admin = lockout)
+    # Preserve at least one active admin (deleting last admin = lockout)
     if _is_last_active_admin(user):
-        return error_response('Cannot deactivate the last active admin', 409)
+        return error_response('Cannot delete the last active admin', 409)
 
-    # Soft delete
+    # Block if the user still owns pending approval requests
+    pending = _pending_approvals_count(user_id)
+    if pending > 0:
+        return error_response(
+            f'Cannot delete: user has {pending} pending approval request(s). '
+            'Resolve them first.', 409
+        )
+
     username = user.username
-    user.active = False
-
-    # SECURITY: Invalidate all active sessions immediately
-    from models.user import UserSession
-    sessions_deleted = UserSession.query.filter_by(user_id=user_id).delete()
-    if sessions_deleted > 0:
-        logger.info(f"Invalidated {sessions_deleted} sessions for deactivated user {username}")
-
     try:
+        sessions_deleted = _purge_user_dependencies(user_id)
+        db.session.delete(user)
         db.session.commit()
-        AuditService.log_action(
-            action='user_deactivate',
-            resource_type='user',
-            resource_id=str(user_id),
-            resource_name=username,
-            details=f'Deactivated user: {username} ({sessions_deleted} sessions invalidated)',
-            success=True
-        )
-
-        try:
-            from websocket.emitters import on_user_deleted
-            on_user_deleted(user_id, username, g.current_user.username)
-        except Exception:
-            pass
-
-        return success_response(
-            message=f'User {username} deactivated successfully'
-        )
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Failed to delete user: {e}", exc_info=True)
+        logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
         return error_response('Failed to delete user', 500)
+
+    if sessions_deleted > 0:
+        logger.info(f"Invalidated {sessions_deleted} sessions for deleted user {username}")
+
+    AuditService.log_action(
+        action='user_delete',
+        resource_type='user',
+        resource_id=str(user_id),
+        resource_name=username,
+        details=f'Deleted user: {username} ({sessions_deleted} sessions invalidated)',
+        success=True
+    )
+
+    try:
+        from websocket.emitters import on_user_deleted
+        on_user_deleted(user_id, username, g.current_user.username)
+    except Exception:
+        pass
+
+    return success_response(
+        message=f'User {username} deleted successfully'
+    )
 
 
 # ============================================================
@@ -389,27 +473,33 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'Not found'})
             continue
         if _is_last_active_admin(user):
-            results['failed'].append({'id': user_id, 'error': 'Cannot deactivate the last active admin'})
+            results['failed'].append({'id': user_id, 'error': 'Cannot delete the last active admin'})
             continue
-        
-        # SECURITY: Invalidate all active sessions before deactivation
-        from models.user import UserSession
-        sessions_deleted = UserSession.query.filter_by(user_id=user_id).delete()
+        if _pending_approvals_count(user_id) > 0:
+            results['failed'].append({'id': user_id, 'error': 'User has pending approval requests'})
+            continue
+
+        try:
+            sessions_deleted = _purge_user_dependencies(user_id)
+            db.session.delete(user)
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+            continue
+        if not safe_commit(logger, f"Delete user {user_id}"):
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+            continue
         total_sessions_invalidated += sessions_deleted
-        
-        user.active = False
-        if not safe_commit(logger, f"Deactivate user {user_id}"):
-            results['failed'].append({'id': user_id, 'error': 'Deactivation failed'})
-            continue
         results['success'].append(user_id)
 
     AuditService.log_action(
-        action='users_bulk_deactivated',
+        action='users_bulk_deleted',
         resource_type='user',
         resource_id=','.join(str(i) for i in results['success']),
         resource_name=f'{len(results["success"])} users',
-        details=f'Bulk deactivated {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)',
+        details=f'Bulk deleted {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)',
         success=True
     )
 
-    return success_response(data=results, message=f'{len(results["success"])} users deactivated')
+    return success_response(data=results, message=f'{len(results["success"])} users deleted')
