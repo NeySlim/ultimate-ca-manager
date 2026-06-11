@@ -10,6 +10,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **User deletion** — the delete endpoint now permanently removes the account (with full FK cleanup: sessions, WebAuthn, mTLS certs, SSO sessions, API keys, group memberships) instead of only disabling it. Blocks deletion when pending approval requests exist; audit history is preserved (#132).
+
 ## [2.167] - 2026-06-10
 
 ### Added
