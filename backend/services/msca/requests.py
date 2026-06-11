@@ -38,7 +38,12 @@ class MicrosoftCARequestsMixin:
             req.status = 'issued'
             req.issued_at = utc_now()
             req.cert_pem = cert_pem
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as db_err:
+                db.session.rollback()
+                logger.error(f"Failed to persist issued status for request {req.request_id}: {db_err}")
+                raise
 
             logger.info(
                 f"Pending request {req.request_id} on '{msca.name}' is now issued"
@@ -52,7 +57,11 @@ class MicrosoftCARequestsMixin:
             elif 'denied' in err_str:
                 req.status = 'denied'
                 req.error_message = str(e)[:500]
-                db.session.commit()
+                try:
+                    db.session.commit()
+                except Exception as db_err:
+                    db.session.rollback()
+                    logger.error(f"Failed to persist denied status for request {req.request_id}: {db_err}")
                 return req.to_dict()
             else:
                 logger.error(f"Error checking request {req.request_id}: {e}")

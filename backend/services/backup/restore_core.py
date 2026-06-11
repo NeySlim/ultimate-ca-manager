@@ -136,7 +136,9 @@ class RestoreCoreMixin:
                 existing.full_name = user_data.get('full_name')
                 existing.role = user_data.get('role', 'user')
                 existing.active = user_data.get('active', True)
-                existing.password_hash = user_data.get('password_hash')
+                # Never null out a working password with a backup that lacks one
+                if user_data.get('password_hash'):
+                    existing.password_hash = user_data.get('password_hash')
             else:
                 new_user = User(
                     username=user_data['username'],

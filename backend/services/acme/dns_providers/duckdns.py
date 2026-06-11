@@ -83,8 +83,9 @@ class DuckDnsDnsProvider(BaseDnsProvider):
                 return False, f"Unexpected response: {result}"
                 
         except requests.RequestException as e:
-            logger.error(f"DuckDNS API request failed: {e}")
-            return False, str(e)
+            msg = self.redact_secrets(e)
+            logger.error(f"DuckDNS API request failed: {msg}")
+            return False, msg
     
     def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
         """Delete TXT record via DuckDNS API (set to empty)"""
@@ -121,8 +122,9 @@ class DuckDnsDnsProvider(BaseDnsProvider):
                 return False, f"Unexpected response: {result}"
                 
         except requests.RequestException as e:
-            logger.error(f"DuckDNS API request failed: {e}")
-            return False, str(e)
+            msg = self.redact_secrets(e)
+            logger.error(f"DuckDNS API request failed: {msg}")
+            return False, msg
     
     def test_connection(self) -> Tuple[bool, str]:
         """Test DuckDNS API connection"""

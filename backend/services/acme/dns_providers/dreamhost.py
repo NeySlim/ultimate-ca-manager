@@ -32,8 +32,9 @@ class DreamhostDnsProvider(BaseDnsProvider):
                 return True, data
             return False, data.get('data', 'Unknown error')
         except requests.RequestException as e:
-            logger.error(f"DreamHost API error: {e}")
-            return False, str(e)
+            msg = self.redact_secrets(e)
+            logger.error(f"DreamHost API error: {msg}")
+            return False, msg
     
     def create_txt_record(self, domain, record_name, record_value, ttl=300):
         success, result = self._request('dns-add_record', {

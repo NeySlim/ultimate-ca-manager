@@ -259,7 +259,20 @@ def create_app(config_name=None):
                 raise SystemExit(1)
         except FileNotFoundError:
             pass
-    
+
+    # Sensitive directories must not be group/world accessible: private key
+    # files are chmod 0600 but transit through the default umask between
+    # write and chmod, and db_migration holds raw unencrypted DB copies
+    # (password hashes, SMTP credentials).
+    for sensitive_dir in (config.PRIVATE_DIR, config.BACKUP_DIR / 'db_migration'):
+        try:
+            sensitive_dir.mkdir(parents=True, exist_ok=True)
+            if sensitive_dir.stat().st_mode & 0o077:
+                os.chmod(sensitive_dir, 0o700)
+                app.logger.info("Tightened sensitive dir perms to 0700: %s", sensitive_dir)
+        except OSError as e:
+            app.logger.warning("Could not tighten perms on %s: %s", sensitive_dir, e)
+
     # Initialize cache
     cache.init_app(app, config={
         'CACHE_TYPE': 'SimpleCache',  # In-memory cache
