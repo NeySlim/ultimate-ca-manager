@@ -261,7 +261,39 @@ Sent by Ultimate Certificate Manager
     )
 
 
+def _emit_expiry_webhooks():
+    """Fire certificate.expiring / certificate.expired webhooks.
+
+    Independent of SMTP config (webhooks must work even when email is off).
+    Runs daily with the scheduled check; 'expiring' is a recurring reminder
+    for the active window, 'expired' is bounded to certs that crossed expiry
+    in the last 24h so each expiry emits roughly once.
+    """
+    try:
+        from services.webhook_service import emit_cert_expiring, emit_cert_expired
+        from models import Certificate
+        from utils.datetime_utils import utc_now
+        from datetime import timedelta
+
+        for cert in get_expiring_certificates(days=30, include_revoked=False):
+            d = cert.get('days_until_expiry', 0)
+            if d > 0:
+                emit_cert_expiring(cert, days_left=d, ca_refid=cert.get('issuer_ca_id'))
+
+        now = utc_now()
+        just_expired = Certificate.query.filter(
+            Certificate.valid_to <= now,
+            Certificate.valid_to > now - timedelta(days=1),
+            Certificate.revoked.isnot(True),
+        ).all()
+        for cert in just_expired:
+            emit_cert_expired(cert.to_dict(), ca_refid=cert.caref)
+    except Exception as e:
+        logger.error(f"Expiry webhook pass failed: {e}")
+
+
 def scheduled_expiry_check():
     """Scheduled task for automatic expiry checking"""
     result = check_and_send_alerts()
     logger.info(f"Scheduled expiry check: {result}")
+    _emit_expiry_webhooks()

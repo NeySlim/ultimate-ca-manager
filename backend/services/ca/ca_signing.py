@@ -174,4 +174,12 @@ class CASigningMixin:
 
         logger.info(f"Signed CSR via {source}: CN={cn}, serial={serial}, CA={ca.descr}")
 
+        # Renewal flows pass source like '<orig>-renewal'; everything else
+        # (EST enrollment, etc.) is a fresh issuance.
+        from services.webhook_service import emit_cert_renewed, emit_cert_issued
+        if 'renewal' in (source or ''):
+            emit_cert_renewed(new_cert.to_dict(), ca_refid=ca.refid)
+        else:
+            emit_cert_issued(new_cert.to_dict(), ca_refid=ca.refid)
+
         return cert_pem_str, serial

@@ -522,6 +522,11 @@ def create_certificate():
         except Exception:
             pass  # Non-blocking
 
+        # Webhook event (this endpoint signs inline, bypassing the service-layer
+        # issuance emit, so fire it here)
+        from services.webhook_service import emit_cert_issued
+        emit_cert_issued(db_cert.to_dict(), ca_refid=ca.refid)
+
         return created_response(
             data=db_cert.to_dict(),
             message='Certificate created successfully'

@@ -232,6 +232,9 @@ def create_csr():
             success=True
         )
         
+        from services.webhook_service import emit_csr_submitted
+        emit_csr_submitted(cert.to_dict())
+
         return created_response(
             data=cert.to_dict(),
             message='CSR created successfully'

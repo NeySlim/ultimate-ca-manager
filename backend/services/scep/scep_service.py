@@ -323,6 +323,12 @@ class SCEPService:
                 cert_obj = x509.load_pem_x509_certificate(
                     base64.b64decode(cert.crt), default_backend()
                 )
+                try:
+                    from services.webhook_service import emit_cert_issued
+                    if cert:
+                        emit_cert_issued(cert.to_dict(), ca_refid=cert.caref)
+                except Exception as e:
+                    logger.error(f"Webhook emit (SCEP issuance) failed: {e}")
                 logger.debug("SCEP: Returning SUCCESS response")
                 return self._create_cert_rep_success(
                     cert_obj, transaction_id, sender_nonce, signer_cert

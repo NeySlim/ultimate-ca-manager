@@ -185,6 +185,9 @@ def renew_certificate(cert_id):
         except Exception:
             pass
 
+        from services.webhook_service import emit_cert_renewed
+        emit_cert_renewed(cert.to_dict(), ca_refid=cert.caref)
+
         return success_response(
             data=cert.to_dict(),
             message='Certificate renewed successfully'

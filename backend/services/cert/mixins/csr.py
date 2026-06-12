@@ -359,4 +359,6 @@ class CSRMixin:
             cert_path = cert_cert_path(certificate)
             with open(cert_path, 'wb') as f:
                 f.write(cert_pem)
+            from services.webhook_service import emit_cert_issued
+            emit_cert_issued(certificate.to_dict(), ca_refid=certificate.caref)
             return certificate

@@ -58,6 +58,9 @@ class CAcrudMixin:
         if child_ca_count > 0:
             raise ValueError(f"CA is parent of {child_ca_count} intermediate CA(s)")
 
+        # Snapshot for the webhook payload before the row is gone
+        _ca_snapshot = ca.to_dict()
+
         # Delete files
         delete_ca_files(ca)
 
@@ -72,5 +75,8 @@ class CAcrudMixin:
             db.session.rollback()
             logger.error(f"Commit failed in services/ca/ca_crud.py:69: {_commit_err}", exc_info=True)
             raise
+
+        from services.webhook_service import emit_ca_deleted
+        emit_ca_deleted(_ca_snapshot)
 
         return True

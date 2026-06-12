@@ -136,7 +136,16 @@ class IssuanceMixin:
         
         # Auto-supersede: revoke previous certs for same domains if enabled
         self._auto_supersede(order, cert_id)
-        
+
+        try:
+            from models import Certificate
+            from services.webhook_service import emit_cert_issued
+            issued = Certificate.query.get(cert_id)
+            if issued:
+                emit_cert_issued(issued.to_dict(), ca_refid=issued.caref)
+        except Exception as e:
+            logger.error(f"Webhook emit (ACME issuance) failed: {e}")
+
         return True, None
     
     def _auto_supersede(self, new_order, new_cert_id: int):

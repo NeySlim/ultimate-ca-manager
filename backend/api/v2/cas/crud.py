@@ -379,6 +379,9 @@ def create_ca():
         except Exception:
             pass  # Non-blocking
 
+        from services.webhook_service import emit_ca_created
+        emit_ca_created(ca.to_dict())
+
         return created_response(
             data=ca.to_dict(),
             message='CA created successfully'
@@ -604,6 +607,9 @@ def update_ca(ca_id):
             on_ca_updated(ca_id, ca.descr, {k: v for k, v in data.items()})
         except Exception:
             pass
+
+        from services.webhook_service import emit_ca_updated
+        emit_ca_updated(ca.to_dict())
 
         return success_response(data=ca.to_dict(), message='CA updated successfully')
     except Exception as e:
