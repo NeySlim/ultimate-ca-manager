@@ -40,26 +40,21 @@ def test_emit_never_raises(monkeypatch):
     emit_cert_issued({'id': 1})
 
 
-class TestIssuanceFiresWebhook:
-    def test_create_certificate_dispatches_issued(self, app, auth_client, create_ca, monkeypatch):
+class TestIssuanceQueuesWebhook:
+    def test_create_certificate_queues_delivery(self, app, auth_client, create_ca):
+        from models import WebhookDelivery
         ca = create_ca(cn='Webhook Fire CA')
 
-        delivered = []
-
         with app.app_context():
-            # Subscribe an endpoint to all events
             ep = WebhookEndpoint(
                 name='test-sink', url='https://example.invalid/hook',
                 events=json.dumps(['*']), enabled=True,
             )
             db.session.add(ep)
             db.session.commit()
-
-        # Intercept the actual HTTP send so nothing leaves the box
-        monkeypatch.setattr(
-            WebhookService, '_send_webhook',
-            staticmethod(lambda endpoint, event_type, payload: delivered.append(event_type)),
-        )
+            ep_id = ep.id
+            WebhookDelivery.query.filter_by(endpoint_id=ep_id).delete()
+            db.session.commit()
 
         r = auth_client.post('/api/v2/certificates', data=json.dumps({
             'cn': 'fire.example.com',
@@ -70,7 +65,12 @@ class TestIssuanceFiresWebhook:
         }), content_type='application/json')
         assert r.status_code in (200, 201), r.data
 
-        assert 'certificate.issued' in delivered
+        # The event must have produced a durable, pending delivery row — not a
+        # synchronous send.
+        with app.app_context():
+            rows = WebhookDelivery.query.filter_by(endpoint_id=ep_id, event_type='certificate.issued').all()
+            assert len(rows) == 1
+            assert rows[0].status == 'pending'
 
 
 if __name__ == '__main__':

@@ -175,7 +175,7 @@ class TestRoundTripCustom:
 
 class TestDeliveryBearer:
     def test_bearer_outgoing_header(self, app, auth_client):
-        """_send_webhook for bearer adds Authorization: Bearer <plaintext>."""
+        """_perform_delivery for bearer adds Authorization: Bearer <plaintext>."""
         r = _post(auth_client, _base(name='Del-Bearer-1', auth_type='bearer',
                                      auth_token='del-bearer-secret'))
         wh_id = assert_success(r, 201)['id']
@@ -191,7 +191,9 @@ class TestDeliveryBearer:
             ep = WebhookEndpoint.query.get(wh_id)
             with patch('utils.ssrf_protection.safe_request_post',
                        side_effect=_fake_post):
-                WebhookService._send_webhook(ep, 'certificate.issued', {})
+                WebhookService._perform_delivery(
+                    ep, 'certificate.issued',
+                    WebhookService._build_body_json('certificate.issued', {}, 'ts'))
 
         assert captured['headers'].get('Authorization') == \
             'Bearer del-bearer-secret'
@@ -199,7 +201,7 @@ class TestDeliveryBearer:
 
 class TestDeliveryBasic:
     def test_basic_outgoing_header(self, app, auth_client):
-        """_send_webhook for basic adds Authorization: Basic base64(user:pass)."""
+        """_perform_delivery for basic adds Authorization: Basic base64(user:pass)."""
         r = _post(auth_client, _base(name='Del-Basic-1', auth_type='basic',
                                      auth_username='bob', auth_token='bobpass'))
         wh_id = assert_success(r, 201)['id']
@@ -215,7 +217,9 @@ class TestDeliveryBasic:
             ep = WebhookEndpoint.query.get(wh_id)
             with patch('utils.ssrf_protection.safe_request_post',
                        side_effect=_fake_post):
-                WebhookService._send_webhook(ep, 'certificate.issued', {})
+                WebhookService._perform_delivery(
+                    ep, 'certificate.issued',
+                    WebhookService._build_body_json('certificate.issued', {}, 'ts'))
 
         auth_val = captured['headers'].get('Authorization', '')
         assert auth_val.startswith('Basic '), \
@@ -226,7 +230,7 @@ class TestDeliveryBasic:
 
 class TestDeliveryApiKey:
     def test_api_key_outgoing_header(self, app, auth_client):
-        """_send_webhook for api_key adds the custom header, NOT Authorization."""
+        """_perform_delivery for api_key adds the custom header, NOT Authorization."""
         r = _post(auth_client, _base(name='Del-ApiKey-1', auth_type='api_key',
                                      auth_header_name='X-Api-Secret',
                                      auth_token='apikey-val-123'))
@@ -243,7 +247,9 @@ class TestDeliveryApiKey:
             ep = WebhookEndpoint.query.get(wh_id)
             with patch('utils.ssrf_protection.safe_request_post',
                        side_effect=_fake_post):
-                WebhookService._send_webhook(ep, 'certificate.issued', {})
+                WebhookService._perform_delivery(
+                    ep, 'certificate.issued',
+                    WebhookService._build_body_json('certificate.issued', {}, 'ts'))
 
         headers = captured.get('headers', {})
         assert headers.get('X-Api-Secret') == 'apikey-val-123'
@@ -253,7 +259,7 @@ class TestDeliveryApiKey:
 
 class TestDeliveryCustom:
     def test_custom_outgoing_header(self, app, auth_client):
-        """_send_webhook for custom places raw token (scheme embedded) in header."""
+        """_perform_delivery for custom places raw token (scheme embedded) in header."""
         r = _post(auth_client, _base(name='Del-Custom-1', auth_type='custom',
                                      auth_header_name='Authorization',
                                      auth_token='auth-key CUSTOM-VAL'))
@@ -270,7 +276,9 @@ class TestDeliveryCustom:
             ep = WebhookEndpoint.query.get(wh_id)
             with patch('utils.ssrf_protection.safe_request_post',
                        side_effect=_fake_post):
-                WebhookService._send_webhook(ep, 'certificate.issued', {})
+                WebhookService._perform_delivery(
+                    ep, 'certificate.issued',
+                    WebhookService._build_body_json('certificate.issued', {}, 'ts'))
 
         # Full raw token is placed verbatim in the configured header
         assert captured['headers'].get('Authorization') == 'auth-key CUSTOM-VAL'
@@ -278,7 +286,7 @@ class TestDeliveryCustom:
 
 class TestDeliveryNone:
     def test_none_no_auth_header_added(self, app, auth_client):
-        """_send_webhook for none adds no Authorization header."""
+        """_perform_delivery for none adds no Authorization header."""
         r = _post(auth_client, _base(name='Del-None-1', auth_type='none'))
         wh_id = assert_success(r, 201)['id']
 
@@ -293,7 +301,9 @@ class TestDeliveryNone:
             ep = WebhookEndpoint.query.get(wh_id)
             with patch('utils.ssrf_protection.safe_request_post',
                        side_effect=_fake_post):
-                WebhookService._send_webhook(ep, 'certificate.issued', {})
+                WebhookService._perform_delivery(
+                    ep, 'certificate.issued',
+                    WebhookService._build_body_json('certificate.issued', {}, 'ts'))
 
         assert 'Authorization' not in captured.get('headers', {}), \
             "none auth_type must not add any Authorization header"
@@ -412,7 +422,9 @@ class TestNoPlaintextInLogs:
                 ep = WebhookEndpoint.query.get(wh_id)
                 with patch('utils.ssrf_protection.safe_request_post',
                            side_effect=_fake_post):
-                    WebhookService._send_webhook(ep, 'certificate.issued', {})
+                    WebhookService._perform_delivery(
+                    ep, 'certificate.issued',
+                    WebhookService._build_body_json('certificate.issued', {}, 'ts'))
 
         for record in caplog.records:
             msg = record.getMessage()

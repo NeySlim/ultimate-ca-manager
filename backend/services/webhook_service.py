@@ -3,7 +3,7 @@ Webhook Service - UCM
 Sends HTTP notifications for certificate lifecycle events.
 """
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 from models import db, SystemConfig
 from utils.encryption import decrypt_if_needed
 import requests
@@ -14,6 +14,15 @@ import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_commit():
+    """Commit, rolling back (never raising) on failure."""
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Webhook delivery commit failed: {e}")
 
 
 # Headers that the operator-supplied custom_headers MUST NOT override
@@ -256,125 +265,146 @@ class WebhookService:
         TEMPLATE_CREATED, TEMPLATE_UPDATED,
     ]
 
+    # Retry policy for asynchronous delivery
+    DEFAULT_MAX_ATTEMPTS = 5
+    _BACKOFF_BASE_SECONDS = 60      # 1st retry ~1 min
+    _BACKOFF_CAP_SECONDS = 3600     # capped at 1 h
+
     @staticmethod
     def send_event(event_type: str, payload: dict, ca_refid: str = None):
-        """
-        Send webhook event to all matching endpoints.
+        """Publish a lifecycle event on the bus (never raises).
 
-        Never raises: webhook delivery is best-effort and must never break the
-        business operation that triggered it. Safe to call from any lifecycle
-        path (issuance, revocation, etc.).
-
-        Args:
-            event_type: One of the event type constants
-            payload: Event data to send
-            ca_refid: Optional CA filter for targeted webhooks
+        The webhook subscriber turns it into durable, asynchronously-delivered
+        WebhookDelivery rows — the triggering operation is never blocked on HTTP.
         """
+        from services.events import event_bus
+        event_bus.emit(event_type, payload, ca_refid)
+
+    @staticmethod
+    def enqueue_deliveries(event_type: str, payload: dict, ca_refid: str = None):
+        """Bus subscriber: queue one delivery per matching, enabled endpoint."""
+        from models import WebhookDelivery
         try:
             endpoints = WebhookEndpoint.query.filter_by(enabled=True).all()
         except Exception as e:
-            logger.error(f"Webhook dispatch skipped ({event_type}): {e}")
+            logger.error(f"Webhook enqueue skipped ({event_type}): {e}")
             return
 
+        now = utc_now()
+        payload_json = json.dumps(payload, default=str)
+        ts = now.isoformat()
+        queued = 0
         for endpoint in endpoints:
-            # Check event type subscription
-            subscribed_events = endpoint.get_events()
-            if event_type not in subscribed_events and '*' not in subscribed_events:
+            subscribed = endpoint.get_events()
+            if event_type not in subscribed and '*' not in subscribed:
                 continue
-
-            # Check CA filter
             if endpoint.ca_filter and ca_refid and endpoint.ca_filter != ca_refid:
                 continue
-
-            # One failing endpoint must not break delivery to the others
-            # nor the business operation that triggered the event
-            try:
-                WebhookService._send_webhook(endpoint, event_type, payload)
-            except Exception as e:
-                logger.error(f"Webhook delivery failed for {endpoint.name}: {e}")
-    
-    @staticmethod
-    def _record_result(endpoint: WebhookEndpoint, success: bool):
-        """Persist delivery bookkeeping; never let a commit failure propagate."""
-        if success:
-            endpoint.last_success = utc_now()
-            endpoint.failure_count = 0
-        else:
-            endpoint.last_failure = utc_now()
-            endpoint.failure_count = (endpoint.failure_count or 0) + 1
+            db.session.add(WebhookDelivery(
+                endpoint_id=endpoint.id,
+                event_type=event_type,
+                payload=payload_json,
+                event_timestamp=ts,
+                status=WebhookDelivery.STATUS_PENDING,
+                next_attempt_at=now,
+                max_attempts=WebhookService.DEFAULT_MAX_ATTEMPTS,
+            ))
+            queued += 1
+        if not queued:
+            return
         try:
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Webhook bookkeeping commit failed for {endpoint.name}: {e}")
+            logger.error(f"Failed to queue webhook deliveries for {event_type}: {e}")
 
     @staticmethod
-    def _send_webhook(endpoint: WebhookEndpoint, event_type: str, payload: dict):
-        """Send single webhook to endpoint"""
+    def _build_body_json(event_type: str, payload: dict, timestamp: str) -> str:
+        return json.dumps({'event': event_type, 'timestamp': timestamp, 'data': payload}, default=str)
+
+    @staticmethod
+    def _perform_delivery(endpoint: WebhookEndpoint, event_type: str, body_json: str):
+        """Build headers, sign, and POST. Returns (ok, status_code, error)."""
+        headers = {}
+        headers.update(_safe_custom_headers(endpoint.get_headers()))
+        headers.update(_build_auth_header(endpoint))
+        headers.update({
+            'Content-Type': 'application/json',
+            'User-Agent': 'UCM-Webhook/2.0',
+            'X-UCM-Event': event_type,
+        })
+        secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
+        if secret_plain:
+            signature = hmac.new(secret_plain.encode(), body_json.encode(), hashlib.sha256).hexdigest()
+            headers['X-UCM-Signature'] = f'sha256={signature}'
+
+        from utils.ssrf_protection import safe_request_post
         try:
-            # Build request body
-            body = {
-                'event': event_type,
-                'timestamp': utc_now().isoformat(),
-                'data': payload
-            }
-            body_json = json.dumps(body, default=str)
-
-            # Custom headers FIRST, so security/identity headers below override
-            # whatever the operator put in (defence in depth).
-            headers = {}
-            headers.update(_safe_custom_headers(endpoint.get_headers()))
-            # Auth headers come after custom_headers so they always win,
-            # but before UCM identity headers so HMAC signature is last.
-            auth_headers = _build_auth_header(endpoint)
-            headers.update(auth_headers)
-            headers.update({
-                'Content-Type': 'application/json',
-                'User-Agent': 'UCM-Webhook/2.0',
-                'X-UCM-Event': event_type,
-            })
-
-            # Add HMAC signature if secret configured
-            secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
-            if secret_plain:
-                signature = hmac.new(
-                    secret_plain.encode(),
-                    body_json.encode(),
-                    hashlib.sha256
-                ).hexdigest()
-                headers['X-UCM-Signature'] = f'sha256={signature}'
-            
-            # Send request with timeout. UCM is on-prem: LAN/RFC1918/.lan
-            # targets MUST keep working. We resolve the hostname once,
-            # block only cloud-metadata + loopback, and pin the TCP
-            # connection to that IP so a hostile DNS server cannot
-            # rebind us to 169.254.169.254 between validation and
-            # connect.
-            from utils.ssrf_protection import safe_request_post
-            response = safe_request_post(
-                endpoint.url,
-                data=body_json,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.ok:
-                logger.info(f"Webhook sent to {endpoint.name}: {event_type}")
-            else:
-                logger.warning(f"Webhook failed for {endpoint.name}: {response.status_code}")
-            WebhookService._record_result(endpoint, response.ok)
-
+            response = safe_request_post(endpoint.url, data=body_json, headers=headers, timeout=10)
+            return bool(response.ok), response.status_code, (None if response.ok else f"HTTP {response.status_code}")
         except requests.RequestException as e:
-            logger.error(f"Webhook error for {endpoint.name}: {e}")
-            WebhookService._record_result(endpoint, False)
-        except ValueError as e:
-            # Raised by safe_request_post when the URL targets cloud
-            # metadata or loopback, or fails DNS resolution.
-            logger.warning(f"Webhook URL rejected for {endpoint.name}: {e}")
-            WebhookService._record_result(endpoint, False)
+            return False, None, str(e)
+        except ValueError as e:  # SSRF / DNS rejection from safe_request_post
+            return False, None, f"URL rejected: {e}"
         except Exception as e:
-            logger.error(f"Unexpected webhook error: {e}")
-            WebhookService._record_result(endpoint, False)
+            return False, None, str(e)
+
+    @staticmethod
+    def _backoff_seconds(attempts: int) -> int:
+        return min(WebhookService._BACKOFF_BASE_SECONDS * (2 ** max(attempts - 1, 0)),
+                   WebhookService._BACKOFF_CAP_SECONDS)
+
+    @staticmethod
+    def process_pending_deliveries(limit: int = 50) -> dict:
+        """Scheduler task: deliver due pending webhook deliveries with backoff."""
+        from models import WebhookDelivery
+        now = utc_now()
+        result = {'attempted': 0, 'delivered': 0, 'retry': 0, 'failed': 0}
+        try:
+            due = (WebhookDelivery.query
+                   .filter(WebhookDelivery.status == WebhookDelivery.STATUS_PENDING,
+                           WebhookDelivery.next_attempt_at <= now)
+                   .order_by(WebhookDelivery.next_attempt_at.asc())
+                   .limit(limit).all())
+        except Exception as e:
+            logger.error(f"Webhook delivery query failed: {e}")
+            return result
+
+        for d in due:
+            result['attempted'] += 1
+            endpoint = WebhookEndpoint.query.get(d.endpoint_id)
+            d.attempts = (d.attempts or 0) + 1
+            if not endpoint or not endpoint.enabled:
+                d.status = WebhookDelivery.STATUS_FAILED
+                d.last_error = 'Endpoint missing or disabled'
+                result['failed'] += 1
+                _safe_commit()
+                continue
+
+            body_json = WebhookService._build_body_json(d.event_type, json.loads(d.payload), d.event_timestamp)
+            ok, code, err = WebhookService._perform_delivery(endpoint, d.event_type, body_json)
+            d.last_response_code = code
+            d.last_error = err
+            if ok:
+                d.status = WebhookDelivery.STATUS_DELIVERED
+                d.delivered_at = now
+                endpoint.last_success = now
+                endpoint.failure_count = 0
+                result['delivered'] += 1
+            elif d.attempts >= (d.max_attempts or WebhookService.DEFAULT_MAX_ATTEMPTS):
+                d.status = WebhookDelivery.STATUS_FAILED
+                endpoint.last_failure = now
+                endpoint.failure_count = (endpoint.failure_count or 0) + 1
+                result['failed'] += 1
+            else:
+                d.next_attempt_at = now + timedelta(seconds=WebhookService._backoff_seconds(d.attempts))
+                endpoint.last_failure = now
+                endpoint.failure_count = (endpoint.failure_count or 0) + 1
+                result['retry'] += 1
+            _safe_commit()
+        if result['attempted']:
+            logger.info(f"Webhook deliveries processed: {result}")
+        return result
     
     @staticmethod
     def test_endpoint(endpoint_id: int) -> tuple:
@@ -393,53 +423,13 @@ class WebhookService:
             'endpoint_name': endpoint.name,
             'test_timestamp': utc_now().isoformat()
         }
-        
-        try:
-            body = {
-                'event': 'test',
-                'timestamp': utc_now().isoformat(),
-                'data': test_payload
-            }
-            body_json = json.dumps(body)
-
-            headers = {}
-            headers.update(_safe_custom_headers(endpoint.get_headers()))
-            auth_headers = _build_auth_header(endpoint)
-            headers.update(auth_headers)
-            headers.update({
-                'Content-Type': 'application/json',
-                'User-Agent': 'UCM-Webhook/2.0',
-                'X-UCM-Event': 'test',
-            })
-
-            secret_plain = decrypt_if_needed(endpoint.secret) if endpoint.secret else None
-            if secret_plain:
-                signature = hmac.new(
-                    secret_plain.encode(),
-                    body_json.encode(),
-                    hashlib.sha256
-                ).hexdigest()
-                headers['X-UCM-Signature'] = f'sha256={signature}'
-            
-            from utils.ssrf_protection import safe_request_post
-            response = safe_request_post(
-                endpoint.url,
-                data=body_json,
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.ok:
-                return True, f"Success: {response.status_code}"
-            else:
-                return False, f"Failed: {response.status_code} {response.text[:200]}"
-                
-        except requests.RequestException as e:
-            return False, f"Request error: {str(e)}"
-        except ValueError as e:
-            return False, f"URL rejected: {str(e)}"
-        except Exception as e:
-            return False, f"Error: {str(e)}"
+        # Test sends synchronously for immediate operator feedback (unlike real
+        # lifecycle events, which are queued and delivered asynchronously).
+        body_json = WebhookService._build_body_json('test', test_payload, utc_now().isoformat())
+        ok, code, err = WebhookService._perform_delivery(endpoint, 'test', body_json)
+        if ok:
+            return True, f"Success: {code}"
+        return False, f"Failed: {err or code}"
 
 
 # ---------------------------------------------------------------------------
@@ -518,3 +508,16 @@ def emit_template_updated(template: dict):
 # Backward-compatible aliases (previous names)
 trigger_cert_issued = emit_cert_issued
 trigger_cert_revoked = emit_cert_revoked
+
+
+# Register the webhook delivery handler on the event bus exactly once. Importing
+# this module (which the lifecycle emit_* helpers all do) wires the subscriber,
+# so any bus event is turned into durable, async WebhookDelivery rows.
+def _register_bus_subscriber():
+    from services.events import event_bus, ALL
+    if not getattr(_register_bus_subscriber, '_done', False):
+        event_bus.subscribe(ALL, WebhookService.enqueue_deliveries)
+        _register_bus_subscriber._done = True
+
+
+_register_bus_subscriber()

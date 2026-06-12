@@ -644,6 +644,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        # Register webhook delivery task (drains the durable delivery queue with retry)
+        try:
+            from services.webhook_service import WebhookService
+            scheduler.register_task(
+                name="webhook_delivery",
+                func=WebhookService.process_pending_deliveries,
+                interval=30,  # Drain pending webhook deliveries every 30s
+                description="Deliver queued webhooks asynchronously with retry/backoff"
+            )
+            app.logger.info("Registered webhook delivery task (every 30s)")
+        except ImportError:
+            pass
+
         # Register session cleanup task (every 15 minutes)
         try:
             from services.session_cleanup_task import SessionCleanupTask

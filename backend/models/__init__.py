@@ -32,6 +32,7 @@ from models.ssh import SSHCertificateAuthority, SSHCertificate
 from models.msca import MicrosoftCA, MSCARequest
 from models.discovered_certificate import ScanProfile, ScanRun, DiscoveredCertificate
 from models.ca_template_pin import CATemplatePin
+from models.webhook_delivery import WebhookDelivery
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -50,4 +51,5 @@ __all__ = [
     "ScanProfile", "ScanRun", "DiscoveredCertificate",
     "SSHCertificateAuthority", "SSHCertificate",
     "CATemplatePin",
+    "WebhookDelivery",
 ]
