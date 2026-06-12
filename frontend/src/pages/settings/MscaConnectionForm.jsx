@@ -94,7 +94,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
   ]
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
         label={`${t('msca.connectionName')} *`}
         value={formData.name}

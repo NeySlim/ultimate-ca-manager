@@ -305,7 +305,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   ]
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       {/* Template selection */}
       {filteredTemplates.length > 0 && (
         <div className="space-y-2">

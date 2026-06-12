@@ -639,7 +639,7 @@ export default function DiscoveryPage() {
                   <MagnifyingGlass size={22} weight="bold" />
                 </Button>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   {scanning && scanProgress && scanProgress.total > 0 && (
                     <div className="flex items-center gap-2 text-xs text-text-secondary mr-1">
                       <div className="w-24 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">

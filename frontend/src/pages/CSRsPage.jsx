@@ -991,7 +991,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
         title={t('csrs.generateCSR')}
         size="lg"
       >
-        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
             {t('csrs.generateDescription')}
           </p>

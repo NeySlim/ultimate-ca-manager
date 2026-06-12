@@ -550,7 +550,7 @@ export default function PoliciesPage() {
         title={editing ? t('policies.editPolicy') : t('policies.createPolicy')}
         size="lg"
       >
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Basic Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input

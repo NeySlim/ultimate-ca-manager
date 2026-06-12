@@ -820,7 +820,7 @@ function SearchBar({
       'shrink-0 border-b border-border-op30',
       isMobile ? 'px-3 py-2 bg-secondary-op10' : 'px-4 py-2 bg-secondary-op30'
     )}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Search input - premium styling on mobile */}
         {searchable && (
           <div className={cn(
@@ -1163,10 +1163,12 @@ function SearchBar({
           </div>
         )}
         
-        {/* Actions - same height as search bar on mobile */}
+        {/* Actions - same height as search bar on mobile. Wraps when the
+            available width is too narrow (e.g. split-view with detail panel)
+            instead of forcing a horizontal scrollbar. */}
         {actions && (
           <div className={cn(
-            "flex items-center gap-2 shrink-0",
+            "flex items-center gap-2 flex-wrap justify-end",
             isMobile && "[&>button]:h-9 [&>button]:px-3 [&>button]:text-xs"
           )}>
             {actions}

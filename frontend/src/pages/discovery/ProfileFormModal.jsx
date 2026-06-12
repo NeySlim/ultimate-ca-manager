@@ -95,7 +95,7 @@ export default function ProfileFormModal({ open, onClose, onSave, profile, t }) 
       onClose={onClose}
       title={profile ? t('discovery.editProfile') : t('discovery.createProfile')}
     >
-      <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+      <form onSubmit={handleSubmit} className="p-5 space-y-5">
         {/* ── Identity Section ── */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-tertiary">

@@ -45,11 +45,12 @@ export function ColumnsView({ tree, selectedId, onSelect, isMobile, t }) {
     )
   }
 
-  // Desktop: side-by-side columns
+  // Desktop: columns fill the available width then wrap to the next row
+  // (vertical scroll handled by the parent container, not horizontal).
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2" style={{ minHeight: 200 }}>
+    <div className="grid gap-3 pb-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
       {roots.map(root => (
-        <div key={root.id} className="ca-col-wrapper flex-1 min-w-[240px] max-w-[400px] flex flex-col rounded-xl border border-border-op60 overflow-hidden">
+        <div key={root.id} className="ca-col-wrapper flex flex-col rounded-xl border border-border-op60 overflow-hidden">
           <ColumnHeader ca={root} selectedId={selectedId} onSelect={onSelect} isMobile={false} t={t} />
           <div className="flex-1 p-2 space-y-1.5 overflow-y-auto">
             {root.children?.map(child => (
@@ -64,7 +65,7 @@ export function ColumnsView({ tree, selectedId, onSelect, isMobile, t }) {
         </div>
       ))}
       {orphans.length > 0 && (
-        <div className="ca-col-wrapper flex-1 min-w-[220px] max-w-[300px] flex flex-col rounded-xl border border-dashed border-border-op60 overflow-hidden">
+        <div className="ca-col-wrapper flex flex-col rounded-xl border border-dashed border-border-op60 overflow-hidden">
           <div className="ca-col-header-orphan px-3 py-2.5">
             <span className="text-xs font-bold text-text-secondary">{t('cas.orphanCAs')}</span>
           </div>

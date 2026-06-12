@@ -876,7 +876,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
   const caOptions = cas.map(ca => ({ value: String(ca.id), label: ca.name }))
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       {/* Issue Mode */}
       <div>
         <label className="block text-xs font-medium text-text-primary mb-2">
@@ -1138,7 +1138,7 @@ function GeneratedResultView({ result, onClose }) {
   const safeKeyId = keyId.replace(/[^a-zA-Z0-9_-]/g, '_')
 
   return (
-    <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+    <div className="p-4 space-y-4">
       {/* Success banner */}
       <div className="p-3 rounded-lg bg-status-success-op10 border border-status-success-op30">
         <div className="flex items-center gap-2 text-status-success text-xs font-medium">

@@ -234,7 +234,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, handleTestConnection }
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       {/* General Settings */}
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-4">
