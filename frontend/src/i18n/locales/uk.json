@@ -2964,6 +2964,24 @@
         "authorizationBlocked": "\"Authorization\" cannot be used as the header name for API Key — use Custom Header type instead",
         "tokenTooLong": "Token exceeds maximum length of 8192 bytes"
       }
+    },
+    "deliveries": {
+      "title": "Доставки — {{name}}",
+      "loadFailed": "Не вдалося завантажити доставки",
+      "requeued": "Доставку повторно поставлено в чергу",
+      "retryFailed": "Не вдалося повторно поставити в чергу",
+      "empty": "Доставок ще немає",
+      "event": "Подія",
+      "statusCol": "Статус",
+      "attempts": "Спроби",
+      "when": "Коли",
+      "next": "наступна",
+      "retry": "Повторити",
+      "status": {
+        "pending": "Очікує",
+        "delivered": "Доставлено",
+        "failed": "Помилка"
+      }
     }
   },
   "safeMode": {

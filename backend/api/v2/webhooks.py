@@ -13,6 +13,7 @@ from models import db
 from services.audit_service import AuditService
 from services.webhook_service import WebhookEndpoint, WebhookService
 from utils.db_transaction import safe_commit
+from utils.datetime_utils import utc_now
 from utils.decorators import require_json_body
 from utils.encryption import encrypt_if_needed
 from utils.response import created_response, error_response, no_content_response, success_response
@@ -436,6 +437,45 @@ def test_webhook(endpoint_id):
         return success_response(message=message)
     else:
         return error_response(message, 400)
+
+
+@bp.route('/api/v2/webhooks/<int:endpoint_id>/deliveries', methods=['GET'])
+@require_auth(['read:settings'])
+def list_deliveries(endpoint_id):
+    """Per-endpoint webhook delivery history (newest first), optional status filter."""
+    from models import WebhookDelivery
+    from utils.pagination import parse_request_pagination, paginate
+    WebhookEndpoint.query.get_or_404(endpoint_id)
+
+    page, per_page = parse_request_pagination(default_per_page=25, max_per_page=100)
+    query = WebhookDelivery.query.filter_by(endpoint_id=endpoint_id)
+    status = request.args.get('status')
+    if status in (WebhookDelivery.STATUS_PENDING, WebhookDelivery.STATUS_DELIVERED, WebhookDelivery.STATUS_FAILED):
+        query = query.filter_by(status=status)
+    query = query.order_by(WebhookDelivery.id.desc())
+
+    result = paginate(query, page, per_page)
+    return success_response(data=[d.to_dict() for d in result['items']], meta=result['meta'])
+
+
+@bp.route('/api/v2/webhooks/<int:endpoint_id>/deliveries/<int:delivery_id>/retry', methods=['POST'])
+@require_auth(['write:settings'])
+def retry_delivery(endpoint_id, delivery_id):
+    """Re-queue a delivery for immediate redelivery."""
+    from models import WebhookDelivery
+    d = WebhookDelivery.query.filter_by(id=delivery_id, endpoint_id=endpoint_id).first()
+    if not d:
+        return error_response('Delivery not found', 404)
+
+    d.status = WebhookDelivery.STATUS_PENDING
+    d.attempts = 0
+    d.max_attempts = WebhookService.DEFAULT_MAX_ATTEMPTS
+    d.next_attempt_at = utc_now()
+    d.last_error = None
+    ok, _err = safe_commit(logger, "Failed to re-queue webhook delivery")
+    if not ok:
+        return _err
+    return success_response(data=d.to_dict(), message="Delivery re-queued")
 
 
 @bp.route('/api/v2/webhooks/<int:endpoint_id>/regenerate-secret', methods=['POST'])

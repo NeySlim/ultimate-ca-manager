@@ -2964,6 +2964,24 @@
         "authorizationBlocked": "\"Authorization\" cannot be used as the header name for API Key — use Custom Header type instead",
         "tokenTooLong": "Token exceeds maximum length of 8192 bytes"
       }
+    },
+    "deliveries": {
+      "title": "投递 — {{name}}",
+      "loadFailed": "加载投递失败",
+      "requeued": "投递已重新排队",
+      "retryFailed": "重新排队失败",
+      "empty": "暂无投递",
+      "event": "事件",
+      "statusCol": "状态",
+      "attempts": "尝试",
+      "when": "时间",
+      "next": "下次",
+      "retry": "重试",
+      "status": {
+        "pending": "待处理",
+        "delivered": "已投递",
+        "failed": "失败"
+      }
     }
   },
   "safeMode": {

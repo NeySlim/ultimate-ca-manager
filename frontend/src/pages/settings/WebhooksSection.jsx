@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bell, TestTube, ArrowsClockwise, Lightning, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
+import { Bell, TestTube, ArrowsClockwise, Lightning, PencilSimple, Trash, Plus, ClockCounterClockwise } from '@phosphor-icons/react'
 import { Button, Badge, HelpCard, DetailSection, DetailContent, DetailHeader, EmptyState } from '../../components'
 import { WEBHOOK_EVENT_LABELS } from './WebhookForm'
+import WebhookDeliveriesModal from './WebhookDeliveriesModal'
 
 export default function WebhooksSection({ webhooks, webhooksLoading, webhookTesting, handleWebhookCreate, handleWebhookEdit, handleWebhookToggle, handleWebhookTest, setWebhookConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
+  const [deliveriesFor, setDeliveriesFor] = useState(null)
   return (
     <DetailContent>
       <DetailHeader
@@ -56,6 +59,9 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                  <Button type="button" size="sm" variant="secondary" onClick={() => setDeliveriesFor(webhook)} title={t('webhooks.deliveries.title', { name: webhook.name })}>
+                    <ClockCounterClockwise size={14} />
+                  </Button>
                   <Button type="button" size="sm" variant="secondary" onClick={() => handleWebhookTest(webhook)} disabled={webhookTesting === webhook.id}>
                     {webhookTesting === webhook.id ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
                   </Button>
@@ -82,6 +88,12 @@ export default function WebhooksSection({ webhooks, webhooksLoading, webhookTest
           </div>
         </DetailSection>
       )}
+
+      <WebhookDeliveriesModal
+        webhook={deliveriesFor}
+        onClose={() => setDeliveriesFor(null)}
+        canRetry={hasPermission('write:settings') || hasPermission('admin:system')}
+      />
     </DetailContent>
   )
 }

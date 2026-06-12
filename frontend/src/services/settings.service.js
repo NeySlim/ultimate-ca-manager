@@ -75,6 +75,16 @@ export const settingsService = {
     return apiClient.post(`/webhooks/${id}/test`)
   },
 
+  async getWebhookDeliveries(id, { page = 1, perPage = 25, status } = {}) {
+    const params = new URLSearchParams({ page, per_page: perPage })
+    if (status) params.set('status', status)
+    return apiClient.get(`/webhooks/${id}/deliveries?${params}`)
+  },
+
+  async retryWebhookDelivery(id, deliveryId) {
+    return apiClient.post(`/webhooks/${id}/deliveries/${deliveryId}/retry`)
+  },
+
   // Encryption
   async getEncryptionStatus() {
     return apiClient.get('/system/security/encryption-status')
