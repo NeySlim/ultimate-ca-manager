@@ -154,13 +154,16 @@ def import_ca():
         )
 
         # Single lifecycle event — bus fans out to webhook + email + WebSocket.
+        # Snapshot before emit: subscribers may commit and expire the instance.
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        ca_dict = ca.to_dict()
+        ca_descr = ca.descr
         from services.webhook_service import emit_ca_created
-        emit_ca_created(ca.to_dict(), actor=username)
+        emit_ca_created(ca_dict, actor=username)
 
         return created_response(
-            data=ca.to_dict(),
-            message=f'CA "{ca.descr}" imported successfully'
+            data=ca_dict,
+            message=f'CA "{ca_descr}" imported successfully'
         )
 
     except ValueError as e:

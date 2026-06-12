@@ -11,11 +11,17 @@ from utils.datetime_utils import utc_now
 @pytest.fixture
 def endpoint(app):
     with app.app_context():
+        # The app fixture is session-scoped with a shared DB and no per-test
+        # rollback, so clear any transaction a prior test may have left dirty
+        # and purge deliveries *before* creating the endpoint. Reading ep.id
+        # then happens right after its own commit, with no intervening DML to
+        # expire/invalidate the instance (avoids a flaky ObjectDeletedError).
+        db.session.rollback()
+        WebhookDelivery.query.delete()
+        db.session.commit()
         ep = WebhookEndpoint(name='sink', url='https://example.invalid/h',
                              events=json.dumps(['*']), enabled=True)
         db.session.add(ep)
-        db.session.commit()
-        WebhookDelivery.query.delete()
         db.session.commit()
         return ep.id
 
@@ -46,6 +52,18 @@ class TestEnqueue:
             rows = WebhookDelivery.query.filter_by(endpoint_id=endpoint).all()
             assert len(rows) == 1
             assert rows[0].status == 'pending' and rows[0].attempts == 0
+
+    def test_enqueue_does_not_expire_caller_objects(self, app, endpoint):
+        # enqueue_deliveries runs synchronously inside the originating request
+        # and commits; that commit must not expire ORM instances the caller
+        # still holds (which would raise ObjectDeletedError on next access).
+        from sqlalchemy import inspect
+        with app.app_context():
+            held = WebhookEndpoint.query.get(endpoint)
+            _ = held.name  # ensure loaded
+            WebhookService.enqueue_deliveries('certificate.issued', {'id': 1})
+            assert not inspect(held).expired  # still usable, no refresh needed
+            assert held.name == 'sink'
 
     def test_ca_filter_excludes_non_matching(self, app):
         with app.app_context():

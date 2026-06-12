@@ -363,11 +363,13 @@ def create_ca():
         )
 
         # Single lifecycle event — bus fans out to webhook + email + WebSocket.
+        # Snapshot before emit: subscribers may commit and expire the instance.
+        ca_dict = ca.to_dict()
         from services.webhook_service import emit_ca_created
-        emit_ca_created(ca.to_dict(), actor=username)
+        emit_ca_created(ca_dict, actor=username)
 
         return created_response(
-            data=ca.to_dict(),
+            data=ca_dict,
             message='CA created successfully'
         )
     except ValueError as e:
@@ -588,10 +590,11 @@ def update_ca(ca_id):
         )
 
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        ca_dict = ca.to_dict()
         from services.webhook_service import emit_ca_updated
-        emit_ca_updated(ca.to_dict(), actor=username, changes={k: v for k, v in data.items()})
+        emit_ca_updated(ca_dict, actor=username, changes={k: v for k, v in data.items()})
 
-        return success_response(data=ca.to_dict(), message='CA updated successfully')
+        return success_response(data=ca_dict, message='CA updated successfully')
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to update CA: {e}")

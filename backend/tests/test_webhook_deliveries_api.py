@@ -10,6 +10,9 @@ from utils.datetime_utils import utc_now
 @pytest.fixture
 def endpoint_with_deliveries(app):
     with app.app_context():
+        # Shared session-scoped DB with no per-test rollback: clear any dirty
+        # transaction left by a prior test before creating the endpoint.
+        db.session.rollback()
         ep = WebhookEndpoint(name='hist', url='https://x.invalid/h',
                              events=json.dumps(['*']), enabled=True)
         db.session.add(ep)

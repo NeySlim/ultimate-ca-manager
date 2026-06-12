@@ -503,14 +503,21 @@ def create_certificate():
         except Exception:
             pass
 
+        # Serialize once, before emitting. The bus fans out to webhook (async),
+        # email and WebSocket subscribers, some of which commit the session and
+        # thus expire ORM instances — re-reading db_cert afterwards could raise
+        # ObjectDeletedError. Reuse this snapshot for the response.
+        cert_dict = db_cert.to_dict()
+        ca_refid = ca.refid
+
         # Single lifecycle event — the bus fans out to webhook (async),
         # email and WebSocket subscribers.
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         from services.webhook_service import emit_cert_issued
-        emit_cert_issued(db_cert.to_dict(), ca_refid=ca.refid, actor=username)
+        emit_cert_issued(cert_dict, ca_refid=ca_refid, actor=username)
 
         return created_response(
-            data=db_cert.to_dict(),
+            data=cert_dict,
             message='Certificate created successfully'
         )
 

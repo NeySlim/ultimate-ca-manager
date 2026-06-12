@@ -10,11 +10,15 @@ from services.webhook_service import WebhookEndpoint, emit_cert_issued, emit_ca_
 @pytest.fixture
 def all_events_endpoint(app):
     with app.app_context():
+        # Shared session-scoped DB with no per-test rollback: clear any dirty
+        # transaction and purge deliveries before creating the endpoint so
+        # ep.id is read right after its own commit (avoids ObjectDeletedError).
+        db.session.rollback()
+        WebhookDelivery.query.delete()
+        db.session.commit()
         ep = WebhookEndpoint(name='fanout', url='https://x.invalid/h',
                              events=json.dumps(['*']), enabled=True)
         db.session.add(ep)
-        db.session.commit()
-        WebhookDelivery.query.delete()
         db.session.commit()
         return ep.id
 

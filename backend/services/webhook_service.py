@@ -312,11 +312,23 @@ class WebhookService:
             queued += 1
         if not queued:
             return
+        # This subscriber runs synchronously inside the originating request
+        # (e.g. certificate issuance). Committing here must NOT expire the
+        # caller's ORM instances, otherwise a freshly-created Certificate/CA
+        # the caller still holds would be invalidated on next access and raise
+        # ObjectDeletedError. Suspend expire-on-commit just for this commit
+        # (on the underlying Session — the scoped_session proxy doesn't expose
+        # the attribute).
+        session = db.session()
+        prev_expire = session.expire_on_commit
         try:
+            session.expire_on_commit = False
             db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to queue webhook deliveries for {event_type}: {e}")
+        finally:
+            session.expire_on_commit = prev_expire
 
     @staticmethod
     def _build_body_json(event_type: str, payload: dict, timestamp: str) -> str:

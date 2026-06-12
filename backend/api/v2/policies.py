@@ -570,11 +570,13 @@ def approve_request(request_id):
     if not ok:
         return _err
 
+    # Snapshot before emitting: bus subscribers may commit and expire the
+    # ORM instance, so re-reading approval afterwards could raise.
+    result = approval.to_dict()
     if approval.status == 'approved':
         from services.webhook_service import emit_csr_approved
-        emit_csr_approved(approval.to_dict())
+        emit_csr_approved(result)
 
-    result = approval.to_dict()
     if issued_cert is not None:
         result['certificate'] = issued_cert
         result['certificate_issued'] = True
@@ -636,11 +638,12 @@ def reject_request(request_id):
     if not ok:
         return _err
 
+    result = approval.to_dict()
     if approval.status == 'rejected':
         from services.webhook_service import emit_csr_rejected
-        emit_csr_rejected(approval.to_dict(), reason=data.get('comment'))
+        emit_csr_rejected(result, reason=data.get('comment'))
 
-    return success_response(data=approval.to_dict(), message="Request rejected")
+    return success_response(data=result, message="Request rejected")
 
 
 @bp.route('/api/v2/approvals/stats', methods=['GET'])

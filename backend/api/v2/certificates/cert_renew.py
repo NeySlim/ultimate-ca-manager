@@ -181,11 +181,13 @@ def renew_certificate(cert_id):
             pass
 
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        cert_dict = cert.to_dict()
+        cert_caref = cert.caref
         from services.webhook_service import emit_cert_renewed
-        emit_cert_renewed(cert.to_dict(), ca_refid=cert.caref, actor=username)
+        emit_cert_renewed(cert_dict, ca_refid=cert_caref, actor=username)
 
         return success_response(
-            data=cert.to_dict(),
+            data=cert_dict,
             message='Certificate renewed successfully'
         )
 
