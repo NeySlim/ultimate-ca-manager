@@ -109,5 +109,14 @@ class NotificationSchedulerMixin:
                     results['crl_expiring']['failed'] += 1
                     logger.error(f"Failed to send CRL notification: {msg}")
 
+        # Fire certificate.expiring / certificate.expired webhooks. Independent
+        # of email notification config — webhooks must work even when email
+        # alerts are disabled or have no recipients.
+        try:
+            from services.expiry_alert_service import _emit_expiry_webhooks
+            _emit_expiry_webhooks()
+        except Exception as e:
+            logger.error(f"Expiry webhook pass failed: {e}")
+
         logger.info(f"Notification check completed: {results}")
         return results
