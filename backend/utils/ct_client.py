@@ -57,7 +57,17 @@ def submit_to_ct_log(log_url: str, cert_chain_pem: List[str], timeout: int = 10)
         }).encode('utf-8')
         
         submit_url = log_url.rstrip('/') + '/ct/v1/add-chain'
-        
+
+        # CT log URLs are admin-configurable; block cloud-metadata/loopback
+        # targets so a misconfigured URL can't be used to probe internals.
+        # (LAN/public remain allowed — CT logs are public infra.)
+        from utils.ssrf_protection import validate_url_not_cloud_metadata
+        try:
+            validate_url_not_cloud_metadata(submit_url)
+        except ValueError as e:
+            logger.warning(f"CT log submission to {log_url} rejected: {e}")
+            return None
+
         ctx = ssl.create_default_context()
         req = urllib.request.Request(
             submit_url,
