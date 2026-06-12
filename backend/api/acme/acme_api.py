@@ -1654,6 +1654,41 @@ def key_change():
 
 # ==================== Health Check ====================
 
+@acme_bp.route('/renewalInfo/<certid>', methods=['GET'])
+def renewal_info(certid: str):
+    """ACME Renewal Information (ARI) — RFC 9773 §4.2.
+
+    Unauthenticated GET. Returns a suggestedWindow telling the client when
+    to renew the certificate identified by ``certid``
+    (base64url(AKI)."."base64url(serial)).
+    """
+    from services.acme import ari
+
+    parsed = ari.parse_certid(certid)
+    if parsed is None:
+        return acme_error('malformed', 'Malformed certificate identifier', 400)
+
+    aki_hex, serial_int = parsed
+    cert = ari.find_certificate(aki_hex, serial_int)
+    if cert is None:
+        return acme_error('malformed', 'Unknown certificate', 404)
+
+    from models import SystemConfig
+    days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()
+    try:
+        renew_before_days = int(days_cfg.value) if days_cfg and days_cfg.value else None
+    except (TypeError, ValueError):
+        renew_before_days = None
+
+    data = ari.build_renewal_info(cert, renew_before_days)
+    response = make_response(jsonify(data), 200)
+    response.headers['Content-Type'] = 'application/json'
+    # ARI responses are cacheable (RFC 9773 §4.2); advise re-poll cadence.
+    response.headers['Retry-After'] = str(ari.RETRY_AFTER_SECONDS)
+    response.headers['Cache-Control'] = f'public, max-age={ari.RETRY_AFTER_SECONDS}'
+    return response
+
+
 @acme_bp.route('/health', methods=['GET'])
 def health():
     """Health check endpoint (not part of ACME spec)"""

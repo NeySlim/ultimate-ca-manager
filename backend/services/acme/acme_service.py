@@ -26,6 +26,7 @@ class AcmeService(NonceMixin, AccountMixin, OrderMixin, ChallengeMixin, Issuance
         "newAuthz": "/acme/new-authz",
         "revokeCert": "/acme/revoke-cert",
         "keyChange": "/acme/key-change",
+        "renewalInfo": "/acme/renewalInfo",
     }
 
     SUPPORTED_CHALLENGES = ["http-01", "dns-01", "tls-alpn-01"]

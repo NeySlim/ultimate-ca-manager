@@ -10,6 +10,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **ACME Renewal Information (ARI)** — the ACME server now advertises and serves a `renewalInfo` resource (RFC 9773), returning a per-certificate suggested renewal window so clients can spread renewals and react immediately to revocation.
+- **Prometheus metrics** — opt-in, bearer-gated `/metrics` endpoint exposing certificate, CA, scheduler, webhook and ACME counters in Prometheus exposition format.
+- **Webhook delivery history** — per-endpoint delivery log with status, attempts and manual retry, backed by a durable async delivery queue with exponential backoff.
+- **Scheduler admin view** — Settings › System now lists background tasks with their status, last run and a run-now action.
+- **Scheduled backups** — automatic encrypted backups on a configurable cadence with retention.
+
+### Fixed
+- **Pagination** — list pages that paginated client-side (Users, Templates, SCEP, SSH CAs, CRL/OCSP, CSRs, ACME accounts, Discovery) now correctly page through their rows instead of rendering the full list on one page.
+
+### Changed
+- **Notifications** — email and WebSocket notifications are now fanned out through an in-process event bus, removing duplicated call-sites.
+
 ## [2.169] - 2026-06-12
 
 ### Added
