@@ -678,9 +678,17 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
-        # Start scheduler now that tasks are registered
-        scheduler.start(app=app)
-        app.logger.info("Scheduler service started with all tasks")
+        # Start scheduler now that tasks are registered. Skip the background
+        # thread under tests: the test SQLite backend uses a single shared
+        # (StaticPool) connection, so a scheduler thread running a query while
+        # a request commits raises "cannot commit transaction - SQL statements
+        # in progress" intermittently. Tasks stay registered (the admin view
+        # and run-now execute them synchronously).
+        if not app.config.get('TESTING'):
+            scheduler.start(app=app)
+            app.logger.info("Scheduler service started with all tasks")
+        else:
+            app.logger.info("Scheduler tasks registered (background thread disabled under TESTING)")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler
