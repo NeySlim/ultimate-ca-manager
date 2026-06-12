@@ -2964,6 +2964,24 @@
         "authorizationBlocked": "\"Authorization\" cannot be used as the header name for API Key — use Custom Header type instead",
         "tokenTooLong": "Token exceeds maximum length of 8192 bytes"
       }
+    },
+    "deliveries": {
+      "title": "配信 — {{name}}",
+      "loadFailed": "配信の読み込みに失敗しました",
+      "requeued": "配信を再キューしました",
+      "retryFailed": "再キューに失敗しました",
+      "empty": "配信はまだありません",
+      "event": "イベント",
+      "statusCol": "ステータス",
+      "attempts": "試行",
+      "when": "いつ",
+      "next": "次回",
+      "retry": "再試行",
+      "status": {
+        "pending": "保留中",
+        "delivered": "配信済み",
+        "failed": "失敗"
+      }
     }
   },
   "safeMode": {

@@ -2964,6 +2964,24 @@
         "authorizationBlocked": "\"Authorization\" cannot be used as the header name for API Key — use Custom Header type instead",
         "tokenTooLong": "Token exceeds maximum length of 8192 bytes"
       }
+    },
+    "deliveries": {
+      "title": "Consegne — {{name}}",
+      "loadFailed": "Impossibile caricare le consegne",
+      "requeued": "Consegna rimessa in coda",
+      "retryFailed": "Impossibile rimettere in coda",
+      "empty": "Nessuna consegna",
+      "event": "Evento",
+      "statusCol": "Stato",
+      "attempts": "Tentativi",
+      "when": "Quando",
+      "next": "prossima",
+      "retry": "Riprova",
+      "status": {
+        "pending": "In attesa",
+        "delivered": "Consegnata",
+        "failed": "Fallita"
+      }
     }
   },
   "safeMode": {
