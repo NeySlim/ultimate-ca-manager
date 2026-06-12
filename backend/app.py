@@ -657,6 +657,14 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        # Wire email + WebSocket notifications onto the event bus so lifecycle
+        # code emits one event instead of calling three notification systems.
+        try:
+            from services.events.subscribers import register_notification_subscribers
+            register_notification_subscribers()
+        except ImportError:
+            pass
+
         # Register session cleanup task (every 15 minutes)
         try:
             from services.session_cleanup_task import SessionCleanupTask

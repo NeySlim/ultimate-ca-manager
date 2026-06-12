@@ -25,8 +25,8 @@ class TestEventBus:
         from services.events import EventBus
         bus = EventBus()
         seen = []
-        bus.subscribe('x', lambda e, p, c: (_ for _ in ()).throw(RuntimeError('boom')))
-        bus.subscribe('x', lambda e, p, c: seen.append(e))
+        bus.subscribe('x', lambda e, p, c, m: (_ for _ in ()).throw(RuntimeError('boom')))
+        bus.subscribe('x', lambda e, p, c, m: seen.append(e))
         bus.emit('x', {})  # must not raise; second handler still runs
         assert seen == ['x']
 
@@ -34,7 +34,7 @@ class TestEventBus:
         from services.events import EventBus, ALL
         bus = EventBus()
         seen = []
-        bus.subscribe(ALL, lambda e, p, c: seen.append(e))
+        bus.subscribe(ALL, lambda e, p, c, m: seen.append(e))
         bus.emit('a', {}); bus.emit('b', {})
         assert seen == ['a', 'b']
 

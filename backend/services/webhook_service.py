@@ -271,17 +271,17 @@ class WebhookService:
     _BACKOFF_CAP_SECONDS = 3600     # capped at 1 h
 
     @staticmethod
-    def send_event(event_type: str, payload: dict, ca_refid: str = None):
+    def send_event(event_type: str, payload: dict, ca_refid: str = None, meta: dict = None):
         """Publish a lifecycle event on the bus (never raises).
 
         The webhook subscriber turns it into durable, asynchronously-delivered
         WebhookDelivery rows — the triggering operation is never blocked on HTTP.
         """
         from services.events import event_bus
-        event_bus.emit(event_type, payload, ca_refid)
+        event_bus.emit(event_type, payload, ca_refid, meta or {})
 
     @staticmethod
-    def enqueue_deliveries(event_type: str, payload: dict, ca_refid: str = None):
+    def enqueue_deliveries(event_type: str, payload: dict, ca_refid: str = None, meta: dict = None):
         """Bus subscriber: queue one delivery per matching, enabled endpoint."""
         from models import WebhookDelivery
         try:
@@ -438,23 +438,31 @@ class WebhookService:
 # triggered it. send_event() is already non-raising; the extra guard here is
 # belt-and-braces for payload construction.
 # ---------------------------------------------------------------------------
-def _emit(event_type: str, payload: dict, ca_refid: str = None):
+def _emit(event_type: str, payload: dict, ca_refid: str = None, meta: dict = None):
     try:
-        WebhookService.send_event(event_type, payload, ca_refid)
+        from services.events import event_bus
+        event_bus.emit(event_type, payload, ca_refid, meta or {})
     except Exception as e:  # pragma: no cover - defensive
-        logger.error(f"Webhook emit failed for {event_type}: {e}")
+        logger.error(f"Event emit failed for {event_type}: {e}")
 
 
-def emit_cert_issued(cert: dict, ca_refid: str = None):
-    _emit(WebhookService.CERT_ISSUED, {'certificate': cert}, ca_refid)
+def _meta(actor=None, **extra):
+    m = {k: v for k, v in extra.items() if v is not None}
+    if actor is not None:
+        m['actor'] = actor
+    return m
 
 
-def emit_cert_revoked(cert: dict, reason: str = None, ca_refid: str = None):
-    _emit(WebhookService.CERT_REVOKED, {'certificate': cert, 'reason': reason}, ca_refid)
+def emit_cert_issued(cert: dict, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_ISSUED, {'certificate': cert}, ca_refid, _meta(actor))
 
 
-def emit_cert_renewed(cert: dict, ca_refid: str = None):
-    _emit(WebhookService.CERT_RENEWED, {'certificate': cert}, ca_refid)
+def emit_cert_revoked(cert: dict, reason: str = None, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_REVOKED, {'certificate': cert, 'reason': reason}, ca_refid, _meta(actor, reason=reason))
+
+
+def emit_cert_renewed(cert: dict, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_RENEWED, {'certificate': cert}, ca_refid, _meta(actor))
 
 
 def emit_cert_expiring(cert: dict, days_left: int = None, ca_refid: str = None):
@@ -465,44 +473,47 @@ def emit_cert_expired(cert: dict, ca_refid: str = None):
     _emit(WebhookService.CERT_EXPIRED, {'certificate': cert}, ca_refid)
 
 
-def emit_cert_imported(cert: dict, ca_refid: str = None):
-    _emit(WebhookService.CERT_IMPORTED, {'certificate': cert}, ca_refid)
+def emit_cert_imported(cert: dict, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_IMPORTED, {'certificate': cert}, ca_refid, _meta(actor))
 
 
-def emit_cert_deleted(cert: dict, ca_refid: str = None):
-    _emit(WebhookService.CERT_DELETED, {'certificate': cert}, ca_refid)
+def emit_cert_deleted(cert: dict, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_DELETED, {'certificate': cert}, ca_refid, _meta(actor))
 
 
-def emit_ca_created(ca: dict):
-    _emit(WebhookService.CA_CREATED, {'ca': ca}, ca.get('refid') if isinstance(ca, dict) else None)
+def emit_ca_created(ca: dict, actor: str = None):
+    refid = ca.get('refid') if isinstance(ca, dict) else None
+    _emit(WebhookService.CA_CREATED, {'ca': ca}, refid, _meta(actor))
 
 
-def emit_ca_updated(ca: dict):
-    _emit(WebhookService.CA_UPDATED, {'ca': ca}, ca.get('refid') if isinstance(ca, dict) else None)
+def emit_ca_updated(ca: dict, actor: str = None, changes: dict = None):
+    refid = ca.get('refid') if isinstance(ca, dict) else None
+    _emit(WebhookService.CA_UPDATED, {'ca': ca}, refid, _meta(actor, changes=changes))
 
 
-def emit_ca_deleted(ca: dict):
-    _emit(WebhookService.CA_DELETED, {'ca': ca}, ca.get('refid') if isinstance(ca, dict) else None)
+def emit_ca_deleted(ca: dict, actor: str = None):
+    refid = ca.get('refid') if isinstance(ca, dict) else None
+    _emit(WebhookService.CA_DELETED, {'ca': ca}, refid, _meta(actor))
 
 
-def emit_csr_submitted(csr: dict):
-    _emit(WebhookService.CSR_SUBMITTED, {'csr': csr})
+def emit_csr_submitted(csr: dict, actor: str = None):
+    _emit(WebhookService.CSR_SUBMITTED, {'csr': csr}, None, _meta(actor))
 
 
-def emit_csr_approved(csr: dict):
-    _emit(WebhookService.CSR_APPROVED, {'csr': csr})
+def emit_csr_approved(csr: dict, actor: str = None):
+    _emit(WebhookService.CSR_APPROVED, {'csr': csr}, None, _meta(actor))
 
 
-def emit_csr_rejected(csr: dict, reason: str = None):
-    _emit(WebhookService.CSR_REJECTED, {'csr': csr, 'reason': reason})
+def emit_csr_rejected(csr: dict, reason: str = None, actor: str = None):
+    _emit(WebhookService.CSR_REJECTED, {'csr': csr, 'reason': reason}, None, _meta(actor, reason=reason))
 
 
-def emit_template_created(template: dict):
-    _emit(WebhookService.TEMPLATE_CREATED, {'template': template})
+def emit_template_created(template: dict, actor: str = None):
+    _emit(WebhookService.TEMPLATE_CREATED, {'template': template}, None, _meta(actor))
 
 
-def emit_template_updated(template: dict):
-    _emit(WebhookService.TEMPLATE_UPDATED, {'template': template})
+def emit_template_updated(template: dict, actor: str = None):
+    _emit(WebhookService.TEMPLATE_UPDATED, {'template': template}, None, _meta(actor))
 
 
 # Backward-compatible aliases (previous names)

@@ -503,29 +503,11 @@ def create_certificate():
         except Exception:
             pass
 
-        # Send notification
-        try:
-            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-            NotificationService.on_certificate_issued(db_cert, username)
-        except Exception:
-            pass  # Non-blocking
-
-        # WebSocket event
-        try:
-            on_certificate_issued(
-                cert_id=db_cert.id,
-                cn=data['cn'],
-                ca_id=ca.id,
-                issuer=ca.name,
-                valid_to=utc_isoformat(not_after)
-            )
-        except Exception:
-            pass  # Non-blocking
-
-        # Webhook event (this endpoint signs inline, bypassing the service-layer
-        # issuance emit, so fire it here)
+        # Single lifecycle event — the bus fans out to webhook (async),
+        # email and WebSocket subscribers.
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         from services.webhook_service import emit_cert_issued
-        emit_cert_issued(db_cert.to_dict(), ca_refid=ca.refid)
+        emit_cert_issued(db_cert.to_dict(), ca_refid=ca.refid, actor=username)
 
         return created_response(
             data=db_cert.to_dict(),

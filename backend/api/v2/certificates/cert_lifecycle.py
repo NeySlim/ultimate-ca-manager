@@ -24,6 +24,8 @@ def delete_certificate(cert_id):
         return error_response('Certificate not found', 404)
 
     cert_name = cert.descr or f'Certificate #{cert_id}'
+    cert_snapshot = cert.to_dict()
+    cert_caref = cert.caref
 
     try:
         # Clean up dependent records
@@ -43,11 +45,9 @@ def delete_certificate(cert_id):
             success=True
         )
 
-        try:
-            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-            on_certificate_deleted(cert_id, cert_name, username)
-        except Exception:
-            pass
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        from services.webhook_service import emit_cert_deleted
+        emit_cert_deleted(cert_snapshot, ca_refid=cert_caref, actor=username)
 
         return no_content_response()
     except Exception as e:
@@ -74,29 +74,13 @@ def revoke_certificate(cert_id):
     try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
-        # Revoke using service
+        # Revoke using service — the service emits a single lifecycle event
+        # that the bus fans out to webhook + email + WebSocket subscribers.
         cert = CertificateService.revoke_certificate(
             cert_id=cert_id,
             reason=reason,
             username=username
         )
-
-        # Send notification
-        try:
-            NotificationService.on_certificate_revoked(cert, reason, username)
-        except Exception:
-            pass  # Non-blocking
-
-        # WebSocket event
-        try:
-            on_certificate_revoked(
-                cert_id=cert.id,
-                cn=cert.descr or cert.refid,
-                reason=reason,
-                revoked_by=username
-            )
-        except Exception:
-            pass  # Non-blocking
 
         return success_response(
             data=cert.to_dict(),

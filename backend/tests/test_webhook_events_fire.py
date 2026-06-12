@@ -22,10 +22,11 @@ def test_event_catalogue_has_15_plus():
         assert ev in WebhookService.ALL_EVENTS
 
 
-def test_emit_helper_calls_send_event(monkeypatch):
+def test_emit_helper_publishes_to_bus(monkeypatch):
+    from services.events import event_bus
     calls = []
-    monkeypatch.setattr(WebhookService, 'send_event',
-                        staticmethod(lambda et, payload, ca_refid=None: calls.append(et)))
+    monkeypatch.setattr(event_bus, 'emit',
+                        lambda et, payload, ca_refid=None, meta=None: calls.append(et))
     emit_cert_issued({'id': 1}, ca_refid='abc')
     emit_template_created({'id': 2})
     assert 'certificate.issued' in calls
@@ -33,10 +34,11 @@ def test_emit_helper_calls_send_event(monkeypatch):
 
 
 def test_emit_never_raises(monkeypatch):
+    from services.events import event_bus
     def _boom(*a, **k):
-        raise RuntimeError("webhook backend down")
-    monkeypatch.setattr(WebhookService, 'send_event', staticmethod(_boom))
-    # Must not propagate — a webhook failure can't break the caller
+        raise RuntimeError("event backend down")
+    monkeypatch.setattr(event_bus, 'emit', _boom)
+    # Must not propagate — a notification failure can't break the caller
     emit_cert_issued({'id': 1})
 
 

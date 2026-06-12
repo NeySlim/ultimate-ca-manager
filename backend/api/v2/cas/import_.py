@@ -153,12 +153,10 @@ def import_ca():
             success=True
         )
 
-        # Send notification for CA creation
-        try:
-            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-            NotificationService.on_ca_created(ca, username)
-        except Exception:
-            pass  # Non-blocking
+        # Single lifecycle event — bus fans out to webhook + email + WebSocket.
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        from services.webhook_service import emit_ca_created
+        emit_ca_created(ca.to_dict(), actor=username)
 
         return created_response(
             data=ca.to_dict(),

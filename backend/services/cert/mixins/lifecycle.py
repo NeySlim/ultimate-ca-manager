@@ -256,7 +256,7 @@ class LifecycleMixin:
         key_path.chmod(0o600)
 
         from services.webhook_service import emit_cert_issued
-        emit_cert_issued(certificate.to_dict(), ca_refid=certificate.caref)
+        emit_cert_issued(certificate.to_dict(), ca_refid=certificate.caref, actor=username)
 
         return certificate
 
@@ -328,7 +328,7 @@ class LifecycleMixin:
                 logger.error(f"Failed to invalidate OCSP cache: {e}")
 
         from services.webhook_service import emit_cert_revoked
-        emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref)
+        emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref, actor=username)
 
         return certificate
 
@@ -385,6 +385,6 @@ class LifecycleMixin:
             return False
 
         from services.webhook_service import emit_cert_deleted
-        emit_cert_deleted(_cert_snapshot, ca_refid=_cert_caref)
+        emit_cert_deleted(_cert_snapshot, ca_refid=_cert_caref, actor=username)
 
         return True

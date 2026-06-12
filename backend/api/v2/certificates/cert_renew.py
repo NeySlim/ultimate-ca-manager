@@ -180,13 +180,9 @@ def renew_certificate(cert_id):
         except Exception:
             pass
 
-        try:
-            on_certificate_renewed(cert_id, cert_id, cert.descr or cert.subject or f'Certificate #{cert_id}')
-        except Exception:
-            pass
-
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         from services.webhook_service import emit_cert_renewed
-        emit_cert_renewed(cert.to_dict(), ca_refid=cert.caref)
+        emit_cert_renewed(cert.to_dict(), ca_refid=cert.caref, actor=username)
 
         return success_response(
             data=cert.to_dict(),

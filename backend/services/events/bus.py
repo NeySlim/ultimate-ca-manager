@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 # Wildcard subscription key — a handler registered here receives every event.
 ALL = '*'
 
-EventHandler = Callable[[str, dict, Optional[str]], None]
+# handler(event_type, payload, ca_refid, meta)
+EventHandler = Callable[[str, dict, Optional[str], Optional[dict]], None]
 
 
 class EventBus:
@@ -35,13 +36,19 @@ class EventBus:
         with self._lock:
             self._handlers.setdefault(event_type, []).append(handler)
 
-    def emit(self, event_type: str, payload: dict, ca_refid: str = None) -> None:
-        """Publish an event. Never raises."""
+    def emit(self, event_type: str, payload: dict, ca_refid: str = None, meta: dict = None) -> None:
+        """Publish an event. Never raises.
+
+        ``meta`` carries non-body context (e.g. the acting username) for
+        subscribers like email/audit; it is intentionally separate from
+        ``payload`` so it never leaks into outbound webhook bodies.
+        """
+        meta = meta or {}
         with self._lock:
             handlers = list(self._handlers.get(event_type, ())) + list(self._handlers.get(ALL, ()))
         for handler in handlers:
             try:
-                handler(event_type, payload, ca_refid)
+                handler(event_type, payload, ca_refid, meta)
             except Exception as e:  # pragma: no cover - defensive
                 logger.error(f"Event handler failed for {event_type}: {e}", exc_info=True)
 

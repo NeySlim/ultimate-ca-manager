@@ -362,25 +362,9 @@ def create_ca():
             hsm_key_algorithm=hsm_key_algorithm,
         )
 
-        # Send notification for CA creation
-        try:
-            NotificationService.on_ca_created(ca, username)
-        except Exception:
-            pass  # Non-blocking
-
-        # WebSocket event
-        try:
-            on_ca_created(
-                ca_id=ca.id,
-                name=ca.name,
-                common_name=ca.dn_commonname,
-                created_by=username
-            )
-        except Exception:
-            pass  # Non-blocking
-
+        # Single lifecycle event — bus fans out to webhook + email + WebSocket.
         from services.webhook_service import emit_ca_created
-        emit_ca_created(ca.to_dict())
+        emit_ca_created(ca.to_dict(), actor=username)
 
         return created_response(
             data=ca.to_dict(),
@@ -603,13 +587,9 @@ def update_ca(ca_id):
             success=True
         )
 
-        try:
-            on_ca_updated(ca_id, ca.descr, {k: v for k, v in data.items()})
-        except Exception:
-            pass
-
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         from services.webhook_service import emit_ca_updated
-        emit_ca_updated(ca.to_dict())
+        emit_ca_updated(ca.to_dict(), actor=username, changes={k: v for k, v in data.items()})
 
         return success_response(data=ca.to_dict(), message='CA updated successfully')
     except Exception as e:
@@ -645,6 +625,8 @@ def delete_ca(ca_id):
             409
         )
 
+    ca_snapshot = ca.to_dict()
+
     try:
         # Delete dependent records before deleting CA
         from models.crl import CRLMetadata
@@ -671,11 +653,9 @@ def delete_ca(ca_id):
             success=True
         )
 
-        try:
-            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-            on_ca_deleted(ca_id, ca_name, username)
-        except Exception:
-            pass
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        from services.webhook_service import emit_ca_deleted
+        emit_ca_deleted(ca_snapshot, actor=username)
 
         return no_content_response()
     except Exception as e:
