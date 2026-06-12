@@ -10,6 +10,7 @@ Handles:
 """
 
 import base64
+import logging
 import secrets
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
@@ -24,6 +25,8 @@ from .chain_builder import ChainBuilder, ChainInfo
 from .matcher import KeyMatcher
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -202,12 +205,24 @@ class SmartImporter:
                 self._import_csrs(objects, matching, result, desc_prefix, username)
             
             db.session.commit()
-            
+
+            # Fire certificate.imported for each successfully imported certificate
+            # (CAs live in a separate table and have their own ca.created event)
+            try:
+                from services.webhook_service import emit_cert_imported
+                from models import Certificate
+                for cid in result.imported_ids.get('certificates', []):
+                    obj = Certificate.query.get(cid)
+                    if obj:
+                        emit_cert_imported(obj.to_dict(), ca_refid=obj.caref)
+            except Exception as e:
+                logger.error(f"Webhook emit (import) failed: {e}")
+
         except Exception as e:
             db.session.rollback()
             result.success = False
             result.errors.append(f"Import failed: {str(e)}")
-        
+
         return result
     
     def _import_cas(

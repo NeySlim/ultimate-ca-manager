@@ -570,6 +570,10 @@ def approve_request(request_id):
     if not ok:
         return _err
 
+    if approval.status == 'approved':
+        from services.webhook_service import emit_csr_approved
+        emit_csr_approved(approval.to_dict())
+
     result = approval.to_dict()
     if issued_cert is not None:
         result['certificate'] = issued_cert
@@ -631,6 +635,10 @@ def reject_request(request_id):
     ok, _err = safe_commit(logger, "Failed to reject request")
     if not ok:
         return _err
+
+    if approval.status == 'rejected':
+        from services.webhook_service import emit_csr_rejected
+        emit_csr_rejected(approval.to_dict(), reason=data.get('comment'))
 
     return success_response(data=approval.to_dict(), message="Request rejected")
 

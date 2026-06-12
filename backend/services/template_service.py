@@ -241,9 +241,12 @@ class TemplateService:
             db.session.rollback()
             logger.error(f"Commit failed in services/template_service.py:238: {_commit_err}", exc_info=True)
             raise
-        
+
+        from services.webhook_service import emit_template_created
+        emit_template_created(template.to_dict())
+
         return template
-    
+
     @staticmethod
     def update_template(template_id: int, data: Dict[str, Any], username: str) -> CertificateTemplate:
         """
@@ -296,9 +299,12 @@ class TemplateService:
             db.session.rollback()
             logger.error(f"Commit failed in services/template_service.py:288: {_commit_err}", exc_info=True)
             raise
-        
+
+        from services.webhook_service import emit_template_updated
+        emit_template_updated(template.to_dict())
+
         return template
-    
+
     @staticmethod
     def delete_template(template_id: int) -> bool:
         """

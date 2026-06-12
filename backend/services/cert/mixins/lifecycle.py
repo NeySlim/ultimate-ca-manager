@@ -255,6 +255,9 @@ class LifecycleMixin:
             f.write(key_pem)
         key_path.chmod(0o600)
 
+        from services.webhook_service import emit_cert_issued
+        emit_cert_issued(certificate.to_dict(), ca_refid=certificate.caref)
+
         return certificate
 
     @staticmethod
@@ -324,6 +327,9 @@ class LifecycleMixin:
                 db.session.rollback()
                 logger.error(f"Failed to invalidate OCSP cache: {e}")
 
+        from services.webhook_service import emit_cert_revoked
+        emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref)
+
         return certificate
 
     @staticmethod
@@ -341,6 +347,10 @@ class LifecycleMixin:
         certificate = Certificate.query.get(cert_id)
         if not certificate:
             return False
+
+        # Snapshot for the webhook payload before the row is gone
+        _cert_snapshot = certificate.to_dict()
+        _cert_caref = certificate.caref
 
         # Clean up FK dependencies (ApprovalRequest.certificate_id has no cascade)
         try:
@@ -373,5 +383,8 @@ class LifecycleMixin:
             db.session.rollback()
             logger.error(f"Failed to delete certificate {cert_id}: {e}")
             return False
+
+        from services.webhook_service import emit_cert_deleted
+        emit_cert_deleted(_cert_snapshot, ca_refid=_cert_caref)
 
         return True

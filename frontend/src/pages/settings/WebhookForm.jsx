@@ -9,11 +9,17 @@ const WEBHOOK_EVENTS = [
   'certificate.revoked',
   'certificate.renewed',
   'certificate.expiring',
+  'certificate.expired',
+  'certificate.imported',
+  'certificate.deleted',
   'ca.created',
   'ca.updated',
+  'ca.deleted',
   'csr.submitted',
   'csr.approved',
   'csr.rejected',
+  'template.created',
+  'template.updated',
 ]
 
 export const WEBHOOK_EVENT_LABELS = {
@@ -21,11 +27,17 @@ export const WEBHOOK_EVENT_LABELS = {
   'certificate.revoked': 'Revoked',
   'certificate.renewed': 'Renewed',
   'certificate.expiring': 'Expiring',
+  'certificate.expired': 'Expired',
+  'certificate.imported': 'Imported',
+  'certificate.deleted': 'Deleted',
   'ca.created': 'CA Created',
   'ca.updated': 'CA Updated',
+  'ca.deleted': 'CA Deleted',
   'csr.submitted': 'CSR Submitted',
   'csr.approved': 'CSR Approved',
   'csr.rejected': 'CSR Rejected',
+  'template.created': 'Template Created',
+  'template.updated': 'Template Updated',
 }
 
 // labelKey pattern: module-level constant, resolved with t() in component

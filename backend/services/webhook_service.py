@@ -228,36 +228,54 @@ def _build_auth_header(webhook) -> dict:
 class WebhookService:
     """Service for sending webhook notifications"""
     
-    # Event types
+    # Event types — certificate lifecycle
     CERT_ISSUED = 'certificate.issued'
     CERT_REVOKED = 'certificate.revoked'
     CERT_RENEWED = 'certificate.renewed'
     CERT_EXPIRING = 'certificate.expiring'
+    CERT_EXPIRED = 'certificate.expired'
+    CERT_IMPORTED = 'certificate.imported'
+    CERT_DELETED = 'certificate.deleted'
+    # CA lifecycle
     CA_CREATED = 'ca.created'
     CA_UPDATED = 'ca.updated'
+    CA_DELETED = 'ca.deleted'
+    # CSR / approval workflow
     CSR_SUBMITTED = 'csr.submitted'
     CSR_APPROVED = 'csr.approved'
     CSR_REJECTED = 'csr.rejected'
-    
+    # Templates
+    TEMPLATE_CREATED = 'template.created'
+    TEMPLATE_UPDATED = 'template.updated'
+
     ALL_EVENTS = [
         CERT_ISSUED, CERT_REVOKED, CERT_RENEWED, CERT_EXPIRING,
-        CA_CREATED, CA_UPDATED,
-        CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED
+        CERT_EXPIRED, CERT_IMPORTED, CERT_DELETED,
+        CA_CREATED, CA_UPDATED, CA_DELETED,
+        CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED,
+        TEMPLATE_CREATED, TEMPLATE_UPDATED,
     ]
-    
+
     @staticmethod
     def send_event(event_type: str, payload: dict, ca_refid: str = None):
         """
         Send webhook event to all matching endpoints.
-        
+
+        Never raises: webhook delivery is best-effort and must never break the
+        business operation that triggered it. Safe to call from any lifecycle
+        path (issuance, revocation, etc.).
+
         Args:
             event_type: One of the event type constants
             payload: Event data to send
             ca_refid: Optional CA filter for targeted webhooks
         """
-        # Get matching endpoints
-        endpoints = WebhookEndpoint.query.filter_by(enabled=True).all()
-        
+        try:
+            endpoints = WebhookEndpoint.query.filter_by(enabled=True).all()
+        except Exception as e:
+            logger.error(f"Webhook dispatch skipped ({event_type}): {e}")
+            return
+
         for endpoint in endpoints:
             # Check event type subscription
             subscribed_events = endpoint.get_events()
@@ -424,20 +442,79 @@ class WebhookService:
             return False, f"Error: {str(e)}"
 
 
-# Helper functions for triggering webhooks from other services
-def trigger_cert_issued(cert: dict, ca_refid: str = None):
-    """Trigger webhook when certificate is issued"""
-    WebhookService.send_event(
-        WebhookService.CERT_ISSUED,
-        {'certificate': cert},
-        ca_refid
-    )
+# ---------------------------------------------------------------------------
+# Lifecycle emit helpers — call these from business logic. Each is wrapped so
+# a webhook problem can never propagate into (and abort) the operation that
+# triggered it. send_event() is already non-raising; the extra guard here is
+# belt-and-braces for payload construction.
+# ---------------------------------------------------------------------------
+def _emit(event_type: str, payload: dict, ca_refid: str = None):
+    try:
+        WebhookService.send_event(event_type, payload, ca_refid)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Webhook emit failed for {event_type}: {e}")
 
 
-def trigger_cert_revoked(cert: dict, reason: str = None, ca_refid: str = None):
-    """Trigger webhook when certificate is revoked"""
-    WebhookService.send_event(
-        WebhookService.CERT_REVOKED,
-        {'certificate': cert, 'reason': reason},
-        ca_refid
-    )
+def emit_cert_issued(cert: dict, ca_refid: str = None):
+    _emit(WebhookService.CERT_ISSUED, {'certificate': cert}, ca_refid)
+
+
+def emit_cert_revoked(cert: dict, reason: str = None, ca_refid: str = None):
+    _emit(WebhookService.CERT_REVOKED, {'certificate': cert, 'reason': reason}, ca_refid)
+
+
+def emit_cert_renewed(cert: dict, ca_refid: str = None):
+    _emit(WebhookService.CERT_RENEWED, {'certificate': cert}, ca_refid)
+
+
+def emit_cert_expiring(cert: dict, days_left: int = None, ca_refid: str = None):
+    _emit(WebhookService.CERT_EXPIRING, {'certificate': cert, 'days_left': days_left}, ca_refid)
+
+
+def emit_cert_expired(cert: dict, ca_refid: str = None):
+    _emit(WebhookService.CERT_EXPIRED, {'certificate': cert}, ca_refid)
+
+
+def emit_cert_imported(cert: dict, ca_refid: str = None):
+    _emit(WebhookService.CERT_IMPORTED, {'certificate': cert}, ca_refid)
+
+
+def emit_cert_deleted(cert: dict, ca_refid: str = None):
+    _emit(WebhookService.CERT_DELETED, {'certificate': cert}, ca_refid)
+
+
+def emit_ca_created(ca: dict):
+    _emit(WebhookService.CA_CREATED, {'ca': ca}, ca.get('refid') if isinstance(ca, dict) else None)
+
+
+def emit_ca_updated(ca: dict):
+    _emit(WebhookService.CA_UPDATED, {'ca': ca}, ca.get('refid') if isinstance(ca, dict) else None)
+
+
+def emit_ca_deleted(ca: dict):
+    _emit(WebhookService.CA_DELETED, {'ca': ca}, ca.get('refid') if isinstance(ca, dict) else None)
+
+
+def emit_csr_submitted(csr: dict):
+    _emit(WebhookService.CSR_SUBMITTED, {'csr': csr})
+
+
+def emit_csr_approved(csr: dict):
+    _emit(WebhookService.CSR_APPROVED, {'csr': csr})
+
+
+def emit_csr_rejected(csr: dict, reason: str = None):
+    _emit(WebhookService.CSR_REJECTED, {'csr': csr, 'reason': reason})
+
+
+def emit_template_created(template: dict):
+    _emit(WebhookService.TEMPLATE_CREATED, {'template': template})
+
+
+def emit_template_updated(template: dict):
+    _emit(WebhookService.TEMPLATE_UPDATED, {'template': template})
+
+
+# Backward-compatible aliases (previous names)
+trigger_cert_issued = emit_cert_issued
+trigger_cert_revoked = emit_cert_revoked
