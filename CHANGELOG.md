@@ -10,6 +10,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.170] - 2026-06-13
+
 ### Added
 - **Certificate conformance linting** — a per-certificate "Lint" action runs the certificate through standards linters (pkilint, plus zlint when available) and shows structured findings, with selectable RFC 5280 and CA/Browser Forum profiles. Informative only; pkilint is an optional dependency and the feature degrades gracefully when it is absent.
 - **ACME Renewal Information (ARI)** — the ACME server now advertises and serves a `renewalInfo` resource (RFC 9773), returning a per-certificate suggested renewal window so clients can spread renewals and react immediately to revocation.
@@ -17,9 +19,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **Webhook delivery history** — per-endpoint delivery log with status, attempts and manual retry, backed by a durable async delivery queue with exponential backoff.
 - **Scheduler admin view** — Settings › System now lists background tasks with their status, last run and a run-now action.
 - **Scheduled backups** — automatic encrypted backups on a configurable cadence with retention.
+- **In-app help** — contextual help panels and guides now cover the new features (linting, ARI, metrics, webhook delivery history, scheduler, scheduled backups) in every supported language.
 
 ### Fixed
 - **Pagination** — list pages that paginated client-side (Users, Templates, SCEP, SSH CAs, CRL/OCSP, CSRs, ACME accounts, Discovery) now correctly page through their rows instead of rendering the full list on one page.
+- **Layout** — list tables and toolbars no longer overflow into a horizontal scrollbar in split view, modals no longer show a double scrollbar, and the CA "columns" view wraps to fill the width instead of scrolling sideways.
+- **Lifecycle events** — issuing, renewing or revoking a certificate (or creating/updating a CA) no longer risks an intermittent error when a webhook endpoint is configured, which could previously surface as a 500.
 
 ### Changed
 - **Notifications** — email and WebSocket notifications are now fanned out through an in-process event bus, removing duplicated call-sites.
