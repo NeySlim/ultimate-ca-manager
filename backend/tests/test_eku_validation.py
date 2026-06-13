@@ -91,3 +91,18 @@ class TestEkuNames:
 
     def test_server_auth_known(self):
         assert EKU_NAMES.get('1.3.6.1.5.5.7.3.1') == 'serverAuth'
+
+    def test_code_signing_purposes_known(self):
+        # v2.171: Authenticode / kernel-mode / macOS code-signing EKUs
+        assert EKU_NAMES.get('1.3.6.1.4.1.311.2.1.21') == 'msIndividualCodeSigning'
+        assert EKU_NAMES.get('1.3.6.1.4.1.311.2.1.22') == 'msCommercialCodeSigning'
+        assert EKU_NAMES.get('1.3.6.1.4.1.311.10.3.13') == 'msLifetimeSigning'
+        assert EKU_NAMES.get('1.3.6.1.4.1.311.61.1.1') == 'msKernelModeCodeSigning'
+        assert EKU_NAMES.get('1.2.840.113635.100.4.1') == 'appleCodeSigning'
+        assert EKU_NAMES.get('1.2.840.113635.100.4.13') == 'appleDeveloperIDApplication'
+
+    def test_code_signing_extra_eku_resolves_by_name(self):
+        # The "Extra EKUs" picker accepts friendly names → resolves to OIDs
+        oids, err = normalize_extra_ekus(['msKernelModeCodeSigning', 'appleCodeSigning'])
+        assert err is None
+        assert oids == ['1.3.6.1.4.1.311.61.1.1', '1.2.840.113635.100.4.1']

@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
+- **Code-signing EKUs** — the Extra-EKU picker now ships the well-known code-signing key purposes (Authenticode individual/commercial, lifetime signing, Windows kernel-mode, macOS code signing / Developer ID Application) on top of the base `codeSigning` EKU, for issuing Windows/JAR/macOS code-signing certificates. New [Code Signing](https://github.com/NeySlim/ultimate-ca-manager/wiki/Code-Signing) wiki guide.
 - **Helm chart** — `charts/ucm/` packages UCM for in-cluster deployment (Deployment, Service, Ingress, PVCs, generated/persisted secrets). Single-instance by design; persistent `/etc/ucm` master.key volume (retained on uninstall); SQLite by default or an external PostgreSQL via `database.databaseUrl`.
 
 ## [2.170] - 2026-06-13

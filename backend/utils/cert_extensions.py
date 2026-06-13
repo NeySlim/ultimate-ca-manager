@@ -34,6 +34,14 @@ EKU_NAMES = {
     '2.16.840.1.113730.4.1': 'nsSGC',
     '1.3.6.1.4.1.311.54.1.2': 'msRemoteDesktop',
     '2.23.140.1.31': 'evSSLServer',
+    # Code-signing key purposes (Authenticode / kernel-mode / macOS) — combine
+    # with the base codeSigning (1.3.6.1.5.5.7.3.3) EKU as "Extra EKUs".
+    '1.3.6.1.4.1.311.2.1.21': 'msIndividualCodeSigning',
+    '1.3.6.1.4.1.311.2.1.22': 'msCommercialCodeSigning',
+    '1.3.6.1.4.1.311.10.3.13': 'msLifetimeSigning',
+    '1.3.6.1.4.1.311.61.1.1': 'msKernelModeCodeSigning',
+    '1.2.840.113635.100.4.1': 'appleCodeSigning',
+    '1.2.840.113635.100.4.13': 'appleDeveloperIDApplication',
 }
 
 
