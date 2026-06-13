@@ -426,7 +426,8 @@
     "generateReport": "Gerar relatório",
     "healthStatus": "Estado de saúde",
     "remove": "Remover",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "keyRecovery": "Recuperação de chaves"
   },
   "commandPalette": {
     "searchPlaceholder": "Pesquisar comandos, certificados, CAs, usuários...",
@@ -4228,6 +4229,46 @@
       "warning": "Aviso",
       "notice": "Nota",
       "info": "Info"
+    }
+  },
+  "keyRecovery": {
+    "title": "Recuperação de chaves",
+    "subtitle": "Recuperação com duplo controlo de chaves privadas arquivadas",
+    "loadFailed": "Falha ao carregar os pedidos",
+    "actionFailed": "Ação falhou",
+    "dualControlOn": "Duplo controlo ativo",
+    "empty": "Sem pedidos de recuperação",
+    "emptyDesc": "Os pedidos de recuperação de chave privada aparecerão aqui",
+    "reason": "Motivo",
+    "reasonHint": "Porque está esta chave a ser recuperada? (auditado)",
+    "reasonRequired": "É necessário um motivo",
+    "requestedBy": "pedido por {{user}}",
+    "decidedBy": "decidido por {{user}}",
+    "recoveredBy": "recuperado por {{user}}",
+    "approve": "Aprovar",
+    "reject": "Rejeitar",
+    "recover": "Recuperar",
+    "download": "Descarregar .p12",
+    "submitRequest": "Enviar pedido",
+    "approved": "Pedido aprovado",
+    "rejected": "Pedido rejeitado",
+    "recovered": "Chave recuperada",
+    "requestSubmitted": "Pedido de recuperação enviado para aprovação",
+    "recoverTitle": "Recuperar chave privada",
+    "recoverWarning": "Isto exporta o certificado e a sua chave privada como um PKCS#12 protegido por palavra-passe. A ação é auditada.",
+    "p12Password": "Palavra-passe PKCS#12",
+    "p12PasswordHint": "Pelo menos 8 caracteres",
+    "passwordTooShort": "A palavra-passe deve ter pelo menos 8 caracteres",
+    "requestTitle": "Pedir recuperação de chave",
+    "requestTitleNamed": "Pedir recuperação de chave — {{name}}",
+    "requestInfo": "Isto abre um pedido com duplo controlo para recuperar a chave privada arquivada do certificado. Um administrador tem de o aprovar.",
+    "requestShort": "Recuperar chave",
+    "status": {
+      "pending": "Pendente",
+      "approved": "Aprovado",
+      "rejected": "Rejeitado",
+      "recovered": "Recuperado",
+      "cancelled": "Cancelado"
     }
   }
 }

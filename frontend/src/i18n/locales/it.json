@@ -426,7 +426,8 @@
     "generateReport": "Genera report",
     "healthStatus": "Stato di salute",
     "remove": "Rimuovi",
-    "continue": "Continua"
+    "continue": "Continua",
+    "keyRecovery": "Recupero chiavi"
   },
   "commandPalette": {
     "searchPlaceholder": "Cerca comandi, certificati, CA, utenti...",
@@ -4228,6 +4229,46 @@
       "warning": "Avviso",
       "notice": "Nota",
       "info": "Info"
+    }
+  },
+  "keyRecovery": {
+    "title": "Recupero chiavi",
+    "subtitle": "Recupero a doppio controllo delle chiavi private archiviate",
+    "loadFailed": "Caricamento delle richieste non riuscito",
+    "actionFailed": "Azione non riuscita",
+    "dualControlOn": "Doppio controllo attivo",
+    "empty": "Nessuna richiesta di recupero",
+    "emptyDesc": "Le richieste di recupero della chiave privata appariranno qui",
+    "reason": "Motivo",
+    "reasonHint": "Perché questa chiave viene recuperata? (verificato)",
+    "reasonRequired": "È richiesto un motivo",
+    "requestedBy": "richiesto da {{user}}",
+    "decidedBy": "deciso da {{user}}",
+    "recoveredBy": "recuperato da {{user}}",
+    "approve": "Approva",
+    "reject": "Rifiuta",
+    "recover": "Recupera",
+    "download": "Scarica .p12",
+    "submitRequest": "Invia richiesta",
+    "approved": "Richiesta approvata",
+    "rejected": "Richiesta rifiutata",
+    "recovered": "Chiave recuperata",
+    "requestSubmitted": "Richiesta di recupero inviata per approvazione",
+    "recoverTitle": "Recupera chiave privata",
+    "recoverWarning": "Questo esporta il certificato e la sua chiave privata come PKCS#12 protetto da password. L’azione è verificata.",
+    "p12Password": "Password PKCS#12",
+    "p12PasswordHint": "Almeno 8 caratteri",
+    "passwordTooShort": "La password deve avere almeno 8 caratteri",
+    "requestTitle": "Richiedi recupero chiave",
+    "requestTitleNamed": "Richiedi recupero chiave — {{name}}",
+    "requestInfo": "Apre una richiesta a doppio controllo per recuperare la chiave privata archiviata del certificato. Un amministratore deve approvarla.",
+    "requestShort": "Recupera chiave",
+    "status": {
+      "pending": "In attesa",
+      "approved": "Approvata",
+      "rejected": "Rifiutata",
+      "recovered": "Recuperata",
+      "cancelled": "Annullata"
     }
   }
 }

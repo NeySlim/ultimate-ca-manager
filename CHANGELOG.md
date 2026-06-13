@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
+- **Key archival & recovery** — a dual-control workflow to recover an archived private key: request (with reason) → admin approve (four-eyes; the approver must differ from the requester, configurable) → download as PKCS#12, once, fully audited. New Governance → Key Recovery page and a per-certificate "Recover key" action. Migration 042 (`key_recovery_requests`).
 - **Code-signing EKUs** — the Extra-EKU picker now ships the well-known code-signing key purposes (Authenticode individual/commercial, lifetime signing, Windows kernel-mode, macOS code signing / Developer ID Application) on top of the base `codeSigning` EKU, for issuing Windows/JAR/macOS code-signing certificates. New [Code Signing](https://github.com/NeySlim/ultimate-ca-manager/wiki/Code-Signing) wiki guide.
 - **Helm chart** — `charts/ucm/` packages UCM for in-cluster deployment (Deployment, Service, Ingress, PVCs, generated/persisted secrets). Single-instance by design; persistent `/etc/ucm` master.key volume (retained on uninstall); SQLite by default or an external PostgreSQL via `database.databaseUrl`.
 

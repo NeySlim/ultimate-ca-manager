@@ -45,6 +45,7 @@ const HSMPage = lazyWithRetry(() => import('./pages/HSMPage'))
 const DevShowcasePage = lazyWithRetry(() => import('./pages/DevShowcasePage'))
 const PoliciesPage = lazyWithRetry(() => import('./pages/PoliciesPage'))
 const ApprovalsPage = lazyWithRetry(() => import('./pages/ApprovalsPage'))
+const KeyRecoveryPage = lazyWithRetry(() => import('./pages/KeyRecoveryPage'))
 const ReportsPage = lazyWithRetry(() => import('./pages/ReportsPage'))
 const DiscoveryPage = lazyWithRetry(() => import('./pages/DiscoveryPage'))
 const SSHCAsPage = lazyWithRetry(() => import('./pages/SSHCAsPage'))
@@ -153,6 +154,7 @@ function AppRoutes() {
           {/* Governance */}
           <Route path="/policies" element={<PermissionRoute permission="read:policies"><PoliciesPage /></PermissionRoute>} />
           <Route path="/approvals" element={<PermissionRoute permission="read:approvals"><ApprovalsPage /></PermissionRoute>} />
+          <Route path="/key-recovery" element={<PermissionRoute permission="read:key_recovery"><KeyRecoveryPage /></PermissionRoute>} />
           <Route path="/reports" element={<PermissionRoute permission="read:audit"><ReportsPage /></PermissionRoute>} />
           <Route path="/discovery" element={<PermissionRoute permission="read:certificates"><DiscoveryPage /></PermissionRoute>} />
           {/* SSH */}

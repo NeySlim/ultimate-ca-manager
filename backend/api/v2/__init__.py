@@ -69,6 +69,7 @@ from api.v2.webauthn import bp as webauthn_bp
 from api.v2.mtls import bp as mtls_bp
 from api.v2.user_certificates import bp as user_certificates_bp
 from api.v2.audit import bp as audit_bp
+from api.v2.key_recovery import bp as key_recovery_bp
 from api.v2.websocket import websocket_bp
 from api.v2.groups import bp as groups_bp
 from api.v2.search import bp as search_bp
@@ -137,6 +138,7 @@ API_V2_BLUEPRINTS = [
     database_bp,
     ssh_cas_bp,
     ssh_certificates_bp,
+    key_recovery_bp,
 ]
 
 

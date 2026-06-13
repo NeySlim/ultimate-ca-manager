@@ -426,7 +426,8 @@
     "generateReport": "Generate report",
     "healthStatus": "Health status",
     "remove": "Remove",
-    "continue": "Continue"
+    "continue": "Continue",
+    "keyRecovery": "Key Recovery"
   },
   "commandPalette": {
     "searchPlaceholder": "Search commands, certificates, CAs, users...",
@@ -4231,6 +4232,46 @@
       "warning": "Warning",
       "notice": "Notice",
       "info": "Info"
+    }
+  },
+  "keyRecovery": {
+    "title": "Key Recovery",
+    "subtitle": "Dual-control recovery of archived private keys",
+    "loadFailed": "Failed to load recovery requests",
+    "actionFailed": "Action failed",
+    "dualControlOn": "Dual control on",
+    "empty": "No recovery requests",
+    "emptyDesc": "Private-key recovery requests will appear here",
+    "reason": "Reason",
+    "reasonHint": "Why is this key being recovered? (audited)",
+    "reasonRequired": "A reason is required",
+    "requestedBy": "requested by {{user}}",
+    "decidedBy": "decided by {{user}}",
+    "recoveredBy": "recovered by {{user}}",
+    "approve": "Approve",
+    "reject": "Reject",
+    "recover": "Recover",
+    "download": "Download .p12",
+    "submitRequest": "Submit request",
+    "approved": "Request approved",
+    "rejected": "Request rejected",
+    "recovered": "Key recovered",
+    "requestSubmitted": "Recovery request submitted for approval",
+    "recoverTitle": "Recover private key",
+    "recoverWarning": "This exports the certificate and its private key as a password-protected PKCS#12. The action is audited.",
+    "p12Password": "PKCS#12 password",
+    "p12PasswordHint": "At least 8 characters",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "requestTitle": "Request key recovery",
+    "requestTitleNamed": "Request key recovery — {{name}}",
+    "requestInfo": "This opens a dual-control request to recover the certificate’s archived private key. An administrator must approve it.",
+    "requestShort": "Recover key",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "recovered": "Recovered",
+      "cancelled": "Cancelled"
     }
   }
 }

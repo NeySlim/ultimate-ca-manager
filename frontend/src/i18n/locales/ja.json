@@ -426,7 +426,8 @@
     "generateReport": "レポート生成",
     "healthStatus": "ヘルスステータス",
     "remove": "削除",
-    "continue": "続行"
+    "continue": "続行",
+    "keyRecovery": "鍵リカバリ"
   },
   "commandPalette": {
     "searchPlaceholder": "コマンド、証明書、CA、ユーザーを検索...",
@@ -4228,6 +4229,46 @@
       "warning": "警告",
       "notice": "通知",
       "info": "情報"
+    }
+  },
+  "keyRecovery": {
+    "title": "鍵リカバリ",
+    "subtitle": "アーカイブ済み秘密鍵の二者承認リカバリ",
+    "loadFailed": "リカバリ要求の読み込みに失敗しました",
+    "actionFailed": "操作に失敗しました",
+    "dualControlOn": "二者承認が有効",
+    "empty": "リカバリ要求はありません",
+    "emptyDesc": "秘密鍵のリカバリ要求がここに表示されます",
+    "reason": "理由",
+    "reasonHint": "なぜこの鍵をリカバリしますか？（監査対象）",
+    "reasonRequired": "理由が必要です",
+    "requestedBy": "要求者: {{user}}",
+    "decidedBy": "決定者: {{user}}",
+    "recoveredBy": "リカバリ実行者: {{user}}",
+    "approve": "承認",
+    "reject": "却下",
+    "recover": "リカバリ",
+    "download": ".p12 をダウンロード",
+    "submitRequest": "要求を送信",
+    "approved": "要求を承認しました",
+    "rejected": "要求を却下しました",
+    "recovered": "鍵をリカバリしました",
+    "requestSubmitted": "リカバリ要求を承認待ちで送信しました",
+    "recoverTitle": "秘密鍵をリカバリ",
+    "recoverWarning": "証明書とその秘密鍵をパスワード保護された PKCS#12 としてエクスポートします。この操作は監査されます。",
+    "p12Password": "PKCS#12 パスワード",
+    "p12PasswordHint": "8文字以上",
+    "passwordTooShort": "パスワードは8文字以上必要です",
+    "requestTitle": "鍵リカバリを要求",
+    "requestTitleNamed": "鍵リカバリを要求 — {{name}}",
+    "requestInfo": "証明書のアーカイブ済み秘密鍵をリカバリする二者承認の要求を作成します。管理者の承認が必要です。",
+    "requestShort": "鍵をリカバリ",
+    "status": {
+      "pending": "保留中",
+      "approved": "承認済み",
+      "rejected": "却下",
+      "recovered": "リカバリ済み",
+      "cancelled": "キャンセル"
     }
   }
 }

@@ -19,6 +19,7 @@ ROLE_PERMISSIONS = {
         'read:hsm',
         'read:ssh', 'write:ssh', 'delete:ssh',
         'read:policies', 'read:approvals', 'write:approvals',
+        'read:key_recovery', 'write:key_recovery',
         'read:audit',
         'read:settings', 'write:settings',
         'read:groups', 'write:groups',

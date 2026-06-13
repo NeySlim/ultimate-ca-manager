@@ -426,7 +426,8 @@
     "generateReport": "Generar informe",
     "healthStatus": "Estado de salud",
     "remove": "Eliminar",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "keyRecovery": "Recuperación de claves"
   },
   "commandPalette": {
     "searchPlaceholder": "Buscar comandos, certificados, CAs, usuarios...",
@@ -4228,6 +4229,46 @@
       "warning": "Advertencia",
       "notice": "Aviso",
       "info": "Info"
+    }
+  },
+  "keyRecovery": {
+    "title": "Recuperación de claves",
+    "subtitle": "Recuperación con doble control de claves privadas archivadas",
+    "loadFailed": "Error al cargar las solicitudes",
+    "actionFailed": "Acción fallida",
+    "dualControlOn": "Doble control activado",
+    "empty": "Sin solicitudes de recuperación",
+    "emptyDesc": "Las solicitudes de recuperación de clave privada aparecerán aquí",
+    "reason": "Motivo",
+    "reasonHint": "¿Por qué se recupera esta clave? (auditado)",
+    "reasonRequired": "Se requiere un motivo",
+    "requestedBy": "solicitado por {{user}}",
+    "decidedBy": "decidido por {{user}}",
+    "recoveredBy": "recuperado por {{user}}",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "recover": "Recuperar",
+    "download": "Descargar .p12",
+    "submitRequest": "Enviar solicitud",
+    "approved": "Solicitud aprobada",
+    "rejected": "Solicitud rechazada",
+    "recovered": "Clave recuperada",
+    "requestSubmitted": "Solicitud de recuperación enviada para aprobación",
+    "recoverTitle": "Recuperar clave privada",
+    "recoverWarning": "Esto exporta el certificado y su clave privada como un PKCS#12 protegido por contraseña. La acción se audita.",
+    "p12Password": "Contraseña PKCS#12",
+    "p12PasswordHint": "Al menos 8 caracteres",
+    "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+    "requestTitle": "Solicitar recuperación de clave",
+    "requestTitleNamed": "Solicitar recuperación de clave — {{name}}",
+    "requestInfo": "Esto abre una solicitud con doble control para recuperar la clave privada archivada del certificado. Un administrador debe aprobarla.",
+    "requestShort": "Recuperar clave",
+    "status": {
+      "pending": "Pendiente",
+      "approved": "Aprobada",
+      "rejected": "Rechazada",
+      "recovered": "Recuperada",
+      "cancelled": "Cancelada"
     }
   }
 }

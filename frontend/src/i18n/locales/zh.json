@@ -426,7 +426,8 @@
     "generateReport": "生成报告",
     "healthStatus": "健康状态",
     "remove": "移除",
-    "continue": "继续"
+    "continue": "继续",
+    "keyRecovery": "密钥恢复"
   },
   "commandPalette": {
     "searchPlaceholder": "搜索命令、证书、CA、用户...",
@@ -4228,6 +4229,46 @@
       "warning": "警告",
       "notice": "提示",
       "info": "信息"
+    }
+  },
+  "keyRecovery": {
+    "title": "密钥恢复",
+    "subtitle": "对归档私钥进行双重控制恢复",
+    "loadFailed": "加载恢复请求失败",
+    "actionFailed": "操作失败",
+    "dualControlOn": "已启用双重控制",
+    "empty": "暂无恢复请求",
+    "emptyDesc": "私钥恢复请求将显示在此处",
+    "reason": "原因",
+    "reasonHint": "为何恢复此密钥？（已审计）",
+    "reasonRequired": "需要填写原因",
+    "requestedBy": "由 {{user}} 请求",
+    "decidedBy": "由 {{user}} 裁决",
+    "recoveredBy": "由 {{user}} 恢复",
+    "approve": "批准",
+    "reject": "拒绝",
+    "recover": "恢复",
+    "download": "下载 .p12",
+    "submitRequest": "提交请求",
+    "approved": "请求已批准",
+    "rejected": "请求已拒绝",
+    "recovered": "密钥已恢复",
+    "requestSubmitted": "恢复请求已提交待批准",
+    "recoverTitle": "恢复私钥",
+    "recoverWarning": "这会将证书及其私钥导出为受密码保护的 PKCS#12。此操作将被审计。",
+    "p12Password": "PKCS#12 密码",
+    "p12PasswordHint": "至少 8 个字符",
+    "passwordTooShort": "密码至少需 8 个字符",
+    "requestTitle": "请求密钥恢复",
+    "requestTitleNamed": "请求密钥恢复 — {{name}}",
+    "requestInfo": "这将创建一个双重控制请求以恢复该证书的归档私钥。需管理员批准。",
+    "requestShort": "恢复密钥",
+    "status": {
+      "pending": "待处理",
+      "approved": "已批准",
+      "rejected": "已拒绝",
+      "recovered": "已恢复",
+      "cancelled": "已取消"
     }
   }
 }

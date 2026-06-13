@@ -76,6 +76,7 @@ const navGroups = [
     children: [
       { id: 'policies', icon: Gavel, labelKey: 'common.policies', path: '/policies', permission: 'read:policies' },
       { id: 'approvals', icon: Stamp, labelKey: 'common.approvals', path: '/approvals', permission: 'read:approvals' },
+      { id: 'keyRecovery', icon: Vault, labelKey: 'common.keyRecovery', path: '/key-recovery', permission: 'read:key_recovery' },
       { id: 'reports', icon: ChartBar, labelKey: 'common.reports', path: '/reports', permission: 'read:audit' },
       { id: 'discovery', icon: MagnifyingGlass, labelKey: 'common.discovery', path: '/discovery', permission: 'read:certificates' },
     ]
