@@ -745,3 +745,86 @@ class TestUserLifecycle:
         # Delete (soft)
         r = auth_client.delete(f'/api/v2/users/{uid}')
         assert r.status_code == 200
+
+
+class TestLinkSSO:
+    """POST /api/v2/users/{id}/link-sso and /unlink-sso (#136).
+
+    Providers/users are created directly via the model: the providers API caps
+    at one provider per type, and the test DB is shared across the session.
+    """
+
+    def _provider_id(self, app):
+        """Reuse an existing SSO provider, or create one directly."""
+        from models import db
+        from models.sso import SSOProvider
+        with app.app_context():
+            p = SSOProvider.query.filter_by(provider_type='ldap').first()
+            if not p:
+                p = SSOProvider(name='link-test-ldap', provider_type='ldap',
+                                display_name='Link Test', enabled=False,
+                                default_role='viewer')
+                db.session.add(p)
+                db.session.commit()
+            return p.id
+
+    def _make_local_user(self, app, username, email):
+        from models import db, User
+        with app.app_context():
+            u = User(username=username, email=email, full_name=username,
+                     role='operator', active=True, password_hash='hashed-local-pw',
+                     auth_source='local')
+            db.session.add(u)
+            db.session.commit()
+            return u.id
+
+    def test_link_requires_auth(self, client):
+        r = client.post('/api/v2/users/1/link-sso',
+                        data=json.dumps({'provider_id': 1}),
+                        content_type='application/json')
+        assert r.status_code == 401
+
+    def test_link_and_unlink_roundtrip(self, app, auth_client):
+        pid = self._provider_id(app)
+        uid = self._make_local_user(app, 'link_local1', 'link_local1@test.local')
+
+        # Link, aligning the username to the SSO identity
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso', data=json.dumps({
+            'provider_id': pid, 'sso_username': 'link_sso1',
+        }), content_type='application/json')
+        data = assert_success(r)
+        assert data['username'] == 'link_sso1'
+        assert data['auth_source'] == 'ldap'
+        assert data['sso_provider_id'] == pid
+
+        # Linking again is rejected
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                             data=json.dumps({'provider_id': pid}),
+                             content_type='application/json')
+        assert_error(r, 400)
+
+        # Unlink → back to local
+        r = auth_client.post(f'/api/v2/users/{uid}/unlink-sso')
+        data = assert_success(r)
+        assert data['auth_source'] == 'local'
+        assert data['sso_provider_id'] is None
+
+    def test_link_missing_provider(self, app, auth_client):
+        uid = self._make_local_user(app, 'link_local2', 'link_local2@test.local')
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso',
+                             data=json.dumps({}), content_type='application/json')
+        assert_error(r, 400)
+
+    def test_link_username_clash(self, app, auth_client):
+        pid = self._provider_id(app)
+        self._make_local_user(app, 'link_taken', 'link_taken@test.local')
+        uid = self._make_local_user(app, 'link_local3', 'link_local3@test.local')
+        r = auth_client.post(f'/api/v2/users/{uid}/link-sso', data=json.dumps({
+            'provider_id': pid, 'sso_username': 'link_taken',
+        }), content_type='application/json')
+        assert_error(r, 409)
+
+    def test_unlink_non_linked(self, app, auth_client):
+        uid = self._make_local_user(app, 'link_local4', 'link_local4@test.local')
+        r = auth_client.post(f'/api/v2/users/{uid}/unlink-sso')
+        assert_error(r, 400)

@@ -2881,6 +2881,21 @@
     "newPassword": "Nouveau mot de passe : {{password}}",
     "checkEmail": "Vérifiez votre email",
     "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
+    "sso": {
+      "link": "Lier au SSO",
+      "unlink": "Délier du SSO",
+      "linkTitle": "Lier {{name}} à l'authentification unique",
+      "linkHelp": "Connecte ce compte local à un fournisseur SSO. Une fois lié, une connexion SSO correspondante adopte ce compte au lieu d'en créer un doublon.",
+      "provider": "Fournisseur SSO",
+      "selectProvider": "Sélectionner un fournisseur",
+      "ssoUsername": "Nom d'utilisateur SSO",
+      "ssoUsernameHelp": "Le nom d'utilisateur envoyé par le fournisseur d'identité. Par défaut l'actuel ; modifiez-le si la connexion SSO diffère.",
+      "linkSuccess": "{{name}} lié à l'authentification unique",
+      "linkFailed": "Échec de la liaison du compte au SSO",
+      "confirmUnlink": "Délier {{name}} de l'authentification unique et le reconvertir en compte local ?",
+      "unlinkSuccess": "{{name}} reconverti en compte local",
+      "unlinkFailed": "Échec de la déliaison du compte"
+    },
     "subtitle_one": "{{count}} utilisateur",
     "subtitle": "{{count}} utilisateurs",
     "mtls": {

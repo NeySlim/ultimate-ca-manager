@@ -1032,6 +1032,21 @@
     "newPassword": "新密码：{{password}}",
     "checkEmail": "检查电子邮件",
     "resetPasswordFailed": "重置密码失败",
+    "sso": {
+      "link": "关联到 SSO",
+      "unlink": "解除 SSO 关联",
+      "linkTitle": "将 {{name}} 关联到单点登录",
+      "linkHelp": "将此本地账户连接到 SSO 提供商。关联后，匹配的 SSO 登录将采用此账户，而不是创建重复账户。",
+      "provider": "SSO 提供商",
+      "selectProvider": "选择提供商",
+      "ssoUsername": "SSO 用户名",
+      "ssoUsernameHelp": "身份提供商发送的用户名。默认为当前用户名；如果 SSO 登录不同，请修改。",
+      "linkSuccess": "{{name}} 已关联到单点登录",
+      "linkFailed": "无法将账户关联到 SSO",
+      "confirmUnlink": "解除 {{name}} 的单点登录关联并转换回本地账户？",
+      "unlinkSuccess": "{{name}} 已转换为本地账户",
+      "unlinkFailed": "无法解除账户关联"
+    },
     "subtitle_one": "{{count}} 个用户",
     "subtitle": "{{count}} 个用户",
     "mtls": {

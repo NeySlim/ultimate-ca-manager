@@ -146,6 +146,114 @@ def toggle_user_status(user_id):
         return error_response('Failed to toggle user status', 500)
 
 
+SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
+
+
+@bp.route('/api/v2/users/<int:user_id>/link-sso', methods=['POST'])
+@require_auth(['write:users'])
+def link_user_sso(user_id):
+    """Link an existing local account to an SSO provider (admin only).
+
+    The recommended way to resolve an email collision between a local user and
+    an SSO identity (#136): instead of creating a duplicate or silently merging
+    on email, an admin deliberately links the two. After linking, an SSO login
+    matching the (optionally updated) username adopts this account.
+
+    POST /api/v2/users/{user_id}/link-sso
+    Body: {"provider_id": int, "sso_username": str?}
+    """
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+
+    from models.sso import SSOProvider
+
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+    if (user.auth_source or 'local') != 'local' or user.sso_provider_id:
+        return error_response('User is already linked to single sign-on', 400)
+
+    data = request.get_json(silent=True) or {}
+    provider_id = data.get('provider_id')
+    if not provider_id:
+        return error_response('provider_id is required', 400)
+    provider = SSOProvider.query.get(provider_id)
+    if not provider:
+        return error_response('SSO provider not found', 404)
+
+    # The username the IdP will send; defaults to the current one.
+    new_username = (data.get('sso_username') or user.username).strip()
+    if not new_username:
+        return error_response('sso_username cannot be empty', 400)
+    if new_username != user.username:
+        clash = User.query.filter(
+            User.username == new_username, User.id != user.id
+        ).first()
+        if clash:
+            return error_response('That username is already taken', 409)
+
+    old_username = user.username
+    user.username = new_username
+    user.auth_source = provider.provider_type
+    user.sso_provider_id = provider.id
+
+    ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
+    if not ok:
+        return err
+    AuditService.log_action(
+        action='user_link_sso',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=(f'Linked account {old_username!r} to SSO provider '
+                 f'{provider.name!r} (username now {new_username!r})'),
+        success=True,
+    )
+    return success_response(
+        data=user.to_dict(),
+        message=f'Account linked to {provider.name}')
+
+
+@bp.route('/api/v2/users/<int:user_id>/unlink-sso', methods=['POST'])
+@require_auth(['write:users'])
+def unlink_user_sso(user_id):
+    """Convert an SSO-linked account back to a local account (admin only).
+
+    POST /api/v2/users/{user_id}/unlink-sso
+    """
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+    if (user.auth_source or 'local') == 'local' and not user.sso_provider_id:
+        return error_response('User is not linked to single sign-on', 400)
+
+    user.auth_source = 'local'
+    user.sso_provider_id = None
+    # An account that never had a local password must set one before it can log in.
+    needs_password = user.password_hash == SSO_NO_PASSWORD
+    if needs_password:
+        user.force_password_change = True
+
+    ok, err = safe_commit(logger, f"Failed to unlink user {user_id} from SSO")
+    if not ok:
+        return err
+    AuditService.log_action(
+        action='user_unlink_sso',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Unlinked account {user.username!r} from single sign-on',
+        success=True,
+    )
+    msg = f'Account {user.username} converted to local'
+    if needs_password:
+        msg += ' — set a password for this account'
+    return success_response(data=user.to_dict(), message=msg)
+
+
 @bp.route('/api/v2/users/<int:user_id>/unlock', methods=['POST'])
 @require_auth(['write:users'])
 def unlock_user(user_id):

@@ -9,15 +9,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { 
-  User, Users, UsersThree, Plus, Trash, PencilSimple, Key, 
-  CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle, Certificate, Download
+  User, Users, UsersThree, Plus, Trash, PencilSimple, Key,
+  CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle, Certificate, Download,
+  LinkSimple, LinkBreak
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select,
   LoadingSpinner, MemberTransferModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
-import { usersService, groupsService, rolesService, casService, accountService } from '../services'
+import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -77,7 +78,15 @@ export default function UsersGroupsPage() {
   const [availableCerts, setAvailableCerts] = useState([])
   const [availableCertsLoading, setAvailableCertsLoading] = useState(false)
   const [selectedAssignCert, setSelectedAssignCert] = useState(null)
-  
+
+  // SSO linking (#136)
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [linkTarget, setLinkTarget] = useState(null)
+  const [linkProviders, setLinkProviders] = useState([])
+  const [linkProviderId, setLinkProviderId] = useState('')
+  const [linkSsoUsername, setLinkSsoUsername] = useState('')
+  const [linkSaving, setLinkSaving] = useState(false)
+
   // Pagination
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
@@ -167,6 +176,57 @@ export default function UsersGroupsPage() {
       showSuccess(t('users.newPassword', { password: res.password || t('users.checkEmail') }))
     } catch (error) {
       showError(error.message || t('users.resetPasswordFailed'))
+    }
+  }
+
+  // ============= SSO LINKING =============
+  const isLinked = (u) => !!(u && ((u.auth_source && u.auth_source !== 'local') || u.sso_provider_id))
+
+  const handleOpenLinkModal = async (user) => {
+    setLinkTarget(user)
+    setLinkProviderId('')
+    setLinkSsoUsername(user.username)
+    setShowLinkModal(true)
+    try {
+      const res = await ssoService.getProviders()
+      setLinkProviders(res.data || res || [])
+    } catch (error) {
+      setLinkProviders([])
+      showError(error.message || t('messages.errors.loadFailed.generic'))
+    }
+  }
+
+  const handleSubmitLink = async () => {
+    if (!linkTarget || !linkProviderId) return
+    setLinkSaving(true)
+    try {
+      await usersService.linkSso(linkTarget.id, {
+        provider_id: Number(linkProviderId),
+        sso_username: (linkSsoUsername || '').trim() || undefined,
+      })
+      showSuccess(t('users.sso.linkSuccess', { name: linkTarget.username }))
+      setShowLinkModal(false)
+      setLinkTarget(null)
+      await loadData()
+    } catch (error) {
+      showError(error.message || t('users.sso.linkFailed'))
+    } finally {
+      setLinkSaving(false)
+    }
+  }
+
+  const handleUnlinkSso = async (user) => {
+    const confirmed = await showConfirm(t('users.sso.confirmUnlink', { name: user.username }), {
+      title: t('users.sso.unlink'),
+      confirmText: t('users.sso.unlink')
+    })
+    if (!confirmed) return
+    try {
+      const res = await usersService.unlinkSso(user.id)
+      showSuccess(res.message || t('users.sso.unlinkSuccess', { name: user.username }))
+      await loadData()
+    } catch (error) {
+      showError(error.message || t('users.sso.unlinkFailed'))
     }
   }
 
@@ -657,10 +717,15 @@ export default function UsersGroupsPage() {
     { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingUser(row); setShowUserModal(true) } },
     { label: row.active ? t('common.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
     { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
+    ...(canWrite('users') ? [
+      isLinked(row)
+        ? { label: t('users.sso.unlink'), icon: LinkBreak, onClick: () => handleUnlinkSso(row) }
+        : { label: t('users.sso.link'), icon: LinkSimple, onClick: () => handleOpenLinkModal(row) }
+    ] : []),
     ...(canDelete('users') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
     ] : [])
-  ], [canDelete, t])
+  ], [canWrite, canDelete, t])
 
   const groupRowActions = useCallback((row) => [
     { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingGroup(row); setShowGroupModal(true) } },
@@ -701,6 +766,15 @@ export default function UsersGroupsPage() {
             <Button type="button" size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
               <Key size={14} /> {t('users.resetPassword')}
             </Button>
+            {isLinked(selectedUser) ? (
+              <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
+                <LinkBreak size={14} /> {t('users.sso.unlink')}
+              </Button>
+            ) : (
+              <Button type="button" size="sm" variant="secondary" onClick={() => handleOpenLinkModal(selectedUser)}>
+                <LinkSimple size={14} /> {t('users.sso.link')}
+              </Button>
+            )}
           </>
         )}
         {canDelete('users') && (
@@ -1028,6 +1102,42 @@ export default function UsersGroupsPage() {
           onSubmit={editingGroup ? handleUpdateGroup : handleCreateGroup}
           onCancel={() => { setShowGroupModal(false); setEditingGroup(null) }}
         />
+      </Modal>
+
+      {/* Link to SSO Modal (#136) */}
+      <Modal
+        open={showLinkModal}
+        onOpenChange={(open) => { setShowLinkModal(open); if (!open) setLinkTarget(null) }}
+        title={t('users.sso.linkTitle', { name: linkTarget?.username || '' })}
+        size="md"
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">{t('users.sso.linkHelp')}</p>
+          <Select
+            label={t('users.sso.provider')}
+            value={linkProviderId}
+            onChange={(val) => setLinkProviderId(val)}
+            placeholder={t('users.sso.selectProvider')}
+            options={linkProviders.map(p => ({
+              value: String(p.id),
+              label: `${p.display_name || p.name} (${(p.provider_type || '').toUpperCase()})`,
+            }))}
+          />
+          <Input
+            label={t('users.sso.ssoUsername')}
+            value={linkSsoUsername}
+            onChange={(e) => setLinkSsoUsername(e.target.value)}
+            helperText={t('users.sso.ssoUsernameHelp')}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => { setShowLinkModal(false); setLinkTarget(null) }}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="button" onClick={handleSubmitLink} disabled={!linkProviderId || linkSaving} loading={linkSaving}>
+              <LinkSimple size={16} /> {t('users.sso.link')}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Member Transfer Modal */}

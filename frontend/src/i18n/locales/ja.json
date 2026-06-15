@@ -1032,6 +1032,21 @@
     "newPassword": "新しいパスワード: {{password}}",
     "checkEmail": "メールを確認してください",
     "resetPasswordFailed": "パスワードのリセットに失敗しました",
+    "sso": {
+      "link": "SSO にリンク",
+      "unlink": "SSO のリンク解除",
+      "linkTitle": "{{name}} をシングルサインオンにリンク",
+      "linkHelp": "このローカルアカウントを SSO プロバイダーに接続します。リンク後は、一致する SSO ログインが重複を作らずにこのアカウントを引き継ぎます。",
+      "provider": "SSO プロバイダー",
+      "selectProvider": "プロバイダーを選択",
+      "ssoUsername": "SSO ユーザー名",
+      "ssoUsernameHelp": "ID プロバイダーが送信するユーザー名。既定は現在の値です。SSO ログインが異なる場合は変更してください。",
+      "linkSuccess": "{{name}} をシングルサインオンにリンクしました",
+      "linkFailed": "アカウントを SSO にリンクできませんでした",
+      "confirmUnlink": "{{name}} のシングルサインオンのリンクを解除し、ローカルアカウントに戻しますか？",
+      "unlinkSuccess": "{{name}} をローカルアカウントに変換しました",
+      "unlinkFailed": "アカウントのリンクを解除できませんでした"
+    },
     "subtitle_one": "{{count}} 人のユーザー",
     "subtitle": "{{count}} 件のユーザー",
     "mtls": {

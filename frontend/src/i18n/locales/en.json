@@ -1032,6 +1032,21 @@
     "newPassword": "New password: {{password}}",
     "checkEmail": "Check email",
     "resetPasswordFailed": "Failed to reset password",
+    "sso": {
+      "link": "Link to SSO",
+      "unlink": "Unlink SSO",
+      "linkTitle": "Link {{name}} to single sign-on",
+      "linkHelp": "Connect this local account to an SSO provider. After linking, a matching SSO login adopts this account instead of creating a duplicate.",
+      "provider": "SSO provider",
+      "selectProvider": "Select a provider",
+      "ssoUsername": "SSO username",
+      "ssoUsernameHelp": "The username the identity provider sends. Defaults to the current one; change it if the SSO login differs.",
+      "linkSuccess": "{{name}} linked to single sign-on",
+      "linkFailed": "Failed to link account to SSO",
+      "confirmUnlink": "Unlink {{name}} from single sign-on and convert it back to a local account?",
+      "unlinkSuccess": "{{name}} converted to a local account",
+      "unlinkFailed": "Failed to unlink account"
+    },
     "subtitle_one": "{{count}} user",
     "subtitle": "{{count}} users",
     "mtls": {

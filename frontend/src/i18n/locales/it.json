@@ -1032,6 +1032,21 @@
     "newPassword": "Nuova password: {{password}}",
     "checkEmail": "Controlla email",
     "resetPasswordFailed": "Reimpostazione password fallita",
+    "sso": {
+      "link": "Collega a SSO",
+      "unlink": "Scollega SSO",
+      "linkTitle": "Collega {{name}} al single sign-on",
+      "linkHelp": "Collega questo account locale a un provider SSO. Dopo il collegamento, un accesso SSO corrispondente adotta questo account invece di crearne un duplicato.",
+      "provider": "Provider SSO",
+      "selectProvider": "Seleziona un provider",
+      "ssoUsername": "Nome utente SSO",
+      "ssoUsernameHelp": "Il nome utente inviato dal provider di identità. Predefinito quello attuale; modificalo se l'accesso SSO è diverso.",
+      "linkSuccess": "{{name}} collegato al single sign-on",
+      "linkFailed": "Impossibile collegare l'account a SSO",
+      "confirmUnlink": "Scollegare {{name}} dal single sign-on e riconvertirlo in account locale?",
+      "unlinkSuccess": "{{name}} riconvertito in account locale",
+      "unlinkFailed": "Impossibile scollegare l'account"
+    },
     "subtitle_one": "{{count}} utente",
     "subtitle": "{{count}} utenti",
     "mtls": {

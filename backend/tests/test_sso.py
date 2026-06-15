@@ -481,13 +481,9 @@ class TestSSOUserProvisioning:
             assert user is not None
             assert user.role == 'operator'
 
-    def test_new_sso_user_with_email_of_local_user(self, app):
-        """#136: an SSO user may share an email with an existing local user.
-
-        Previously the UNIQUE constraint on users.email turned this into an
-        IntegrityError -> 500. The constraint is dropped (migration 043) so the
-        SSO user is created normally with the shared email.
-        """
+    def test_new_sso_user_email_conflict_is_refused(self, app):
+        """#136: an SSO login whose email already belongs to an account is
+        refused (no duplicate, no silent merge) so an admin can link them."""
         with app.app_context():
             from api.v2.sso import _get_or_create_sso_user
             from models import db, User
@@ -509,12 +505,41 @@ class TestSSOUserProvisioning:
                 provider, 'sso.bob136', shared, 'SSO Bob', {'groups': []}
             )
 
+            assert user is None
+            assert err == 'email_conflict'
+            # No duplicate created.
+            assert User.query.filter_by(email=shared).count() == 1
+
+    def test_sso_login_adopts_linked_account(self, app):
+        """After an admin links a local account to a provider and aligns the
+        username, the matching SSO login adopts that account (no new row)."""
+        with app.app_context():
+            from api.v2.sso import _get_or_create_sso_user
+            from models import db, User
+
+            email = 'linked136@example.test'
+            for uname in ('jdoe', 'jdoe.local'):
+                User.query.filter_by(username=uname).delete()
+            db.session.commit()
+
+            provider = self._make_provider(provider_type='ldap', default_role='viewer')
+            # Simulate the admin link: username aligned to the SSO username,
+            # auth_source/provider set on the existing local row.
+            linked = User(
+                username='jdoe', email=email, full_name='J Doe', role='admin',
+                active=True, password_hash='hashed-local-pw',
+                auth_source='ldap', sso_provider_id=provider.id,
+            )
+            db.session.add(linked)
+            db.session.commit()
+            uid = linked.id
+
+            user, err = _get_or_create_sso_user(
+                provider, 'jdoe', email, 'J Doe', {'groups': []}
+            )
             assert err is None
-            assert user is not None
-            assert user.username == 'sso.bob136'
-            assert user.email == shared
-            # Both rows coexist with the same email.
-            assert User.query.filter_by(email=shared).count() == 2
+            assert user is not None and user.id == uid
+            assert User.query.filter_by(email=email).count() == 1
 
 
 # ============================================================

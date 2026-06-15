@@ -1032,6 +1032,21 @@
     "newPassword": "Nova palavra-passe: {{password}}",
     "checkEmail": "Verificar e-mail",
     "resetPasswordFailed": "Falha ao repor palavra-passe",
+    "sso": {
+      "link": "Vincular ao SSO",
+      "unlink": "Desvincular SSO",
+      "linkTitle": "Vincular {{name}} ao início de sessão único",
+      "linkHelp": "Liga esta conta local a um fornecedor SSO. Após vincular, um início de sessão SSO correspondente adota esta conta em vez de criar um duplicado.",
+      "provider": "Fornecedor SSO",
+      "selectProvider": "Selecionar um fornecedor",
+      "ssoUsername": "Nome de utilizador SSO",
+      "ssoUsernameHelp": "O nome de utilizador enviado pelo fornecedor de identidade. Predefinição: o atual; altere-o se o início de sessão SSO for diferente.",
+      "linkSuccess": "{{name}} vinculado ao início de sessão único",
+      "linkFailed": "Falha ao vincular a conta ao SSO",
+      "confirmUnlink": "Desvincular {{name}} do início de sessão único e reconvertê-la em conta local?",
+      "unlinkSuccess": "{{name}} reconvertida em conta local",
+      "unlinkFailed": "Falha ao desvincular a conta"
+    },
     "subtitle_one": "{{count}} usuário",
     "subtitle": "{{count}} utilizadores",
     "mtls": {

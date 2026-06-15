@@ -1032,6 +1032,21 @@
     "newPassword": "New contraseña: {{password}}",
     "checkEmail": "Verificar email",
     "resetPasswordFailed": "Error to reset contraseña",
+    "sso": {
+      "link": "Vincular a SSO",
+      "unlink": "Desvincular SSO",
+      "linkTitle": "Vincular {{name}} al inicio de sesión único",
+      "linkHelp": "Conecta esta cuenta local a un proveedor SSO. Tras vincular, un inicio de sesión SSO coincidente adopta esta cuenta en lugar de crear un duplicado.",
+      "provider": "Proveedor SSO",
+      "selectProvider": "Seleccionar un proveedor",
+      "ssoUsername": "Usuario SSO",
+      "ssoUsernameHelp": "El nombre de usuario que envía el proveedor de identidad. Por defecto el actual; cámbielo si el inicio de sesión SSO difiere.",
+      "linkSuccess": "{{name}} vinculado al inicio de sesión único",
+      "linkFailed": "No se pudo vincular la cuenta a SSO",
+      "confirmUnlink": "¿Desvincular {{name}} del inicio de sesión único y reconvertirla en cuenta local?",
+      "unlinkSuccess": "{{name}} reconvertida en cuenta local",
+      "unlinkFailed": "No se pudo desvincular la cuenta"
+    },
     "subtitle_one": "{{count}} usuario",
     "subtitle": "{{count}} usuarios",
     "mtls": {

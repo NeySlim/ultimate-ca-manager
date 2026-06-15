@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Fixed
-- **SSO login with a shared email** — an SSO (LDAP/OAuth2/SAML) user can now be provisioned even when its email already belongs to a local account; the global uniqueness constraint on user emails has been dropped (uniqueness for locally-managed users is still enforced in the UI). Previously this raised an Internal Server Error on first SSO login (#136). Migration 043.
+- **SSO login with an email that already exists** — an SSO (LDAP/OAuth2/SAML) login whose email matches an existing account no longer returns an Internal Server Error. Instead of silently merging on email (an account-takeover risk) or creating a duplicate, the login is refused with a clear message, and an administrator can deliberately link the two from Users › *Link to SSO* (new `link-sso`/`unlink-sso` actions). One account per email is preserved (#136).
 - **Key-recovery dual control is now configurable** — a Settings › Security toggle enables/disables four-eyes control for private-key recovery, and `KEY_RECOVERY_DUAL_CONTROL` in the service environment overrides it (an explicit `false`/`0`/`no` disables it, and the toggle is shown read-only). Previously the setting could not be changed from the UI and the environment value was ignored (#137).
 
 
