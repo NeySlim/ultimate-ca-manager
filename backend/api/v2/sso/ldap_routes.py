@@ -112,6 +112,12 @@ def ldap_login():
     if not user:
         # Generic message — don't disclose whether the LDAP user exists or whether
         # auto-provisioning is on/off. Details go to logs only.
+        if error_code == 'email_conflict':
+            # The user did authenticate; this is a provisioning conflict, so a
+            # clear (non-sensitive) hint is fine and actionable.
+            return error_response(
+                "An account with your email address already exists. "
+                "Ask an administrator to link it to single sign-on.", 409)
         if error_code == 'auto_create_disabled':
             logger.warning(
                 f"LDAP login refused for '{username}': automatic account creation disabled"
@@ -299,8 +305,18 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         # ── Userinfo sync (email, full name) ─────────────────────────────
         # Controlled by `auto_update_users`. Does NOT touch the role.
         if provider.auto_update_users:
-            if email:
-                user.email = email
+            if email and email != user.email:
+                # Don't steal an email already owned by another account.
+                other = User.query.filter(
+                    User.email == email, User.id != user.id
+                ).first()
+                if other:
+                    logger.warning(
+                        f"SSO email sync skipped for '{user.username}': {email} "
+                        f"already belongs to account '{other.username}'"
+                    )
+                else:
+                    user.email = email
             if fullname:
                 user.full_name = fullname
 
@@ -343,12 +359,28 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         logger.warning(f"SSO user {username} not found and auto_create disabled")
         return None, 'auto_create_disabled'
 
+    # Refuse (don't auto-link) when the email already belongs to another account.
+    # Silently merging on email is the "account pre-hijacking" attack class, so an
+    # admin must link the accounts explicitly (POST /api/v2/users/<id>/link-sso).
+    # See #136.
+    effective_email = email or f'{username}@sso.local'
+    if effective_email:
+        clash = User.query.filter_by(email=effective_email).first()
+        if clash:
+            logger.warning(
+                f"SSO login for '{username}' (provider {provider.name}) refused: "
+                f"email {effective_email} already belongs to account "
+                f"'{clash.username}' (auth_source={clash.auth_source or 'local'}). "
+                f"An administrator must link the accounts."
+            )
+            return None, 'email_conflict'
+
     # Creation path keeps the historical fallback to default_role.
     role = _resolve_role(provider, external_data)
 
     user = User(
         username=username,
-        email=email or f'{username}@sso.local',
+        email=effective_email,
         full_name=fullname or username,
         role=role,
         active=True,

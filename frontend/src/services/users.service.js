@@ -36,6 +36,14 @@ export const usersService = {
     return apiClient.post(`/users/${id}/toggle-active`)
   },
 
+  async linkSso(id, { provider_id, sso_username } = {}) {
+    return apiClient.post(`/users/${id}/link-sso`, { provider_id, sso_username })
+  },
+
+  async unlinkSso(id) {
+    return apiClient.post(`/users/${id}/unlink-sso`)
+  },
+
   // Bulk operations
   async bulkDelete(ids) {
     return apiClient.post('/users/bulk/delete', { ids })

@@ -38,10 +38,10 @@ class User(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    # Not globally UNIQUE: an SSO user may share an email with a local user
-    # (see #136). Uniqueness for locally-managed users is enforced at the
-    # application layer in api/v2/users/crud.py.
-    email = db.Column(db.String(120), nullable=False, index=True)
+    # UNIQUE: one account per email. An SSO login whose email already belongs to
+    # a local account is refused (no duplicate, no auto-link — see #136); an admin
+    # links the two explicitly via /api/v2/users/<id>/link-sso.
+    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(255))  # Full name for WebAuthn/certificates
     role = db.Column(db.String(20), nullable=False, default="viewer")  # admin, operator, viewer

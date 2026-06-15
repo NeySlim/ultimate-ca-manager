@@ -1032,6 +1032,21 @@
     "newPassword": "Neues Passwort: {{password}}",
     "checkEmail": "E-Mail prüfen",
     "resetPasswordFailed": "Fehler beim Zurücksetzen des Passworts",
+    "sso": {
+      "link": "Mit SSO verknüpfen",
+      "unlink": "SSO-Verknüpfung lösen",
+      "linkTitle": "{{name}} mit Single Sign-On verknüpfen",
+      "linkHelp": "Verbindet dieses lokale Konto mit einem SSO-Anbieter. Nach dem Verknüpfen übernimmt eine passende SSO-Anmeldung dieses Konto, statt ein Duplikat zu erstellen.",
+      "provider": "SSO-Anbieter",
+      "selectProvider": "Anbieter auswählen",
+      "ssoUsername": "SSO-Benutzername",
+      "ssoUsernameHelp": "Der vom Identitätsanbieter gesendete Benutzername. Standardmäßig der aktuelle; ändern Sie ihn, wenn die SSO-Anmeldung abweicht.",
+      "linkSuccess": "{{name}} mit Single Sign-On verknüpft",
+      "linkFailed": "Konto konnte nicht mit SSO verknüpft werden",
+      "confirmUnlink": "Verknüpfung von {{name}} mit Single Sign-On lösen und wieder in ein lokales Konto umwandeln?",
+      "unlinkSuccess": "{{name}} in ein lokales Konto umgewandelt",
+      "unlinkFailed": "Verknüpfung des Kontos konnte nicht gelöst werden"
+    },
     "subtitle_one": "{{count}} Benutzer",
     "subtitle": "{{count}} Benutzer",
     "mtls": {
