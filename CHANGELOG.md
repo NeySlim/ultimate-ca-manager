@@ -8,7 +8,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
-## [Unreleased]
+## [2.171] - 2026-06-15
 
 ### Added
 - **Key archival & recovery** — a dual-control workflow to recover an archived private key: request (with reason) → admin approve (four-eyes; the approver must differ from the requester, configurable) → download as PKCS#12, once, fully audited. New Governance → Key Recovery page and a per-certificate "Recover key" action. Migration 042 (`key_recovery_requests`).
