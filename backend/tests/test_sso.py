@@ -481,6 +481,41 @@ class TestSSOUserProvisioning:
             assert user is not None
             assert user.role == 'operator'
 
+    def test_new_sso_user_with_email_of_local_user(self, app):
+        """#136: an SSO user may share an email with an existing local user.
+
+        Previously the UNIQUE constraint on users.email turned this into an
+        IntegrityError -> 500. The constraint is dropped (migration 043) so the
+        SSO user is created normally with the shared email.
+        """
+        with app.app_context():
+            from api.v2.sso import _get_or_create_sso_user
+            from models import db, User
+
+            shared = 'shared136@example.test'
+            for uname in ('local.bob136', 'sso.bob136'):
+                User.query.filter_by(username=uname).delete()
+            db.session.commit()
+
+            local = User(
+                username='local.bob136', email=shared, full_name='Local Bob',
+                role='admin', active=True, password_hash='hashed-local-pw',
+            )
+            db.session.add(local)
+            db.session.commit()
+
+            provider = self._make_provider(default_role='admin')
+            user, err = _get_or_create_sso_user(
+                provider, 'sso.bob136', shared, 'SSO Bob', {'groups': []}
+            )
+
+            assert err is None
+            assert user is not None
+            assert user.username == 'sso.bob136'
+            assert user.email == shared
+            # Both rows coexist with the same email.
+            assert User.query.filter_by(email=shared).count() == 2
+
 
 # ============================================================
 # LDAP Rate Limiting — Lockout helpers
