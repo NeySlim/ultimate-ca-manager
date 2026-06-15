@@ -8,7 +8,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
-## [Unreleased]
+## [2.172] - 2026-06-16
 
 ### Fixed
 - **SSO login with an email that already exists** — an SSO (LDAP/OAuth2/SAML) login whose email matches an existing account no longer returns an Internal Server Error. Instead of silently merging on email (an account-takeover risk) or creating a duplicate, the login is refused with a clear message, and an administrator can deliberately link the two from Users › *Link to SSO* (new `link-sso`/`unlink-sso` actions). One account per email is preserved (#136).
