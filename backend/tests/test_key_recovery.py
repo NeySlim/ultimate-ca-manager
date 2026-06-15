@@ -137,5 +137,35 @@ class TestList:
         assert 'requests' in body and 'dual_control' in body
 
 
+class TestDualControlEnvOverride:
+    """#137: KEY_RECOVERY_DUAL_CONTROL in the env overrides the DB row."""
+
+    def test_env_false_overrides_db_on(self, app, monkeypatch):
+        from api.v2.key_recovery import _dual_control_enabled
+        _set_dual_control(app, True)  # DB says ON
+        monkeypatch.setenv('KEY_RECOVERY_DUAL_CONTROL', 'false')
+        with app.app_context():
+            assert _dual_control_enabled() is False
+
+    def test_env_lowercase_key_accepted(self, app, monkeypatch):
+        from api.v2.key_recovery import _dual_control_enabled
+        _set_dual_control(app, True)
+        monkeypatch.delenv('KEY_RECOVERY_DUAL_CONTROL', raising=False)
+        monkeypatch.setenv('key_recovery_dual_control', 'no')
+        with app.app_context():
+            assert _dual_control_enabled() is False
+
+    def test_db_used_when_env_absent(self, app, monkeypatch):
+        from api.v2.key_recovery import _dual_control_enabled
+        monkeypatch.delenv('KEY_RECOVERY_DUAL_CONTROL', raising=False)
+        monkeypatch.delenv('key_recovery_dual_control', raising=False)
+        _set_dual_control(app, False)
+        with app.app_context():
+            assert _dual_control_enabled() is False
+        _set_dual_control(app, True)
+        with app.app_context():
+            assert _dual_control_enabled() is True
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

@@ -7,6 +7,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db
 from services.audit_service import AuditService
+from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
 import json
 import logging
 
@@ -47,6 +48,11 @@ def get_general_settings():
         'password_require_special': get_config('password_require_special', 'true') == 'true',
         # Security toggles
         'enforce_2fa': get_config('enforce_2fa', 'false') == 'true',
+        # Key recovery dual control (four-eyes). Reports the *effective* value
+        # (env override > DB > default ON); `_locked` is true when an env var
+        # forces it, in which case the Settings toggle is read-only.
+        'key_recovery_dual_control': _dual_control_enabled(),
+        'key_recovery_dual_control_locked': _dual_control_env() is not None,
     })
 
 
@@ -68,6 +74,8 @@ def update_general_settings():
         'password_require_numbers', 'password_require_special',
         # Security toggles
         'enforce_2fa',
+        # Key recovery four-eyes control (env var, when set, overrides this)
+        'key_recovery_dual_control',
         # Prometheus metrics bearer token (empty = disabled)
         'metrics_token',
     ]

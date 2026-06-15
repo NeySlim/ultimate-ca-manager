@@ -205,6 +205,35 @@ class TestGeneralSettings:
         data = assert_success(r)
         assert data['auto_backup_enabled'] is True
 
+    def test_key_recovery_dual_control_default_on(self, auth_client):
+        """Defaults to ON and is not locked when no env override is set."""
+        import os
+        os.environ.pop('KEY_RECOVERY_DUAL_CONTROL', None)
+        os.environ.pop('key_recovery_dual_control', None)
+        data = assert_success(auth_client.get('/api/v2/settings/general'))
+        assert data['key_recovery_dual_control'] is True
+        assert data['key_recovery_dual_control_locked'] is False
+
+    def test_key_recovery_dual_control_toggle_persists(self, auth_client):
+        import os
+        os.environ.pop('KEY_RECOVERY_DUAL_CONTROL', None)
+        os.environ.pop('key_recovery_dual_control', None)
+        assert_success(patch_json(auth_client, '/api/v2/settings/general',
+                                  {'key_recovery_dual_control': False}))
+        data = assert_success(auth_client.get('/api/v2/settings/general'))
+        assert data['key_recovery_dual_control'] is False
+        assert data['key_recovery_dual_control_locked'] is False
+        # restore
+        assert_success(patch_json(auth_client, '/api/v2/settings/general',
+                                  {'key_recovery_dual_control': True}))
+
+    def test_key_recovery_dual_control_env_locks(self, auth_client, monkeypatch):
+        """Env override forces the value and marks the toggle read-only."""
+        monkeypatch.setenv('KEY_RECOVERY_DUAL_CONTROL', 'false')
+        data = assert_success(auth_client.get('/api/v2/settings/general'))
+        assert data['key_recovery_dual_control'] is False
+        assert data['key_recovery_dual_control_locked'] is True
+
     def test_patch_general_empty_body(self, auth_client):
         """PATCH with empty body should succeed (no-op)."""
         r = patch_json(auth_client, '/api/v2/settings/general', {})

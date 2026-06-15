@@ -11,6 +11,7 @@ audit:
 """
 import base64
 import logging
+import os
 
 from flask import Blueprint, request, g, Response
 from cryptography import x509
@@ -43,11 +44,35 @@ def _user_id():
     return getattr(getattr(g, 'current_user', None), 'id', None)
 
 
+def _is_disabled_value(val):
+    return str(val).strip().lower() in ('false', '0', 'no')
+
+
+def _dual_control_env():
+    """Env override for dual control, or None when unset.
+
+    Accepted in both the canonical UPPER and lower case so the value an operator
+    writes in /etc/ucm/ucm.env takes effect regardless of casing. When set it
+    wins over the stored setting and the Settings toggle (operator escape hatch).
+    """
+    env = os.environ.get('KEY_RECOVERY_DUAL_CONTROL')
+    if env is None:
+        env = os.environ.get('key_recovery_dual_control')
+    if env is None:
+        return None
+    return not _is_disabled_value(env)
+
+
 def _dual_control_enabled():
+    # Default ON (four-eyes). Only an explicit 'false'/'0'/'no' disables it.
+    # Resolution order: env override (set in /etc/ucm/ucm.env) > DB > default ON.
+    env = _dual_control_env()
+    if env is not None:
+        return env
+
     from models import SystemConfig
     row = SystemConfig.query.filter_by(key='key_recovery_dual_control').first()
-    # Default ON (four-eyes). Only an explicit 'false' disables it.
-    return not (row and str(row.value).lower() in ('false', '0', 'no'))
+    return not (row and _is_disabled_value(row.value))
 
 
 def _audit(action, req, *, success=True, extra=None):

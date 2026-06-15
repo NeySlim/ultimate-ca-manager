@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User, Download } from '@phosphor-icons/react'
+import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User, Download, Key } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
@@ -84,6 +84,29 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           label={t('settings.enforce2fa')}
           description={t('settings.enforce2faDesc')}
         />
+      </DetailSection>
+      <DetailSection title={t('settings.keyRecoveryTitle')} icon={Key} iconClass="icon-bg-amber">
+        <div className="space-y-3">
+          <ToggleSwitch
+            checked={settings.key_recovery_dual_control !== false}
+            onChange={(val) => updateSetting('key_recovery_dual_control', val)}
+            label={t('settings.keyRecoveryDualControl')}
+            description={t('settings.keyRecoveryDualControlDesc')}
+            disabled={settings.key_recovery_dual_control_locked}
+          />
+          {settings.key_recovery_dual_control_locked && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
+              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.keyRecoveryDualControlLocked')}</span>
+            </div>
+          )}
+          {hasPermission('admin:system') && !settings.key_recovery_dual_control_locked && (
+            <Button type="button" onClick={() => handleSave('security')} disabled={saving}>
+              <FloppyDisk size={16} />
+              {t('common.saveChanges')}
+            </Button>
+          )}
+        </div>
       </DetailSection>
       <DetailSection title={t('settings.passwordPolicy')} icon={Lock} iconClass="icon-bg-violet">
         <div className="space-y-4">
