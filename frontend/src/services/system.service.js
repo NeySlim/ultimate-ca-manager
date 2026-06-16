@@ -1,7 +1,7 @@
 /**
  * System Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const systemService = {
   // Version/Updates
@@ -10,8 +10,16 @@ export const systemService = {
   },
 
   // Backup Management
-  async listBackups() {
-    return apiClient.get('/system/backups')
+  async listBackups(params = {}) {
+    return apiClient.get(`/system/backups${buildQueryString(params)}`)
+  },
+
+  async bulkDeleteBackups(filenames) {
+    return apiClient.post('/system/backups/bulk-delete', { filenames })
+  },
+
+  async runBackupRetention() {
+    return apiClient.post('/system/backups/run-retention')
   },
 
   async backup(password) {

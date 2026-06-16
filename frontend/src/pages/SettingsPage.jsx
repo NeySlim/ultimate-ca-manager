@@ -106,6 +106,10 @@ export default function SettingsPage() {
   const [oauthPresets, setOauthPresets] = useState({})
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [backups, setBackups] = useState([])
+  const [backupMeta, setBackupMeta] = useState({ total: 0, pages: 1, page: 1 })
+  const [backupQuery, setBackupQuery] = useState({ page: 1, per_page: 20, search: '', sort: 'created_desc' })
+  const [selectedBackups, setSelectedBackups] = useState([])
+  const [backupBusy, setBackupBusy] = useState(false)
   const [dbStats, setDbStats] = useState(null)
   const [httpsInfo, setHttpsInfo] = useState(null)
   const [selectedHttpsCert, setSelectedHttpsCert] = useState(null)
@@ -323,11 +327,72 @@ export default function SettingsPage() {
     }
   }
 
-  const loadBackups = async () => {
+  const loadBackups = async (query = backupQuery) => {
     try {
-      const data = await systemService.listBackups()
-      setBackups(data.data || [])
+      const res = await systemService.listBackups(query)
+      const data = res.data || res
+      // New shape {items, meta}; tolerate the old flat array for safety.
+      if (Array.isArray(data)) {
+        setBackups(data)
+        setBackupMeta({ total: data.length, pages: 1, page: 1 })
+      } else {
+        setBackups(data.items || [])
+        setBackupMeta(data.meta || { total: 0, pages: 1, page: 1 })
+      }
+      setSelectedBackups([])
     } catch (error) {
+    }
+  }
+
+  const updateBackupQuery = (patch) => {
+    const next = { ...backupQuery, ...patch }
+    // Any change other than an explicit page jump resets to page 1.
+    if (!('page' in patch)) next.page = 1
+    setBackupQuery(next)
+    loadBackups(next)
+  }
+
+  const toggleSelectBackup = (filename) => {
+    setSelectedBackups((prev) =>
+      prev.includes(filename) ? prev.filter((f) => f !== filename) : [...prev, filename])
+  }
+
+  const toggleSelectAllBackups = () => {
+    setSelectedBackups((prev) =>
+      prev.length === backups.length ? [] : backups.map((b) => b.filename))
+  }
+
+  const handleBulkDeleteBackups = async () => {
+    if (selectedBackups.length === 0) return
+    const confirmed = await showConfirm(
+      t('settings.backupBulkDeleteConfirm', { count: selectedBackups.length }),
+      { title: t('settings.deleteBackup'), confirmText: t('common.delete'), variant: 'danger' })
+    if (!confirmed) return
+    setBackupBusy(true)
+    try {
+      const res = await systemService.bulkDeleteBackups(selectedBackups)
+      showSuccess(t('settings.backupDeletedCount', { count: (res.data || res).deleted ?? selectedBackups.length }))
+      loadBackups()
+    } catch (error) {
+      showError(error.message || t('messages.errors.deleteFailed.backup'))
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  const handleRunRetention = async () => {
+    const confirmed = await showConfirm(t('settings.backupRunRetentionConfirm'),
+      { title: t('settings.backupCleanupNow'), confirmText: t('settings.backupCleanupNow') })
+    if (!confirmed) return
+    setBackupBusy(true)
+    try {
+      const res = await systemService.runBackupRetention()
+      showSuccess(t('settings.backupRetentionRemoved', { count: (res.data || res).removed ?? 0 }))
+      loadBackups()
+    } catch (error) {
+      showError(error.message || t('common.error'))
+    } finally {
+      setBackupBusy(false)
     }
   }
 
@@ -1285,6 +1350,15 @@ export default function SettingsPage() {
             saving={saving}
             hasPermission={hasPermission}
             backups={backups}
+            backupMeta={backupMeta}
+            backupQuery={backupQuery}
+            updateBackupQuery={updateBackupQuery}
+            selectedBackups={selectedBackups}
+            toggleSelectBackup={toggleSelectBackup}
+            toggleSelectAllBackups={toggleSelectAllBackups}
+            handleBulkDeleteBackups={handleBulkDeleteBackups}
+            handleRunRetention={handleRunRetention}
+            backupBusy={backupBusy}
             setShowBackupModal={setShowBackupModal}
             setShowRestoreModal={setShowRestoreModal}
             setRestoreFile={setRestoreFile}

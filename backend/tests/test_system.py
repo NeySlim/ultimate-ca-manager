@@ -274,21 +274,55 @@ class TestBackupCreate:
 
 
 class TestBackupList:
-    """GET /system/backups"""
+    """GET /system/backups — paginated {items, meta} with summary."""
 
     def test_returns_200(self, auth_client):
         r = auth_client.get('/api/v2/system/backups')
         assert r.status_code == 200
 
-    def test_returns_list(self, auth_client):
-        r = auth_client.get('/api/v2/system/backups')
-        data = assert_success(r)
-        assert isinstance(data, list)
+    def test_returns_paginated_shape(self, auth_client):
+        data = assert_success(auth_client.get('/api/v2/system/backups'))
+        assert isinstance(data, dict)
+        assert isinstance(data['items'], list)
+        meta = data['meta']
+        for k in ('total', 'page', 'per_page', 'pages', 'total_size_bytes'):
+            assert k in meta
+
+    def test_per_page_capped(self, auth_client):
+        data = assert_success(auth_client.get('/api/v2/system/backups?per_page=99999'))
+        assert data['meta']['per_page'] <= 100
 
     def test_alias_route(self, auth_client):
         """GET /system/backup/list also works."""
         r = auth_client.get('/api/v2/system/backup/list')
         assert r.status_code == 200
+
+
+class TestBackupBulkOps:
+    """Bulk delete + run-retention endpoints."""
+
+    def test_bulk_delete_requires_auth(self, client):
+        r = client.post('/api/v2/system/backups/bulk-delete',
+                        data=json.dumps({'filenames': ['x.ucmbkp']}),
+                        content_type='application/json')
+        assert r.status_code == 401
+
+    def test_bulk_delete_empty_list_rejected(self, auth_client):
+        r = auth_client.post('/api/v2/system/backups/bulk-delete',
+                             data=json.dumps({'filenames': []}),
+                             content_type='application/json')
+        assert r.status_code == 400
+
+    def test_bulk_delete_missing_files_ok(self, auth_client):
+        r = auth_client.post('/api/v2/system/backups/bulk-delete',
+                             data=json.dumps({'filenames': ['nope_123.ucmbkp']}),
+                             content_type='application/json')
+        data = assert_success(r)
+        assert data['deleted'] == 0
+
+    def test_run_retention_returns_count(self, auth_client):
+        data = assert_success(auth_client.post('/api/v2/system/backups/run-retention'))
+        assert 'removed' in data
 
 
 class TestBackupDownload:
