@@ -71,12 +71,18 @@ def get_settings():
     # Derive proxy account info
     proxy_account_url = proxy_account_url_cfg.value if proxy_account_url_cfg else None
     proxy_upstream_url = proxy_upstream_cfg.value if proxy_upstream_cfg else None
+    dns_timeout_cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
+    try:
+        dns_timeout = int(dns_timeout_cfg.value) if dns_timeout_cfg else 120
+    except (ValueError, TypeError):
+        dns_timeout = 120
 
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
         'environment': env_cfg.value if env_cfg else 'staging',
         'renewal_enabled': renewal_enabled.value == 'true' if renewal_enabled else True,
         'renewal_days': int(renewal_days.value) if renewal_days else 30,
+        'dns_propagation_timeout': dns_timeout,
         'has_staging_account': bool(staging_account and staging_account.is_registered()),
         'has_production_account': bool(production_account and production_account.is_registered()),
         'proxy_enabled': proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False,
@@ -146,6 +152,17 @@ def update_settings():
             return error_response('Renewal days must be between 1 and 60', 400)
         _set_config('acme.client.renewal_days', str(days), 'ACME renewal days before expiry')
         updates.append('renewal_days')
+
+    if 'dns_propagation_timeout' in data:
+        try:
+            dns_to = int(data['dns_propagation_timeout'])
+        except (TypeError, ValueError):
+            return error_response('DNS propagation timeout must be an integer', 400)
+        if dns_to < 0 or dns_to > 3600:
+            return error_response('DNS propagation timeout must be between 0 and 3600 seconds', 400)
+        _set_config('acme.client.dns_propagation_timeout', str(dns_to),
+                    'Seconds to self-check DNS-01 TXT propagation before submitting to the CA')
+        updates.append('dns_propagation_timeout')
 
     if 'proxy_enabled' in data:
         _set_config('acme.proxy_enabled',

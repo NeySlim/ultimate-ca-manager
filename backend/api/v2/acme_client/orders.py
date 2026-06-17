@@ -24,6 +24,61 @@ from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
+# DNS-01 propagation: poll for the expected TXT record before telling the CA to
+# validate, instead of a fixed sleep (#140). Timeout is configurable.
+_DNS_SELFCHECK_DEFAULT_TIMEOUT = 120
+_DNS_SELFCHECK_INTERVAL = 5
+
+
+def _dns_propagation_timeout() -> int:
+    cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
+    try:
+        return max(0, int(cfg.value)) if cfg and cfg.value is not None else _DNS_SELFCHECK_DEFAULT_TIMEOUT
+    except (ValueError, TypeError):
+        return _DNS_SELFCHECK_DEFAULT_TIMEOUT
+
+
+def _txt_present(name: str, expected: str) -> bool:
+    """True if the DNS TXT record `name` currently serves the `expected` value."""
+    try:
+        import dns.resolver
+    except ImportError:
+        return False
+    try:
+        answers = dns.resolver.resolve(name, 'TXT', lifetime=5)
+    except Exception:
+        return False
+    for rdata in answers:
+        try:
+            for chunk in rdata.strings:
+                if chunk.decode('utf-8', 'ignore') == expected:
+                    return True
+        except Exception:
+            if str(rdata).strip('"') == expected:
+                return True
+    return False
+
+
+def _dns_selfcheck(challenges: dict, timeout: int) -> dict:
+    """Poll DNS until every dns-01 TXT record is visible, or until timeout.
+
+    Returns {'ok': bool, 'missing': [domains], 'waited': seconds}. Non-dns-01
+    challenges (no dns_txt_value) are ignored.
+    """
+    pending = {d: c for d, c in challenges.items() if c.get('dns_txt_value')}
+    waited = 0
+    while pending:
+        for domain in list(pending):
+            c = pending[domain]
+            if _txt_present(c['dns_txt_name'], c['dns_txt_value']):
+                logger.info(f'DNS TXT confirmed for {domain} ({c["dns_txt_name"]})')
+                del pending[domain]
+        if not pending or waited >= timeout:
+            break
+        time.sleep(_DNS_SELFCHECK_INTERVAL)
+        waited += _DNS_SELFCHECK_INTERVAL
+    return {'ok': not pending, 'missing': list(pending), 'waited': waited}
+
 
 @bp.route('/api/v2/acme/client/orders', methods=['GET'])
 @require_auth(['read:acme'])
@@ -124,6 +179,7 @@ def request_certificate():
 
     # DNS provider (required for dns-01)
     dns_provider_id = data.get('dns_provider_id')
+    provider = None
     if challenge_type == 'dns-01' and dns_provider_id:
         provider = DnsProvider.query.get(dns_provider_id)
         if not provider:
@@ -174,18 +230,27 @@ def request_certificate():
         challenge_info = {}
         challenge_warning = None
         auto_poll_result = None
+        manual_dns = bool(provider) and provider.provider_type == 'manual'
         if challenge_type == 'dns-01':
             setup_success, setup_message, challenge_info = client.setup_dns_challenge(order)
             if not setup_success:
                 challenge_warning = setup_message
+            elif manual_dns:
+                # Manual provider: the user must place the TXT record themselves,
+                # which can take far longer than any auto-wait. Do NOT auto-submit
+                # (that's what made manual DNS-01 fail, #140) — leave the order
+                # pending so the user adds the record and clicks "Verify" when
+                # ready (the verify endpoint self-checks DNS before submitting).
+                logger.info(f'Order {order.id}: manual DNS provider — awaiting user verification')
             else:
-                # Auto-poll: wait for DNS propagation, verify challenges,
-                # and finalize when the order becomes 'ready'.
+                # Automated provider: self-check DNS propagation, then submit and
+                # finalize when the order becomes 'ready'.
                 auto_poll_result = _auto_poll_and_finalize(client, order)
 
         response_data = {
             'order': order.to_dict(),
             'challenges': challenge_info,
+            'manual_dns': manual_dns,
         }
         if challenge_warning:
             response_data['challenge_warning'] = challenge_warning
@@ -223,6 +288,7 @@ def verify_challenges(order_id):
 
     data = request.json or {}
     specific_domain = data.get('domain')
+    force = bool(data.get('force'))
 
     try:
         client = AcmeClientService(environment=order.environment)
@@ -231,6 +297,22 @@ def verify_challenges(order_id):
         challenges = order.challenges_dict
 
         domains_to_verify = [specific_domain] if specific_domain else list(challenges.keys())
+
+        # DNS self-check before submitting: if the expected TXT record isn't
+        # visible yet, don't submit (a failed validation marks the order invalid
+        # and burns the token). Tell the user to wait and retry. `force` bypasses.
+        if not force:
+            to_check = {d: challenges[d] for d in domains_to_verify
+                        if d in challenges and challenges[d].get('dns_txt_value')}
+            if to_check:
+                check = _dns_selfcheck(to_check, timeout=0)  # single pass, quick
+                if not check['ok']:
+                    return success_response(
+                        data={'dns_not_ready': True, 'missing': check['missing'],
+                              'order': order.to_dict()},
+                        message=('TXT record not visible yet for '
+                                 f'{", ".join(check["missing"])}. Add the record, '
+                                 'wait for propagation, then verify again.'))
 
         for domain in domains_to_verify:
             if domain not in challenges:
@@ -440,10 +522,17 @@ def _auto_poll_and_finalize(client, order) -> dict:
             result['error'] = 'No challenges for this order'
             return result
 
-        # 1. Wait for DNS propagation (same delay as renewal service)
-        logger.info('Waiting 10s for DNS propagation...')
-        time.sleep(10)
+        # 1. Self-check DNS propagation: poll for the expected TXT records up to
+        #    the configured timeout before asking the CA to validate (#140).
+        timeout = _dns_propagation_timeout()
+        check = _dns_selfcheck(challenges, timeout)
         result['dns_propagation_wait'] = True
+        if check['ok']:
+            logger.info(f'DNS propagation confirmed after {check["waited"]}s')
+        else:
+            logger.warning(
+                f'DNS self-check timed out after {timeout}s; TXT not visible for '
+                f'{check["missing"]} — submitting anyway (CA may still validate)')
 
         # 2. Submit challenges for validation
         for domain in challenges:

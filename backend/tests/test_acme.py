@@ -409,6 +409,21 @@ class TestAcmeClientSettings:
                        {'renewal_days': 61})
         assert_error(r, 400)
 
+    def test_client_settings_has_dns_propagation_timeout(self, auth_client):
+        data = assert_success(auth_client.get('/api/v2/acme/client/settings'))
+        assert 'dns_propagation_timeout' in data
+        assert isinstance(data['dns_propagation_timeout'], int)
+
+    def test_patch_dns_propagation_timeout_valid(self, auth_client):
+        assert_success(patch_json(auth_client, '/api/v2/acme/client/settings',
+                                  {'dns_propagation_timeout': 300}))
+        data = assert_success(auth_client.get('/api/v2/acme/client/settings'))
+        assert data['dns_propagation_timeout'] == 300
+
+    def test_patch_dns_propagation_timeout_out_of_range(self, auth_client):
+        assert_error(patch_json(auth_client, '/api/v2/acme/client/settings',
+                                {'dns_propagation_timeout': 99999}), 400)
+
     def test_patch_client_settings_empty_body_rejected(self, auth_client):
         r = auth_client.patch('/api/v2/acme/client/settings',
                               data=None, content_type=CONTENT_JSON)
