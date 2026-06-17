@@ -109,6 +109,9 @@ def ensure_admin_user(app):
         )
         admin.set_password(app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123"))
         admin.force_password_change = True
+        # Exempt the bootstrap admin from forced 2FA enrolment (#141) so
+        # enabling global enforcement can never lock out this account.
+        admin.totp_exempt = True
         db.session.add(admin)
         db.session.commit()
         logger.info(f"✓ Admin user created: {admin.username}")

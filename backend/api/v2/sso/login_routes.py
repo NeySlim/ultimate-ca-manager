@@ -281,6 +281,13 @@ def sso_callback(provider_type):
             session['last_activity'] = _sso_now.isoformat()
             session.permanent = True
 
+            # Forced 2FA enrolment (#141): restrict the session until TOTP is
+            # enrolled when this provider enforces 2FA. The frontend picks it up
+            # via /auth/verify after the sso-complete redirect.
+            from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
+            if must_enroll_2fa(user, auth_method='sso', provider=provider):
+                session[ENROLL_SESSION_KEY] = True
+
             # SEC-07: Audit log SSO login
             AuditService.log_action(
                 action='login_success',
@@ -414,6 +421,13 @@ def sso_callback(provider_type):
             session['login_time'] = _saml_now.isoformat()
             session['last_activity'] = _saml_now.isoformat()
             session.permanent = True
+
+            # Forced 2FA enrolment (#141): restrict the session until TOTP is
+            # enrolled when this provider enforces 2FA. The frontend picks it up
+            # via /auth/verify after the sso-complete redirect.
+            from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
+            if must_enroll_2fa(user, auth_method='sso', provider=provider):
+                session[ENROLL_SESSION_KEY] = True
 
             # SEC-07: Audit log SAML SSO login
             AuditService.log_action(

@@ -289,9 +289,19 @@ def create_session_for_user(user):
     session['last_activity'] = now.isoformat()
     session.permanent = True
     session.modified = True
-    
+
+    # Forced 2FA enrolment (#141): SSO accounts whose provider requires it get a
+    # restricted session until TOTP is confirmed. The frontend picks this up via
+    # /auth/verify (must_enroll_2fa) and routes to the enrolment screen.
+    from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
+    provider = getattr(user, 'sso_provider', None)
+    if must_enroll_2fa(user, auth_method='sso', provider=provider):
+        session[ENROLL_SESSION_KEY] = True
+        session.modified = True
+
     return {
-        'user': user.to_dict() if hasattr(user, 'to_dict') else {'id': user.id, 'username': user.username}
+        'user': user.to_dict() if hasattr(user, 'to_dict') else {'id': user.id, 'username': user.username},
+        'must_enroll_2fa': bool(session.get(ENROLL_SESSION_KEY)),
     }
 
 
@@ -323,7 +333,19 @@ def require_auth(permissions=None):
                     'error': 'Unauthorized',
                     'message': 'Authentication required'
                 }), 401
-            
+
+            # Forced-2FA-enrolment gate (#141): a session flagged for mandatory
+            # enrolment may only reach the enrolment endpoints (and logout) until
+            # TOTP is confirmed. Checked before permissions so an un-enrolled
+            # session is uniformly blocked regardless of its permissions.
+            from auth.twofa_enforcement import ENROLL_SESSION_KEY, ENROLL_ALLOWED_PATHS
+            if session.get(ENROLL_SESSION_KEY) and request.path not in ENROLL_ALLOWED_PATHS:
+                return jsonify({
+                    'error': 'Forbidden',
+                    'message': '2FA enrolment required',
+                    'must_enroll_2fa': True
+                }), 403
+
             # Check permissions if specified
             if permissions:
                 user_perms = auth_result['permissions']
@@ -343,7 +365,7 @@ def require_auth(permissions=None):
             g.auth_method = auth_result['auth_method']
             g.permissions = auth_result['permissions']
             g.user_id = auth_result['user_id']
-            
+
             # Call the actual route function
             return f(*args, **kwargs)
         

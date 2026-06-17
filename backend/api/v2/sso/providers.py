@@ -94,6 +94,7 @@ def create_provider():
         auto_create_users=data.get('auto_create_users', True),
         auto_update_users=data.get('auto_update_users', True),
         sync_role_on_login=data.get('sync_role_on_login', False),
+        enforce_2fa=bool(data.get('enforce_2fa', False)),
     )
 
     # If setting as default, clear other providers
@@ -223,6 +224,8 @@ def update_provider(provider_id=None, provider_type_name=None):
         provider.auto_update_users = data['auto_update_users']
     if 'sync_role_on_login' in data:
         provider.sync_role_on_login = bool(data['sync_role_on_login'])
+    if 'enforce_2fa' in data:
+        provider.enforce_2fa = bool(data['enforce_2fa'])
 
     # Type-specific fields
     if provider.provider_type == 'saml':

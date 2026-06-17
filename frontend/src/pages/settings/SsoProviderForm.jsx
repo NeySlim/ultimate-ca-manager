@@ -34,6 +34,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     auto_create_users: provider?.auto_create_users ?? true,
     auto_update_users: provider?.auto_update_users ?? true,
     sync_role_on_login: provider?.sync_role_on_login ?? false,
+    enforce_2fa: provider?.enforce_2fa ?? false,
     attribute_mapping: provider?.attribute_mapping || {},
     role_mapping: provider?.role_mapping || {},
     // LDAP
@@ -265,6 +266,12 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
             label={t('sso.isDefault')}
           />
         </div>
+        <ToggleSwitch
+          checked={formData.enforce_2fa}
+          onChange={(val) => handleChange('enforce_2fa', val)}
+          label={t('sso.enforce2fa')}
+          description={t('sso.enforce2faHelp')}
+        />
       </div>
 
       {isLdap && (

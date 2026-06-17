@@ -164,6 +164,13 @@ def ldap_login():
     session['last_activity'] = _ldap_now.isoformat()
     session.permanent = True
 
+    # Forced 2FA enrolment (#141): if this provider enforces 2FA and the user
+    # has no TOTP yet, flag the session as restricted until enrolment.
+    from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
+    _must_enroll = must_enroll_2fa(user, auth_method='sso', provider=provider)
+    if _must_enroll:
+        session[ENROLL_SESSION_KEY] = True
+
     # Audit log LDAP login success
     AuditService.log_action(
         action='login_success',
@@ -207,6 +214,7 @@ def ldap_login():
             'permissions': permissions,
             'auth_method': 'ldap',
             'csrf_token': csrf_token,
+            'requires_2fa_enrollment': _must_enroll,
             'force_password_change': user.force_password_change or False,
             'timezone': tz_row.value if tz_row else 'UTC',
             'date_format': df_row.value if df_row else 'short',

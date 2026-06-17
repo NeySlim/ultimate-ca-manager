@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "Reimposta 2FA",
+    "confirmReset2fa": "Reimpostare l'autenticazione a due fattori per {{name}}? Dovrà registrarla di nuovo al prossimo accesso.",
+    "reset2faSuccess": "L'autenticazione a due fattori è stata reimpostata",
+    "exempt2fa": "Esenta da 2FA",
+    "require2fa": "Richiedi 2FA",
+    "exempt2faOn": "Utente esentato dall'obbligo di 2FA",
+    "exempt2faOff": "L'utente è ora soggetto all'obbligo di 2FA",
+    "exempt2faLabel": "Esente da 2FA"
   },
   "groups": {
     "group": "Gruppo",
@@ -2427,7 +2435,13 @@
     "apiKeySavedDone": "Ho salvato la chiave",
     "apiKeyPrefixUnavailable": "Prefisso non disponibile (chiave precedente)",
     "expiresInDaysHelp": "Lascia vuoto o imposta 0 per una chiave senza scadenza.",
-    "expiresInDaysPlaceholder": "es. 365 (vuoto = nessuna scadenza)"
+    "expiresInDaysPlaceholder": "es. 365 (vuoto = nessuna scadenza)",
+    "enroll2faRequired": "Autenticazione a due fattori richiesta",
+    "enroll2faReason": "L'amministratore richiede la 2FA sul tuo account. Configurala ora per continuare.",
+    "twoFaSetupFailed": "Impossibile avviare la configurazione 2FA",
+    "twoFaEnabled": "Autenticazione a due fattori attivata",
+    "backupCodesHint": "Conserva questi codici di backup in un luogo sicuro. Ognuno può essere usato una volta se perdi l'accesso all'app di autenticazione.",
+    "backupCodesSaved": "Ho salvato i miei codici di backup"
   },
   "rbac": {
     "title": "Controllo accessi basato su ruoli",
@@ -2739,7 +2753,9 @@
     "syncRoleOnLogin": "Sincronizza il ruolo da SSO ad ogni accesso",
     "syncRoleOnLoginHelp": "Se abilitato, il ruolo viene risincronizzato dalla mappatura dei ruoli ad ogni accesso. Gli utenti senza corrispondenza mantengono il loro ruolo UCM. Se disabilitato (predefinito), il ruolo viene impostato solo alla creazione dell'utente e poi gestito in UCM.",
     "defaultRoleHelp": "Applicato solo quando un utente viene creato automaticamente al primo accesso.",
-    "accountStatusAttrHelp": "Attributo LDAP che indica se un account è disabilitato. Valori comuni: 'description', 'userAccountControl', 'accountStatus'. Lasciare vuoto per disabilitare questo controllo."
+    "accountStatusAttrHelp": "Attributo LDAP che indica se un account è disabilitato. Valori comuni: 'description', 'userAccountControl', 'accountStatus'. Lasciare vuoto per disabilitare questo controllo.",
+    "enforce2fa": "Imponi 2FA",
+    "enforce2faHelp": "Richiedi agli utenti che si autenticano tramite questo provider di configurare l'autenticazione a due fattori TOTP."
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",

@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "2FA zurücksetzen",
+    "confirmReset2fa": "Zwei-Faktor-Authentifizierung für {{name}} zurücksetzen? Die Person muss sich bei der nächsten Anmeldung erneut registrieren.",
+    "reset2faSuccess": "Die Zwei-Faktor-Authentifizierung wurde zurückgesetzt",
+    "exempt2fa": "Von 2FA ausnehmen",
+    "require2fa": "2FA verlangen",
+    "exempt2faOn": "Benutzer von der 2FA-Pflicht ausgenommen",
+    "exempt2faOff": "Benutzer unterliegt nun der 2FA-Pflicht",
+    "exempt2faLabel": "2FA-befreit"
   },
   "groups": {
     "group": "Gruppe",
@@ -2427,7 +2435,13 @@
     "apiKeySavedDone": "Ich habe den Schlüssel gespeichert",
     "apiKeyPrefixUnavailable": "Präfix nicht verfügbar (alter Schlüssel)",
     "expiresInDaysHelp": "Leer lassen oder 0 setzen für einen Schlüssel ohne Ablaufdatum.",
-    "expiresInDaysPlaceholder": "z. B. 365 (leer = kein Ablaufdatum)"
+    "expiresInDaysPlaceholder": "z. B. 365 (leer = kein Ablaufdatum)",
+    "enroll2faRequired": "Zwei-Faktor-Authentifizierung erforderlich",
+    "enroll2faReason": "Ihr Administrator verlangt 2FA für Ihr Konto. Richten Sie sie jetzt ein, um fortzufahren.",
+    "twoFaSetupFailed": "2FA-Einrichtung konnte nicht gestartet werden",
+    "twoFaEnabled": "Zwei-Faktor-Authentifizierung aktiviert",
+    "backupCodesHint": "Bewahren Sie diese Backup-Codes sicher auf. Jeder kann einmal verwendet werden, falls Sie den Zugriff auf Ihre Authentifizierungs-App verlieren.",
+    "backupCodesSaved": "Ich habe meine Backup-Codes gespeichert"
   },
   "rbac": {
     "title": "Rollenbasierte Zugriffskontrolle",
@@ -2739,7 +2753,9 @@
     "syncRoleOnLogin": "Rolle bei jeder Anmeldung vom SSO synchronisieren",
     "syncRoleOnLoginHelp": "Wenn aktiviert, wird die Rolle bei jeder Anmeldung aus dem Rollen-Mapping neu synchronisiert. Benutzer ohne Mapping-Treffer behalten ihre UCM-Rolle. Wenn deaktiviert (Standard), wird die Rolle nur bei der Erstellung des Benutzers gesetzt und danach in UCM verwaltet.",
     "defaultRoleHelp": "Wird nur angewendet, wenn ein Benutzer bei der ersten Anmeldung automatisch angelegt wird.",
-    "accountStatusAttrHelp": "LDAP-Attribut, das angibt, ob ein Konto deaktiviert ist. Häufige Werte: 'description', 'userAccountControl', 'accountStatus'. Leer lassen, um diese Prüfung zu deaktivieren."
+    "accountStatusAttrHelp": "LDAP-Attribut, das angibt, ob ein Konto deaktiviert ist. Häufige Werte: 'description', 'userAccountControl', 'accountStatus'. Leer lassen, um diese Prüfung zu deaktivieren.",
+    "enforce2fa": "2FA erzwingen",
+    "enforce2faHelp": "Benutzer, die sich über diesen Anbieter anmelden, zur Einrichtung der TOTP-Zwei-Faktor-Authentifizierung verpflichten."
   },
   "notifications": {
     "certificateIssued": "Zertifikat ausgestellt: {{name}}",

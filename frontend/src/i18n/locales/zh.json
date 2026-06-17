@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "重置双重验证",
+    "confirmReset2fa": "重置 {{name}} 的双重身份验证？该用户需要在下次登录时重新注册。",
+    "reset2faSuccess": "双重身份验证已重置",
+    "exempt2fa": "豁免双重验证",
+    "require2fa": "要求双重验证",
+    "exempt2faOn": "用户已豁免双重验证强制要求",
+    "exempt2faOff": "用户现在受双重验证强制要求约束",
+    "exempt2faLabel": "豁免双重验证"
   },
   "groups": {
     "group": "组",
@@ -2427,7 +2435,13 @@
     "apiKeySavedDone": "我已保存密钥",
     "apiKeyPrefixUnavailable": "前缀不可用（旧密钥）",
     "expiresInDaysHelp": "留空或设为 0 表示永不过期。",
-    "expiresInDaysPlaceholder": "例如 365 (留空 = 永不过期)"
+    "expiresInDaysPlaceholder": "例如 365 (留空 = 永不过期)",
+    "enroll2faRequired": "需要双重身份验证",
+    "enroll2faReason": "您的管理员要求为您的账户启用双重验证。请立即设置以继续。",
+    "twoFaSetupFailed": "无法启动双重验证设置",
+    "twoFaEnabled": "双重身份验证已启用",
+    "backupCodesHint": "请将这些备份码保存在安全的地方。如果您无法访问身份验证器，每个备份码可使用一次。",
+    "backupCodesSaved": "我已保存备份码"
   },
   "rbac": {
     "title": "基于角色的访问控制",
@@ -2739,7 +2753,9 @@
     "syncRoleOnLogin": "每次登录时从 SSO 同步角色",
     "syncRoleOnLoginHelp": "启用后，每次登录时都会从您的角色映射重新同步角色。没有匹配映射的用户将保留其 UCM 角色。禁用时（默认），角色仅在创建用户时设置，之后在 UCM 中管理。",
     "defaultRoleHelp": "仅在首次登录时自动创建用户时应用。",
-    "accountStatusAttrHelp": "指示帐户是否被禁用的 LDAP 属性。常见值：'description'、'userAccountControl'、'accountStatus'。留空以禁用此检查。"
+    "accountStatusAttrHelp": "指示帐户是否被禁用的 LDAP 属性。常见值：'description'、'userAccountControl'、'accountStatus'。留空以禁用此检查。",
+    "enforce2fa": "强制双重验证",
+    "enforce2faHelp": "要求通过此提供程序进行身份验证的用户注册 TOTP 双重身份验证。"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",

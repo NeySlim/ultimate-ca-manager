@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "Restablecer 2FA",
+    "confirmReset2fa": "¿Restablecer la autenticación de dos factores para {{name}}? Deberá volver a configurarla en el próximo inicio de sesión.",
+    "reset2faSuccess": "Se ha restablecido la autenticación de dos factores",
+    "exempt2fa": "Eximir de 2FA",
+    "require2fa": "Exigir 2FA",
+    "exempt2faOn": "Usuario eximido de la obligación de 2FA",
+    "exempt2faOff": "El usuario ahora está sujeto a la obligación de 2FA",
+    "exempt2faLabel": "Exento de 2FA"
   },
   "groups": {
     "group": "Grupo",
@@ -2427,7 +2435,13 @@
     "apiKeySavedDone": "He guardado la clave",
     "apiKeyPrefixUnavailable": "Prefijo no disponible (clave antigua)",
     "expiresInDaysHelp": "Deje vacío o ponga 0 para una clave sin fecha de caducidad.",
-    "expiresInDaysPlaceholder": "ej. 365 (vacío = sin caducidad)"
+    "expiresInDaysPlaceholder": "ej. 365 (vacío = sin caducidad)",
+    "enroll2faRequired": "Se requiere autenticación de dos factores",
+    "enroll2faReason": "Su administrador exige 2FA en su cuenta. Configúrela ahora para continuar.",
+    "twoFaSetupFailed": "No se pudo iniciar la configuración de 2FA",
+    "twoFaEnabled": "Autenticación de dos factores activada",
+    "backupCodesHint": "Guarde estos códigos de respaldo en un lugar seguro. Cada uno puede usarse una vez si pierde el acceso a su autenticador.",
+    "backupCodesSaved": "He guardado mis códigos de respaldo"
   },
   "rbac": {
     "title": "Control de acceso basado en roles",
@@ -2739,7 +2753,9 @@
     "syncRoleOnLogin": "Sincronizar el rol desde SSO en cada inicio de sesión",
     "syncRoleOnLoginHelp": "Si está activado, el rol se vuelve a sincronizar desde su asignación de roles en cada inicio de sesión. Los usuarios sin coincidencia conservan su rol de UCM. Si está desactivado (predeterminado), el rol se establece solo al crear el usuario y luego se gestiona en UCM.",
     "defaultRoleHelp": "Se aplica solo cuando un usuario se crea automáticamente en su primer inicio de sesión.",
-    "accountStatusAttrHelp": "Atributo LDAP que indica si una cuenta está deshabilitada. Valores comunes: 'description', 'userAccountControl', 'accountStatus'. Dejar vacío para desactivar esta verificación."
+    "accountStatusAttrHelp": "Atributo LDAP que indica si una cuenta está deshabilitada. Valores comunes: 'description', 'userAccountControl', 'accountStatus'. Dejar vacío para desactivar esta verificación.",
+    "enforce2fa": "Exigir 2FA",
+    "enforce2faHelp": "Exigir que los usuarios que se autentican mediante este proveedor configuren la autenticación de dos factores TOTP."
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

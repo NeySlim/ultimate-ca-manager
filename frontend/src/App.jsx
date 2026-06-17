@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, WindowManagerProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
-import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, SafeModeOverlay, DetailWindowLayer } from './components'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, DetailWindowLayer } from './components'
 
 // Auto-reload on chunk load failure (stale cache after update)
 function lazyWithRetry(importFn) {
@@ -92,18 +92,24 @@ function PermissionRoute({ children, permission }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated, loading, sessionChecked, forcePasswordChange, clearForcePasswordChange, logout } = useAuth()
-  
+  const { isAuthenticated, loading, sessionChecked, forcePasswordChange, clearForcePasswordChange, mustEnroll2fa, checkSession, logout } = useAuth()
+
   return (
     <Suspense fallback={<PageLoader />}>
       {/* Global session warning (when logged in) */}
       {isAuthenticated && <SessionWarning onLogout={logout} />}
-      
+
+      {/* Mandatory 2FA enrolment overlay (#141) — takes precedence over the
+          password-change prompt; blocks all access until TOTP is confirmed. */}
+      {isAuthenticated && mustEnroll2fa && (
+        <ForceEnroll2FA onComplete={checkSession} />
+      )}
+
       {/* Force password change modal */}
-      {isAuthenticated && forcePasswordChange && (
+      {isAuthenticated && !mustEnroll2fa && forcePasswordChange && (
         <ForcePasswordChange onComplete={clearForcePasswordChange} />
       )}
-      
+
       <Routes>
         <Route 
           path="/login" 

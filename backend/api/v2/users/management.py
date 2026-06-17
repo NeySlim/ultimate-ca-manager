@@ -97,6 +97,43 @@ def reset_user_password(user_id):
         return error_response('Failed to reset password', 500)
 
 
+@bp.route('/api/v2/users/<int:user_id>/reset-2fa', methods=['POST'])
+@require_auth(['write:users'])
+def reset_user_2fa(user_id):
+    """
+    Clear a user's 2FA — admin break-glass for a locked-out user (#141).
+
+    POST /api/v2/users/{user_id}/reset-2fa
+
+    The user keeps their account but must re-enrol TOTP on next login if
+    enforcement applies. To let them in without 2FA, also set ``totp_exempt``.
+    """
+    # SECURITY: only admins may reset another user's 2FA
+    if g.current_user.role != 'admin':
+        return error_response('Access denied', 403)
+
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+
+    user.totp_confirmed = False
+    user.totp_secret = None
+    user.backup_codes = None
+    ok, _err = safe_commit(logger, "Failed to reset user 2FA")
+    if not ok:
+        return _err
+
+    AuditService.log_action(
+        action='mfa_reset',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'2FA reset by {g.current_user.username} for user: {user.username}',
+        success=True,
+    )
+    return success_response(message=f'2FA reset for user {user.username}')
+
+
 @bp.route('/api/v2/users/<int:user_id>/toggle', methods=['PATCH'])
 @bp.route('/api/v2/users/<int:user_id>/toggle-active', methods=['POST'])
 @require_auth(['write:users'])

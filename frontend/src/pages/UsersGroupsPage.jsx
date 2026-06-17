@@ -178,6 +178,38 @@ export default function UsersGroupsPage() {
     }
   }
 
+  const handleReset2FA = async (user) => {
+    const confirmed = await showConfirm(t('users.confirmReset2fa', { name: user.username }), {
+      title: t('users.reset2fa'),
+      confirmText: t('common.reset')
+    })
+    if (!confirmed) return
+    try {
+      await usersService.reset2FA(user.id)
+      showSuccess(t('users.reset2faSuccess'))
+      loadData()
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, totp_confirmed: false, two_factor_enabled: false, mfa_enabled: false })
+      }
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.user'))
+    }
+  }
+
+  const handleToggle2faExempt = async (user) => {
+    try {
+      const next = !user.totp_exempt
+      await usersService.update(user.id, { totp_exempt: next })
+      showSuccess(next ? t('users.exempt2faOn') : t('users.exempt2faOff'))
+      loadData()
+      if (selectedUser?.id === user.id) {
+        setSelectedUser({ ...selectedUser, totp_exempt: next })
+      }
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.user'))
+    }
+  }
+
   // ============= SSO LINKING =============
   const isLinked = (u) => !!(u && ((u.auth_source && u.auth_source !== 'local') || u.sso_provider_id))
 
@@ -763,6 +795,14 @@ export default function UsersGroupsPage() {
             <Button type="button" size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
               <Key size={14} /> {t('users.resetPassword')}
             </Button>
+            {selectedUser.totp_confirmed && (
+              <Button type="button" size="sm" variant="secondary" onClick={() => handleReset2FA(selectedUser)}>
+                <ShieldCheck size={14} /> {t('users.reset2fa')}
+              </Button>
+            )}
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleToggle2faExempt(selectedUser)}>
+              <ShieldCheck size={14} /> {selectedUser.totp_exempt ? t('users.require2fa') : t('users.exempt2fa')}
+            </Button>
             {isLinked(selectedUser) ? (
               <Button type="button" size="sm" variant="secondary" onClick={() => handleUnlinkSso(selectedUser)}>
                 <LinkBreak size={14} /> {t('users.sso.unlink')}
@@ -803,6 +843,7 @@ export default function UsersGroupsPage() {
         <CompactGrid columns={1}>
           <CompactField autoIcon="enable2FA" label={t('common.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
           <CompactField autoIcon="totp" label={t('common.totp', 'TOTP')} value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
+          <CompactField autoIcon="totp" label={t('users.exempt2faLabel')} value={selectedUser.totp_exempt ? t('common.yes') : t('common.no')} />
         </CompactGrid>
       </CompactSection>
 

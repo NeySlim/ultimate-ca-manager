@@ -351,6 +351,12 @@ def update_user(user_id):
             return error_response('Cannot disable the last active admin', 409)
         user.active = new_active
 
+    # SECURITY: Only admins can change 2FA exemption (#141)
+    if 'totp_exempt' in data:
+        if g.current_user.role != 'admin':
+            return error_response('Only admins can change 2FA exemption', 403)
+        user.totp_exempt = bool(data['totp_exempt'])
+
     # Update password if provided
     if 'password' in data and data['password']:
         # SECURITY: Validate password strength

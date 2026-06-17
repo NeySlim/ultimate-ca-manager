@@ -285,6 +285,42 @@ def login_password():
             message='2FA verification required'
         )
 
+    # Forced 2FA enrolment (#141): enforcement is ON for this local account and
+    # it has no TOTP yet → establish a restricted session that can only reach the
+    # 2FA enrolment endpoints until TOTP is confirmed.
+    from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
+    if must_enroll_2fa(user, auth_method='password'):
+        now = utc_now()
+        session.clear()
+        session['user_id'] = user.id
+        session['username'] = user.username
+        session['auth_method'] = 'password'
+        session['login_time'] = now.isoformat()
+        session['last_activity'] = now.isoformat()
+        session[ENROLL_SESSION_KEY] = True
+        session.permanent = True
+
+        csrf_token = CSRFProtection.generate_token(user.id) if HAS_CSRF else None
+
+        AuditService.log_action(
+            action='login_2fa_enrollment_required',
+            resource_type='user',
+            resource_id=user.id,
+            resource_name=username,
+            details=f'2FA enforcement: enrolment required for {username}',
+            success=True,
+            username=username
+        )
+
+        return success_response(
+            data={
+                'requires_2fa_enrollment': True,
+                'csrf_token': csrf_token,
+                'user': {'id': user.id, 'username': user.username}
+            },
+            message='2FA enrolment required'
+        )
+
     # No 2FA - create full session
     now = utc_now()
     session.clear()

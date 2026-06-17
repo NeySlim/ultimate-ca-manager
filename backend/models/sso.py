@@ -88,7 +88,12 @@ class SSOProvider(db.Model):
     # only updated if `role_mapping` resolves; `default_role` is never
     # applied to existing users.
     sync_role_on_login = db.Column(db.Boolean, default=False, nullable=False)
-    
+
+    # Force TOTP 2FA enrolment for users authenticating through this provider
+    # (#141). Independent of the global `enforce_2fa` setting, which only gates
+    # local accounts. Default OFF to avoid surprising existing deployments.
+    enforce_2fa = db.Column(db.Boolean, default=False, nullable=False)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
@@ -155,6 +160,7 @@ class SSOProvider(db.Model):
             'auto_create_users': self.auto_create_users,
             'auto_update_users': self.auto_update_users,
             'sync_role_on_login': bool(self.sync_role_on_login),
+            'enforce_2fa': bool(self.enforce_2fa),
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at),
             'last_used_at': utc_isoformat(self.last_used_at),

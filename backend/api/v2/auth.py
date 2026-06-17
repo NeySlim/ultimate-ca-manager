@@ -208,6 +208,12 @@ def verify():
     from auth.unified import AuthManager
     session_timeout = AuthManager._get_session_timeout()
     
+    # Forced-2FA-enrolment state (#141): the session is authenticated but may
+    # only reach the enrolment endpoints until TOTP is confirmed. The frontend
+    # uses this to route to the mandatory enrolment screen.
+    from auth.twofa_enforcement import ENROLL_SESSION_KEY
+    must_enroll_2fa = bool(session.get(ENROLL_SESSION_KEY))
+
     # If authenticated
     return success_response(
         data={
@@ -221,6 +227,7 @@ def verify():
                 'username': g.current_user.username,
                 'role': g.current_user.role
             },
+            'must_enroll_2fa': must_enroll_2fa,
             'csrf_token': csrf_token,
             'timezone': app_timezone,
             'date_format': app_date_format,

@@ -268,6 +268,12 @@ export default function LoginPage() {
       saveUsername(username)
       saveAuthMethod('password')
       await login(username, password, userData)
+      // #141: if 2FA enrolment is enforced, the session is established but
+      // restricted; the ForceEnroll2FA overlay takes over after navigation.
+      if (userData.requires_2fa_enrollment) {
+        navigate('/dashboard')
+        return
+      }
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
     } catch (error) {

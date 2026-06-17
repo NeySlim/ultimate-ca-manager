@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "2FAをリセット",
+    "confirmReset2fa": "{{name}} の二要素認証をリセットしますか？次回ログイン時に再登録が必要になります。",
+    "reset2faSuccess": "二要素認証がリセットされました",
+    "exempt2fa": "2FAを免除",
+    "require2fa": "2FAを必須にする",
+    "exempt2faOn": "ユーザーは2FA強制から免除されました",
+    "exempt2faOff": "ユーザーは2FA強制の対象になりました",
+    "exempt2faLabel": "2FA免除"
   },
   "groups": {
     "group": "グループ",
@@ -2427,7 +2435,13 @@
     "apiKeySavedDone": "キーを保存しました",
     "apiKeyPrefixUnavailable": "プレフィックスは利用できません (古いキー)",
     "expiresInDaysHelp": "無期限のキーにするには空欄または0を入力してください。",
-    "expiresInDaysPlaceholder": "例: 365 (空欄 = 無期限)"
+    "expiresInDaysPlaceholder": "例: 365 (空欄 = 無期限)",
+    "enroll2faRequired": "二要素認証が必要です",
+    "enroll2faReason": "管理者がアカウントに2FAを要求しています。続行するには今すぐ設定してください。",
+    "twoFaSetupFailed": "2FAのセットアップを開始できませんでした",
+    "twoFaEnabled": "二要素認証が有効になりました",
+    "backupCodesHint": "これらのバックアップコードを安全な場所に保管してください。認証アプリにアクセスできなくなった場合、各コードは一度だけ使用できます。",
+    "backupCodesSaved": "バックアップコードを保存しました"
   },
   "rbac": {
     "title": "ロールベースアクセス制御",
@@ -2739,7 +2753,9 @@
     "syncRoleOnLogin": "ログインごとに SSO からロールを同期",
     "syncRoleOnLoginHelp": "有効にすると、ログインごとにロールマッピングからロールが再同期されます。マッピングに一致しないユーザーは UCM のロールを保持します。無効（デフォルト）の場合、ロールはユーザー作成時にのみ設定され、その後は UCM で管理されます。",
     "defaultRoleHelp": "初回ログイン時にユーザーが自動作成される場合にのみ適用されます。",
-    "accountStatusAttrHelp": "アカウントが無効化されているかどうかを示すLDAP属性。一般的な値： 'description'、 'userAccountControl'、 'accountStatus'。このチェックを無効にするには空白にしてください。"
+    "accountStatusAttrHelp": "アカウントが無効化されているかどうかを示すLDAP属性。一般的な値： 'description'、 'userAccountControl'、 'accountStatus'。このチェックを無効にするには空白にしてください。",
+    "enforce2fa": "2FAを強制する",
+    "enforce2faHelp": "このプロバイダーで認証するユーザーにTOTP二要素認証の登録を必須にします。"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",

@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "Reset 2FA",
+    "confirmReset2fa": "Reset two-factor authentication for {{name}}? They will need to re-enrol on next login.",
+    "reset2faSuccess": "Two-factor authentication has been reset",
+    "exempt2fa": "Exempt from 2FA",
+    "require2fa": "Require 2FA",
+    "exempt2faOn": "User exempted from 2FA enforcement",
+    "exempt2faOff": "User is now subject to 2FA enforcement",
+    "exempt2faLabel": "2FA exempt"
   },
   "groups": {
     "group": "Group",
@@ -2428,7 +2436,13 @@
     "apiKeySavedDone": "I've saved the key",
     "apiKeyPrefixUnavailable": "Key prefix unavailable (legacy key)",
     "expiresInDaysHelp": "Leave empty or set 0 for a key that never expires.",
-    "expiresInDaysPlaceholder": "e.g. 365 (empty = no expiration)"
+    "expiresInDaysPlaceholder": "e.g. 365 (empty = no expiration)",
+    "enroll2faRequired": "Two-factor authentication required",
+    "enroll2faReason": "Your administrator requires 2FA on your account. Set it up now to continue.",
+    "twoFaSetupFailed": "Failed to start 2FA setup",
+    "twoFaEnabled": "Two-factor authentication enabled",
+    "backupCodesHint": "Store these backup codes somewhere safe. Each can be used once if you lose access to your authenticator.",
+    "backupCodesSaved": "I've saved my backup codes"
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -2742,7 +2756,9 @@
     "syncRoleOnLogin": "Sync role from SSO on each login",
     "syncRoleOnLoginHelp": "When enabled, the role is re-synced from your role mapping on every login. Users without a mapping match keep their UCM role. When disabled (default), the role is set only when the user is created and is then managed in UCM.",
     "defaultRoleHelp": "Applied only when a user is auto-created on first login.",
-    "accountStatusAttrHelp": "LDAP attribute that indicates if an account is disabled. Common values: 'description', 'userAccountControl', 'accountStatus'. Leave empty to disable this check."
+    "accountStatusAttrHelp": "LDAP attribute that indicates if an account is disabled. Common values: 'description', 'userAccountControl', 'accountStatus'. Leave empty to disable this check.",
+    "enforce2fa": "Enforce 2FA",
+    "enforce2faHelp": "Require users authenticating through this provider to enrol TOTP two-factor authentication."
   },
   "notifications": {
     "certificateIssued": "Certificate issued: {{name}}",

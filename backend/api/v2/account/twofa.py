@@ -3,7 +3,7 @@ import base64
 import secrets
 import logging
 
-from flask import request, g
+from flask import request, g, session
 from models import db, User
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
@@ -96,6 +96,12 @@ def confirm_2fa():
     if not ok:
         return _err
 
+    # If this confirmation satisfied a forced-enrolment session (#141), lift the
+    # gate so the now-enrolled user gets a full session.
+    from auth.twofa_enforcement import ENROLL_SESSION_KEY
+    if session.pop(ENROLL_SESSION_KEY, None) is not None:
+        session.modified = True
+
     AuditService.log_action(
         action='mfa_enable',
         resource_type='user',
@@ -129,6 +135,13 @@ def disable_2fa():
     user = User.query.get(g.current_user.id)
     if not user:
         return error_response('User not found', 404)
+
+    # Block self-disable while 2FA is enforced for this account (#141) — would
+    # otherwise be a trivial bypass of the enforcement.
+    from auth.twofa_enforcement import enforcement_active_for
+    if enforcement_active_for(user):
+        return error_response(
+            '2FA is enforced for your account and cannot be disabled', 403)
 
     # Verify with TOTP code
     if code:

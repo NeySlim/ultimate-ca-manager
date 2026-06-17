@@ -28,6 +28,10 @@ export const usersService = {
     return apiClient.post(`/users/${id}/reset-password`)
   },
 
+  async reset2FA(id) {
+    return apiClient.post(`/users/${id}/reset-2fa`)
+  },
+
   async getPasswordPolicy() {
     return apiClient.get('/users/password-policy')
   },

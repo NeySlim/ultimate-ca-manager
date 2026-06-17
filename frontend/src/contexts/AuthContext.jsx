@@ -26,6 +26,8 @@ export function AuthProvider({ children }) {
   const [permissions, setPermissions] = useState([])
   const [role, setRole] = useState(null)
   const [forcePasswordChange, setForcePasswordChange] = useState(false)
+  // #141: session authenticated but must enrol TOTP before full access.
+  const [mustEnroll2fa, setMustEnroll2fa] = useState(false)
 
   const checkSession = useCallback(async () => {
     try {
@@ -40,6 +42,7 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(false)
         setPermissions([])
         setRole(null)
+        setMustEnroll2fa(false)
         setPrefsAuthenticated(false)
         return false
       }
@@ -48,6 +51,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       setPermissions(userData.permissions || [])
       setRole(userData.role || null)
+      setMustEnroll2fa(userData.must_enroll_2fa || false)
       if (userData.timezone) setAppTimezone(userData.timezone)
       if (userData.date_format) setDateFormat(userData.date_format)
       if (userData.show_time !== undefined) setShowTime(userData.show_time !== false)
@@ -66,6 +70,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false)
       setPermissions([])
       setRole(null)
+      setMustEnroll2fa(false)
       return false
     } finally {
       setLoading(false)
@@ -107,6 +112,8 @@ export function AuthProvider({ children }) {
       setForcePasswordChange(response.data?.force_password_change || false)
       // Apply display settings from login response (timezone, date_format, show_time)
       const loginData = response.data || response
+      // #141: forced-2FA-enrolment flag from the login response.
+      setMustEnroll2fa(loginData.requires_2fa_enrollment || loginData.must_enroll_2fa || false)
       if (loginData.timezone) setAppTimezone(loginData.timezone)
       if (loginData.date_format) setDateFormat(loginData.date_format)
       if (loginData.show_time !== undefined) setShowTime(loginData.show_time !== false)
@@ -152,6 +159,7 @@ export function AuthProvider({ children }) {
       setPermissions([])
       setRole(null)
       setForcePasswordChange(false)
+      setMustEnroll2fa(false)
       setPrefsAuthenticated(false)
       setLoading(false)
       debug('🔓 Local session cleared')
@@ -168,6 +176,7 @@ export function AuthProvider({ children }) {
     permissions,
     role,
     forcePasswordChange,
+    mustEnroll2fa,
     login,
     logout,
     checkSession,

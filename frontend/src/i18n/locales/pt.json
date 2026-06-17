@@ -1072,7 +1072,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "Repor 2FA",
+    "confirmReset2fa": "Repor a autenticação de dois fatores de {{name}}? Terá de a configurar novamente no próximo início de sessão.",
+    "reset2faSuccess": "A autenticação de dois fatores foi reposta",
+    "exempt2fa": "Isentar de 2FA",
+    "require2fa": "Exigir 2FA",
+    "exempt2faOn": "Utilizador isento da obrigatoriedade de 2FA",
+    "exempt2faOff": "O utilizador está agora sujeito à obrigatoriedade de 2FA",
+    "exempt2faLabel": "Isento de 2FA"
   },
   "groups": {
     "group": "Grupo",
@@ -2427,7 +2435,13 @@
     "apiKeySavedDone": "Salvei a chave",
     "apiKeyPrefixUnavailable": "Prefixo indisponível (chave antiga)",
     "expiresInDaysHelp": "Deixe vazio ou defina 0 para uma chave que nunca expira.",
-    "expiresInDaysPlaceholder": "ex. 365 (vazio = sem expiração)"
+    "expiresInDaysPlaceholder": "ex. 365 (vazio = sem expiração)",
+    "enroll2faRequired": "Autenticação de dois fatores obrigatória",
+    "enroll2faReason": "O seu administrador exige 2FA na sua conta. Configure-a agora para continuar.",
+    "twoFaSetupFailed": "Falha ao iniciar a configuração de 2FA",
+    "twoFaEnabled": "Autenticação de dois fatores ativada",
+    "backupCodesHint": "Guarde estes códigos de backup num local seguro. Cada um pode ser usado uma vez se perder o acesso ao seu autenticador.",
+    "backupCodesSaved": "Guardei os meus códigos de backup"
   },
   "rbac": {
     "title": "Controlo de acesso baseado em funções",
@@ -2739,7 +2753,9 @@
     "syncRoleOnLogin": "Sincronizar a função do SSO em cada login",
     "syncRoleOnLoginHelp": "Quando ativado, a função é ressincronizada a partir do mapeamento de funções a cada login. Usuários sem correspondência mantêm sua função UCM. Quando desativado (padrão), a função é definida apenas na criação do usuário e depois gerenciada no UCM.",
     "defaultRoleHelp": "Aplicado apenas quando um usuário é criado automaticamente no primeiro login.",
-    "accountStatusAttrHelp": "Atributo LDAP que indica se uma conta está desativada. Valores comuns: 'description', 'userAccountControl', 'accountStatus'. Deixe vazio para desativar esta verificação."
+    "accountStatusAttrHelp": "Atributo LDAP que indica se uma conta está desativada. Valores comuns: 'description', 'userAccountControl', 'accountStatus'. Deixe vazio para desativar esta verificação.",
+    "enforce2fa": "Exigir 2FA",
+    "enforce2faHelp": "Exigir que os utilizadores que se autenticam através deste fornecedor configurem a autenticação de dois fatores TOTP."
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

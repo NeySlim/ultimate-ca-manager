@@ -116,7 +116,13 @@
     "apiKeySavedDone": "J'ai sauvegardé la clé",
     "apiKeyPrefixUnavailable": "Préfixe indisponible (ancienne clé)",
     "expiresInDaysHelp": "Laissez vide ou mettez 0 pour une clé sans date d'expiration.",
-    "expiresInDaysPlaceholder": "ex. 365 (vide = pas d'expiration)"
+    "expiresInDaysPlaceholder": "ex. 365 (vide = pas d'expiration)",
+    "enroll2faRequired": "Authentification à deux facteurs requise",
+    "enroll2faReason": "Votre administrateur impose la 2FA sur votre compte. Configurez-la maintenant pour continuer.",
+    "twoFaSetupFailed": "Échec du démarrage de la configuration 2FA",
+    "twoFaEnabled": "Authentification à deux facteurs activée",
+    "backupCodesHint": "Conservez ces codes de secours en lieu sûr. Chacun est utilisable une seule fois en cas de perte de votre authentificateur.",
+    "backupCodesSaved": "J'ai sauvegardé mes codes de secours"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -2648,7 +2654,9 @@
     "syncRoleOnLogin": "Synchroniser le rôle depuis le SSO à chaque connexion",
     "syncRoleOnLoginHelp": "Si activé, le rôle est re-synchronisé depuis votre mappage de rôles à chaque connexion. Les utilisateurs sans correspondance gardent leur rôle UCM. Si désactivé (par défaut), le rôle est défini uniquement à la création de l'utilisateur puis géré dans UCM.",
     "defaultRoleHelp": "Appliqué uniquement à la création automatique d'un utilisateur lors de sa première connexion.",
-    "accountStatusAttrHelp": "Attribut LDAP qui indique si un compte est désactivé. Valeurs courantes : 'description', 'userAccountControl', 'accountStatus'. Laisser vide pour désactiver cette vérification."
+    "accountStatusAttrHelp": "Attribut LDAP qui indique si un compte est désactivé. Valeurs courantes : 'description', 'userAccountControl', 'accountStatus'. Laisser vide pour désactiver cette vérification.",
+    "enforce2fa": "Imposer la 2FA",
+    "enforce2faHelp": "Obliger les utilisateurs authentifiés via ce fournisseur à configurer la 2FA TOTP."
   },
   "templates": {
     "template": "Modèle",
@@ -2950,7 +2958,15 @@
       "ldap": "LDAP",
       "oauth2": "OAuth2",
       "saml": "SAML"
-    }
+    },
+    "reset2fa": "Réinitialiser la 2FA",
+    "confirmReset2fa": "Réinitialiser la 2FA pour {{name}} ? L'utilisateur devra la reconfigurer à la prochaine connexion.",
+    "reset2faSuccess": "L'authentification à deux facteurs a été réinitialisée",
+    "exempt2fa": "Exempter de la 2FA",
+    "require2fa": "Imposer la 2FA",
+    "exempt2faOn": "Utilisateur exempté de l'obligation 2FA",
+    "exempt2faOff": "Utilisateur de nouveau soumis à l'obligation 2FA",
+    "exempt2faLabel": "Exempté de 2FA"
   },
   "validation": {
     "required": "Ce champ est requis",

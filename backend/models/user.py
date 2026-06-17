@@ -60,6 +60,9 @@ class User(db.Model):
     totp_secret = db.Column(db.String(32))  # Base32-encoded TOTP secret
     totp_confirmed = db.Column(db.Boolean, default=False)  # TOTP setup confirmed
     backup_codes = db.Column(db.Text)  # JSON array of backup codes (hashed)
+    # Per-user opt-out from forced 2FA enrolment (#141). Set on the initial
+    # admin so global enforcement can never lock out the bootstrap account.
+    totp_exempt = db.Column(db.Boolean, default=False)
     
     # Password management
     force_password_change = db.Column(db.Boolean, default=False)  # Must change on next login
@@ -144,6 +147,7 @@ class User(db.Model):
             "mfa_enabled": self.mfa_enabled,
             "totp_enabled": self.totp_confirmed,
             "two_factor_enabled": self.totp_confirmed,
+            "totp_exempt": bool(self.totp_exempt),
             "force_password_change": self.force_password_change or False,
             "created_at": utc_isoformat(self.created_at),
             "last_login": utc_isoformat(self.last_login),
