@@ -5,6 +5,8 @@ Safe for Docker, systemd, and development environments
 """
 import threading
 import time
+import os
+import atexit
 import logging
 from datetime import datetime
 from typing import Dict, Callable, Optional, Any
@@ -101,6 +103,9 @@ class SchedulerService:
         self._thread: Optional[threading.Thread] = None
         self._running = False
         self._app = None
+        self._owns_lock = False
+        self._owner_pid = None
+        self._lock_path = None
         logger.info(f"SchedulerService initialized (wake interval: {wake_interval}s)")
     
     def register_task(
@@ -240,9 +245,19 @@ class SchedulerService:
     def _scheduler_loop(self) -> None:
         """Main scheduler loop - runs in background thread"""
         logger.info("Scheduler thread started")
-        
+        loop_pid = os.getpid()
+
         while self._running:
             try:
+                # Under gunicorn + gevent the scheduler greenlet can be inherited
+                # by a forked worker (start() is not called again there, so the
+                # pidfile lock alone wouldn't catch it). If this loop is running
+                # in a process that is not the lock owner, it's a forked copy —
+                # exit so only the owning process runs scheduled tasks (#139).
+                if os.getpid() != loop_pid or (self._owner_pid and os.getpid() != self._owner_pid):
+                    logger.info("Scheduler loop detected in a non-owner (forked) process; exiting")
+                    self._running = False
+                    break
                 # Make a snapshot of tasks to avoid holding lock during execution
                 with self.tasks_lock:
                     tasks_to_run = [
@@ -274,23 +289,88 @@ class SchedulerService:
                 logger.error(f"Error in scheduler loop: {e}", exc_info=True)
                 time.sleep(self.wake_interval)
     
+    @staticmethod
+    def _pid_alive(pid: int) -> bool:
+        if pid <= 0:
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True  # exists but owned by another user
+        return True
+
+    def _acquire_singleton_lock(self) -> bool:
+        """Acquire the cross-process scheduler lock so only ONE process runs the
+        background loop. Under gunicorn the app is started in both the master and
+        the worker(s); without this every scheduled task (incl. webhook delivery)
+        would run in each process. Atomic O_EXCL create on a pidfile — survives
+        fork because the filesystem, not inherited memory, is the source of truth.
+        """
+        try:
+            from config.settings import DATA_DIR
+            self._lock_path = os.path.join(str(DATA_DIR), 'scheduler.lock')
+        except Exception:
+            self._lock_path = '/tmp/ucm-scheduler.lock'
+        for _ in range(2):
+            try:
+                fd = os.open(self._lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+                os.write(fd, str(os.getpid()).encode())
+                os.close(fd)
+                self._owns_lock = True
+                self._owner_pid = os.getpid()
+                return True
+            except FileExistsError:
+                try:
+                    with open(self._lock_path) as f:
+                        other = int((f.read().strip() or '0'))
+                except (OSError, ValueError):
+                    other = 0
+                if other and other != os.getpid() and self._pid_alive(other):
+                    return False  # another live process owns the scheduler
+                # Stale lock (owner died) — remove and retry once.
+                try:
+                    os.unlink(self._lock_path)
+                except OSError:
+                    pass
+        return False
+
+    def _release_lock(self) -> None:
+        # Only the process that actually acquired the lock may remove it — a
+        # forked worker inherits _owns_lock=True and this atexit handler but must
+        # not delete the master's lock when it exits.
+        if self._owns_lock and self._lock_path and self._owner_pid == os.getpid():
+            try:
+                os.unlink(self._lock_path)
+            except OSError:
+                pass
+            self._owns_lock = False
+
     def start(self, app=None) -> None:
         """
         Start the scheduler thread
-        
+
         Args:
             app: Flask app for application context (optional)
         """
         if self._running:
             logger.warning("Scheduler already running")
             return
-        
+
         self._app = app
+        # Only one process across master/workers may run the background loop.
+        if not self._acquire_singleton_lock():
+            logger.info("Scheduler background loop owned by another process — "
+                        "tasks registered here, but not running the loop in this process")
+            return
+
         self._running = True
         self._thread = threading.Thread(target=self._scheduler_loop, daemon=True)
         self._thread.name = "SchedulerService"
         self._thread.start()
-        logger.info("Scheduler started")
+        atexit.register(self._release_lock)
+        logger.info(f"Scheduler started (pid {os.getpid()} owns the scheduler lock)")
     
     def stop(self, timeout: int = 10) -> bool:
         """
@@ -314,7 +394,8 @@ class SchedulerService:
             if self._thread.is_alive():
                 logger.warning(f"Scheduler thread did not stop within {timeout}s")
                 return False
-        
+
+        self._release_lock()
         logger.info("Scheduler stopped")
         return True
 
