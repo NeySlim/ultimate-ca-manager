@@ -8,7 +8,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
-## [2.174] - 2026-06-17
+## [2.175] - 2026-06-17
+
+### Fixed
+- **Manual DNS-01 is usable again** — the ACME client no longer waits a fixed 10s then auto-submits. For a **Manual** DNS provider the order stays pending so you can add the TXT record and click **Verify Challenge** (which self-checks DNS before submitting, so it never burns the token; a force option bypasses the check). For **automated** providers the client self-checks propagation (configurable *DNS propagation timeout* in ACME → Let's Encrypt settings) and runs validation in the background so the request never blocks (#140).
 
 ### Fixed
 - **Duplicate webhook notifications** — `certificate.expiring` (and other events) could be delivered twice with an identical payload while the delivery log showed a single event. Webhook deliveries are now claimed atomically (exactly-once) and the background scheduler runs in a single process, so each delivery is sent once even under concurrent workers (#139).
