@@ -269,6 +269,8 @@ class WebhookService:
     DEFAULT_MAX_ATTEMPTS = 5
     _BACKOFF_BASE_SECONDS = 60      # 1st retry ~1 min
     _BACKOFF_CAP_SECONDS = 3600     # capped at 1 h
+    _CLAIM_LEASE_SECONDS = 120      # delivery lease; longer than the POST timeout
+                                    # so a crashed claim is reclaimed, not lost (#139)
 
     @staticmethod
     def send_event(event_type: str, payload: dict, ca_refid: str = None, meta: dict = None):
@@ -383,9 +385,28 @@ class WebhookService:
             return result
 
         for d in due:
+            # Atomic claim (#139): only one scheduler/worker may send a row.
+            # Bump attempts + push next_attempt_at forward (a lease) in a single
+            # conditional UPDATE; if another process already claimed it the
+            # rowcount is 0 and we skip — guarantees exactly-once delivery even
+            # when the scheduler runs in multiple workers. A crashed claim is
+            # reclaimed once the lease (next_attempt_at) elapses.
+            from sqlalchemy import update as _sa_update
+            claimed = db.session.execute(
+                _sa_update(WebhookDelivery)
+                .where(WebhookDelivery.id == d.id,
+                       WebhookDelivery.status == WebhookDelivery.STATUS_PENDING,
+                       WebhookDelivery.next_attempt_at <= now)
+                .values(attempts=(WebhookDelivery.attempts + 1),
+                        next_attempt_at=now + timedelta(seconds=WebhookService._CLAIM_LEASE_SECONDS))
+            ).rowcount
+            db.session.commit()
+            if not claimed:
+                continue  # already claimed by a concurrent scheduler
+            db.session.refresh(d)
+
             result['attempted'] += 1
             endpoint = WebhookEndpoint.query.get(d.endpoint_id)
-            d.attempts = (d.attempts or 0) + 1
             if not endpoint or not endpoint.enabled:
                 d.status = WebhookDelivery.STATUS_FAILED
                 d.last_error = 'Endpoint missing or disabled'

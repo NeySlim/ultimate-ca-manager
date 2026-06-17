@@ -118,6 +118,25 @@ class TestProcessDeliveries:
             assert res['failed'] == 1
             assert WebhookDelivery.query.get(did).status == 'failed'
 
+    def test_concurrent_process_delivers_once(self, app, endpoint, monkeypatch):
+        """#139: a pending row is delivered exactly once even if a second
+        scheduler/worker runs concurrently (atomic claim)."""
+        did = self._queue(app, endpoint)
+        calls = []
+
+        def perform(ep, et, body):
+            calls.append(1)
+            if len(calls) == 1:
+                # Re-enter mid-delivery, simulating a concurrent worker.
+                WebhookService.process_pending_deliveries()
+            return (True, 200, None)
+
+        monkeypatch.setattr(WebhookService, '_perform_delivery', staticmethod(perform))
+        with app.app_context():
+            WebhookService.process_pending_deliveries()
+            assert len(calls) == 1  # the concurrent run could not re-claim it
+            assert WebhookDelivery.query.get(did).status == 'delivered'
+
     def test_future_deliveries_not_picked(self, app, endpoint, monkeypatch):
         self._queue(app, endpoint, next_attempt_at=utc_now() + timedelta(hours=1))
         calls = []
