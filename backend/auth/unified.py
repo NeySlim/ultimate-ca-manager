@@ -269,42 +269,6 @@ class AuthManager:
     
 
 
-def create_session_for_user(user):
-    """
-    Helper function to establish a session for a user.
-    Used by SSO callback to establish session.
-    
-    Args:
-        user: User model instance
-    
-    Returns:
-        dict: {'user': dict}
-    """
-    now = utc_now()
-    # Regenerate session ID to prevent session fixation
-    session.clear()
-    session['user_id'] = user.id
-    session['username'] = user.username
-    session['login_time'] = now.isoformat()
-    session['last_activity'] = now.isoformat()
-    session.permanent = True
-    session.modified = True
-
-    # Forced 2FA enrolment (#141): SSO accounts whose provider requires it get a
-    # restricted session until TOTP is confirmed. The frontend picks this up via
-    # /auth/verify (must_enroll_2fa) and routes to the enrolment screen.
-    from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
-    provider = getattr(user, 'sso_provider', None)
-    if must_enroll_2fa(user, auth_method='sso', provider=provider):
-        session[ENROLL_SESSION_KEY] = True
-        session.modified = True
-
-    return {
-        'user': user.to_dict() if hasattr(user, 'to_dict') else {'id': user.id, 'username': user.username},
-        'must_enroll_2fa': bool(session.get(ENROLL_SESSION_KEY)),
-    }
-
-
 def require_auth(permissions=None):
     """
     Decorator to protect routes with authentication
