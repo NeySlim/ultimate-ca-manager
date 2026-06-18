@@ -8,6 +8,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
+## [2.176] - 2026-06-18
+
+### Added
+- **Forced 2FA enrolment** — local and SSO logins can be required to enrol a TOTP authenticator before the session is fully usable. A restricted session is established until enrolment is complete (only the 2FA enrolment and logout endpoints are reachable). Global enforcement is a single *Enforce Two-Factor Authentication* toggle for local accounts; each SSO provider has its own `enforce_2fa` switch, independent of the global one. Individual users can be exempted (e.g., a break-glass admin). mTLS and WebAuthn logins are never additionally forced, since they are already a strong second factor (#141).
+
+
 ## [2.175] - 2026-06-17
 
 ### Fixed
