@@ -11,7 +11,7 @@
 
 > **UCM is a young and actively developed project.** Feedback, bug reports, and feature requests are very welcome! Feel free to [open an issue](https://github.com/NeySlim/ultimate-ca-manager/issues) — every report helps make UCM better.
 
-> **Latest release — v2.170** (2026-06-13): certificate conformance linting (pkilint/zlint, RFC 5280 + CA/Browser Forum profiles), ACME Renewal Information (ARI, RFC 9773), an opt-in bearer-gated Prometheus `/metrics` endpoint, per-webhook delivery history with manual retry, a background-task scheduler view, and scheduled encrypted backups. See the [v2.170 release notes](https://github.com/NeySlim/ultimate-ca-manager/releases/latest) and the full [CHANGELOG](CHANGELOG.md).
+> **Latest release — v2.176** (2026-06-18): forced 2FA enrolment for local logins and per-SSO-provider, with restricted sessions until enrolment completes and per-user exemptions (#141). See the [v2.176 release notes](https://github.com/NeySlim/ultimate-ca-manager/releases/latest) and the full [CHANGELOG](CHANGELOG.md).
 
 ![Dashboard](docs/screenshots/dashboard-dark.png)
 
