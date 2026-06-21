@@ -74,24 +74,3 @@ def get_ca_cert_pem(ca) -> bytes:
         return base64.b64decode(ca.crt)
     return b''
 
-
-def get_ca_private_key_pem(ca, decrypted: bool = False) -> bytes:
-    """
-    Get CA private key as PEM bytes.
-
-    Args:
-        ca: CA model instance
-        decrypted: If True, key is already decrypted
-
-    Returns:
-        Private key PEM bytes or None
-    """
-    if not ca.prv:
-        return None
-
-    key_data = ca.prv
-    if not decrypted:
-        from security.encryption import decrypt_private_key
-        key_data = decrypt_private_key(key_data)
-
-    return base64.b64decode(key_data)

@@ -14,7 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from models import CA, Certificate, db
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
-from .helpers import get_ca_cert_pem, get_ca_private_key_pem
+from .helpers import get_ca_cert_pem
 
 logger = logging.getLogger(__name__)
 
