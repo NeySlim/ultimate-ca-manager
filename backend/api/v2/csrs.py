@@ -694,7 +694,7 @@ def sign_csr(csr_id):
     if not ca:
         return error_response('CA not found', 404)
     
-    if not ca.crt or not ca.prv:
+    if not ca.crt or not ca.has_private_key:
         return error_response('CA is not valid for signing', 400)
 
     # Check offline status
@@ -776,7 +776,7 @@ def bulk_sign_csrs():
         return error_response('ca_id required', 400)
 
     ca = CA.query.get(ca_id)
-    if not ca or not ca.crt or not ca.prv:
+    if not ca or not ca.crt or not ca.has_private_key:
         return error_response('CA not found or not valid for signing', 404)
 
     # Clamp validity to CA expiration
