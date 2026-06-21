@@ -19,7 +19,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
-from utils.key_codec import load_pem_bytes
 from websocket.emitters import on_certificate_issued
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.db_transaction import safe_commit
@@ -109,8 +108,11 @@ def create_certificate():
     if not ca:
         return error_response('CA not found', 404)
 
-    if not ca.prv:
+    if not ca.has_private_key:
         return error_response('CA private key not available', 400)
+
+    if ca.offline:
+        return error_response('CA is offline; restore it before issuing', 400)
 
     # Policy evaluation — check if approval is required (admins bypass)
     try:
@@ -153,8 +155,8 @@ def create_certificate():
         # Load CA certificate and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
-        ca_key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-        ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        ca_key = get_ca_signing_key(ca)
 
         # Generate key pair
         key_type = data.get('key_type', 'RSA')

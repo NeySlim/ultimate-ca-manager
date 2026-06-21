@@ -49,8 +49,22 @@ def get_scep_service():
     if not ca:
         return None, "Configured CA not found"
 
-    if not ca.prv:
+    if not ca.has_private_key:
         return None, "CA does not have a private key"
+
+    if ca.offline:
+        return None, "CA is offline; restore it before using it for SCEP"
+
+    # SCEP enrollment decrypts the client's PKCS#7 envelope with the CA's
+    # RSA private key (RFC 8894 §3.4). HSM-resident signing keys do not
+    # expose decryption in the current providers, so SCEP is not supported
+    # for HSM-backed CAs. Local CAs work normally.
+    if ca.uses_hsm:
+        return None, (
+            "SCEP is not supported for HSM-backed CAs: the protocol "
+            "requires RSA envelope decryption, which is not available "
+            "for HSM-resident keys"
+        )
 
     # Get challenge password and auto-approve setting
     challenge = get_config(f'scep_challenge_{ca.id}')
