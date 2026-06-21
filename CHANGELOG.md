@@ -8,6 +8,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
+## [2.177] - 2026-06-21
+
+### Fixed
+- **HSM-backed CA certificate issuance** — issuing, renewing, bulk-reissuing, or approval-flow issuing a certificate against an HSM-backed CA (Vault Transit / OpenBao / PKCS#11 / Azure Key Vault / GCP KMS) no longer fails with `CA private key not available`. Every certificate-issuance path now goes through the HSM-aware `get_ca_signing_key` loader instead of reading the local `ca.prv` column (which is empty for HSM CAs), and gates on `has_private_key` rather than on `ca.prv` (#142).
+- **EST and auto-renewal signing** — `sign_csr_from_crypto` (the EST enrollment and automatic-renewal signing path) was loading the CA key directly from `ca.prv` and crashed on HSM-backed CAs; it now routes through the same HSM key loader as the rest of the codebase (#142).
+- **SCEP with HSM-backed CAs** — the SCEP factory no longer crashes when the configured CA is HSM-backed. SCEP requires RSA envelope decryption (RFC 8894 §3.4), which is not available for HSM-resident keys, so the service now returns a clear `SCEP is not supported for HSM-backed CAs` error at configuration time instead of failing opaquely at runtime (#142).
+
+### Changed
+- **Dead code removed** — the unused `CAOperationsMixin.generate_crl` implementation (all callers use `CRLService.generate_crl`, which is already HSM-aware) and the orphaned `get_ca_private_key_pem` helper have been removed.
+
+
 ## [2.176] - 2026-06-18
 
 ### Added
