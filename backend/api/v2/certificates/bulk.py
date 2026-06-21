@@ -24,7 +24,6 @@ from services.audit_service import AuditService
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_now
-from utils.key_codec import load_pem_bytes
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -94,16 +93,19 @@ def bulk_renew_certificates():
                 continue
 
             ca = CA.query.filter_by(refid=cert.caref).first()
-            if not ca or not ca.prv:
+            if not ca or not ca.has_private_key:
                 results['failed'].append({'id': cert_id, 'error': 'Issuing CA not found or no private key'})
+                continue
+            if ca.offline:
+                results['failed'].append({'id': cert_id, 'error': 'CA is offline'})
                 continue
 
             orig_cert_pem = base64.b64decode(cert.crt)
             orig_cert = x509.load_pem_x509_certificate(orig_cert_pem, default_backend())
             ca_cert_pem = base64.b64decode(ca.crt)
             ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
-            ca_key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-            ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca)
 
             orig_pub_key = orig_cert.public_key()
             if isinstance(orig_pub_key, rsa.RSAPublicKey):
