@@ -234,3 +234,98 @@ class TestIssue142GatePaths:
             content_type='application/json')
         assert r.status_code in (200, 201), r.data
         assert b'no private key' not in r.data.lower(), r.data
+
+
+class TestIssue142EstAutoRenewalSigningPath:
+    """sign_csr_from_crypto (EST + auto-renewal) must accept HSM-backed CAs."""
+
+    def test_sign_csr_from_crypto_with_hsm_ca(self, app, hsm_provider_and_key):
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        from services.ca_service import CAService
+        from models import db, CA, Certificate
+
+        ca_id = _make_hsm_ca(app, hsm_provider_and_key)
+
+        # Build a CSR signed by an unrelated key.
+        key = rsa.generate_private_key(65537, 2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,
+                                                           'est-hsm-142.test')]))
+               .sign(key, hashes.SHA256(), default_backend()))
+
+        patches = _patch_hsm_sign(hsm_provider_and_key['real_key'],
+                                  hsm_provider_and_key['pub_pem'])
+        for p in patches:
+            p.start()
+        try:
+            with app.app_context():
+                ca = CA.query.get(ca_id)
+                cert_pem, serial = CAService.sign_csr_from_crypto(
+                    ca, csr, validity_days=90, source='est')
+        finally:
+            for p in patches:
+                p.stop()
+
+        # The issued cert must be signed by the HSM key.
+        issued = x509.load_pem_x509_certificate(
+            cert_pem.encode() if isinstance(cert_pem, str) else cert_pem,
+            default_backend())
+        hsm_provider_and_key['real_key'].public_key().verify(
+            issued.signature, issued.tbs_certificate_bytes,
+            padding.PKCS1v15(), issued.signature_hash_algorithm)
+
+        with app.app_context():
+            db.session.query(Certificate).filter_by(serial_number=str(
+                issued.serial_number)).delete()
+            db.session.commit()
+
+
+class TestIssue142ScepHsmGate:
+    """SCEP must refuse HSM-backed CAs clearly (envelope decrypt unsupported)."""
+
+    def test_scep_refuses_hsm_ca(self, app, auth_client, hsm_provider_and_key):
+        from api.scep_protocol import get_scep_service
+        from models import db
+        from models.system_config import SystemConfig
+
+        ca_id = _make_hsm_ca(app, hsm_provider_and_key)
+        with app.app_context():
+            row = SystemConfig.query.filter_by(key='scep_enabled').first()
+            if not row:
+                row = SystemConfig(key='scep_enabled', value='true')
+                db.session.add(row)
+            row.value = 'true'
+            row2 = SystemConfig.query.filter_by(key='scep_ca_id').first()
+            if not row2:
+                row2 = SystemConfig(key='scep_ca_id', value=str(ca_id))
+                db.session.add(row2)
+            else:
+                row2.value = str(ca_id)
+            db.session.commit()
+
+            service, error = get_scep_service()
+            assert service is None
+            assert error is not None
+            assert 'HSM' in error or 'hsm' in error.lower() or 'decrypt' in error.lower(), error
+
+    def test_scep_accepts_local_ca(self, app, auth_client, create_ca):
+        from api.scep_protocol import get_scep_service
+        from models import db
+        from models.system_config import SystemConfig
+
+        ca = create_ca(cn='SCEP Local 142')
+        with app.app_context():
+            for row in SystemConfig.query.filter(
+                    SystemConfig.key.in_(['scep_enabled', 'scep_ca_id'])).all():
+                if row.key == 'scep_enabled':
+                    row.value = 'true'
+                else:
+                    row.value = str(ca['id'])
+            db.session.commit()
+            service, error = get_scep_service()
+            # Local CA must NOT be rejected with the HSM message.
+            assert error is None or 'HSM' not in error, error

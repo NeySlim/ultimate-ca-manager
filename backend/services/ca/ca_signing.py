@@ -56,20 +56,16 @@ class CASigningMixin:
             Tuple of (cert_pem_string, serial_number_string)
         """
         CASigningMixin._check_ca_offline(ca)
-        from security.encryption import decrypt_private_key
 
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
 
-        # Load CA cert and key
+        # Load CA cert and key (local or HSM-backed)
         ca_cert_pem = get_ca_cert_pem(ca)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
 
-        ca_prv_decrypted = decrypt_private_key(ca.prv)
-        ca_key_pem = base64.b64decode(ca_prv_decrypted)
-        ca_private_key = serialization.load_pem_private_key(
-            ca_key_pem, password=None, backend=default_backend()
-        )
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        ca_private_key = get_ca_signing_key(ca)
 
         # Resolve CDP/OCSP/AIA URLs
         cdp_urls = [url.replace('{ca_refid}', ca.refid or '') for url in ca.get_cdp_urls()] if ca.cdp_enabled else None
