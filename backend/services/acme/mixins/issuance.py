@@ -248,7 +248,7 @@ class IssuanceMixin:
             ca_id = find_local_domain_ca(domain)
             if ca_id:
                 ca = CA.query.get(ca_id)
-                if ca and ca.prv:
+                if ca and ca.has_private_key:
                     return ca.refid
         
         # Check DNS domain-specific CA
@@ -256,7 +256,7 @@ class IssuanceMixin:
             result = find_provider_for_domain(domain)
             if result and result.get('issuing_ca_id'):
                 ca = CA.query.get(result['issuing_ca_id'])
-                if ca and ca.prv:
+                if ca and ca.has_private_key:
                     return ca.refid
         
         # Fall back to global default
@@ -268,7 +268,7 @@ class IssuanceMixin:
                     ca = CA.query.get(int(ca_id_cfg.value))
                 except (ValueError, TypeError):
                     pass
-            if ca and ca.prv:
+            if ca and ca.has_private_key:
                 return ca.refid
         
         return None
@@ -297,13 +297,15 @@ class IssuanceMixin:
         if ca_refid:
             ca = CA.query.filter_by(refid=ca_refid).first()
         else:
-            # Find first CA with private key
-            ca = CA.query.filter(CA.prv.isnot(None)).first()
+            # Find first CA with a usable signing key (local or HSM)
+            ca = CA.query.filter(
+                CA.prv.isnot(None) | CA.hsm_key_id.isnot(None)
+            ).first()
         
         if not ca:
             return False, None, "No CA available for signing"
         
-        if not ca.prv:
+        if not ca.has_private_key:
             return False, None, f"CA {ca.refid} has no private key"
         
         # Extract CN from CSR for better description

@@ -13,7 +13,6 @@ import json
 import logging
 import base64
 import uuid
-from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from services.audit_service import AuditService
 
@@ -109,14 +108,16 @@ def _issue_approved_certificate(approval):
     ca = CA.query.get(data['ca_id'])
     if not ca:
         raise ValueError(f"CA {data['ca_id']} not found")
-    if not ca.prv:
+    if not ca.has_private_key:
         raise ValueError("CA private key not available")
-    
+    if ca.offline:
+        raise ValueError("CA is offline; restore it before issuing")
+
     # Load CA cert and key
     ca_cert_pem = base64.b64decode(ca.crt)
     ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
-    ca_key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
-    ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    ca_key = get_ca_signing_key(ca)
     
     # Generate key pair
     key_type = data.get('key_type', 'RSA')
