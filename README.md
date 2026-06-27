@@ -4,14 +4,14 @@
 ![License](https://img.shields.io/badge/license-BSD--3--Clause%20%2B%20Commons%20Clause-green.svg)
 ![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
-![Tests](https://img.shields.io/badge/tests-2137%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2498%20passing-brightgreen)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20UCM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/neyslim)
 
 **Ultimate Certificate Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (ACME, SCEP, EST, OCSP, CRL/CDP), Microsoft ADCS integration, multi-factor authentication, and certificate lifecycle management.
 
 > **UCM is a young and actively developed project.** Feedback, bug reports, and feature requests are very welcome! Feel free to [open an issue](https://github.com/NeySlim/ultimate-ca-manager/issues) — every report helps make UCM better.
 
-> **Latest release — v2.176** (2026-06-18): forced 2FA enrolment for local logins and per-SSO-provider, with restricted sessions until enrolment completes and per-user exemptions (#141). See the [v2.176 release notes](https://github.com/NeySlim/ultimate-ca-manager/releases/latest) and the full [CHANGELOG](CHANGELOG.md).
+> **Latest release — v2.179** (2026-06-27): dashboard scroll fix on narrow desktop viewports, certificate-lint toast cascade fix, and a downloadable diagnostic log bundle from Settings. See the [v2.179 release notes](https://github.com/NeySlim/ultimate-ca-manager/releases/latest) and the full [CHANGELOG](CHANGELOG.md).
 
 ![Dashboard](docs/screenshots/dashboard-dark.png)
 
@@ -58,6 +58,7 @@
 - **Certificate Toolbox** -- SSL checker, CSR/cert decoder, key matcher, format converter
 - **Email Notifications** -- SMTP with **OAuth2 (XOAUTH2)** for Gmail, Outlook.com & Microsoft 365, customizable HTML/text templates, certificate expiry alerts
 - **Backup & Restore** -- Manual and scheduled encrypted backups with retention policies
+- **Diagnostic Log Bundle** -- One-click download (Settings → About → Diagnostic) of application logs, error log, systemd journal and a secret-free system diagnostic as a ZIP, with sensitive tokens redacted
 - **Prometheus Metrics** -- opt-in, bearer-gated `/metrics` endpoint exposing certificate, CA, scheduler, webhook and ACME counters
 - **Scheduler** -- admin view of background tasks (expiry checks, CRL refresh, webhook delivery, backups, auto-renewal) with status and run-now
 - **Software Updates** -- In-app update checker with one-click install
