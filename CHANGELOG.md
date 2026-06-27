@@ -8,6 +8,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
+## [2.179] - 2026-06-27
+
+### Fixed
+- **Dashboard could not be scrolled on smaller desktop viewports** — on laptops where the sidebar narrowed the grid below the large breakpoint, the dashboard rendered a non-scrollable multi-row grid clipped inside a fixed-height container, so the lower widgets (Recent Activity, System Health, ACME Accounts, Trust Store) were unreachable. The grid container now scrolls vertically when the layout overflows instead of being clipped (#144).
+- **Certificate linting no longer spawns a cascade of error toasts** — the conformance-lint modal (`CertificateLintModal`) retriggered its own fetch in a loop whenever a lint call failed, because the toast-dispatch callbacks it depended on were recreated on every render. Toast / notification callbacks are now stable, and the modal guards against concurrent lint calls, so a failed lint surfaces a single error instead of an unbounded stack (#145).
+
+### Added
+- **Downloadable diagnostic log bundle** — Settings → About → Diagnostic exposes an admin-only button that downloads a ZIP of the most relevant logs (`ucm.log`, `error.log`, `access.log`, the last lines of the systemd journal when available) plus a short secret-free system diagnostic (version, DB backend, migration number, services status). Sensitive tokens (Bearer credentials, passwords, API tokens, JWTs, PEM private-key blocks) are redacted before packaging, and each log file is capped so the bundle stays lightweight.
+
+
 ## [2.178] - 2026-06-23
 
 ### Fixed
