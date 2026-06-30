@@ -347,6 +347,15 @@ class AcmeClientOrder(db.Model):
     # DNS Provider for DNS-01 challenges
     dns_provider_id = db.Column(db.Integer, db.ForeignKey('dns_providers.id'))
     
+    # External ACME CA account that issued/will renew this order. Links to
+    # acme_client_accounts (the external CA: Let's Encrypt, Actalis, ZeroSSL...).
+    # Distinct from `account_id` below, which is the *local* proxy AcmeAccount.
+    # Nullable for legacy rows pre-migration 047 — resolution then falls back to
+    # the environment/default account.
+    acme_client_account_id = db.Column(
+        db.Integer, db.ForeignKey('acme_client_accounts.id'), nullable=True, index=True
+    )
+    
     # Resulting certificate (after issuance)
     certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
     
@@ -379,6 +388,9 @@ class AcmeClientOrder(db.Model):
     dns_provider = db.relationship('DnsProvider', back_populates='client_orders')
     certificate = db.relationship('Certificate', foreign_keys=[certificate_id])
     account = db.relationship('AcmeAccount', foreign_keys=[account_id])
+    acme_client_account = db.relationship(
+        'AcmeClientAccount', foreign_keys=[acme_client_account_id]
+    )
     
     @property
     def domains_list(self):
@@ -433,6 +445,12 @@ class AcmeClientOrder(db.Model):
                 account_short_id = (self.account_id or '')[:12]
         except Exception:
             pass
+        ca_account_label = None
+        try:
+            if self.acme_client_account is not None:
+                ca_account_label = self.acme_client_account.label
+        except Exception:
+            pass
         return {
             'id': self.id,
             'domains': self.domains_list,
@@ -449,6 +467,8 @@ class AcmeClientOrder(db.Model):
             'renewal_enabled': self.renewal_enabled,
             'error_message': self.error_message,
             'is_proxy_order': bool(self.is_proxy_order),
+            'acme_client_account_id': self.acme_client_account_id,
+            'acme_client_account_label': ca_account_label,
             'account_id': self.account_id,
             'account_email': account_email,
             'account_short_id': account_short_id,

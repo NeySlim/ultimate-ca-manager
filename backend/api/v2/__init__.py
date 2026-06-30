@@ -82,6 +82,7 @@ from api.v2.acme_client import settings as acme_client_settings  # noqa: F401
 from api.v2.acme_client import proxy as acme_client_proxy  # noqa: F401
 from api.v2.acme_client import orders as acme_client_orders  # noqa: F401
 from api.v2.acme_client import account as acme_client_account  # noqa: F401
+from api.v2.acme_client import accounts as acme_client_accounts  # noqa: F401
 from api.v2.acme_domains import bp as acme_domains_bp
 from api.v2.acme_local_domains import bp as acme_local_domains_bp
 from api.v2.hsm import bp as hsm_bp

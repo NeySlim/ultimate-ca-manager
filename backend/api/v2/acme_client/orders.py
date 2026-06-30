@@ -178,8 +178,29 @@ def request_certificate():
     if not environment:
         env_cfg = SystemConfig.query.filter_by(key='acme.client.environment').first()
         environment = env_cfg.value if env_cfg else 'staging'
-    if environment not in ['staging', 'production']:
+    # Only Let's Encrypt staging/production are gated to those two values. A
+    # selected custom CA (Actalis, ZeroSSL...) derives 'custom' and is allowed.
+    if environment not in ['staging', 'production', 'custom']:
         return error_response('Environment must be staging or production', 400)
+
+    # Explicit ACME CA account selection (multi-CA). When provided, the chosen
+    # AcmeClientAccount wins over environment/default resolution and is pinned
+    # to the order so renewals stay on the same authority.
+    acme_account_id = data.get('acme_account_id')
+    if acme_account_id not in (None, ''):
+        from models.acme_client_account import AcmeClientAccount
+        try:
+            acme_account_id = int(acme_account_id)
+        except (TypeError, ValueError):
+            return error_response('acme_account_id must be an integer', 400)
+        selected_account = AcmeClientAccount.query.get(acme_account_id)
+        if not selected_account:
+            return error_response('ACME account not found', 404)
+        # Drive environment from the selected account so the order/Audit row
+        # records the real CA context (staging/production/custom).
+        environment = selected_account.derived_environment()
+    else:
+        acme_account_id = None
 
     # DNS provider (required for dns-01)
     dns_provider_id = data.get('dns_provider_id')
@@ -203,7 +224,9 @@ def request_certificate():
 
     # Create order
     try:
-        client = AcmeClientService.for_issuance(environment=environment)
+        client = AcmeClientService.for_issuance(
+            environment=environment, account_id=acme_account_id
+        )
         success, message, order = client.create_order(
             domains=domains,
             email=email,

@@ -28,6 +28,7 @@ import CertDetailPanel from './acme/CertDetailPanel'
 import OrderDetailPanel from './acme/OrderDetailPanel'
 import CreateAccountForm from './acme/CreateAccountForm'
 import RequestCertificateForm from './acme/RequestCertificateForm'
+import CaAccountsManager from './acme/CaAccountsManager'
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
@@ -50,6 +51,7 @@ export default function ACMEPage() {
   // Data states - Let's Encrypt Client
   const [clientOrders, setClientOrders] = useState([])
   const [clientSettings, setClientSettings] = useState({})
+  const [caAccounts, setCaAccounts] = useState([])
   const [dnsProviders, setDnsProviders] = useState([])
   const [dnsProviderTypes, setDnsProviderTypes] = useState([])
   const [acmeDomains, setAcmeDomains] = useState([])
@@ -139,7 +141,7 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes, domainsRes, localDomainsRes, eabReqRes, caAccountsRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
@@ -150,7 +152,8 @@ export default function ACMEPage() {
         acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
         acmeService.getDomains().catch(() => ({ data: [] })),
         acmeService.getLocalDomains().catch(() => ({ data: [] })),
-        acmeService.getEabRequired().catch(() => ({ data: { eab_required: false } }))
+        acmeService.getEabRequired().catch(() => ({ data: { eab_required: false } })),
+        acmeService.getCaAccounts().catch(() => ({ data: [] }))
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
@@ -158,6 +161,7 @@ export default function ACMEPage() {
       setHistory(historyRes.data || [])
       setClientOrders(clientOrdersRes.data || [])
       setClientSettings(clientSettingsRes.data || {})
+      setCaAccounts(caAccountsRes.data || [])
       setEabHmacInput(null)
       setEabRequired(!!(eabReqRes.data?.eab_required))
       
@@ -376,7 +380,60 @@ export default function ACMEPage() {
       showError(error.message || t('acme.certificateRequestFailed'))
     }
   }
-  
+
+  // --- Multi-CA account management ---
+  const handleCreateCaAccount = async (data) => {
+    try {
+      await acmeService.createCaAccount(data)
+      showSuccess(t('acme.caAccountCreated'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.createFailed.generic'))
+      throw error
+    }
+  }
+
+  const handleUpdateCaAccount = async (id, data) => {
+    try {
+      await acmeService.updateCaAccount(id, data)
+      showSuccess(t('acme.caAccountUpdated'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.generic'))
+      throw error
+    }
+  }
+
+  const handleDeleteCaAccount = async (id) => {
+    try {
+      await acmeService.deleteCaAccount(id)
+      showSuccess(t('acme.caAccountDeleted'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.deleteFailed.generic'))
+    }
+  }
+
+  const handleSetDefaultCaAccount = async (id) => {
+    try {
+      await acmeService.setDefaultCaAccount(id)
+      showSuccess(t('acme.caAccountDefaultSet'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.generic'))
+    }
+  }
+
+  const handleRegisterCaAccount = async (id, email) => {
+    try {
+      const res = await acmeService.registerCaAccount(id, email)
+      showSuccess(res.message || t('acme.caAccountRegistered'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.registrationFailed'))
+    }
+  }
+
   const handleVerifyChallenge = async (order, force = false) => {
     try {
       const result = await acmeService.verifyChallenge(order.id, null, force)
@@ -991,6 +1048,7 @@ export default function ACMEPage() {
         }}
       >
         {activeTab === 'letsencrypt' && (
+          <>
           <LetsEncryptTab
             clientOrders={clientOrders}
             selectedClientOrder={selectedClientOrder}
@@ -1036,6 +1094,19 @@ export default function ACMEPage() {
             canWrite={canWrite('acme')}
             canDelete={canDelete('acme')}
           />
+          <div className="px-4 pb-4">
+            <CaAccountsManager
+              accounts={caAccounts}
+              canWrite={canWrite('acme')}
+              canDelete={canDelete('acme')}
+              onCreate={handleCreateCaAccount}
+              onUpdate={handleUpdateCaAccount}
+              onDelete={handleDeleteCaAccount}
+              onSetDefault={handleSetDefaultCaAccount}
+              onRegister={handleRegisterCaAccount}
+            />
+          </div>
+          </>
         )}
         {activeTab === 'dns' && (
           <DnsProvidersTab
@@ -1150,6 +1221,7 @@ export default function ACMEPage() {
           onSubmit={handleRequestCertificate}
           onCancel={() => setShowRequestModal(false)}
           dnsProviders={dnsProviders}
+          caAccounts={caAccounts}
           defaultEnvironment={clientSettings.environment || 'staging'}
           defaultEmail={clientSettings.email || ''}
         />

@@ -307,3 +307,99 @@ class TestForIssuanceFactory:
             db.session.commit()
             svc = AcmeClientService.for_order(order)
             assert svc.directory_url == AcmeClientAccount.LE_STAGING_URL
+
+
+class TestMultiCaPinOrderToAccount:
+    """PR #149: when an order is created via for_issuance(account_id=…),
+    the resulting AcmeClientOrder row must be pinned to that account so
+    renewals reuse the same CA."""
+
+    def _make_registered_account(self, directory_url, label="Test CA"):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.backends import default_backend
+        key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+        pem = key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        ).decode()
+        acct = AcmeClientAccount(
+            directory_url=directory_url, label=label, email='ops@test.example',
+            account_url=f'{directory_url}/acct/1', account_key=pem,
+            account_key_algorithm='ES256', is_default=True,
+        )
+        db.session.add(acct)
+        db.session.commit()
+        return acct
+
+    def _mock_post(self, order_url, finalize_url, authz_url, challenge_type='dns-01'):
+
+        class _Resp:
+            def __init__(self, status, payload=None, location=None):
+                self.status_code = status
+                self._payload = payload or {}
+                self.headers = {'Location': location} if location else {}
+
+            def json(self):
+                return self._payload
+
+        def _post(url, payload, use_jwk=False):
+            if url == 'https://dir.test/directory/newOrder':
+                return _Resp(201, {
+                    'status': 'pending',
+                    'expires': '2027-01-01T00:00:00Z',
+                    'finalize': finalize_url,
+                    'authorizations': [authz_url],
+                }, location=order_url)
+            if url == authz_url:
+                return _Resp(200, {
+                    'identifier': {'type': 'dns', 'value': 'test.example.com'},
+                    'challenges': [{'type': challenge_type, 'token': 'tok', 'url': f'{authz_url}/c0', 'status': 'pending'}],
+                })
+            return _Resp(404)
+        return _post
+
+    def test_create_order_pins_acme_client_account_id(self, app, clean_acme_state, monkeypatch):
+        with app.app_context():
+            acct = self._make_registered_account('https://dir.test/directory', 'Custom CA')
+            svc = AcmeClientService(account=acct)
+            # bypass network: directory + JWS POST
+            monkeypatch.setattr(svc, '_fetch_directory', lambda: {
+                'newNonce': 'https://dir.test/nonce',
+                'newOrder': 'https://dir.test/directory/newOrder',
+                'newAccount': 'https://dir.test/newAccount',
+            })
+            monkeypatch.setattr(svc, '_post', self._mock_post(
+                'https://dir.test/order/1', 'https://dir.test/order/1/finalize',
+                'https://dir.test/authz/1'))
+
+            ok, msg, order = svc.create_order(
+                ['test.example.com'], email='ops@test.example',
+                challenge_type='dns-01')
+
+            assert ok, f"create_order failed: {msg}"
+            assert order is not None
+            # THE pin: the order remembers which external CA account issued it.
+            assert order.acme_client_account_id == acct.id
+            assert order.environment == 'custom'
+
+    def test_for_order_prefers_pinned_account_id(self, app, clean_acme_state):
+        """verify/finalize/status on an existing order must reuse the pinned
+        account, even after the global default changed."""
+        with app.app_context():
+            acct = self._make_registered_account('https://dir.test/directory', 'Custom CA')
+
+            from models import AcmeClientOrder
+            order = AcmeClientOrder(
+                domains='[]', challenge_type='dns-01', environment='custom',
+                status='pending', account_url=acct.account_url,
+                acme_client_account_id=acct.id)
+            db.session.add(order)
+            db.session.commit()
+
+            # Even with the legacy fallback stub removed, for_order must hit the
+            # pinned account first.
+            svc = AcmeClientService.for_order(order)
+            assert svc.account.id == acct.id
+            assert svc.directory_url == 'https://dir.test/directory'
