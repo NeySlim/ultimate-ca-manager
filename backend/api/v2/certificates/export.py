@@ -13,18 +13,145 @@ import zipfile
 from flask import Response, request, g
 from auth.unified import require_auth, has_permission
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import pkcs12
 
 from models import Certificate, CA
+from models.truststore import TrustedCertificate
 from utils.response import success_response, error_response
 from utils.sanitize import sanitize_filename
 from utils.key_codec import load_pem_bytes
 from . import bp
 
 logger = logging.getLogger(__name__)
+
+
+def _split_pem_certs(pem_bytes):
+    """Return every PEM certificate block found in *pem_bytes* as x509 objects."""
+    certs = []
+    marker = b'-----END CERTIFICATE-----'
+    for chunk in pem_bytes.split(marker):
+        if b'-----BEGIN CERTIFICATE-----' not in chunk:
+            continue
+        block = chunk[chunk.index(b'-----BEGIN CERTIFICATE-----'):] + marker + b'\n'
+        try:
+            certs.append(x509.load_pem_x509_certificate(block, default_backend()))
+        except Exception:
+            continue
+    return certs
+
+
+def _resolve_issuer_cert(cert):
+    """Find the issuer certificate of *cert* among locally known sources.
+
+    Looks up managed CAs (by AKI→SKI, then issuer DN) and then the Trust Store
+    (by issuer DN). Returns the issuer x509.Certificate or None. Used to fill in
+    a missing chain when it is neither stored inline nor reachable via `caref`.
+    """
+    issuer_dn = cert.issuer.rfc4514_string()
+
+    aki = None
+    try:
+        aki_ext = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
+        if aki_ext.value.key_identifier:
+            aki = aki_ext.value.key_identifier.hex()
+    except x509.ExtensionNotFound:
+        pass
+
+    # 1. Managed CAs — prefer AKI→SKI, then subject DN
+    ca = None
+    if aki:
+        ca = CA.query.filter(CA.ski == aki).first()
+    if ca is None:
+        ca = CA.query.filter(CA.subject == issuer_dn).first()
+    if ca is not None and ca.crt:
+        try:
+            return x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
+        except Exception:
+            pass
+
+    # 2. Trust Store — by issuer DN
+    tc = TrustedCertificate.query.filter_by(subject=issuer_dn).first()
+    if tc is not None and tc.certificate_pem:
+        try:
+            return x509.load_pem_x509_certificate(tc.certificate_pem.encode(), default_backend())
+        except Exception:
+            pass
+    return None
+
+
+def _build_ca_chain(certificate, cert_pem):
+    """Build the issuing CA chain (excluding the leaf) for chain-aware exports.
+
+    Order of preference:
+      1. The chain already stored inline with the certificate (ACME / imported
+         full-chain certs store leaf + intermediates in `crt`).
+      2. The managed CA chain walked via `certificate.caref`.
+      3. If the chain is still missing or incomplete, reconstruct it from locally
+         known issuers (managed CAs + Trust Store) by walking issuer DNs up to a
+         self-signed root.
+    """
+    inline = _split_pem_certs(cert_pem)
+    leaf = inline[0] if inline else None
+    chain = inline[1:] if len(inline) > 1 else []
+
+    # 2. Managed CA walk via caref (only when nothing came inline)
+    if not chain and certificate.caref:
+        ca = CA.query.filter_by(refid=certificate.caref).first()
+        while ca:
+            if ca.crt:
+                try:
+                    chain.append(
+                        x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
+                    )
+                except Exception:
+                    pass
+            ca = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
+
+    # 3. Extend/complete the chain using locally known issuers until we reach a
+    #    self-signed root (or can no longer resolve the next issuer).
+    seen = {c.fingerprint(hashes.SHA256()) for c in chain}
+    top = chain[-1] if chain else leaf
+    guard = 0
+    while top is not None and guard < 10:
+        guard += 1
+        if top.subject.rfc4514_string() == top.issuer.rfc4514_string():
+            break  # self-signed root reached
+        nxt = _resolve_issuer_cert(top)
+        if nxt is None:
+            break
+        fp = nxt.fingerprint(hashes.SHA256())
+        if fp in seen:
+            break  # cycle / already present
+        seen.add(fp)
+        chain.append(nxt)
+        top = nxt
+
+    return chain
+
+
+def _named_cas(ca_certs):
+    """Wrap CA certs as PKCS12Certificate objects carrying a friendlyName.
+
+    Without an explicit friendlyName, keystore tools (XCA, keytool, certmgr)
+    auto-label intermediate/root entries as ``<leaf>_ca_0``, ``_ca_1``, ...
+    Tagging each CA with its Common Name (falling back to the full subject DN)
+    makes them display under their real name.
+    """
+    if not ca_certs:
+        return None
+    named = []
+    for c in ca_certs:
+        try:
+            attrs = c.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+            fname = attrs[0].value if attrs else c.subject.rfc4514_string()
+        except Exception:
+            fname = c.subject.rfc4514_string()
+        named.append(pkcs12.PKCS12Certificate(c, fname.encode()))
+    return named
 
 
 @bp.route('/api/v2/certificates/export', methods=['GET', 'POST'])
@@ -223,26 +350,14 @@ def export_certificate(cert_id):
             key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
 
-            # Build CA chain if available and requested
-            ca_certs = []
-            if include_chain and certificate.caref:
-                ca = CA.query.filter_by(refid=certificate.caref).first()
-                while ca:
-                    if ca.crt:
-                        ca_cert = x509.load_pem_x509_certificate(
-                            base64.b64decode(ca.crt), default_backend()
-                        )
-                        ca_certs.append(ca_cert)
-                    if ca.caref:
-                        ca = CA.query.filter_by(refid=ca.caref).first()
-                    else:
-                        break
+            # Build CA chain if requested (inline stored chain or managed CA)
+            ca_certs = _build_ca_chain(certificate, cert_pem) if include_chain else []
 
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(certificate.descr or certificate.refid).encode(),
                 key=private_key,
                 cert=cert,
-                cas=ca_certs if ca_certs else None,
+                cas=_named_cas(ca_certs),
                 encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
             )
 
@@ -296,26 +411,14 @@ def export_certificate(cert_id):
             key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
 
-            # Build CA chain if available and requested
-            ca_certs = []
-            if include_chain and certificate.caref:
-                ca = CA.query.filter_by(refid=certificate.caref).first()
-                while ca:
-                    if ca.crt:
-                        ca_cert = x509.load_pem_x509_certificate(
-                            base64.b64decode(ca.crt), default_backend()
-                        )
-                        ca_certs.append(ca_cert)
-                    if ca.caref:
-                        ca = CA.query.filter_by(refid=ca.caref).first()
-                    else:
-                        break
+            # Build CA chain if requested (inline stored chain or managed CA)
+            ca_certs = _build_ca_chain(certificate, cert_pem) if include_chain else []
 
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(certificate.descr or certificate.refid).encode(),
                 key=private_key,
                 cert=cert,
-                cas=ca_certs if ca_certs else None,
+                cas=_named_cas(ca_certs),
                 encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
             )
 
@@ -347,18 +450,9 @@ def export_certificate(cert_id):
 
             cert_chain = [("X.509", cert_der)]
 
-            if include_chain and certificate.caref:
-                ca = CA.query.filter_by(refid=certificate.caref).first()
-                while ca:
-                    if ca.crt:
-                        ca_cert = x509.load_pem_x509_certificate(
-                            base64.b64decode(ca.crt), default_backend()
-                        )
-                        cert_chain.append(("X.509", ca_cert.public_bytes(serialization.Encoding.DER)))
-                    if ca.caref:
-                        ca = CA.query.filter_by(refid=ca.caref).first()
-                    else:
-                        break
+            if include_chain:
+                for ca_cert in _build_ca_chain(certificate, cert_pem):
+                    cert_chain.append(("X.509", ca_cert.public_bytes(serialization.Encoding.DER)))
 
             ts = int(time.time() * 1000)
             pke = pyjks.PrivateKeyEntry(

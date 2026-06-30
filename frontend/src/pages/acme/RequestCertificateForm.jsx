@@ -4,14 +4,16 @@ import { Warning, CloudArrowUp } from '@phosphor-icons/react'
 import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
 
-export default function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvironment, defaultEmail }) {
+export default function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, caAccounts = [], defaultEnvironment, defaultEmail }) {
   const { t } = useTranslation()
   const { showWarning } = useNotification()
+  const defaultCaAccountId = caAccounts.find(a => a.is_default)?.id ?? null
   const [formData, setFormData] = useState({
     domains: '',
     email: defaultEmail,
     challenge_type: 'dns-01',
     environment: defaultEnvironment,
+    acme_account_id: defaultCaAccountId,
     dns_provider_id: dnsProviders.find(p => p.is_default)?.id || null
   })
   
@@ -50,10 +52,19 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
       domains: domainList
     })
   }
-  
+
+  const hasCaAccounts = caAccounts.length > 0
+  const selectedCa = caAccounts.find(a => a.id === formData.acme_account_id)
+  // A selected account drives the CA; the manual environment selector only
+  // applies to the legacy "no explicit account" Let's Encrypt path.
+  const showEnvironmentSelect = !hasCaAccounts || !formData.acme_account_id
+  const isProductionContext = selectedCa
+    ? selectedCa.environment === 'production'
+    : formData.environment === 'production'
+
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
-      {formData.environment === 'production' && (
+      {isProductionContext && (
         <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-2">
           <Warning size={18} className="text-yellow-500 shrink-0 mt-0.5" />
           <div>
@@ -114,15 +125,36 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
         />
       )}
       
-      <Select
-        label={t('acme.environment')}
-        value={formData.environment}
-        onChange={(val) => setFormData(prev => ({ ...prev, environment: val }))}
-        options={[
-          { value: 'staging', label: t('acme.staging') + ' - ' + t('acme.stagingDesc') },
-          { value: 'production', label: t('acme.production') + ' - ' + t('acme.productionDesc') }
-        ]}
-      />
+      {hasCaAccounts && (
+        <Select
+          label={t('acme.certificateAuthority')}
+          value={formData.acme_account_id != null ? String(formData.acme_account_id) : ''}
+          onChange={(val) => setFormData(prev => ({ ...prev, acme_account_id: val ? parseInt(val) : null }))}
+          options={[
+            ...caAccounts.map(a => ({
+              value: String(a.id),
+              label: a.label
+                + (a.environment && a.environment !== 'custom' ? ` (${a.environment})` : '')
+                + (a.is_default ? ` — ${t('common.default')}` : '')
+                + (a.is_registered ? '' : ` · ${t('acme.notRegistered')}`)
+            })),
+            { value: '', label: t('acme.useEnvironmentDefault') }
+          ]}
+          helperText={t('acme.certificateAuthorityHelper')}
+        />
+      )}
+
+      {showEnvironmentSelect && (
+        <Select
+          label={t('acme.environment')}
+          value={formData.environment}
+          onChange={(val) => setFormData(prev => ({ ...prev, environment: val }))}
+          options={[
+            { value: 'staging', label: t('acme.staging') + ' - ' + t('acme.stagingDesc') },
+            { value: 'production', label: t('acme.production') + ' - ' + t('acme.productionDesc') }
+          ]}
+        />
+      )}
       
       <Select
         label={t('acme.keyType')}
