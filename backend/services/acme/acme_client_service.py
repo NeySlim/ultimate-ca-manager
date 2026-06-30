@@ -86,6 +86,61 @@ class AcmeClientService:
                 "(acme.client.verify_ssl=false)."
             )
     
+    @classmethod
+    def for_issuance(cls, environment: str = None) -> 'AcmeClientService':
+        """Build a client for certificate issuance/renewal.
+
+        The bare ``environment=`` constructor always maps staging/production to
+        Let's Encrypt by design (see ``_resolve_account``). That makes a custom
+        default CA (e.g. Actalis) unreachable from the request/renewal flows,
+        which only ever pass an environment. This factory honors a configured
+        custom directory (``SystemConfig['acme.client.directory_url']``) over the
+        Let's Encrypt mapping, so issuance actually targets the configured CA.
+
+        When no custom directory is set, behavior is identical to
+        ``AcmeClientService(environment=...)`` (Let's Encrypt staging/production).
+        """
+        from models.acme_client_account import AcmeClientAccount
+
+        cfg = SystemConfig.query.filter_by(key='acme.client.directory_url').first()
+        custom_url = (cfg.value or '').strip() if cfg and cfg.value else ''
+        le_urls = (AcmeClientAccount.LE_STAGING_URL, AcmeClientAccount.LE_PRODUCTION_URL)
+        if custom_url and custom_url not in le_urls:
+            svc = cls(directory_url=custom_url)
+            svc._sync_legacy_eab_to_account()
+            return svc
+        return cls(environment=environment)
+
+    def _sync_legacy_eab_to_account(self) -> None:
+        """Backfill EAB credentials from legacy SystemConfig onto the account row.
+
+        The Settings page persists EAB under ``acme.client.eab_kid`` /
+        ``acme.client.eab_hmac_key`` (SystemConfig), but issuance reads EAB from
+        the AcmeClientAccount row (``_get_eab_credentials``). After the account
+        refactor, EAB configured via Settings for a custom CA never reached the
+        row, so EAB-required registration (Actalis, HARICA, ...) failed. Sync the
+        legacy values onto the row when the row is missing them (row wins if set).
+        """
+        if self.account.eab_kid and self.account.eab_hmac_key:
+            return
+        kid_cfg = SystemConfig.query.filter_by(key='acme.client.eab_kid').first()
+        hmac_cfg = SystemConfig.query.filter_by(key='acme.client.eab_hmac_key').first()
+        kid = (kid_cfg.value or '').strip() if kid_cfg and kid_cfg.value else ''
+        hmac_key = (hmac_cfg.value or '').strip() if hmac_cfg and hmac_cfg.value else ''
+        if not (kid and hmac_key):
+            return
+        self.account.eab_kid = self.account.eab_kid or kid
+        self.account.eab_hmac_key = self.account.eab_hmac_key or hmac_key
+        try:
+            db.session.commit()
+            logger.info(
+                f"Synced legacy EAB credentials from SystemConfig to ACME account "
+                f"{self.account.label} ({self.account.directory_url})"
+            )
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to sync legacy EAB to account row: {e}")
+
     @staticmethod
     def _resolve_account(account, directory_url, environment):
         """Resolve constructor args to a persisted AcmeClientAccount row.

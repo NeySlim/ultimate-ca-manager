@@ -93,6 +93,61 @@ class TestBugRegression:
             assert svc_stg2.account.id == svc_stg.account.id
 
 
+class TestForIssuanceCustomDirectory:
+    """for_issuance() must route to a configured custom CA (e.g. Actalis) instead
+    of silently falling back to Let's Encrypt — the original report's bug."""
+
+    def test_for_issuance_honors_custom_directory_over_environment(self, app, clean_acme_state):
+        with app.app_context():
+            custom = "https://acme-api.actalis.com/acme/directory"
+            db.session.add(SystemConfig(
+                key='acme.client.directory_url', value=custom, description='custom CA'
+            ))
+            db.session.commit()
+
+            svc = AcmeClientService.for_issuance(environment='production')
+            # Must NOT be Let's Encrypt despite environment='production'
+            assert svc.directory_url == custom
+            assert svc.account.directory_url == custom
+            assert svc.environment == 'custom'
+
+    def test_for_issuance_falls_back_to_letsencrypt_without_custom(self, app, clean_acme_state):
+        with app.app_context():
+            svc = AcmeClientService.for_issuance(environment='staging')
+            assert svc.directory_url == AcmeClientAccount.LE_STAGING_URL
+
+    def test_for_issuance_ignores_letsencrypt_url_as_custom(self, app, clean_acme_state):
+        """A custom directory_url that happens to be a Let's Encrypt URL is not
+        treated as a custom CA (avoids creating a duplicate path)."""
+        with app.app_context():
+            db.session.add(SystemConfig(
+                key='acme.client.directory_url',
+                value=AcmeClientAccount.LE_PRODUCTION_URL, description='legacy'
+            ))
+            db.session.commit()
+            svc = AcmeClientService.for_issuance(environment='staging')
+            # environment wins → staging, not the prod URL from config
+            assert svc.directory_url == AcmeClientAccount.LE_STAGING_URL
+
+    def test_for_issuance_syncs_legacy_eab_to_account_row(self, app, clean_acme_state):
+        """EAB set via Settings (SystemConfig) must reach the custom account row."""
+        with app.app_context():
+            custom = "https://acme-api.actalis.com/acme/directory"
+            for k, v in [
+                ('acme.client.directory_url', custom),
+                ('acme.client.eab_kid', 'kid-actalis-123'),
+                ('acme.client.eab_hmac_key', 'c2VjcmV0LWhtYWMta2V5'),
+            ]:
+                db.session.add(SystemConfig(key=k, value=v, description=''))
+            db.session.commit()
+
+            svc = AcmeClientService.for_issuance(environment='production')
+            kid, hmac_key = svc._get_eab_credentials()
+            assert kid == 'kid-actalis-123'
+            assert hmac_key == 'c2VjcmV0LWhtYWMta2V5'
+            assert svc.account.eab_kid == 'kid-actalis-123'
+
+
 class TestAccountKeyBinding:
     def test_account_key_persists_to_account_row(self, app, clean_acme_state):
         """Generated keys must land on the AcmeClientAccount row, not SystemConfig."""

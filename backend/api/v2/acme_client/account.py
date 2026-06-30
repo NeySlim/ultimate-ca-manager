@@ -47,7 +47,7 @@ def register_account():
         return error_response('Environment must be staging or production', 400)
 
     try:
-        client = AcmeClientService(environment=environment)
+        client = AcmeClientService.for_issuance(environment=environment)
         success, message, account_url = client.register_account(email)
 
         if success:

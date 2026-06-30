@@ -203,7 +203,7 @@ def request_certificate():
 
     # Create order
     try:
-        client = AcmeClientService(environment=environment)
+        client = AcmeClientService.for_issuance(environment=environment)
         success, message, order = client.create_order(
             domains=domains,
             email=email,
@@ -301,7 +301,7 @@ def verify_challenges(order_id):
     force = bool(data.get('force'))
 
     try:
-        client = AcmeClientService(environment=order.environment)
+        client = AcmeClientService.for_issuance(environment=order.environment)
 
         results = {}
         challenges = order.challenges_dict
@@ -382,7 +382,7 @@ def check_order_status(order_id):
         return error_response('Order not found', 404)
 
     try:
-        client = AcmeClientService(environment=order.environment)
+        client = AcmeClientService.for_issuance(environment=order.environment)
         status, data = client.check_order_status(order)
 
         return success_response(data={
@@ -408,7 +408,7 @@ def finalize_order(order_id):
         return error_response('Order already issued', 400)
 
     try:
-        client = AcmeClientService(environment=order.environment)
+        client = AcmeClientService.for_issuance(environment=order.environment)
         success, message, cert_id = client.finalize_order(order)
 
         if success:
@@ -450,7 +450,7 @@ def cancel_order(order_id):
     # Clean up DNS if needed
     if order.challenge_type == 'dns-01' and order.dns_provider_id:
         try:
-            client = AcmeClientService(environment=order.environment)
+            client = AcmeClientService.for_issuance(environment=order.environment)
             client.cleanup_dns_challenge(order)
         except Exception:
             pass  # Best effort cleanup
@@ -651,7 +651,7 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
                 if order.status in ('issued', 'invalid', 'expired'):
                     logger.info(f'Auto-poll background: order {order_id} already {order.status}, skipping')
                     return
-                client = AcmeClientService(environment=environment)
+                client = AcmeClientService.for_issuance(environment=environment)
                 _auto_poll_and_finalize(client, order)
             except Exception as e:
                 logger.error(f'Auto-poll background failed for order {order_id}: {e}', exc_info=True)
