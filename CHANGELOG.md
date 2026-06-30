@@ -11,6 +11,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 
+## [2.180] - 2026-06-30
+
+### Fixed
+- **Custom ACME CA directory and EAB are now honored for issuance and renewal** — when a custom ACME directory URL was configured in Settings → ACME client (e.g. Actalis, ZeroSSL, Google Trust Services) together with External Account Binding credentials, certificate issuance and renewal still went to Let's Encrypt instead of the configured CA. The custom directory and the EAB persisted in `SystemConfig` were never used by the issuance/renewal path; `acme.client.directory_url` was effectively dead for issuance. A new `AcmeClientService.for_issuance()` factory reads the configured custom directory (over the Let's Encrypt staging/production mapping) and backfills legacy EAB from `SystemConfig` onto the `AcmeClientAccount` row, and `for_order()` resolves the issuing account from the order's recorded `account_url` so an order keeps its CA across changes to the directory setting. All issuance, verify, finalize, status, auto-poll and renewal entry points now route through these factories (#147).
+
+
 ## [2.179] - 2026-06-27
 
 ### Fixed
