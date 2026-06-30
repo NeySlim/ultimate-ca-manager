@@ -96,9 +96,12 @@ def renew_certificate(order) -> tuple:
     credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
     dns_provider = create_provider(dns_provider_model.provider_type, credentials)
     
-    # Initialize ACME client — honor a configured custom CA directory (e.g. Actalis)
-    # over the Let's Encrypt staging/production mapping, matching the issuance path.
-    acme_client = AcmeClientService.for_issuance(environment=order.environment)
+    # Initialize ACME client — reuse the order's pinned CA account so renewals
+    # stay on the same authority, then fall back to the configured custom CA
+    # directory / environment mapping, matching the issuance path.
+    acme_client = AcmeClientService.for_issuance(
+        environment=order.environment, account_id=order.acme_client_account_id
+    )
     
     # Create new order for same domains
     domains = order.domains_list

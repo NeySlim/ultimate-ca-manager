@@ -171,14 +171,36 @@ def request_certificate():
     if challenge_type not in ['dns-01', 'http-01']:
         return error_response('Challenge type must be dns-01 or http-01', 400)
 
+    # Explicit ACME CA account selection (multi-CA). When provided, the chosen
+    # AcmeClientAccount wins over environment/default resolution and is pinned to
+    # the order so renewals stay on the same authority.
+    acme_account_id = data.get('acme_account_id')
+    selected_account = None
+    if acme_account_id is not None and acme_account_id != '':
+        from models.acme_client_account import AcmeClientAccount
+        try:
+            acme_account_id = int(acme_account_id)
+        except (TypeError, ValueError):
+            return error_response('acme_account_id must be an integer', 400)
+        selected_account = AcmeClientAccount.query.get(acme_account_id)
+        if not selected_account:
+            return error_response('ACME account not found', 404)
+    else:
+        acme_account_id = None
+
     # Environment — fall back to configured default, NOT hardcoded staging.
     # Without this, a frontend race (modal opened before settings finished loading)
     # silently downgrades a production-default install to staging (#26).
     environment = data.get('environment')
     if not environment:
-        env_cfg = SystemConfig.query.filter_by(key='acme.client.environment').first()
-        environment = env_cfg.value if env_cfg else 'staging'
-    if environment not in ['staging', 'production']:
+        if selected_account is not None:
+            environment = selected_account.derived_environment()
+        else:
+            env_cfg = SystemConfig.query.filter_by(key='acme.client.environment').first()
+            environment = env_cfg.value if env_cfg else 'staging'
+    # Only Let's Encrypt staging/production are gated to those two values. A
+    # selected custom CA (Actalis, ZeroSSL...) derives 'custom' and is allowed.
+    if selected_account is None and environment not in ['staging', 'production']:
         return error_response('Environment must be staging or production', 400)
 
     # DNS provider (required for dns-01)
@@ -203,7 +225,9 @@ def request_certificate():
 
     # Create order
     try:
-        client = AcmeClientService.for_issuance(environment=environment)
+        client = AcmeClientService.for_issuance(
+            environment=environment, account_id=acme_account_id
+        )
         success, message, order = client.create_order(
             domains=domains,
             email=email,
@@ -301,7 +325,9 @@ def verify_challenges(order_id):
     force = bool(data.get('force'))
 
     try:
-        client = AcmeClientService.for_issuance(environment=order.environment)
+        client = AcmeClientService.for_issuance(
+            environment=order.environment, account_id=order.acme_client_account_id
+        )
 
         results = {}
         challenges = order.challenges_dict
@@ -382,7 +408,9 @@ def check_order_status(order_id):
         return error_response('Order not found', 404)
 
     try:
-        client = AcmeClientService.for_issuance(environment=order.environment)
+        client = AcmeClientService.for_issuance(
+            environment=order.environment, account_id=order.acme_client_account_id
+        )
         status, data = client.check_order_status(order)
 
         return success_response(data={
@@ -408,7 +436,9 @@ def finalize_order(order_id):
         return error_response('Order already issued', 400)
 
     try:
-        client = AcmeClientService.for_issuance(environment=order.environment)
+        client = AcmeClientService.for_issuance(
+            environment=order.environment, account_id=order.acme_client_account_id
+        )
         success, message, cert_id = client.finalize_order(order)
 
         if success:
@@ -450,7 +480,9 @@ def cancel_order(order_id):
     # Clean up DNS if needed
     if order.challenge_type == 'dns-01' and order.dns_provider_id:
         try:
-            client = AcmeClientService.for_issuance(environment=order.environment)
+            client = AcmeClientService.for_issuance(
+            environment=order.environment, account_id=order.acme_client_account_id
+        )
             client.cleanup_dns_challenge(order)
         except Exception:
             pass  # Best effort cleanup
@@ -651,7 +683,10 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
                 if order.status in ('issued', 'invalid', 'expired'):
                     logger.info(f'Auto-poll background: order {order_id} already {order.status}, skipping')
                     return
-                client = AcmeClientService.for_issuance(environment=environment)
+                client = AcmeClientService.for_issuance(
+                    environment=order.environment,
+                    account_id=order.acme_client_account_id,
+                )
                 _auto_poll_and_finalize(client, order)
             except Exception as e:
                 logger.error(f'Auto-poll background failed for order {order_id}: {e}', exc_info=True)

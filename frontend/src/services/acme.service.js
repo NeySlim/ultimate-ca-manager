@@ -123,6 +123,35 @@ export const acmeService = {
     return apiClient.post('/acme/client/account', { email, environment })
   },
 
+  // Client CA Accounts (multi-CA: Let's Encrypt, Actalis, ZeroSSL...)
+  async getCaAccounts() {
+    return apiClient.get('/acme/client/accounts')
+  },
+
+  async getCaAccount(id) {
+    return apiClient.get(`/acme/client/accounts/${id}`)
+  },
+
+  async createCaAccount(data) {
+    return apiClient.post('/acme/client/accounts', data)
+  },
+
+  async updateCaAccount(id, data) {
+    return apiClient.patch(`/acme/client/accounts/${id}`, data)
+  },
+
+  async deleteCaAccount(id) {
+    return apiClient.delete(`/acme/client/accounts/${id}`)
+  },
+
+  async setDefaultCaAccount(id) {
+    return apiClient.post(`/acme/client/accounts/${id}/default`)
+  },
+
+  async registerCaAccount(id, email) {
+    return apiClient.post(`/acme/client/accounts/${id}/register`, email ? { email } : {})
+  },
+
   // Client Orders (certificates from Let's Encrypt)
   async getClientOrders(status, environment) {
     return apiClient.get(`/acme/client/orders${buildQueryString({ status, environment })}`)

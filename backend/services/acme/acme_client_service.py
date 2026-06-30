@@ -87,20 +87,37 @@ class AcmeClientService:
             )
     
     @classmethod
-    def for_issuance(cls, environment: str = None) -> 'AcmeClientService':
+    def for_issuance(cls, environment: str = None,
+                     account_id: int = None) -> 'AcmeClientService':
         """Build a client for certificate issuance/renewal.
 
-        The bare ``environment=`` constructor always maps staging/production to
-        Let's Encrypt by design (see ``_resolve_account``). That makes a custom
-        default CA (e.g. Actalis) unreachable from the request/renewal flows,
-        which only ever pass an environment. This factory honors a configured
-        custom directory (``SystemConfig['acme.client.directory_url']``) over the
-        Let's Encrypt mapping, so issuance actually targets the configured CA.
+        Resolution priority (multi-CA aware):
+          1. ``account_id`` — an explicit AcmeClientAccount row id. This is how
+             per-request CA selection and same-CA renewals are honored: the
+             requester picks an account, the order stores it, and renewal passes
+             it back here. Wins over everything else.
+          2. A configured custom directory
+             (``SystemConfig['acme.client.directory_url']``) that is not Let's
+             Encrypt — kept for the single-custom-CA setup (e.g. Actalis) so
+             existing installs without an explicit selection still target it.
+          3. ``environment=`` — Let's Encrypt staging/production (legacy).
 
-        When no custom directory is set, behavior is identical to
-        ``AcmeClientService(environment=...)`` (Let's Encrypt staging/production).
+        The bare ``environment=`` constructor always maps staging/production to
+        Let's Encrypt by design (see ``_resolve_account``), which is why steps 1
+        and 2 exist.
         """
         from models.acme_client_account import AcmeClientAccount
+
+        if account_id is not None:
+            acct = AcmeClientAccount.query.get(account_id)
+            if acct is not None:
+                svc = cls(account=acct)
+                svc._sync_legacy_eab_to_account()
+                return svc
+            logger.warning(
+                f"for_issuance: acme_client_account id={account_id} not found, "
+                f"falling back to directory/environment resolution"
+            )
 
         cfg = SystemConfig.query.filter_by(key='acme.client.directory_url').first()
         custom_url = (cfg.value or '').strip() if cfg and cfg.value else ''
@@ -243,10 +260,26 @@ class AcmeClientService:
         return self.directory
     
     def _get_nonce(self) -> str:
-        """Get a fresh nonce from the ACME server"""
+        """Get a fresh nonce from the ACME server.
+
+        The newNonce HEAD is retried with backoff: some ACME CAs (e.g. ZeroSSL)
+        respond slowly/intermittently, and a single transient timeout here would
+        otherwise fail challenge submission, status polling and finalization.
+        """
         directory = self._fetch_directory()
-        resp = self.session.head(directory['newNonce'], timeout=10)
-        return resp.headers['Replay-Nonce']
+        last_exc = None
+        for attempt in range(3):
+            try:
+                resp = self.session.head(directory['newNonce'], timeout=30)
+                resp.raise_for_status()
+                return resp.headers['Replay-Nonce']
+            except Exception as e:
+                last_exc = e
+                logger.warning(
+                    f"newNonce fetch failed (attempt {attempt + 1}/3): {e}"
+                )
+                time.sleep(2 * (attempt + 1))
+        raise last_exc
     
     # =========================================================================
     # Account Key Management
@@ -637,6 +670,9 @@ class AcmeClientService:
                 account_url=self.account_url,
                 finalize_url=order_data.get('finalize'),
                 dns_provider_id=dns_provider_id,
+                # Pin the order to its issuing CA account so renewals stay on the
+                # same authority instead of re-resolving to the global default.
+                acme_client_account_id=getattr(self.account, 'id', None),
                 expires_at=datetime.fromisoformat(order_data['expires'].rstrip('Z'))
             )
             

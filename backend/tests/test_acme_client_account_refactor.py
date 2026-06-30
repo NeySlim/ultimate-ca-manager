@@ -148,6 +148,49 @@ class TestForIssuanceCustomDirectory:
             assert svc.account.eab_kid == 'kid-actalis-123'
 
 
+class TestForIssuanceExplicitAccount:
+    """Multi-CA: for_issuance(account_id=...) must pin the chosen account,
+    overriding the environment mapping and any configured custom directory."""
+
+    def test_explicit_account_id_wins_over_environment(self, app, clean_acme_state):
+        with app.app_context():
+            acct = AcmeClientAccount(
+                directory_url='https://acme-api.actalis.com/acme/directory',
+                label='Actalis', email='ops@example.com', is_default=False,
+            )
+            db.session.add(acct)
+            db.session.commit()
+
+            svc = AcmeClientService.for_issuance(environment='production',
+                                                 account_id=acct.id)
+            assert svc.account.id == acct.id
+            assert svc.directory_url == acct.directory_url
+
+    def test_explicit_account_id_wins_over_custom_directory(self, app, clean_acme_state):
+        with app.app_context():
+            # A global custom directory is configured (legacy single-CA path)...
+            db.session.add(SystemConfig(
+                key='acme.client.directory_url',
+                value='https://acme.zerossl.com/v2/DV90', description='custom'
+            ))
+            chosen = AcmeClientAccount(
+                directory_url='https://acme-api.actalis.com/acme/directory',
+                label='Actalis', email='ops@example.com',
+            )
+            db.session.add(chosen)
+            db.session.commit()
+
+            # ...but an explicit account selection must take precedence.
+            svc = AcmeClientService.for_issuance(account_id=chosen.id)
+            assert svc.directory_url == chosen.directory_url
+
+    def test_unknown_account_id_falls_back_gracefully(self, app, clean_acme_state):
+        with app.app_context():
+            svc = AcmeClientService.for_issuance(environment='staging',
+                                                 account_id=999999)
+            assert svc.directory_url == AcmeClientAccount.LE_STAGING_URL
+
+
 class TestAccountKeyBinding:
     def test_account_key_persists_to_account_row(self, app, clean_acme_state):
         """Generated keys must land on the AcmeClientAccount row, not SystemConfig."""
