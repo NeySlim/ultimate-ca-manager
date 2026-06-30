@@ -11,6 +11,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 
+## [2.181] - 2026-06-30
+
+### Added
+- **Multi-CA management for the ACME client** — UCM can now issue certificates from several external ACME authorities (Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…) instead of a single one. ACME CA accounts are managed from the UI (CRUD, per-account External Account Binding, default selection, registration status), each certificate request picks its issuing CA, and the order is pinned to that account so renewals stay on the same authority. The `AcmeClientOrder.acme_client_account_id` foreign key (migration `047`) links each order to its external CA account; `AcmeClientService.for_issuance(environment, account_id=)` resolves explicit account > configured custom directory > Let's Encrypt environment, and `for_order(order)` reuses the pinned account on verify/finalize/status/renewal (#149).
+
+
 ## [2.180] - 2026-06-30
 
 ### Fixed
