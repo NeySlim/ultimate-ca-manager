@@ -172,12 +172,22 @@ class AcmeClientService:
     # Issuance entry-point factory (issue #147)
     # ------------------------------------------------------------------
     @classmethod
-    def for_issuance(cls, environment: Optional[str] = None) -> 'AcmeClientService':
+    def for_issuance(cls, environment: Optional[str] = None,
+                    account_id: Optional[int] = None) -> 'AcmeClientService':
         """Build the service for a NEW issuance / registration flow.
 
-        Honors the custom ACME directory configured in Settings
-        (``acme.client.directory_url``) over the LE staging/production mapping,
-        and backfills legacy EAB (``acme.client.eab_kid`` / ``eab_hmac_key``)
+        Resolution priority (multi-CA aware):
+          1. ``account_id`` — an explicit ``AcmeClientAccount`` row id. This is
+             how per-request CA selection and same-CA renewals are honored: the
+             requester picks an account, the order stores it, and renewal passes
+             it back here. Wins over everything else.
+          2. A configured custom directory
+             (``SystemConfig['acme.client.directory_url']``) that is not Let's
+             Encrypt — kept for the single-custom-CA setup (e.g. Actalis) so
+             existing installs without an explicit selection still target it.
+          3. ``environment=`` — Let's Encrypt staging/production (legacy).
+
+        Also backfills legacy EAB (``acme.client.eab_kid`` / ``eab_hmac_key``)
         stored in SystemConfig onto the resolved account row.
 
         Use this for: ``request_certificate``, ``register_account``, and the
@@ -187,26 +197,43 @@ class AcmeClientService:
         """
         from models.acme_client_account import AcmeClientAccount
 
+        # 1. Explicit account selection (multi-CA).
+        if account_id is not None:
+            acct = AcmeClientAccount.query.get(account_id)
+            if acct is not None:
+                svc = cls(account=acct)
+                svc._sync_legacy_eab_to_account()
+                return svc
+            logger.warning(
+                f"for_issuance: acme_client_account id={account_id} not found, "
+                f"falling back to directory/environment resolution"
+            )
+
+        # 2. Configured custom directory (single-custom-CA back-compat).
         custom = _legacy_directory_url()
         if custom and custom not in (AcmeClientAccount.LE_STAGING_URL,
                                      AcmeClientAccount.LE_PRODUCTION_URL):
             svc = cls(directory_url=custom)
             svc._sync_legacy_eab_to_account()
             return svc
+        # 3. Let's Encrypt staging/production mapping.
         return cls(environment=environment)
 
     @classmethod
     def for_order(cls, order: 'AcmeClientOrder') -> 'AcmeClientService':
         """Build the service for an EXISTING order (verify/finalize/status/renew).
 
-        Resolves the account from the order's recorded ``account_url`` so a
-        custom-CA order keeps its CA even if ``acme.client.directory_url``
-        was changed (or cleared) after the order was created. Falls back to
-        :meth:`for_issuance` when the account cannot be located (e.g. an order
-        created before the account was registered).
+        Prefers the order's pinned ``acme_client_account_id`` (migration 047+),
+        then the account resolved from ``account_url`` (so a custom-CA order
+        keeps its CA even if ``acme.client.directory_url`` was changed/cleared
+        after creation), then falls back to :meth:`for_issuance`.
         """
         from models.acme_client_account import AcmeClientAccount
 
+        if order and order.acme_client_account_id:
+            acct = AcmeClientAccount.query.get(order.acme_client_account_id)
+            if acct:
+                return cls(account=acct)
         if order and order.account_url:
             account = AcmeClientAccount.query.filter_by(
                 account_url=order.account_url).first()
@@ -283,10 +310,26 @@ class AcmeClientService:
         return self.directory
     
     def _get_nonce(self) -> str:
-        """Get a fresh nonce from the ACME server"""
+        """Get a fresh nonce from the ACME server.
+
+        The newNonce HEAD is retried with backoff: some ACME CAs (e.g. ZeroSSL)
+        respond slowly/intermittently, and a single transient timeout here would
+        otherwise fail challenge submission, status polling and finalization.
+        """
         directory = self._fetch_directory()
-        resp = self.session.head(directory['newNonce'], timeout=10)
-        return resp.headers['Replay-Nonce']
+        last_exc: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                resp = self.session.head(directory['newNonce'], timeout=30)
+                resp.raise_for_status()
+                return resp.headers['Replay-Nonce']
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                logger.warning(
+                    f"newNonce fetch failed (attempt {attempt + 1}/3): {exc}"
+                )
+                time.sleep(2 * (attempt + 1))
+        raise last_exc  # type: ignore[misc]
     
     # =========================================================================
     # Account Key Management
@@ -677,6 +720,9 @@ class AcmeClientService:
                 account_url=self.account_url,
                 finalize_url=order_data.get('finalize'),
                 dns_provider_id=dns_provider_id,
+                # Pin the order to its issuing CA account so renewals stay on the
+                # same authority instead of re-resolving to the global default.
+                acme_client_account_id=getattr(self.account, 'id', None),
                 expires_at=datetime.fromisoformat(order_data['expires'].rstrip('Z'))
             )
             

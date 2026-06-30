@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import {
   Plus, Trash, CheckCircle, ArrowsClockwise, Key, Play, Warning,
-  DownloadSimple, Eye, MagnifyingGlass, Copy, CaretRight, Globe,
+  DownloadSimple, Eye, MagnifyingGlass, Copy, CaretRight,
   LockKey, PlugsConnected, ClockCounterClockwise, Certificate, Gear, ShieldCheck
 } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
@@ -16,18 +16,12 @@ export default function LetsEncryptTab({
   clientSettings,
   localContactEmail,
   onLocalContactEmailChange,
-  localDirectoryUrl,
-  onLocalDirectoryUrlChange,
-  localEabKid,
-  onLocalEabKidChange,
   localProxyUpstreamUrl,
   onLocalProxyUpstreamUrlChange,
   localProxyEabKid,
   onLocalProxyEabKidChange,
   proxyEabHmacInput,
   onProxyEabHmacInputChange,
-  eabHmacInput,
-  onEabHmacInputChange,
   proxyEmail,
   onProxyEmailChange,
   testingConnection,
@@ -315,61 +309,6 @@ export default function LetsEncryptTab({
             ]}
             helperText={t('acme.accountKeyTypeHelper')}
           />
-
-          {/* Custom ACME Directory — collapsed advanced option */}
-          <details className="group rounded-lg border border-border/50 hover:border-border transition-colors">
-            <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-tertiary-op30 transition-colors list-none [&::-webkit-details-marker]:hidden">
-              <CaretRight size={14} weight="bold" className="shrink-0 transition-transform duration-200 group-open:rotate-90" />
-              <Globe size={14} className="shrink-0" />
-              {t('acme.customDirectoryOverride')}
-              {localDirectoryUrl && (
-                <Badge variant="outline" size="sm">{t('common.configured')}</Badge>
-              )}
-            </summary>
-            <div className="px-3 pb-3 space-y-3">
-              <p className="text-xs text-text-tertiary">{t('acme.customDirectoryOverrideHelper')}</p>
-              <Input
-                label={t('acme.directoryUrl')}
-                type="url"
-                value={localDirectoryUrl}
-                onChange={(e) => onLocalDirectoryUrlChange(e.target.value)}
-                onBlur={() => onBlurSave('directory_url', localDirectoryUrl, onLocalDirectoryUrlChange)}
-                disabled={!canWrite}
-                placeholder="https://acme.zerossl.com/v2/DV90"
-                helperText={t('acme.directoryUrlHelper')}
-              />
-
-              <Input
-                label={t('acme.eabKid')}
-                value={localEabKid}
-                onChange={(e) => onLocalEabKidChange(e.target.value)}
-                onBlur={() => onBlurSave('eab_kid', localEabKid, onLocalEabKidChange)}
-                disabled={!canWrite}
-                placeholder="key-id-from-ca"
-                helperText={t('acme.eabKidHelper')}
-              />
-
-              <Input
-                label={t('acme.eabHmacKey')}
-                type="password"
-                value={eabHmacInput !== null ? eabHmacInput : (clientSettings.eab_hmac_key_set ? '••••••••' : '')}
-                onChange={(e) => onEabHmacInputChange(e.target.value)}
-                onBlur={() => {
-                  if (eabHmacInput !== null && eabHmacInput !== '') {
-                    onUpdateClientSetting('eab_hmac_key', eabHmacInput)
-                  }
-                }}
-                onFocus={() => {
-                  if (eabHmacInput === null && clientSettings.eab_hmac_key_set) {
-                    onEabHmacInputChange('')
-                  }
-                }}
-                disabled={!canWrite}
-                placeholder={t('acme.eabHmacKeyPlaceholder')}
-                helperText={t('acme.eabHmacKeyHelper')}
-              />
-            </div>
-          </details>
         </div>
       </CompactSection>
 
