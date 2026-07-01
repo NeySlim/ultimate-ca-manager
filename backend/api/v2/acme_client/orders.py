@@ -20,8 +20,9 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
-from services.acme.acme_client_service import AcmeClientService
+from services.acme.acme_client_service import AcmeClientService, AUTHZ_INVALID_USER_MSG
 from services.audit_service import AuditService
+from utils.dns_txt_lookup import log_public_resolver_status, txt_record_present
 
 logger = logging.getLogger(__name__)
 
@@ -44,27 +45,15 @@ def _dns_propagation_timeout() -> int:
 
 def _txt_present(name: str, expected: str) -> bool:
     """True if the DNS TXT record `name` currently serves the `expected` value."""
-    try:
-        import dns.resolver
-    except ImportError:
-        return False
-    try:
-        answers = dns.resolver.resolve(name, 'TXT', lifetime=5)
-    except Exception:
-        return False
-    for rdata in answers:
-        try:
-            for chunk in rdata.strings:
-                if chunk.decode('utf-8', 'ignore') == expected:
-                    return True
-        except Exception:
-            if str(rdata).strip('"') == expected:
-                return True
-    return False
+    return txt_record_present(name, expected)
 
 
 def _dns_selfcheck(challenges: dict, timeout: int) -> dict:
     """Poll DNS until every dns-01 TXT record is visible, or until timeout.
+
+    Each poll queries configured/authoritative resolvers plus 9.9.9.9, 8.8.8.8
+    and 1.1.1.1 explicitly (logged per resolver). A domain is ready when any of
+    these paths returns the expected TXT.
 
     Returns {'ok': bool, 'missing': [domains], 'waited': seconds}. Non-dns-01
     challenges (no dns_txt_value) are ignored.
@@ -74,9 +63,13 @@ def _dns_selfcheck(challenges: dict, timeout: int) -> dict:
     while pending:
         for domain in list(pending):
             c = pending[domain]
-            if _txt_present(c['dns_txt_name'], c['dns_txt_value']):
-                logger.info(f'DNS TXT confirmed for {domain} ({c["dns_txt_name"]})')
+            txt_name = c['dns_txt_name']
+            txt_value = c['dns_txt_value']
+            if _txt_present(txt_name, txt_value):
+                logger.info(f'DNS TXT confirmed for {domain} ({txt_name})')
                 del pending[domain]
+            else:
+                log_public_resolver_status(txt_name, txt_value)
         if not pending or waited >= timeout:
             break
         time.sleep(_DNS_SELFCHECK_INTERVAL)
@@ -179,7 +172,7 @@ def request_certificate():
         env_cfg = SystemConfig.query.filter_by(key='acme.client.environment').first()
         environment = env_cfg.value if env_cfg else 'staging'
     # Only Let's Encrypt staging/production are gated to those two values. A
-    # selected custom CA (Actalis, ZeroSSL...) derives 'custom' and is allowed.
+    # selected custom CA (ZeroSSL...) derives 'custom' and is allowed.
     if environment not in ['staging', 'production', 'custom']:
         return error_response('Environment must be staging or production', 400)
 
@@ -369,8 +362,14 @@ def verify_challenges(order_id):
             except Exception:
                 order.status = 'validating'
         elif any_failed:
-            # Reset to pending so user can retry
-            order.status = 'pending'
+            invalid_hit = any(
+                AUTHZ_INVALID_USER_MSG in (r.get('message') or '')
+                for r in results.values() if not r.get('success')
+            )
+            if invalid_hit:
+                order.status = 'invalid'
+            else:
+                order.status = 'pending'
             order.error_message = '; '.join(
                 f"{d}: {r['message']}" for d, r in results.items() if not r['success']
             )
@@ -595,13 +594,21 @@ def _auto_poll_and_finalize(client, order) -> dict:
 
         _set_status('validating')
 
-        # 3. Poll order status until ready/valid/invalid or timeout
-        max_wait = 60  # seconds
-        poll_interval = 3
+        poll = client.get_poll_settings()
+        max_wait = poll['order_poll_timeout_sec']
+        poll_interval = poll['order_poll_interval_sec']
         elapsed = 0
         while elapsed < max_wait:
             time.sleep(poll_interval)
             elapsed += poll_interval
+
+            invalid = client.find_invalid_authorization(order)
+            if invalid:
+                domain, msg = invalid
+                result['error'] = msg
+                logger.warning(f'Authorization invalid for {domain} on order {order.id}: {msg}')
+                _set_status('invalid', msg)
+                break
 
             le_status, le_data = client.check_order_status(order)
             result['polling_status'] = le_status
@@ -631,8 +638,14 @@ def _auto_poll_and_finalize(client, order) -> dict:
                 break
 
             if elapsed >= max_wait:
-                result['error'] = f'Timeout after {max_wait}s (status: {le_status})'
-                _set_status('pending', result['error'])
+                invalid = client.find_invalid_authorization(order)
+                if invalid:
+                    _, msg = invalid
+                    result['error'] = msg
+                    _set_status('invalid', msg)
+                else:
+                    result['error'] = f'Timeout after {max_wait}s (status: {le_status})'
+                    _set_status('pending', result['error'])
                 break
 
     except Exception as e:

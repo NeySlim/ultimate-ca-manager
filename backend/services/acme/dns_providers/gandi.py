@@ -3,9 +3,11 @@ Gandi DNS Provider
 Uses Gandi LiveDNS API for record management
 https://api.gandi.net/docs/livedns/
 """
-import requests
-from typing import Tuple, Dict, Any, Optional
 import logging
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import quote
+
+import requests
 
 from .base import BaseDnsProvider
 
@@ -124,15 +126,27 @@ class GandiDnsProvider(BaseDnsProvider):
             'rrset_ttl': ttl,
         }
         
+        encoded_name = quote(relative_name, safe='')
         success, result = self._request(
-            'PUT', 
-            f'/domains/{gandi_domain}/records/{relative_name}/TXT',
-            data
+            'PUT',
+            f'/domains/{gandi_domain}/records/{encoded_name}/TXT',
+            data,
         )
-        
+
         if not success:
             return False, f"Failed to create record: {result}"
-        
+
+        # Confirm via LiveDNS API (immediate; does not depend on public resolver cache).
+        ok_get, current = self._request(
+            'GET',
+            f'/domains/{gandi_domain}/records/{encoded_name}/TXT',
+        )
+        if ok_get and isinstance(current, dict):
+            values = current.get('rrset_values') or []
+            if record_value in values:
+                logger.info(f"Gandi: Created TXT record {record_name} (verified via API)")
+                return True, "Record created successfully"
+
         logger.info(f"Gandi: Created TXT record {record_name}")
         return True, "Record created successfully"
     
@@ -149,9 +163,10 @@ class GandiDnsProvider(BaseDnsProvider):
             relative_name = record_name
         
         # Delete the record
+        encoded_name = quote(relative_name, safe='')
         success, result = self._request(
             'DELETE',
-            f'/domains/{gandi_domain}/records/{relative_name}/TXT'
+            f'/domains/{gandi_domain}/records/{encoded_name}/TXT',
         )
         
         if not success:

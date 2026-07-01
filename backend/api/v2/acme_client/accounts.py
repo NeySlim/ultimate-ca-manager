@@ -2,7 +2,7 @@
 ACME Client CA Accounts — multi-CA management.
 
 CRUD over ``acme_client_accounts`` (the external ACME authorities UCM can
-request certificates from: Let's Encrypt, Actalis, ZeroSSL, ...). Each row is
+request certificates from: Let's Encrypt, ZeroSSL, ...). Each row is
 one directory URL + its registration credentials and optional EAB. One row can
 be flagged ``is_default`` and is used when a request does not select a CA.
 
@@ -31,6 +31,31 @@ from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYP
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_timing_int(value, field: str, min_val: int, max_val: int) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{field} must be an integer')
+    if n < min_val or n > max_val:
+        raise ValueError(f'{field} must be between {min_val} and {max_val}')
+    return n
+
+
+def _apply_timing_fields(acct: AcmeClientAccount, data: dict) -> None:
+    if 'order_poll_timeout_sec' in data:
+        acct.order_poll_timeout_sec = _validate_timing_int(
+            data['order_poll_timeout_sec'], 'order_poll_timeout_sec', 30, 600,
+        )
+    if 'order_poll_interval_sec' in data:
+        acct.order_poll_interval_sec = _validate_timing_int(
+            data['order_poll_interval_sec'], 'order_poll_interval_sec', 1, 30,
+        )
+    if 'http_timeout_sec' in data:
+        acct.http_timeout_sec = _validate_timing_int(
+            data['http_timeout_sec'], 'http_timeout_sec', 10, 120,
+        )
 
 
 def _clear_other_defaults(except_id=None):
@@ -114,6 +139,10 @@ def create_ca_account():
         eab_hmac_key=(data.get('eab_hmac_key') or '').strip() or None,
         is_default=is_default,
     )
+    try:
+        _apply_timing_fields(acct, data)
+    except ValueError as exc:
+        return error_response(str(exc), 400)
     db.session.add(acct)
     ok, err = safe_commit(logger, 'Failed to create ACME CA account')
     if not ok:
@@ -170,6 +199,11 @@ def update_ca_account(account_id):
     if data.get('is_default') is True:
         _clear_other_defaults(except_id=acct.id)
         acct.is_default = True
+
+    try:
+        _apply_timing_fields(acct, data)
+    except ValueError as exc:
+        return error_response(str(exc), 400)
 
     ok, err = safe_commit(logger, 'Failed to update ACME CA account')
     if not ok:

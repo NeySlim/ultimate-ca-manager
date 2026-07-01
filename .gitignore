@@ -20,6 +20,9 @@ ENV/
 # IDEs
 .vscode/
 .idea/
+
+# Cursor editor
+.cursor/
 *.swp
 *.swo
 *~

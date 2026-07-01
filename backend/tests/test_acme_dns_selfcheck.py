@@ -4,6 +4,7 @@ import types
 import pytest
 
 from api.v2.acme_client import orders as orders_mod
+from utils import dns_txt_lookup as dns_lookup_mod
 
 
 @pytest.fixture
@@ -113,3 +114,77 @@ def test_auto_poll_spawns_thread_when_not_testing(app, monkeypatch):
         app.config['TESTING'] = False
         orders_mod._run_auto_poll_background(999999, 'staging')
     assert started == [True], 'a background thread must be spawned outside TESTING'
+
+
+def test_txt_present_uses_authoritative_before_public(fake_dns, monkeypatch):
+    """Authoritative resolver is tried before public resolvers."""
+    fake_dns['records']['_acme-challenge.example.com'] = ['token']
+    monkeypatch.setattr(
+        dns_lookup_mod,
+        '_authoritative_nameserver_ips',
+        lambda _name: ['203.0.113.53'],
+    )
+    calls = []
+
+    class _RData:
+        def __init__(self, values):
+            self.strings = [v.encode() for v in values]
+
+    def _resolve_with_ns(name, nameservers, rtype='TXT'):
+        calls.append((name, nameservers))
+        return [_RData(fake_dns['records'][name])]
+
+    monkeypatch.setattr(dns_lookup_mod, '_resolve_with_ns', _resolve_with_ns)
+    assert orders_mod._txt_present('_acme-challenge.example.com', 'token') is True
+    assert calls and calls[0][1] == ['203.0.113.53']
+
+
+def test_check_public_resolvers_queries_each_ip(fake_dns, monkeypatch):
+    state = {'hits': set()}
+
+    class _RData:
+        def __init__(self, values):
+            self.strings = [v.encode() for v in values]
+
+    def _resolve_with_ns(name, nameservers, rtype='TXT'):
+        ip = nameservers[0]
+        state['hits'].add(ip)
+        if ip == '8.8.8.8':
+            return [_RData(['token'])]
+        raise Exception('NXDOMAIN')
+
+    monkeypatch.setattr(dns_lookup_mod, '_resolve_with_ns', _resolve_with_ns)
+    status = dns_lookup_mod.check_public_resolvers('_acme-challenge.example.com', 'token')
+    assert state['hits'] == set(dns_lookup_mod.PUBLIC_DNS_RESOLVERS)
+    assert status == {'9.9.9.9': False, '8.8.8.8': True, '1.1.1.1': False}
+
+
+def test_txt_present_falls_back_to_public_resolver(fake_dns, monkeypatch):
+    monkeypatch.setattr(dns_lookup_mod, 'get_configured_dns01_nameservers', lambda: [])
+    monkeypatch.setattr(dns_lookup_mod, '_authoritative_nameserver_ips', lambda _name: [])
+
+    class _RData:
+        def __init__(self, values):
+            self.strings = [v.encode() for v in values]
+
+    def _resolve_with_ns(name, nameservers, rtype='TXT'):
+        if nameservers == ['1.1.1.1']:
+            return [_RData(['the-token'])]
+        raise Exception('NXDOMAIN')
+
+    monkeypatch.setattr(dns_lookup_mod, '_resolve_with_ns', _resolve_with_ns)
+    assert orders_mod._txt_present('_acme-challenge.example.com', 'the-token') is True
+
+
+def test_parse_resolver_ips_accepts_valid_and_skips_invalid(caplog):
+    import logging
+
+    caplog.set_level(logging.WARNING)
+    result = dns_lookup_mod._parse_resolver_ips('8.8.8.8, not-an-ip, 1.1.1.1')
+    assert result == ['8.8.8.8', '1.1.1.1']
+    assert any('not-an-ip' in rec.message for rec in caplog.records)
+
+
+def test_parse_resolver_ips_accepts_ipv6():
+    result = dns_lookup_mod._parse_resolver_ips('2001:4860:4860::8888')
+    assert result == ['2001:4860:4860::8888']

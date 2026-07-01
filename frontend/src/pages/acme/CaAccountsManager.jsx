@@ -13,11 +13,14 @@ const EMPTY_FORM = {
   eab_kid: '',
   eab_hmac_key: '',
   is_default: false,
+  order_poll_timeout_sec: '180',
+  order_poll_interval_sec: '3',
+  http_timeout_sec: '60',
 }
 
 /**
  * Multi-CA account manager for the ACME client. Lists every external ACME
- * authority (Let's Encrypt, Actalis, ZeroSSL...) UCM can request certificates
+ * authority (Let's Encrypt, ZeroSSL...) UCM can request certificates
  * from, and lets admins add/edit/remove them, set the default, and register.
  */
 export default function CaAccountsManager({
@@ -52,6 +55,9 @@ export default function CaAccountsManager({
       eab_kid: acct.eab_kid || '',
       eab_hmac_key: '',
       is_default: !!acct.is_default,
+      order_poll_timeout_sec: String(acct.order_poll_timeout_sec ?? 180),
+      order_poll_interval_sec: String(acct.order_poll_interval_sec ?? 3),
+      http_timeout_sec: String(acct.http_timeout_sec ?? 60),
     })
     setShowForm(true)
   }
@@ -66,6 +72,11 @@ export default function CaAccountsManager({
     e.preventDefault()
     setBusy(true)
     try {
+      const timing = {
+        order_poll_timeout_sec: parseInt(form.order_poll_timeout_sec, 10),
+        order_poll_interval_sec: parseInt(form.order_poll_interval_sec, 10),
+        http_timeout_sec: parseInt(form.http_timeout_sec, 10),
+      }
       if (editingId) {
         const payload = {
           label: form.label,
@@ -73,11 +84,12 @@ export default function CaAccountsManager({
           account_key_algorithm: form.account_key_algorithm,
           eab_kid: form.eab_kid,
           is_default: form.is_default,
+          ...timing,
         }
         if (form.eab_hmac_key) payload.eab_hmac_key = form.eab_hmac_key
         await onUpdate(editingId, payload)
       } else {
-        await onCreate({ ...form })
+        await onCreate({ ...form, ...timing })
       }
       closeForm()
     } finally {
@@ -125,6 +137,13 @@ export default function CaAccountsManager({
                       {acct.directory_url}
                     </p>
                     <p className="text-xs text-text-tertiary mt-0.5">{acct.email}</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">
+                      {t('acme.caTimingSummary', {
+                        timeout: acct.order_poll_timeout_sec ?? 180,
+                        interval: acct.order_poll_interval_sec ?? 3,
+                        http: acct.http_timeout_sec ?? 60,
+                      })}
+                    </p>
                   </div>
                 </div>
                 {canWrite && (
@@ -170,7 +189,7 @@ export default function CaAccountsManager({
               label={t('acme.caLabel')}
               value={form.label}
               onChange={(e) => setForm(p => ({ ...p, label: e.target.value }))}
-              placeholder="Actalis Production"
+              placeholder="ZeroSSL Production"
               required
             />
 
@@ -179,7 +198,7 @@ export default function CaAccountsManager({
               type="url"
               value={form.directory_url}
               onChange={(e) => setForm(p => ({ ...p, directory_url: e.target.value }))}
-              placeholder="https://acme-api.actalis.com/acme/directory"
+              placeholder="https://acme.example.com/directory"
               disabled={!!editingId}
               required
               helperText={editingId ? t('acme.directoryUrlImmutable') : t('acme.directoryUrlHelper')}
@@ -219,6 +238,38 @@ export default function CaAccountsManager({
               onChange={(e) => setForm(p => ({ ...p, eab_hmac_key: e.target.value }))}
               placeholder={editingId ? t('acme.eabHmacKeyKeepPlaceholder') : t('acme.eabHmacKeyPlaceholder')}
               helperText={t('acme.eabHmacKeyHelper')}
+            />
+
+            <p className="text-xs font-medium text-text-secondary pt-1">{t('acme.caTimingSettings')}</p>
+
+            <Input
+              label={t('acme.caOrderPollTimeout')}
+              type="number"
+              min={30}
+              max={600}
+              value={form.order_poll_timeout_sec}
+              onChange={(e) => setForm(p => ({ ...p, order_poll_timeout_sec: e.target.value }))}
+              helperText={t('acme.caOrderPollTimeoutHelper')}
+            />
+
+            <Input
+              label={t('acme.caOrderPollInterval')}
+              type="number"
+              min={1}
+              max={30}
+              value={form.order_poll_interval_sec}
+              onChange={(e) => setForm(p => ({ ...p, order_poll_interval_sec: e.target.value }))}
+              helperText={t('acme.caOrderPollIntervalHelper')}
+            />
+
+            <Input
+              label={t('acme.caHttpTimeout')}
+              type="number"
+              min={10}
+              max={120}
+              value={form.http_timeout_sec}
+              onChange={(e) => setForm(p => ({ ...p, http_timeout_sec: e.target.value }))}
+              helperText={t('acme.caHttpTimeoutHelper')}
             />
 
             <label className="flex items-center gap-2 text-sm text-text-secondary">

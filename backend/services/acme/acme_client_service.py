@@ -27,6 +27,10 @@ from utils.safe_requests import create_session
 
 logger = logging.getLogger(__name__)
 
+AUTHZ_INVALID_USER_MSG = (
+    'Authorization is invalid for this order. Delete it and request a new certificate.'
+)
+
 # Supported key types for account keys and certificate keys
 ACCOUNT_KEY_TYPES = {
     'RS256': {'alg': 'RS256', 'generate': lambda: rsa.generate_private_key(65537, 2048, default_backend())},
@@ -183,7 +187,7 @@ class AcmeClientService:
              it back here. Wins over everything else.
           2. A configured custom directory
              (``SystemConfig['acme.client.directory_url']``) that is not Let's
-             Encrypt — kept for the single-custom-CA setup (e.g. Actalis) so
+             Encrypt — kept for the single-custom-CA setup so
              existing installs without an explicit selection still target it.
           3. ``environment=`` — Let's Encrypt staging/production (legacy).
 
@@ -247,7 +251,7 @@ class AcmeClientService:
         The Settings UI persists EAB into SystemConfig, but issuance reads EAB
         from the ``AcmeClientAccount`` row. For a custom directory configured
         via Settings, the row is created on first use — backfill the EAB there
-        so an EAB-required CA (e.g. Actalis) registration can succeed. Does
+        so an EAB-required CA registration can succeed. Does
         NOT overwrite an EAB already present on the row.
 
         Returns True if the account was updated.
@@ -294,6 +298,27 @@ class AcmeClientService:
         )
         return True
         
+    def _http_timeout(self) -> int:
+        from models.acme_client_account import AcmeClientAccount
+        if self.account:
+            return self.account.get_http_timeout_sec()
+        return AcmeClientAccount.DEFAULT_HTTP_TIMEOUT_SEC
+
+    def get_poll_settings(self) -> Dict[str, int]:
+        """Per-CA order polling settings (timeout, interval, HTTP timeout)."""
+        from models.acme_client_account import AcmeClientAccount
+        if self.account:
+            return {
+                'order_poll_timeout_sec': self.account.get_order_poll_timeout_sec(),
+                'order_poll_interval_sec': self.account.get_order_poll_interval_sec(),
+                'http_timeout_sec': self.account.get_http_timeout_sec(),
+            }
+        return {
+            'order_poll_timeout_sec': AcmeClientAccount.DEFAULT_ORDER_POLL_TIMEOUT_SEC,
+            'order_poll_interval_sec': AcmeClientAccount.DEFAULT_ORDER_POLL_INTERVAL_SEC,
+            'http_timeout_sec': AcmeClientAccount.DEFAULT_HTTP_TIMEOUT_SEC,
+        }
+
     # =========================================================================
     # Directory & Nonce
     # =========================================================================
@@ -303,7 +328,7 @@ class AcmeClientService:
         if self.directory:
             return self.directory
         
-        resp = self.session.get(self.directory_url, timeout=30)
+        resp = self.session.get(self.directory_url, timeout=self._http_timeout())
         resp.raise_for_status()
         self.directory = resp.json()
         logger.info(f"Fetched ACME directory from {self.directory_url}")
@@ -554,7 +579,7 @@ class AcmeClientService:
             url,
             json=jws,
             headers={"Content-Type": "application/jose+json"},
-            timeout=30
+            timeout=self._http_timeout(),
         )
         return resp
     
@@ -750,11 +775,13 @@ class AcmeClientService:
                             
                             challenges_data[domain] = {
                                 'url': challenge['url'],
+                                'authz_url': authz_url,
                                 'token': token,
                                 'key_authorization': key_auth,
                                 'dns_txt_name': f"_acme-challenge.{domain.lstrip('*.')}",
                                 'dns_txt_value': dns_value if challenge_type == 'dns-01' else None,
                                 'status': challenge['status'],
+                                'authz_status': authz.get('status'),
                             }
                             break
             
@@ -829,6 +856,60 @@ class AcmeClientService:
         
         return all_success, "DNS challenges set up" if all_success else "Some challenges failed", results
     
+    @staticmethod
+    def _authz_error_detail(authz_data: dict) -> str:
+        err = authz_data.get('error') or {}
+        if isinstance(err, dict) and err.get('detail'):
+            return str(err['detail'])
+        return ''
+
+    def check_authorization_status(
+        self, order: AcmeClientOrder, domain: str,
+    ) -> Tuple[str, Dict[str, Any]]:
+        """Fetch current authorization status from the CA (POST-as-GET)."""
+        challenges = order.challenges_dict
+        if domain not in challenges:
+            return 'unknown', {}
+        authz_url = challenges[domain].get('authz_url')
+        if not authz_url:
+            return challenges[domain].get('authz_status', 'unknown'), {}
+
+        try:
+            resp = self._post(authz_url, '')
+            if resp.status_code != 200:
+                return challenges[domain].get('authz_status', 'unknown'), {}
+            authz = resp.json()
+            status = authz.get('status', 'unknown')
+            challenges[domain]['authz_status'] = status
+            if authz.get('error'):
+                challenges[domain]['authz_error'] = authz['error']
+            for ch in authz.get('challenges', []):
+                if ch.get('type') == order.challenge_type:
+                    challenges[domain]['status'] = ch.get('status', challenges[domain].get('status'))
+                    if ch.get('error'):
+                        challenges[domain]['challenge_error'] = ch['error']
+                    break
+            order.set_challenges_dict(challenges)
+            db.session.commit()
+            return status, authz
+        except Exception as exc:
+            logger.warning('Authorization status check failed for %s: %s', domain, exc)
+            return challenges[domain].get('authz_status', 'unknown'), {}
+
+    def find_invalid_authorization(
+        self, order: AcmeClientOrder,
+    ) -> Optional[Tuple[str, str]]:
+        """Return (domain, detail) when any authorization is invalid, else None."""
+        for domain in order.challenges_dict:
+            status, authz_data = self.check_authorization_status(order, domain)
+            if status == 'invalid':
+                detail = self._authz_error_detail(authz_data)
+                msg = AUTHZ_INVALID_USER_MSG
+                if detail:
+                    msg = f'{AUTHZ_INVALID_USER_MSG} ({detail})'
+                return domain, msg
+        return None
+    
     def verify_challenge(self, order: AcmeClientOrder, domain: str) -> Tuple[bool, str]:
         """
         Tell ACME server to verify a challenge.
@@ -846,6 +927,17 @@ class AcmeClientService:
                 return False, f"No challenge found for {domain}"
             
             challenge = challenges[domain]
+
+            authz_status, authz_data = self.check_authorization_status(order, domain)
+            if authz_status == 'invalid':
+                detail = self._authz_error_detail(authz_data)
+                msg = AUTHZ_INVALID_USER_MSG
+                if detail:
+                    msg = f'{AUTHZ_INVALID_USER_MSG} ({detail})'
+                return False, msg
+            if authz_status == 'valid' or challenge.get('status') == 'valid':
+                return True, 'Authorization already valid'
+
             challenge_url = challenge['url']
             
             # POST empty object to trigger validation
@@ -860,7 +952,10 @@ class AcmeClientService:
                 return True, f"Challenge submitted: {result.get('status')}"
             else:
                 error = resp.json()
-                return False, f"Challenge submission failed: {error.get('detail', 'Unknown error')}"
+                detail = error.get('detail', 'Unknown error')
+                if 'invalid' in detail.lower():
+                    return False, f'{AUTHZ_INVALID_USER_MSG} ({detail})'
+                return False, f"Challenge submission failed: {detail}"
                 
         except Exception as e:
             logger.error(f"Challenge verification error: {e}")
