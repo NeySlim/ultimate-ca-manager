@@ -12,6 +12,7 @@ import json
 import logging
 
 from . import bp, get_config, set_config
+from utils.hsts import hsts_env_locked
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,13 @@ def get_general_settings():
         'password_require_special': get_config('password_require_special', 'true') == 'true',
         # Security toggles
         'enforce_2fa': get_config('enforce_2fa', 'false') == 'true',
+        # HSTS (HTTP Strict-Transport-Security) — issue #154.
+        # Defaults match the previous hardcoded header (on + includeSubDomains, 1y).
+        # `_locked` lists the keys forced by env vars (read-only toggle in UI).
+        'hsts_enabled': get_config('hsts_enabled', 'true') == 'true',
+        'hsts_include_subdomains': get_config('hsts_include_subdomains', 'true') == 'true',
+        'hsts_max_age': int(get_config('hsts_max_age', '31536000')),
+        'hsts_env_locked': hsts_env_locked(),
         # Key recovery dual control (four-eyes). Reports the *effective* value
         # (env override > DB > default ON); `_locked` is true when an env var
         # forces it, in which case the Settings toggle is read-only.
@@ -74,6 +82,10 @@ def update_general_settings():
         'password_require_numbers', 'password_require_special',
         # Security toggles
         'enforce_2fa',
+        # HSTS (operator-configurable, issue #154)
+        'hsts_enabled',
+        'hsts_include_subdomains',
+        'hsts_max_age',
         # Key recovery four-eyes control (env var, when set, overrides this)
         'key_recovery_dual_control',
         # Prometheus metrics bearer token (empty = disabled)
@@ -92,6 +104,15 @@ def update_general_settings():
         if port == Config.HTTPS_PORT:
             return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
         data['http_protocol_port'] = str(port)
+
+    # Validate HSTS max-age (non-negative int) when provided
+    if 'hsts_max_age' in data:
+        try:
+            data['hsts_max_age'] = str(int(data['hsts_max_age']))
+        except (ValueError, TypeError):
+            return error_response('hsts_max_age must be an integer', 400)
+        if int(data['hsts_max_age']) < 0:
+            return error_response('hsts_max_age must be >= 0', 400)
 
     for key in allowed_keys:
         if key in data:

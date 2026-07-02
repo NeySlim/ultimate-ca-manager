@@ -41,6 +41,16 @@ export default {
         ]
       },
       {
+        title: "HSTS (Strict Transport Security)",
+        content: "Operator-konfigurierbare HSTS-Richtlinie, sodass Instanzen mit selbstsignierten Zertifikaten während der Ersteinrichtung sich vollständig abmelden können.",
+        items: [
+          { label: "Standard", text: "HSTS an, includeSubDomains, max-age 1 Jahr (abwärtskompatibel)" },
+          { label: "Deaktivieren", text: "Für Instanzen mit selbstsignierten Zertifikaten während der Ersteinrichtung deaktivieren (verhindert Browser-Sperre)" },
+          { label: "Env-Override", text: "UCM_HSTS_ENABLED, UCM_HSTS_INCLUDE_SUBDOMAINS, UCM_HSTS_MAX_AGE in /etc/ucm/ucm.env haben Vorrang vor der DB" },
+          { label: "Subdomains", text: "includeSubDomains entfernen, wenn Subdomains separate Dienste mit eigenen Zertifikaten hosten" },
+        ]
+      },
+      {
         title: 'Kategorien',
         items: [
           { label: 'Allgemein', text: 'Instanzname, Hostname und systemweite Standardwerte' },

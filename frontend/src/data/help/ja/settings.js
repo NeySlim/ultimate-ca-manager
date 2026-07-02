@@ -41,6 +41,16 @@ export default {
         ]
       },
       {
+        title: "HSTS（Strict Transport Security）",
+        content: "オペレーター設定可能なHSTSポリシー。初期セットアップ時に自己署名証明書を使用するインスタンスは、HSTSを完全にオプトアウトできます。",
+        items: [
+          { label: "デフォルト", text: "HSTSオン、includeSubDomains、max-age 1年（後方互換）" },
+          { label: "無効化", text: "初期セットアップ時に自己署名証明書を使用するインスタンスでは無効化（ブラウザのロックアウトを防止）" },
+          { label: "環境変数", text: "/etc/ucm/ucm.env の UCM_HSTS_ENABLED, UCM_HSTS_INCLUDE_SUBDOMAINS, UCM_HSTS_MAX_AGE がDBより優先" },
+          { label: "サブドメイン", text: "サブドメインが独自の証明書を持つ別のサービスをホストする場合は includeSubDomains を外す" },
+        ]
+      },
+      {
         title: 'カテゴリ',
         items: [
           { label: '一般', text: 'インスタンス名、ホスト名、システム全体のデフォルト' },

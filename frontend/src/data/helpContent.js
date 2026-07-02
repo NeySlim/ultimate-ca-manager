@@ -785,6 +785,17 @@ export const helpContent = {
         ]
       },
       {
+        title: 'HSTS (Strict Transport Security)',
+        icon: Globe,
+        content: 'Operator-configurable HSTS policy so instances serving self-signed certificates during setup can opt out entirely.',
+        items: [
+          { label: 'Default', text: 'HSTS on, includeSubDomains, max-age 1 year (backward compatible)' },
+          { label: 'Disable', text: 'Turn off for instances with self-signed certs during initial setup (avoids browser lock-out)' },
+          { label: 'Env override', text: 'UCM_HSTS_ENABLED, UCM_HSTS_INCLUDE_SUBDOMAINS, UCM_HSTS_MAX_AGE in /etc/ucm/ucm.env win over the DB setting' },
+          { label: 'Subdomains', text: 'Drop includeSubDomains when subdomains host separate services with their own certs' },
+        ]
+      },
+      {
         title: 'Categories',
         icon: Gear,
         items: [
