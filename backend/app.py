@@ -794,8 +794,14 @@ def create_app(config_name=None):
             )
         
         # Add security headers if not present
+        # HSTS is operator-configurable (Settings -> General, or UCM_HSTS_*
+        # env vars) so instances serving self-signed certs during setup can
+        # opt out entirely — see issue #154.
         if 'Strict-Transport-Security' not in response.headers:
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            from utils.hsts import build_hsts_header
+            hsts_value = build_hsts_header()
+            if hsts_value:
+                response.headers['Strict-Transport-Security'] = hsts_value
         if 'X-Content-Type-Options' not in response.headers:
             response.headers['X-Content-Type-Options'] = 'nosniff'
         if 'X-Frame-Options' not in response.headers:

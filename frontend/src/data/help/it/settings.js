@@ -41,6 +41,16 @@ export default {
         ]
       },
       {
+        title: "HSTS (Strict Transport Security)",
+        content: "Policy HSTS configurabile dall'operatore affinché le istanze con certificati autofirmati durante la configurazione iniziale possano escludersi del tutto.",
+        items: [
+          { label: "Predefinito", text: "HSTS attivo, includeSubDomains, max-age 1 anno (retrocompatibile)" },
+          { label: "Disabilita", text: "Disabilita per istanze con certificati autofirmati durante la configurazione iniziale (evita il blocco del browser)" },
+          { label: "Variabile d'ambiente", text: "UCM_HSTS_ENABLED, UCM_HSTS_INCLUDE_SUBDOMAINS, UCM_HSTS_MAX_AGE in /etc/ucm/ucm.env prevalgono sul DB" },
+          { label: "Sottodomini", text: "Rimuovi includeSubDomains quando i sottodomini ospitano servizi separati con certificati propri" },
+        ]
+      },
+      {
         title: 'Categorie',
         items: [
           { label: 'Generale', text: 'Nome dell\'istanza, hostname e impostazioni predefinite di sistema' },

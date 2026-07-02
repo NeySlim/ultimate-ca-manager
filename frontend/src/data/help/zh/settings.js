@@ -41,6 +41,16 @@ export default {
         ]
       },
       {
+        title: "HSTS（Strict Transport Security）",
+        content: "可由操作员配置的 HSTS 策略，以便在初始设置期间使用自签名证书的实例可以完全退出。",
+        items: [
+          { label: "默认", text: "HSTS 开启，includeSubDomains，max-age 1 年（向后兼容）" },
+          { label: "禁用", text: "对于在初始设置期间使用自签名证书的实例，请禁用（避免浏览器锁定）" },
+          { label: "环境变量", text: "/etc/ucm/ucm.env 中的 UCM_HSTS_ENABLED, UCM_HSTS_INCLUDE_SUBDOMAINS, UCM_HSTS_MAX_AGE 优先于数据库" },
+          { label: "子域名", text: "当子域名托管具有各自证书的独立服务时，移除 includeSubDomains" },
+        ]
+      },
+      {
         title: '类别',
         items: [
           { label: '通用', text: '实例名称、主机名和全系统默认值' },

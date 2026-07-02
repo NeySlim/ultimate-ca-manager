@@ -41,6 +41,16 @@ export default {
         ]
       },
       {
+        title: "HSTS (Strict Transport Security)",
+        content: "Política HSTS configurable por el operador para que las instancias con certificados autofirmados durante la configuración inicial puedan excluirse por completo.",
+        items: [
+          { label: "Predeterminado", text: "HSTS activado, includeSubDomains, max-age 1 año (compatible con versiones anteriores)" },
+          { label: "Desactivar", text: "Desactivar para instancias con certificados autofirmados durante la configuración inicial (evita el bloqueo del navegador)" },
+          { label: "Variable de entorno", text: "UCM_HSTS_ENABLED, UCM_HSTS_INCLUDE_SUBDOMAINS, UCM_HSTS_MAX_AGE en /etc/ucm/ucm.env prevalecen sobre la base de datos" },
+          { label: "Subdominios", text: "Quitar includeSubDomains cuando los subdominios alojen servicios separados con sus propios certificados" },
+        ]
+      },
+      {
         title: 'Categorías',
         items: [
           { label: 'General', text: 'Nombre de instancia, nombre de host y valores predeterminados del sistema' },

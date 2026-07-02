@@ -85,6 +85,55 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           description={t('settings.enforce2faDesc')}
         />
       </DetailSection>
+      <DetailSection title={t('settings.hstsTitle')} icon={Globe} iconClass="icon-bg-sky">
+        <div className="space-y-4">
+          <ToggleSwitch
+            checked={settings.hsts_enabled !== false}
+            onChange={(val) => updateSetting('hsts_enabled', val)}
+            label={t('settings.hstsEnabled')}
+            description={t('settings.hstsEnabledDesc')}
+            disabled={settings.hsts_env_locked?.includes('hsts_enabled')}
+          />
+          {settings.hsts_enabled !== false && (
+            <>
+              <ToggleSwitch
+                checked={settings.hsts_include_subdomains !== false}
+                onChange={(val) => updateSetting('hsts_include_subdomains', val)}
+                label={t('settings.hstsIncludeSubdomains')}
+                description={t('settings.hstsIncludeSubdomainsDesc')}
+                disabled={settings.hsts_env_locked?.includes('hsts_include_subdomains')}
+              />
+              <Input
+                label={t('settings.hstsMaxAge')}
+                type="number"
+                value={settings.hsts_max_age ?? 31536000}
+                onChange={(e) => updateSetting('hsts_max_age', parseInt(e.target.value))}
+                min="0"
+                helperText={t('settings.hstsMaxAgeDesc')}
+                disabled={settings.hsts_env_locked?.includes('hsts_max_age')}
+              />
+            </>
+          )}
+          {settings.hsts_env_locked?.length > 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
+              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.hstsEnvLocked')}</span>
+            </div>
+          )}
+          {settings.hsts_env_locked?.length === 0 && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-info-op10 text-xs text-status-info">
+              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.hstsNote')}</span>
+            </div>
+          )}
+          {hasPermission('admin:system') && (
+            <Button type="button" onClick={() => handleSave('security')} disabled={saving}>
+              <FloppyDisk size={16} />
+              {t('common.saveChanges')}
+            </Button>
+          )}
+        </div>
+      </DetailSection>
       <DetailSection title={t('settings.keyRecoveryTitle')} icon={Key} iconClass="icon-bg-amber">
         <div className="space-y-3">
           <ToggleSwitch
