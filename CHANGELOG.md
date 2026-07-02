@@ -11,7 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 
-## [2.181] - 2026-06-30
+## [2.182] - 2026-07-02
+
+### Added
+- **Per-CA ACME timing settings and robust DNS-01 TXT verification** — each external ACME CA account now carries its own order poll timeout, poll interval and HTTP timeout (migration `048` adds `acme_client_accounts.order_poll_timeout_sec`, `order_poll_interval_sec`, `http_timeout_sec`), so a slow authority no longer inherits the global hardcoded values. The DNS-01 challenge self-check now resolves the expected TXT record through the authoritative nameservers first, then public resolvers, with per-resolver diagnostic logging, and invalid ACME authorizations are detected during polling instead of stalling until timeout. The Gandi DNS provider was also hardened (URL-encoding of record values, post-create verification, missing `Any` import) (#150).
+
+### Fixed
+- **ACME auto-renewal no longer crashes when refreshing the order expiry** — the renewal service read `new_cert.not_after` to copy the new certificate's expiry onto the order's `expires_at`, but the `Certificate` model exposes that date as `valid_to`. The `AttributeError` aborted the renewal right after the new certificate had been issued and imported, so `expires_at` was never updated and the scheduler re-requested the same certificate on every tick. The renewal path now reads `valid_to`, and `expires_at` is updated correctly so a renewed certificate is not renewed again until its next due window.
 
 ### Added
 - **Multi-CA management for the ACME client** — UCM can now issue certificates from several external ACME authorities (Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…) instead of a single one. ACME CA accounts are managed from the UI (CRUD, per-account External Account Binding, default selection, registration status), each certificate request picks its issuing CA, and the order is pinned to that account so renewals stay on the same authority. The `AcmeClientOrder.acme_client_account_id` foreign key (migration `047`) links each order to its external CA account; `AcmeClientService.for_issuance(environment, account_id=)` resolves explicit account > configured custom directory > Let's Encrypt environment, and `for_order(order)` reuses the pinned account on verify/finalize/status/renewal (#149).
