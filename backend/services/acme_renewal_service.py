@@ -176,8 +176,8 @@ def renew_certificate(order) -> tuple:
     # Update expiry from new certificate
     from models import Certificate
     new_cert = Certificate.query.get(cert_id)
-    if new_cert and new_cert.not_after:
-        order.expires_at = new_cert.not_after
+    if new_cert and new_cert.valid_to:
+        order.expires_at = new_cert.valid_to
     
     try:
         db.session.commit()
