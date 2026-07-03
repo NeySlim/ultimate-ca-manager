@@ -671,7 +671,12 @@
       "hsmKeyAlgorithm": "Algorithme de clé HSM",
       "hsmExistingKey": "Clé HSM existante",
       "hsmExistingKeyRequired": "Sélectionnez une clé HSM",
-      "hsmNoUnusedKeys": "Aucune clé de signature inutilisée sur ce fournisseur"
+      "hsmNoUnusedKeys": "Aucune clé de signature inutilisée sur ce fournisseur",
+      "digestAuto": "Auto (aligné sur la clé)",
+      "digestAutoHint": "Utilisera {{digest}} pour la clé sélectionnée",
+      "certificateProfile": "Profil certificat (RFC 5280)",
+      "certificateProfileHelp": "Les CA racines utilisent keyCertSign + cRLSign par défaut. Les CA émettrices ajoutent digitalSignature et peuvent inclure TLS Web Server Authentication (serverAuth).",
+      "ekuServerAuth": "Extended Key Usage : TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "Adossé HSM",
@@ -1052,6 +1057,7 @@
     "viewCertificate": "Voir le certificat",
     "aboutCSRs": "À propos des CSR",
     "serial": "Série",
+    "serialHex": "Série (hex)",
     "codeSigning": "Signature de code",
     "custom": "Personnalisé",
     "ca": "AC",

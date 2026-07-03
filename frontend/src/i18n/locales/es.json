@@ -233,6 +233,7 @@
     "viewCertificate": "Ver Certificado",
     "aboutCSRs": "Acerca de CSRs",
     "serial": "Serial",
+    "serialHex": "Serial (hex)",
     "codeSigning": "Firma de código",
     "custom": "Personalizado",
     "ca": "CA",
@@ -847,7 +848,12 @@
       "hsmKeyAlgorithm": "Algoritmo de clave HSM",
       "hsmExistingKey": "Clave HSM existente",
       "hsmExistingKeyRequired": "Seleccione una clave HSM",
-      "hsmNoUnusedKeys": "No hay claves de firma no utilizadas en este proveedor"
+      "hsmNoUnusedKeys": "No hay claves de firma no utilizadas en este proveedor",
+      "digestAuto": "Auto (según clave)",
+      "digestAutoHint": "Usará {{digest}} para la clave seleccionada",
+      "certificateProfile": "Perfil de certificado (RFC 5280)",
+      "certificateProfileHelp": "CA raíz: keyCertSign + cRLSign. CA emisora: digitalSignature y serverAuth opcional.",
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "Respaldada por HSM",

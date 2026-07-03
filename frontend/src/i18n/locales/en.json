@@ -234,6 +234,7 @@
     "viewCertificate": "View Certificate",
     "aboutCSRs": "About CSRs",
     "serial": "Serial",
+    "serialHex": "Serial (hex)",
     "codeSigning": "Code Signing",
     "custom": "Custom",
     "ca": "CA",
@@ -847,7 +848,12 @@
       "hsmKeyAlgorithm": "HSM Key Algorithm",
       "hsmExistingKey": "Existing HSM Key",
       "hsmExistingKeyRequired": "Select an HSM key",
-      "hsmNoUnusedKeys": "No unused signing keys on this provider"
+      "hsmNoUnusedKeys": "No unused signing keys on this provider",
+      "digestAuto": "Auto (match key size)",
+      "digestAutoHint": "Will use {{digest}} for the selected key",
+      "certificateProfile": "Certificate Profile (RFC 5280)",
+      "certificateProfileHelp": "Root CAs default to keyCertSign + cRLSign. Issuing CAs add digitalSignature and may include TLS Web Server Authentication (serverAuth).",
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "HSM-backed",

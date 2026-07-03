@@ -45,6 +45,8 @@ class CACreationMixin:
         hsm_key_id: Optional[int] = None,
         hsm_key_label: Optional[str] = None,
         hsm_key_algorithm: Optional[str] = None,
+        key_usage: Optional[List[str]] = None,
+        extended_key_usage: Optional[List[str]] = None,
     ) -> CA:
         """
         Create an internal Certificate Authority.
@@ -184,6 +186,8 @@ class CACreationMixin:
             policy_constraints_inhibit=policy_constraints_inhibit,
             inhibit_any_policy=inhibit_any_policy,
             sia_urls=sia_urls,
+            key_usage=key_usage,
+            extended_key_usage=extended_key_usage,
         )
 
         # If using local key, use the generated key PEM

@@ -233,6 +233,7 @@
     "viewCertificate": "Zertifikat anzeigen",
     "aboutCSRs": "Über CSRs",
     "serial": "Seriennummer",
+    "serialHex": "Seriennummer (hex)",
     "codeSigning": "Codesignierung",
     "custom": "Benutzerdefiniert",
     "ca": "CA",
@@ -847,7 +848,12 @@
       "hsmKeyAlgorithm": "HSM-Schlüsselalgorithmus",
       "hsmExistingKey": "Vorhandener HSM-Schlüssel",
       "hsmExistingKeyRequired": "HSM-Schlüssel auswählen",
-      "hsmNoUnusedKeys": "Keine ungenutzten Signaturschlüssel auf diesem Anbieter"
+      "hsmNoUnusedKeys": "Keine ungenutzten Signaturschlüssel auf diesem Anbieter",
+      "digestAuto": "Auto (Schlüsselgröße)",
+      "digestAutoHint": "Verwendet {{digest}} für den gewählten Schlüssel",
+      "certificateProfile": "Zertifikatsprofil (RFC 5280)",
+      "certificateProfileHelp": "Root-CAs: keyCertSign + cRLSign. Ausstellende CAs: digitalSignature und optional serverAuth.",
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "HSM-gesichert",

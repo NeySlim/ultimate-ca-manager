@@ -18,6 +18,10 @@ import pytest
 import json
 import os
 import sys
+import base64
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.x509.oid import ExtensionOID
 from tests.conftest import get_json, assert_success, assert_error
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,6 +43,13 @@ VALID_ROOT_CA = {
 
 def post_json(client, url, data):
     return client.post(url, data=json.dumps(data), content_type=CONTENT_JSON)
+
+
+def _load_created_cert(data):
+    pem = data.get('pem') or ''
+    if not pem and data.get('crt'):
+        pem = base64.b64decode(data['crt']).decode('utf-8')
+    return x509.load_pem_x509_certificate(pem.encode(), default_backend())
 
 
 def patch_json(client, url, data):
@@ -157,6 +168,53 @@ class TestCreateCA:
         r = post_json(auth_client, '/api/v2/cas', payload)
         data = assert_success(r, status=201)
         assert data['id'] is not None
+
+    def test_create_root_ca_ec_p384_uses_sha384_and_rfc_key_usage(self, auth_client):
+        payload = {
+            **VALID_ROOT_CA,
+            'commonName': 'RFC Root P384',
+            'keyAlgo': 'ECDSA',
+            'keySize': 'secp384r1',
+            'hashAlgorithm': 'auto',
+        }
+        r = post_json(auth_client, '/api/v2/cas', payload)
+        data = assert_success(r, status=201)
+        cert = _load_created_cert(data)
+        assert 'SHA384' in cert.signature_algorithm_oid._name.upper()
+        ku = cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
+        assert ku.key_cert_sign and ku.crl_sign
+        assert not ku.digital_signature
+        with pytest.raises(x509.ExtensionNotFound):
+            cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE)
+
+    def test_create_intermediate_ca_le_style_profile(self, auth_client, create_ca):
+        root = create_ca(cn='Parent For LE Profile')
+        payload = {
+            **VALID_ROOT_CA,
+            'type': 'intermediate',
+            'commonName': 'LE Style Intermediate',
+            'parentCAId': root['id'],
+            'keyAlgo': 'ECDSA',
+            'keySize': 'secp384r1',
+            'hashAlgorithm': 'sha384',
+        }
+        r = post_json(auth_client, '/api/v2/cas', payload)
+        data = assert_success(r, status=201)
+        cert = _load_created_cert(data)
+        assert 'SHA384' in cert.signature_algorithm_oid._name.upper()
+        ku = cert.extensions.get_extension_for_oid(ExtensionOID.KEY_USAGE).value
+        assert ku.digital_signature and ku.key_cert_sign and ku.crl_sign
+        eku = cert.extensions.get_extension_for_oid(ExtensionOID.EXTENDED_KEY_USAGE).value
+        assert x509.oid.ExtendedKeyUsageOID.SERVER_AUTH in eku
+
+    def test_create_ca_rejects_invalid_key_usage(self, auth_client):
+        payload = {
+            **VALID_ROOT_CA,
+            'commonName': 'Bad KU Root',
+            'keyUsage': ['digitalSignature'],
+        }
+        r = post_json(auth_client, '/api/v2/cas', payload)
+        assert_error(r, 400)
 
 
 # ============================================================
