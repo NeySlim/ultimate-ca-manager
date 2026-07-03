@@ -1,10 +1,19 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Warning, CloudArrowUp } from '@phosphor-icons/react'
+import { Warning, CloudArrowUp, MagnifyingGlass } from '@phosphor-icons/react'
 import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
 
-export default function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, caAccounts = [], defaultEnvironment, defaultEmail }) {
+export default function RequestCertificateForm({
+  onSubmit,
+  onPreflight,
+  onCancel,
+  dnsProviders,
+  caAccounts = [],
+  defaultEnvironment,
+  defaultEmail,
+  preflightLoading = false,
+}) {
   const { t } = useTranslation()
   const { showWarning } = useNotification()
   const defaultCaAccountId = caAccounts.find(a => a.is_default)?.id ?? null
@@ -18,11 +27,11 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
     key_type: 'RSA-2048',
     key_source: 'generate',
     csr_pem: '',
+    verify_dns: false,
+    preflight_mode: 'full',
   })
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-
+  const buildPayload = () => {
     const domainList = formData.domains
       .split(/[,\n]/)
       .map(d => d.trim())
@@ -30,29 +39,29 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
 
     if (domainList.length === 0) {
       showWarning(t('acme.atLeastOneDomainRequired'))
-      return
+      return null
     }
 
     const domainRegex = /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i
     const invalidDomains = domainList.filter(d => !domainRegex.test(d))
     if (invalidDomains.length > 0) {
       showWarning(t('acme.invalidDomainFormat', { domains: invalidDomains.join(', ') }))
-      return
+      return null
     }
 
     if (formData.challenge_type === 'http-01' && domainList.some(d => d.startsWith('*.'))) {
       showWarning(t('acme.wildcardRequiresDns01'))
-      return
+      return null
     }
 
     if (!formData.email) {
       showWarning(t('common.emailRequired'))
-      return
+      return null
     }
 
     if (formData.key_source === 'csr' && !formData.csr_pem.trim()) {
       showWarning(t('acme.csrRequired'))
-      return
+      return null
     }
 
     const payload = {
@@ -72,7 +81,25 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
       payload.csr_pem = formData.csr_pem.trim()
     }
 
-    onSubmit(payload)
+    return payload
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const payload = buildPayload()
+    if (payload) onSubmit(payload)
+  }
+
+  const handlePreflight = (e) => {
+    e.preventDefault()
+    const payload = buildPayload()
+    if (payload) {
+      onPreflight({
+        ...payload,
+        mode: formData.preflight_mode,
+        verify_dns: formData.verify_dns,
+      })
+    }
   }
 
   const hasCaAccounts = caAccounts.length > 0
@@ -83,7 +110,7 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
     : formData.environment === 'production'
 
   return (
-    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+    <form className="p-4 space-y-4">
       {isProductionContext && (
         <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-2">
           <Warning size={18} className="text-yellow-500 shrink-0 mt-0.5" />
@@ -218,11 +245,38 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
         />
       )}
 
+      <div className="p-3 rounded-lg border border-border bg-bg-secondary/50 space-y-3">
+        <p className="text-sm font-medium text-text-primary">{t('acme.preflightTitle')}</p>
+        <p className="text-xs text-text-secondary">{t('acme.preflightDesc')}</p>
+        <Select
+          label={t('acme.preflightMode')}
+          value={formData.preflight_mode}
+          onChange={(val) => setFormData(prev => ({ ...prev, preflight_mode: val }))}
+          options={[
+            { value: 'full', label: t('acme.preflightModeFull') },
+            { value: 'validate_only', label: t('acme.preflightModeValidateOnly') },
+          ]}
+        />
+        <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.verify_dns}
+            onChange={(e) => setFormData(prev => ({ ...prev, verify_dns: e.target.checked }))}
+            className="rounded border-border"
+          />
+          {t('acme.preflightVerifyDns')}
+        </label>
+      </div>
+
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit">
+        <Button type="button" variant="secondary" onClick={handlePreflight} disabled={preflightLoading}>
+          <MagnifyingGlass size={14} />
+          {preflightLoading ? t('acme.preflightRunning') : t('acme.preflightRun')}
+        </Button>
+        <Button type="button" onClick={handleSubmit}>
           <CloudArrowUp size={14} />
           {t('acme.requestCertificate')}
         </Button>

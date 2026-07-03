@@ -162,8 +162,11 @@ export const acmeService = {
   },
 
   async requestCertificate(data) {
-    // data: { domains, email, challenge_type, environment, dns_provider_id }
     return apiClient.post('/acme/client/request', data)
+  },
+
+  async preflightCertificate(data) {
+    return apiClient.post('/acme/client/preflight', data)
   },
 
   async verifyChallenge(orderId, domain = null, force = false) {

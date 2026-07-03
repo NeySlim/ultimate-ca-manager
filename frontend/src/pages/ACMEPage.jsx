@@ -67,6 +67,8 @@ export default function ACMEPage() {
   const [activeDetailTab, setActiveDetailTab] = useState('account')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [preflightLoading, setPreflightLoading] = useState(false)
+  const [preflightResult, setPreflightResult] = useState(null)
   const [showDnsProviderModal, setShowDnsProviderModal] = useState(false)
   const [showDomainModal, setShowDomainModal] = useState(false)
   const [showLocalDomainModal, setShowLocalDomainModal] = useState(false)
@@ -365,8 +367,6 @@ export default function ACMEPage() {
       if (payload.challenge_warning) {
         showWarning(payload.challenge_warning)
       } else if (payload.auto_polling) {
-        // Automated DNS-01: issuance runs in the background; the detail panel
-        // polls /status until done.
         showInfo(t('acme.certificateRequestAutoPolling'))
       } else {
         showSuccess(t('acme.certificateRequestCreated'))
@@ -378,6 +378,24 @@ export default function ACMEPage() {
       }
     } catch (error) {
       showError(error.message || t('acme.certificateRequestFailed'))
+    }
+  }
+
+  const handlePreflight = async (data) => {
+    setPreflightLoading(true)
+    try {
+      const result = await acmeService.preflightCertificate(data)
+      const report = result.data || {}
+      setPreflightResult(report)
+      if (report.ok) {
+        showSuccess(t('acme.preflightPassed'))
+      } else {
+        showWarning(t('acme.preflightFailed'))
+      }
+    } catch (error) {
+      showError(error.message || t('acme.preflightError'))
+    } finally {
+      setPreflightLoading(false)
     }
   }
 
@@ -1219,12 +1237,66 @@ export default function ACMEPage() {
       >
         <RequestCertificateForm
           onSubmit={handleRequestCertificate}
+          onPreflight={handlePreflight}
           onCancel={() => setShowRequestModal(false)}
           dnsProviders={dnsProviders}
           caAccounts={caAccounts}
           defaultEnvironment={clientSettings.environment || 'staging'}
           defaultEmail={clientSettings.email || ''}
+          preflightLoading={preflightLoading}
         />
+      </Modal>
+
+      <Modal
+        open={!!preflightResult}
+        onClose={() => setPreflightResult(null)}
+        title={preflightResult?.ok ? t('acme.preflightPassedTitle') : t('acme.preflightFailedTitle')}
+        size="lg"
+      >
+        {preflightResult && (
+          <div className="p-4 space-y-3">
+            <p className="text-sm text-text-secondary">{t('acme.preflightStagingNote')}</p>
+            <ul className="space-y-2">
+              {(preflightResult.steps || []).map((step) => (
+                <li
+                  key={step.name}
+                  className={`p-2 rounded border text-sm ${
+                    step.status === 'pass'
+                      ? 'border-green-500/30 bg-green-500/5'
+                      : 'border-red-500/30 bg-red-500/5'
+                  }`}
+                >
+                  <div className="font-medium">{step.label}</div>
+                  {step.detail && <div className="text-text-secondary text-xs mt-1">{step.detail}</div>}
+                  {step.data?.txt_records?.length > 0 && (
+                    <ul className="mt-2 font-mono text-xs space-y-1">
+                      {step.data.txt_records.map((rec) => (
+                        <li key={rec.name}>
+                          <span className="text-text-tertiary">{rec.name}</span>
+                          <br />
+                          {rec.value}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {(preflightResult.txt_records || []).length > 0 && (
+              <div className="pt-2 border-t border-border">
+                <p className="text-sm font-medium mb-2">{t('acme.preflightTxtRecords')}</p>
+                <ul className="font-mono text-xs space-y-2">
+                  {preflightResult.txt_records.map((rec) => (
+                    <li key={rec.name} className="p-2 bg-bg-secondary rounded">
+                      <div className="text-text-tertiary">{rec.name}</div>
+                      <div className="break-all">{rec.value}</div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
       
       {/* DNS Provider Modal */}
