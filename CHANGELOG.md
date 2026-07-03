@@ -9,7 +9,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 
 ## [Unreleased]
-- **WebSocket handshake fails when if HTTPS_PORT was set to 443** - `CORS_ORIGINS` always appended `:{HTTPS_PORT}` to every allowed origin, so on port 443 the list contained entries such as `https://ucm.example.com:443`. Browsers omit the port number from the `Origin` header when it is the scheme default so it would never match. As Socket.IO performs server-side checks on `Origin`, WebSocket connections would be silently rejected. `CORS_ORIGINS` now omits the port suffix when `HTTPS_PORT` is 443.
+
+
+## [2.183] - 2026-07-03
+
+### Added
+- **Operator-configurable HSTS (Strict-Transport-Security) header** — the HSTS policy was previously hardcoded to `max-age=31536000; includeSubDomains` on every HTTPS response. Instances serving self-signed certificates during initial setup can now opt out entirely, drop the `includeSubDomains` directive, or shorten `max-age` from Settings → Security. The setting can also be forced via `UCM_HSTS_ENABLED`, `UCM_HSTS_INCLUDE_SUBDOMAINS` and `UCM_HSTS_MAX_AGE` environment variables in `/etc/ucm/ucm.env` (takes precedence over the database); when set, the corresponding toggle in the UI is locked with a badge (#154).
+- **mTLS PKCS#12 export from Account** — after generating an mTLS certificate from the Account page, both PEM and PKCS#12 (.p12) download are now offered client-side, with password-protected PKCS#12 for browser or OS keychain import. The download endpoint enforces POST with a JSON body for PKCS#12 (password never sent via query string, avoiding leakage in proxy logs), minimum 8-character password, and returns the `AuthCertificate` id usable by list/download/export (#156).
+
+### Fixed
+- **WebSocket handshake fails when if HTTPS_PORT was set to 443** - `CORS_ORIGINS` always appended `:{HTTPS_PORT}` to every allowed origin, so on port 443 the list contained entries such as `https://ucm.example.com:443`. Browsers omit the port number from the `Origin` header when it is the scheme default so it would never match. As Socket.IO performs server-side checks on `Origin`, WebSocket connections would be silently rejected. `CORS_ORIGINS` now omits the port suffix when `HTTPS_PORT` is 443 (#155).
+- **SSH setup script command injection via hostname** — the public `GET /ssh/setup/<refid>` endpoint accepted arbitrary `hostname` query values that were embedded into generated shell/PowerShell scripts without validation. A payload such as `$(id)` or `";id;"` would execute when an operator piped the script to bash. Hostnames are now validated against `^[a-zA-Z0-9._-]+$` via a shared helper on both the public and authenticated setup routes, and the Windows script generator escapes single quotes (#157).
 
 
 ## [2.182] - 2026-07-02
