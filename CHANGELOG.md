@@ -9,6 +9,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 
 ## [Unreleased]
+- **WebSocket handshake fails when if HTTPS_PORT was set to 443** - `CORS_ORIGINS` always appended `:{HTTPS_PORT}` to every allowed origin, so on port 443 the list contained entries such as `https://ucm.example.com:443`. Browsers omit the port number from the `Origin` header when it is the scheme default so it would never match. As Socket.IO performs server-side checks on `Origin`, WebSocket connections would be silently rejected. `CORS_ORIGINS` now omits the port suffix when `HTTPS_PORT` is 443.
 
 
 ## [2.182] - 2026-07-02

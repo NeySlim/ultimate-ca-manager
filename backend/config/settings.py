@@ -219,14 +219,15 @@ class Config:
     
     # CORS - auto-include FQDN and hostname
     _https_port = int(os.getenv("HTTPS_PORT", "8443"))
-    _cors_origins = [f"https://localhost:{_https_port}", f"https://127.0.0.1:{_https_port}"]
+    _port_suffix = "" if _https_port == 443 else f":{_https_port}"
+    _cors_origins = [f"https://localhost{_port_suffix}", f"https://127.0.0.1{_port_suffix}"]
     _fqdn = get_system_fqdn()
     if _fqdn and _fqdn not in ('localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local'):
-        _cors_origins.append(f"https://{_fqdn}:{_https_port}")
+        _cors_origins.append(f"https://{_fqdn}{_port_suffix}")
     # Also add short hostname (e.g. "pve" from "pve.example.com")
     _hostname = os.getenv("HOSTNAME", "") or _fqdn.split(".")[0] if _fqdn else ""
-    if _hostname and _hostname not in ('localhost', '127.0.0.1') and f"https://{_hostname}:{_https_port}" not in _cors_origins:
-        _cors_origins.append(f"https://{_hostname}:{_https_port}")
+    if _hostname and _hostname not in ('localhost', '127.0.0.1') and f"https://{_hostname}{_port_suffix}" not in _cors_origins:
+        _cors_origins.append(f"https://{_hostname}{_port_suffix}")
     # Allow extra origins via env
     _extra = os.getenv("CORS_EXTRA_ORIGINS", "")
     if _extra:
