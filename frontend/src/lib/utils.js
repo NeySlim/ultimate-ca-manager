@@ -159,3 +159,40 @@ export function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
+/**
+ * Format an X.509 serial number as colon-separated uppercase hex (browser/OpenSSL style).
+ * Accepts decimal strings (UCM DB), compact hex, 0x-prefixed hex, or colon-separated hex.
+ */
+export function formatSerialNumberHex(serial) {
+  if (serial == null || serial === '') return null
+
+  const raw = String(serial).trim()
+  if (!raw) return null
+
+  if (/^([0-9A-Fa-f]{2}:)+[0-9A-Fa-f]{2}$/.test(raw)) {
+    return raw.toUpperCase()
+  }
+
+  const stripped = raw.replace(/^0x/i, '').replace(/:/g, '')
+  if (!/^[0-9A-Fa-f]+$/.test(stripped)) return null
+
+  let hex
+  if (/[A-Fa-f]/.test(stripped)) {
+    hex = stripped.toUpperCase()
+  } else if (/^\d+$/.test(stripped)) {
+    try {
+      hex = BigInt(stripped).toString(16).toUpperCase()
+    } catch {
+      return null
+    }
+  } else {
+    return null
+  }
+
+  if (hex.length % 2 !== 0) {
+    hex = `0${hex}`
+  }
+
+  return hex.match(/.{2}/g).join(':')
+}
+

@@ -1052,6 +1052,7 @@
     "viewCertificate": "Voir le certificat",
     "aboutCSRs": "À propos des CSR",
     "serial": "Série",
+    "serialHex": "Série (hex)",
     "codeSigning": "Signature de code",
     "custom": "Personnalisé",
     "ca": "AC",

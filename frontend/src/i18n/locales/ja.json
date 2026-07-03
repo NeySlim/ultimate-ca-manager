@@ -233,6 +233,7 @@
     "viewCertificate": "証明書を表示",
     "aboutCSRs": "CSRについて",
     "serial": "シリアル番号",
+    "serialHex": "シリアル番号 (hex)",
     "codeSigning": "コード署名",
     "custom": "カスタム",
     "ca": "CA",

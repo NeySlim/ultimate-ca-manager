@@ -233,6 +233,7 @@
     "viewCertificate": "Visualizza Certificato",
     "aboutCSRs": "Informazioni sulle CSR",
     "serial": "Seriale",
+    "serialHex": "Seriale (hex)",
     "codeSigning": "Firma codice",
     "custom": "Personalizzato",
     "ca": "CA",

@@ -233,6 +233,7 @@
     "viewCertificate": "查看证书",
     "aboutCSRs": "关于 CSR",
     "serial": "序列号",
+    "serialHex": "序列号 (hex)",
     "codeSigning": "代码签名",
     "custom": "自定义",
     "ca": "CA",

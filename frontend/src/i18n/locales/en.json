@@ -234,6 +234,7 @@
     "viewCertificate": "View Certificate",
     "aboutCSRs": "About CSRs",
     "serial": "Serial",
+    "serialHex": "Serial (hex)",
     "codeSigning": "Code Signing",
     "custom": "Custom",
     "ca": "CA",
