@@ -256,6 +256,8 @@ class WebhookService:
     # Templates
     TEMPLATE_CREATED = 'template.created'
     TEMPLATE_UPDATED = 'template.updated'
+    # ACME client
+    ACME_PREFLIGHT = 'acme.preflight'
 
     ALL_EVENTS = [
         CERT_ISSUED, CERT_REVOKED, CERT_RENEWED, CERT_EXPIRING,
@@ -263,6 +265,7 @@ class WebhookService:
         CA_CREATED, CA_UPDATED, CA_DELETED,
         CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED,
         TEMPLATE_CREATED, TEMPLATE_UPDATED,
+        ACME_PREFLIGHT,
     ]
 
     # Retry policy for asynchronous delivery
@@ -547,6 +550,26 @@ def emit_template_created(template: dict, actor: str = None):
 
 def emit_template_updated(template: dict, actor: str = None):
     _emit(WebhookService.TEMPLATE_UPDATED, {'template': template}, None, _meta(actor))
+
+
+def emit_acme_preflight(
+    domains: list,
+    ok: bool,
+    mode: str,
+    steps: list,
+    actor: str = None,
+):
+    _emit(
+        WebhookService.ACME_PREFLIGHT,
+        {
+            'domains': domains,
+            'ok': ok,
+            'mode': mode,
+            'steps': steps,
+        },
+        None,
+        _meta(actor),
+    )
 
 
 # Backward-compatible aliases (previous names)
