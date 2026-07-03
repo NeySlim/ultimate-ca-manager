@@ -361,7 +361,7 @@ if (-not $DryRun) {{
 def _host_ca_script_windows(pub_key, ca_label, hostname):
     ps_pub_key = pub_key.replace("'", "''")
     ps_label = ca_label.replace("'", "''")
-    hostname_init = hostname if hostname else ''
+    hostname_init = (hostname if hostname else '').replace("'", "''")
     return rf'''<#
 .SYNOPSIS
     SSH Host CA Trust Setup Script (Windows OpenSSH Server)

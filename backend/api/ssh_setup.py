@@ -14,6 +14,7 @@ Security:
 import logging
 from flask import Blueprint, request, Response
 
+from api.v2.ssh.validation import validate_setup_hostname
 from models.ssh import SSHCertificateAuthority
 from services.ssh_ca_service import SSHCAService
 
@@ -49,6 +50,13 @@ def get_public_setup_script(refid):
             ca_type = ca.ca_type
 
         hostname = request.args.get('hostname', '').strip()
+        hostname_err = validate_setup_hostname(hostname)
+        if hostname_err:
+            return Response(
+                '#!/bin/sh\necho "Error: Invalid hostname format"\nexit 1\n',
+                status=400,
+                mimetype='text/x-shellscript',
+            )
 
         platform = request.args.get('platform', 'unix').strip().lower()
         if platform not in ('unix', 'linux', 'macos', 'windows'):

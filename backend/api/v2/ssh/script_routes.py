@@ -13,6 +13,7 @@ from models.ssh import SSHCertificateAuthority
 
 from .helpers import bp, logger
 from .setup_scripts import _generate_setup_script
+from .validation import validate_setup_hostname
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>/public-key', methods=['GET'])
@@ -58,8 +59,9 @@ def get_ssh_ca_setup_script(ca_id):
             ca_type = ca.ca_type
 
         hostname = request.args.get('hostname', '').strip()
-        if hostname and not re.match(r'^[a-zA-Z0-9._-]+$', hostname):
-            return error_response('Invalid hostname format', 400)
+        hostname_err = validate_setup_hostname(hostname)
+        if hostname_err:
+            return error_response(hostname_err, 400)
 
         platform = request.args.get('platform', 'unix').strip().lower()
         if platform not in ('unix', 'linux', 'macos', 'windows'):

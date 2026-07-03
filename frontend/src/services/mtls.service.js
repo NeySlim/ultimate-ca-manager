@@ -14,4 +14,11 @@ export const mtlsService = {
   revokeCertificate: (id) => apiClient.delete(`/mtls/certificates/${id}`),
   downloadCertificate: (id, format = 'pem') =>
     apiClient.get(`/mtls/certificates/${id}/download${buildQueryString({ format })}`),
+
+  downloadCertificatePkcs12: (id, password) =>
+    apiClient.post(
+      `/mtls/certificates/${id}/download`,
+      { format: 'pkcs12', password },
+      { responseType: 'blob' },
+    ),
 }
