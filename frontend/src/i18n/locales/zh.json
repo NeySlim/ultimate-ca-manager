@@ -2440,7 +2440,7 @@
     "securityKey": "安全密钥",
     "mtlsCertCreated": "mTLS 证书创建成功",
     "mtlsCertCreateFailed": "创建 mTLS 证书失败",
-    "mtlsDownloadWarning": "请立即保存私钥。",
+    "mtlsDownloadWarning": "请保存下方的 PEM 证书和私钥，或使用密码下载 PKCS#12（.p12）文件以导入浏览器或密钥链。",
     "mtlsCertManaged": "此证书由UCM管理。您可以随时从用户证书下载。",
     "downloadPEM": "下载PEM",
     "manageAllCertificates": "管理所有证书",

@@ -214,7 +214,6 @@ def create_mtls_certificate():
             username=user.username,
         )
 
-        # Read back the PEM cert and key for the response
         cert_pem = base64.b64decode(cert_obj.crt).decode('utf-8') if cert_obj.crt else ''
         key_pem = ''
         key_file = cert_key_path(cert_obj)
@@ -248,7 +247,9 @@ def create_mtls_certificate():
         )
 
         return created_response(data={
-            'id': cert_obj.id,
+            # AuthCertificate id — used by list/download/export in Mon compte → mTLS
+            'id': auth_cert.id,
+            'certificate_id': cert_obj.id,
             'name': cert_name,
             'serial': cert_obj.serial_number or '',
             'certificate': cert_pem,
@@ -294,14 +295,30 @@ def delete_mtls_certificate(cert_id):
     return success_response(message='Certificate deleted')
 
 
-@bp.route('/certificates/<int:cert_id>/download', methods=['GET'])
+@bp.route('/certificates/<int:cert_id>/download', methods=['GET', 'POST'])
 @require_auth()
 def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
 
     user = g.current_user
-    fmt = request.args.get('format', 'pem')
-    password = request.args.get('password', '')
+    if request.method == 'POST' and request.is_json:
+        data = request.get_json() or {}
+        fmt = str(data.get('format', 'pem')).lower()
+        password = data.get('password', '')
+    else:
+        fmt = request.args.get('format', 'pem')
+        password = request.args.get('password', '')
+        # SECURITY: never accept PKCS12 passwords via query string (proxy logs).
+        if password or fmt in ('p12', 'pkcs12'):
+            if password:
+                logger.warning(
+                    'Rejected mTLS PKCS12 download with password in query string (cert_id=%s)',
+                    cert_id,
+                )
+            return error_response(
+                'PKCS12 export requires POST with JSON body (format, password)',
+                400,
+            )
 
     # Authorize via auth_certificates ownership (not string match on subject)
     auth_cert = AuthCertificate.query.filter_by(id=cert_id, user_id=user.id).first()

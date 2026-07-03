@@ -39,6 +39,7 @@ export function ExportModal({
   hasPrivateKey = false,
   canExportKey = false,
   isHsmBacked = false,
+  defaultFormat = 'pem',
   onExport,
 }) {
   const { t } = useTranslation()
@@ -51,13 +52,13 @@ export function ExportModal({
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setFormat('pem')
+      setFormat(defaultFormat)
       setIncludeChain(true)
       setIncludeKey(false)
       setPassword('')
       setExporting(false)
     }
-  }, [open])
+  }, [open, defaultFormat])
 
   // PKCS12 always includes key — sync state
   const isPkcs12 = format === 'pkcs12'
@@ -74,7 +75,7 @@ export function ExportModal({
   })
 
   const handleExport = async () => {
-    if (needsPassword && password.length < 4) return
+    if (needsPassword && password.length < 8) return
     setExporting(true)
     try {
       await onExport(format, {
@@ -220,7 +221,7 @@ export function ExportModal({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={t('export.passwordPlaceholder', 'Min. 4 characters')}
+                placeholder={t('export.passwordPlaceholder', 'Min. 8 characters')}
                 autoFocus
                 className={cn(
                   'w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-bg-primary text-text-primary',
@@ -238,7 +239,7 @@ export function ExportModal({
           </Button>
           <Button
             type="submit"
-            disabled={exporting || (needsPassword && password.length < 4)}
+            disabled={exporting || (needsPassword && password.length < 8)}
           >
             <Download size={16} />
             {exporting ? t('common.exporting', 'Exporting...') : t('export.download', 'Download')}
