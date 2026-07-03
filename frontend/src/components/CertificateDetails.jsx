@@ -18,7 +18,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAppTimezone } from '../stores/timezoneStore'
-import { formatDate as formatDateUtil } from '../lib/utils'
+import { formatDate as formatDateUtil, formatSerialNumberHex } from '../lib/utils'
 import { 
   Certificate, 
   Key, 
@@ -131,6 +131,7 @@ export function CertificateDetails({
   if (!certificate) return null
   
   const cert = certificate
+  const serialHex = formatSerialNumberHex(cert.serial_number)
   const status = cert.revoked ? 'revoked' : (cert.status || 'valid')
   
   // Status badge config
@@ -284,6 +285,9 @@ export function CertificateDetails({
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label={t('common.serial')} value={cert.serial_number} mono copyable />
+          {serialHex && (
+            <CompactField icon={Hash} label={t('common.serialHex')} value={serialHex} mono copyable />
+          )}
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={cert.key_type} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
           <CompactField autoIcon="certType" label={t('details.certType')} value={formatCertType(cert.cert_type, t)} />

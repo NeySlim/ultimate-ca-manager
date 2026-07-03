@@ -5,6 +5,7 @@ import {
   extractCN, 
   extractData, 
   formatDate,
+  formatSerialNumberHex,
   exportToCSV,
   exportToJSON
 } from '../utils'
@@ -99,6 +100,29 @@ describe('utils', () => {
 
     it('returns custom fallback', () => {
       expect(extractData(null, 'key', 'default')).toBe('default')
+    })
+  })
+
+  describe('formatSerialNumberHex', () => {
+    it('formats decimal serial as colon-separated hex', () => {
+      expect(formatSerialNumberHex('406584939640065587371689749107479415526363616011'))
+        .toBe('47:37:E6:35:30:D7:EA:91:39:2B:51:4E:34:55:DB:E2:2E:A1:D3:0B')
+    })
+
+    it('normalizes compact hex', () => {
+      expect(formatSerialNumberHex('4737E63530D7EA91392B514E3455DBE22EA1D30B'))
+        .toBe('47:37:E6:35:30:D7:EA:91:39:2B:51:4E:34:55:DB:E2:2E:A1:D3:0B')
+    })
+
+    it('normalizes colon-separated hex', () => {
+      expect(formatSerialNumberHex('47:37:e6:35:30:d7:ea:91:39:2b:51:4e:34:55:db:e2:2e:a1:d3:0b'))
+        .toBe('47:37:E6:35:30:D7:EA:91:39:2B:51:4E:34:55:DB:E2:2E:A1:D3:0B')
+    })
+
+    it('returns null for empty or invalid input', () => {
+      expect(formatSerialNumberHex(null)).toBeNull()
+      expect(formatSerialNumberHex('')).toBeNull()
+      expect(formatSerialNumberHex('not-a-serial')).toBeNull()
     })
   })
 
