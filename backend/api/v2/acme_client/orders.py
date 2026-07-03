@@ -3,6 +3,7 @@ ACME Client Orders Routes
 GET    /api/v2/acme/client/orders
 GET    /api/v2/acme/client/orders/<id>
 POST   /api/v2/acme/client/request
+POST   /api/v2/acme/client/preflight
 POST   /api/v2/acme/client/orders/<id>/verify
 GET    /api/v2/acme/client/orders/<id>/status
 POST   /api/v2/acme/client/orders/<id>/finalize
@@ -745,3 +746,88 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
     thread = threading.Thread(target=_worker, name=f'acme-autopoll-{order_id}', daemon=True)
     thread.start()
     logger.info(f'Started background auto-poll thread for order {order_id}')
+
+
+@bp.route('/api/v2/acme/client/preflight', methods=['POST'])
+@require_auth(['write:acme'])
+def preflight_certificate():
+    """
+    Dry-run / preflight validation for an ACME certificate request.
+
+    Uses the Let's Encrypt staging directory (or validate-only for custom CAs)
+    without changing global ACME settings or consuming production rate limits.
+    """
+    data = request.json
+    if not data:
+        return error_response('Request body required', 400)
+
+    domains = data.get('domains', [])
+    if not domains or not isinstance(domains, list):
+        return error_response('At least one domain is required', 400)
+
+    email = data.get('email')
+    if not email:
+        email_cfg = SystemConfig.query.filter_by(key='acme.client.email').first()
+        if email_cfg:
+            email = email_cfg.value
+
+    challenge_type = data.get('challenge_type', 'dns-01')
+    if challenge_type not in ('dns-01', 'http-01'):
+        return error_response('Challenge type must be dns-01 or http-01', 400)
+
+    mode = (data.get('mode') or 'full').lower()
+    if mode not in ('full', 'validate_only'):
+        return error_response('mode must be full or validate_only', 400)
+
+    acme_account_id = data.get('acme_account_id')
+    if acme_account_id not in (None, ''):
+        try:
+            acme_account_id = int(acme_account_id)
+        except (TypeError, ValueError):
+            return error_response('acme_account_id must be an integer', 400)
+    else:
+        acme_account_id = None
+
+    dns_provider_id = data.get('dns_provider_id')
+    if dns_provider_id not in (None, ''):
+        try:
+            dns_provider_id = int(dns_provider_id)
+        except (TypeError, ValueError):
+            return error_response('dns_provider_id must be an integer', 400)
+    else:
+        dns_provider_id = None
+
+    key_source = (data.get('key_source') or 'generate').lower()
+    csr_pem = data.get('csr_pem') or data.get('csr')
+
+    from services.acme.acme_preflight_service import AcmePreflightService
+    from services.webhook_service import emit_acme_preflight
+
+    report = AcmePreflightService.run(
+        domains=domains,
+        email=email,
+        challenge_type=challenge_type,
+        dns_provider_id=dns_provider_id,
+        acme_account_id=acme_account_id,
+        key_source=key_source,
+        csr_pem=csr_pem,
+        verify_dns=bool(data.get('verify_dns')),
+        mode=mode,
+    )
+
+    emit_acme_preflight(
+        domains=domains,
+        ok=report['ok'],
+        mode=mode,
+        steps=report['steps'],
+    )
+
+    AuditService.log_action(
+        action='acme_preflight',
+        resource_type='acme_order',
+        resource_name=', '.join(domains),
+        details=f"Preflight {'passed' if report['ok'] else 'failed'} ({mode})",
+        success=report['ok'],
+    )
+
+    return success_response(data=report)
