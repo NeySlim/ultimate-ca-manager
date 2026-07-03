@@ -58,6 +58,8 @@ export default function AccountPage() {
   const [showMTLSModal, setShowMTLSModal] = useState(false)
   const [mtlsCreating, setMtlsCreating] = useState(false)
   const [mtlsResult, setMtlsResult] = useState(null)
+  const [mtlsP12Password, setMtlsP12Password] = useState('')
+  const [mtlsP12Downloading, setMtlsP12Downloading] = useState(false)
   const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
   const [mtlsTab, setMtlsTab] = useState('generate')
   const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
@@ -394,6 +396,8 @@ export default function AccountPage() {
   const handleCloseMTLSModal = () => {
     setShowMTLSModal(false)
     setMtlsResult(null)
+    setMtlsP12Password('')
+    setMtlsP12Downloading(false)
     setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
     setMtlsImportForm({ name: '', pem: '' })
     setMtlsTab('generate')
@@ -463,10 +467,38 @@ export default function AccountPage() {
     }
   }
 
+  const handleDownloadMTLSPkcs12 = async (certId, certName, password) => {
+    if (!password || password.length < 8) {
+      showError(t('certificates.pkcs12PasswordRequired'))
+      return
+    }
+    setMtlsP12Downloading(true)
+    try {
+      const blob = await accountService.downloadMTLSCertificate(certId, {
+        format: 'pkcs12',
+        password,
+      })
+      downloadBlob(blob, `${certName || 'mtls-cert'}.p12`)
+      showSuccess(t('userCertificates.exportSuccess'))
+    } catch (error) {
+      showError(error.message || t('userCertificates.exportError'))
+    } finally {
+      setMtlsP12Downloading(false)
+    }
+  }
+
   const handleExportCert = async (format, options) => {
     if (!exportCert) return
     try {
-      const blob = await userCertificatesService.export(exportCert.id, format, options)
+      let blob
+      if (format === 'pkcs12' || format === 'p12') {
+        blob = await accountService.downloadMTLSCertificate(exportCert.id, {
+          format: 'pkcs12',
+          password: options.password,
+        })
+      } else {
+        blob = await userCertificatesService.export(exportCert.id, format, options)
+      }
       const extMap = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', key: 'key', jks: 'jks' }
       downloadBlob(blob, `${exportCert.name || 'certificate'}.${extMap[format] || 'pem'}`)
       showSuccess(t('userCertificates.exportSuccess'))
@@ -1065,6 +1097,10 @@ export default function AccountPage() {
               <div className="p-3 rounded-lg bg-status-success-op10 text-sm text-status-success font-medium">
                 {t('account.mtlsCertCreated')}
               </div>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-bg-secondary text-xs text-text-secondary">
+                <ShieldCheck size={16} weight="fill" className="flex-shrink-0 mt-0.5 text-status-success" />
+                <span>{t('account.mtlsDownloadWarning')}</span>
+              </div>
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-text-secondary font-medium">{t('common.certificate')}</label>
@@ -1087,15 +1123,38 @@ export default function AccountPage() {
                   <span>{t('account.mtlsCertManaged')}</span>
                 </div>
               </div>
-              <div className="flex justify-between pt-4 border-t border-border">
-                <Button type="button" variant="outline" size="sm" onClick={() => {
-                  const pem = (mtlsResult.certificate || '') + '\n' + (mtlsResult.private_key || '')
-                  const blob = new Blob([pem], { type: 'application/x-pem-file' })
-                  downloadBlob(blob, `${mtlsResult.name || 'mtls-cert'}.pem`)
-                }}>
-                  <Download size={16} className="mr-1" />
-                  {t('account.downloadPEM')}
-                </Button>
+              <Input
+                type="password"
+                label={t('export.password')}
+                value={mtlsP12Password}
+                onChange={(e) => setMtlsP12Password(e.target.value)}
+                helperText={t('export.formatP12Desc')}
+              />
+              <div className="flex flex-wrap gap-2 justify-between pt-4 border-t border-border">
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
+                    const pem = (mtlsResult.certificate || '') + '\n' + (mtlsResult.private_key || '')
+                    const blob = new Blob([pem], { type: 'application/x-pem-file' })
+                    downloadBlob(blob, `${mtlsResult.name || 'mtls-cert'}.pem`)
+                  }}>
+                    <Download size={16} className="mr-1" />
+                    {t('account.downloadPEM')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    loading={mtlsP12Downloading}
+                    disabled={mtlsP12Downloading || mtlsP12Password.length < 8}
+                    onClick={() => handleDownloadMTLSPkcs12(
+                      mtlsResult.id,
+                      mtlsResult.name,
+                      mtlsP12Password,
+                    )}
+                  >
+                    <Download size={16} className="mr-1" />
+                    {t('export.formats.pkcs12')}
+                  </Button>
+                </div>
                 <Button type="button" variant="secondary" onClick={handleCloseMTLSModal}>
                   {t('common.close')}
                 </Button>
@@ -1277,6 +1336,7 @@ export default function AccountPage() {
         entityName={exportCert?.name || ''}
         hasPrivateKey={exportCert?.hasPrivateKey || false}
         canExportKey={true}
+        defaultFormat="pem"
         onExport={handleExportCert}
       />
     </>

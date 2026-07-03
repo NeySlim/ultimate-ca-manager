@@ -2440,7 +2440,7 @@
     "securityKey": "Chiave di Sicurezza",
     "mtlsCertCreated": "Certificato mTLS creato con successo",
     "mtlsCertCreateFailed": "Errore nella creazione del certificato mTLS",
-    "mtlsDownloadWarning": "Salva la chiave privata ora — non sarà recuperabile in seguito.",
+    "mtlsDownloadWarning": "Salva il certificato PEM e la chiave privata qui sotto, oppure scarica un file PKCS#12 (.p12) con password per l'import nel browser o portachiavi.",
     "mtlsCertManaged": "Questo certificato è gestito da UCM. Puoi scaricarlo in qualsiasi momento da Certificati utente.",
     "downloadPEM": "Scarica PEM",
     "manageAllCertificates": "Gestisci tutti i certificati",

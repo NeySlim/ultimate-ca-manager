@@ -132,6 +132,10 @@ class TestMTLSCertificates:
         r = auth_client.get('/api/v2/mtls/certificates/99999/download')
         assert r.status_code == 404
 
+    def test_download_pkcs12_requires_post(self, auth_client):
+        r = auth_client.get('/api/v2/mtls/certificates/1/download?format=pkcs12&password=secret123')
+        assert r.status_code == 400
+
 
 # ============================================================
 # Enrollment
