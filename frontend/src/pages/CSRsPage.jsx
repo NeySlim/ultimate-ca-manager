@@ -22,6 +22,7 @@ import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
+import { getSanValidationError } from '../lib/sanValidate'
 import { VALIDITY } from '../constants/config'
 export default function CSRsPage() {
   const { t } = useTranslation()
@@ -262,6 +263,13 @@ export default function CSRsPage() {
   const handleGenerate = async () => {
     if (!genCN.trim()) {
       showError(t('certificates.cnRequired'))
+      return
+    }
+    const sanError = genSans
+      .map((s) => getSanValidationError(s.type, s.value))
+      .find(Boolean)
+    if (sanError) {
+      showError(t(sanError.key, sanError.params))
       return
     }
     setGenerating(true)
@@ -1010,8 +1018,9 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             options={[
               { value: 'RSA 2048', label: 'RSA 2048' },
               { value: 'RSA 4096', label: 'RSA 4096' },
-              { value: 'EC P-256', label: 'EC P-256' },
-              { value: 'EC P-384', label: 'EC P-384' },
+              { value: 'EC P-256', label: 'NIST P-256 (ECDSA)' },
+              { value: 'EC P-384', label: 'NIST P-384 (ECDSA)' },
+              { value: 'EC P-521', label: 'NIST P-521 (ECDSA)' },
             ]}
             value={genKeyType}
             onChange={setGenKeyType}

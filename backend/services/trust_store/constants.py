@@ -13,6 +13,7 @@ KEY_TYPES = {
     '4096': ('rsa', 4096),
     '8192': ('rsa', 8192),
     'prime256v1': ('ec', ec.SECP256R1()),
+    'secp256r1': ('ec', ec.SECP256R1()),
     'secp384r1': ('ec', ec.SECP384R1()),
     'secp521r1': ('ec', ec.SECP521R1()),
 }

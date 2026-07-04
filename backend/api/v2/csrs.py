@@ -159,67 +159,28 @@ def create_csr():
             if not is_valid:
                 return error_response(error, 400)
             
-        # Parse key type (Frontend sends "RSA 2048")
-        key_algo_full = data.get('key_type', 'RSA 2048')
-        # Simple parser
-        if 'RSA' in key_algo_full:
-            key_type = key_algo_full.replace('RSA', '').strip() or '2048'
-            if key_type not in ('2048', '3072', '4096'):
-                return error_response('RSA key size must be 2048, 3072, or 4096', 400)
-        elif 'EC' in key_algo_full:
-            key_type = key_algo_full.replace('EC', '').strip() or 'secp256r1'
-            if key_type not in ('secp256r1', 'secp384r1', 'secp521r1', 'prime256v1'):
-                return error_response('EC curve must be secp256r1, secp384r1, or secp521r1', 400)
-        else:
-            key_type = '2048'
+        # Parse key type (Frontend: "RSA 2048", "EC P-256", etc.)
+        from utils.key_type import parse_csr_key_type
+        try:
+            key_type = parse_csr_key_type(data.get('key_type', 'RSA 2048'))
+        except ValueError as exc:
+            return error_response(str(exc), 400)
 
-        # Parse SANs - frontend sends ["DNS:example.com", "IP:1.2.3.4", "Email:user@example.com", "UPN:user@domain"]
-        from utils.upn_san import is_valid_upn
-        san_dns = []
-        san_ip = []
-        san_email = []
-        san_uri = []
-        san_upn = []
-        for entry in data.get('sans', []):
-            entry = entry.strip()
-            entry_lower = entry.lower()
-            if entry_lower.startswith('email:'):
-                val = entry[6:].strip()
-                if val:
-                    san_email.append(val)
-                continue
-            if entry_lower.startswith('uri:'):
-                val = entry[4:].strip()
-                if val:
-                    san_uri.append(val)
-                continue
-            if entry_lower.startswith('upn:'):
-                val = entry[4:].strip()
-                if val:
-                    if not is_valid_upn(val):
-                        return error_response(f'Invalid UPN format: {val}', 400)
-                    san_upn.append(val)
-                continue
-            # Strip DNS:/IP: prefix for remaining
-            entry_clean = re.sub(r'^(DNS|IP):\s*', '', entry, flags=re.IGNORECASE)
-            if not entry_clean:
-                continue
-            try:
-                from ipaddress import ip_address
-                ip_address(entry_clean)
-                san_ip.append(entry_clean)
-            except ValueError:
-                san_dns.append(entry_clean)
+        # Parse SANs - frontend sends ["DNS:example.com", "IP:1.2.3.4", ...]
+        from utils.san_parse import parse_csr_san_entries
+        san_buckets, san_error = parse_csr_san_entries(data.get('sans', []))
+        if san_error:
+            return error_response(san_error, 400)
 
         cert = CertificateService.generate_csr(
             descr=f"CSR for {data['cn']}",
             dn=dn,
             key_type=key_type,
-            san_dns=san_dns or None,
-            san_ip=san_ip or None,
-            san_email=san_email or None,
-            san_uri=san_uri or None,
-            san_upn=san_upn or None,
+            san_dns=san_buckets['san_dns'] or None,
+            san_ip=san_buckets['san_ip'] or None,
+            san_email=san_buckets['san_email'] or None,
+            san_uri=san_buckets['san_uri'] or None,
+            san_upn=san_buckets['san_upn'] or None,
             username=getattr(g, 'current_user', None) and g.current_user.username or 'system'
         )
         
