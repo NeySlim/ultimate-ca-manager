@@ -254,7 +254,45 @@ class TestCreateCSR:
     def test_create_csr_ec_key(self, auth_client):
         r = _create_csr(auth_client, cn='ec-test.example.com',
                         key_type='EC P-256')
-        assert r.status_code in (200, 201, 400, 500)
+        assert r.status_code in (200, 201)
+
+    def test_create_csr_ec_p521(self, auth_client):
+        r = _create_csr(auth_client, cn='ec521-test.example.com',
+                        key_type='EC P-521')
+        assert r.status_code in (200, 201)
+
+    def test_create_csr_ec_invalid_curve(self, auth_client):
+        r = _create_csr(auth_client, cn='ec-bad.example.com',
+                        key_type='EC secp256k1')
+        assert r.status_code == 400
+
+    def test_create_csr_rejects_fqdn_in_ip_san(self, auth_client):
+        r = _create_csr(auth_client, cn='san-ip-fqdn.example.com',
+                        sans=['IP:www.example.org'])
+        assert r.status_code == 400
+        assert b'DNS type' in r.data
+
+    def test_create_csr_rejects_ip_in_dns_san(self, auth_client):
+        r = _create_csr(auth_client, cn='san-dns-ip.example.com',
+                        sans=['DNS:10.0.0.1'])
+        assert r.status_code == 400
+        assert b'IP type' in r.data
+
+    def test_create_csr_rejects_hostname_in_email_san(self, auth_client):
+        r = _create_csr(auth_client, cn='san-email-host.example.com',
+                        sans=['Email:www.example.org'])
+        assert r.status_code == 400
+
+    def test_create_csr_rejects_bare_fqdn_in_uri_san(self, auth_client):
+        r = _create_csr(auth_client, cn='san-uri-host.example.com',
+                        sans=['URI:www.example.org'])
+        assert r.status_code == 400
+        assert b'scheme' in r.data
+
+    def test_create_csr_rejects_invalid_upn_san(self, auth_client):
+        r = _create_csr(auth_client, cn='san-upn-bad.example.com',
+                        sans=['UPN:invalid'])
+        assert r.status_code == 400
 
 
 # ============================================================
