@@ -4,7 +4,7 @@ import logging
 from flask import request, g, current_app
 from models import db
 from models.api_key import APIKey
-from auth.unified import AuthManager, require_auth
+from auth.unified import AuthManager, require_auth, has_permission
 from auth.permissions import get_role_permissions
 from services.audit_service import AuditService
 from utils.response import success_response, error_response, created_response
@@ -79,6 +79,12 @@ def create_api_key():
                 return error_response(f'Invalid permission resource: {resource}', 400)
         else:
             return error_response(f'Invalid permission format: {perm}', 400)
+
+        if not has_permission(perm, user_perms):
+            return error_response(
+                f'Cannot grant permission you do not have: {perm}',
+                403,
+            )
 
     # Check limit (max 10 keys per user by default)
     max_keys = current_app.config.get('API_KEY_MAX_PER_USER', 10)
