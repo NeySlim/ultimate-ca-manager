@@ -989,8 +989,10 @@ class AcmeClientService:
     def finalize_order(self, order: AcmeClientOrder) -> Tuple[bool, str, Optional[int]]:
         """
         Finalize order and download certificate.
-        Supports configurable key types (RSA-2048/4096, ECDSA P-256/P-384).
-        
+        Supports configurable key types (RSA-2048/4096, ECDSA P-256/P-384),
+        external CSR (key_source=csr), and private key reuse on renewal
+        (key_source=reuse).
+
         Returns:
             Tuple of (success, message, certificate_id)
         """
@@ -999,45 +1001,52 @@ class AcmeClientService:
             status, data = self.check_order_status(order)
             if status != 'ready':
                 return False, f"Order not ready for finalization (status: {status})", None
-            
-            # Generate CSR
+
             domains = order.domains_list
             primary_domain = domains[0]
-            
-            # Determine key type from order or settings
-            key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
-            key_generator = CERT_KEY_TYPES.get(key_type, CERT_KEY_TYPES['RSA-2048'])
-            cert_key = key_generator()
-            
-            # Pick hash algorithm based on key type
-            if isinstance(cert_key, ec.EllipticCurvePrivateKey):
-                if isinstance(cert_key.curve, ec.SECP384R1):
-                    hash_alg = hashes.SHA384()
+            key_source = (getattr(order, 'key_source', None) or 'generate').lower()
+            cert_key = None
+            csr_b64 = None
+
+            if key_source == 'csr':
+                if not order.csr_pem:
+                    return False, 'External CSR not stored on order', None
+                from utils.acme_csr import (
+                    load_pem_csr,
+                    csr_domains_match_order,
+                    csr_to_b64url_der,
+                )
+                try:
+                    csr = load_pem_csr(order.csr_pem)
+                except ValueError as exc:
+                    return False, str(exc), None
+                match_ok, match_msg = csr_domains_match_order(csr, domains)
+                if not match_ok:
+                    return False, match_msg, None
+                csr_b64 = csr_to_b64url_der(csr)
+            elif key_source == 'reuse':
+                from utils.acme_csr import load_private_key_from_certificate
+                from models import Certificate
+                src_id = order.source_certificate_id or order.certificate_id
+                if not src_id:
+                    # First issuance: generate a key; renewals reuse it via source_certificate_id.
+                    key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+                    key_generator = CERT_KEY_TYPES.get(key_type, CERT_KEY_TYPES['RSA-2048'])
+                    cert_key = key_generator()
+                    csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
                 else:
-                    hash_alg = hashes.SHA256()
+                    src_cert = Certificate.query.get(src_id)
+                    try:
+                        cert_key = load_private_key_from_certificate(src_cert)
+                    except ValueError as exc:
+                        return False, str(exc), None
+                    csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
             else:
-                hash_alg = hashes.SHA256()
-            
-            # Build CSR — CN must match a SAN exactly, otherwise LE treats it
-            # as an extra identifier and rejects the CSR (wildcard bug #34)
-            subject = x509.Name([
-                x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
-            ])
-            
-            # Add SANs
-            san_list = [x509.DNSName(d) for d in domains]
-            
-            csr = x509.CertificateSigningRequestBuilder().subject_name(
-                subject
-            ).add_extension(
-                x509.SubjectAlternativeName(san_list),
-                critical=False
-            ).sign(cert_key, hash_alg, default_backend())
-            
-            # Encode CSR as base64url DER
-            csr_der = csr.public_bytes(Encoding.DER)
-            csr_b64 = base64.urlsafe_b64encode(csr_der).rstrip(b'=').decode()
-            
+                key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+                key_generator = CERT_KEY_TYPES.get(key_type, CERT_KEY_TYPES['RSA-2048'])
+                cert_key = key_generator()
+                csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
+
             # Submit CSR to finalize URL
             resp = self._post(order.finalize_url, {"csr": csr_b64})
             
@@ -1070,14 +1079,16 @@ class AcmeClientService:
                 return False, "Failed to download certificate", None
             
             cert_pem = cert_resp.text
-            
-            # Store private key
-            key_pem = cert_key.private_bytes(
-                encoding=Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption()
-            ).decode()
-            
+
+            # Store private key (not available for external CSR-only issuance)
+            key_pem = None
+            if cert_key is not None:
+                key_pem = cert_key.private_bytes(
+                    encoding=Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption()
+                ).decode()
+
             # Import into UCM certificate store
             cert_id = self._import_certificate(
                 cert_pem=cert_pem,
@@ -1183,6 +1194,31 @@ class AcmeClientService:
         cfg = SystemConfig.query.filter_by(key='acme.client.key_type').first()
         kt = cfg.value if cfg else 'RSA-2048'
         return kt if kt in CERT_KEY_TYPES else 'RSA-2048'
+
+    @staticmethod
+    def _build_csr_b64(cert_key, domains: List[str], primary_domain: str) -> str:
+        """Build a CSR for the given domains and return base64url DER."""
+        if isinstance(cert_key, ec.EllipticCurvePrivateKey):
+            if isinstance(cert_key.curve, ec.SECP384R1):
+                hash_alg = hashes.SHA384()
+            else:
+                hash_alg = hashes.SHA256()
+        else:
+            hash_alg = hashes.SHA256()
+
+        subject = x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
+        ])
+        san_list = [x509.DNSName(d) for d in domains]
+        csr = x509.CertificateSigningRequestBuilder().subject_name(
+            subject
+        ).add_extension(
+            x509.SubjectAlternativeName(san_list),
+            critical=False,
+        ).sign(cert_key, hash_alg, default_backend())
+
+        csr_der = csr.public_bytes(Encoding.DER)
+        return base64.urlsafe_b64encode(csr_der).rstrip(b'=').decode()
     
     # =========================================================================
     # Cleanup

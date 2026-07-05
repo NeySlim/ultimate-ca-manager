@@ -210,10 +210,39 @@ def request_certificate():
     if has_wildcard and challenge_type != 'dns-01':
         return error_response('Wildcard domains require DNS-01 challenge', 400)
 
-    # Key type for certificate
+    # Key type for certificate (ignored when key_source=csr)
     key_type = data.get('key_type')
     if key_type and key_type not in ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384']:
         return error_response('Invalid key type', 400)
+
+    key_source = (data.get('key_source') or 'generate').lower()
+    if key_source not in ('generate', 'reuse', 'csr'):
+        return error_response('key_source must be generate, reuse, or csr', 400)
+
+    csr_pem = data.get('csr_pem') or data.get('csr')
+    if key_source == 'csr':
+        if not csr_pem:
+            return error_response('csr_pem is required when key_source is csr', 400)
+        from utils.acme_csr import load_pem_csr, csr_domains_match_order
+        try:
+            csr = load_pem_csr(csr_pem)
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+        match_ok, match_msg = csr_domains_match_order(csr, domains)
+        if not match_ok:
+            return error_response(match_msg, 400)
+    elif csr_pem:
+        return error_response('csr_pem is only valid when key_source is csr', 400)
+
+    if key_source == 'reuse' and data.get('source_certificate_id'):
+        from models import Certificate
+        try:
+            src_id = int(data['source_certificate_id'])
+        except (TypeError, ValueError):
+            return error_response('source_certificate_id must be an integer', 400)
+        src_cert = Certificate.query.get(src_id)
+        if not src_cert or not src_cert.prv:
+            return error_response('source_certificate_id must reference a certificate with a stored private key', 400)
 
     # Create order
     try:
@@ -230,12 +259,17 @@ def request_certificate():
         if not success:
             return error_response(message, 400)
 
-        # Store key_type on order if specified
+        # Persist key options on order
+        order.key_source = key_source
         if key_type:
             order.key_type = key_type
-            ok, _err = safe_commit(logger, "Failed to persist order key_type")
-            if not ok:
-                return _err
+        if key_source == 'csr':
+            order.csr_pem = csr_pem.strip() + '\n'
+        if key_source == 'reuse' and data.get('source_certificate_id'):
+            order.source_certificate_id = int(data['source_certificate_id'])
+        ok, _err = safe_commit(logger, "Failed to persist order key options")
+        if not ok:
+            return _err
 
         AuditService.log_action(
             action='acme_request',

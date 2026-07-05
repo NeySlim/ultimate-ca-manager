@@ -14,49 +14,69 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
     challenge_type: 'dns-01',
     environment: defaultEnvironment,
     acme_account_id: defaultCaAccountId,
-    dns_provider_id: dnsProviders.find(p => p.is_default)?.id || null
+    dns_provider_id: dnsProviders.find(p => p.is_default)?.id || null,
+    key_type: 'RSA-2048',
+    key_source: 'generate',
+    csr_pem: '',
   })
-  
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    
+
     const domainList = formData.domains
       .split(/[,\n]/)
       .map(d => d.trim())
       .filter(d => d)
-    
+
     if (domainList.length === 0) {
       showWarning(t('acme.atLeastOneDomainRequired'))
       return
     }
-    
+
     const domainRegex = /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i
     const invalidDomains = domainList.filter(d => !domainRegex.test(d))
     if (invalidDomains.length > 0) {
       showWarning(t('acme.invalidDomainFormat', { domains: invalidDomains.join(', ') }))
       return
     }
-    
+
     if (formData.challenge_type === 'http-01' && domainList.some(d => d.startsWith('*.'))) {
       showWarning(t('acme.wildcardRequiresDns01'))
       return
     }
-    
+
     if (!formData.email) {
       showWarning(t('common.emailRequired'))
       return
     }
-    
-    onSubmit({
-      ...formData,
-      domains: domainList
-    })
+
+    if (formData.key_source === 'csr' && !formData.csr_pem.trim()) {
+      showWarning(t('acme.csrRequired'))
+      return
+    }
+
+    const payload = {
+      domains: domainList,
+      email: formData.email,
+      challenge_type: formData.challenge_type,
+      environment: formData.environment,
+      acme_account_id: formData.acme_account_id,
+      dns_provider_id: formData.dns_provider_id,
+      key_source: formData.key_source,
+    }
+
+    if (formData.key_source !== 'csr') {
+      payload.key_type = formData.key_type
+    }
+    if (formData.key_source === 'csr') {
+      payload.csr_pem = formData.csr_pem.trim()
+    }
+
+    onSubmit(payload)
   }
 
   const hasCaAccounts = caAccounts.length > 0
   const selectedCa = caAccounts.find(a => a.id === formData.acme_account_id)
-  // A selected account drives the CA; the manual environment selector only
-  // applies to the legacy "no explicit account" Let's Encrypt path.
   const showEnvironmentSelect = !hasCaAccounts || !formData.acme_account_id
   const isProductionContext = selectedCa
     ? selectedCa.environment === 'production'
@@ -73,7 +93,7 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
           </div>
         </div>
       )}
-      
+
       <div>
         <label className="block text-sm font-medium text-text-primary mb-1">
           {t('acme.domains')} <span className="text-red-500">*</span>
@@ -87,7 +107,7 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
         />
         <p className="text-xs text-text-tertiary mt-1">{t('acme.domainsHelper')}</p>
       </div>
-      
+
       <Input
         label={t('acme.contactEmail')}
         type="email"
@@ -96,7 +116,7 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
         required
         helperText={t('acme.contactEmailHelper')}
       />
-      
+
       <Select
         label={t('acme.challengeType')}
         value={formData.challenge_type}
@@ -107,7 +127,7 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
         ]}
         helperText={t('acme.challengeTypeHelper')}
       />
-      
+
       {formData.challenge_type === 'dns-01' && (
         <Select
           label={t('acme.provider')}
@@ -116,15 +136,15 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
           placeholder={t('acme.selectDnsProvider')}
           options={[
             { value: '', label: t('acme.manualDns') },
-            ...dnsProviders.map(p => ({ 
-              value: p.id.toString(), 
+            ...dnsProviders.map(p => ({
+              value: p.id.toString(),
               label: p.name + (p.is_default ? ' (' + t('common.default') + ')' : '')
             }))
           ]}
           helperText={t('acme.dnsProviderHelper')}
         />
       )}
-      
+
       {hasCaAccounts && (
         <Select
           label={t('acme.certificateAuthority')}
@@ -155,20 +175,49 @@ export default function RequestCertificateForm({ onSubmit, onCancel, dnsProvider
           ]}
         />
       )}
-      
+
       <Select
-        label={t('acme.keyType')}
-        value={formData.key_type || 'RSA-2048'}
-        onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
+        label={t('acme.keySource')}
+        value={formData.key_source}
+        onChange={(val) => setFormData(prev => ({ ...prev, key_source: val }))}
         options={[
-          { value: 'RSA-2048', label: 'RSA 2048' },
-          { value: 'RSA-4096', label: 'RSA 4096' },
-          { value: 'EC-P256', label: 'ECDSA P-256' },
-          { value: 'EC-P384', label: 'ECDSA P-384' },
+          { value: 'generate', label: t('acme.keySourceGenerate') },
+          { value: 'reuse', label: t('acme.keySourceReuse') },
+          { value: 'csr', label: t('acme.keySourceCsr') },
         ]}
-        helperText={t('acme.keyTypeHelper')}
+        helperText={t('acme.keySourceHelper')}
       />
-      
+
+      {formData.key_source === 'csr' && (
+        <div>
+          <label className="block text-sm font-medium text-text-primary mb-1">
+            {t('acme.csrPem')} <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            className="w-full h-32 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-mono resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"
+            value={formData.csr_pem}
+            onChange={(e) => setFormData(prev => ({ ...prev, csr_pem: e.target.value }))}
+            placeholder="-----BEGIN CERTIFICATE REQUEST-----"
+          />
+          <p className="text-xs text-text-tertiary mt-1">{t('acme.csrPemHelper')}</p>
+        </div>
+      )}
+
+      {formData.key_source !== 'csr' && (
+        <Select
+          label={t('acme.keyType')}
+          value={formData.key_type || 'RSA-2048'}
+          onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
+          options={[
+            { value: 'RSA-2048', label: 'RSA 2048' },
+            { value: 'RSA-4096', label: 'RSA 4096' },
+            { value: 'EC-P256', label: 'ECDSA P-256' },
+            { value: 'EC-P384', label: 'ECDSA P-384' },
+          ]}
+          helperText={t('acme.keyTypeHelper')}
+        />
+      )}
+
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}

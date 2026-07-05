@@ -330,6 +330,9 @@ class AcmeClientOrder(db.Model):
     challenge_type = db.Column(db.String(20), nullable=False, default='dns-01')  # http-01, dns-01
     environment = db.Column(db.String(20), nullable=False, default='staging')  # staging, production
     key_type = db.Column(db.String(20), default='RSA-2048')  # RSA-2048, RSA-4096, EC-P256, EC-P384
+    key_source = db.Column(db.String(20), default='generate', nullable=False)  # generate, reuse, csr
+    csr_pem = db.Column(db.Text)  # PEM CSR when key_source=csr
+    source_certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))  # reuse key from this cert
     
     # Order status
     status = db.Column(db.String(20), default='pending', nullable=False)
@@ -458,6 +461,9 @@ class AcmeClientOrder(db.Model):
             'challenge_type': self.challenge_type,
             'environment': self.environment,
             'key_type': self.key_type or 'RSA-2048',
+            'key_source': self.key_source or 'generate',
+            'has_csr': bool(self.csr_pem),
+            'source_certificate_id': self.source_certificate_id,
             'status': self.status,
             'order_url': self.order_url,
             'challenges': self.challenges_dict,

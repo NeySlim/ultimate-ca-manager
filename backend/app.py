@@ -1027,6 +1027,9 @@ def init_database(app):
                 ('renewal_failures', 'INTEGER', '0'),
                 ('last_error_at', 'DATETIME', None),
                 ('key_type', "VARCHAR(20)", "'RSA-2048'"),
+                ('key_source', "VARCHAR(20)", "'generate'"),
+                ('csr_pem', 'TEXT', None),
+                ('source_certificate_id', 'INTEGER', None),
             ],
             'crl_metadata': [
                 ('is_delta', 'BOOLEAN', '0'),

@@ -119,6 +119,19 @@ def renew_certificate(order) -> tuple:
     if not success:
         raise Exception(f"Order creation failed: {message}")
     
+    # Preserve key source across renewals (#161)
+    new_order.key_source = order.key_source or 'generate'
+    new_order.key_type = order.key_type
+    if order.csr_pem:
+        new_order.csr_pem = order.csr_pem
+    if (order.key_source or 'generate') == 'reuse' and order.certificate_id:
+        new_order.source_certificate_id = order.certificate_id
+    try:
+        db.session.commit()
+    except Exception as _ks_err:
+        db.session.rollback()
+        logger.warning(f"Could not persist key source on renewal order: {_ks_err}")
+    
     new_order_url = new_order.order_url
     new_finalize_url = new_order.finalize_url
     challenges = new_order.challenges_dict
