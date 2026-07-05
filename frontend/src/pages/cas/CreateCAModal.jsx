@@ -16,6 +16,18 @@ import { useNotification } from '../../contexts'
 import { useWebSocket } from '../../hooks'
 import { extractData, cn } from '../../lib/utils'
 
+const ROOT_KEY_USAGE = ['keyCertSign', 'cRLSign']
+const INTERMEDIATE_KEY_USAGE = ['digitalSignature', 'keyCertSign', 'cRLSign']
+const CA_KU_OPTIONS = ['digitalSignature', 'keyCertSign', 'cRLSign']
+
+function suggestedDigest(keyAlgo, keySize) {
+  if (keyAlgo === 'ECDSA') {
+    if (keySize === 'secp384r1') return 'sha384'
+    if (keySize === 'secp521r1') return 'sha512'
+  }
+  return 'sha256'
+}
+
 export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
@@ -28,7 +40,10 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormValidity, setCreateFormValidity] = useState('10')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [createFormPathLength, setCreateFormPathLength] = useState('')
-  const [createFormOcspMustStaple, setCreateFormOcspMustStaple] = useState(false)
+  const [createFormDigest, setCreateFormDigest] = useState('auto')
+  const [createFormKeyUsage, setCreateFormKeyUsage] = useState(ROOT_KEY_USAGE)
+  const [createFormEkuServerAuth, setCreateFormEkuServerAuth] = useState(false)
+  const [showCertProfile, setShowCertProfile] = useState(false)
 
   // HSM key storage state
   const [createFormKeyStorage, setCreateFormKeyStorage] = useState('local') // 'local' | 'hsm'
@@ -73,6 +88,30 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     return () => { cancelled = true }
   }, [createFormKeyStorage, createFormHsmKeyMode, createFormHsmProviderId])
 
+  // Apply RFC 5280 defaults when CA type changes
+  useEffect(() => {
+    if (createFormType === 'root') {
+      setCreateFormKeyUsage(ROOT_KEY_USAGE)
+      setCreateFormEkuServerAuth(false)
+    } else {
+      setCreateFormKeyUsage(INTERMEDIATE_KEY_USAGE)
+      setCreateFormEkuServerAuth(true)
+    }
+  }, [createFormType])
+
+  // Reset form when modal closes
+  useEffect(() => {
+    if (open) return
+    setCreateFormType('root')
+    setCreateFormKeyAlgo('RSA')
+    setCreateFormKeySize('2048')
+    setCreateFormDigest('auto')
+    setCreateFormKeyUsage(ROOT_KEY_USAGE)
+    setCreateFormEkuServerAuth(false)
+    setShowCertProfile(false)
+    setShowAdvanced(false)
+  }, [open])
+
   // Reset HSM form state when modal closes
   useEffect(() => {
     if (open) return
@@ -101,6 +140,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       type: createFormType,
       parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null,
       ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
+      hashAlgorithm: createFormDigest,
+      keyUsage: createFormKeyUsage,
+      ...(createFormType === 'intermediate' && {
+        extendedKeyUsage: createFormEkuServerAuth ? ['serverAuth'] : [],
+      }),
     }
 
     // HSM key storage — replaces local key fields
@@ -237,6 +281,24 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               value={createFormKeySize}
               onChange={(value) => setCreateFormKeySize(value)}
             />
+            <Select
+              label={t('common.signatureAlgorithm')}
+              options={[
+                { value: 'auto', label: t('cas.create.digestAuto') },
+                { value: 'sha256', label: 'SHA-256' },
+                { value: 'sha384', label: 'SHA-384' },
+                { value: 'sha512', label: 'SHA-512' },
+              ]}
+              value={createFormDigest}
+              onChange={(value) => setCreateFormDigest(value)}
+              helperText={
+                createFormDigest === 'auto'
+                  ? t('cas.create.digestAutoHint', {
+                      digest: suggestedDigest(createFormKeyAlgo, createFormKeySize).toUpperCase(),
+                    })
+                  : undefined
+              }
+            />
           </div>
         </div>
         )}
@@ -350,7 +412,6 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         )}
 
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-text-primary">{t('common.validityPeriod')}</h3>
           <Select
             label={t('common.validityPeriod')}
             options={[
@@ -386,6 +447,55 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               onChange={(value) => setCreateFormParentCAId(value)}
               required
             />
+          )}
+        </div>
+
+        {/* Certificate profile (RFC 5280 Key Usage / EKU) */}
+        <div className="space-y-4">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-text-primary transition-colors"
+            onClick={() => setShowCertProfile(!showCertProfile)}
+          >
+            {showCertProfile ? <CaretDown size={14} /> : <CaretRight size={14} />}
+            {t('cas.create.certificateProfile')}
+          </button>
+          {showCertProfile && (
+            <div className="space-y-4 pl-2 border-l-2 border-border">
+              <p className="text-xs text-text-secondary">{t('cas.create.certificateProfileHelp')}</p>
+              <fieldset className="space-y-2">
+                <legend className="text-xs font-medium text-text-secondary">{t('common.keyUsage')}</legend>
+                {CA_KU_OPTIONS.map((ku) => (
+                  <label key={ku} className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-border"
+                      checked={createFormKeyUsage.includes(ku)}
+                      onChange={(e) => {
+                        setCreateFormKeyUsage((prev) => {
+                          if (e.target.checked) {
+                            return prev.includes(ku) ? prev : [...prev, ku]
+                          }
+                          return prev.filter((x) => x !== ku)
+                        })
+                      }}
+                    />
+                    {ku}
+                  </label>
+                ))}
+              </fieldset>
+              {createFormType === 'intermediate' && (
+                <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-border"
+                    checked={createFormEkuServerAuth}
+                    onChange={(e) => setCreateFormEkuServerAuth(e.target.checked)}
+                  />
+                  {t('cas.create.ekuServerAuth')}
+                </label>
+              )}
+            </div>
           )}
         </div>
 

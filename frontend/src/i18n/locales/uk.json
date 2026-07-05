@@ -233,6 +233,7 @@
     "viewCertificate": "Переглянути сертифікат",
     "aboutCSRs": "Про CSR",
     "serial": "Серійний номер",
+    "serialHex": "Серійний номер (hex)",
     "codeSigning": "Підпис коду",
     "custom": "Користувацький",
     "ca": "CA",
@@ -847,7 +848,12 @@
       "hsmKeyAlgorithm": "Алгоритм ключа HSM",
       "hsmExistingKey": "Наявний ключ HSM",
       "hsmExistingKeyRequired": "Виберіть ключ HSM",
-      "hsmNoUnusedKeys": "Немає невикористаних ключів підписання на цьому постачальнику"
+      "hsmNoUnusedKeys": "Немає невикористаних ключів підписання на цьому постачальнику",
+      "digestAuto": "Авто (відповідно до ключа)",
+      "digestAutoHint": "Буде використано {{digest}} для обраного ключа",
+      "certificateProfile": "Профіль сертифіката (RFC 5280)",
+      "certificateProfileHelp": "Кореневі CA: keyCertSign + cRLSign. Видаючі CA: digitalSignature та опційно serverAuth.",
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "На основі HSM",

@@ -210,7 +210,7 @@ export function CADetails({
       {/* Technical Details */}
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
-          <CompactField icon={Hash} label={t('common.serial')} value={ca.serial} mono copyable />
+          <CompactField icon={Hash} label={t('common.serial')} value={ca.serial_number} mono copyable />
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={ca.key_type} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={ca.signature_algorithm || ca.hash_algorithm} />
           <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />

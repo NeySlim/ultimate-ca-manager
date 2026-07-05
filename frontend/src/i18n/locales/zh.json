@@ -233,6 +233,7 @@
     "viewCertificate": "查看证书",
     "aboutCSRs": "关于 CSR",
     "serial": "序列号",
+    "serialHex": "序列号 (hex)",
     "codeSigning": "代码签名",
     "custom": "自定义",
     "ca": "CA",
@@ -847,7 +848,12 @@
       "hsmKeyAlgorithm": "HSM 密钥算法",
       "hsmExistingKey": "现有 HSM 密钥",
       "hsmExistingKeyRequired": "选择 HSM 密钥",
-      "hsmNoUnusedKeys": "此提供商上没有未使用的签名密钥"
+      "hsmNoUnusedKeys": "此提供商上没有未使用的签名密钥",
+      "digestAuto": "自动（匹配密钥大小）",
+      "digestAutoHint": "将为所选密钥使用 {{digest}}",
+      "certificateProfile": "证书配置文件 (RFC 5280)",
+      "certificateProfileHelp": "根 CA：keyCertSign + cRLSign。签发 CA：digitalSignature，可选 serverAuth。",
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "HSM 支持",

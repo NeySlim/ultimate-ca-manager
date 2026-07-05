@@ -41,6 +41,20 @@ def serial_to_int(serial: str | int | None) -> int | None:
         return None
 
 
+def format_serial_colon(serial: str | int | None) -> str:
+    """Return serial as colon-separated uppercase hex pairs (OpenSSL display style)."""
+    if serial is None or serial == '':
+        return ''
+    n = serial_to_int(serial)
+    if n is not None:
+        hex_str = format(n, 'X')
+    else:
+        hex_str = str(serial).replace(':', '').upper()
+    if len(hex_str) % 2:
+        hex_str = '0' + hex_str
+    return ':'.join(hex_str[i:i + 2] for i in range(0, len(hex_str), 2))
+
+
 def serial_to_hex(serial: str | int | None) -> str:
     """Return the lowercase hex form of a certificate serial.
 

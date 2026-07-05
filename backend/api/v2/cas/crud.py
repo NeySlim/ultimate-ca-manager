@@ -21,6 +21,12 @@ from utils.db_transaction import safe_commit
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
+from utils.ca_profile import (
+    resolve_digest,
+    validate_ca_key_usage,
+    normalize_ca_eku,
+    default_key_usage_for_ca,
+)
 from models import Certificate, CA, db
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -342,11 +348,39 @@ def create_ca():
         if sia_err:
             return error_response(sia_err, 400)
 
+        is_root = not caref
+        raw_digest = data.get('digest') or data.get('hashAlgorithm')
+        digest, digest_err = resolve_digest(raw_digest, key_type)
+        if digest_err:
+            return error_response(digest_err, 400)
+
+        raw_ku = data.get('keyUsage')
+        if raw_ku is None and data.get('key_usage') is not None:
+            raw_ku = data.get('key_usage')
+        if raw_ku is None:
+            key_usage = default_key_usage_for_ca(is_root)
+        else:
+            ku_err = validate_ca_key_usage(raw_ku)
+            if ku_err:
+                return error_response(ku_err, 400)
+            key_usage = list(dict.fromkeys(s.strip() for s in raw_ku if isinstance(s, str)))
+
+        raw_eku = data.get('extendedKeyUsage')
+        if raw_eku is None and data.get('extended_key_usage') is not None:
+            raw_eku = data.get('extended_key_usage')
+        if raw_eku is None:
+            extended_key_usage = None
+        else:
+            extended_key_usage, eku_err = normalize_ca_eku(raw_eku, is_root)
+            if eku_err:
+                return error_response(eku_err, 400)
+
         ca = CAService.create_internal_ca(
             descr=description,
             dn=dn,
             key_type=key_type,
             validity_days=validity_years * 365,
+            digest=digest,
             caref=caref,
             username=username,
             path_length=path_length,
@@ -356,6 +390,8 @@ def create_ca():
             policy_constraints_inhibit=data.get('policyConstraintsInhibit'),
             inhibit_any_policy=inhibit_any_policy,
             sia_urls=sia_urls_validated,
+            key_usage=key_usage,
+            extended_key_usage=extended_key_usage,
             hsm_provider_id=int(hsm_provider_id) if hsm_provider_id else None,
             hsm_key_id=int(hsm_key_id) if hsm_key_id else None,
             hsm_key_label=hsm_key_label,
@@ -418,6 +454,7 @@ def get_ca(ca_id):
     # Get parsed certificate details
     try:
         details = CAService.get_ca_details(ca_id)
+        fingerprints = details.get('fingerprints', {})
         # Merge details into response
         ca_data.update({
             'commonName': details.get('subject', {}).get('CN', ca.descr),
@@ -425,11 +462,18 @@ def get_ca(ca_id):
             'country': details.get('subject', {}).get('C', ''),
             'keyAlgo': details.get('public_key', {}).get('algorithm', 'RSA'),
             'keySize': details.get('public_key', {}).get('size', 2048),
-            'fingerprint': details.get('fingerprints', {}).get('sha256', ''),
+            'fingerprint': fingerprints.get('sha256', ''),
+            'thumbprint_sha256': fingerprints.get('sha256', ''),
+            'thumbprint_sha1': fingerprints.get('sha1', ''),
+            'signature_algorithm': details.get('signature_algorithm'),
             'crlStatus': crl_status,
             'nextCrlUpdate': next_crl_update
         })
-    except Exception as e:
+        from utils.serial_format import format_serial_colon
+        serial_raw = details.get('serial_number')
+        if serial_raw:
+            ca_data['serial_number'] = format_serial_colon(serial_raw)
+    except Exception:
         # Fallback if parsing fails
         pass
 

@@ -2,7 +2,8 @@
 Fingerprint operations mixin for TrustStoreService
 """
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
 from typing import Dict
 
 
@@ -12,7 +13,7 @@ class FingerprintMixin:
     @staticmethod
     def get_certificate_fingerprints(cert_pem: bytes) -> Dict[str, str]:
         """Calculate certificate fingerprints."""
-        cert = x509.load_pem_x509_certificate(cert_pem, serialization.DefaultBackend())
+        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
 
         sha256_hash = cert.fingerprint(hashes.SHA256()).hex().upper()
         sha1_hash = cert.fingerprint(hashes.SHA1()).hex().upper()

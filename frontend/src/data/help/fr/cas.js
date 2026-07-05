@@ -93,9 +93,10 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 1. Cliquez sur **Créer** → **CA racine**
 2. Remplissez les champs du sujet (CN, O, OU, C, ST, L)
 3. Sélectionnez l'algorithme de clé (RSA 2048/4096, ECDSA P-256/P-384)
-4. Définissez la période de validité (typiquement 10-20 ans pour les CA racines)
-5. Sélectionnez optionnellement un modèle de certificat
-6. Cliquez sur **Créer**
+4. Choisissez l'algorithme de signature (Auto, SHA-256/384/512 — Auto aligne P-384 sur SHA-384)
+5. Définissez la période de validité (typiquement 10-20 ans pour les CA racines)
+6. Optionnel : ouvrez **Profil certificat (RFC 5280)** pour ajuster Key Usage / EKU
+7. Cliquez sur **Créer**
 
 ### Créer une CA intermédiaire
 1. Cliquez sur **Créer** → **CA intermédiaire**

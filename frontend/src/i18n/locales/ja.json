@@ -233,6 +233,7 @@
     "viewCertificate": "証明書を表示",
     "aboutCSRs": "CSRについて",
     "serial": "シリアル番号",
+    "serialHex": "シリアル番号 (hex)",
     "codeSigning": "コード署名",
     "custom": "カスタム",
     "ca": "CA",
@@ -847,7 +848,12 @@
       "hsmKeyAlgorithm": "HSM 鍵アルゴリズム",
       "hsmExistingKey": "既存の HSM 鍵",
       "hsmExistingKeyRequired": "HSM 鍵を選択してください",
-      "hsmNoUnusedKeys": "このプロバイダーに未使用の署名鍵はありません"
+      "hsmNoUnusedKeys": "このプロバイダーに未使用の署名鍵はありません",
+      "digestAuto": "自動（鍵サイズに合わせる）",
+      "digestAutoHint": "選択した鍵に {{digest}} を使用します",
+      "certificateProfile": "証明書プロファイル (RFC 5280)",
+      "certificateProfileHelp": "ルート CA: keyCertSign + cRLSign。発行 CA: digitalSignature と任意で serverAuth。",
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
     },
     "detail": {
       "hsmBacked": "HSM バック",

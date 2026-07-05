@@ -18,6 +18,15 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def to_naive_utc(dt: datetime | None) -> datetime | None:
+    """Normalize aware UTC datetimes to naive UTC for DB / utc_now() comparisons."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def utc_isoformat(dt):
     """Return an ISO 8601 UTC string ending in 'Z', or None.
 
