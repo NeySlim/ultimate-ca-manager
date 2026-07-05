@@ -76,12 +76,19 @@ def csr_to_b64url_der(csr: x509.CertificateSigningRequest) -> str:
 
 
 def load_private_key_from_certificate(cert) -> object:
-    """Load a cryptography private key from a Certificate model row (prv is base64 PEM)."""
+    """Load a cryptography private key from a Certificate model row.
+
+    Works for both storage formats: base64-plain PEM (ACME imports) and
+    Fernet-encrypted (CSR/lifecycle, backup restore) — see utils/key_codec.py.
+    """
+    from utils.key_codec import load_pem_bytes
+
     if not cert or not cert.prv:
         raise ValueError('Certificate has no stored private key')
-    key_pem = base64.b64decode(cert.prv).decode()
+    context = f"certificate {getattr(cert, 'id', '?')}"
+    pem_bytes = load_pem_bytes(cert.prv, context=context)
     return serialization.load_pem_private_key(
-        key_pem.encode(),
+        pem_bytes,
         password=None,
         backend=default_backend(),
     )
