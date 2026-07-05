@@ -220,6 +220,27 @@ class TestCreateAPIKey:
         })
         assert_error(r, 400)
 
+    def test_cannot_grant_permissions_beyond_role(self, viewer_client):
+        """Viewer must not create API keys with admin/write permissions."""
+        r = post_json(viewer_client, '/api/v2/account/apikeys', {
+            'name': 'Escalation Attempt',
+            'permissions': ['admin:system', 'write:users'],
+        })
+        assert r.status_code == 403
+
+    def test_viewer_can_grant_own_read_permissions(self, viewer_client):
+        r = post_json(viewer_client, '/api/v2/account/apikeys', {
+            'name': 'Viewer Read Key',
+            'permissions': ['read:certificates', 'read:cas'],
+        })
+        data = assert_success(r, 201)
+        kid = data.get('id')
+        try:
+            assert data.get('key', '').startswith('ucm_ak_')
+        finally:
+            if kid:
+                viewer_client.delete(f'/api/v2/account/apikeys/{kid}')
+
     def test_permissions_not_list(self, auth_client):
         r = post_json(auth_client, '/api/v2/account/apikeys', {
             'name': 'String Perms', 'permissions': 'read:certificates',

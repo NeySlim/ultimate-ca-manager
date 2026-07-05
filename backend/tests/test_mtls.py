@@ -148,6 +148,26 @@ class TestMTLSEnroll:
         r = _post(auth_client, '/api/v2/mtls/enroll', {})
         assert r.status_code == 400
 
+    def test_enroll_rejects_spoofed_proxy_headers_from_untrusted_peer(
+        self, auth_client, monkeypatch,
+    ):
+        """Untrusted peers must not enroll via forged X-SSL-Client-* headers."""
+        monkeypatch.setattr(
+            'utils.trusted_proxy.is_request_from_trusted_proxy',
+            lambda: False,
+        )
+        r = auth_client.post(
+            '/api/v2/mtls/enroll',
+            data='{}',
+            content_type='application/json',
+            headers={
+                'X-SSL-Client-Verify': 'SUCCESS',
+                'X-SSL-Client-S-DN': 'CN=Spoofed Victim,O=Test',
+                'X-SSL-Client-Serial': 'aabbccdd',
+            },
+        )
+        assert r.status_code == 400
+
     def test_enroll_import_empty_pem(self, auth_client):
         """Import with no PEM data → 400."""
         r = _post(auth_client, '/api/v2/mtls/enroll-import', {})
