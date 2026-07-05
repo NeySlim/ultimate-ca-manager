@@ -9,8 +9,15 @@ function looksLikeIpv4(v) {
   return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(v)
 }
 
+function looksLikeIpv6(v) {
+  // IPv6 must contain at least one ':' and no scheme separator.
+  // Exclude URIs (e.g. https://host) which also contain ':'.
+  if (v.includes('://')) return false
+  return /^[0-9a-fA-F:]+$/.test(v) && v.includes(':')
+}
+
 function looksLikeIp(v) {
-  return looksLikeIpv4(v) || v.includes(':')
+  return looksLikeIpv4(v) || looksLikeIpv6(v)
 }
 
 function isValidEmail(v) {
@@ -42,14 +49,14 @@ export function getSanValidationError(type, value) {
       }
       return null
     case 'DNS':
+      if (v.includes('://')) {
+        return { key: 'csrs.sanUriUseUri', params: { value: v } }
+      }
       if (looksLikeIp(v)) {
         return { key: 'csrs.sanIpForAddress', params: { value: v } }
       }
       if (v.includes('@')) {
         return { key: 'csrs.sanEmailUseEmail', params: { value: v } }
-      }
-      if (v.includes('://')) {
-        return { key: 'csrs.sanUriUseUri', params: { value: v } }
       }
       return null
     case 'Email':
