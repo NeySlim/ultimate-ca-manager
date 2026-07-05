@@ -11,6 +11,21 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 
+## [2.184] - 2026-07-05
+
+### Added
+- **Configurable RFC 5280 CA profile** — the Create CA wizard exposes signature digest (Auto aligns P-384 to SHA-384 and P-521 to SHA-512, or explicit SHA-256/384/512) and an expandable Certificate Profile section with Key Usage and Extended Key Usage. Roots default to `keyCertSign` + `cRLSign` (no `digitalSignature`) and no EKU; issuing CAs add `digitalSignature` and optional `serverAuth`, matching common enterprise root/intermediate profiles (Let's Encrypt Root-YR / issuing CA style). Intermediate CA `notAfter` is clamped to the parent CA expiry, and `GET /api/v2/cas/:id` now returns the X.509 serial number (colon-separated hex) and SHA-1/SHA-256 thumbprints. The obsolete Create CA help step about optional template selection (templates removed in migration 017) has been removed (#160).
+- **ACME external CSR and renewal key reuse** — the ACME request form now offers a Key Source selector: Generate new key (default), Reuse key on renewal (preserves the same private key across renewals for DANE/TLSA and key pinning; first issuance generates a key, renewals reload it), or Provide external CSR (paste a PEM CSR; UCM submits it at ACME finalize, the private key never enters UCM). CSR domains are validated against the order identifiers (case-insensitive, RFC 4343). Auto-renewal honours the selected key source. Migration `049` adds `key_source`, `csr_pem` and `source_certificate_id` on `acme_client_orders` (#161).
+- **ACME staging preflight dry-run** — a Run Preflight action on the ACME request form validates domains, contact email, ACME account/EAB, CA connectivity and DNS-01 challenge setup against the Let's Encrypt staging directory without consuming production rate limits or changing the global environment. Two modes: Full (staging order + required DNS TXT records preview) and Validate only (config + connectivity). For manual DNS providers it displays the exact `_acme-challenge` TXT records to add, with optional DNS propagation verification. Emits an `acme.preflight` webhook event and an `acme_preflight` audit entry (#162).
+- **Typed SAN validation for CSR creation** — SAN entries are now validated per type (DNS, IP, Email, URI, UPN) on both backend and frontend, with clear cross-type errors (e.g. an FQDN entered in the IP field is rejected with a hint to use DNS). The frontend validation mirrors the backend rules so the client and server stay consistent (#167).
+- **NIST P-521 EC curve option and normalized EC key labels** — Generate CSR and Create CA now accept NIST P-256, P-384 and P-521 (ECDSA) key types through normalized labels (`EC P-256`, `NIST P-384`, `secp256r1`, `prime256v1`, …) that map to the OpenSSL curve names used internally. Previously `EC P-256` failed because the UI label was stripped to `P-256` and validated against OpenSSL curve names. The `secp256k1` (Koblitz) curve remains intentionally unsupported (#167).
+- **Hex serial number in certificate technical details** — the certificate details view shows the serial as colon-separated uppercase hex (browser/OpenSSL display style) alongside the decimal form, copyable. Conversion handles decimal, `0x`-prefixed and compact/colon hex inputs and supports serials larger than 159 bits via arbitrary-precision integer math.
+
+### Fixed
+- **API key permission escalation** — a non-admin user with permission to create API keys (`POST /api/v2/account/apikeys`) could mint a key carrying permissions their own role did not hold (e.g. a viewer granting `admin:system`). The create path now rejects any permission the creator does not have, with the same wildcard semantics as the auth checker. Sharing a wildcard key (`*`) requires the creator to be an admin (#163).
+- **Forged mTLS enrollment via spoofed proxy headers** — `POST /api/v2/mtls/enroll` honored `X-SSL-Client-Verify`, `X-SSL-Client-S-DN` and `X-SSL-Client-Cert` headers from any peer, so a caller who could reach gunicorn directly could forge a client certificate and enroll it as another user. The endpoint now gates on `is_request_from_trusted_proxy()` for those headers, matching the existing protection on the `login_mtls()` path (#163).
+
+
 ## [2.183] - 2026-07-03
 
 ### Added
