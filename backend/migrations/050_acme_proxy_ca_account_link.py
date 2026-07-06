@@ -89,11 +89,13 @@ def _insert_account_sqlite(conn, directory_url, label, email, account_url, accou
                            algorithm, eab_kid, eab_hmac_key, is_default):
     if _find_account_id_by_url(conn, directory_url, sqlite=True):
         return _find_account_id_by_url(conn, directory_url, sqlite=True)
+    import datetime as _dt
+    now = _dt.datetime.utcnow().isoformat(sep=' ', timespec='seconds')
     conn.execute(
         """INSERT INTO acme_client_accounts
            (directory_url, label, email, account_url, account_key, account_key_algorithm,
-            eab_kid, eab_hmac_key, is_default)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            eab_kid, eab_hmac_key, is_default, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             directory_url,
             label,
@@ -104,6 +106,8 @@ def _insert_account_sqlite(conn, directory_url, label, email, account_url, accou
             eab_kid,
             eab_hmac_key,
             1 if is_default else 0,
+            now,
+            now,
         ),
     )
     return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -227,12 +231,15 @@ def upgrade(conn):
                 if "staging" in directory_url
                 else "Let's Encrypt Production (proxy)"
             )
+        import datetime as _dt
+        now = _dt.datetime.utcnow().isoformat(sep=' ', timespec='seconds')
         result = conn.execute(
             text(
                 """INSERT INTO acme_client_accounts
                    (directory_url, label, email, account_url, account_key,
-                    account_key_algorithm, eab_kid, eab_hmac_key, is_default)
-                   VALUES (:u, :l, :e, :au, :ak, :alg, :kid, :hmac, FALSE)
+                    account_key_algorithm, eab_kid, eab_hmac_key, is_default,
+                    created_at, updated_at)
+                   VALUES (:u, :l, :e, :au, :ak, :alg, :kid, :hmac, FALSE, :now, :now)
                    RETURNING id"""
             ),
             {
@@ -244,6 +251,7 @@ def upgrade(conn):
                 "alg": "RS256",
                 "kid": proxy_eab_kid,
                 "hmac": proxy_eab_hmac,
+                "now": now,
             },
         )
         account_id = result.scalar()
