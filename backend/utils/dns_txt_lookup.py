@@ -6,6 +6,9 @@ Checks run in order:
 2. authoritative nameservers for the zone (fast — record published at source)
 3. public recursive resolvers (9.9.9.9, 8.8.8.8, 1.1.1.1) — global propagation
 4. system resolver as last resort
+
+A domain is considered ready when **any** path above returns the expected TXT.
+Public resolver lines in logs are informational (#171); they do not require 3/3 OK.
 """
 import ipaddress
 import logging
@@ -49,9 +52,13 @@ def get_configured_dns01_nameservers() -> List[str]:
 
 
 def _txt_rdata_matches(rdata, expected: str) -> bool:
+    """Match a TXT rdata against the expected ACME token (single or split strings)."""
     try:
-        for chunk in rdata.strings:
-            if chunk.decode('utf-8', 'ignore') == expected:
+        chunks = [chunk.decode('utf-8', 'ignore') for chunk in rdata.strings]
+        if ''.join(chunks) == expected:
+            return True
+        for chunk in chunks:
+            if chunk == expected:
                 return True
     except Exception:
         if str(rdata).strip('"') == expected:
@@ -64,6 +71,30 @@ def _answers_contain_expected(answers, expected: str) -> bool:
         if _txt_rdata_matches(rdata, expected):
             return True
     return False
+
+
+def _resolver_failure_reason(exc: Exception) -> str:
+    import dns.resolver
+
+    exc_types = (
+        ('nxdomain', 'NXDOMAIN'),
+        ('no_answer', 'NoAnswer'),
+        ('no_nameservers', 'NoNameservers'),
+        ('timeout', 'Timeout'),
+    )
+    for label, attr in exc_types:
+        exc_cls = getattr(dns.resolver, attr, None)
+        if exc_cls is not None and isinstance(exc, exc_cls):
+            return label
+
+    msg = str(exc).lower()
+    if 'nxdomain' in msg:
+        return 'nxdomain'
+    if 'timeout' in msg:
+        return 'timeout'
+    if 'no answer' in msg or 'noanswer' in msg:
+        return 'no_answer'
+    return type(exc).__name__.lower()
 
 
 def _resolve_with_ns(name: str, nameservers: List[str], rtype: str = 'TXT'):
@@ -102,23 +133,46 @@ def _authoritative_nameserver_ips(name: str) -> List[str]:
     return []
 
 
+def _check_one_public_resolver(name: str, expected: str, resolver_ip: str) -> Tuple[bool, str]:
+    """Query one public resolver; return (ok, status_label)."""
+    try:
+        answers = _resolve_with_ns(name, [resolver_ip])
+        if _answers_contain_expected(answers, expected):
+            return True, 'OK'
+        return False, 'value_mismatch'
+    except Exception as exc:
+        return False, _resolver_failure_reason(exc)
+
+
 def check_public_resolvers(name: str, expected: str) -> Dict[str, bool]:
     """Query each public resolver individually for the expected TXT value."""
     status: Dict[str, bool] = {}
     for resolver_ip in PUBLIC_DNS_RESOLVERS:
-        try:
-            answers = _resolve_with_ns(name, [resolver_ip])
-            status[resolver_ip] = _answers_contain_expected(answers, expected)
-        except Exception:
-            status[resolver_ip] = False
+        ok, _reason = _check_one_public_resolver(name, expected, resolver_ip)
+        status[resolver_ip] = ok
     return status
 
 
 def log_public_resolver_status(name: str, expected: str) -> Dict[str, bool]:
-    """Log and return per-resolver public propagation status."""
-    status = check_public_resolvers(name, expected)
-    parts = [f'{ip}={"OK" if ok else "pending"}' for ip, ok in status.items()]
+    """Log per-resolver public propagation status with failure reasons."""
+    status: Dict[str, bool] = {}
+    parts: List[str] = []
+    for resolver_ip in PUBLIC_DNS_RESOLVERS:
+        ok, reason = _check_one_public_resolver(name, expected, resolver_ip)
+        status[resolver_ip] = ok
+        if ok:
+            parts.append(f'{resolver_ip}=OK')
+        else:
+            parts.append(f'{resolver_ip}=pending ({reason})')
+    ok_count = sum(1 for ok in status.values() if ok)
     logger.info('DNS public propagation for %s: %s', name, ', '.join(parts))
+    logger.info(
+        'DNS public propagation summary for %s: %s/%s resolvers OK '
+        '(informational only; UCM proceeds when authoritative or any resolver confirms)',
+        name,
+        ok_count,
+        len(PUBLIC_DNS_RESOLVERS),
+    )
     return status
 
 
@@ -163,12 +217,16 @@ def txt_record_present(name: str, expected: str, *, log_public: bool = True) -> 
     try:
         answers, source = resolve_txt_answers(name)
         if _answers_contain_expected(answers, expected):
-            if source != 'recursive' and not source.startswith('public:'):
-                logger.info('DNS TXT confirmed for %s via %s resolver', name, source)
-            elif source.startswith('public:'):
+            if source == 'configured':
+                logger.info('DNS TXT confirmed for %s via configured resolver(s)', name)
+            elif source == 'authoritative':
+                logger.info('DNS TXT confirmed for %s via authoritative resolver', name)
+            elif source and source.startswith('public:'):
                 resolver_ip = source.split(':', 1)[1]
                 logger.info('DNS TXT confirmed for %s via public resolver %s', name, resolver_ip)
-            if log_public and not source.startswith('public:'):
+            else:
+                logger.info('DNS TXT confirmed for %s via system resolver', name)
+            if log_public:
                 log_public_resolver_status(name, expected)
             return True
     except Exception:

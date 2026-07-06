@@ -44,6 +44,11 @@ def _dns_propagation_timeout() -> int:
         return _DNS_SELFCHECK_DEFAULT_TIMEOUT
 
 
+def _dns_propagation_skip_wait() -> bool:
+    """True when acme.client.dns_propagation_timeout=0 (skip propagation polling)."""
+    return _dns_propagation_timeout() == 0
+
+
 def _txt_present(name: str, expected: str) -> bool:
     """True if the DNS TXT record `name` currently serves the `expected` value."""
     return txt_record_present(name, expected)
@@ -362,11 +367,14 @@ def verify_challenges(order_id):
         # DNS self-check before submitting: if the expected TXT record isn't
         # visible yet, don't submit (a failed validation marks the order invalid
         # and burns the token). Tell the user to wait and retry. `force` bypasses.
-        if not force:
+        # timeout=0 skips the wait entirely (#171); otherwise poll up to the
+        # configured timeout (not a single pass).
+        if not force and not _dns_propagation_skip_wait():
             to_check = {d: challenges[d] for d in domains_to_verify
                         if d in challenges and challenges[d].get('dns_txt_value')}
             if to_check:
-                check = _dns_selfcheck(to_check, timeout=0)  # single pass, quick
+                timeout = _dns_propagation_timeout()
+                check = _dns_selfcheck(to_check, timeout)
                 if not check['ok']:
                     return success_response(
                         data={'dns_not_ready': True, 'missing': check['missing'],
@@ -374,6 +382,11 @@ def verify_challenges(order_id):
                         message=('TXT record not visible yet for '
                                  f'{", ".join(check["missing"])}. Add the record, '
                                  'wait for propagation, then verify again.'))
+        elif not force and _dns_propagation_skip_wait():
+            logger.info(
+                'DNS propagation wait skipped (acme.client.dns_propagation_timeout=0); '
+                'submitting manual verify to CA'
+            )
 
         for domain in domains_to_verify:
             if domain not in challenges:
@@ -608,15 +621,22 @@ def _auto_poll_and_finalize(client, order) -> dict:
 
         # 1. Self-check DNS propagation: poll for the expected TXT records up to
         #    the configured timeout before asking the CA to validate (#140).
+        #    timeout=0 skips polling and submits immediately (#171).
         timeout = _dns_propagation_timeout()
-        check = _dns_selfcheck(challenges, timeout)
-        result['dns_propagation_wait'] = True
-        if check['ok']:
-            logger.info(f'DNS propagation confirmed after {check["waited"]}s')
+        if _dns_propagation_skip_wait():
+            logger.info(
+                'DNS propagation wait skipped (acme.client.dns_propagation_timeout=0); '
+                'submitting auto verify to CA'
+            )
         else:
-            logger.warning(
-                f'DNS self-check timed out after {timeout}s; TXT not visible for '
-                f'{check["missing"]} — submitting anyway (CA may still validate)')
+            check = _dns_selfcheck(challenges, timeout)
+            result['dns_propagation_wait'] = True
+            if check['ok']:
+                logger.info(f'DNS propagation confirmed after {check["waited"]}s')
+            else:
+                logger.warning(
+                    f'DNS self-check timed out after {timeout}s; TXT not visible for '
+                    f'{check["missing"]} — submitting anyway (CA may still validate)')
 
         # 2. Submit challenges for validation
         for domain in challenges:

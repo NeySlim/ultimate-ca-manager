@@ -188,3 +188,100 @@ def test_parse_resolver_ips_accepts_valid_and_skips_invalid(caplog):
 def test_parse_resolver_ips_accepts_ipv6():
     result = dns_lookup_mod._parse_resolver_ips('2001:4860:4860::8888')
     assert result == ['2001:4860:4860::8888']
+
+
+def test_txt_rdata_matches_concatenated_chunks():
+    class _RData:
+        def __init__(self, values):
+            self.strings = [v.encode() for v in values]
+
+    # Some resolvers return long TXT as multiple quoted strings (#171 / Quad9).
+    rdata = _RData(['part1', 'part2'])
+    assert dns_lookup_mod._txt_rdata_matches(rdata, 'part1part2') is True
+    assert dns_lookup_mod._txt_rdata_matches(rdata, 'part1') is True
+    assert dns_lookup_mod._txt_rdata_matches(rdata, 'wrong') is False
+
+
+def test_log_public_resolver_status_shows_failure_reason(monkeypatch, caplog):
+    import logging
+
+    caplog.set_level(logging.INFO)
+
+    def _check_one(name, expected, resolver_ip):
+        if resolver_ip == '8.8.8.8':
+            return True, 'OK'
+        if resolver_ip == '9.9.9.9':
+            return False, 'nxdomain'
+        return False, 'timeout'
+
+    monkeypatch.setattr(dns_lookup_mod, '_check_one_public_resolver', _check_one)
+    status = dns_lookup_mod.log_public_resolver_status('_acme-challenge.example.com', 'tok')
+    assert status['8.8.8.8'] is True
+    assert status['9.9.9.9'] is False
+    messages = ' '.join(rec.message for rec in caplog.records)
+    assert '9.9.9.9=pending (nxdomain)' in messages
+    assert '1/3 resolvers OK' in messages
+    assert 'informational only' in messages
+
+
+def test_dns_propagation_skip_wait(monkeypatch):
+    monkeypatch.setattr(orders_mod, '_dns_propagation_timeout', lambda: 0)
+    assert orders_mod._dns_propagation_skip_wait() is True
+    monkeypatch.setattr(orders_mod, '_dns_propagation_timeout', lambda: 120)
+    assert orders_mod._dns_propagation_skip_wait() is False
+
+
+def test_verify_skips_dns_gate_when_timeout_zero(app, auth_client, monkeypatch):
+    """Manual Verify must not block on DNS when propagation timeout is 0 (#171)."""
+    import json
+    from models import db, AcmeClientOrder
+
+    monkeypatch.setattr(orders_mod, '_dns_propagation_timeout', lambda: 0)
+
+    selfcheck_called = []
+    monkeypatch.setattr(
+        orders_mod,
+        '_dns_selfcheck',
+        lambda *args, **kwargs: selfcheck_called.append(True) or {'ok': False, 'missing': ['example.com']},
+    )
+
+    verify_calls = []
+
+    class _MockClient:
+        def verify_challenge(self, order, domain):
+            verify_calls.append(domain)
+            return True, 'submitted'
+
+        def check_order_status(self, order):
+            return 'validating', None
+
+    monkeypatch.setattr(
+        orders_mod.AcmeClientService,
+        'for_order',
+        staticmethod(lambda order: _MockClient()),
+    )
+
+    with app.app_context():
+        order = AcmeClientOrder(
+            domains=json.dumps(['example.com']),
+            challenge_type='dns-01',
+            environment='staging',
+            status='pending',
+        )
+        order.set_challenges_dict({
+            'example.com': {
+                'dns_txt_name': '_acme-challenge.example.com',
+                'dns_txt_value': 'the-token',
+            }
+        })
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+
+    from tests.test_acme import post_json, assert_success
+
+    r = post_json(auth_client, f'/api/v2/acme/client/orders/{order_id}/verify', {})
+    data = assert_success(r)
+    assert selfcheck_called == []
+    assert verify_calls == ['example.com']
+    assert data.get('dns_not_ready') is not True
