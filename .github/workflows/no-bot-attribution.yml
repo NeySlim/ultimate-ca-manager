@@ -1,0 +1,45 @@
+name: No bot attribution
+
+on:
+  pull_request:
+    branches: [dev, test, main]
+
+jobs:
+  check-co-authored:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Block bot Co-authored-by trailers
+        run: |
+          set +e
+          # Emails / noreply IDs of AI coding agents. Extend this list as needed.
+          BOTS='
+            cursoragent@cursor.com
+            223556219+Copilot@users.noreply.github.com
+            noreply@anthropic.com
+            50341347+claude@users.noreply.github.com
+            198982749+github-actions[bot]@users.noreply.github.com
+          '
+          # Build a grep pattern from the list (escaped dots, joined by |).
+          PATTERN=$(printf '%s\n' "$BOTS" | grep -v '^$' | sed 's/[.]/\\./g' | paste -sd'|' -)
+          # Inspect every commit in the PR range.
+          RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          bad=0
+          for sha in $(git rev-list "$RANGE"); do
+            body=$(git log -1 --format='%B' "$sha")
+            offender=$(printf '%s' "$body" | grep -iE "Co-authored-by:.*($PATTERN)" || true)
+            if [ -n "$offender" ]; then
+              echo "::error file=,line=1::Commit $sha carries a bot Co-authored-by trailer:"
+              echo "::error file=,line=1::  $offender"
+              bad=1
+            fi
+          done
+          if [ "$bad" = "1" ]; then
+            echo "::error::One or more commits attribute authorship to an AI agent."
+            echo "Remove the Co-authored-by trailer from the offending commit(s) and re-push."
+            echo "Configure your tool (Cursor / Claude Code / Copilot CLI) to disable commit attribution."
+            exit 1
+          fi
+          echo "✓ No bot attribution trailers found."
