@@ -104,17 +104,22 @@ export const acmeService = {
   },
 
   // LE Proxy
-  async registerProxy(email) {
-    return apiClient.post('/acme/client/proxy/register', { email })
+  async registerProxy(email, acmeAccountId) {
+    const payload = { email }
+    if (acmeAccountId != null) payload.acme_account_id = acmeAccountId
+    return apiClient.post('/acme/client/proxy/register', payload)
   },
 
-  async unregisterProxy() {
-    return apiClient.post('/acme/client/proxy/unregister')
+  async unregisterProxy(acmeAccountId) {
+    const payload = {}
+    if (acmeAccountId != null) payload.acme_account_id = acmeAccountId
+    return apiClient.post('/acme/client/proxy/unregister', payload)
   },
 
-  async testProxyConnection(url) {
+  async testProxyConnection({ url, acmeAccountId } = {}) {
     const payload = {}
     if (url) payload.url = url
+    if (acmeAccountId != null) payload.acme_account_id = acmeAccountId
     return apiClient.post('/acme/client/proxy/test-connection', payload)
   },
 

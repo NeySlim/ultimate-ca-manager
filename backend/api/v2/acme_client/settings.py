@@ -58,6 +58,7 @@ def get_settings():
     # Proxy upstream URL and mode
     proxy_upstream_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
     proxy_mode_cfg = SystemConfig.query.filter_by(key='acme.proxy.upstream_mode').first()
+    proxy_account_id_cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
     client_verify_ssl_cfg = SystemConfig.query.filter_by(key='acme.client.verify_ssl').first()
     proxy_verify_ssl_cfg = SystemConfig.query.filter_by(key='acme.proxy.verify_ssl').first()
 
@@ -68,9 +69,30 @@ def get_settings():
     proxy_eab_kid_cfg = SystemConfig.query.filter_by(key='acme.proxy.eab_kid').first()
     proxy_eab_hmac_cfg = SystemConfig.query.filter_by(key='acme.proxy.eab_hmac_key').first()
 
-    # Derive proxy account info
-    proxy_account_url = proxy_account_url_cfg.value if proxy_account_url_cfg else None
-    proxy_upstream_url = proxy_upstream_cfg.value if proxy_upstream_cfg else None
+    # Derive proxy account info from linked AcmeClientAccount when set
+    proxy_acme_account_id = None
+    proxy_account = None
+    if proxy_account_id_cfg and proxy_account_id_cfg.value:
+        try:
+            proxy_acme_account_id = int(proxy_account_id_cfg.value)
+            proxy_account = AcmeClientAccount.query.get(proxy_acme_account_id)
+        except (TypeError, ValueError):
+            proxy_acme_account_id = None
+
+    if proxy_account:
+        proxy_upstream_url = proxy_account.directory_url
+        proxy_upstream_mode = proxy_account.derived_environment()
+        proxy_account_url = proxy_account.account_url
+        proxy_account_registered = proxy_account.is_registered()
+        proxy_eab_kid = proxy_account.eab_kid
+        proxy_eab_hmac_set = bool(proxy_account.eab_hmac_key)
+    else:
+        proxy_account_url = proxy_account_url_cfg.value if proxy_account_url_cfg else None
+        proxy_upstream_url = proxy_upstream_cfg.value if proxy_upstream_cfg else None
+        proxy_upstream_mode = proxy_mode_cfg.value if proxy_mode_cfg else 'staging'
+        proxy_account_registered = bool(proxy_account_url)
+        proxy_eab_kid = proxy_eab_kid_cfg.value if proxy_eab_kid_cfg else None
+        proxy_eab_hmac_set = bool(proxy_eab_hmac_cfg and proxy_eab_hmac_cfg.value)
     dns_timeout_cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
     try:
         dns_timeout = int(dns_timeout_cfg.value) if dns_timeout_cfg else 120
@@ -90,12 +112,13 @@ def get_settings():
         'proxy_email': proxy_email_cfg.value if proxy_email_cfg else None,
         'proxy_registered': bool(proxy_email_cfg),
         'proxy_upstream_url': proxy_upstream_url,
-        'proxy_upstream_mode': proxy_mode_cfg.value if proxy_mode_cfg else 'staging',
+        'proxy_upstream_mode': proxy_upstream_mode,
+        'proxy_acme_account_id': proxy_acme_account_id,
         'proxy_verify_ssl': _coerce_bool(proxy_verify_ssl_cfg.value if proxy_verify_ssl_cfg else None, True),
         'proxy_account_url': proxy_account_url,
-        'proxy_account_registered': bool(proxy_account_url),
-        'proxy_eab_kid': proxy_eab_kid_cfg.value if proxy_eab_kid_cfg else None,
-        'proxy_eab_hmac_key_set': bool(proxy_eab_hmac_cfg and proxy_eab_hmac_cfg.value),
+        'proxy_account_registered': proxy_account_registered,
+        'proxy_eab_kid': proxy_eab_kid,
+        'proxy_eab_hmac_key_set': proxy_eab_hmac_set,
         'directory_url': directory_cfg.value if directory_cfg else None,
         'eab_kid': eab_kid_cfg.value if eab_kid_cfg else None,
         'eab_hmac_key_set': bool(eab_hmac_cfg and eab_hmac_cfg.value),
@@ -248,6 +271,36 @@ def update_settings():
         _set_config('acme.client.account_key_type', data['account_key_type'], 'Account key algorithm')
         updates.append('account_key_type')
 
+    if 'proxy_acme_account_id' in data:
+        from models import AcmeClientAccount
+        raw = data.get('proxy_acme_account_id')
+        if raw is None or raw == '':
+            cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
+            if cfg:
+                db.session.delete(cfg)
+            updates.append('proxy_acme_account_id')
+        else:
+            try:
+                account_id = int(raw)
+            except (TypeError, ValueError):
+                return error_response('proxy_acme_account_id must be an integer', 400)
+            acct = AcmeClientAccount.query.get(account_id)
+            if not acct:
+                return error_response('ACME CA account not found', 404)
+            _set_config(
+                'acme.proxy.acme_account_id',
+                str(account_id),
+                'AcmeClientAccount id used as ACME proxy upstream',
+            )
+            # Keep legacy URL/mode in sync for older API consumers
+            _set_config('acme.proxy.upstream_url', acct.directory_url, 'ACME proxy upstream directory URL')
+            _set_config(
+                'acme.proxy.upstream_mode',
+                acct.derived_environment(),
+                'ACME proxy upstream mode',
+            )
+            updates.append('proxy_acme_account_id')
+
     if 'proxy_upstream_url' in data:
         url_val = (data['proxy_upstream_url'] or '').strip()
         if url_val and not url_val.startswith('https://'):
@@ -301,19 +354,53 @@ def update_settings():
         updates.append('proxy_upstream_mode')
 
     if 'reset_proxy_account' in data and data['reset_proxy_account']:
+        from models import AcmeClientAccount
+        account_id_cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
+        if account_id_cfg and account_id_cfg.value:
+            try:
+                acct = AcmeClientAccount.query.get(int(account_id_cfg.value))
+                if acct:
+                    acct.account_url = None
+                    acct.account_key = None
+            except (TypeError, ValueError):
+                pass
         for reset_key in ['acme.proxy.account_url', 'acme.proxy.account_key']:
             cfg = SystemConfig.query.filter_by(key=reset_key).first()
             if cfg:
                 db.session.delete(cfg)
-        logger.info("Proxy account credentials reset by user")
+        logger.info("Proxy upstream account credentials reset by user")
         updates.append('reset_proxy_account')
 
     if 'proxy_eab_kid' in data:
-        _set_config('acme.proxy.eab_kid', data['proxy_eab_kid'] or '', 'ACME proxy EAB Key ID')
+        kid_val = data['proxy_eab_kid'] or ''
+        _set_config('acme.proxy.eab_kid', kid_val, 'ACME proxy EAB Key ID')
+        account_id_cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
+        if account_id_cfg and account_id_cfg.value:
+            try:
+                from models import AcmeClientAccount
+                acct = AcmeClientAccount.query.get(int(account_id_cfg.value))
+                if acct:
+                    acct.eab_kid = kid_val or None
+                    if not kid_val and 'proxy_eab_hmac_key' in data and not data.get('proxy_eab_hmac_key'):
+                        acct.eab_hmac_key = None
+            except (TypeError, ValueError):
+                pass
         updates.append('proxy_eab_kid')
 
     if 'proxy_eab_hmac_key' in data:
-        _set_config('acme.proxy.eab_hmac_key', data['proxy_eab_hmac_key'] or '', 'ACME proxy EAB HMAC Key')
+        hmac_val = data['proxy_eab_hmac_key'] or ''
+        _set_config('acme.proxy.eab_hmac_key', hmac_val, 'ACME proxy EAB HMAC Key')
+        account_id_cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
+        if account_id_cfg and account_id_cfg.value:
+            try:
+                from models import AcmeClientAccount
+                acct = AcmeClientAccount.query.get(int(account_id_cfg.value))
+                if acct:
+                    acct.eab_hmac_key = hmac_val or None
+                    if not hmac_val and 'proxy_eab_kid' in data and not data.get('proxy_eab_kid'):
+                        acct.eab_kid = None
+            except (TypeError, ValueError):
+                pass
         updates.append('proxy_eab_hmac_key')
 
     ok, _err = safe_commit(logger, "Failed to update ACME client settings")

@@ -352,6 +352,15 @@ class TestAcmeServerHistory:
 class TestAcmeClientSettings:
     """GET/PATCH /api/v2/acme/client/settings"""
 
+    @pytest.fixture(autouse=True)
+    def _clear_proxy_account_link(self, app):
+        from models import db, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            db.session.commit()
+        yield
+
     def test_get_client_settings(self, auth_client):
         r = auth_client.get('/api/v2/acme/client/settings')
         data = assert_success(r)
@@ -486,6 +495,7 @@ class TestAcmeClientSettings:
         r = auth_client.get('/api/v2/acme/client/settings')
         data = assert_success(r)
         assert 'proxy_upstream_url' in data
+        assert 'proxy_acme_account_id' in data
 
     def test_patch_proxy_eab_kid(self, auth_client):
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
@@ -528,17 +538,54 @@ class TestAcmeClientSettings:
 class TestAcmeClientProxy:
     """POST /api/v2/acme/client/proxy/register|unregister"""
 
-    def test_proxy_register(self, auth_client):
-        from unittest.mock import patch, PropertyMock
-        with patch('services.acme.acme_proxy_service.AcmeProxyService.account_url',
-                   new_callable=PropertyMock, return_value='https://example.com/acct/1'), \
-             patch('services.acme.acme_proxy_service.AcmeProxyService._load_or_create_account_key',
-                   return_value=(None, None)):
-            r = post_json(auth_client, '/api/v2/acme/client/proxy/register',
-                          {'email': 'proxy@example.com'})
+    @pytest.fixture(autouse=True)
+    def _clean_proxy_config(self, app):
+        from models import db, SystemConfig, AcmeClientAccount
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            SystemConfig.query.filter_by(key='acme.proxy_email').delete()
+            db.session.commit()
+        yield
+
+    def test_proxy_register(self, auth_client, app):
+        from unittest.mock import patch
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        custom_dir = 'https://proxy-reg-test.example/directory'
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            AcmeClientAccount.query.filter_by(directory_url=custom_dir).delete()
+            db.session.commit()
+            acct = AcmeClientAccount(
+                directory_url=custom_dir,
+                label='Proxy Reg',
+                email='proxy@example.com',
+            )
+            db.session.add(acct)
+            db.session.commit()
+            account_id = acct.id
+            db.session.add(SystemConfig(
+                key=PROXY_ACCOUNT_ID_KEY,
+                value=str(account_id),
+                description='test',
+            ))
+            db.session.commit()
+
+        with patch(
+            'services.acme.acme_client_service.AcmeClientService.register_account',
+            return_value=(True, 'ok', 'https://example.com/acct/1'),
+        ):
+            r = post_json(
+                auth_client,
+                '/api/v2/acme/client/proxy/register',
+                {'email': 'proxy@example.com', 'acme_account_id': account_id},
+            )
             data = assert_success(r)
             assert data['registered'] is True
             assert data['email'] == 'proxy@example.com'
+            assert data['acme_account_id'] == account_id
             assert 'account_url' in data
 
     def test_proxy_register_missing_email(self, auth_client):
@@ -563,24 +610,84 @@ class TestAcmeClientProxy:
                           {'email': bad})
             assert_error(r, 400)
 
-    def test_proxy_unregister(self, auth_client):
-        # Register first, then unregister (mock upstream call)
-        from unittest.mock import patch, PropertyMock
-        with patch('services.acme.acme_proxy_service.AcmeProxyService.account_url',
-                   new_callable=PropertyMock, return_value='https://example.com/acct/2'), \
-             patch('services.acme.acme_proxy_service.AcmeProxyService._load_or_create_account_key',
-                   return_value=(None, None)):
-            post_json(auth_client, '/api/v2/acme/client/proxy/register',
-                      {'email': 'unreg@example.com'})
-        r = post_json(auth_client, '/api/v2/acme/client/proxy/unregister', {})
+    def test_proxy_unregister(self, auth_client, app):
+        from unittest.mock import patch
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        custom_dir = 'https://proxy-unreg-test.example/directory'
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            AcmeClientAccount.query.filter_by(directory_url=custom_dir).delete()
+            db.session.commit()
+            acct = AcmeClientAccount(
+                directory_url=custom_dir,
+                label='Proxy Unreg',
+                email='unreg@example.com',
+                account_url='https://example.com/acct/2',
+            )
+            db.session.add(acct)
+            db.session.commit()
+            account_id = acct.id
+            db.session.add(SystemConfig(
+                key=PROXY_ACCOUNT_ID_KEY,
+                value=str(account_id),
+                description='test',
+            ))
+            db.session.commit()
+
+        with patch(
+            'services.acme.acme_client_service.AcmeClientService.register_account',
+            return_value=(True, 'ok', 'https://example.com/acct/2'),
+        ):
+            post_json(
+                auth_client,
+                '/api/v2/acme/client/proxy/register',
+                {'email': 'unreg@example.com', 'acme_account_id': account_id},
+            )
+        r = post_json(
+            auth_client,
+            '/api/v2/acme/client/proxy/unregister',
+            {'acme_account_id': account_id},
+        )
         data = assert_success(r)
         assert data['registered'] is False
 
-    def test_proxy_unregister_when_not_registered(self, auth_client):
-        # Ensure unregistered first
-        post_json(auth_client, '/api/v2/acme/client/proxy/unregister', {})
-        r = post_json(auth_client, '/api/v2/acme/client/proxy/unregister', {})
+    def test_proxy_unregister_when_not_registered(self, auth_client, app):
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        with app.app_context():
+            acct = AcmeClientAccount(
+                directory_url='https://proxy-idempotent-unreg.example/directory',
+                label='Idempotent',
+                email='ops@example.com',
+            )
+            db.session.add(acct)
+            db.session.commit()
+            account_id = acct.id
+            db.session.add(SystemConfig(
+                key=PROXY_ACCOUNT_ID_KEY,
+                value=str(account_id),
+                description='test',
+            ))
+            db.session.commit()
+
+        post_json(
+            auth_client,
+            '/api/v2/acme/client/proxy/unregister',
+            {'acme_account_id': account_id},
+        )
+        r =         post_json(
+            auth_client,
+            '/api/v2/acme/client/proxy/unregister',
+            {'acme_account_id': account_id},
+        )
         assert_success(r)
+
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            db.session.commit()
 
 
 class TestAcmeProxyEmailValidation:
@@ -1191,6 +1298,62 @@ class TestAcmeProxyProtocol:
     new-order) using JWS-signed requests, NOT the management API.
     Covers regression from issue #55: proxy KID-based JWS verification.
     """
+
+    _STUB_DIRECTORY_URL = 'https://acme-stub.example/directory'
+
+    @pytest.fixture(autouse=True)
+    def _proxy_protocol_upstream_stub(self, app, monkeypatch):
+        """Isolate proxy protocol tests from leaked PROXY_ACCOUNT_ID_KEY rows."""
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        fake_directory = {
+            'newNonce': 'https://acme-stub.example/acme/new-nonce',
+            'newAccount': 'https://acme-stub.example/acme/new-account',
+            'newOrder': 'https://acme-stub.example/acme/new-order',
+            'meta': {},
+        }
+
+        class _FakeResp:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return fake_directory
+
+        monkeypatch.setattr(
+            'services.acme.acme_proxy_service.requests.get',
+            lambda *args, **kwargs: _FakeResp(),
+        )
+
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            AcmeClientAccount.query.filter_by(
+                directory_url=self._STUB_DIRECTORY_URL
+            ).delete()
+            db.session.commit()
+            acct = AcmeClientAccount(
+                directory_url=self._STUB_DIRECTORY_URL,
+                label='Proxy Protocol Stub',
+                email='proxy-protocol@example.com',
+            )
+            db.session.add(acct)
+            db.session.commit()
+            db.session.add(SystemConfig(
+                key=PROXY_ACCOUNT_ID_KEY,
+                value=str(acct.id),
+                description='test proxy protocol',
+            ))
+            db.session.commit()
+        yield
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            AcmeClientAccount.query.filter_by(
+                directory_url=self._STUB_DIRECTORY_URL
+            ).delete()
+            db.session.commit()
 
     @staticmethod
     def _get_nonce(client):

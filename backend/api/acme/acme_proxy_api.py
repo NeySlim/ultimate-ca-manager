@@ -1,6 +1,10 @@
 """
 ACME Proxy API Endpoints (RFC 8555)
 Mirrors the standard ACME API but proxies requests to upstream providers.
+
+Supports:
+  - Legacy default proxy: /acme/proxy/directory
+  - Per-CA proxy paths:   /acme/proxy/<slug>/directory
 """
 from flask import Blueprint, request, jsonify, make_response
 import base64
@@ -12,6 +16,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
 from services.acme.acme_proxy_service import AcmeProxyService
+from services.acme.acme_proxy_account import resolve_proxy_by_slug
 from services.acme import AcmeService
 
 logger = logging.getLogger(__name__)
@@ -21,8 +26,16 @@ acme_proxy_bp = Blueprint('acme_proxy', __name__, url_prefix='/acme/proxy')
 
 # ==================== Helpers ====================
 
-def get_proxy_service():
-    base_url = f"{request.scheme}://{request.host}"
+def _proxy_base_url(slug=None):
+    root = f"{request.scheme}://{request.host}/acme/proxy"
+    return f"{root}/{slug}" if slug else root
+
+
+def get_proxy_service(slug=None):
+    base_url = _proxy_base_url(slug)
+    if slug:
+        account = resolve_proxy_by_slug(slug)
+        return AcmeProxyService(base_url, account_id=account.id)
     return AcmeProxyService(base_url)
 
 
@@ -64,7 +77,6 @@ def verify_proxy_jws():
         if not jws_data:
             return False, None, None, "Request body is not valid JSON"
 
-        # Use base_url (no query params) as expected URL per RFC 8555 §6.4
         expected_url = request.base_url
 
         from api.acme.acme_api import verify_jws
@@ -76,22 +88,40 @@ def verify_proxy_jws():
 
 
 def _require_empty_payload(payload):
-    """Validate POST-as-GET: payload MUST be empty (RFC 8555 §6.3).
-
-    Returns an error response if payload is non-empty, None otherwise.
-    """
+    """Validate POST-as-GET: payload MUST be empty (RFC 8555 §6.3)."""
     if payload:
         return proxy_error("malformed", "Payload must be empty for POST-as-GET requests")
     return None
 
 
+def _dual_route(rule, methods, endpoint):
+    """Register both default and slug-scoped proxy routes."""
+
+    def decorator(view_func):
+        acme_proxy_bp.add_url_rule(
+            rule,
+            endpoint=endpoint,
+            view_func=lambda **kw: view_func(slug=None, **kw),
+            methods=methods,
+        )
+        acme_proxy_bp.add_url_rule(
+            f'/<slug>{rule}',
+            endpoint=f'{endpoint}_slug',
+            view_func=view_func,
+            methods=methods,
+        )
+        return view_func
+
+    return decorator
+
+
 # ==================== Endpoints ====================
 
-@acme_proxy_bp.route('/directory', methods=['GET'])
-def directory():
+@_dual_route('/directory', methods=['GET'], endpoint='proxy_directory')
+def directory(slug=None):
     """ACME directory (RFC 8555 §7.1.1)"""
     try:
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         return proxy_response(svc.get_directory())
     except RuntimeError as e:
         logger.error(f"ACME proxy directory error: {e}")
@@ -101,29 +131,21 @@ def directory():
         return proxy_error("serverInternal", "Failed to retrieve directory", 500)
 
 
-@acme_proxy_bp.route('/new-nonce', methods=['GET', 'HEAD'])
-def new_nonce():
+@_dual_route('/new-nonce', methods=['GET', 'HEAD'], endpoint='proxy_new_nonce')
+def new_nonce(slug=None):
     """New nonce (RFC 8555 §7.2)"""
-    svc = get_proxy_service()
+    svc = get_proxy_service(slug)
     nonce = svc.new_nonce()
-    resp = make_response('', 200 if request.method == 'GET' else 200)
+    resp = make_response('', 200)
     resp.status_code = 204 if request.method == 'HEAD' else 200
     resp.headers['Replay-Nonce'] = nonce
     resp.headers['Cache-Control'] = 'no-store'
     return resp
 
 
-@acme_proxy_bp.route('/new-account', methods=['POST'])
-def new_account():
-    """New account (RFC 8555 §7.3)
-
-    The proxy stores client accounts locally for JWS verification on
-    subsequent requests, while using a shared upstream account for
-    actual certificate issuance.
-
-    Issue #112: enforce local UCM EAB policy here, BEFORE creating the
-    account. Upstream LE doesn't require EAB so we cannot rely on it.
-    """
+@_dual_route('/new-account', methods=['POST'], endpoint='proxy_new_account')
+def new_account(slug=None):
+    """New account (RFC 8555 §7.3)"""
     from models import SystemConfig
 
     is_valid, payload, jwk, err = verify_proxy_jws()
@@ -133,7 +155,6 @@ def new_account():
     if not jwk:
         return proxy_error("malformed", "Missing JWK in protected header")
 
-    # === EAB enforcement (issue #112) ===
     eab_data = payload.get('externalAccountBinding') if isinstance(payload, dict) else None
     eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
     eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
@@ -157,7 +178,6 @@ def new_account():
             terms_of_service_agreed=payload.get("termsOfServiceAgreed", False)
         )
 
-        # Mark EAB credential as used (one-shot binding)
         if eab_data and is_new:
             try:
                 eab_protected = json.loads(
@@ -169,7 +189,7 @@ def new_account():
             except Exception as e:
                 logger.warning(f"Could not mark EAB credential used: {e}")
 
-        acct_url = f"{request.scheme}://{request.host}/acme/proxy/acct/{account.account_id}"
+        acct_url = f"{_proxy_base_url(slug)}/acct/{account.account_id}"
 
         resp_data = {
             "status": account.status,
@@ -185,8 +205,8 @@ def new_account():
         return proxy_error("serverInternal", "Failed to create account", 500)
 
 
-@acme_proxy_bp.route('/new-order', methods=['POST'])
-def new_order():
+@_dual_route('/new-order', methods=['POST'], endpoint='proxy_new_order')
+def new_order(slug=None):
     """New order (RFC 8555 §7.4)"""
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
@@ -201,7 +221,6 @@ def new_order():
         if not_before:
             not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
 
-        # Compute client JWK thumbprint for order tracking
         client_thumbprint = None
         if jwk:
             try:
@@ -213,12 +232,12 @@ def new_order():
             except Exception:
                 pass
 
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         order_data, order_id = svc.new_order(
             identifiers, not_before, client_thumbprint=client_thumbprint
         )
 
-        order_url = f"{request.scheme}://{request.host}/acme/proxy/order/{order_id}"
+        order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(order_data, 201)
         resp.headers['Location'] = order_url
         return resp
@@ -230,15 +249,14 @@ def new_order():
         return proxy_error("serverInternal", str(e))
     except Exception as e:
         logger.error(f"ACME proxy new-order error: {e}")
-        # Surface DNS provider configuration errors clearly
         detail = str(e)
         if "No DNS provider" in detail:
             return proxy_error("serverInternal", detail)
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
-@acme_proxy_bp.route('/authz/<authz_id>', methods=['POST'])
-def authz(authz_id):
+@_dual_route('/authz/<authz_id>', methods=['POST'], endpoint='proxy_authz')
+def authz(authz_id, slug=None):
     """Get authorization (RFC 8555 §7.5) — POST-as-GET"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
@@ -249,7 +267,7 @@ def authz(authz_id):
         return err_resp
 
     try:
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         result = svc.get_authz(authz_id)
         if not result:
             return proxy_error("malformed", "Authorization not found", 404)
@@ -266,15 +284,15 @@ def authz(authz_id):
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
-@acme_proxy_bp.route('/challenge/<chall_id>', methods=['POST'])
-def challenge(chall_id):
+@_dual_route('/challenge/<chall_id>', methods=['POST'], endpoint='proxy_challenge')
+def challenge(chall_id, slug=None):
     """Respond to challenge (RFC 8555 §7.5.1)"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
     try:
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         data, link_header = svc.respond_challenge(chall_id)
         resp = proxy_response(data)
         if link_header:
@@ -288,16 +306,14 @@ def challenge(chall_id):
         error_type = "serverInternal"
         if "dns-01" in detail.lower() or "unsupported" in detail.lower():
             error_type = "unsupportedIdentifier"
-        elif "dns provider" in detail.lower():
-            error_type = "serverInternal"
         return proxy_error(error_type, detail)
     except Exception as e:
         logger.error(f"ACME proxy challenge error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
-@acme_proxy_bp.route('/order/<order_id>', methods=['POST'])
-def get_order(order_id):
+@_dual_route('/order/<order_id>', methods=['POST'], endpoint='proxy_get_order')
+def get_order(order_id, slug=None):
     """Get order status (RFC 8555 §7.4) — POST-as-GET"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
@@ -308,9 +324,9 @@ def get_order(order_id):
         return err_resp
 
     try:
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         data = svc.get_order(order_id)
-        order_url = f"{request.scheme}://{request.host}/acme/proxy/order/{order_id}"
+        order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
         return resp
@@ -321,14 +337,13 @@ def get_order(order_id):
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
-@acme_proxy_bp.route('/order/<order_id>/finalize', methods=['POST'])
-def finalize(order_id):
+@_dual_route('/order/<order_id>/finalize', methods=['POST'], endpoint='proxy_finalize')
+def finalize(order_id, slug=None):
     """Finalize order with CSR (RFC 8555 §7.4)"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
-    # Extract requester account_id from JWS kid for ownership check
     requester_account_id = None
     try:
         jws_data = request.get_json(silent=True) or {}
@@ -347,17 +362,16 @@ def finalize(order_id):
         if not csr_b64:
             return proxy_error("malformed", "Missing 'csr' in payload")
 
-        # Decode base64url CSR to PEM (RFC 8555 §7.4 uses DER in base64url)
         csr_b64 += '=' * (4 - len(csr_b64) % 4)
         csr_der = base64.urlsafe_b64decode(csr_b64)
         csr_obj = x509.load_der_x509_csr(csr_der)
         csr_pem = csr_obj.public_bytes(serialization.Encoding.PEM).decode()
 
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         data = svc.finalize_order(order_id, csr_pem,
                                   requester_account_id=requester_account_id)
 
-        order_url = f"{request.scheme}://{request.host}/acme/proxy/order/{order_id}"
+        order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
         return resp
@@ -370,8 +384,8 @@ def finalize(order_id):
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
-@acme_proxy_bp.route('/cert/<cert_id>', methods=['POST'])
-def cert(cert_id):
+@_dual_route('/cert/<cert_id>', methods=['POST'], endpoint='proxy_cert')
+def cert(cert_id, slug=None):
     """Download certificate (RFC 8555 §7.4.2) — POST-as-GET"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
@@ -382,7 +396,7 @@ def cert(cert_id):
         return err_resp
 
     try:
-        svc = get_proxy_service()
+        svc = get_proxy_service(slug)
         content, content_type, link_header = svc.get_certificate(cert_id)
 
         resp = make_response(content, 200)
@@ -399,8 +413,8 @@ def cert(cert_id):
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
-@acme_proxy_bp.route('/revoke-cert', methods=['POST'])
-def revoke_cert():
+@_dual_route('/revoke-cert', methods=['POST'], endpoint='proxy_revoke_cert')
+def revoke_cert(slug=None):
     """Revoke certificate (RFC 8555 §7.6)"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
@@ -409,19 +423,16 @@ def revoke_cert():
     if not payload or 'certificate' not in payload:
         return proxy_error("malformed", "Missing 'certificate' in payload")
 
-    # Certificate revocation is not proxied to upstream — local certs are
-    # managed locally. Return not-implemented for now.
     logger.warning("ACME proxy revoke-cert called but not implemented")
     return proxy_error("serverInternal", "Certificate revocation via proxy is not supported", 501)
 
 
-@acme_proxy_bp.route('/key-change', methods=['POST'])
-def key_change():
+@_dual_route('/key-change', methods=['POST'], endpoint='proxy_key_change')
+def key_change(slug=None):
     """Key change (RFC 8555 §7.3.5)"""
     is_valid, payload, _, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
-    # Key change is not applicable to the stateless proxy model.
     logger.warning("ACME proxy key-change called but not implemented")
     return proxy_error("serverInternal", "Key change via proxy is not supported", 501)

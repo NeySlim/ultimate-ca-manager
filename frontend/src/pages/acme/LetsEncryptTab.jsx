@@ -33,7 +33,8 @@ export default function LetsEncryptTab({
   onUpdateClientSetting,
   onRegisterProxy,
   onUnregisterProxy,
-  onProxyModeChange,
+  onProxyAccountChange,
+  caAccounts = [],
   onResetProxyAccount,
   onTestConnection,
   onRequestCertificate,
@@ -50,6 +51,18 @@ export default function LetsEncryptTab({
 }) {
   const { t } = useTranslation()
   const { copy } = useClipboard()
+
+  const proxyAccountId = clientSettings.proxy_acme_account_id ?? null
+  const selectedProxyAccount = caAccounts.find(a => a.id === proxyAccountId)
+  const proxyServerBase = selectedProxyAccount?.proxy_enabled && selectedProxyAccount?.proxy_slug
+    ? `${window.location.origin}/acme/proxy/${selectedProxyAccount.proxy_slug}`
+    : `${window.location.origin}/acme/proxy`
+  const proxyDirectoryUrl = `${proxyServerBase}/directory`
+  const enabledProxyAccounts = caAccounts.filter(a => a.proxy_enabled && a.proxy_slug)
+  const proxyAccountOptions = caAccounts.map(a => ({
+    value: String(a.id),
+    label: `${a.label}${a.is_default ? ` (${t('common.default')})` : ''}${a.is_registered ? '' : ` — ${t('acme.notRegistered')}`}`,
+  }))
 
   return (
     <div className="p-4 space-y-4">
@@ -325,19 +338,27 @@ export default function LetsEncryptTab({
 
           {clientSettings.proxy_enabled && (
             <>
-              {/* Upstream CA Mode Selector */}
               <Select
-                label={t('acme.upstreamCA')}
-                value={clientSettings.proxy_upstream_mode || 'staging'}
-                onChange={onProxyModeChange}
-                disabled={!canWrite}
+                label={t('acme.proxyUpstreamCAAccount')}
+                value={proxyAccountId != null ? String(proxyAccountId) : ''}
+                onChange={(val) => onProxyAccountChange(val ? parseInt(val, 10) : null)}
+                disabled={!canWrite || caAccounts.length === 0}
                 options={[
-                  { value: 'staging', label: t('acme.letsEncryptStaging') },
-                  { value: 'production', label: t('acme.letsEncryptProduction') },
-                  { value: 'custom', label: t('acme.customCA') },
+                  { value: '', label: t('acme.proxySelectCaAccount') },
+                  ...proxyAccountOptions,
                 ]}
-                helperText={t('acme.upstreamCAHelper')}
+                helperText={
+                  caAccounts.length === 0
+                    ? t('acme.proxyNoCaAccounts')
+                    : t('acme.proxyUpstreamCAAccountHelper')
+                }
               />
+
+              {selectedProxyAccount && (
+                <p className="text-xs text-text-tertiary font-mono break-all">
+                  {selectedProxyAccount.directory_url}
+                </p>
+              )}
 
               <ToggleSwitch
                 checked={clientSettings.proxy_verify_ssl ?? true}
@@ -352,51 +373,27 @@ export default function LetsEncryptTab({
                 </div>
               )}
 
-              {/* Custom URL (only in custom mode) */}
-              {clientSettings.proxy_upstream_mode === 'custom' && (
-                <Input
-                  label={t('acme.customCAUrl')}
-                  type="url"
-                  value={localProxyUpstreamUrl}
-                  onChange={(e) => onLocalProxyUpstreamUrlChange(e.target.value)}
-                  onBlur={() => onBlurSave('proxy_upstream_url', localProxyUpstreamUrl, onLocalProxyUpstreamUrlChange)}
-                  disabled={!canWrite}
-                  placeholder="https://acme.zerossl.com/v2/DV90"
-                  helperText={t('acme.customCAUrlHelper')}
-                />
+              {selectedProxyAccount && (
+                <p className="text-xs text-text-tertiary">{t('acme.proxyManageCaAccountsHint')}</p>
               )}
 
               {/* Account Registration Status */}
-              {clientSettings.proxy_account_registered ? (() => {
-                const accountUrl = clientSettings.proxy_account_url || ''
-                const isLEAccount = accountUrl.includes('letsencrypt.org')
-                const mode = clientSettings.proxy_upstream_mode || 'staging'
-                const isMismatch = (mode === 'custom' && isLEAccount) ||
-                  (mode !== 'custom' && !isLEAccount && accountUrl)
+              {proxyAccountId && selectedProxyAccount?.is_registered ? (() => {
+                const accountUrl = clientSettings.proxy_account_url || selectedProxyAccount.account_url || ''
 
                 return (
-                  <div className={cn(
-                    'p-3 rounded-lg border',
-                    isMismatch
-                      ? 'status-warning-bg status-warning-border'
-                      : 'status-success-bg status-success-border'
-                  )}>
+                  <div className="p-3 rounded-lg border status-success-bg status-success-border">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        {isMismatch
-                          ? <Warning size={18} className="status-warning-text" weight="fill" />
-                          : <CheckCircle size={18} className="status-success-text" weight="fill" />
-                        }
+                        <CheckCircle size={18} className="status-success-text" weight="fill" />
                         <div>
                           <p className="text-sm font-medium text-text-primary">
-                            {isMismatch ? t('acme.accountMismatch') : t('acme.upstreamAccountRegistered')}
+                            {t('acme.upstreamAccountRegistered')}
                           </p>
                           <p className="text-xs text-text-secondary font-mono">
                             {accountUrl ? `...${accountUrl.slice(-30)}` : t('acme.accountRegistered')}
                           </p>
-                          {isMismatch && (
-                            <p className="text-xs status-warning-text mt-1">{t('acme.accountMismatchHelper')}</p>
-                          )}
+                          <p className="text-xs text-text-tertiary mt-1">{selectedProxyAccount.label}</p>
                         </div>
                       </div>
                       {canWrite && (
@@ -414,7 +411,7 @@ export default function LetsEncryptTab({
                     </div>
                   </div>
                 )
-              })() : (
+              })() : proxyAccountId ? (
                 <div className="p-3 rounded-lg bg-tertiary-op30 border border-border">
                   <div className="flex items-center gap-2">
                     <Warning size={18} className="text-text-tertiary" />
@@ -424,7 +421,7 @@ export default function LetsEncryptTab({
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Connection Test */}
               <div className="flex items-center gap-2">
@@ -433,7 +430,7 @@ export default function LetsEncryptTab({
                   variant="secondary"
                   size="sm"
                   onClick={onTestConnection}
-                  disabled={testingConnection || (clientSettings.proxy_upstream_mode === 'custom' && !localProxyUpstreamUrl && !clientSettings.proxy_upstream_url)}
+                  disabled={testingConnection || !proxyAccountId}
                 >
                   {testingConnection ? <ArrowsClockwise size={14} className="animate-spin" /> : <PlugsConnected size={14} />}
                   {t('acme.testConnection')}
@@ -447,83 +444,68 @@ export default function LetsEncryptTab({
                 )}
               </div>
 
-              {/* EAB Credentials (collapsible section) */}
-              <details className="group rounded-lg border border-border/50 hover:border-border transition-colors">
-                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none px-3 py-2.5 rounded-lg hover:bg-tertiary-op30 transition-colors list-none [&::-webkit-details-marker]:hidden">
-                  <CaretRight size={14} weight="bold" className="shrink-0 transition-transform duration-200 group-open:rotate-90" />
-                  <LockKey size={14} className="shrink-0" />
-                  {t('acme.proxyEabCredentials')}
-                  {(clientSettings.proxy_eab_hmac_key_set || localProxyEabKid) && (
-                    <Badge variant="outline" size="sm">{t('common.configured')}</Badge>
-                  )}
-                </summary>
-                <div className="px-3 pb-3 space-y-3">
-                  <Input
-                    label={t('acme.proxyEabKid')}
-                    value={localProxyEabKid}
-                    onChange={(e) => onLocalProxyEabKidChange(e.target.value)}
-                    onBlur={() => onBlurSave('proxy_eab_kid', localProxyEabKid, onLocalProxyEabKidChange)}
-                    disabled={!canWrite}
-                    placeholder="key-id-from-upstream-ca"
-                    helperText={t('acme.proxyEabKidHelper')}
-                  />
-
-                  <Input
-                    label={t('acme.proxyEabHmacKey')}
-                    type="password"
-                    value={proxyEabHmacInput !== null ? proxyEabHmacInput : (clientSettings.proxy_eab_hmac_key_set ? '••••••••' : '')}
-                    onChange={(e) => onProxyEabHmacInputChange(e.target.value)}
-                    onBlur={() => {
-                      if (proxyEabHmacInput !== null && proxyEabHmacInput !== '') {
-                        onUpdateClientSetting('proxy_eab_hmac_key', proxyEabHmacInput)
-                      }
-                    }}
-                    onFocus={() => {
-                      if (proxyEabHmacInput === null && clientSettings.proxy_eab_hmac_key_set) {
-                        onProxyEabHmacInputChange('')
-                      }
-                    }}
-                    disabled={!canWrite}
-                    placeholder={t('acme.proxyEabHmacKeyPlaceholder')}
-                    helperText={t('acme.proxyEabHmacKeyHelper')}
-                  />
-                </div>
-              </details>
-
               {/* Proxy Endpoint & Usage */}
               <div className="p-3 bg-tertiary-op50 rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-text-secondary">{t('acme.yourProxyUrl')}</p>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => copy(`${window.location.origin}/acme/proxy/directory`)}>
+                  <p className="text-xs font-medium text-text-secondary">{t('acme.proxyPathUrl')}</p>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => copy(proxyDirectoryUrl)}>
                     <Copy size={12} />
                   </Button>
                 </div>
                 <code className="block text-xs text-accent-primary font-mono bg-bg-secondary p-2 rounded break-all">
-                  {window.location.origin}/acme/proxy/directory
+                  {proxyDirectoryUrl}
                 </code>
+                {!selectedProxyAccount?.proxy_enabled && (
+                  <>
+                    <p className="text-xs text-text-tertiary">{t('acme.proxyDefaultUrl')}</p>
+                    <code className="block text-xs text-text-secondary font-mono bg-bg-secondary p-2 rounded break-all">
+                      {window.location.origin}/acme/proxy/directory
+                    </code>
+                  </>
+                )}
+                {enabledProxyAccounts.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <p className="text-xs font-medium text-text-secondary">{t('acme.proxyEnabledEndpoints')}</p>
+                    {enabledProxyAccounts.map((acct) => (
+                      <div key={acct.id} className="flex items-center justify-between gap-2">
+                        <code className="text-xs text-text-secondary font-mono break-all">
+                          {window.location.origin}/acme/proxy/{acct.proxy_slug}/directory
+                        </code>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copy(`${window.location.origin}/acme/proxy/${acct.proxy_slug}/directory`)}
+                        >
+                          <Copy size={12} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs font-medium text-text-secondary mt-3">{t('acme.proxyUsage')}</p>
                 <pre className="text-xs text-text-primary bg-bg-secondary p-2 rounded overflow-x-auto font-mono whitespace-pre-wrap break-all">
 {`certbot certonly \\
-  --server ${window.location.origin}/acme/proxy/directory \\
+  --server ${proxyDirectoryUrl} \\
   --preferred-challenges dns-01 \\
   --authenticator manual \\
   --manual-auth-hook /bin/true \\
   --manual-cleanup-hook /bin/true \\
   --non-interactive --agree-tos -m you@example.com \\
-  -d example.com`}
+  -d subdomain.example.com`}
                 </pre>
-                <p className="text-xs text-text-tertiary">{t('acme.proxyUsageNote')}</p>
+                <p className="text-xs text-text-tertiary whitespace-pre-line">{t('acme.proxyUsageNote')}</p>
               </div>
 
               {/* Proxy Registration */}
-              {clientSettings.proxy_registered ? (
+              {proxyAccountId && selectedProxyAccount?.is_registered ? (
                 <div className="p-3 rounded-lg status-success-bg status-success-border border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CheckCircle size={18} className="status-success-text" weight="fill" />
                       <div>
                         <p className="text-sm font-medium text-text-primary">{t('acme.proxyRegistered')}</p>
-                        <p className="text-xs text-text-secondary">{clientSettings.proxy_email}</p>
+                        <p className="text-xs text-text-secondary">{selectedProxyAccount.email}</p>
                       </div>
                     </div>
                     <Button
@@ -537,12 +519,12 @@ export default function LetsEncryptTab({
                     </Button>
                   </div>
                 </div>
-              ) : (
+              ) : proxyAccountId ? (
                 <div className="space-y-3 p-3 bg-tertiary-op30 rounded-lg">
                   <Input
                     label={t('common.emailAddress')}
                     type="email"
-                    value={proxyEmail}
+                    value={proxyEmail || selectedProxyAccount?.email || ''}
                     onChange={(e) => onProxyEmailChange(e.target.value)}
                     placeholder={t('acme.emailPlaceholder')}
                     helperText={t('common.emailRequired')}
@@ -552,13 +534,13 @@ export default function LetsEncryptTab({
                     variant="secondary"
                     size="sm"
                     onClick={onRegisterProxy}
-                    disabled={!proxyEmail}
+                    disabled={!proxyEmail && !selectedProxyAccount?.email}
                   >
                     <Key size={14} />
                     {t('acme.registerAccount')}
                   </Button>
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </div>

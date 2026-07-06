@@ -226,12 +226,19 @@ export default function ACMEPage() {
   // =========================================================================
 
   const handleRegisterProxy = async () => {
-    if (!proxyEmail) {
+    const accountId = clientSettings.proxy_acme_account_id
+    const selected = caAccounts.find(a => a.id === accountId)
+    const email = (proxyEmail || selected?.email || '').trim()
+    if (!accountId) {
+      showError(t('acme.proxySelectCaAccount'))
+      return
+    }
+    if (!email) {
       showError(t('messages.errors.validation.requiredField'))
       return
     }
     try {
-      await acmeService.registerProxy(proxyEmail)
+      await acmeService.registerProxy(email, accountId)
       showSuccess(t('acme.proxyRegisteredSuccess'))
       setProxyEmail('')
       loadData()
@@ -244,11 +251,22 @@ export default function ACMEPage() {
     const confirmed = await showConfirm(t('acme.confirmUnregisterProxy'))
     if (!confirmed) return
     try {
-      await acmeService.unregisterProxy()
+      await acmeService.unregisterProxy(clientSettings.proxy_acme_account_id)
       showSuccess(t('acme.proxyUnregisteredSuccess'))
       loadData()
     } catch (error) {
       showError(error.message || t('acme.proxyUnregistrationFailed'))
+    }
+  }
+
+  const handleProxyAccountChange = async (accountId) => {
+    try {
+      setConnectionResult(null)
+      await acmeService.updateClientSettings({ proxy_acme_account_id: accountId || null })
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+      loadData()
     }
   }
 
@@ -281,8 +299,9 @@ export default function ACMEPage() {
     setTestingConnection(true)
     setConnectionResult(null)
     try {
-      const url = clientSettings.proxy_upstream_url || localProxyUpstreamUrl
-      const res = await acmeService.testProxyConnection(url || undefined)
+      const res = await acmeService.testProxyConnection({
+        acmeAccountId: clientSettings.proxy_acme_account_id,
+      })
       setConnectionResult(res.data || res)
     } catch (error) {
       setConnectionResult({ connected: false, error: error.message })
@@ -1097,7 +1116,8 @@ export default function ACMEPage() {
             onUpdateClientSetting={handleUpdateClientSetting}
             onRegisterProxy={handleRegisterProxy}
             onUnregisterProxy={handleUnregisterProxy}
-            onProxyModeChange={handleProxyModeChange}
+            onProxyAccountChange={handleProxyAccountChange}
+            caAccounts={caAccounts}
             onResetProxyAccount={handleResetProxyAccount}
             onTestConnection={handleTestConnection}
             onRequestCertificate={() => setShowRequestModal(true)}

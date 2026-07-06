@@ -13,13 +13,13 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, Union
 
 from cryptography.hazmat.primitives import serialization, hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
 from cryptography.hazmat.backends import default_backend
-import josepy as jose
 
 from models import db, SystemConfig, DnsProvider
 from security.encryption import encrypt_text, decrypt_text
 from utils.datetime_utils import utc_isoformat
+from services.acme.acme_proxy_account import resolve_proxy_account
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,10 @@ class AcmeProxyService:
     DEFAULT_UPSTREAM = "https://acme-staging-v02.api.letsencrypt.org/directory"
     # Production: https://acme-v02.api.letsencrypt.org/directory
     
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, account_id: int = None):
         self.base_url = base_url.rstrip('/')
-        self.upstream_directory_url = self._get_upstream_url()
+        self.account = resolve_proxy_account(account_id)
+        self.upstream_directory_url = self.account.directory_url
         self.verify_ssl = self._get_verify_ssl()
         self.directory = None
         self.nonces = []
@@ -40,8 +41,8 @@ class AcmeProxyService:
                 "(acme.proxy.verify_ssl=false)."
             )
         
-        # Load or create upstream account key
-        self.private_key, self.account_key = self._load_or_create_account_key()
+        # Load or create upstream account key (stored on AcmeClientAccount)
+        self.private_key, self.account_jwk = self._load_or_create_account_key()
         # Lazy-load account URL — don't register in constructor
         # This prevents /directory from failing when upstream is unreachable
         self._account_url = None
@@ -56,11 +57,6 @@ class AcmeProxyService:
     @account_url.setter
     def account_url(self, value):
         self._account_url = value
-
-    def _get_upstream_url(self) -> str:
-        """Get configured upstream URL (falls back to default if empty/missing)"""
-        config = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
-        return config.value if config and config.value else self.DEFAULT_UPSTREAM
 
     def _decode_proxy_id(self, id_b64: str) -> str:
         """Decode a client-supplied proxy ID (base64url of upstream URL) and
@@ -107,55 +103,47 @@ class AcmeProxyService:
         return True
 
     def _load_or_create_account_key(self):
-        """Load upstream account private key"""
-        config = SystemConfig.query.filter_by(key='acme.proxy.account_key').first()
-        if config:
-            # Decrypt before loading — decrypt_text is a no-op if the value
-            # is already plaintext (e.g. written before encryption was
-            # enabled, or by pre-#105 versions), so this is safe for
-            # existing installations.
-            private_key = serialization.load_pem_private_key(
-                decrypt_text(config.value).encode(),
-                password=None,
-                backend=default_backend()
-            )
-        else:
-            # Generate new key
-            private_key = rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=2048,
-                backend=default_backend()
-            )
-            # Encrypt before saving — encrypt_text is a no-op if encryption
-            # is not configured, keeping behaviour identical for installations
-            # that do not use the key encryption feature.
-            pem = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption()
-            ).decode()
+        """Load upstream account private key from the linked AcmeClientAccount."""
+        from services.acme.acme_client_service import AcmeClientService
 
-            db.session.add(SystemConfig(
-                key='acme.proxy.account_key',
-                value=encrypt_text(pem),
-                description="Private key for ACME Proxy upstream account"
-            ))
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Failed to save ACME proxy account key: {e}")
-                raise
-            
-        return private_key, jose.JWKRSA(key=private_key.public_key())
+        client = AcmeClientService(account=self.account)
+        private_key = client._get_account_key()
+        jwk_dict = client._build_jwk(private_key)
+        return private_key, jwk_dict
+
+    def _detect_key_algorithm(self) -> str:
+        from services.acme.acme_client_service import AcmeClientService
+        return AcmeClientService(account=self.account)._detect_key_algorithm(self.private_key)
+
+    def _sign_data(self, data: bytes) -> bytes:
+        from services.acme.acme_client_service import AcmeClientService
+        return AcmeClientService(account=self.account)._sign_data(self.private_key, data)
+
+    def _jwk_thumbprint(self) -> str:
+        from services.acme.acme_client_service import AcmeClientService
+        return AcmeClientService(account=self.account)._jwk_thumbprint(self.private_key)
+
+    def _refresh_account_session(self) -> None:
+        """Re-bind the linked AcmeClientAccount to the current SQLAlchemy session.
+
+        Background threads push their own app context (and therefore their own
+        session). ORM objects loaded on the request thread are detached here;
+        signing upstream JWS in _bg_respond_challenge would raise DetachedInstanceError
+        without this refresh.
+        """
+        from models.acme_client_account import AcmeClientAccount
+
+        account_id = self.account.id
+        self.account = db.session.get(AcmeClientAccount, account_id)
+        if not self.account:
+            raise RuntimeError(f"ACME proxy account {account_id} not found")
+        if self._account_url is None:
+            self._account_url = self.account.account_url
 
     def _get_upstream_account_url(self):
-        """Get or register account URL"""
-        url_config = SystemConfig.query.filter_by(key='acme.proxy.account_url').first()
-        if url_config and url_config.value:
-            return url_config.value
-        
-        # Register if not exists or empty
+        """Get or register account URL on the linked AcmeClientAccount row."""
+        if self.account.account_url:
+            return self.account.account_url
         return self._register_upstream_account()
 
     @staticmethod
@@ -177,11 +165,18 @@ class AcmeProxyService:
     def _resolve_contact_email(self) -> Optional[str]:
         """Resolve the contact email to use for upstream account registration.
         Priority:
-          1. Admin-configured acme.proxy_email (validated)
-          2. None — caller must handle (LE accepts registration without contact)
-        Never synthesizes admin@<fqdn> because internal FQDNs (.lan/.local)
-        fail the upstream Public Suffix List check.
+          1. Email on the linked AcmeClientAccount row
+          2. Legacy acme.proxy_email (validated)
+          3. None — caller must handle (LE accepts registration without contact)
         """
+        if self.account.email:
+            email = self.account.email.strip()
+            if self._is_public_email_domain(email):
+                return email
+            logger.warning(
+                "Account email '%s' has non-public TLD; trying legacy proxy_email.",
+                email,
+            )
         cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
         if cfg and cfg.value:
             email = cfg.value.strip()
@@ -194,70 +189,23 @@ class AcmeProxyService:
         return None
 
     def _register_upstream_account(self):
-        """Register account with upstream, with optional EAB support"""
-        self._ensure_directory()
-        new_account_url = self.directory['newAccount']
+        """Register the linked AcmeClientAccount with the upstream CA."""
+        from services.acme.acme_client_service import AcmeClientService
 
         contact_email = self._resolve_contact_email()
-        payload = {"termsOfServiceAgreed": True}
-        if contact_email:
-            payload["contact"] = [f"mailto:{contact_email}"]
-        
-        # Add External Account Binding if configured (required by HARICA, etc.)
-        eab_kid_config = SystemConfig.query.filter_by(key='acme.proxy.eab_kid').first()
-        eab_hmac_config = SystemConfig.query.filter_by(key='acme.proxy.eab_hmac_key').first()
-        if eab_kid_config and eab_hmac_config:
-            eab_kid = eab_kid_config.value
-            eab_hmac_key = eab_hmac_config.value
-            payload["externalAccountBinding"] = self._build_eab(
-                eab_kid, eab_hmac_key, new_account_url
-            )
-            logger.info(f"Registering upstream account with EAB (kid={eab_kid})")
-        else:
-            # Check if upstream requires EAB
-            meta = self.directory.get('meta', {})
-            if meta.get('externalAccountRequired'):
-                raise RuntimeError(
-                    "Upstream CA requires External Account Binding (EAB). "
-                    "Configure acme.proxy.eab_kid and acme.proxy.eab_hmac_key in Settings > ACME."
-                )
-        
-        resp = self._post_jws(new_account_url, payload)
-        
-        if resp.status_code in [200, 201]:
-            loc = resp.headers['Location']
-            
-            # Check if exists
-            config = SystemConfig.query.filter_by(key='acme.proxy.account_url').first()
-            if config:
-                config.value = loc
-            else:
-                db.session.add(SystemConfig(
-                    key='acme.proxy.account_url',
-                    value=loc,
-                    description="Upstream ACME Account URL"
-                ))
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Failed to save upstream ACME account URL: {e}")
-                raise
-            return loc
-        else:
-            logger.error(
-                "Failed to register upstream account (HTTP %s): %s",
-                resp.status_code, resp.text[:500]
-            )
-            # Surface the upstream 'detail' if available; otherwise a generic message.
-            detail = None
-            try:
-                detail = resp.json().get('detail')
-            except Exception:
-                pass
+        if not contact_email:
             raise RuntimeError(
-                f"Failed to register upstream ACME account: {detail or 'upstream error'}"
+                "A public contact email is required on the selected CA account "
+                "to register with the upstream ACME server."
             )
+
+        client = AcmeClientService(account=self.account)
+        success, message, account_url = client.register_account(contact_email)
+        if not success:
+            raise RuntimeError(message)
+
+        self._account_url = account_url
+        return account_url
 
     def _ensure_directory(self):
         """Fetch upstream directory"""
@@ -295,10 +243,11 @@ class AcmeProxyService:
 
     def _sign_and_post(self, url: str, payload, nonce: str, kid: str = None) -> requests.Response:
         """Build a JWS with the given nonce and POST it once."""
+        alg = self._detect_key_algorithm()
         if kid:
-            protected = {"alg": "RS256", "kid": kid, "nonce": nonce, "url": url}
+            protected = {"alg": alg, "kid": kid, "nonce": nonce, "url": url}
         else:
-            protected = {"alg": "RS256", "jwk": self.account_key.to_json(), "nonce": nonce, "url": url}
+            protected = {"alg": alg, "jwk": self.account_jwk, "nonce": nonce, "url": url}
 
         if payload == "":
             payload_json = b""
@@ -307,19 +256,11 @@ class AcmeProxyService:
 
         protected_json = json.dumps(protected).encode('utf-8')
 
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.asymmetric import padding
-
         payload_b64 = base64.urlsafe_b64encode(payload_json).rstrip(b'=').decode('utf-8')
         protected_b64 = base64.urlsafe_b64encode(protected_json).rstrip(b'=').decode('utf-8')
 
         signing_input = f"{protected_b64}.{payload_b64}".encode('utf-8')
-
-        sig = self.private_key.sign(
-            signing_input,
-            padding.PKCS1v15(),
-            hashes.SHA256()
-        )
+        sig = self._sign_data(signing_input)
 
         data = {
             "protected": protected_b64,
@@ -376,16 +317,15 @@ class AcmeProxyService:
                 if 'not valid' in detail.lower() or 'deactivated' in detail.lower():
                     logger.warning(f"Upstream account invalid ({detail}), re-registering...")
                     
-                    # Clear stale account URL from DB
-                    config = SystemConfig.query.filter_by(key='acme.proxy.account_url').first()
-                    if config:
-                        db.session.delete(config)
-                        try:
-                            db.session.commit()
-                        except Exception as e:
-                            db.session.rollback()
-                            logger.error(f"Failed to clear stale account URL: {e}")
-                            return resp
+                    # Clear stale account URL on the linked row
+                    self.account.account_url = None
+                    self._account_url = None
+                    try:
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        logger.error(f"Failed to clear stale account URL: {e}")
+                        return resp
                     
                     # Re-register with upstream
                     self.account_url = self._register_upstream_account()
@@ -419,11 +359,11 @@ class AcmeProxyService:
         eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
         meta['externalAccountRequired'] = eab_required
         return {
-            "newNonce": f"{self.base_url}/acme/proxy/new-nonce",
-            "newAccount": f"{self.base_url}/acme/proxy/new-account",
-            "newOrder": f"{self.base_url}/acme/proxy/new-order",
-            "revokeCert": f"{self.base_url}/acme/proxy/revoke-cert",
-            "keyChange": f"{self.base_url}/acme/proxy/key-change",
+            "newNonce": f"{self.base_url}/new-nonce",
+            "newAccount": f"{self.base_url}/new-account",
+            "newOrder": f"{self.base_url}/new-order",
+            "revokeCert": f"{self.base_url}/revoke-cert",
+            "keyChange": f"{self.base_url}/key-change",
             "meta": meta,
         }
 
@@ -535,10 +475,10 @@ class AcmeProxyService:
         proxy_authzs = []
         for authz_url in upstream_order['authorizations']:
             authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
-            proxy_authzs.append(f"{self.base_url}/acme/proxy/authz/{authz_id}")
+            proxy_authzs.append(f"{self.base_url}/authz/{authz_id}")
             
         upstream_order['authorizations'] = proxy_authzs
-        upstream_order['finalize'] = f"{self.base_url}/acme/proxy/order/{order_id}/finalize"
+        upstream_order['finalize'] = f"{self.base_url}/order/{order_id}/finalize"
         
         return upstream_order, order_id
 
@@ -619,7 +559,7 @@ class AcmeProxyService:
                             db.session.rollback()
                             logger.error(f"Failed to start auto-DNS thread: {e}")
             
-            chall['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id}"
+            chall['url'] = f"{self.base_url}/challenge/{chall_id}"
             proxy_challenges.append(chall)
         
         if not proxy_challenges:
@@ -660,7 +600,7 @@ class AcmeProxyService:
         
         if status != 'pending':
             # Already processing or finished
-            challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
+            challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
             return challenge_data, self._get_authz_link(resp.headers.get('Link'))
 
         # If still pending, check if we already triggered automation in get_authz
@@ -670,7 +610,7 @@ class AcmeProxyService:
             if chall_url in challenges_data and challenges_data[chall_url].get('status') == 'initiated':
                 # Already triggered, just return 'processing'
                 challenge_data['status'] = 'processing'
-                challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
+                challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
                 return challenge_data, self._get_authz_link(resp.headers.get('Link'))
 
         # Fallback: Trigger if not already triggered (should be rare now)
@@ -698,7 +638,7 @@ class AcmeProxyService:
         thread.start()
         
         challenge_data['status'] = 'processing'
-        challenge_data['url'] = f"{self.base_url}/acme/proxy/challenge/{chall_id_b64}"
+        challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
         
         return challenge_data, self._get_authz_link(resp.headers.get('Link'))
 
@@ -728,6 +668,8 @@ class AcmeProxyService:
         
         with app.app_context():
             try:
+                self._refresh_account_session()
+
                 # Calculate TXT value
                 digest = hashlib.sha256(key_authz.encode()).digest()
                 txt_value = base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
@@ -774,6 +716,13 @@ class AcmeProxyService:
                     logger.error(f"[ACME Proxy BG] Upstream challenge validation error: {resp.text}")
                 else:
                     logger.info(f"[ACME Proxy BG] Upstream challenge validation triggered successfully for {domain}")
+                    challenges_data = order.challenges_dict
+                    entry = challenges_data.get(chall_url, {})
+                    entry['status'] = 'submitted'
+                    entry['submitted_at'] = datetime.now().isoformat()
+                    challenges_data[chall_url] = entry
+                    order.set_challenges_dict(challenges_data)
+                    db.session.commit()
                     
             except Exception as e:
                 logger.error(f"[ACME Proxy BG] Error in background challenge setup: {e}", exc_info=True)
@@ -816,17 +765,7 @@ class AcmeProxyService:
     
     def _get_account_thumbprint(self):
         """Get JWK thumbprint of our upstream account key"""
-        import hashlib
-        # The thumbprint is SHA-256 of the canonical JWK
-        jwk = self.account_key.to_json()
-        # Canonical form for RSA: {"e":"...","kty":"RSA","n":"..."}
-        canonical = json.dumps({
-            "e": jwk["e"],
-            "kty": jwk["kty"],
-            "n": jwk["n"]
-        }, separators=(',', ':'), sort_keys=True)
-        digest = hashlib.sha256(canonical.encode()).digest()
-        return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+        return self._jwk_thumbprint()
 
     def _build_eab(self, kid, hmac_key_b64, account_url):
         """Build External Account Binding JWS (RFC 8555 §7.3.4)"""
@@ -848,7 +787,7 @@ class AcmeProxyService:
         ).rstrip(b'=').decode()
         
         # Payload is the account key JWK
-        jwk_json = json.dumps(self.account_key.to_json(), separators=(',', ':'), sort_keys=True)
+        jwk_json = json.dumps(self.account_jwk, separators=(',', ':'), sort_keys=True)
         payload_b64 = base64.urlsafe_b64encode(jwk_json.encode()).rstrip(b'=').decode()
         
         # HMAC-SHA256 signature
@@ -873,18 +812,18 @@ class AcmeProxyService:
         order = resp.json()
         
         # Rewrite URLs
-        order['finalize'] = f"{self.base_url}/acme/proxy/order/{order_id_b64}/finalize"
+        order['finalize'] = f"{self.base_url}/order/{order_id_b64}/finalize"
         if 'certificate' in order:
             cert_url = order['certificate']
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
-            order['certificate'] = f"{self.base_url}/acme/proxy/cert/{cert_id}"
+            order['certificate'] = f"{self.base_url}/cert/{cert_id}"
         
         # Rewrite authorization URLs
         if 'authorizations' in order:
             proxy_authzs = []
             for authz_url in order['authorizations']:
                 authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
-                proxy_authzs.append(f"{self.base_url}/acme/proxy/authz/{authz_id}")
+                proxy_authzs.append(f"{self.base_url}/authz/{authz_id}")
             order['authorizations'] = proxy_authzs
             
         return order
@@ -949,18 +888,18 @@ class AcmeProxyService:
         order = resp.json()
         
         # Rewrite URLs
-        order['finalize'] = f"{self.base_url}/acme/proxy/order/{order_id_b64}/finalize"
+        order['finalize'] = f"{self.base_url}/order/{order_id_b64}/finalize"
         if 'certificate' in order:
             cert_url = order['certificate']
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
-            order['certificate'] = f"{self.base_url}/acme/proxy/cert/{cert_id}"
+            order['certificate'] = f"{self.base_url}/cert/{cert_id}"
             
         # Rewrite authorization URLs
         if 'authorizations' in order:
             proxy_authzs = []
             for authz_url in order['authorizations']:
                 authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
-                proxy_authzs.append(f"{self.base_url}/acme/proxy/authz/{authz_id}")
+                proxy_authzs.append(f"{self.base_url}/authz/{authz_id}")
             order['authorizations'] = proxy_authzs
 
         return order

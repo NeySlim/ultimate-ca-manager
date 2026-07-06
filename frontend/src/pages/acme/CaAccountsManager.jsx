@@ -13,6 +13,8 @@ const EMPTY_FORM = {
   eab_kid: '',
   eab_hmac_key: '',
   is_default: false,
+  proxy_enabled: false,
+  proxy_slug: '',
   order_poll_timeout_sec: '180',
   order_poll_interval_sec: '3',
   http_timeout_sec: '60',
@@ -55,6 +57,8 @@ export default function CaAccountsManager({
       eab_kid: acct.eab_kid || '',
       eab_hmac_key: '',
       is_default: !!acct.is_default,
+      proxy_enabled: !!acct.proxy_enabled,
+      proxy_slug: acct.proxy_slug || '',
       order_poll_timeout_sec: String(acct.order_poll_timeout_sec ?? 180),
       order_poll_interval_sec: String(acct.order_poll_interval_sec ?? 3),
       http_timeout_sec: String(acct.http_timeout_sec ?? 60),
@@ -84,6 +88,8 @@ export default function CaAccountsManager({
           account_key_algorithm: form.account_key_algorithm,
           eab_kid: form.eab_kid,
           is_default: form.is_default,
+          proxy_enabled: form.proxy_enabled,
+          proxy_slug: form.proxy_slug,
           ...timing,
         }
         if (form.eab_hmac_key) payload.eab_hmac_key = form.eab_hmac_key
@@ -137,6 +143,11 @@ export default function CaAccountsManager({
                       {acct.directory_url}
                     </p>
                     <p className="text-xs text-text-tertiary mt-0.5">{acct.email}</p>
+                    {acct.proxy_enabled && acct.proxy_slug && (
+                      <p className="text-xs text-accent-primary font-mono mt-1 break-all">
+                        /acme/proxy/{acct.proxy_slug}/directory
+                      </p>
+                    )}
                     <p className="text-xs text-text-tertiary mt-0.5">
                       {t('acme.caTimingSummary', {
                         timeout: acct.order_poll_timeout_sec ?? 180,
@@ -271,6 +282,25 @@ export default function CaAccountsManager({
               onChange={(e) => setForm(p => ({ ...p, http_timeout_sec: e.target.value }))}
               helperText={t('acme.caHttpTimeoutHelper')}
             />
+
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              <input
+                type="checkbox"
+                checked={form.proxy_enabled}
+                onChange={(e) => setForm(p => ({ ...p, proxy_enabled: e.target.checked }))}
+              />
+              {t('acme.proxyEnabled')}
+            </label>
+
+            {form.proxy_enabled && (
+              <Input
+                label={t('acme.proxySlug')}
+                value={form.proxy_slug}
+                onChange={(e) => setForm(p => ({ ...p, proxy_slug: e.target.value.toLowerCase() }))}
+                placeholder="actalis-production"
+                helperText={t('acme.proxySlugHelper')}
+              />
+            )}
 
             <label className="flex items-center gap-2 text-sm text-text-secondary">
               <input

@@ -198,11 +198,31 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 1. 转到 **ACME** → **Let's Encrypt** 选项卡
 2. 滚动到 **ACME代理** 部分
 3. 启用 **ACME代理** 开关
-4. 选择 **上游CA**：Let's Encrypt 生产、Let's Encrypt 测试或自定义
-5. 对于自定义CA，手动输入ACME目录URL
-6. 如果上游CA需要EAB，展开 **EAB凭据** 并输入Key ID和HMAC密钥
-7. 点击 **测试连接** 验证与上游CA的连接性
-8. UCM在首次代理请求时自动注册账户
+4. 在 **外部 CA 账户** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
+5. 点击 **测试连接** 验证与上游 CA 的连接
+6. 如需要，注册上游账户（邮箱 + **注册账户**）
+7. 若尚未注册，UCM 在首次代理请求时自动注册
+
+### 专用代理路径（多 CA）
+每个外部 CA 账户可暴露自己的 ACME 代理端点：
+
+1. 打开 **外部 CA 账户**（同一 Let's Encrypt 选项卡）
+2. 编辑或创建 CA 账户
+3. 启用 **通过 ACME 代理暴露**
+4. 设置唯一的 **代理路径 (slug)** — 如 \`actalis-production\`
+5. 保存 — URL 显示在代理部分和账户卡片上
+
+客户端使用：
+\`\`\`
+https://your-ucm-server:8443/acme/proxy/<slug>/directory
+\`\`\`
+
+遗留默认路径（代理设置中所选账户）：
+\`\`\`
+https://your-ucm-server:8443/acme/proxy/directory
+\`\`\`
+
+保留 slug（不可用）：\`directory\`、\`new-order\`、\`challenge\`、\`acct\` 等
 
 ### 账户管理
 - **账户状态标记** 显示UCM是否已在上游CA注册
@@ -211,14 +231,37 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 - **测试连接** 检查上游目录是否可达以及是否需要EAB
 
 ### 使用代理
-将内部ACME客户端指向代理目录：
+将内部 ACME 客户端指向目标 CA 的代理目录。
+
+**按 slug 的 URL**（多 CA 时推荐）：
+\`\`\`
+https://your-ucm-server:8443/acme/proxy/<slug>/directory
+\`\`\`
+
+**默认 URL**（代理设置中所选账户）：
 \`\`\`
 https://your-ucm-server:8443/acme/proxy/directory
 \`\`\`
 
-> 💡 代理EAB凭据与客户端EAB不同——它们是UCM向上游CA的身份验证，而非您的客户端向UCM的身份验证。
+certbot 示例（替换 \`<slug>\`）：
+\`\`\`
+certbot certonly \\
+  --server https://your-ucm-server:8443/acme/proxy/<slug>/directory \\
+  --preferred-challenges dns-01 \\
+  --authenticator manual \\
+  --manual-auth-hook /bin/true \\
+  --manual-cleanup-hook /bin/true \\
+  --non-interactive --agree-tos -m you@example.com \\
+  -d subdomain.example.com
+\`\`\`
 
-> ⚠ 代理模式需要UCM中至少配置一个DNS提供商用于挑战解析。
+> 💡 代理 EAB 凭据与客户端 EAB 不同——用于 UCM 向上游 CA 认证。
+
+> ⚠ 前提：域名须在 ACME Domains 中配置 DNS 提供商。代理仅支持 dns-01。
+
+> ⚠ 避免对同一 FQDN 并发请求（Certbot + UCM 界面）。
+
+> ℹ️ 自签名 HTTPS（实验环境）请为 Certbot 添加 \`--no-verify-ssl\`。
 
 ## 本地 ACME 服务器
 

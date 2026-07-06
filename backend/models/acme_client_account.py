@@ -26,6 +26,9 @@ class AcmeClientAccount(db.Model):
     eab_kid = db.Column(db.String(255), nullable=True)
     eab_hmac_key = db.Column(db.Text, nullable=True)  # encrypted at rest
     is_default = db.Column(db.Boolean, default=False, nullable=False)
+    # Optional dedicated ACME proxy path: /acme/proxy/<proxy_slug>/directory
+    proxy_slug = db.Column(db.String(63), unique=True, nullable=True, index=True)
+    proxy_enabled = db.Column(db.Boolean, default=False, nullable=False)
     order_poll_timeout_sec = db.Column(
         db.Integer, nullable=False, default=DEFAULT_ORDER_POLL_TIMEOUT_SEC,
     )
@@ -74,6 +77,8 @@ class AcmeClientAccount(db.Model):
             'account_key_algorithm': self.account_key_algorithm,
             'eab_kid': self.eab_kid,
             'is_default': self.is_default,
+            'proxy_slug': self.proxy_slug,
+            'proxy_enabled': bool(self.proxy_enabled),
             'is_registered': self.is_registered(),
             'environment': self.derived_environment(),
             'order_poll_timeout_sec': self.get_order_poll_timeout_sec(),

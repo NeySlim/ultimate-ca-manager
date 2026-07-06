@@ -33,6 +33,41 @@ from services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 
+def _ensure_unique_proxy_slug(slug: str, except_id: int = None) -> str:
+    from services.acme.acme_proxy_account import normalize_proxy_slug
+    slug = normalize_proxy_slug(slug)
+    q = AcmeClientAccount.query.filter_by(proxy_slug=slug)
+    if except_id is not None:
+        q = q.filter(AcmeClientAccount.id != except_id)
+    if q.first():
+        raise ValueError(f'proxy_slug {slug!r} is already in use')
+    return slug
+
+
+def _apply_proxy_endpoint_fields(acct: AcmeClientAccount, data: dict) -> None:
+    from services.acme.acme_proxy_account import slugify_proxy_label
+
+    if 'proxy_enabled' in data:
+        acct.proxy_enabled = bool(data.get('proxy_enabled'))
+
+    if 'proxy_slug' in data:
+        raw = (data.get('proxy_slug') or '').strip()
+        if raw:
+            acct.proxy_slug = _ensure_unique_proxy_slug(raw, except_id=acct.id)
+        elif not acct.proxy_enabled:
+            acct.proxy_slug = None
+    elif acct.proxy_enabled and not acct.proxy_slug:
+        base = slugify_proxy_label(acct.label)
+        acct.proxy_slug = _ensure_unique_proxy_slug(base, except_id=acct.id)
+
+    if acct.proxy_enabled and not acct.proxy_slug:
+        acct.proxy_slug = _ensure_unique_proxy_slug(
+            slugify_proxy_label(acct.label), except_id=acct.id
+        )
+    if not acct.proxy_enabled and 'proxy_slug' in data and not (data.get('proxy_slug') or '').strip():
+        acct.proxy_slug = None
+
+
 def _validate_timing_int(value, field: str, min_val: int, max_val: int) -> int:
     try:
         n = int(value)
@@ -141,6 +176,7 @@ def create_ca_account():
     )
     try:
         _apply_timing_fields(acct, data)
+        _apply_proxy_endpoint_fields(acct, data)
     except ValueError as exc:
         return error_response(str(exc), 400)
     db.session.add(acct)
@@ -202,6 +238,7 @@ def update_ca_account(account_id):
 
     try:
         _apply_timing_fields(acct, data)
+        _apply_proxy_endpoint_fields(acct, data)
     except ValueError as exc:
         return error_response(str(exc), 400)
 

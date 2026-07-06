@@ -198,11 +198,31 @@ Der ACME-Proxy ermöglicht es internen Clients, Zertifikate von einer öffentlic
 1. Gehen Sie zu **ACME** → Registerkarte **Let's Encrypt**
 2. Scrollen Sie zum Abschnitt **ACME Proxy**
 3. Aktivieren Sie den **ACME Proxy**-Schalter
-4. Wählen Sie eine **Upstream-CA**: Let's Encrypt Produktion, Let's Encrypt Staging oder Benutzerdefiniert
-5. Für benutzerdefinierte CAs geben Sie die ACME-Verzeichnis-URL manuell ein
-6. Wenn die Upstream-CA EAB erfordert, klappen Sie **EAB-Zugangsdaten** auf und geben Sie Key ID und HMAC-Schlüssel ein
-7. Klicken Sie auf **Verbindungstest**, um die Konnektivität zur Upstream-CA zu überprüfen
-8. UCM registriert automatisch ein Konto bei der ersten Proxy-Anfrage
+4. Wählen Sie ein **Upstream-CA-Konto** unter **Externe CA-Konten** (Let's Encrypt, Actalis, ZeroSSL, benutzerdefinierte URL, EAB)
+5. Klicken Sie auf **Verbindungstest**, um die Konnektivität zur Upstream-CA zu überprüfen
+6. Registrieren Sie das Upstream-Konto bei Bedarf (E-Mail + **Konto registrieren**)
+7. UCM registriert automatisch ein Konto bei der ersten Proxy-Anfrage, falls noch nicht geschehen
+
+### Dedizierte Proxy-Pfade (Multi-CA)
+Jedes externe CA-Konto kann einen eigenen ACME-Proxy-Endpunkt bereitstellen:
+
+1. Öffnen Sie **Externe CA-Konten** (gleiche Registerkarte Let's Encrypt)
+2. Bearbeiten oder erstellen Sie ein CA-Konto
+3. Aktivieren Sie **Über ACME-Proxy bereitstellen**
+4. Setzen Sie einen eindeutigen **Proxy-Pfad (Slug)** — z. B. \`actalis-production\`, \`letsencrypt-staging\`
+5. Speichern — die URL erscheint im Proxy-Abschnitt und auf der Kontokarte
+
+Clients verwenden:
+\`\`\`
+https://ihr-ucm-server:8443/acme/proxy/<slug>/directory
+\`\`\`
+
+Der Legacy-Standardpfad bleibt für das in den Proxy-Einstellungen gewählte Konto verfügbar:
+\`\`\`
+https://ihr-ucm-server:8443/acme/proxy/directory
+\`\`\`
+
+Reservierte Slugs (nicht erlaubt): \`directory\`, \`new-order\`, \`challenge\`, \`acct\`, usw.
 
 ### Kontoverwaltung
 - Das **Kontostatus-Badge** zeigt an, ob UCM bei der Upstream-CA registriert ist
@@ -211,14 +231,37 @@ Der ACME-Proxy ermöglicht es internen Clients, Zertifikate von einer öffentlic
 - **Verbindungstest** prüft, ob das Upstream-Verzeichnis erreichbar ist und ob EAB erforderlich ist
 
 ### Proxy verwenden
-Richten Sie Ihre internen ACME-Clients auf das Proxy-Verzeichnis:
+Richten Sie Ihre internen ACME-Clients auf das Proxy-Verzeichnis der Ziel-CA.
+
+**Slug-URL** (empfohlen bei mehreren CAs):
+\`\`\`
+https://ihr-ucm-server:8443/acme/proxy/<slug>/directory
+\`\`\`
+
+**Standard-URL** (Konto aus den Proxy-Einstellungen):
 \`\`\`
 https://ihr-ucm-server:8443/acme/proxy/directory
 \`\`\`
 
+Beispiel mit certbot (\`<slug>\` ersetzen):
+\`\`\`
+certbot certonly \\
+  --server https://ihr-ucm-server:8443/acme/proxy/<slug>/directory \\
+  --preferred-challenges dns-01 \\
+  --authenticator manual \\
+  --manual-auth-hook /bin/true \\
+  --manual-cleanup-hook /bin/true \\
+  --non-interactive --agree-tos -m you@example.com \\
+  -d subdomain.example.com
+\`\`\`
+
 > 💡 Die Proxy-EAB-Zugangsdaten sind von den Client-EAB getrennt — sie authentifizieren UCM gegenüber der Upstream-CA, nicht Ihre Clients gegenüber UCM.
 
-> ⚠ Der Proxy-Modus erfordert mindestens einen in UCM konfigurierten DNS-Anbieter für die Challenge-Auflösung.
+> ⚠ Voraussetzung: Die Domain muss in ACME Domains mit DNS-Provider konfiguriert sein. Der Proxy unterstützt nur dns-01.
+
+> ⚠ Vermeiden Sie gleichzeitige Anfragen für denselben FQDN (Certbot + UCM-UI).
+
+> ℹ️ Bei selbstsigniertem UCM-HTTPS-Zertifikat (Lab) \`--no-verify-ssl\` zu Certbot hinzufügen.
 
 ## Lokaler ACME-Server
 
