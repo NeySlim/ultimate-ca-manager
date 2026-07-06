@@ -1255,7 +1255,7 @@
     "autoRenewal": "自動更新",
     "autoRenewalDesc": "有効期限の30日前に証明書を自動更新",
     "dnsPropagationTimeout": "DNS 伝播タイムアウト (秒)",
-    "dnsPropagationTimeoutHelper": "CA に検証を依頼する前に DNS-01 の TXT レコードを確認する最大時間。遅い/レジストラ DNS では増やしてください。0 = 即時送信。",
+    "dnsPropagationTimeoutHelper": "CA検証前にDNS-01 TXTをポーリングする秒数（自動DNS）。0 = 伝播待ちをスキップ（自動と手動の検証はポーリングなしでCAに送信）。正の値：手動検証はこの上限まで待機。権威またはいずれかのリゾルバが確認すれば続行；9.9.9.9 / 8.8.8.8 / 1.1.1.1のログは参考情報です。",
     "revokeOnRenewal": "更新後に古い証明書を失効させる",
     "revokeOnRenewalDesc": "新しい証明書の発行時に前の証明書を'superseded'の理由で自動的に失効させます",
     "renewalPolicy": "更新ポリシー",

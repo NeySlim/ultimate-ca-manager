@@ -368,11 +368,15 @@ def verify_challenges(order_id):
         # DNS self-check before submitting: if the expected TXT record isn't
         # visible yet, don't submit (a failed validation marks the order invalid
         # and burns the token). Tell the user to wait and retry. `force` bypasses.
-        if not force:
+        # `dns_propagation_timeout=0` also bypasses ("submit immediately",
+        # issue #171); otherwise poll up to the configured timeout (not a single
+        # pass) so a slow-but-converging record does not spuriously block.
+        timeout = _dns_propagation_timeout()
+        if not force and timeout > 0:
             to_check = {d: challenges[d] for d in domains_to_verify
                         if d in challenges and challenges[d].get('dns_txt_value')}
             if to_check:
-                check = _dns_selfcheck(to_check, timeout=0)  # single pass, quick
+                check = _dns_selfcheck(to_check, timeout)
                 if not check['ok']:
                     return success_response(
                         data={'dns_not_ready': True, 'missing': check['missing'],
@@ -380,6 +384,11 @@ def verify_challenges(order_id):
                         message=('TXT record not visible yet for '
                                  f'{", ".join(check["missing"])}. Add the record, '
                                  'wait for propagation, then verify again.'))
+        elif not force and timeout <= 0:
+            logger.info(
+                'DNS propagation wait skipped for manual verify '
+                '(acme.client.dns_propagation_timeout=0); submitting to CA'
+            )
 
         for domain in domains_to_verify:
             if domain not in challenges:

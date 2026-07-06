@@ -244,3 +244,75 @@ def test_check_public_resolvers_logs_exception_type(fake_dns, monkeypatch, caplo
         'exception type must be logged for the failing resolver'
     assert any('1.1.1.1' in m and 'TimeoutError' in m for m in debug_msgs), \
         'exception type must be logged for the timed-out resolver'
+
+
+def test_txt_rdata_matches_concatenated_chunks():
+    """A TXT RR whose value is split across multiple <character-string> chunks
+    (RFC 1035 §3.3.14; Quad9 is known to do this for long ACME tokens) must
+    match when the joined value equals the expected token (issue #171)."""
+    class _RData:
+        def __init__(self, values):
+            self.strings = [v.encode() for v in values]
+
+    rdata = _RData(['part1', 'part2'])
+    # Joined match (the realistic case: token split across two chunks)
+    assert dns_lookup_mod._txt_rdata_matches(rdata, 'part1part2') is True
+    # A single chunk still matches in isolation
+    assert dns_lookup_mod._txt_rdata_matches(rdata, 'part1') is True
+    # A wrong value does not match
+    assert dns_lookup_mod._txt_rdata_matches(rdata, 'wrong') is False
+
+
+def test_verify_challenges_skips_dns_gate_when_timeout_zero(app, auth_client, monkeypatch):
+    """Manual Verify must NOT block on DNS when dns_propagation_timeout=0
+    (issue #171): the self-check is skipped entirely and verify_challenge is
+    called straight away."""
+    import json
+    from models import db, AcmeClientOrder
+
+    monkeypatch.setattr(orders_mod, '_dns_propagation_timeout', lambda: 0)
+
+    selfcheck_called = []
+    monkeypatch.setattr(
+        orders_mod, '_dns_selfcheck',
+        lambda *a, **k: selfcheck_called.append(True) or {'ok': False, 'missing': ['example.com']},
+    )
+
+    verify_calls = []
+
+    class _MockClient:
+        def verify_challenge(self, order, domain):
+            verify_calls.append(domain)
+            return True, 'submitted'
+
+        def check_order_status(self, order):
+            return 'validating', None
+
+    monkeypatch.setattr(
+        orders_mod.AcmeClientService, 'for_order',
+        staticmethod(lambda order: _MockClient()),
+    )
+
+    with app.app_context():
+        order = AcmeClientOrder(
+            domains=json.dumps(['example.com']),
+            challenge_type='dns-01',
+            environment='staging',
+            status='pending',
+        )
+        order.set_challenges_dict({
+            'example.com': {
+                'dns_txt_name': '_acme-challenge.example.com',
+                'dns_txt_value': 'the-token',
+            }
+        })
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+
+    from tests.test_acme import post_json, assert_success
+
+    r = post_json(auth_client, f'/api/v2/acme/client/orders/{order_id}/verify', {})
+    assert_success(r)
+    assert selfcheck_called == [], '_dns_selfcheck must not be called when timeout=0'
+    assert verify_calls == ['example.com'], 'verify_challenge must be called directly'

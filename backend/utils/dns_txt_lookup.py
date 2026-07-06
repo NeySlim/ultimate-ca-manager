@@ -49,9 +49,21 @@ def get_configured_dns01_nameservers() -> List[str]:
 
 
 def _txt_rdata_matches(rdata, expected: str) -> bool:
+    """Match a TXT rdata against the expected ACME token.
+
+    Some public resolvers (notably Quad9) split long TXT character-strings
+    across multiple ``rdata.strings`` chunks (RFC 1035 §3.3.14 allows a TXT RR
+    to carry several <character-string> elements). The ACME authorization token
+    is a single value regardless of how it was wire-split, so join the chunks
+    before comparing — a correct record would otherwise render as
+    ``value_mismatch`` / ``pending`` (issue #171).
+    """
     try:
-        for chunk in rdata.strings:
-            if chunk.decode('utf-8', 'ignore') == expected:
+        chunks = [chunk.decode('utf-8', 'ignore') for chunk in rdata.strings]
+        if ''.join(chunks) == expected:
+            return True
+        for chunk in chunks:
+            if chunk == expected:
                 return True
     except Exception:
         if str(rdata).strip('"') == expected:

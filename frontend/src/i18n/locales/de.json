@@ -1255,7 +1255,7 @@
     "autoRenewal": "Automatische Verlängerung",
     "autoRenewalDesc": "Zertifikate 30 Tage vor Ablauf automatisch verlängern",
     "dnsPropagationTimeout": "DNS-Propagations-Timeout (s)",
-    "dnsPropagationTimeoutHelper": "Wie lange auf den DNS-01-TXT-Eintrag gewartet wird, bevor die CA zur Validierung aufgefordert wird. Bei langsamem/Registrar-DNS erhöhen. 0 = sofort senden.",
+    "dnsPropagationTimeoutHelper": "Sekunden, die vor der CA-Validierung auf den DNS-01-TXT gewartet wird (Auto-DNS). 0 = Propagationswartezeit überspringen (Auto und manuelles Verifizieren senden ohne Polling an die CA). Positive Werte: manuelles Verifizieren wartet bis zu diesem Limit. Fährt fort, sobald autoritativ oder ein Resolver bestätigt; die 9.9.9.9 / 8.8.8.8 / 1.1.1.1-Logs sind rein informativ.",
     "revokeOnRenewal": "Altes Zertifikat nach Erneuerung widerrufen",
     "revokeOnRenewalDesc": "Das vorherige Zertifikat automatisch mit dem Grund 'superseded' widerrufen, wenn ein neues ausgestellt wird",
     "renewalPolicy": "Erneuerungsrichtlinie",
