@@ -51,6 +51,11 @@ def app():
     application = create_app('testing')
     application.config['TESTING'] = True
     application.config['WTF_CSRF_ENABLED'] = False
+    # Deterministic FQDN so CA OCSP/CDP/AIA auto-URL generation does not depend
+    # on the CI runner's `hostname -f` (which can lack a domain part and thus
+    # resolve to None, flaking tests that patch `ocsp_enabled=True` without a
+    # configured protocol_base_url).
+    application.config['FQDN'] = 'ucm.test'
 
     yield application
 
