@@ -35,7 +35,7 @@ def _get_config(key: str) -> Optional[str]:
     return val or None
 
 
-def _legacy_upstream_directory_url() -> str:
+def legacy_upstream_directory_url() -> str:
     """Derive upstream directory URL from legacy proxy SystemConfig keys."""
     custom = _get_config('acme.proxy.upstream_url')
     if custom:
@@ -104,7 +104,7 @@ def resolve_proxy_account(explicit_id: Optional[int] = None) -> AcmeClientAccoun
             raise RuntimeError(f"Configured proxy CA account id={account_id} was not found")
         return acct
 
-    legacy_url = _legacy_upstream_directory_url()
+    legacy_url = legacy_upstream_directory_url()
     acct = AcmeClientAccount.query.filter_by(directory_url=legacy_url).first()
     if acct:
         return acct

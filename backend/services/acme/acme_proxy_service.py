@@ -19,7 +19,10 @@ from cryptography.hazmat.backends import default_backend
 from models import db, SystemConfig, DnsProvider
 from security.encryption import encrypt_text, decrypt_text
 from utils.datetime_utils import utc_isoformat
-from services.acme.acme_proxy_account import resolve_proxy_account
+from services.acme.acme_proxy_account import (
+    resolve_proxy_account,
+    legacy_upstream_directory_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +33,11 @@ class AcmeProxyService:
     
     def __init__(self, base_url: str, account_id: int = None):
         self.base_url = base_url.rstrip('/')
-        self.account = resolve_proxy_account(account_id)
-        self.upstream_directory_url = self.account.directory_url
+        self._account_id = account_id
+        self._account = None
+        self._key_loaded = False
+        self._private_key = None
+        self._account_jwk = None
         self.verify_ssl = self._get_verify_ssl()
         self.directory = None
         self.nonces = []
@@ -40,12 +46,66 @@ class AcmeProxyService:
                 "ACME proxy upstream SSL verification disabled by settings "
                 "(acme.proxy.verify_ssl=false)."
             )
-        
-        # Load or create upstream account key (stored on AcmeClientAccount)
-        self.private_key, self.account_jwk = self._load_or_create_account_key()
+        # Resolve the upstream directory URL eagerly (cheap: config read or one
+        # DB lookup). For an explicit account_id (slug routes) the row MUST
+        # exist. For the legacy default route we fall back to the configured /
+        # Let's Encrypt staging URL when no account is configured yet, so that
+        # /directory and /new-nonce keep working on a fresh install (regression
+        # v2.185: resolving the account in __init__ broke /directory with a 500
+        # before any CA account was added).
+        try:
+            self.upstream_directory_url = self.account.directory_url
+        except RuntimeError:
+            if account_id is not None:
+                raise  # explicit/slug request must reference a real account
+            self.upstream_directory_url = legacy_upstream_directory_url()
         # Lazy-load account URL — don't register in constructor
         # This prevents /directory from failing when upstream is unreachable
         self._account_url = None
+
+    @property
+    def account(self):
+        """Linked AcmeClientAccount, resolved lazily.
+
+        Resolved on first access so that /directory and /new-nonce (which only
+        need ``upstream_directory_url``) work even when no CA account is
+        configured. Key-bearing operations (new-account, new-order, signing)
+        trigger the resolution and will raise the helpful "No external ACME CA
+        account configured" error if none exists.
+        """
+        if self._account is None:
+            self._account = resolve_proxy_account(self._account_id)
+        return self._account
+
+    @account.setter
+    def account(self, value):
+        self._account = value
+
+    @property
+    def private_key(self):
+        self._ensure_account_key()
+        return self._private_key
+
+    @private_key.setter
+    def private_key(self, value):
+        self._private_key = value
+
+    @property
+    def account_jwk(self):
+        self._ensure_account_key()
+        return self._account_jwk
+
+    @account_jwk.setter
+    def account_jwk(self, value):
+        self._account_jwk = value
+
+    def _ensure_account_key(self):
+        """Load the upstream account private key on first use (requires the
+        linked AcmeClientAccount to be configured)."""
+        if self._key_loaded:
+            return
+        self._private_key, self._account_jwk = self._load_or_create_account_key()
+        self._key_loaded = True
 
     @property
     def account_url(self):
@@ -134,11 +194,11 @@ class AcmeProxyService:
         from models.acme_client_account import AcmeClientAccount
 
         account_id = self.account.id
-        self.account = db.session.get(AcmeClientAccount, account_id)
-        if not self.account:
+        self._account = db.session.get(AcmeClientAccount, account_id)
+        if not self._account:
             raise RuntimeError(f"ACME proxy account {account_id} not found")
         if self._account_url is None:
-            self._account_url = self.account.account_url
+            self._account_url = self._account.account_url
 
     def _get_upstream_account_url(self):
         """Get or register account URL on the linked AcmeClientAccount row."""

@@ -1526,7 +1526,85 @@ class TestAcmeProxyProtocol:
         assert 'Signature verification failed' in detail or 'malformed' in detail.lower()
 
 
-# ============================================================
+class TestAcmeProxyFreshInstall:
+    """Regression v2.185: /acme/proxy/directory must return 200 on a fresh
+    install with NO external CA account configured (the legacy default path
+    falls back to the Let's Encrypt staging directory URL from config).
+
+    Before the fix, AcmeProxyService.__init__ called resolve_proxy_account()
+    eagerly, which raised RuntimeError when no AcmeClientAccount existed,
+    turning /directory into a 500 and breaking the release smoke gate.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_proxy_account(self, app, monkeypatch):
+        from models import db, AcmeClientAccount, SystemConfig
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+
+        fake_directory = {
+            'newNonce': 'https://acme-staging-v02.api.letsencrypt.org/acme/new-nonce',
+            'newAccount': 'https://acme-staging-v02.api.letsencrypt.org/acme/new-account',
+            'newOrder': 'https://acme-staging-v02.api.letsencrypt.org/acme/new-order',
+            'meta': {},
+        }
+
+        class _FakeResp:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return fake_directory
+
+        monkeypatch.setattr(
+            'services.acme.acme_proxy_service.requests.get',
+            lambda *args, **kwargs: _FakeResp(),
+        )
+
+        with app.app_context():
+            # Snapshot existing rows so other tests are not affected (session DB).
+            keep = [
+                {c.key: getattr(a, c.key) for c in a.__table__.columns}
+                for a in AcmeClientAccount.query.all()
+            ]
+            keep_cfg = [
+                {c.key: getattr(r, c.key) for c in r.__table__.columns}
+                for r in SystemConfig.query.filter(
+                    SystemConfig.key.in_([PROXY_ACCOUNT_ID_KEY, 'acme.proxy.upstream_url'])
+                ).all()
+            ]
+            AcmeClientAccount.query.delete()
+            SystemConfig.query.filter(
+                SystemConfig.key.in_([PROXY_ACCOUNT_ID_KEY, 'acme.proxy.upstream_url'])
+            ).delete(synchronize_session=False)
+            db.session.commit()
+        yield
+        with app.app_context():
+            AcmeClientAccount.query.delete()
+            for row in keep:
+                db.session.add(AcmeClientAccount(**row))
+            for row in keep_cfg:
+                db.session.add(SystemConfig(**row))
+            db.session.commit()
+
+    def test_directory_without_account(self, client):
+        """GET /acme/proxy/directory returns 200 when no CA account exists."""
+        r = client.get('/acme/proxy/directory')
+        assert r.status_code == 200, r.get_data(as_text=True)
+        data = r.get_json()
+        assert 'newNonce' in data
+        assert 'newAccount' in data
+        assert 'newOrder' in data
+
+    def test_new_nonce_without_account(self, client):
+        """GET /acme/proxy/new-nonce returns a nonce when no CA account exists."""
+        r = client.get('/acme/proxy/new-nonce')
+        assert r.status_code == 200
+        assert 'Replay-Nonce' in r.headers
+
+
+
 # Viewer Role — ACME read-only access
 # ============================================================
 
