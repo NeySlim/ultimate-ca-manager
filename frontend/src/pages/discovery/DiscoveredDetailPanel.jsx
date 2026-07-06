@@ -186,7 +186,11 @@ export default function DiscoveredDetailPanel({ item, t }) {
               <CompactField label={t('common.keyAlgorithm')} value={`${cert.key_algorithm}${cert.key_size ? ` ${cert.key_size}` : ''}${cert.curve ? ` (${cert.curve})` : ''}`} />
             )}
             {cert.signature_algorithm && (
-              <CompactField label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
+              <CompactField
+                label={t('common.issuerSignatureAlgorithm')}
+                hint={t('common.issuerSignatureAlgorithmHint')}
+                value={cert.signature_algorithm}
+              />
             )}
           </CompactGrid>
         </CompactSection>

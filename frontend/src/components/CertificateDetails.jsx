@@ -200,7 +200,7 @@ export function CertificateDetails({
         <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
           <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
           <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
-          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{t('common.signature')}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
         </div>
       </div>
       
@@ -289,7 +289,12 @@ export function CertificateDetails({
             <CompactField icon={Hash} label={t('common.serialHex')} value={serialHex} mono copyable />
           )}
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={cert.key_type} />
-          <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} />
+          <CompactField
+            autoIcon="issuerSignatureAlgorithm"
+            label={t('common.issuerSignatureAlgorithm')}
+            hint={t('common.issuerSignatureAlgorithmHint')}
+            value={cert.signature_algorithm}
+          />
           <CompactField autoIcon="certType" label={t('details.certType')} value={formatCertType(cert.cert_type, t)} />
         </CompactGrid>
       </CompactSection>

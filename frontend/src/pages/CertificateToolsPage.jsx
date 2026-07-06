@@ -723,7 +723,7 @@ export default function CertificateToolsPage() {
           <CompactField autoIcon="tlsVersion" label={t('tools.tlsVersion')} value={data.tls_version} />
           <CompactField autoIcon="cipher" label={t('tools.cipher')} value={data.cipher?.name} />
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
-          <CompactField autoIcon="signature" label={t('common.signature')} value={data.signature_algorithm} />
+          <CompactField autoIcon="signature" label={t('common.issuerSignatureShort')} hint={t('common.issuerSignatureAlgorithmHint')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* SANs */}
@@ -825,7 +825,7 @@ export default function CertificateToolsPage() {
           <CompactField autoIcon="serialNumber" label={t('common.serialNumber')} value={data.serial_number} copyable mono />
           <CompactField autoIcon="version" label={t('tools.version')} value={data.version} />
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
-          <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={data.signature_algorithm} />
+          <CompactField autoIcon="issuerSignatureAlgorithm" label={t('common.issuerSignatureAlgorithm')} hint={t('common.issuerSignatureAlgorithmHint')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* Extensions */}

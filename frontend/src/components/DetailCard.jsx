@@ -30,6 +30,7 @@ const FIELD_ICONS = {
   'keyType': Key, 'keyAlgorithm': Key, 'keySize': Key,
   'algorithm': Key, 'signature': ShieldCheck,
   'signatureAlgorithm': ShieldCheck,
+  'issuerSignatureAlgorithm': ShieldCheck,
   'certType': Certificate, 'certificateType': Certificate, 'type': FileText,
   // Security / Fingerprints
   'fingerprint': Fingerprint, 'thumbprint': Fingerprint,
@@ -549,6 +550,7 @@ export function CompactField({
   autoIcon,
   mono, 
   copyable,
+  hint,
   className, 
   colSpan 
 }) {
@@ -585,7 +587,7 @@ export function CompactField({
           <Icon size={11} className="text-text-tertiary" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-2xs text-text-tertiary uppercase tracking-wider">{label}</div>
+          <div className="text-2xs text-text-tertiary uppercase tracking-wider" title={hint}>{label}</div>
           <div className="text-xs font-mono text-text-primary break-all">
             {value}
           </div>
@@ -618,7 +620,7 @@ export function CompactField({
       )}
       onClick={copyable ? handleCopy : undefined}
     >
-      <span className="text-text-tertiary">{label}:</span>
+      <span className="text-text-tertiary" title={hint}>{label}:</span>
       <span className="ml-1 font-mono text-xs text-text-primary">
         {value}
       </span>

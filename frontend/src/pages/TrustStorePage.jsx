@@ -458,7 +458,7 @@ export default function TrustStorePage() {
           <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || 'SHA256'}</div>
-            <div className="text-2xs text-text-tertiary">{t('common.signature')}</div>
+            <div className="text-2xs text-text-tertiary" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
           </div>
           <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />

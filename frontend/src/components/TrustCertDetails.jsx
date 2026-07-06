@@ -238,7 +238,12 @@ export function TrustCertDetails({
         <CompactGrid>
           <CompactField label={t('common.serialNumber')} value={cert.serial || cert.serial_number} icon={Hash} mono />
           <CompactField label={t('common.keyType')} value={cert.key_type} icon={Key} />
-          <CompactField label={t('common.signatureAlgorithm')} value={cert.signature_algorithm} autoIcon="signatureAlgorithm" />
+          <CompactField
+            label={t('common.issuerSignatureAlgorithm')}
+            hint={t('common.issuerSignatureAlgorithmHint')}
+            value={cert.signature_algorithm}
+            autoIcon="issuerSignatureAlgorithm"
+          />
           {cert.subject && (
             <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={cert.subject} className="col-span-2" mono />
           )}

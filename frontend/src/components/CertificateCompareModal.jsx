@@ -170,7 +170,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
               <CompareField label={t('common.validFrom')} value1={formatDate(cert1.valid_from)} value2={formatDate(cert2.valid_from)} />
               <CompareField label={t('common.validUntil')} value1={formatDate(cert1.valid_to)} value2={formatDate(cert2.valid_to)} />
               <CompareField label={t('common.serialNumber')} value1={cert1.serial_number} value2={cert2.serial_number} mono />
-              <CompareField label={t('common.signatureAlgorithm')} value1={cert1.signature_algorithm} value2={cert2.signature_algorithm} />
+              <CompareField label={t('common.issuerSignatureAlgorithm')} value1={cert1.signature_algorithm} value2={cert2.signature_algorithm} />
               {(cert1.san || cert2.san) && (
                 <CompareField label={t('details.sans')} value1={cert1.san} value2={cert2.san} />
               )}
