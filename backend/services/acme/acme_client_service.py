@@ -587,25 +587,26 @@ class AcmeClientService:
     # Account Management
     # =========================================================================
     
-    def register_account(self, email: str) -> Tuple[bool, str, Optional[str]]:
+    def register_account(self, email: Optional[str]) -> Tuple[bool, str, Optional[str]]:
         """
         Register or retrieve existing ACME account.
         Supports External Account Binding (EAB) per RFC 8555 §7.3.4.
-        
+
         Args:
-            email: Contact email address
-        
+            email: Contact email address, or None to register without a
+                contact (RFC 8555 makes `contact` optional; Let's Encrypt
+                accepts contact-less registrations)
+
         Returns:
             Tuple of (success, message, account_url)
         """
         try:
             directory = self._fetch_directory()
             new_account_url = directory['newAccount']
-            
-            payload = {
-                "termsOfServiceAgreed": True,
-                "contact": [f"mailto:{email}"],
-            }
+
+            payload = {"termsOfServiceAgreed": True}
+            if email:
+                payload["contact"] = [f"mailto:{email}"]
             
             # External Account Binding (EAB) — RFC 8555 §7.3.4
             eab_kid, eab_hmac_key = self._get_eab_credentials()
@@ -620,9 +621,11 @@ class AcmeClientService:
             if resp.status_code in [200, 201]:
                  account_url = resp.headers.get('Location')
                  self._save_account_url(account_url)
-                 
-                 # Persist the email used for registration
-                 self.account.email = email
+
+                 # Persist the email used for registration (keep the existing
+                 # one on a contact-less registration)
+                 if email:
+                     self.account.email = email
                  try:
                      db.session.commit()
                  except Exception as e:

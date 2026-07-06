@@ -254,9 +254,12 @@ class AcmeProxyService:
 
         contact_email = self._resolve_contact_email()
         if not contact_email:
-            raise RuntimeError(
-                "A public contact email is required on the selected CA account "
-                "to register with the upstream ACME server."
+            # RFC 8555 makes `contact` optional and Let's Encrypt accepts
+            # contact-less registrations — don't block issuance when the only
+            # available email has a non-public TLD (.lan/.local).
+            logger.warning(
+                "No public contact email available for the proxy upstream "
+                "account; registering without a contact."
             )
 
         client = AcmeClientService(account=self.account)

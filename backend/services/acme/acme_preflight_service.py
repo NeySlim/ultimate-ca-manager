@@ -186,9 +186,6 @@ class AcmePreflightService:
                 account_ok = reg_ok
                 account_detail = reg_msg
                 acct = client.account
-                eab_required = bool(getattr(acct, 'eab_kid', None) is None and directory.get('meta', {}).get('externalAccountRequired'))
-                if acct and acct.eab_kid:
-                    eab_required = False
                 if directory.get('meta', {}).get('externalAccountRequired') and not (acct and acct.eab_kid):
                     account_ok = False
                     account_detail = 'External Account Binding required but not configured'
@@ -297,6 +294,18 @@ class AcmePreflightService:
                 logger.error('Preflight staging order failed: %s', exc, exc_info=True)
                 steps.append(_step('challenge_preview', 'Staging order', False, str(exc)))
                 overall_ok = False
+                # The ephemeral staging order must not survive a failed
+                # preflight either (the happy path deletes it above).
+                if staging_order is not None and staging_order.id is not None:
+                    try:
+                        db.session.rollback()
+                        leftover = db.session.get(AcmeClientOrder, staging_order.id)
+                        if leftover is not None:
+                            db.session.delete(leftover)
+                            db.session.commit()
+                    except Exception as del_err:
+                        db.session.rollback()
+                        logger.warning('Could not delete preflight staging order: %s', del_err)
         elif mode == 'validate_only':
             steps.append(_step(
                 'challenge_preview', 'Challenge preview',

@@ -34,6 +34,11 @@ logger = logging.getLogger(__name__)
 # timeout and honors the full configured timeout.
 _DNS_SELFCHECK_DEFAULT_TIMEOUT = 120
 _DNS_SELFCHECK_INTERVAL = 5
+# The manual verify endpoint runs the self-check synchronously inside the HTTP
+# request, so its wait is capped regardless of dns_propagation_timeout (which
+# can be up to 3600s): beyond this the client/proxy would time out first. The
+# response then reports dns_not_ready and the user retries.
+_MANUAL_VERIFY_MAX_WAIT_SEC = 30
 
 
 def _dns_propagation_timeout() -> int:
@@ -181,7 +186,7 @@ def request_certificate():
     # Only Let's Encrypt staging/production are gated to those two values. A
     # selected custom CA (ZeroSSL...) derives 'custom' and is allowed.
     if environment not in ['staging', 'production', 'custom']:
-        return error_response('Environment must be staging or production', 400)
+        return error_response('Environment must be staging, production, or custom', 400)
 
     # Explicit ACME CA account selection (multi-CA). When provided, the chosen
     # AcmeClientAccount wins over environment/default resolution and is pinned
@@ -369,14 +374,16 @@ def verify_challenges(order_id):
         # visible yet, don't submit (a failed validation marks the order invalid
         # and burns the token). Tell the user to wait and retry. `force` bypasses.
         # `dns_propagation_timeout=0` also bypasses ("submit immediately",
-        # issue #171); otherwise poll up to the configured timeout (not a single
-        # pass) so a slow-but-converging record does not spuriously block.
+        # issue #171); otherwise poll so a slow-but-converging record does not
+        # spuriously block — but capped at _MANUAL_VERIFY_MAX_WAIT_SEC since this
+        # runs synchronously in the request (the background auto-poll honors the
+        # full configured timeout).
         timeout = _dns_propagation_timeout()
         if not force and timeout > 0:
             to_check = {d: challenges[d] for d in domains_to_verify
                         if d in challenges and challenges[d].get('dns_txt_value')}
             if to_check:
-                check = _dns_selfcheck(to_check, timeout)
+                check = _dns_selfcheck(to_check, min(timeout, _MANUAL_VERIFY_MAX_WAIT_SEC))
                 if not check['ok']:
                     return success_response(
                         data={'dns_not_ready': True, 'missing': check['missing'],
@@ -654,18 +661,26 @@ def _auto_poll_and_finalize(client, order) -> dict:
         poll = client.get_poll_settings()
         max_wait = poll['order_poll_timeout_sec']
         poll_interval = poll['order_poll_interval_sec']
+        # Authorization status is one signed POST-as-GET per domain; polling it
+        # on every iteration would double the traffic to the CA (rate limits).
+        # Check it periodically — the order-status poll below still runs every
+        # interval and catches the terminal 'invalid' state on its own.
+        authz_check_every = max(poll_interval * 5, 15)
+        next_authz_check = authz_check_every
         elapsed = 0
         while elapsed < max_wait:
             time.sleep(poll_interval)
             elapsed += poll_interval
 
-            invalid = client.find_invalid_authorization(order)
-            if invalid:
-                domain, msg = invalid
-                result['error'] = msg
-                logger.warning(f'Authorization invalid for {domain} on order {order.id}: {msg}')
-                _set_status('invalid', msg)
-                break
+            if elapsed >= next_authz_check:
+                next_authz_check = elapsed + authz_check_every
+                invalid = client.find_invalid_authorization(order)
+                if invalid:
+                    domain, msg = invalid
+                    result['error'] = msg
+                    logger.warning(f'Authorization invalid for {domain} on order {order.id}: {msg}')
+                    _set_status('invalid', msg)
+                    break
 
             le_status, le_data = client.check_order_status(order)
             result['polling_status'] = le_status

@@ -49,14 +49,6 @@ def hsts_env_locked() -> list[str]:
     return locked
 
 
-def _env_bool(key: str, default: bool) -> bool:
-    """Read a boolean env override (canonical UPPER + lower), else default."""
-    val = os.environ.get(key.upper()) or os.environ.get(key.lower())
-    if val is None:
-        return default
-    return not _is_disabled(val)
-
-
 def _cfg_value(key: str):
     """Read a SystemConfig value, tolerating any DB error / missing table."""
     try:

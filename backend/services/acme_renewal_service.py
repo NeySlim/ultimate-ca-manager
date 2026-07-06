@@ -124,8 +124,17 @@ def renew_certificate(order) -> tuple:
     new_order.key_type = order.key_type
     if order.csr_pem:
         new_order.csr_pem = order.csr_pem
-    if (order.key_source or 'generate') == 'reuse' and order.certificate_id:
-        new_order.source_certificate_id = order.certificate_id
+    if (order.key_source or 'generate') == 'reuse':
+        # Prefer the cert issued by this order; fall back to the original
+        # source so the key-reuse chain survives an order whose import failed.
+        reuse_src = order.certificate_id or order.source_certificate_id
+        if reuse_src:
+            new_order.source_certificate_id = reuse_src
+        else:
+            logger.warning(
+                f"Order {order.id} has key_source=reuse but no linked "
+                f"certificate; a new key will be generated on finalize"
+            )
     try:
         db.session.commit()
     except Exception as _ks_err:
