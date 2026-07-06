@@ -241,7 +241,7 @@
     "autoRenewal": "Renouvellement automatique",
     "autoRenewalDesc": "Renouveler automatiquement les certificats 30 jours avant expiration",
     "dnsPropagationTimeout": "Délai de propagation DNS (s)",
-    "dnsPropagationTimeoutHelper": "Secondes d'attente du TXT DNS-01 avant validation CA (DNS auto). 0 = ignorer l'attente de propagation (auto et vérification manuelle soumettent au CA sans polling). Valeur positive : la vérification manuelle attend jusqu'à cette limite. Procède dès qu'un résolveur autoritaire ou public confirme ; les logs 9.9.9.9 / 8.8.8.8 / 1.1.1.1 sont informatifs.",
+    "dnsPropagationTimeoutHelper": "Secondes d'attente du TXT DNS-01 avant validation CA (DNS auto). 0 = ignorer l'attente de propagation (auto et vérification manuelle soumettent au CA sans polling). Valeur positive : l'auto-poll en arrière-plan attend jusqu'à cette limite ; la vérification manuelle sonde 30 s max puis signale « pas prêt » pour réessayer. Procède dès qu'un résolveur autoritaire ou public confirme ; les logs 9.9.9.9 / 8.8.8.8 / 1.1.1.1 sont informatifs.",
     "revokeOnRenewal": "Révoquer l'ancien certificat après renouvellement",
     "revokeOnRenewalDesc": "Révoquer automatiquement le certificat précédent avec la raison 'superseded' lors de l'émission d'un nouveau",
     "renewalPolicy": "Politique de renouvellement",

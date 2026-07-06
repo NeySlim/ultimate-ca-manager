@@ -801,6 +801,23 @@ Some CAs require EAB credentials to link your ACME account with an existing acco
 
 ECDSA keys are recommended for modern deployments — smaller, faster, and equally secure.
 
+### Key Source
+When requesting a certificate, choose where the private key comes from:
+
+- **Generate new key** *(default)* — UCM creates a fresh key pair for each order
+- **Reuse key on renewal** — keep the same private key across renewals (needed for DANE/TLSA records and key pinning); the first issuance generates the key, renewals reload it
+- **Provide external CSR** — paste a PEM CSR generated elsewhere; UCM submits it at finalize and the private key never enters UCM. CSR domains must exactly match the order identifiers
+
+### Preflight (dry run)
+**Run Preflight** on the request form validates the whole request against the Let's Encrypt **staging** directory, without consuming production rate limits:
+
+- Checks domain syntax, contact email, ACME account / EAB and CA connectivity
+- **Full** mode creates a staging order and previews the exact \`_acme-challenge\` TXT records to publish
+- **Validate only** checks configuration and connectivity without creating an order
+- Optionally verifies DNS TXT propagation after you added the records
+
+> 💡 Custom CAs have no staging endpoint — preflight then validates configuration and connectivity only.
+
 ### DNS Providers
 Configure DNS-01 challenge providers for domain validation. Supported providers include:
 - Cloudflare

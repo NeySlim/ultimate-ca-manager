@@ -163,6 +163,23 @@ Algumas CAs requerem credenciais EAB para vincular sua conta ACME a uma conta ex
 
 Chaves ECDSA são recomendadas para implantações modernas — menores, mais rápidas e igualmente seguras.
 
+### Origem da chave
+Ao solicitar um certificado, escolha de onde vem a chave privada:
+
+- **Gerar nova chave** *(padrão)* — o UCM cria um novo par de chaves para cada ordem
+- **Reutilizar chave na renovação** — mantém a mesma chave privada entre renovações (necessário para DANE/TLSA e key pinning); a primeira emissão gera a chave, as renovações a recarregam
+- **Fornecer CSR externo** — cole um CSR PEM gerado externamente; o UCM envia-o no finalize e a chave privada nunca entra no UCM. Os domínios do CSR devem corresponder exatamente aos identificadores da ordem
+
+### Preflight (ensaio)
+**Executar preflight** no formulário de solicitação valida todo o pedido contra o diretório **staging** do Let's Encrypt, sem consumir limites de produção:
+
+- Verifica sintaxe dos domínios, email de contato, conta ACME / EAB e conectividade com a CA
+- O modo **Completo** cria uma ordem staging e mostra os registros TXT \`_acme-challenge\` exatos a publicar
+- **Somente validar** verifica configuração e conectividade sem criar ordem
+- Opcionalmente verifica a propagação DNS dos TXT após adicionar os registros
+
+> 💡 CAs personalizadas não têm endpoint staging — o preflight valida apenas configuração e conectividade.
+
 ### Provedores DNS
 Configure provedores de desafio DNS-01 para validação de domínio. Provedores suportados incluem:
 - Cloudflare

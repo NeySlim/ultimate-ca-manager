@@ -163,6 +163,23 @@ Einige CAs erfordern EAB-Anmeldeinformationen, um Ihr ACME-Konto mit einem beste
 
 ECDSA-Schlüssel werden für moderne Implementierungen empfohlen — kleiner, schneller und gleich sicher.
 
+### Schlüsselquelle
+Wählen Sie bei einer Zertifikatsanforderung, woher der private Schlüssel stammt:
+
+- **Neuen Schlüssel erzeugen** *(Standard)* — UCM erstellt für jede Order ein neues Schlüsselpaar
+- **Schlüssel bei Erneuerung wiederverwenden** — derselbe private Schlüssel über Erneuerungen hinweg (nötig für DANE/TLSA und Key Pinning); die Erstausstellung erzeugt den Schlüssel, Erneuerungen laden ihn erneut
+- **Externen CSR bereitstellen** — fügen Sie einen extern erzeugten PEM-CSR ein; UCM reicht ihn beim Finalize ein, der private Schlüssel gelangt nie in UCM. Die CSR-Domänen müssen exakt den Order-Identifiern entsprechen
+
+### Preflight (Testlauf)
+**Preflight ausführen** im Anforderungsformular validiert die gesamte Anfrage gegen das **Staging**-Verzeichnis von Let's Encrypt, ohne Produktions-Ratenlimits zu verbrauchen:
+
+- Prüft Domänensyntax, Kontakt-E-Mail, ACME-Konto / EAB und CA-Erreichbarkeit
+- Der Modus **Vollständig** erstellt eine Staging-Order und zeigt die exakt zu veröffentlichenden \`_acme-challenge\`-TXT-Einträge an
+- **Nur validieren** prüft Konfiguration und Konnektivität ohne Order
+- Optional wird die DNS-TXT-Propagation nach dem Eintragen geprüft
+
+> 💡 Eigene CAs haben keinen Staging-Endpunkt — der Preflight prüft dann nur Konfiguration und Konnektivität.
+
 ### DNS-Anbieter
 Konfigurieren Sie DNS-01-Challenge-Anbieter für die Domänenvalidierung. Unterstützte Anbieter umfassen:
 - Cloudflare

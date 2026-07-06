@@ -1255,7 +1255,7 @@
     "autoRenewal": "自动续期",
     "autoRenewalDesc": "在到期前30天自动续期证书",
     "dnsPropagationTimeout": "DNS 传播超时（秒）",
-    "dnsPropagationTimeoutHelper": "在 CA 验证前轮询 DNS-01 TXT 记录的秒数（自动 DNS）。0 = 跳过传播等待（自动和手动验证均不轮询直接提交至 CA）。正值：手动验证等待至该上限。当权威或任一解析器确认时即继续；9.9.9.9 / 8.8.8.8 / 1.1.1.1 日志仅供参考。",
+    "dnsPropagationTimeoutHelper": "在 CA 验证前轮询 DNS-01 TXT 记录的秒数（自动 DNS）。0 = 跳过传播等待（自动和手动验证均不轮询直接提交至 CA）。正值：后台自动轮询等待至该上限；手动验证最多轮询 30 秒，随后提示“未就绪”以便重试。当权威或任一解析器确认时即继续；9.9.9.9 / 8.8.8.8 / 1.1.1.1 日志仅供参考。",
     "revokeOnRenewal": "续期后吊销旧证书",
     "revokeOnRenewalDesc": "签发新证书时自动以'superseded'为由吊销前一个证书",
     "renewalPolicy": "续期策略",

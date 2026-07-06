@@ -4,14 +4,14 @@
 ![License](https://img.shields.io/badge/license-BSD--3--Clause%20%2B%20Commons%20Clause-green.svg)
 ![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
-![Tests](https://img.shields.io/badge/tests-2507%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-2671%20passing-brightgreen)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20UCM-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/neyslim)
 
 **Ultimate Certificate Manager (UCM)** is a web-based Certificate Authority management platform with PKI protocol support (ACME, SCEP, EST, OCSP, CRL/CDP), Microsoft ADCS integration, multi-factor authentication, and certificate lifecycle management.
 
 > **UCM is a young and actively developed project.** Feedback, bug reports, and feature requests are very welcome! Feel free to [open an issue](https://github.com/NeySlim/ultimate-ca-manager/issues) — every report helps make UCM better.
 
-> **Latest release — v2.181** (2026-06-30): multi-CA ACME client management — issue from several external ACME CAs (Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…) with per-request CA selection; orders are pinned to their CA account so renewals stay on the same authority. See the [v2.181 release notes](https://github.com/NeySlim/ultimate-ca-manager/releases/latest) and the full [CHANGELOG](CHANGELOG.md).
+> **Latest release — v2.185** (2026-07-06): multi-CA ACME proxy with per-account endpoints (`/acme/proxy/<slug>/directory`), typed SAN validation on certificate issuance, and DNS-01 propagation fixes (multi-string TXT records, `dns_propagation_timeout=0` honored). See the [v2.185 release notes](https://github.com/NeySlim/ultimate-ca-manager/releases/latest) and the full [CHANGELOG](CHANGELOG.md).
 
 ![Dashboard](docs/screenshots/dashboard-dark.png)
 
@@ -31,7 +31,7 @@
 - **SSH Certificates** -- SSH Certificate Authority management, sign host/user certificates, import CAs and certs, curl-friendly setup scripts
 
 ### Protocols
-- **ACME** -- RFC 8555, auto-enrollment, auto-renewal, DNS-01/HTTP-01/TLS-ALPN-01 challenges, wildcard support, **External Account Binding (EAB, RFC 8555 §7.3.4)**, **Renewal Information (ARI, RFC 9773)**, **custom DNS resolvers** for split-horizon, ACME on internal/private IPs, **multi-CA management** (per-request CA selection, pinned on order so renewals reuse the same CA: Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…), **external CSR and renewal key reuse**, **staging preflight dry-run**, proxy mode
+- **ACME** -- RFC 8555, auto-enrollment, auto-renewal, DNS-01/HTTP-01/TLS-ALPN-01 challenges, wildcard support, **External Account Binding (EAB, RFC 8555 §7.3.4)**, **Renewal Information (ARI, RFC 9773)**, **custom DNS resolvers** for split-horizon, ACME on internal/private IPs, **multi-CA management** (per-request CA selection, pinned on order so renewals reuse the same CA: Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…), **external CSR and renewal key reuse**, **staging preflight dry-run**, **multi-CA proxy** (per-CA endpoints at `/acme/proxy/<slug>/directory`)
 - **SCEP** -- RFC 8894 device auto-enrollment with approval workflows
 - **EST** -- RFC 7030 Enrollment over Secure Transport
 - **OCSP** -- RFC 6960 real-time certificate status
@@ -51,6 +51,7 @@
 - **RBAC** -- 4 built-in roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions
 - **Policies & Approvals** -- Certificate issuance policies with approval workflows
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
+- **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own
 
 ### Operations & Monitoring
 - **Dashboard** -- Customizable drag-and-drop widgets, real-time stats, certificate trends
@@ -166,6 +167,8 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [x] **Key Archival & Recovery** — Dual-control recovery of archived private keys: request → admin approve (four-eyes) → PKCS#12 download, fully audited; [guide](https://github.com/NeySlim/ultimate-ca-manager/wiki/Key-Recovery) *(v2.171)*
 - [x] **Custom external ACME CA for issuance** — a configured custom ACME directory URL plus EAB (Settings → ACME client) is now used by issuance and renewal instead of always hitting Let's Encrypt; account row carries the directory/EAB atomically *(v2.180)*
 - [x] **Multi-CA management with per-request selection** — issue from several external ACME CAs (Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…); each request picks its CA, the order is pinned to that account so renewals stay on the same authority; CRUD UI for CA accounts with per-account EAB and default selection *(v2.181)*
+- [x] **Multi-CA ACME proxy endpoints** — each external CA account can expose its own proxy path at `/acme/proxy/<slug>/directory` alongside the legacy default endpoint, with per-account upstream credentials *(v2.185)*
+- [x] **ACME external CSR, renewal key reuse & staging preflight** — finalize with an externally generated CSR (key never enters UCM), keep the same private key across renewals (DANE/TLSA), and dry-run requests against Let's Encrypt staging before touching production rate limits *(v2.184)*
 - [x] **Code Signing** — Issue and manage code-signing certificates for Authenticode, JAR and macOS via the `codeSigning` EKU plus platform key purposes (kernel-mode, lifetime, Apple Developer ID); [usage guide](https://github.com/NeySlim/ultimate-ca-manager/wiki/Code-Signing) *(v2.171)*
 - [x] **Helm chart** — Package UCM itself as a Helm chart for in-cluster deployment under `charts/ucm/` (single-instance, persistent `master.key`, SQLite or external PostgreSQL) *(v2.171)*
 - [x] **SAN database columns derived from final SAN list** — `san_email` / `san_dns` / `san_ip` / `san_uri` always match the X.509 extension, with backfill migration *(v2.140)*
