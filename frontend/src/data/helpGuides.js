@@ -1574,7 +1574,7 @@ System-wide configuration organized into tabs. Changes take effect immediately u
 - **Hostname** — The server's fully qualified domain name
 - **Default Validity** — Default certificate validity period in days
 - **Expiry Warning Threshold** — Days before expiry to trigger warnings
-- **Public ACME vhost** — Hostname advertised in ACME directory URLs (e.g. \`acme.ucm.example.com\`). Often the same wildcard \`*.ucm.example.com\` certificate covers both \`admin.ucm.example.com\` (admin UI) and \`acme.ucm.example.com\` (ACME endpoints without client mTLS). Does not cover the apex \`ucm.example.com\` unless explicitly listed in the cert SAN.
+- **Public ACME vhost** — Concrete hostname in ACME directory URLs (e.g. \`acme.ucm.example.com\` — not \`*.ucm.example.com\`). A wildcard \`*.ucm.example.com\` **TLS certificate SAN** covers both \`admin.ucm.example.com\` and \`acme.ucm.example.com\`. Configure DNS and TLS for the ACME vhost **before** saving — clients that re-read the directory switch URLs immediately.
 
 ## Appearance
 

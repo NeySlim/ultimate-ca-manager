@@ -80,7 +80,7 @@ function useHelpTranslation(lang, pageKey) {
   const langKey = lang?.substring(0, 2)
 
   useEffect(() => {
-    if (!langKey || !pageKey) {
+    if (!langKey || langKey === 'en' || !pageKey) {
       setTranslation(null)
       return
     }

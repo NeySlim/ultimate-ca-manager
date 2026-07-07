@@ -2432,12 +2432,12 @@
       "enabled": "Metrics endpoint enabled",
       "disabled": "Metrics endpoint disabled"
     },
-    "acmeProxyVhost": "ACME Proxy vhost",
-    "acmeProxyVhostHelper": "Public hostname in ACME directory URLs (e.g. acme.ucm.example.com; often covered by a *.ucm.example.com wildcard).",
-    "acmeProxyPort": "ACME Proxy port",
-    "acmeProxyPortHelper": "Public HTTPS port used in ACME proxy directory URLs.",
-    "acmeProxyTlsCertId": "ACME Proxy TLS certificate ID",
-    "acmeProxyTlsCertIdHelper": "Managed certificate ID for the ACME vhost (e.g. wildcard *.ucm.example.com; metadata only — deploy on reverse proxy)."
+    "acmePublicVhost": "ACME public vhost",
+    "acmePublicVhostHelper": "Concrete hostname in ACME directory URLs (e.g. acme.ucm.example.com — not *.ucm.example.com). Ensure DNS and TLS work before saving; clients switch URLs immediately.",
+    "acmePublicPort": "ACME public port",
+    "acmePublicPortHelper": "Public HTTPS port in ACME directory URLs (local server and proxy).",
+    "acmePublicTlsCertId": "ACME public TLS certificate ID",
+    "acmePublicTlsCertIdHelper": "Managed certificate ID for the ACME vhost TLS (e.g. wildcard *.ucm.example.com SAN; metadata only — deploy on reverse proxy)."
   },
   "account": {
     "profile": "Profile",

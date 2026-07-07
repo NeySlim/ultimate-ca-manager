@@ -3,7 +3,7 @@
 Reference topology (example.com — no production hostnames):
 
 - Admin GUI base URL: ``admin.ucm.example.com``
-- ACME proxy vhost: ``acme.ucm.example.com``
+- ACME public vhost: ``acme.ucm.example.com``
 - Wildcard ``*.ucm.example.com`` covers both admin and ACME vhosts
 
 See ``docs/testing/ACME-PUBLIC-VHOST.md`` for the full test plan and wildcard guide.
@@ -11,11 +11,15 @@ See ``docs/testing/ACME-PUBLIC-VHOST.md`` for the full test plan and wildcard gu
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from werkzeug.test import EnvironBuilder
 
 from models import db, SystemConfig
 from utils.acme_public_url import get_acme_public_origin
+
+pytestmark = pytest.mark.usefixtures('clear_acme_public_vhost_settings')
 
 
 def _make_request(app, host='admin.ucm.example.com', scheme='https'):
@@ -31,8 +35,8 @@ def _make_request(app, host='admin.ucm.example.com', scheme='https'):
 def _set_acme_public_config(app, vhost: str = '', port: str = '443'):
     with app.app_context():
         for key, value in (
-            ('acme_proxy_vhost', vhost),
-            ('acme_proxy_port', port),
+            ('acme_public_vhost', vhost),
+            ('acme_public_port', port),
         ):
             row = SystemConfig.query.filter_by(key=key).first()
             if not row:
@@ -159,3 +163,42 @@ class TestAcmeDirectoryPublicUrls:
         assert data['newOrder'] == (
             'https://acme.ucm.example.com:8443/acme/proxy/new-order'
         )
+
+
+class TestAcmePublicVhostSettingsApi:
+    def test_patch_rejects_wildcard_vhost(self, auth_client):
+        r = auth_client.patch(
+            '/api/v2/settings/general',
+            data=json.dumps({'acme_public_vhost': '*.ucm.example.com'}),
+            content_type='application/json',
+        )
+        assert r.status_code == 400
+        assert 'wildcard' in r.get_json().get('message', '').lower()
+
+    def test_patch_accepts_concrete_vhost(self, auth_client):
+        r = auth_client.patch(
+            '/api/v2/settings/general',
+            data=json.dumps({
+                'acme_public_vhost': 'acme.ucm.example.com',
+                'acme_public_port': 8443,
+            }),
+            content_type='application/json',
+        )
+        assert r.status_code == 200
+        data = auth_client.get('/api/v2/settings/general').get_json()['data']
+        assert data['acme_public_vhost'] == 'acme.ucm.example.com'
+        assert data['acme_public_port'] == 8443
+
+
+class TestProxyJwsExpectedUrls:
+    def test_prefers_configured_public_origin_over_inbound_host(self, app):
+        from api.acme.acme_proxy_api import _proxy_expected_jws_urls
+
+        _set_acme_public_config(app, 'acme.ucm.example.com', '8443')
+        with app.test_request_context(
+            'https://admin.ucm.example.com:8443/acme/proxy/new-order',
+            method='POST',
+        ):
+            urls = _proxy_expected_jws_urls()
+        assert urls[0] == 'https://acme.ucm.example.com:8443/acme/proxy/new-order'
+        assert 'https://admin.ucm.example.com:8443/acme/proxy/new-order' in urls

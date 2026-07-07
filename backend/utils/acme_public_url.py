@@ -4,8 +4,8 @@ from models import SystemConfig
 
 
 def _configured_acme_host_port():
-    host_cfg = SystemConfig.query.filter_by(key='acme_proxy_vhost').first()
-    port_cfg = SystemConfig.query.filter_by(key='acme_proxy_port').first()
+    host_cfg = SystemConfig.query.filter_by(key='acme_public_vhost').first()
+    port_cfg = SystemConfig.query.filter_by(key='acme_public_port').first()
     host = (host_cfg.value.strip() if host_cfg and host_cfg.value else '')
     port_raw = (port_cfg.value.strip() if port_cfg and port_cfg.value else '')
     try:

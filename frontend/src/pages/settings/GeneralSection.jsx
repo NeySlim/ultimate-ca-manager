@@ -89,31 +89,31 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.httpProtocolPortHelper')}
           />
           <Input
-            label={t('settings.acmeProxyVhost')}
-            value={settings.acme_proxy_vhost || ''}
-            onChange={(e) => updateSetting('acme_proxy_vhost', e.target.value)}
+            label={t('settings.acmePublicVhost')}
+            value={settings.acme_public_vhost || ''}
+            onChange={(e) => updateSetting('acme_public_vhost', e.target.value)}
             placeholder="acme.ucm.example.com"
-            helperText={t('settings.acmeProxyVhostHelper')}
+            helperText={t('settings.acmePublicVhostHelper')}
           />
           <Input
-            label={t('settings.acmeProxyPort')}
+            label={t('settings.acmePublicPort')}
             type="number"
             min={1}
             max={65535}
-            value={settings.acme_proxy_port ?? 443}
+            value={settings.acme_public_port ?? 443}
             onChange={(e) => {
               const val = parseInt(e.target.value, 10) || 443
-              updateSetting('acme_proxy_port', Math.min(65535, Math.max(1, val)))
+              updateSetting('acme_public_port', Math.min(65535, Math.max(1, val)))
             }}
-            helperText={t('settings.acmeProxyPortHelper')}
+            helperText={t('settings.acmePublicPortHelper')}
           />
           <Input
-            label={t('settings.acmeProxyTlsCertId')}
+            label={t('settings.acmePublicTlsCertId')}
             type="number"
             min={1}
-            value={settings.acme_proxy_tls_cert_id || ''}
-            onChange={(e) => updateSetting('acme_proxy_tls_cert_id', e.target.value)}
-            helperText={t('settings.acmeProxyTlsCertIdHelper')}
+            value={settings.acme_public_tls_cert_id || ''}
+            onChange={(e) => updateSetting('acme_public_tls_cert_id', e.target.value)}
+            helperText={t('settings.acmePublicTlsCertIdHelper')}
           />
         </div>
       </DetailSection>

@@ -19,7 +19,7 @@ export default {
         items: [
           { label: "管理", text: "admin.ucm.example.com — GUI 和 API（按策略 mTLS）" },
           { label: "ACME", text: "acme.ucm.example.com — /acme/* 和 /acme/proxy/*（无客户端 mTLS）" },
-          { label: "通配符", text: "证书 *.ucm.example.com 覆盖 admin.ucm.example.com 和 acme.ucm.example.com，不覆盖 apex ucm.example.com" },
+          { label: "通配符 TLS", text: "具体主机名（如 acme.ucm.example.com）。证书 SAN *.ucm.example.com 覆盖 admin/ACME 的 TLS — 不可将 *.ucm.example.com 填为 vhost" },
           { label: "TLS 证书 ID", text: "部署在 ACME vhost 上的证书元数据（如通配符）" },
         ]
       },

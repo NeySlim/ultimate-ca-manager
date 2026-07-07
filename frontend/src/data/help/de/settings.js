@@ -19,7 +19,7 @@ export default {
         items: [
           { label: "Admin", text: "admin.ucm.example.com — GUI und API (mTLS nach Richtlinie)" },
           { label: "ACME", text: "acme.ucm.example.com — /acme/* und /acme/proxy/* (ohne Client-mTLS)" },
-          { label: "Wildcard", text: "Ein Zertifikat *.ucm.example.com deckt admin.ucm.example.com und acme.ucm.example.com ab, nicht den Apex ucm.example.com" },
+          { label: "Wildcard TLS", text: "Konkreter Hostname (z. B. acme.ucm.example.com). Ein *.ucm.example.com-Zertifikat-SAN deckt TLS für Admin- und ACME-Vhosts ab — nicht *.ucm.example.com als Vhost eintragen" },
           { label: "TLS-Zertifikat-ID", text: "Metadaten für das auf dem ACME-Vhost bereitgestellte Zertifikat (z. B. Wildcard)" },
         ]
       },

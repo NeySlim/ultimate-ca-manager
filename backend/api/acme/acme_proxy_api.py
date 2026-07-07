@@ -67,6 +67,19 @@ def proxy_error(error_type, detail, status_code=400):
     return resp
 
 
+def _proxy_expected_jws_urls():
+    """URLs accepted for the RFC 8555 JWS ``url`` header on proxy endpoints."""
+    path = request.path
+    if request.query_string:
+        path = f'{path}?{request.query_string.decode("utf-8")}'
+    public_origin = get_acme_public_origin(request).rstrip('/')
+    urls = [f'{public_origin}{path}']
+    inbound = request.url.split('#', 1)[0]
+    if inbound not in urls:
+        urls.append(inbound)
+    return urls
+
+
 def verify_proxy_jws():
     """Verify incoming JWS against the client's own key.
 
@@ -78,10 +91,14 @@ def verify_proxy_jws():
         if not jws_data:
             return False, None, None, "Request body is not valid JSON"
 
-        expected_url = request.base_url
-
         from api.acme.acme_api import verify_jws
-        return verify_jws(jws_data, expected_url)
+        last_error = "JWS verification failed"
+        for expected_url in _proxy_expected_jws_urls():
+            is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
+            if is_valid:
+                return is_valid, payload, jwk, error
+            last_error = error or last_error
+        return False, None, None, last_error
 
     except Exception as e:
         logger.error(f"ACME proxy JWS verification error: {e}")

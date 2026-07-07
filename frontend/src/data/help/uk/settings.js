@@ -19,7 +19,8 @@ export default {
         items: [
           { label: "Адмін", text: "admin.ucm.example.com — GUI та API (mTLS за політикою)" },
           { label: "ACME", text: "acme.ucm.example.com — /acme/* та /acme/proxy/* (без клієнтського mTLS)" },
-          { label: "Wildcard", text: "Сертифікат *.ucm.example.com покриває admin.ucm.example.com і acme.ucm.example.com, не apex ucm.example.com" },
+          { label: "TLS wildcard", text: "Конкретне ім'я (напр. acme.ucm.example.com). SAN *.ucm.example.com у сертифікаті покриває TLS admin і ACME — не вводьте *.ucm.example.com як vhost" },
+          { label: "Перед збереженням", text: "DNS і TLS для vhost ACME мають працювати — клієнти одразу перемикають URL каталогу" },
           { label: "ID TLS-сертифіката", text: "Метадані сертифіката на vhost ACME (напр. wildcard)" },
         ]
       },

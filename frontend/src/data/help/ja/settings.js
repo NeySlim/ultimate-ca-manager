@@ -19,7 +19,7 @@ export default {
         items: [
           { label: "管理", text: "admin.ucm.example.com — GUI と API（ポリシーに応じた mTLS）" },
           { label: "ACME", text: "acme.ucm.example.com — /acme/* と /acme/proxy/*（クライアント mTLS なし）" },
-          { label: "ワイルドカード", text: "証明書 *.ucm.example.com は admin.ucm.example.com と acme.ucm.example.com をカバー。apex ucm.example.com は不可" },
+          { label: "ワイルドカード TLS", text: "具体ホスト名（例: acme.ucm.example.com）。証明書 SAN の *.ucm.example.com は admin/ACME の TLS をカバー — vhost に *. は不可" },
           { label: "TLS 証明書 ID", text: "ACME vhost に配置する証明書のメタデータ（例: ワイルドカード）" },
         ]
       },
