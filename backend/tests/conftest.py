@@ -205,6 +205,25 @@ def create_user(auth_client):
     return _create
 
 
+@pytest.fixture
+def clear_acme_public_vhost_settings(app):
+    """Clear acme_public_* SystemConfig before and after tests that set them."""
+    from models import db, SystemConfig
+
+    keys = ('acme_public_vhost', 'acme_public_port', 'acme_public_tls_cert_id')
+
+    def _delete_keys():
+        with app.app_context():
+            SystemConfig.query.filter(
+                SystemConfig.key.in_(keys)
+            ).delete(synchronize_session=False)
+            db.session.commit()
+
+    _delete_keys()
+    yield
+    _delete_keys()
+
+
 # ============================================================
 # Helpers
 # ============================================================

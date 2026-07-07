@@ -14,6 +14,16 @@ export default {
         ]
       },
       {
+        title: "公開 ACME vhost",
+        content: "設定 › 一般: リバースプロキシ背後の ACME directory URL 用の公開ホスト名とポート。",
+        items: [
+          { label: "管理", text: "admin.ucm.example.com — GUI と API（ポリシーに応じた mTLS）" },
+          { label: "ACME", text: "acme.ucm.example.com — /acme/* と /acme/proxy/*（クライアント mTLS なし）" },
+          { label: "ワイルドカード TLS", text: "具体ホスト名（例: acme.ucm.example.com）。証明書 SAN の *.ucm.example.com は admin/ACME の TLS をカバー — vhost に *. は不可" },
+          { label: "TLS 証明書 ID", text: "ACME vhost に配置する証明書のメタデータ（例: ワイルドカード）" },
+        ]
+      },
+      {
         title: "Webhook 配信履歴",
         content: "各 Webhook エンドポイントは、ステータス・試行回数・手動再試行を含む配信ログを保持します。",
         items: [

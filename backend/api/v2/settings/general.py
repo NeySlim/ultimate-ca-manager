@@ -5,11 +5,12 @@ Settings - General settings + Certificate Transparency routes
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import db
+from models import db, Certificate
 from services.audit_service import AuditService
 from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
 import json
 import logging
+import re
 
 from . import bp, get_config, set_config
 from utils.hsts import hsts_env_locked
@@ -38,6 +39,10 @@ def get_general_settings():
         'protocol_base_url': get_config('protocol_base_url', ''),
         'http_protocol_port': int(get_config('http_protocol_port', '8080')),
         'base_url': get_config('base_url', ''),
+        # ACME public endpoint (local server + proxy directory URLs behind reverse proxy)
+        'acme_public_vhost': get_config('acme_public_vhost', ''),
+        'acme_public_port': int(get_config('acme_public_port', '443')),
+        'acme_public_tls_cert_id': int(get_config('acme_public_tls_cert_id', '0') or 0) or None,
         'date_format': get_config('date_format', 'short'),
         'show_time': get_config('show_time', 'true') == 'true',
         # Password policy
@@ -76,6 +81,7 @@ def update_general_settings():
         'backup_retention_days', 'backup_password', 'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time',
+        'acme_public_vhost', 'acme_public_port', 'acme_public_tls_cert_id',
         # Password policy
         'min_password_length', 'max_password_length',
         'password_require_uppercase', 'password_require_lowercase',
@@ -104,6 +110,48 @@ def update_general_settings():
         if port == Config.HTTPS_PORT:
             return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
         data['http_protocol_port'] = str(port)
+
+    if 'acme_public_vhost' in data:
+        host = (data.get('acme_public_vhost') or '').strip().lower()
+        if host:
+            if host.startswith('*.'):
+                return error_response(
+                    'acme_public_vhost must be a concrete hostname (wildcard is TLS SAN only, not an advertised URL)',
+                    400,
+                )
+            if (
+                '://' in host
+                or '/' in host
+                or ':' in host
+                or not re.fullmatch(r'[a-z0-9.-]+', host)
+            ):
+                return error_response('acme_public_vhost must be a hostname only', 400)
+        data['acme_public_vhost'] = host
+
+    if 'acme_public_port' in data:
+        try:
+            acme_port = int(data['acme_public_port'])
+        except (ValueError, TypeError):
+            return error_response('acme_public_port must be an integer', 400)
+        if acme_port < 1 or acme_port > 65535:
+            return error_response('acme_public_port must be between 1 and 65535', 400)
+        data['acme_public_port'] = str(acme_port)
+
+    if 'acme_public_tls_cert_id' in data:
+        cert_id_raw = data.get('acme_public_tls_cert_id')
+        if cert_id_raw in (None, '', 0, '0'):
+            data['acme_public_tls_cert_id'] = ''
+        else:
+            try:
+                cert_id = int(cert_id_raw)
+            except (ValueError, TypeError):
+                return error_response('acme_public_tls_cert_id must be an integer', 400)
+            cert = db.session.get(Certificate, cert_id)
+            if not cert:
+                return error_response('ACME public TLS certificate not found', 404)
+            if not cert.prv:
+                return error_response('ACME public TLS certificate must include a private key', 400)
+            data['acme_public_tls_cert_id'] = str(cert_id)
 
     # Validate HSTS max-age (non-negative int) when provided
     if 'hsts_max_age' in data:

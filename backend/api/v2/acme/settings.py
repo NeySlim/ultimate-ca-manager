@@ -7,6 +7,7 @@ from services.cert_service import CertificateService
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.acme_public_url import get_acme_public_origin
 
 from . import bp, logger
 
@@ -126,12 +127,14 @@ def get_acme_settings():
         if ca:
             ca_name = ca.common_name
 
+    public_base = get_acme_public_origin(request)
     return success_response(data={
         'enabled': enabled,
         'issuing_ca_id': ca_id,
         'issuing_ca_name': ca_name,
         'provider': 'Built-in ACME Server',
         'contact_email': 'admin@ucm.local',
+        'acme_public_base_url': f'{public_base}/acme',
         'revoke_on_renewal': revoke_on_renewal,
         'superseded_count': superseded_count,
         'terms_of_service': terms_of_service,

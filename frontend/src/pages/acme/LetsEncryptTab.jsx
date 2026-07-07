@@ -54,9 +54,10 @@ export default function LetsEncryptTab({
 
   const proxyAccountId = clientSettings.proxy_acme_account_id ?? null
   const selectedProxyAccount = caAccounts.find(a => a.id === proxyAccountId)
+  const publicProxyBase = (clientSettings.acme_proxy_public_base_url || `${window.location.origin}/acme/proxy`).replace(/\/$/, '')
   const proxyServerBase = selectedProxyAccount?.proxy_enabled && selectedProxyAccount?.proxy_slug
-    ? `${window.location.origin}/acme/proxy/${selectedProxyAccount.proxy_slug}`
-    : `${window.location.origin}/acme/proxy`
+    ? `${publicProxyBase}/${selectedProxyAccount.proxy_slug}`
+    : publicProxyBase
   const proxyDirectoryUrl = `${proxyServerBase}/directory`
   const enabledProxyAccounts = caAccounts.filter(a => a.proxy_enabled && a.proxy_slug)
   const proxyAccountOptions = caAccounts.map(a => ({
@@ -459,7 +460,7 @@ export default function LetsEncryptTab({
                   <>
                     <p className="text-xs text-text-tertiary">{t('acme.proxyDefaultUrl')}</p>
                     <code className="block text-xs text-text-secondary font-mono bg-bg-secondary p-2 rounded break-all">
-                      {window.location.origin}/acme/proxy/directory
+                      {publicProxyBase}/directory
                     </code>
                   </>
                 )}
@@ -469,13 +470,13 @@ export default function LetsEncryptTab({
                     {enabledProxyAccounts.map((acct) => (
                       <div key={acct.id} className="flex items-center justify-between gap-2">
                         <code className="text-xs text-text-secondary font-mono break-all">
-                          {window.location.origin}/acme/proxy/{acct.proxy_slug}/directory
+                          {publicProxyBase}/{acct.proxy_slug}/directory
                         </code>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => copy(`${window.location.origin}/acme/proxy/${acct.proxy_slug}/directory`)}
+                          onClick={() => copy(`${publicProxyBase}/${acct.proxy_slug}/directory`)}
                         >
                           <Copy size={12} />
                         </Button>

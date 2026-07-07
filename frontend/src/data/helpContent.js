@@ -758,6 +758,17 @@ export const helpContent = {
         ]
       },
       {
+        title: "Public ACME vhost",
+        content: "Settings › General: public hostname and port for ACME directory URLs behind a reverse proxy.",
+        items: [
+          { label: "Admin", text: "admin.ucm.example.com — GUI and API (mTLS per policy)" },
+          { label: "ACME", text: "acme.ucm.example.com — /acme/* and /acme/proxy/* (no client mTLS)" },
+          { label: "Wildcard TLS", text: "Use a concrete hostname here (e.g. acme.ucm.example.com). A *.ucm.example.com certificate SAN covers TLS for admin and ACME vhosts — do not enter *.ucm.example.com as the vhost" },
+          { label: "Before saving", text: "Have DNS and TLS working for the ACME vhost first — clients that re-read the directory switch URLs immediately and renewals fail if the vhost is unreachable" },
+          { label: "TLS certificate ID", text: "Metadata for the certificate deployed on the ACME vhost (e.g. wildcard)" },
+        ]
+      },
+      {
         title: "Webhook delivery history",
         content: "Each webhook endpoint keeps a delivery log with status, attempts and a manual retry.",
         items: [

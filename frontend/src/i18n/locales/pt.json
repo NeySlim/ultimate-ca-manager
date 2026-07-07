@@ -2430,7 +2430,13 @@
       "disable": "Desativar",
       "enabled": "Endpoint de métricas ativado",
       "disabled": "Endpoint de métricas desativado"
-    }
+    },
+    "acmePublicVhost": "Vhost público ACME",
+    "acmePublicVhostHelper": "Hostname concreto nas URL do diretório ACME (ex.: acme.ucm.example.com — não *.ucm.example.com). Tenha DNS e TLS prontos antes de salvar; clientes mudam de URL imediatamente.",
+    "acmePublicPort": "Porta pública ACME",
+    "acmePublicPortHelper": "Porta HTTPS pública nas URL do diretório ACME (servidor local e proxy).",
+    "acmePublicTlsCertId": "ID certificado TLS público ACME",
+    "acmePublicTlsCertIdHelper": "ID do certificado para o vhost ACME (ex. SAN wildcard *.ucm.example.com; apenas metadados — implantar no reverse proxy)."
   },
   "account": {
     "profile": "Perfil",

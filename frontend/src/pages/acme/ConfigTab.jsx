@@ -25,6 +25,7 @@ export default function ConfigTab({ acmeSettings, cas, updateSetting, onSaveConf
 
   const tos = acmeSettings.terms_of_service
   const tosExists = tos?.title || tos?.body
+  const acmePublicBase = (acmeSettings.acme_public_base_url || `${window.location.origin}/acme`).replace(/\/$/, '')
 
   // Preview of saved ToS (from props)
   const savedPreview = useMemo(() => renderTosPreview(tos?.body), [tos?.body])
@@ -126,21 +127,21 @@ export default function ConfigTab({ acmeSettings, cas, updateSetting, onSaveConf
           <CompactField 
             autoIcon="environment"
             label={t('acme.directory')} 
-            value={`${window.location.origin}/acme/directory`}
+            value={`${acmePublicBase}/directory`}
             mono
             copyable
           />
           {(acmeSettings.terms_of_service?.title || acmeSettings.terms_of_service?.body) && (
             <CompactField 
               label={t('acme.termsOfServiceUrl')}
-              value={`${window.location.origin}/acme/terms`}
+              value={`${acmePublicBase}/terms`}
               mono
               copyable
             />
           )}
         </CompactGrid>
         <p className="text-xs text-text-tertiary mt-2">
-          {t('acme.certbotUsage')} <code className="bg-bg-tertiary px-1 rounded">--server {window.location.origin}/acme/directory</code>
+          {t('acme.certbotUsage')} <code className="bg-bg-tertiary px-1 rounded">--server {acmePublicBase}/directory</code>
         </p>
       </CompactSection>
 

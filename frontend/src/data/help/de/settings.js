@@ -14,6 +14,16 @@ export default {
         ]
       },
       {
+        title: "Öffentlicher ACME-Vhost",
+        content: "Einstellungen › Allgemein: öffentlicher Hostname und Port für ACME-Directory-URLs hinter einem Reverse Proxy.",
+        items: [
+          { label: "Admin", text: "admin.ucm.example.com — GUI und API (mTLS nach Richtlinie)" },
+          { label: "ACME", text: "acme.ucm.example.com — /acme/* und /acme/proxy/* (ohne Client-mTLS)" },
+          { label: "Wildcard TLS", text: "Konkreter Hostname (z. B. acme.ucm.example.com). Ein *.ucm.example.com-Zertifikat-SAN deckt TLS für Admin- und ACME-Vhosts ab — nicht *.ucm.example.com als Vhost eintragen" },
+          { label: "TLS-Zertifikat-ID", text: "Metadaten für das auf dem ACME-Vhost bereitgestellte Zertifikat (z. B. Wildcard)" },
+        ]
+      },
+      {
         title: "Webhook-Zustellungsverlauf",
         content: "Jeder Webhook-Endpunkt führt ein Zustellungsprotokoll mit Status, Versuchen und manuellem Wiederholen.",
         items: [

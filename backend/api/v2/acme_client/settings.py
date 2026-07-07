@@ -11,6 +11,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils.acme_public_url import get_acme_public_origin
 from models import db, SystemConfig
 from services.audit_service import AuditService
 
@@ -99,6 +100,9 @@ def get_settings():
     except (ValueError, TypeError):
         dns_timeout = 120
 
+    public_base = get_acme_public_origin(request)
+    acme_proxy_public_base_url = f'{public_base}/acme/proxy'
+
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
         'environment': env_cfg.value if env_cfg else 'staging',
@@ -124,6 +128,8 @@ def get_settings():
         'eab_hmac_key_set': bool(eab_hmac_cfg and eab_hmac_cfg.value),
         'key_type': key_type_cfg.value if key_type_cfg else 'RSA-2048',
         'account_key_type': acct_key_type_cfg.value if acct_key_type_cfg else 'ES256',
+        'acme_public_base_url': f'{public_base}/acme',
+        'acme_proxy_public_base_url': acme_proxy_public_base_url,
     })
 
 

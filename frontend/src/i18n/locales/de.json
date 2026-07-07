@@ -2430,7 +2430,13 @@
       "disable": "Deaktivieren",
       "enabled": "Metriken-Endpunkt aktiviert",
       "disabled": "Metriken-Endpunkt deaktiviert"
-    }
+    },
+    "acmePublicVhost": "Öffentlicher ACME-Vhost",
+    "acmePublicVhostHelper": "Konkreter Hostname in ACME-Directory-URLs (z. B. acme.ucm.example.com — nicht *.ucm.example.com). DNS und TLS vor dem Speichern bereitstellen; Clients wechseln sofort die URLs.",
+    "acmePublicPort": "Öffentlicher ACME-Port",
+    "acmePublicPortHelper": "Öffentlicher HTTPS-Port in ACME-Directory-URLs (lokaler Server und Proxy).",
+    "acmePublicTlsCertId": "Öffentliche ACME-TLS-Zertifikat-ID",
+    "acmePublicTlsCertIdHelper": "Zertifikat-ID für den ACME-Vhost (z. B. Wildcard-SAN *.ucm.example.com; nur Metadaten — auf dem Reverse Proxy deployen)."
   },
   "account": {
     "profile": "Profil",

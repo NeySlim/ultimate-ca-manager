@@ -2431,7 +2431,13 @@
       "disable": "Disable",
       "enabled": "Metrics endpoint enabled",
       "disabled": "Metrics endpoint disabled"
-    }
+    },
+    "acmePublicVhost": "ACME public vhost",
+    "acmePublicVhostHelper": "Concrete hostname in ACME directory URLs (e.g. acme.ucm.example.com — not *.ucm.example.com). Ensure DNS and TLS work before saving; clients switch URLs immediately.",
+    "acmePublicPort": "ACME public port",
+    "acmePublicPortHelper": "Public HTTPS port in ACME directory URLs (local server and proxy).",
+    "acmePublicTlsCertId": "ACME public TLS certificate ID",
+    "acmePublicTlsCertIdHelper": "Managed certificate ID for the ACME vhost TLS (e.g. wildcard *.ucm.example.com SAN; metadata only — deploy on reverse proxy)."
   },
   "account": {
     "profile": "Profile",

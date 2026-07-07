@@ -2430,7 +2430,13 @@
       "disable": "Вимкнути",
       "enabled": "Endpoint метрик увімкнено",
       "disabled": "Endpoint метрик вимкнено"
-    }
+    },
+    "acmePublicVhost": "Публічний vhost ACME",
+    "acmePublicVhostHelper": "Конкретне ім'я хоста в URL каталогу ACME (напр. acme.ucm.example.com — не *.ucm.example.com). DNS і TLS мають працювати до збереження; клієнти одразу перемикають URL.",
+    "acmePublicPort": "Публічний порт ACME",
+    "acmePublicPortHelper": "Публічний HTTPS-порт у URL каталогу ACME (локальний сервер і проксі).",
+    "acmePublicTlsCertId": "ID публічного TLS-сертифіката ACME",
+    "acmePublicTlsCertIdHelper": "ID сертифіката для vhost ACME (напр. SAN wildcard *.ucm.example.com; лише метадані — розгорнути на reverse proxy)."
   },
   "account": {
     "profile": "Профіль",

@@ -2600,7 +2600,13 @@
       "disable": "Désactiver",
       "enabled": "Endpoint de métriques activé",
       "disabled": "Endpoint de métriques désactivé"
-    }
+    },
+    "acmePublicVhost": "vhost public ACME",
+    "acmePublicVhostHelper": "Nom d'hôte concret dans les URL ACME (ex. acme.ucm.example.com — pas *.ucm.example.com). DNS et TLS opérationnels avant enregistrement ; les clients basculent immédiatement.",
+    "acmePublicPort": "port public ACME",
+    "acmePublicPortHelper": "Port HTTPS public dans les URL du directory ACME (serveur local et proxy).",
+    "acmePublicTlsCertId": "ID certificat TLS public ACME",
+    "acmePublicTlsCertIdHelper": "ID du certificat pour le vhost ACME (ex. SAN wildcard *.ucm.example.com ; métadonnée — déployer sur le reverse proxy)."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

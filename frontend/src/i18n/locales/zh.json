@@ -2430,7 +2430,13 @@
       "disable": "禁用",
       "enabled": "指标端点已启用",
       "disabled": "指标端点已禁用"
-    }
+    },
+    "acmePublicVhost": "ACME 公共 vhost",
+    "acmePublicVhostHelper": "ACME 目录 URL 中的具体主机名（如 acme.ucm.example.com，不可填 *.ucm.example.com）。保存前确保 DNS 与 TLS 就绪；客户端会立即切换 URL。",
+    "acmePublicPort": "ACME 公共端口",
+    "acmePublicPortHelper": "ACME 目录 URL 中的公共 HTTPS 端口（本地服务器与代理）。",
+    "acmePublicTlsCertId": "ACME 公共 TLS 证书 ID",
+    "acmePublicTlsCertIdHelper": "ACME vhost 的证书 ID（如通配符 SAN *.ucm.example.com；仅元数据，需在反向代理上部署）。"
   },
   "account": {
     "profile": "个人资料",

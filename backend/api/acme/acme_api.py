@@ -15,6 +15,7 @@ from config.settings import Config
 import logging
 import re
 from utils.datetime_utils import utc_now
+from utils.acme_public_url import get_acme_public_origin
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def get_acme_service() -> AcmeService:
     so this is cheap and avoids stale base_url issues behind proxies
     or with multi-hostname access.
     """
-    base_url = f"{request.scheme}://{request.host}"
+    base_url = get_acme_public_origin(request)
     return AcmeService(base_url=base_url)
 
 

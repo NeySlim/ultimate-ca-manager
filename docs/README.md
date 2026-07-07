@@ -25,6 +25,12 @@ Technical documentation for Ultimate Certificate Manager.
 - **[REDIS.md](./REDIS.md)** — Optional Redis integration
 - **[TESTING.md](./TESTING.md)** — Testing & linting guide (unit + E2E + ESLint + Ruff)
 
+### ACME testing notes
+
+- **[testing/ACME-PUBLIC-VHOST.md](./testing/ACME-PUBLIC-VHOST.md)** — Public ACME vhost, wildcard TLS, test plan
+- **[testing/ACME-PROXY-MULTI-CA.md](./testing/ACME-PROXY-MULTI-CA.md)** — Multi-CA proxy endpoints
+- **[testing/ACME-DNS-PROPAGATION.md](./testing/ACME-DNS-PROPAGATION.md)** — DNS-01 propagation checks
+
 ## Architecture
 
 | Component | Stack |

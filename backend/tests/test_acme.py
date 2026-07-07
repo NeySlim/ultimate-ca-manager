@@ -214,6 +214,23 @@ class TestAcmeServerSettings:
         data = assert_success(r)
         assert data['enabled'] is True
 
+    def test_get_settings_exposes_configured_public_acme_base_url(self, app, auth_client, clear_acme_public_vhost_settings):
+        from models import db, SystemConfig
+        with app.app_context():
+            host_cfg = SystemConfig.query.filter_by(key='acme_public_vhost').first()
+            if not host_cfg:
+                host_cfg = SystemConfig(key='acme_public_vhost')
+                db.session.add(host_cfg)
+            host_cfg.value = 'acme.ucm.example.com'
+            port_cfg = SystemConfig.query.filter_by(key='acme_public_port').first()
+            if not port_cfg:
+                port_cfg = SystemConfig(key='acme_public_port')
+                db.session.add(port_cfg)
+            port_cfg.value = '9443'
+            db.session.commit()
+        data = assert_success(auth_client.get('/api/v2/acme/settings'))
+        assert data['acme_public_base_url'] == 'https://acme.ucm.example.com:9443/acme'
+
 
 # ============================================================
 # ACME Server — Stats
@@ -529,6 +546,24 @@ class TestAcmeClientSettings:
         data = assert_success(r)
         assert 'proxy_eab_kid' in data
         assert 'proxy_eab_hmac_key_set' in data
+
+    def test_get_client_settings_exposes_configured_public_acme_urls(self, app, auth_client, clear_acme_public_vhost_settings):
+        from models import db, SystemConfig
+        with app.app_context():
+            host_cfg = SystemConfig.query.filter_by(key='acme_public_vhost').first()
+            if not host_cfg:
+                host_cfg = SystemConfig(key='acme_public_vhost')
+                db.session.add(host_cfg)
+            host_cfg.value = 'acme.ucm.example.com'
+            port_cfg = SystemConfig.query.filter_by(key='acme_public_port').first()
+            if not port_cfg:
+                port_cfg = SystemConfig(key='acme_public_port')
+                db.session.add(port_cfg)
+            port_cfg.value = '8443'
+            db.session.commit()
+        data = assert_success(auth_client.get('/api/v2/acme/client/settings'))
+        assert data['acme_public_base_url'] == 'https://acme.ucm.example.com:8443/acme'
+        assert data['acme_proxy_public_base_url'] == 'https://acme.ucm.example.com:8443/acme/proxy'
 
 
 # ============================================================

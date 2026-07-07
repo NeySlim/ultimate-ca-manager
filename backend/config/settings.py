@@ -279,6 +279,9 @@ class TestingConfig(Config):
     DEBUG = True
     DATABASE_PATH = ":memory:"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    # Inherit Config.SQLALCHEMY_ENGINE_OPTIONS when DATABASE_URL is set in the
+    # environment (PG CI job) but force in-memory SQLite — pool_* args are invalid.
+    SQLALCHEMY_ENGINE_OPTIONS = {}
 
 
 # Configuration dictionary
