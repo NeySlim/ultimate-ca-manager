@@ -2430,7 +2430,13 @@
       "disable": "無効化",
       "enabled": "メトリクスエンドポイントを有効化しました",
       "disabled": "メトリクスエンドポイントを無効化しました"
-    }
+    },
+    "acmeProxyVhost": "ACMEプロキシ vhost",
+    "acmeProxyVhostHelper": "ACME directory URL の公開ホスト名（例: acme.ucm.example.com。*.ucm.example.com ワイルドカードでカバーされることが多い）。",
+    "acmeProxyPort": "ACMEプロキシポート",
+    "acmeProxyPortHelper": "ACMEプロキシ directory URL で使用する公開 HTTPS ポート。",
+    "acmeProxyTlsCertId": "ACMEプロキシ TLS 証明書 ID",
+    "acmeProxyTlsCertIdHelper": "ACME vhost 用の管理証明書 ID（例: ワイルドカード *.ucm.example.com。メタデータのみ — リバースプロキシに配置）。"
   },
   "account": {
     "profile": "プロフィール",

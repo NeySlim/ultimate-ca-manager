@@ -2430,7 +2430,13 @@
       "disable": "禁用",
       "enabled": "指标端点已启用",
       "disabled": "指标端点已禁用"
-    }
+    },
+    "acmeProxyVhost": "ACME 代理 vhost",
+    "acmeProxyVhostHelper": "ACME 目录 URL 中的公共主机名（例如 acme.ucm.example.com；通常由通配符 *.ucm.example.com 覆盖）。",
+    "acmeProxyPort": "ACME 代理端口",
+    "acmeProxyPortHelper": "ACME 代理目录 URL 使用的公共 HTTPS 端口。",
+    "acmeProxyTlsCertId": "ACME 代理 TLS 证书 ID",
+    "acmeProxyTlsCertIdHelper": "ACME vhost 的管理证书 ID（例如通配符 *.ucm.example.com；仅元数据 — 在反向代理上部署）。"
   },
   "account": {
     "profile": "个人资料",

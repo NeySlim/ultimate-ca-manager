@@ -2430,7 +2430,13 @@
       "disable": "Desativar",
       "enabled": "Endpoint de métricas ativado",
       "disabled": "Endpoint de métricas desativado"
-    }
+    },
+    "acmeProxyVhost": "Vhost proxy ACME",
+    "acmeProxyVhostHelper": "Hostname público nos URL do diretório ACME (ex.: acme.ucm.example.com; frequentemente coberto por wildcard *.ucm.example.com).",
+    "acmeProxyPort": "Porta proxy ACME",
+    "acmeProxyPortHelper": "Porta HTTPS pública usada nos URL do proxy ACME.",
+    "acmeProxyTlsCertId": "ID certificado TLS proxy ACME",
+    "acmeProxyTlsCertIdHelper": "ID do certificado gerido para o vhost ACME (ex.: wildcard *.ucm.example.com; apenas metadados — implementar no reverse proxy)."
   },
   "account": {
     "profile": "Perfil",

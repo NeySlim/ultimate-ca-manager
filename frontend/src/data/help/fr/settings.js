@@ -14,6 +14,16 @@ export default {
         ]
       },
       {
+        title: "Vhost ACME public",
+        content: "Paramètres › Général : nom d'hôte et port publics pour les URL du directory ACME derrière un reverse proxy.",
+        items: [
+          { label: "Admin", text: "admin.ucm.example.com — GUI et API (mTLS selon politique)" },
+          { label: "ACME", text: "acme.ucm.example.com — /acme/* et /acme/proxy/* (sans mTLS client)" },
+          { label: "Wildcard", text: "Un certificat *.ucm.example.com couvre admin.ucm.example.com et acme.ucm.example.com, pas l'apex ucm.example.com" },
+          { label: "ID certificat TLS", text: "Métadonnée du certificat déployé sur le vhost ACME (ex. wildcard)" },
+        ]
+      },
+      {
         title: "Historique de livraison des webhooks",
         content: "Chaque endpoint webhook conserve un journal de livraison avec statut, tentatives et nouvelle tentative manuelle.",
         items: [

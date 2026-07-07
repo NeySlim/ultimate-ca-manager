@@ -14,6 +14,16 @@ export default {
         ]
       },
       {
+        title: "Публічний vhost ACME",
+        content: "Налаштування › Загальні: публічне ім'я хоста та порт для URL каталогу ACME за reverse proxy.",
+        items: [
+          { label: "Адмін", text: "admin.ucm.example.com — GUI та API (mTLS за політикою)" },
+          { label: "ACME", text: "acme.ucm.example.com — /acme/* та /acme/proxy/* (без клієнтського mTLS)" },
+          { label: "Wildcard", text: "Сертифікат *.ucm.example.com покриває admin.ucm.example.com і acme.ucm.example.com, не apex ucm.example.com" },
+          { label: "ID TLS-сертифіката", text: "Метадані сертифіката на vhost ACME (напр. wildcard)" },
+        ]
+      },
+      {
         title: "Історія доставки вебхуків",
         content: "Кожен endpoint вебхука веде журнал доставки зі статусом, спробами та ручним повтором.",
         items: [
