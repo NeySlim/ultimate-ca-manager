@@ -38,9 +38,10 @@ def check_caa(domain: str, issuer_domains: Optional[List[str]] = None) -> Tuple[
     if not issuer_domains:
         issuer_domains = []
 
-    # Strip wildcard prefix for lookup
-    check_domain = domain.lstrip('*.')
+    # Strip wildcard prefix for lookup (only the leading "*." label, not an
+    # arbitrary set of leading '*'/'.' characters as lstrip('*.') would do)
     is_wildcard = domain.startswith('*.')
+    check_domain = domain[2:] if is_wildcard else domain
 
     # Walk up the domain tree (RFC 6844 §4)
     parts = check_domain.split('.')

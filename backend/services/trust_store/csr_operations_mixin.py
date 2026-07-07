@@ -135,8 +135,40 @@ class CSROperationsMixin:
             utc_now() + timedelta(days=validity_days)
         )
 
-        # Copy extensions from CSR
+        # Copy extensions from CSR — but never let a requester confer CA powers
+        # on a non-CA (leaf) certificate through a crafted CSR. Only the explicit
+        # intermediate-CA signing flow (cert_type='intermediate_ca') may assert
+        # BasicConstraints CA:true / keyCertSign; for every other type the
+        # policy blocks below set the correct leaf values. Without this an EST /
+        # SCEP / ACME enrollee could submit a CSR with BasicConstraints(ca=True)
+        # and receive a working subordinate CA (trust escalation).
+        issuing_ca = cert_type == 'intermediate_ca'
         for extension in csr.extensions:
+            if not issuing_ca and extension.oid == ExtensionOID.BASIC_CONSTRAINTS:
+                # Force a leaf BasicConstraints regardless of what the CSR asked
+                # for (the policy block below only fires when the CSR omits it).
+                builder = builder.add_extension(
+                    x509.BasicConstraints(ca=False, path_length=None),
+                    critical=True,
+                )
+                continue
+            if not issuing_ca and extension.oid == ExtensionOID.KEY_USAGE:
+                ku = extension.value
+                if ku.key_cert_sign or ku.crl_sign:
+                    # Strip CA-only bits; keep the rest of the requested usage.
+                    ku = x509.KeyUsage(
+                        digital_signature=ku.digital_signature,
+                        content_commitment=ku.content_commitment,
+                        key_encipherment=ku.key_encipherment,
+                        data_encipherment=ku.data_encipherment,
+                        key_agreement=ku.key_agreement,
+                        key_cert_sign=False,
+                        crl_sign=False,
+                        encipher_only=ku.encipher_only if ku.key_agreement else False,
+                        decipher_only=ku.decipher_only if ku.key_agreement else False,
+                    )
+                builder = builder.add_extension(ku, extension.critical)
+                continue
             builder = builder.add_extension(extension.value, extension.critical)
 
         # Auto-add SAN from CN if CSR has no SAN extension

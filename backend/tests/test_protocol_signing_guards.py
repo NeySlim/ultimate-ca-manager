@@ -94,3 +94,66 @@ class TestScepOfflineGuard:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestCsrExtensionPolicy:
+    """A crafted CSR must never confer CA powers on a leaf certificate
+    (EST/SCEP/ACME enrollees call the shared TrustStoreService.sign_csr)."""
+
+    @staticmethod
+    def _ca():
+        import datetime
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        key = rsa.generate_private_key(65537, 2048)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Guard Root CA')])
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                .not_valid_before(datetime.datetime(2020, 1, 1))
+                .not_valid_after(datetime.datetime(2035, 1, 1))
+                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .sign(key, hashes.SHA256()))
+        return cert, key
+
+    @staticmethod
+    def _malicious_csr():
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        k = rsa.generate_private_key(65537, 2048)
+        return (x509.CertificateSigningRequestBuilder()
+                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'evil.example.com')]))
+                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .add_extension(x509.KeyUsage(
+                    digital_signature=True, key_cert_sign=True, crl_sign=True,
+                    content_commitment=False, key_encipherment=True, data_encipherment=False,
+                    key_agreement=False, encipher_only=False, decipher_only=False), critical=True)
+                .sign(k, hashes.SHA256()))
+
+    def _issue(self, cert_type):
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        from services.trust_store import TrustStoreService
+        ca_cert, ca_key = self._ca()
+        pem = TrustStoreService.sign_csr(
+            csr_pem=self._malicious_csr().public_bytes(serialization.Encoding.PEM),
+            ca_cert=ca_cert, ca_private_key=ca_key, validity_days=90, cert_type=cert_type)
+        return x509.load_pem_x509_certificate(pem if isinstance(pem, bytes) else pem.encode())
+
+    def test_leaf_cannot_become_ca_via_crafted_csr(self):
+        from cryptography import x509
+        cert = self._issue('server_cert')
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
+        ku = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+        assert bc.ca is False
+        assert ku.key_cert_sign is False
+        assert ku.crl_sign is False
+
+    def test_intermediate_ca_signing_still_confers_ca(self):
+        from cryptography import x509
+        cert = self._issue('intermediate_ca')
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
+        assert bc.ca is True
