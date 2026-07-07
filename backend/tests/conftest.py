@@ -205,6 +205,25 @@ def create_user(auth_client):
     return _create
 
 
+@pytest.fixture(autouse=True)
+def _clear_acme_public_vhost_settings(app):
+    """Clear acme_proxy_* SystemConfig so public URL tests do not leak into ACME JWS tests."""
+    from models import db, SystemConfig
+
+    keys = ('acme_proxy_vhost', 'acme_proxy_port', 'acme_proxy_tls_cert_id')
+
+    def _delete_keys():
+        with app.app_context():
+            SystemConfig.query.filter(
+                SystemConfig.key.in_(keys)
+            ).delete(synchronize_session=False)
+            db.session.commit()
+
+    _delete_keys()
+    yield
+    _delete_keys()
+
+
 # ============================================================
 # Helpers
 # ============================================================

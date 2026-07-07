@@ -67,16 +67,6 @@ def certificate_covers_hostname(hostname: str, sans: list[str]) -> bool:
     return any(wildcard_san_matches(hostname, san) for san in sans)
 
 
-@pytest.fixture(autouse=True)
-def _reset_acme_public_config(app):
-    with app.app_context():
-        SystemConfig.query.filter(
-            SystemConfig.key.in_(('acme_proxy_vhost', 'acme_proxy_port'))
-        ).delete(synchronize_session=False)
-        db.session.commit()
-    yield
-
-
 class TestGetAcmePublicOrigin:
     def test_uses_configured_acme_vhost_and_non_default_port(self, app):
         _set_acme_public_config(app, 'acme.ucm.example.com', '8443')
