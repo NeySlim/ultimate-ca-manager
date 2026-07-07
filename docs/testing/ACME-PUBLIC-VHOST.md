@@ -8,10 +8,12 @@ Voir aussi : [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPA
 
 ## Topologie de référence
 
+Dans le cas courant, admin et ACME sont des **sous-domaines de `ucm.example.com`** :
+
 | Rôle | FQDN | Usage |
 |------|------|--------|
 | **Admin UCM** | `https://admin.ucm.example.com:8443` | GUI, API session, mTLS client optionnel/obligatoire |
-| **ACME public** | `https://acme.example.com:8443` | `/acme/*` (CA locale) et `/acme/proxy/*` (proxy vers CA externe) |
+| **ACME public** | `https://acme.ucm.example.com:8443` | `/acme/*` (CA locale) et `/acme/proxy/*` (proxy vers CA externe) |
 | **URL de base UCM** (Paramètres → Général) | `https://admin.ucm.example.com` | Liens absolus, notifications, SAML |
 
 Le listener UCM (gunicorn) est unique ; en production, un **reverse proxy** (F5, nginx, Traefik) termine TLS par **vhost** et route vers le backend UCM.
@@ -20,7 +22,7 @@ Le listener UCM (gunicorn) est unique ; en production, un **reverse proxy** (F5,
 
 | Clé `SystemConfig` | Exemple | Effet |
 |--------------------|---------|--------|
-| `acme_proxy_vhost` | `acme.example.com` | Hostname dans les URLs du directory ACME (`newOrder`, `newNonce`, …) |
+| `acme_proxy_vhost` | `acme.ucm.example.com` | Hostname dans les URLs du directory ACME (`newOrder`, `newNonce`, …) |
 | `acme_proxy_port` | `8443` | Port dans ces URLs (omis si `443`) |
 | `acme_proxy_tls_cert_id` | ID certificat UCM | **Métadonnée** : cert TLS à déployer sur le vhost ACME côté proxy (non appliqué au runtime gunicorn) |
 
@@ -28,48 +30,57 @@ Sans `acme_proxy_vhost`, UCM retombe sur `scheme://Host` de la requête entrante
 
 ## Certificats wildcard — règles essentielles
 
-Un SAN wildcard `*.example.com` ne couvre **qu’un seul** label à gauche de `example.com`.
+Un SAN wildcard `*.ucm.example.com` couvre **un seul** label à gauche de `ucm.example.com` :
 
-| Hostname accédé | Cert `*.example.com` | Cert `*.ucm.example.com` | Cert SAN explicites `admin.ucm.example.com` + `acme.example.com` |
-|-----------------|----------------------|--------------------------|------------------------------------------------------------------|
-| `acme.example.com` | ✅ | ❌ | ✅ |
-| `admin.ucm.example.com` | ❌ | ✅ | ✅ |
-| `ucm.example.com` (apex) | ❌ | ❌ | ❌ (sauf SAN apex dédié) |
-| `api.ucm.example.com` | ❌ | ✅ | ❌ (sauf SAN dédié) |
+| Hostname accédé | Cert `*.ucm.example.com` | Cert `*.example.com` |
+|-----------------|--------------------------|----------------------|
+| `admin.ucm.example.com` | ✅ | ❌ |
+| `acme.ucm.example.com` | ✅ | ❌ |
+| `api.ucm.example.com` | ✅ | ❌ |
+| `ucm.example.com` (apex) | ❌ | ❌ |
+| `acme.example.com` | ❌ | ✅ |
+
+**Cas typique UCM** : un certificat wildcard `*.ucm.example.com` suffit pour **les deux** vhosts
+`admin.ucm.example.com` et `acme.ucm.example.com`, à condition que le reverse proxy présente
+ce même certificat (ou des copies) sur chaque vhost SNI.
+
+Ce wildcard **ne couvre pas** l’apex `ucm.example.com` — il faut un SAN explicite si ce nom est utilisé.
 
 ### Erreurs fréquentes
 
-1. **Appliquer `*.example.com` sur le vhost admin**  
-   Le navigateur accède à `admin.ucm.example.com` → deux labels avant `example.com` → **hostname mismatch**.
+1. **Appliquer `*.ucm.example.com` puis accéder via `ucm.example.com`**  
+   L’apex n’est pas couvert par le wildcard → **hostname mismatch**.
 
-2. **Appliquer `*.ucm.example.com` sur le vhost ACME `acme.example.com`**  
-   `acme.example.com` n’est pas sous `*.ucm.example.com` → **hostname mismatch**.
+2. **Configurer `acme_proxy_vhost=acme.ucm.example.com` mais DNS/TLS sur un autre nom**  
+   (ex. `acme.example.com` hors zone `ucm`) → timeout ou erreur TLS côté Certbot.
 
-3. **Configurer `acme_proxy_vhost=acme.example.com` sans DNS ni TLS alignés**  
-   Certbot / curl time-out ou échouent en TLS alors que UCM répond en local sur un autre nom.
+3. **Un seul listener gunicorn avec un cert admin, URLs directory pointant vers `acme.ucm.example.com`**  
+   Les clients ACME vérifient le cert du hostname annoncé dans le directory, pas celui de l’admin.
 
 4. **Confondre URL directory et certificat serveur**  
-   Les URLs dans le directory suivent `acme_proxy_vhost` ; le client ACME vérifie le certificat TLS **du hostname de chaque URL** annoncée.
+   Les URLs dans le directory suivent `acme_proxy_vhost` ; le client ACME valide le TLS **de chaque URL** annoncée.
 
 ### Stratégies TLS recommandées
 
-**Option A — Deux vhosts proxy (recommandé prod)**
+**Option A — Wildcard `*.ucm.example.com` (recommandé si les deux vhosts sont sous `ucm.example.com`)**
 
 ```
-admin.ucm.example.com:8443  → cert SAN admin.ucm.example.com (ou *.ucm.example.com)
-acme.example.com:8443       → cert SAN acme.example.com (ou *.example.com)
-                              → pas de mTLS client
+admin.ucm.example.com:8443  → cert *.ucm.example.com (mTLS selon politique admin)
+acme.ucm.example.com:8443   → même cert *.ucm.example.com, sans mTLS client
 ```
 
-**Option B — Un certificat multi-SAN**
+**Option B — SAN explicites**
 
 ```
-SAN: admin.ucm.example.com, acme.example.com
+SAN: admin.ucm.example.com, acme.ucm.example.com
 ```
 
-**Option C — Lab / single-node**
+**Option C — Lab / single-node (temporaire)**
 
-Utiliser temporairement le même FQDN pour admin et ACME (ex. `admin.ucm.example.com`) le temps de valider le flux ACME, puis scinder.
+Même FQDN pour admin et ACME le temps de valider le flux, puis scinder les vhosts.
+
+> `*.example.com` ne remplace pas `*.ucm.example.com` pour `admin.ucm.example.com` /
+> `acme.ucm.example.com` : ces noms ont **deux** labels avant `example.com`.
 
 ## Configuration exemple
 
@@ -79,19 +90,19 @@ Utiliser temporairement le même FQDN pour admin et ACME (ex. `admin.ucm.example
 PATCH /api/v2/settings/general
 {
   "base_url": "https://admin.ucm.example.com",
-  "acme_proxy_vhost": "acme.example.com",
+  "acme_proxy_vhost": "acme.ucm.example.com",
   "acme_proxy_port": 8443,
   "acme_proxy_tls_cert_id": 42
 }
 ```
 
-`acme_proxy_tls_cert_id` référence le certificat géré dans UCM à installer sur le vhost `acme.example.com` du reverse proxy.
+`acme_proxy_tls_cert_id` référence le certificat wildcard (ou dédié) géré dans UCM à installer sur le vhost `acme.ucm.example.com` du reverse proxy.
 
 ### DNS
 
 ```
 admin.ucm.example.com.  A     203.0.113.10
-acme.example.com.       A     203.0.113.10
+acme.ucm.example.com.   A     203.0.113.10
 ```
 
 Même IP possible ; le proxy distingue par **SNI / Host**.
@@ -100,7 +111,7 @@ Même IP possible ; le proxy distingue par **SNI / Host**.
 
 ```bash
 certbot certonly \
-  --server https://acme.example.com:8443/acme/proxy/actalis-production/directory \
+  --server https://acme.ucm.example.com:8443/acme/proxy/actalis-production/directory \
   --preferred-challenges dns-01 \
   --authenticator manual \
   --manual-auth-hook /path/to/auth.sh \
@@ -110,7 +121,7 @@ certbot certonly \
   -d app.example.com
 ```
 
-Prérequis : `acme.example.com` résout vers le proxy, cert TLS valide pour ce nom, pas de mTLS client requis sur ce vhost.
+Prérequis : `acme.ucm.example.com` résout vers le proxy, cert TLS valide pour ce nom (wildcard `*.ucm.example.com` ou SAN explicite), pas de mTLS client requis sur ce vhost.
 
 ## Tests automatisés (pytest)
 
@@ -148,49 +159,50 @@ python -m pytest tests/test_acme_public_url.py \
 
 ### 1. Paramètres généraux
 
-1. Paramètres → Général : `acme_proxy_vhost` = `acme.example.com`, port `8443`
+1. Paramètres → Général : `acme_proxy_vhost` = `acme.ucm.example.com`, port `8443`
 2. Enregistrer → recharger la page → valeurs persistées
-3. ACME → Configuration : directory affiché `https://acme.example.com:8443/acme/directory`
-4. ACME → Let's Encrypt : proxy URL `https://acme.example.com:8443/acme/proxy/...`
+3. ACME → Configuration : directory `https://acme.ucm.example.com:8443/acme/directory`
+4. ACME → Let's Encrypt : proxy `https://acme.ucm.example.com:8443/acme/proxy/...`
 
-### 2. DNS et TLS
+### 2. DNS et TLS (wildcard `*.ucm.example.com`)
 
-1. `dig +short acme.example.com` → IP du proxy attendue
-2. `openssl s_client -connect acme.example.com:8443 -servername acme.example.com`  
-   → SAN contient `acme.example.com` ou wildcard compatible (`*.example.com`)
-3. `curl -sk https://acme.example.com:8443/acme/proxy/directory` → JSON directory, URLs cohérentes
+1. `dig +short acme.ucm.example.com` → IP du proxy attendue
+2. `openssl s_client -connect acme.ucm.example.com:8443 -servername acme.ucm.example.com`  
+   → SAN `*.ucm.example.com` ou `acme.ucm.example.com`
+3. Répéter pour `admin.ucm.example.com` avec le même certificat wildcard
+4. `curl -sk https://acme.ucm.example.com:8443/acme/proxy/directory` → JSON directory, URLs cohérentes
 
-### 3. Admin TLS (wildcard `*.ucm.example.com`)
+### 3. Séparation admin / ACME
 
-1. Appliquer un cert `*.ucm.example.com` **uniquement** sur le vhost `admin.ucm.example.com`
-2. Ouvrir `https://admin.ucm.example.com:8443` → pas d’erreur certificat
-3. Vérifier que le **même** cert wildcard n’est **pas** utilisé seul pour `acme.example.com`
+1. Vhost admin : mTLS selon politique
+2. Vhost ACME : **pas** de mTLS client obligatoire
+3. Même cert wildcard acceptable sur les deux vhosts proxy
 
 ### 4. Certbot E2E
 
 1. Compte proxy activé (slug ex. `actalis-production`)
-2. Lancer certbot avec `--server https://acme.example.com:8443/acme/proxy/<slug>/directory`
-3. Attendu : enregistrement compte OK, challenge DNS-01 soumis (échec seulement si hook DNS absent)
+2. `--server https://acme.ucm.example.com:8443/acme/proxy/<slug>/directory`
+3. Attendu : enregistrement compte OK, challenge DNS-01 soumis
 
 ### 5. Régression apex wildcard
 
-1. Certificat CN=`*.ucm.example.com`, SAN=`*.ucm.example.com` seulement
-2. Tenter HTTPS sur `https://ucm.example.com` → **doit** échouer (apex non couvert)
-3. Documenter pour l’équipe ops : wildcard ≠ apex
+1. Certificat SAN=`*.ucm.example.com` seulement
+2. `https://ucm.example.com` → **doit** échouer (apex non couvert)
+3. `https://admin.ucm.example.com` et `https://acme.ucm.example.com` → **doivent** réussir
 
 ## Critères d’acceptation
 
-- [ ] `acme_public_base_url` et liens directory utilisent `acme.example.com` configuré
-- [ ] Admin reste sur `admin.ucm.example.com` avec cert compatible
+- [ ] `acme_public_base_url` utilise `acme.ucm.example.com` configuré
+- [ ] Un cert `*.ucm.example.com` couvre admin **et** ACME
 - [ ] Certbot atteint le directory sans timeout ni hostname mismatch
 - [ ] Tests `test_acme_public_url.py` verts
-- [ ] Aucun hostname de production réel dans les commits doc (uniquement `example.com`)
+- [ ] Uniquement des noms `example.com` dans la doc
 
 ## Dépannage
 
 | Symptôme | Cause probable | Action |
 |----------|----------------|--------|
-| `ConnectTimeout` vers `acme.example.com` | DNS vers mauvaise IP / pare-feu | Corriger enregistrement A/AAAA, ouvrir :8443 |
-| `Hostname mismatch` | Cert wildcard ou SAN incorrect pour le vhost | Cert dédié ou multi-SAN (voir table ci-dessus) |
-| Directory OK en curl local, Certbot échoue | URLs directory pointent vers autre hostname que le TLS servi | Aligner `acme_proxy_vhost` + cert proxy |
-| GUI OK, ACME KO après changement cert HTTPS | Cert admin appliqué sur listener unique sans split vhost | Restaurer cert admin ; terminer TLS ACME sur le proxy |
+| `ConnectTimeout` vers `acme.ucm.example.com` | DNS / pare-feu | Corriger A/AAAA, ouvrir :8443 |
+| `Hostname mismatch` sur admin | Apex ou mauvais wildcard | Vérifier SAN ; apex requiert SAN dédié |
+| Certbot OK en local, KO à distance | DNS `acme.ucm.example.com` incorrect | Aligner DNS public |
+| GUI OK après changement cert HTTPS | Cert appliqué sur listener unique | Split vhost proxy ou restaurer cert admin |

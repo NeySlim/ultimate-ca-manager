@@ -221,7 +221,7 @@ class TestAcmeServerSettings:
             if not host_cfg:
                 host_cfg = SystemConfig(key='acme_proxy_vhost')
                 db.session.add(host_cfg)
-            host_cfg.value = 'acme.example.com'
+            host_cfg.value = 'acme.ucm.example.com'
             port_cfg = SystemConfig.query.filter_by(key='acme_proxy_port').first()
             if not port_cfg:
                 port_cfg = SystemConfig(key='acme_proxy_port')
@@ -229,7 +229,7 @@ class TestAcmeServerSettings:
             port_cfg.value = '9443'
             db.session.commit()
         data = assert_success(auth_client.get('/api/v2/acme/settings'))
-        assert data['acme_public_base_url'] == 'https://acme.example.com:9443/acme'
+        assert data['acme_public_base_url'] == 'https://acme.ucm.example.com:9443/acme'
 
 
 # ============================================================
@@ -554,7 +554,7 @@ class TestAcmeClientSettings:
             if not host_cfg:
                 host_cfg = SystemConfig(key='acme_proxy_vhost')
                 db.session.add(host_cfg)
-            host_cfg.value = 'acme.example.com'
+            host_cfg.value = 'acme.ucm.example.com'
             port_cfg = SystemConfig.query.filter_by(key='acme_proxy_port').first()
             if not port_cfg:
                 port_cfg = SystemConfig(key='acme_proxy_port')
@@ -562,8 +562,8 @@ class TestAcmeClientSettings:
             port_cfg.value = '8443'
             db.session.commit()
         data = assert_success(auth_client.get('/api/v2/acme/client/settings'))
-        assert data['acme_public_base_url'] == 'https://acme.example.com:8443/acme'
-        assert data['acme_proxy_public_base_url'] == 'https://acme.example.com:8443/acme/proxy'
+        assert data['acme_public_base_url'] == 'https://acme.ucm.example.com:8443/acme'
+        assert data['acme_proxy_public_base_url'] == 'https://acme.ucm.example.com:8443/acme/proxy'
 
 
 # ============================================================

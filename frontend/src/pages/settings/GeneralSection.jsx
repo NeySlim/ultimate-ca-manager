@@ -92,7 +92,7 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             label={t('settings.acmeProxyVhost')}
             value={settings.acme_proxy_vhost || ''}
             onChange={(e) => updateSetting('acme_proxy_vhost', e.target.value)}
-            placeholder="acme.example.com"
+            placeholder="acme.ucm.example.com"
             helperText={t('settings.acmeProxyVhostHelper')}
           />
           <Input

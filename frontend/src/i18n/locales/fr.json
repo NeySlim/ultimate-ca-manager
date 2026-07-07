@@ -2602,11 +2602,11 @@
       "disabled": "Endpoint de métriques désactivé"
     },
     "acmeProxyVhost": "vhost proxy ACME",
-    "acmeProxyVhostHelper": "Nom d'hôte public utilisé dans les URL du proxy ACME (vhost dédié).",
+    "acmeProxyVhostHelper": "Nom d'hôte public dans les URL ACME (ex. acme.ucm.example.com ; souvent couvert par un wildcard *.ucm.example.com).",
     "acmeProxyPort": "Port proxy ACME",
     "acmeProxyPortHelper": "Port HTTPS public utilisé dans les URL du proxy ACME.",
     "acmeProxyTlsCertId": "ID certificat TLS proxy ACME",
-    "acmeProxyTlsCertIdHelper": "ID du certificat géré réservé au vhost ACME dédié (métadonnée; déploiement côté reverse proxy)."
+    "acmeProxyTlsCertIdHelper": "ID du certificat géré pour le vhost ACME (ex. wildcard *.ucm.example.com ; métadonnée — déploiement côté reverse proxy)."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

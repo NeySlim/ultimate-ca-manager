@@ -2433,11 +2433,11 @@
       "disabled": "Metrics endpoint disabled"
     },
     "acmeProxyVhost": "ACME Proxy vhost",
-    "acmeProxyVhostHelper": "Public hostname used in ACME proxy directory URLs (for dedicated virtual host).",
+    "acmeProxyVhostHelper": "Public hostname in ACME directory URLs (e.g. acme.ucm.example.com; often covered by a *.ucm.example.com wildcard).",
     "acmeProxyPort": "ACME Proxy port",
     "acmeProxyPortHelper": "Public HTTPS port used in ACME proxy directory URLs.",
     "acmeProxyTlsCertId": "ACME Proxy TLS certificate ID",
-    "acmeProxyTlsCertIdHelper": "Managed certificate ID reserved for the dedicated ACME vhost (metadata only; deployment handled by reverse proxy)."
+    "acmeProxyTlsCertIdHelper": "Managed certificate ID for the ACME vhost (e.g. wildcard *.ucm.example.com; metadata only — deploy on reverse proxy)."
   },
   "account": {
     "profile": "Profile",
