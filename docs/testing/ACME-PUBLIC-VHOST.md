@@ -6,6 +6,27 @@ les règles des certificats wildcard, le plan de test et les commandes pytest.
 
 Voir aussi : [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGATION.md](./ACME-DNS-PROPAGATION.md).
 
+## Portée fonctionnelle (PR)
+
+| Zone | Fichiers / comportement |
+|------|-------------------------|
+| **Backend** | `backend/utils/acme_public_url.py`, `get_acme_public_origin()` |
+| **API ACME** | `acme_api.py`, `acme_proxy_api.py` — liens directory (`newOrder`, …) |
+| **Settings API** | `api/v2/settings/general.py` — GET/PATCH `acme_proxy_*` |
+| **Settings ACME** | `api/v2/acme/settings.py`, `api/v2/acme_client/settings.py` — `acme_public_base_url`, `acme_proxy_public_base_url` |
+| **Frontend** | `GeneralSection.jsx`, `ConfigTab.jsx`, `LetsEncryptTab.jsx` |
+| **i18n (9 langues)** | `frontend/src/i18n/locales/{en,fr,de,es,it,ja,pt,uk,zh}.json` — labels + helpers wildcard |
+| **Aide contextuelle** | `frontend/src/data/help/{en,de,es,fr,it,ja,pt,uk,zh}/settings.js` + `helpContent.js` |
+| **Tests** | `backend/tests/test_acme_public_url.py`, extensions `test_acme.py` |
+
+### Clés `SystemConfig`
+
+| Clé | Validation | Effet runtime |
+|-----|------------|---------------|
+| `acme_proxy_vhost` | Hostname seul (wildcard `*.` accepté en préfixe) | URLs directory ACME |
+| `acme_proxy_port` | 1–65535 | Port dans les URLs (omis si 443) |
+| `acme_proxy_tls_cert_id` | ID certificat UCM avec clé privée | Métadonnée ops (pas de push TLS automatique) |
+
 ## Topologie de référence
 
 Dans le cas courant, admin et ACME sont des **sous-domaines de `ucm.example.com`** :
@@ -125,24 +146,35 @@ Prérequis : `acme.ucm.example.com` résout vers le proxy, cert TLS valide pour 
 
 ## Tests automatisés (pytest)
 
-### Suite ciblée (non-régression vhost public)
+### Suite minimale (vhost public)
 
 ```bash
 cd backend
 python -m pytest tests/test_acme_public_url.py -q
-python -m pytest tests/test_acme.py::TestAcmeServerSettings::test_get_settings_exposes_configured_public_acme_base_url \
+# Attendu : 18 passed
+
+python -m pytest \
+  tests/test_acme.py::TestAcmeServerSettings::test_get_settings_exposes_configured_public_acme_base_url \
   tests/test_acme.py::TestAcmeClientSettings::test_get_client_settings_exposes_configured_public_acme_urls \
   -q
+# Attendu : 2 passed
 ```
 
-### Couverture
+### Détail `test_acme_public_url.py`
+
+| Classe | Scénarios |
+|--------|-----------|
+| `TestGetAcmePublicOrigin` | vhost+port configurés, port 443 omis, fallback `Host`, admin Host n’écrase pas le vhost ACME |
+| `TestWildcardSanHostnameCompatibility` | Table SAN : `*.ucm.example.com` couvre `admin.ucm.example.com` **et** `acme.ucm.example.com` ; apex `ucm.example.com` non couvert ; `*.example.com` insuffisant pour les sous-domaines `ucm` |
+| `TestAcmeDirectoryPublicUrls` | `/acme/directory` et `/acme/proxy/directory` renvoient `newOrder` avec l’origine configurée |
+
+### Couverture API settings
 
 | Fichier | Scénarios |
 |---------|-----------|
-| `test_acme_public_url.py` | `get_acme_public_origin`, port 443 vs non défaut, fallback Host, **table wildcard SAN**, directory `/acme` et `/acme/proxy` |
-| `test_acme.py` | Settings API `acme_public_base_url` / `acme_proxy_public_base_url` |
+| `test_acme.py` | `acme_public_base_url`, `acme_proxy_public_base_url` après PATCH general settings |
 
-### Commande suite ACME élargie
+### Commande suite ACME élargie (non-régression proxy)
 
 ```bash
 cd backend
@@ -153,50 +185,103 @@ python -m pytest tests/test_acme_public_url.py \
   tests/test_acme.py::TestAcmeClientSettings \
   tests/test_acme.py::TestAcmeClientProxy \
   -q
+# Référence locale : 90 passed
+```
+
+### Frontend (i18n)
+
+```bash
+cd frontend
+npm run check:i18n
+# Attendu : 4036 keys, 9/9 locales in sync (clés acmeProxy*)
 ```
 
 ## Plan de test manuel
 
-### 1. Paramètres généraux
+### 1. Paramètres généraux (GUI)
 
-1. Paramètres → Général : `acme_proxy_vhost` = `acme.ucm.example.com`, port `8443`
-2. Enregistrer → recharger la page → valeurs persistées
-3. ACME → Configuration : directory `https://acme.ucm.example.com:8443/acme/directory`
-4. ACME → Let's Encrypt : proxy `https://acme.ucm.example.com:8443/acme/proxy/...`
+1. **Paramètres → Général** : renseigner
+   - `acme_proxy_vhost` = `acme.ucm.example.com`
+   - `acme_proxy_port` = `8443`
+   - `acme_proxy_tls_cert_id` = ID d’un cert `*.ucm.example.com` (optionnel)
+2. Enregistrer → recharger (`Ctrl+Shift+R`) → valeurs persistées
+3. Vérifier les **helpers** sous les champs (wildcard `*.ucm.example.com`) dans au moins **fr** et **en**
+4. **ACME → Configuration** : directory `https://acme.ucm.example.com:8443/acme/directory`
+5. **ACME → Let's Encrypt** : base proxy `https://acme.ucm.example.com:8443/acme/proxy/...`
 
-### 2. DNS et TLS (wildcard `*.ucm.example.com`)
+### 2. API REST
+
+```bash
+# Lecture
+curl -sk -b cookies.txt https://admin.ucm.example.com:8443/api/v2/settings/general \
+  | jq '.data.acme_proxy_vhost, .data.acme_proxy_port'
+
+curl -sk -b cookies.txt https://admin.ucm.example.com:8443/api/v2/acme/client/settings \
+  | jq '.data.acme_public_base_url, .data.acme_proxy_public_base_url'
+
+# Écriture (session admin)
+curl -sk -b cookies.txt -X PATCH https://admin.ucm.example.com:8443/api/v2/settings/general \
+  -H 'Content-Type: application/json' \
+  -d '{"acme_proxy_vhost":"acme.ucm.example.com","acme_proxy_port":8443}'
+```
+
+Attendu après PATCH : les URLs ci-dessus reflètent `acme.ucm.example.com:8443`.
+
+### 3. Aide contextuelle (9 langues UI / 8+1 help)
+
+| Langue UI | Fichier aide panneau | Helpers i18n |
+|-----------|---------------------|--------------|
+| en | `help/en/settings.js` + `helpContent.js` | `en.json` |
+| fr, de, es, it, ja, pt, uk, zh | `help/<lang>/settings.js` | `<lang>.json` |
+
+1. Ouvrir **Paramètres** → panneau d’aide flottant
+2. Section **« Public ACME vhost »** (ou équivalent traduit) visible
+3. Contenu : `admin.ucm.example.com`, `acme.ucm.example.com`, wildcard `*.ucm.example.com`, apex non couvert
+
+### 4. DNS et TLS (wildcard `*.ucm.example.com`)
 
 1. `dig +short acme.ucm.example.com` → IP du proxy attendue
 2. `openssl s_client -connect acme.ucm.example.com:8443 -servername acme.ucm.example.com`  
    → SAN `*.ucm.example.com` ou `acme.ucm.example.com`
-3. Répéter pour `admin.ucm.example.com` avec le même certificat wildcard
-4. `curl -sk https://acme.ucm.example.com:8443/acme/proxy/directory` → JSON directory, URLs cohérentes
+3. Répéter pour `admin.ucm.example.com` avec le **même** certificat wildcard
+4. `curl -sk https://acme.ucm.example.com:8443/acme/proxy/directory` → JSON ; chaque URL utilise `acme.ucm.example.com`
 
-### 3. Séparation admin / ACME
+### 5. Séparation admin / ACME (reverse proxy)
 
-1. Vhost admin : mTLS selon politique
-2. Vhost ACME : **pas** de mTLS client obligatoire
-3. Même cert wildcard acceptable sur les deux vhosts proxy
+1. Vhost **admin** : mTLS selon politique (`mtls_required` si applicable)
+2. Vhost **ACME** : pas de mTLS client obligatoire (Certbot / Actalis)
+3. Même cert wildcard présenté sur les deux vhosts SNI
 
-### 4. Certbot E2E
+### 6. Certbot E2E
 
-1. Compte proxy activé (slug ex. `actalis-production`)
-2. `--server https://acme.ucm.example.com:8443/acme/proxy/<slug>/directory`
-3. Attendu : enregistrement compte OK, challenge DNS-01 soumis
+```bash
+certbot certonly \
+  --server https://acme.ucm.example.com:8443/acme/proxy/<slug>/directory \
+  --preferred-challenges dns-01 \
+  ...
+```
 
-### 5. Régression apex wildcard
+Attendu : enregistrement compte OK ; échec uniquement si hook DNS absent ou TXT non publié.
 
-1. Certificat SAN=`*.ucm.example.com` seulement
-2. `https://ucm.example.com` → **doit** échouer (apex non couvert)
-3. `https://admin.ucm.example.com` et `https://acme.ucm.example.com` → **doivent** réussir
+### 7. Régressions wildcard connues
+
+| Action | Résultat attendu |
+|--------|------------------|
+| Cert `*.ucm.example.com` sur vhost admin | `https://admin.ucm.example.com` OK |
+| Même cert sur vhost ACME | `https://acme.ucm.example.com` OK |
+| Accès apex `https://ucm.example.com` avec SAN wildcard seul | **Échec TLS** (apex non couvert) |
+| Appliquer wildcard comme cert HTTPS unique gunicorn + directory vers `acme.ucm...` | Certbot **hostname mismatch** si cert ne matche pas l’URL directory |
+| `acme_proxy_vhost` pointe vers un DNS injoignable | `ConnectTimeout` Certbot |
 
 ## Critères d’acceptation
 
-- [ ] `acme_public_base_url` utilise `acme.ucm.example.com` configuré
-- [ ] Un cert `*.ucm.example.com` couvre admin **et** ACME
+- [ ] `acme_public_base_url` et `acme_proxy_public_base_url` utilisent `acme.ucm.example.com` configuré
+- [ ] Un cert `*.ucm.example.com` couvre **admin** et **ACME** (pas l’apex)
 - [ ] Certbot atteint le directory sans timeout ni hostname mismatch
-- [ ] Tests `test_acme_public_url.py` verts
-- [ ] Uniquement des noms `example.com` dans la doc
+- [ ] `pytest tests/test_acme_public_url.py` — 18 passed
+- [ ] `npm run check:i18n` — 9 locales synchronisées
+- [ ] Aide panneau + helpers mentionnent la topologie wildcard dans toutes les langues UI
+- [ ] Doc et exemples : uniquement `example.com` (pas de FQDN lab)
 
 ## Dépannage
 
