@@ -274,9 +274,9 @@ def simple_enroll():
     try:
         # Get CSR from request body (base64 encoded PKCS#10), capped read
         content_type = request.content_type or ''
-        csr_data, too_big = _read_est_body_text()
-        if too_big is not None:
-            return too_big
+        csr_data, err = _read_est_body_text()
+        if err is not None:
+            return err
 
         if PKCS10_MIME in content_type:
             # Decode base64 CSR
@@ -376,9 +376,9 @@ def simple_reenroll():
     # Process enrollment directly (not delegating to simple_enroll which allows Basic auth)
     try:
         content_type = request.content_type or ''
-        csr_data, too_big = _read_est_body_text()
-        if too_big is not None:
-            return too_big
+        csr_data, err = _read_est_body_text()
+        if err is not None:
+            return err
 
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
@@ -545,9 +545,9 @@ def server_keygen():
     auth_method = 'mtls' if _trusted_client_cert() else 'basic'
 
     try:
-        csr_data, too_big = _read_est_body_text()
-        if too_big is not None:
-            return too_big
+        csr_data, err = _read_est_body_text()
+        if err is not None:
+            return err
         if not csr_data:
             return Response('Invalid CSR', status=400)
         

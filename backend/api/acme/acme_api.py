@@ -406,7 +406,7 @@ def directory():
     # Add metadata
     directory_data['meta'] = {
         'termsOfService': f'{service.base_url}/acme/terms',
-        'website': 'https://github.com/fabriziosalmi/ultimate-ca-manager',
+        'website': 'https://github.com/NeySlim/ultimate-ca-manager',
         'caaIdentities': [get_acme_public_host(request)],
         'externalAccountRequired': eab_required
     }

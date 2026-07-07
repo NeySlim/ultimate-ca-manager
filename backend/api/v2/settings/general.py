@@ -12,6 +12,9 @@ import json
 import logging
 
 from . import bp, get_config, set_config
+from utils.hsts import hsts_env_locked
+
+logger = logging.getLogger(__name__)
 
 
 def _int_config(key, default):
@@ -20,9 +23,6 @@ def _int_config(key, default):
         return int(get_config(key, str(default)) or default)
     except (TypeError, ValueError):
         return default
-from utils.hsts import hsts_env_locked
-
-logger = logging.getLogger(__name__)
 
 
 @bp.route('/api/v2/settings/general', methods=['GET'])
