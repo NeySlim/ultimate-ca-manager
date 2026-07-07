@@ -97,6 +97,11 @@ def verify_proxy_jws():
             is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
             if is_valid:
                 return is_valid, payload, jwk, error
+            # A non-URL failure means the URL matched and something else is
+            # wrong (nonce, signature, alg): retrying other URLs cannot
+            # succeed and would only mask this error with a URL mismatch.
+            if error and not error.startswith('URL mismatch'):
+                return False, None, None, error
             last_error = error or last_error
         return False, None, None, last_error
 
