@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.acme.acme_debug import (
+from utils.acme_debug import (
     CONFIG_KEY,
     acme_debug_logging_enabled,
     acme_log,
@@ -40,7 +40,7 @@ def test_acme_debug_logging_enabled(app):
 
 
 def test_acme_debug_logging_memoized_per_app_context(app, monkeypatch):
-    import services.acme.acme_debug as debug_mod
+    import utils.acme_debug as debug_mod
 
     query_mock = MagicMock()
     cfg = MagicMock()

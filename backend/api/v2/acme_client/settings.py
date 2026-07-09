@@ -13,7 +13,7 @@ from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.acme_public_url import get_acme_public_base, get_acme_proxy_public_base
 from models import db, SystemConfig
-from services.acme.acme_debug import clear_acme_debug_cache
+from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)

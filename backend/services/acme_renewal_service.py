@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from utils.datetime_utils import utc_now
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
-from services.acme.acme_debug import acme_log
+from utils.acme_debug import acme_log
 
 logger = logging.getLogger(__name__)
 

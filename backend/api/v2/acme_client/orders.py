@@ -27,7 +27,7 @@ from services.acme.dns_selfcheck import (
     dns_propagation_timeout as _shared_dns_propagation_timeout,
     wait_for_challenges as _shared_wait_for_challenges,
 )
-from services.acme.acme_debug import acme_log
+from utils.acme_debug import acme_log
 from utils.dns_txt_lookup import txt_record_present
 
 logger = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 - **ACME LOT A — shared DNS self-check for proxy and renewal** — the ACME proxy and auto-renewal paths no longer use a blind fixed 30s sleep after publishing the DNS-01 TXT record. Both now poll actively via `services/acme/dns_selfcheck.py`, honouring `acme.client.dns_propagation_timeout` (same setting as the ACME client auto-poll). If the TXT is still missing when the timeout elapses, the proxy skips upstream challenge submission and marks the challenge `dns_not_ready` instead of burning the token on the upstream CA. Renewal cleans up DNS TXT records on propagation or finalization failure.
-- **ACME debug logging toggle** — GUI setting `acme.client.debug_logging` promotes DNS poll diagnostics (pending TXT, poll ticks, auto-poll/proxy/renewal wait banners) from DEBUG to INFO without raising the global log level. The flag is memoized per app context so poll loops do not query SystemConfig on every line.
+- **ACME debug logging toggle** — GUI setting `acme.client.debug_logging` promotes DNS poll diagnostics (pending TXT, poll ticks, resolver lookup source, per-resolver failures) from DEBUG to INFO without raising the global log level. Implemented in `utils/acme_debug.py` with per-app-context memoization on `flask.g`.
 
 ### Changed
 - **ACME client DNS self-check refactor** — `_dns_selfcheck` / timeout reading in `orders.py` now delegate to the shared `dns_selfcheck` module used by proxy and renewal, keeping one implementation for poll interval, logging, and timeout semantics.

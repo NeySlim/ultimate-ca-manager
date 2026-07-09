@@ -1256,6 +1256,8 @@
     "autoRenewalDesc": "Rinnova automaticamente i certificati 30 giorni prima della scadenza",
     "dnsPropagationTimeout": "Timeout di propagazione DNS (s)",
     "dnsPropagationTimeoutHelper": "Secondi di polling del TXT DNS-01 prima della validazione CA (DNS auto). 0 = salta l'attesa di propagazione (auto e Verifica manuale inviano alla CA senza polling). Valori positivi: l'auto-poll in background attende fino a questo limite; la Verifica manuale esegue il polling per massimo 30 s, poi segnala «non pronto» per riprovare. Procede quando un resolver autoritativo o uno qualsiasi conferma; i log 9.9.9.9 / 8.8.8.8 / 1.1.1.1 sono informativi.",
+    "debugLogging": "Verbose ACME/DNS logs",
+    "debugLoggingDesc": "Emit DNS poll diagnostics at INFO in UCM logs. Disable after troubleshooting.",
     "revokeOnRenewal": "Revoca vecchio certificato dopo il rinnovo",
     "revokeOnRenewalDesc": "Revoca automaticamente il certificato precedente con il motivo 'superseded' quando ne viene emesso uno nuovo",
     "renewalPolicy": "Politica di rinnovo",

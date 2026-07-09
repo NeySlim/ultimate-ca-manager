@@ -1256,6 +1256,8 @@
     "autoRenewalDesc": "有効期限の30日前に証明書を自動更新",
     "dnsPropagationTimeout": "DNS 伝播タイムアウト (秒)",
     "dnsPropagationTimeoutHelper": "CA検証前にDNS-01 TXTをポーリングする秒数（自動DNS）。0 = 伝播待ちをスキップ（自動と手動の検証はポーリングなしでCAに送信）。正の値：バックグラウンドの自動ポーリングはこの上限まで待機し、手動検証は最大30秒ポーリングした後「未準備」と報告するため再試行できます。権威またはいずれかのリゾルバが確認すれば続行；9.9.9.9 / 8.8.8.8 / 1.1.1.1のログは参考情報です。",
+    "debugLogging": "Verbose ACME/DNS logs",
+    "debugLoggingDesc": "Emit DNS poll diagnostics at INFO in UCM logs. Disable after troubleshooting.",
     "revokeOnRenewal": "更新後に古い証明書を失効させる",
     "revokeOnRenewalDesc": "新しい証明書の発行時に前の証明書を'superseded'の理由で自動的に失効させます",
     "renewalPolicy": "更新ポリシー",

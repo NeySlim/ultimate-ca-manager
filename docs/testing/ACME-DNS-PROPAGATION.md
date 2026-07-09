@@ -33,7 +33,7 @@ on such a resolver.
 | Key | Purpose |
 |-----|---------|
 | `acme.client.dns_propagation_timeout` | Seconds to poll before auto DNS submits to the CA. `0` = skip the propagation wait entirely. Default `120`. |
-| `acme.client.debug_logging` | When `true`, DNS poll diagnostics (pending TXT, poll ticks, wait banners) log at **INFO** instead of DEBUG. Memoized per app context. |
+| `acme.client.debug_logging` | When `true`, DNS poll diagnostics (pending TXT, poll ticks, resolver lookup source, per-resolver failures) log at **INFO** instead of DEBUG. Implemented in `utils/acme_debug.py`, memoized per app context. |
 | `acme.dns01_nameservers` | Optional comma-separated resolver IPs used **first** for propagation checks (and DNS-01 challenge cleanup). |
 
 ### `dns_propagation_timeout` behavior

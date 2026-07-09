@@ -11,6 +11,8 @@ import ipaddress
 import logging
 from typing import Dict, List, Tuple
 
+from utils.acme_debug import acme_log
+
 logger = logging.getLogger(__name__)
 
 # Public resolvers polled explicitly (matches typical /etc/resolv.conf on UCM hosts).
@@ -130,7 +132,8 @@ def check_public_resolvers(name: str, expected: str) -> Dict[str, bool]:
         except Exception as exc:
             # Preserve the reason so it can be surfaced in logs; a bare bool
             # hides SERVFAIL/timeouts behind the same 'pending' label.
-            logger.debug(
+            acme_log(
+                logger,
                 'DNS public resolver %s returned no matching TXT for %s: %s: %s',
                 resolver_ip, name, type(exc).__name__, exc,
             )
@@ -172,21 +175,21 @@ def resolve_txt_answers(name: str) -> Tuple[object, str]:
         try:
             return _resolve_with_ns(name, custom), 'configured'
         except Exception as exc:
-            logger.debug('TXT via configured NS failed for %s: %s', name, exc)
+            acme_log(logger, 'TXT via configured NS failed for %s: %s', name, exc)
 
     auth_ips = _authoritative_nameserver_ips(name)
     if auth_ips:
         try:
             return _resolve_with_ns(name, auth_ips[:6]), 'authoritative'
         except Exception as exc:
-            logger.debug('TXT via authoritative NS failed for %s: %s', name, exc)
+            acme_log(logger, 'TXT via authoritative NS failed for %s: %s', name, exc)
 
     for resolver_ip in PUBLIC_DNS_RESOLVERS:
         try:
             answers = _resolve_with_ns(name, [resolver_ip])
             return answers, f'public:{resolver_ip}'
         except Exception as exc:
-            logger.debug('TXT via %s failed for %s: %s', resolver_ip, name, exc)
+            acme_log(logger, 'TXT via %s failed for %s: %s', resolver_ip, name, exc)
 
     return dns.resolver.resolve(name, 'TXT', lifetime=10), 'recursive'
 
@@ -196,6 +199,7 @@ def txt_record_present(name: str, expected: str, *, log_public: bool = True) -> 
     try:
         answers, source = resolve_txt_answers(name)
         if _answers_contain_expected(answers, expected):
+            acme_log(logger, 'DNS TXT lookup for %s via %s', name, source)
             if source != 'recursive' and not source.startswith('public:'):
                 logger.info('DNS TXT confirmed for %s via %s resolver', name, source)
             elif source.startswith('public:'):

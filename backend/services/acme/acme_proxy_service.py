@@ -23,7 +23,7 @@ from services.acme.acme_proxy_account import (
     legacy_upstream_directory_url,
 )
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_txt
-from services.acme.acme_debug import acme_log
+from utils.acme_debug import acme_log
 
 logger = logging.getLogger(__name__)
 

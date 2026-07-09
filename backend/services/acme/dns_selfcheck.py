@@ -5,7 +5,7 @@ import logging
 import time
 
 from models import SystemConfig
-from services.acme.acme_debug import acme_log
+from utils.acme_debug import acme_log
 from utils.dns_txt_lookup import log_public_resolver_status, txt_record_present
 
 logger = logging.getLogger(__name__)
