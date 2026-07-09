@@ -57,11 +57,14 @@ class MicrosoftCAConnectionMixin:
                 if msca.kerberos_principal:
                     os.environ['KRB5_CLIENT_KTNAME'] = msca.kerberos_keytab_path or ''
 
+                # auth_method='basic' is a placeholder: the real auth is the
+                # Kerberos handler set below. 'ntlm' would make certsrv import
+                # requests_ntlm, which is neither installed nor used here.
                 client = certsrv.Certsrv(
                     server=server,
                     username='',
                     password='',
-                    auth_method='ntlm',
+                    auth_method='basic',
                     cafile=cafile,
                 )
                 client.session.auth = HTTPKerberosAuth(
