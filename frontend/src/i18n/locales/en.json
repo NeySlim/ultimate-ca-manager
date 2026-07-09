@@ -1256,6 +1256,8 @@
     "autoRenewalDesc": "Automatically renew certificates 30 days before expiration",
     "dnsPropagationTimeout": "DNS propagation timeout (s)",
     "dnsPropagationTimeoutHelper": "Seconds to poll the DNS-01 TXT record before CA validation (auto DNS). 0 = skip propagation wait (auto and manual Verify submit to the CA without polling). Positive values: the background auto-poll waits up to this limit; manual Verify polls at most 30s, then reports not-ready so you can retry. Proceeds as soon as the authoritative or any resolver confirms; the 9.9.9.9 / 8.8.8.8 / 1.1.1.1 lines are informational only.",
+    "debugLogging": "Verbose ACME/DNS logs",
+    "debugLoggingDesc": "Emit DNS diagnostics (resolvers, poll ticks, timeouts) at INFO in UCM logs. Disable after troubleshooting.",
     "revokeOnRenewal": "Revoke old certificate after renewal",
     "revokeOnRenewalDesc": "Automatically revoke the previous certificate with reason 'superseded' when a new one is issued",
     "renewalPolicy": "Renewal Policy",

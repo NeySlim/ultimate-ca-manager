@@ -297,6 +297,14 @@ export default function LetsEncryptTab({
             helperText={t('acme.dnsPropagationTimeoutHelper')}
           />
 
+          <ToggleSwitch
+            checked={clientSettings.debug_logging ?? false}
+            onChange={(val) => onUpdateClientSetting('debug_logging', val)}
+            disabled={!canWrite}
+            label={t('acme.debugLogging')}
+            description={t('acme.debugLoggingDesc')}
+          />
+
           <Select
             label={t('acme.keyType')}
             value={clientSettings.key_type || 'RSA-2048'}

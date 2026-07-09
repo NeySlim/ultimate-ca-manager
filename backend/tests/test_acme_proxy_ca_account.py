@@ -173,7 +173,7 @@ class TestProxyServiceBinding:
             with patch.object(svc, '_post_with_account', return_value=mock_resp) as post_mock, \
                  patch('api.v2.acme_domains.find_provider_for_domain') as find_prov, \
                  patch('services.acme.dns_providers.create_provider') as create_prov, \
-                 patch('services.acme.acme_proxy_service.time.sleep'):
+                 patch('services.acme.acme_proxy_service.wait_for_txt', return_value={'ok': True, 'missing': [], 'waited': 0}):
                 from models import AcmeClientOrder
                 order = AcmeClientOrder(
                     domains='["test.example.com"]',
@@ -204,6 +204,60 @@ class TestProxyServiceBinding:
                 )
 
             post_mock.assert_called_once()
+
+    def test_bg_thread_skips_upstream_when_dns_not_ready(self, app, clean_proxy_state):
+        """If DNS TXT is still missing after timeout, do not submit upstream."""
+        from unittest.mock import MagicMock, patch
+        from services.acme.acme_proxy_service import AcmeProxyService
+        from models import AcmeClientOrder
+
+        with app.app_context():
+            acct = _seed_account()
+            db.session.add(SystemConfig(
+                key=PROXY_ACCOUNT_ID_KEY,
+                value=str(acct.id),
+                description='test',
+            ))
+            db.session.commit()
+
+            svc = AcmeProxyService('https://ucm.example')
+
+            order = AcmeClientOrder(
+                domains='["test.example.com"]',
+                environment='custom',
+                challenge_type='dns-01',
+                status='pending',
+                is_proxy_order=True,
+            )
+            db.session.add(order)
+            db.session.commit()
+
+            with patch('api.v2.acme_domains.find_provider_for_domain') as find_prov, \
+                 patch('services.acme.dns_providers.create_provider') as create_prov, \
+                 patch('services.acme.acme_proxy_service.wait_for_txt', return_value={'ok': False, 'missing': ['_single_'], 'waited': 5}), \
+                 patch.object(svc, '_post_with_account') as post_mock:
+                provider_model = MagicMock()
+                provider_model.id = 1
+                provider_model.provider_type = 'gandi'
+                provider_model.credentials = '{}'
+                find_prov.return_value = {'provider': provider_model}
+                provider = MagicMock()
+                provider.get_zone_for_domain.return_value = 'example.com'
+                provider.get_acme_challenge_name.return_value = '_acme-challenge.test.example.com'
+                create_prov.return_value = provider
+
+                svc._bg_respond_challenge(
+                    app,
+                    'https://acme-proxy-test.example/chall/2',
+                    'token.thumb',
+                    'test.example.com',
+                    order.id,
+                )
+
+            post_mock.assert_not_called()
+            db.session.refresh(order)
+            entry = order.challenges_dict.get('https://acme-proxy-test.example/chall/2', {})
+            assert entry.get('status') == 'dns_not_ready'
 
 
 class TestProxyMultiPath:

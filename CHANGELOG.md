@@ -10,9 +10,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **ACME LOT A — shared DNS self-check for proxy and renewal** — the ACME proxy and auto-renewal paths no longer use a blind fixed 30s sleep after publishing the DNS-01 TXT record. Both now poll actively via `services/acme/dns_selfcheck.py`, honouring `acme.client.dns_propagation_timeout` (same setting as the ACME client auto-poll). If the TXT is still missing when the timeout elapses, the proxy skips upstream challenge submission and marks the challenge `dns_not_ready` instead of burning the token on the upstream CA.
+- **GUI toggle: verbose ACME/DNS logs** — **ACME → Let's Encrypt → Logs ACME/DNS détaillés** (`acme.client.debug_logging`) promotes DNS resolver diagnostics (poll ticks, per-resolver failures, lookup source) from DEBUG to INFO for troubleshooting without changing the global `LOG_LEVEL`.
+
+### Changed
+- **ACME client DNS self-check refactor** — `_dns_selfcheck` / timeout reading in `orders.py` now delegate to the shared `dns_selfcheck` module used by proxy and renewal, keeping one implementation for poll interval, logging, and timeout semantics.
+
 ### Fixed
 - **AD CS Kerberos authentication crashed on a missing unused dependency** — the kerberos auth mode built the certsrv client in NTLM mode before attaching the Kerberos handler, which made the certsrv library import `requests_ntlm` even though it was never used. Every Test Connection / sign in kerberos mode failed with "No module named 'requests_ntlm'". The client is now built with a neutral placeholder auth and the Kerberos handler attached directly; all three auth modes (basic, certificate/mTLS, kerberos) smoke-tested end-to-end against a Windows Server 2025 AD CS.
-
 
 ## [2.188] - 2026-07-08
 

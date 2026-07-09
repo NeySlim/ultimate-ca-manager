@@ -438,6 +438,21 @@ class TestAcmeClientSettings:
         assert_error(patch_json(auth_client, '/api/v2/acme/client/settings',
                                 {'dns_propagation_timeout': 99999}), 400)
 
+    def test_client_settings_has_debug_logging(self, auth_client):
+        data = assert_success(auth_client.get('/api/v2/acme/client/settings'))
+        assert 'debug_logging' in data
+        assert isinstance(data['debug_logging'], bool)
+
+    def test_patch_debug_logging(self, auth_client):
+        assert_success(patch_json(auth_client, '/api/v2/acme/client/settings',
+                                  {'debug_logging': True}))
+        data = assert_success(auth_client.get('/api/v2/acme/client/settings'))
+        assert data['debug_logging'] is True
+        assert_success(patch_json(auth_client, '/api/v2/acme/client/settings',
+                                  {'debug_logging': False}))
+        data2 = assert_success(auth_client.get('/api/v2/acme/client/settings'))
+        assert data2['debug_logging'] is False
+
     def test_patch_client_settings_empty_body_rejected(self, auth_client):
         r = auth_client.patch('/api/v2/acme/client/settings',
                               data=None, content_type=CONTENT_JSON)

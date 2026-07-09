@@ -5,7 +5,6 @@ Acts as a gateway between internal ACME clients and upstream ACME providers (Let
 """
 import json
 import base64
-import time
 import requests
 import secrets
 import logging
@@ -23,6 +22,8 @@ from services.acme.acme_proxy_account import (
     resolve_proxy_account,
     legacy_upstream_directory_url,
 )
+from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_txt
+from services.acme.acme_debug import acme_log
 
 logger = logging.getLogger(__name__)
 
@@ -724,7 +725,6 @@ class AcmeProxyService:
     def _bg_respond_challenge(self, app, chall_url, key_authz, domain, order_id):
         """Background task for DNS setup and upstream validation trigger"""
         import hashlib
-        import time
         from api.v2.acme_domains import find_provider_for_domain
         from services.acme.dns_providers import create_provider
         from models import AcmeClientOrder
@@ -754,10 +754,36 @@ class AcmeProxyService:
                 
                 logger.info(f"[ACME Proxy BG] Creating DNS TXT record for {domain} in zone {zone}: {full_record_name}")
                 provider.create_txt_record(zone, full_record_name, txt_value)
-                
-                # Wait for DNS propagation
-                logger.info(f"[ACME Proxy BG] Waiting 30s for propagation for {domain}...")
-                time.sleep(30)
+
+                # Active DNS self-check instead of fixed sleep.
+                timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')
+                acme_log(
+                    logger,
+                    '[ACME Proxy BG] DNS propagation wait for %s: timeout=%ss, record=%s',
+                    domain, timeout, full_record_name,
+                )
+                if timeout <= 0:
+                    logger.info("[ACME Proxy BG] DNS propagation wait skipped (timeout=0)")
+                    check = {'ok': True, 'missing': [], 'waited': 0}
+                else:
+                    check = wait_for_txt(full_record_name, txt_value, timeout)
+                if not check['ok']:
+                    logger.error(
+                        "[ACME Proxy BG] DNS TXT not visible after %ss for %s (%s) — "
+                        "not submitting upstream",
+                        timeout, domain, full_record_name,
+                    )
+                    self._delete_dns_record(provider, zone, full_record_name)
+                    challenges_data = order.challenges_dict
+                    entry = challenges_data.get(chall_url, {})
+                    entry['status'] = 'dns_not_ready'
+                    entry['error'] = f'dns txt not visible after {timeout}s'
+                    entry['checked_at'] = datetime.now().isoformat()
+                    challenges_data[chall_url] = entry
+                    order.set_challenges_dict(challenges_data)
+                    db.session.commit()
+                    return
+                logger.info("[ACME Proxy BG] DNS TXT confirmed after %ss for %s", check['waited'], domain)
                 
                 # Store record info for cleanup
                 records = json.loads(order.dns_records_created) if order.dns_records_created else []
@@ -792,6 +818,14 @@ class AcmeProxyService:
                 db.session.rollback()
             finally:
                 db.session.remove()
+
+    @staticmethod
+    def _delete_dns_record(provider, zone: str, record_name: str) -> None:
+        """Best-effort TXT cleanup helper."""
+        try:
+            provider.delete_txt_record(zone, record_name)
+        except Exception as e:
+            logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
     
     def _find_order_for_challenge(self, chall_url, AcmeClientOrder):
         """Find the proxy order associated with a challenge URL."""
