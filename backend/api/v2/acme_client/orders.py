@@ -20,7 +20,7 @@ from api.v2.acme_client import bp
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, DnsProvider, AcmeClientOrder
+from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import AcmeClientService, AUTHZ_INVALID_USER_MSG
 from services.audit_service import AuditService
 from services.acme.dns_selfcheck import (
