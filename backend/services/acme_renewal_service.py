@@ -184,7 +184,7 @@ def renew_certificate(order) -> tuple:
             if not success_dns:
                 raise Exception(f"Failed to create DNS record for {domain}: {msg}")
 
-        dns_txt_created = True
+            dns_txt_created = True
 
         # Wait for DNS propagation using active self-check.
         timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')

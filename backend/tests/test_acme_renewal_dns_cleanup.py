@@ -18,11 +18,15 @@ def renewal_order(app):
         db.session.add(provider)
         db.session.flush()
 
-        db.session.add(SystemConfig(
-            key='acme.client.email',
-            value='renewal-test@example.com',
-            description='test',
-        ))
+        email_cfg = SystemConfig.query.filter_by(key='acme.client.email').first()
+        if email_cfg:
+            email_cfg.value = 'renewal-test@example.com'
+        else:
+            db.session.add(SystemConfig(
+                key='acme.client.email',
+                value='renewal-test@example.com',
+                description='test',
+            ))
 
         order = AcmeClientOrder(
             domains='["example.com"]',
@@ -101,3 +105,59 @@ def test_renewal_deletes_txt_when_propagation_not_ready(app, renewal_order):
     assert len(deleted) == 1
     assert deleted[0]['record_name'] == '_acme-challenge.example.com'
     assert deleted[0]['domain'] == 'example.com'
+
+
+def test_renewal_deletes_txt_when_create_fails_on_second_domain(app, renewal_order):
+    """Multi-domain renewal must clean up TXT records created before a later failure."""
+    from models import db
+    from models.acme_models import AcmeClientOrder
+    from services import acme_renewal_service as renew_mod
+
+    order_id, _provider_id = renewal_order
+    deleted = []
+    create_calls = []
+
+    def create_side_effect(**kwargs):
+        create_calls.append(kwargs['domain'])
+        if kwargs['domain'] == 'www.example.com':
+            return False, 'provider error'
+        return True, 'ok'
+
+    mock_provider = MagicMock()
+    mock_provider.create_txt_record.side_effect = create_side_effect
+    mock_provider.delete_txt_record.side_effect = (
+        lambda **kwargs: deleted.append(kwargs) or (True, 'ok')
+    )
+
+    with app.app_context():
+        new_order = AcmeClientOrder(
+            domains='["example.com", "www.example.com"]',
+            environment='production',
+            challenge_type='dns-01',
+            status='pending',
+            order_url='https://ca.example/order/1',
+            finalize_url='https://ca.example/order/1/finalize',
+        )
+        new_order.set_challenges_dict({
+            'example.com': {'dns_txt_value': 'token-a'},
+            'www.example.com': {'dns_txt_value': 'token-b'},
+        })
+        db.session.add(new_order)
+        db.session.commit()
+
+        mock_client = MagicMock()
+        mock_client.create_order.return_value = (True, 'ok', new_order)
+
+        order = db.session.get(AcmeClientOrder, order_id)
+
+        with patch('services.acme.dns_providers.create_provider', return_value=mock_provider), \
+             patch(
+                 'services.acme.acme_client_service.AcmeClientService.for_order',
+                 return_value=mock_client,
+             ):
+            with pytest.raises(Exception, match='Failed to create DNS record for www.example.com'):
+                renew_mod.renew_certificate(order)
+
+    assert create_calls == ['example.com', 'www.example.com']
+    assert len(deleted) == 2
+    assert {d['domain'] for d in deleted} == {'example.com', 'www.example.com'}
