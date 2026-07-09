@@ -6,6 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from utils.datetime_utils import utc_now
+from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 
 logger = logging.getLogger(__name__)
 
@@ -144,94 +145,124 @@ def renew_certificate(order) -> tuple:
     new_order_url = new_order.order_url
     new_finalize_url = new_order.finalize_url
     challenges = new_order.challenges_dict
-    
-    # Setup DNS challenges using data already computed by create_order
-    for domain, challenge_info in challenges.items():
-        dns_value = challenge_info.get('dns_txt_value')
-        record_name = challenge_info.get('dns_txt_name', f"_acme-challenge.{domain.lstrip('*.')}")
-        
-        if not dns_value:
-            raise Exception(f"No DNS challenge value for {domain}")
-        
-        # Create DNS record
-        success_dns, msg = dns_provider.create_txt_record(
-            domain=domain.lstrip('*.'),
-            record_name=record_name,
-            record_value=dns_value,
-            ttl=300
-        )
-        
-        if not success_dns:
-            raise Exception(f"Failed to create DNS record for {domain}: {msg}")
-    
-    # Wait for DNS propagation
-    logger.info("Waiting for DNS propagation...")
-    time.sleep(30)
-    
-    # Submit challenges for validation
-    for domain in challenges.keys():
-        success_ch, msg = acme_client.verify_challenge(new_order, domain)
-        if not success_ch:
-            logger.warning(f"Challenge submission warning for {domain}: {msg}")
-    
-    # Wait for validation
-    logger.info("Waiting for ACME validation...")
-    time.sleep(20)
-    
-    # Finalize order — finalize_order handles CSR generation, cert download, and import
-    success_fin, message_fin, cert_id = acme_client.finalize_order(new_order)
-    
-    if not success_fin:
-        raise Exception(f"Order finalization failed: {message_fin}")
-    
-    if not cert_id:
-        raise Exception("Certificate import failed during finalization")
-    
-    # Update original order with new certificate reference
-    order.certificate_id = cert_id
-    order.order_url = new_order_url
-    order.last_renewal_at = utc_now()
-    order.renewal_failures = 0
-    order.error_message = None
-    order.last_error_at = None
-    
-    # Update expiry from new certificate
-    from models import Certificate
-    new_cert = db.session.get(Certificate, cert_id)
-    if new_cert and new_cert.valid_to:
-        order.expires_at = new_cert.valid_to
-    
-    try:
-        db.session.commit()
-    except Exception as _commit_err:
-        db.session.rollback()
-        logger.error(f"Commit failed in services/acme_renewal_service.py:182: {_commit_err}", exc_info=True)
-        raise
-    
-    # Cleanup DNS records
-    for domain, challenge_info in challenges.items():
-        record_name = challenge_info.get('dns_txt_name', f"_acme-challenge.{domain.lstrip('*.')}")
-        dns_provider.delete_txt_record(
-            domain=domain.lstrip('*.'),
-            record_name=record_name
-        )
-    
-    logger.info(f"Successfully renewed certificate for {order.primary_domain} (new cert ID: {cert_id})")
-    
-    # Revoke old certificate if setting is enabled
-    if old_certificate_id and old_certificate_id != cert_id:
-        try:
-            from models import SystemConfig
-            revoke_setting = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
-            if revoke_setting and revoke_setting.value == 'true':
-                from services.cert_service import CertificateService
-                CertificateService.revoke_certificate(
-                    cert_id=old_certificate_id,
-                    reason='superseded',
-                    username='system'
+    dns_txt_created = False
+
+    def _cleanup_dns_txt_records():
+        for domain, challenge_info in challenges.items():
+            record_name = challenge_info.get(
+                'dns_txt_name', f"_acme-challenge.{domain.lstrip('*.')}"
+            )
+            try:
+                dns_provider.delete_txt_record(
+                    domain=domain.lstrip('*.'),
+                    record_name=record_name,
                 )
-                logger.info(f"Revoked superseded certificate {old_certificate_id}")
-        except Exception as e:
-            logger.warning(f"Failed to revoke old certificate {old_certificate_id}: {e}")
-    
-    return True, f"Successfully renewed (new certificate ID: {cert_id})"
+            except Exception as exc:
+                logger.warning(
+                    'Failed to delete renewal DNS TXT for %s (%s): %s',
+                    domain, record_name, exc,
+                )
+
+    try:
+        # Setup DNS challenges using data already computed by create_order
+        for domain, challenge_info in challenges.items():
+            dns_value = challenge_info.get('dns_txt_value')
+            record_name = challenge_info.get(
+                'dns_txt_name', f"_acme-challenge.{domain.lstrip('*.')}"
+            )
+
+            if not dns_value:
+                raise Exception(f"No DNS challenge value for {domain}")
+
+            success_dns, msg = dns_provider.create_txt_record(
+                domain=domain.lstrip('*.'),
+                record_name=record_name,
+                record_value=dns_value,
+                ttl=300,
+            )
+
+            if not success_dns:
+                raise Exception(f"Failed to create DNS record for {domain}: {msg}")
+
+        dns_txt_created = True
+
+        # Wait for DNS propagation using active self-check.
+        timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')
+        if timeout <= 0:
+            logger.info("DNS propagation pre-check skipped (timeout=0)")
+            check = {'ok': True, 'missing': [], 'waited': 0}
+        else:
+            check = wait_for_challenges(challenges, timeout)
+        if not check['ok']:
+            raise Exception(
+                f"DNS propagation not ready after {timeout}s for: {', '.join(check['missing'])}"
+            )
+        logger.info("DNS propagation confirmed after %ss", check['waited'])
+
+        # Submit challenges for validation
+        for domain in challenges.keys():
+            success_ch, msg = acme_client.verify_challenge(new_order, domain)
+            if not success_ch:
+                logger.warning(f"Challenge submission warning for {domain}: {msg}")
+
+        # Wait for validation
+        logger.info("Waiting for ACME validation...")
+        time.sleep(20)
+
+        # Finalize order — finalize_order handles CSR generation, cert download, and import
+        success_fin, message_fin, cert_id = acme_client.finalize_order(new_order)
+
+        if not success_fin:
+            raise Exception(f"Order finalization failed: {message_fin}")
+
+        if not cert_id:
+            raise Exception("Certificate import failed during finalization")
+
+        # Update original order with new certificate reference
+        order.certificate_id = cert_id
+        order.order_url = new_order_url
+        order.last_renewal_at = utc_now()
+        order.renewal_failures = 0
+        order.error_message = None
+        order.last_error_at = None
+
+        # Update expiry from new certificate
+        from models import Certificate
+        new_cert = db.session.get(Certificate, cert_id)
+        if new_cert and new_cert.valid_to:
+            order.expires_at = new_cert.valid_to
+
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(
+                f"Commit failed in services/acme_renewal_service.py:182: {_commit_err}",
+                exc_info=True,
+            )
+            raise
+
+        logger.info(
+            f"Successfully renewed certificate for {order.primary_domain} (new cert ID: {cert_id})"
+        )
+
+        # Revoke old certificate if setting is enabled
+        if old_certificate_id and old_certificate_id != cert_id:
+            try:
+                from models import SystemConfig
+                revoke_setting = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
+                if revoke_setting and revoke_setting.value == 'true':
+                    from services.cert_service import CertificateService
+                    CertificateService.revoke_certificate(
+                        cert_id=old_certificate_id,
+                        reason='superseded',
+                        username='system',
+                    )
+                    logger.info(f"Revoked superseded certificate {old_certificate_id}")
+            except Exception as e:
+                logger.warning(f"Failed to revoke old certificate {old_certificate_id}: {e}")
+
+        return True, f"Successfully renewed (new certificate ID: {cert_id})"
+    finally:
+        if dns_txt_created:
+            _cleanup_dns_txt_records()

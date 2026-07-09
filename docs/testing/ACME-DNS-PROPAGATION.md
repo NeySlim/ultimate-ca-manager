@@ -44,6 +44,33 @@ on such a resolver.
 
 The UI helper text on **ACME → Let's Encrypt** reflects this split.
 
+## Proxy and Renewal (LOT A)
+
+Proxy and renewal no longer use a blind fixed 30s sleep:
+
+- `services/acme/acme_proxy_service.py::_bg_respond_challenge`
+- `services/acme_renewal_service.py::renew_certificate`
+
+Both now use the shared active DNS self-check (`services/acme/dns_selfcheck.py`)
+with `acme.client.dns_propagation_timeout`:
+
+- `timeout=0` -> skip wait, submit immediately (legacy behavior)
+- `timeout>0` -> poll for TXT visibility before submit
+
+If proxy DNS never becomes visible before timeout, upstream challenge submission
+is skipped and challenge state is marked `dns_not_ready`. Renewal deletes
+created TXT records on propagation or finalization failure (same as the success
+path cleanup).
+
+### LOT A pytest plan
+
+```bash
+cd backend
+python -m pytest tests/test_acme_dns_selfcheck.py tests/test_acme_proxy_ca_account.py -q
+python -m pytest tests/test_acme.py::TestAcmeClientSettings -q
+python -m pytest tests/test_acme_public_url.py tests/test_acme_security_paths.py::TestKeyChangeConflict::test_key_change_to_existing_account_key_rejected -q
+```
+
 ### Excluding a problematic resolver
 
 There is no per-resolver disable switch for the public-recursor diagnostic

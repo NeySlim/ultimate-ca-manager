@@ -316,3 +316,23 @@ def test_verify_challenges_skips_dns_gate_when_timeout_zero(app, auth_client, mo
     assert_success(r)
     assert selfcheck_called == [], '_dns_selfcheck must not be called when timeout=0'
     assert verify_calls == ['example.com'], 'verify_challenge must be called directly'
+
+
+def test_wait_for_challenges_falls_back_when_dns_txt_name_missing(fake_dns):
+    """Renewal challenge dicts may omit dns_txt_name; poll must not KeyError."""
+    from services.acme import dns_selfcheck as dns_mod
+
+    fake_dns['records']['_acme-challenge.example.com'] = ['token-value']
+    ch = {'example.com': {'dns_txt_value': 'token-value'}}
+    res = dns_mod.wait_for_challenges(ch, timeout=0)
+    assert res['ok'] is True
+    assert res['missing'] == []
+
+
+def test_challenge_txt_name_fallback():
+    from services.acme.dns_selfcheck import challenge_txt_name
+
+    assert challenge_txt_name('*.example.com', {}) == '_acme-challenge.example.com'
+    assert challenge_txt_name(
+        'example.com', {'dns_txt_name': '_acme-challenge.custom.example.com'}
+    ) == '_acme-challenge.custom.example.com'

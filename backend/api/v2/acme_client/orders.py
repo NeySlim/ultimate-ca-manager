@@ -20,10 +20,14 @@ from api.v2.acme_client import bp
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db, DnsProvider, AcmeClientOrder, SystemConfig
+from models import db, DnsProvider, AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService, AUTHZ_INVALID_USER_MSG
 from services.audit_service import AuditService
-from utils.dns_txt_lookup import log_public_resolver_status, txt_record_present
+from services.acme.dns_selfcheck import (
+    dns_propagation_timeout as _shared_dns_propagation_timeout,
+    wait_for_challenges as _shared_wait_for_challenges,
+)
+from utils.dns_txt_lookup import txt_record_present
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +37,6 @@ logger = logging.getLogger(__name__)
 # _run_auto_poll_background), so it is NOT constrained by the gunicorn worker
 # timeout and honors the full configured timeout.
 _DNS_SELFCHECK_DEFAULT_TIMEOUT = 120
-_DNS_SELFCHECK_INTERVAL = 5
 # The manual verify endpoint runs the self-check synchronously inside the HTTP
 # request, so its wait is capped regardless of dns_propagation_timeout (which
 # can be up to 3600s): beyond this the client/proxy would time out first. The
@@ -42,11 +45,8 @@ _MANUAL_VERIFY_MAX_WAIT_SEC = 30
 
 
 def _dns_propagation_timeout() -> int:
-    cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
-    try:
-        return max(0, int(cfg.value)) if cfg and cfg.value is not None else _DNS_SELFCHECK_DEFAULT_TIMEOUT
-    except (ValueError, TypeError):
-        return _DNS_SELFCHECK_DEFAULT_TIMEOUT
+    # Keep local wrapper for backwards-compatible tests/imports.
+    return _shared_dns_propagation_timeout('acme.client.dns_propagation_timeout')
 
 
 def _txt_present(name: str, expected: str) -> bool:
@@ -70,23 +70,8 @@ def _dns_selfcheck(challenges: dict, timeout: int) -> dict:
     Returns {'ok': bool, 'missing': [domains], 'waited': seconds}. Non-dns-01
     challenges (no dns_txt_value) are ignored.
     """
-    pending = {d: c for d, c in challenges.items() if c.get('dns_txt_value')}
-    waited = 0
-    while pending:
-        for domain in list(pending):
-            c = pending[domain]
-            txt_name = c['dns_txt_name']
-            txt_value = c['dns_txt_value']
-            if _txt_present(txt_name, txt_value):
-                logger.info(f'DNS TXT confirmed for {domain} ({txt_name})')
-                del pending[domain]
-            else:
-                log_public_resolver_status(txt_name, txt_value)
-        if not pending or waited >= timeout:
-            break
-        time.sleep(_DNS_SELFCHECK_INTERVAL)
-        waited += _DNS_SELFCHECK_INTERVAL
-    return {'ok': not pending, 'missing': list(pending), 'waited': waited}
+    # Keep local wrapper for backwards-compatible tests/imports.
+    return _shared_wait_for_challenges(challenges, timeout)
 
 
 @bp.route('/api/v2/acme/client/orders', methods=['GET'])
