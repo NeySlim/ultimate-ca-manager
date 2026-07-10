@@ -332,4 +332,3 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             'nonce': nonce.hex(),
             'ciphertext': ciphertext.hex()
         }
-        return plaintext.decode()
