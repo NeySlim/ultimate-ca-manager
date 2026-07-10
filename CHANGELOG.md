@@ -10,6 +10,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+
+## [2.191] - 2026-07-10
+
+> ⚠️ **Upgrade note — LDAP/SSO certificate verification is now enforced.** Before this
+> release, an LDAP/SSO provider with **"verify SSL" enabled but no CA bundle uploaded**
+> silently performed **no** certificate validation. It now validates the LDAP server
+> certificate against the system trust store. **Action required:** if your LDAP server
+> uses a private or self-signed certificate that is not in the host's system trust store,
+> upload its CA as the provider's CA bundle before upgrading, or those logins will start
+> failing with a TLS validation error. Providers with "verify SSL = off" are unaffected.
+> See #181.
+
 ### Security
 - **LDAP TLS was not validated when "verify SSL" was on but no CA bundle was set** — with SSL verification enabled but no CA bundle uploaded, the LDAP/SSO TLS builder fell back to ldap3's default TLS, which does not validate the server certificate, so a "verify SSL = on" provider silently performed no verification (MITM exposure on LDAP auth). It now validates against the system trust store (`CERT_REQUIRED`). **Note:** verification is on by default — an LDAP server using a private/self-signed certificate that is not in the system trust store must now have its CA uploaded as the provider CA bundle (previously such setups connected without validation). Explicit "verify SSL = off" is unchanged. Contributed by @heidrickla (#181).
 - **SSRF guard could be bypassed via unspecified and IPv4-mapped IPv6 addresses** — the outbound-URL guard (webhooks, SSO discovery, ACME proxy) checked loopback but not the unspecified address (`0.0.0.0` / `::`, which route to loopback on most systems), and matched the cloud-metadata deny-list by string, so an IPv4-mapped IPv6 encoding (e.g. `::ffff:169.254.169.254`) slipped past. The guard now collapses IPv4-mapped IPv6 to IPv4, compares against a parsed-IP deny-set, and treats unspecified addresses as forbidden. Contributed by @heidrickla (#182).
