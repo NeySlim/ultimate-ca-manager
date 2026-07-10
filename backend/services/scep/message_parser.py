@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional
 import asn1crypto.cms
 import asn1crypto.core
 import asn1crypto.x509
-from Crypto.Cipher import DES3, AES
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
@@ -267,19 +268,19 @@ def decrypt_scep_envelope(encrypted_bytes: bytes, ca_key) -> bytes:
         raise ValueError("DES encryption is not supported — use AES or 3DES")
     elif "1.2.840.113549.3.7" in alg_oid:  # 3DES
         logger.warning("SCEP client using 3DES encryption — deprecated, prefer AES")
-        cipher = DES3.new(content_encryption_key, DES3.MODE_CBC, iv)
-        plaintext = cipher.decrypt(encrypted_content_bytes)
+        decryptor = Cipher(TripleDES(content_encryption_key), modes.CBC(iv)).decryptor()
+        plaintext = decryptor.update(encrypted_content_bytes) + decryptor.finalize()
         pad_len = plaintext[-1]
-        if pad_len < 1 or pad_len > DES3.block_size or not all(
+        if pad_len < 1 or pad_len > 8 or not all(  # 3DES block size = 8 bytes
             b == pad_len for b in plaintext[-pad_len:]
         ):
             raise ValueError("Invalid PKCS#7 padding in SCEP message")
         return plaintext[:-pad_len]
     elif "2.16.840.1.101.3.4.1" in alg_oid:  # AES (any variant)
-        cipher = AES.new(content_encryption_key, AES.MODE_CBC, iv)
-        plaintext = cipher.decrypt(encrypted_content_bytes)
+        decryptor = Cipher(algorithms.AES(content_encryption_key), modes.CBC(iv)).decryptor()
+        plaintext = decryptor.update(encrypted_content_bytes) + decryptor.finalize()
         pad_len = plaintext[-1]
-        if pad_len < 1 or pad_len > AES.block_size or not all(
+        if pad_len < 1 or pad_len > 16 or not all(  # AES block size = 16 bytes
             b == pad_len for b in plaintext[-pad_len:]
         ):
             raise ValueError("Invalid PKCS#7 padding in SCEP message")
