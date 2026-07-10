@@ -84,7 +84,10 @@ def _build_ldap_tls(provider):
             os.close(fd)
         return __import__('ldap3').Tls(ca_certs_file=ca_path, validate=ssl.CERT_REQUIRED)
 
-    return None
+    # verify requested but no explicit CA bundle: validate against the system trust store
+    # (CERT_REQUIRED) rather than returning None, which would leave ldap3 on its default
+    # unvalidated TLS — i.e. a "verify SSL" setting that silently doesn't verify.
+    return __import__('ldap3').Tls(validate=ssl.CERT_REQUIRED)
 
 
 def _encrypt_ldap_password(password: str) -> str:
