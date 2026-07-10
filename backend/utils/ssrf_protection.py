@@ -69,6 +69,24 @@ _CLOUD_METADATA_HOSTS = {
     'metadata.goog',
 }
 
+# Deny-list as parsed IP objects so an IPv4-mapped IPv6 form (::ffff:a.b.c.d) can't
+# evade a string comparison by re-encoding an IPv4 target as IPv6.
+_CLOUD_METADATA_IP_OBJS = {ipaddress.ip_address(a) for a in _CLOUD_METADATA_IPS}
+
+
+def _forbidden_ip_reason(ip):
+    """Why `ip` (an ipaddress object) is a forbidden SSRF target — cloud metadata,
+    loopback, or unspecified (0.0.0.0 / ::, which route to loopback on most OSes) — or
+    None. IPv4-mapped IPv6 is collapsed to IPv4 first so it can't slip past the checks."""
+    mapped = getattr(ip, 'ipv4_mapped', None)
+    if mapped is not None:
+        ip = mapped
+    if ip in _CLOUD_METADATA_IP_OBJS:
+        return "cloud metadata IP"
+    if ip.is_loopback or ip.is_unspecified:
+        return "loopback/unspecified address"
+    return None
+
 
 def validate_url_not_cloud_metadata(url: str) -> None:
     """Validate that a URL doesn't target cloud metadata services or loopback.
@@ -97,13 +115,12 @@ def validate_url_not_cloud_metadata(url: str) -> None:
     # Check literal IP
     try:
         ip = ipaddress.ip_address(host)
-        if str(ip) in _CLOUD_METADATA_IPS:
-            raise ValueError(f"Host {host} is a cloud metadata IP")
-        if ip.is_loopback:
-            raise ValueError(f"Host {host} is a loopback address")
+        reason = _forbidden_ip_reason(ip)
+        if reason:
+            raise ValueError(f"Host {host} is a {reason}")
         return
     except ValueError as e:
-        if "metadata" in str(e) or "loopback" in str(e):
+        if "metadata" in str(e) or "loopback" in str(e) or "unspecified" in str(e):
             raise
         # Not a literal IP — fall through to DNS resolution
 
@@ -112,10 +129,9 @@ def validate_url_not_cloud_metadata(url: str) -> None:
         addrs = socket.getaddrinfo(host, None)
         for _, _, _, _, sockaddr in addrs:
             ip = ipaddress.ip_address(sockaddr[0])
-            if str(ip) in _CLOUD_METADATA_IPS:
-                raise ValueError(f"Host {host} resolves to cloud metadata IP {ip}")
-            if ip.is_loopback:
-                raise ValueError(f"Host {host} resolves to loopback {ip}")
+            reason = _forbidden_ip_reason(ip)
+            if reason:
+                raise ValueError(f"Host {host} resolves to {reason} {ip}")
     except socket.gaierror:
         # Cannot resolve — not a SSRF risk (can't reach anything)
         pass
@@ -207,13 +223,12 @@ def _resolve_and_validate(url: str) -> tuple:
     # Already a literal IP — validate and pin to itself.
     try:
         ip_obj = ipaddress.ip_address(host)
-        if str(ip_obj) in _CLOUD_METADATA_IPS:
-            raise ValueError(f"Host {host} is a cloud metadata IP")
-        if ip_obj.is_loopback:
-            raise ValueError(f"Host {host} is a loopback address")
+        reason = _forbidden_ip_reason(ip_obj)
+        if reason:
+            raise ValueError(f"Host {host} is a {reason}")
         return host, str(ip_obj)
     except ValueError as e:
-        if "metadata" in str(e) or "loopback" in str(e):
+        if "metadata" in str(e) or "loopback" in str(e) or "unspecified" in str(e):
             raise
         # Not a literal IP — resolve below.
 
@@ -225,10 +240,9 @@ def _resolve_and_validate(url: str) -> tuple:
     chosen = None
     for _, _, _, _, sockaddr in addrs:
         ip = ipaddress.ip_address(sockaddr[0])
-        if str(ip) in _CLOUD_METADATA_IPS:
-            raise ValueError(f"Host {host} resolves to cloud metadata IP {ip}")
-        if ip.is_loopback:
-            raise ValueError(f"Host {host} resolves to loopback {ip}")
+        reason = _forbidden_ip_reason(ip)
+        if reason:
+            raise ValueError(f"Host {host} resolves to {reason} {ip}")
         if chosen is None:
             chosen = str(ip)
 
