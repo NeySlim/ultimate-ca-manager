@@ -7,7 +7,7 @@ from typing import Optional
 import asn1crypto.cms
 import asn1crypto.core
 import asn1crypto.x509
-from Crypto.Cipher import AES
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
@@ -72,11 +72,11 @@ def encrypt_for_client(
     content_key = secrets.token_bytes(32)   # AES-256
     iv = secrets.token_bytes(16)            # AES block size
 
-    cipher = AES.new(content_key, AES.MODE_CBC, iv)
     block_size = 16
     padding_len = block_size - (len(data) % block_size)
     padded_data = data + bytes([padding_len] * padding_len)
-    encrypted_content = cipher.encrypt(padded_data)
+    encryptor = Cipher(algorithms.AES(content_key), modes.CBC(iv)).encryptor()
+    encrypted_content = encryptor.update(padded_data) + encryptor.finalize()
 
     encrypted_key = client_public_key.encrypt(content_key, asym_padding.PKCS1v15())
 
