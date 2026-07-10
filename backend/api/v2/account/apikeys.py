@@ -5,7 +5,7 @@ from flask import request, g, current_app
 from models import db
 from models.api_key import APIKey
 from auth.unified import AuthManager, require_auth, has_permission
-from auth.permissions import get_role_permissions
+from auth.permissions import get_role_permissions, VALID_RESOURCES
 from services.audit_service import AuditService
 from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
@@ -63,7 +63,11 @@ def create_api_key():
     # Validate permissions format — users cannot grant permissions they don't have
     user_perms = get_role_permissions(g.current_user.role)
     valid_categories = ['read', 'write', 'delete', 'admin']
-    valid_resources = ['cas', 'certificates', 'acme', 'scep', 'crl', 'settings', 'users', 'system']
+    # Derived from ROLE_PERMISSIONS (single source of truth) so this validator can't drift
+    # from the resources @require_auth actually enforces — the previous hardcoded list was
+    # missing csrs/user_certificates/templates/truststore/est/hsm/ssh/policies/approvals/
+    # key_recovery/audit/groups and listed two non-resources (users/system).
+    valid_resources = VALID_RESOURCES
 
     for perm in data['permissions']:
         if perm == '*':

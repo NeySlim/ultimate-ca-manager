@@ -53,6 +53,29 @@ ROLE_PERMISSIONS = {
 }
 
 
+# Resources enforced by @require_auth but reachable ONLY through the '*' (admin) wildcard,
+# so they never appear in a named role's explicit scope list in ROLE_PERMISSIONS above.
+# They must still be scope-able on an API key (e.g. an admin minting a key for user
+# management or SSO config), so they're unioned into VALID_RESOURCES below. Keep in sync
+# with @require_auth usage — tests/test_apikey_valid_resources.py fails if a new enforced
+# scope is added without registering its resource here (or granting it to a role above).
+ADMIN_ONLY_RESOURCES = {'users', 'system', 'sso'}
+
+# Canonical set of resources an API key can be scoped to: every resource granted to a role
+# in ROLE_PERMISSIONS PLUS the admin-only resources above. Derived from these sources of
+# truth so this validator can't silently drift from the `action:resource` scopes that
+# @require_auth actually enforces (the previous hardcoded list had drifted — it was missing
+# csrs/user_certificates/templates/... — and deriving from ROLE_PERMISSIONS alone dropped
+# the admin-only users/system/sso resources).
+VALID_RESOURCES = sorted(
+    {perm.split(':', 1)[1]
+     for perms in ROLE_PERMISSIONS.values()
+     for perm in perms
+     if ':' in perm}
+    | ADMIN_ONLY_RESOURCES
+)
+
+
 def get_role_permissions(role: str) -> list:
     """Get permissions for a role"""
     return ROLE_PERMISSIONS.get(role, [])
