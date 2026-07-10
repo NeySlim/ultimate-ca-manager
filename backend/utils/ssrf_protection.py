@@ -247,6 +247,7 @@ def safe_request_post(url, **kwargs):
     use the original hostname so HTTPS works normally.
     """
     import requests
+    kwargs.setdefault('timeout', 30)  # never hang forever on a stuck/slow upstream
     host, ip = _resolve_and_validate(url)
     with _pin_host(host, ip):
         return requests.post(url, **kwargs)
@@ -255,6 +256,7 @@ def safe_request_post(url, **kwargs):
 def safe_request_get(url, **kwargs):
     """requests.get() counterpart of safe_request_post()."""
     import requests
+    kwargs.setdefault('timeout', 30)  # never hang forever on a stuck/slow upstream
     host, ip = _resolve_and_validate(url)
     with _pin_host(host, ip):
         return requests.get(url, **kwargs)

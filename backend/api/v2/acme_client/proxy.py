@@ -12,7 +12,7 @@ from flask import request
 from api.v2.acme_client import bp, _set_config, _coerce_bool
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils.ssrf_protection import validate_url_not_cloud_metadata, safe_request_get
 from models import db, SystemConfig
 from models.acme_client_account import AcmeClientAccount
 from services.acme.acme_proxy_account import resolve_proxy_account
@@ -60,8 +60,7 @@ def _resolve_test_url(data: dict) -> str:
 @require_auth(['read:acme'])
 def test_proxy_connection():
     """Test connection to upstream ACME directory"""
-    import urllib.request
-    import ssl
+    import requests
 
     data = request.json or {}
     try:
@@ -81,10 +80,12 @@ def test_proxy_connection():
     verify_ssl = _coerce_bool(cfg.value if cfg else None, True)
 
     try:
-        ctx = ssl.create_default_context() if verify_ssl else ssl._create_unverified_context()
-        req = urllib.request.Request(url, headers={'User-Agent': 'UCM-ACME-Proxy'})
-        resp = urllib.request.urlopen(req, timeout=10, context=ctx)
-        directory = json.loads(resp.read().decode('utf-8'))
+        # safe_request_get re-resolves, re-validates (cloud-metadata/loopback deny-list)
+        # AND pins the TCP connection to that IP — closing the DNS-rebinding window the
+        # previous validate-then-urlopen left open (urlopen re-resolved independently).
+        resp = safe_request_get(url, headers={'User-Agent': 'UCM-ACME-Proxy'},
+                                timeout=10, verify=verify_ssl)
+        directory = resp.json()
 
         meta = directory.get('meta', {})
         ca_name = None
@@ -111,8 +112,8 @@ def test_proxy_connection():
             'eab_required': meta.get('externalAccountRequired', False),
             'endpoints': list(directory.keys()),
         })
-    except urllib.error.URLError as e:
-        return error_response(f'Connection failed: {e.reason}', 502)
+    except (ValueError, requests.RequestException) as e:
+        return error_response(f'Connection failed: {e}', 502)
     except Exception as e:
         logger.error(f"Proxy connection test failed: {e}")
         return error_response('Connection test failed', 502)
