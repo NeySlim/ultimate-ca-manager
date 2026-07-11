@@ -147,13 +147,29 @@ def detect_auth_methods():
     cert_info = getattr(g, 'mtls_cert_info', None)
     if not cert_info:
         try:
-            headers = dict(request.headers)
-            if 'X-SSL-Client-Verify' in headers:
-                cert_info = CertificateParser.extract_from_nginx_headers(headers)
-            elif 'X-SSL-Client-S-DN' in headers:
-                cert_info = CertificateParser.extract_from_apache_headers(headers)
-            elif request.environ.get('peercert'):
-                cert_info = CertificateParser.extract_from_flask_native(request.environ['peercert'])
+            # Native gunicorn TLS — peercert is already validated by the stack.
+            if request.environ.get('peercert'):
+                cert_info = CertificateParser.extract_from_flask_native(
+                    request.environ['peercert']
+                )
+            else:
+                # Reverse-proxy headers — same trusted-proxy gate as login_mtls().
+                from utils.trusted_proxy import is_request_from_trusted_proxy
+                headers = dict(request.headers)
+                spoof_attempt = (
+                    'X-SSL-Client-Verify' in headers
+                    or 'X-SSL-Client-S-DN' in headers
+                    or 'X-SSL-Client-Cert' in headers
+                )
+                if spoof_attempt and not is_request_from_trusted_proxy():
+                    logger.warning(
+                        "auth/methods: ignoring proxy cert headers from untrusted peer %s",
+                        request.remote_addr,
+                    )
+                elif 'X-SSL-Client-Verify' in headers:
+                    cert_info = CertificateParser.extract_from_nginx_headers(headers)
+                elif 'X-SSL-Client-S-DN' in headers:
+                    cert_info = CertificateParser.extract_from_apache_headers(headers)
         except Exception as e:
             logger.error(f"Error detecting mTLS: {e}")
             methods['mtls_status'] = 'error'

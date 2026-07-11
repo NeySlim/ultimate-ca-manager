@@ -135,7 +135,7 @@ def delete_webhook(webhook_id):
 @require_auth(['write:settings'])
 def test_webhook(webhook_id):
     """Test webhook by sending a test event"""
-    import requests as http_requests
+    from utils.ssrf_protection import safe_request_post
 
     webhooks = get_webhooks()
     webhook = next((w for w in webhooks if w.get('id') == webhook_id), None)
@@ -157,7 +157,7 @@ def test_webhook(webhook_id):
     }
 
     try:
-        response = http_requests.post(
+        response = safe_request_post(
             webhook['url'],
             json=test_payload,
             timeout=10,

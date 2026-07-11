@@ -327,8 +327,10 @@ class AcmeClientService:
         """Fetch ACME directory from server"""
         if self.directory:
             return self.directory
-        
-        resp = self.session.get(self.directory_url, timeout=self._http_timeout())
+
+        from utils.ssrf_protection import safe_request_get
+
+        resp = safe_request_get(self.directory_url, timeout=self._http_timeout())
         resp.raise_for_status()
         self.directory = resp.json()
         logger.info(f"Fetched ACME directory from {self.directory_url}")

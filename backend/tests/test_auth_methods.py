@@ -67,6 +67,46 @@ class TestDetectAuthMethods:
         r = _post(client, '/api/v2/auth/methods', {})
         assert r.status_code == 200
 
+    def test_auth_methods_ignores_spoofed_proxy_headers(
+        self, client, app, monkeypatch,
+    ):
+        """Untrusted peers must not learn mtls_user via forged X-SSL-Client-* headers."""
+        from models import User, db
+        from models.auth_certificate import AuthCertificate
+
+        serial = 'AABBCCDD'
+        with app.app_context():
+            admin = User.query.filter_by(username='admin').first()
+            AuthCertificate.query.filter_by(cert_serial=serial).delete()
+            db.session.add(AuthCertificate(
+                user_id=admin.id,
+                cert_serial=serial,
+                cert_subject='CN=Test User',
+                enabled=True,
+            ))
+            db.session.commit()
+
+        monkeypatch.setattr(
+            'utils.trusted_proxy.is_request_from_trusted_proxy',
+            lambda: False,
+        )
+        r = client.get(
+            '/api/v2/auth/methods',
+            headers={
+                'X-SSL-Client-Verify': 'SUCCESS',
+                'X-SSL-Client-S-DN': 'CN=Spoofed,O=Test',
+                'X-SSL-Client-Serial': serial,
+            },
+        )
+        assert r.status_code == 200
+        data = get_json(r).get('data', {})
+        assert data.get('mtls_user') is None
+        assert data.get('mtls_status') != 'enrolled'
+
+        with app.app_context():
+            AuthCertificate.query.filter_by(cert_serial=serial).delete()
+            db.session.commit()
+
 
 # ============================================================
 # POST /api/v2/auth/login/password — password login
