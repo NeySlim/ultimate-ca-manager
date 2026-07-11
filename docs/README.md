@@ -27,6 +27,7 @@ Technical documentation for Ultimate Certificate Manager.
 
 ### ACME testing notes
 
+- **[testing/PUBLIC-ENDPOINTS.md](./testing/PUBLIC-ENDPOINTS.md)** — Admin/protocol/ACME URLs, DNS preflight, env vars, pitfalls
 - **[testing/ACME-PUBLIC-VHOST.md](./testing/ACME-PUBLIC-VHOST.md)** — Public ACME vhost, wildcard TLS, test plan
 - **[testing/ACME-PROXY-MULTI-CA.md](./testing/ACME-PROXY-MULTI-CA.md)** — Multi-CA proxy endpoints
 - **[testing/ACME-DNS-PROPAGATION.md](./testing/ACME-DNS-PROPAGATION.md)** — DNS-01 propagation checks

@@ -13,6 +13,14 @@ export const settingsService = {
     return apiClient.patch('/settings/general', settings)
   },
 
+  async getPublicEndpoints() {
+    return apiClient.get('/settings/public-endpoints')
+  },
+
+  async preflightPublicEndpoints() {
+    return apiClient.post('/settings/public-endpoints/preflight', {})
+  },
+
   async getEmailSettings() {
     return apiClient.get('/settings/email')
   },

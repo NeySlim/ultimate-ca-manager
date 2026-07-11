@@ -46,10 +46,26 @@ def _configured_acme_host_port():
     host = values.get('acme_public_vhost', '')
     port_raw = values.get('acme_public_port', '')
     try:
-        port = int(port_raw) if port_raw else 443
+        port = int(port_raw) if port_raw else _default_acme_https_port()
     except (TypeError, ValueError):
-        port = 443
+        port = _default_acme_https_port()
     return host, port
+
+
+def _default_acme_https_port() -> int:
+    """Match deployment HTTPS_PORT when acme_public_port is unset in DB."""
+    import os
+    env = os.getenv('HTTPS_PORT')
+    if env is not None:
+        try:
+            return int(env)
+        except (TypeError, ValueError):
+            pass
+    try:
+        from flask import current_app
+        return int(current_app.config.get('HTTPS_PORT', 8443))
+    except Exception:
+        return 8443
 
 
 def get_acme_public_origin(flask_request) -> str:

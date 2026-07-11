@@ -6,6 +6,7 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { useNotification } from '../../contexts'
 import { certificatesService, settingsService } from '../../services'
 import ServiceStatusWidget from './ServiceStatusWidget'
+import PublicEndpointsPanel from './PublicEndpointsPanel'
 
 export default function GeneralSection({ settings, updateSetting, handleSave, saving, canWrite }) {
   const { t } = useTranslation()
@@ -13,6 +14,7 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   const [metricsToken, setMetricsToken] = useState('')
   const [metricsBusy, setMetricsBusy] = useState(false)
   const [tlsCertOptions, setTlsCertOptions] = useState([])
+  const [endpointsRefresh, setEndpointsRefresh] = useState(0)
 
   // Certificates with a private key, for the ACME public vhost TLS selector
   useEffect(() => {
@@ -89,7 +91,7 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             label={t('settings.protocolBaseUrl')}
             value={settings.protocol_base_url || ''}
             onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
-            placeholder="http://pki.example.com"
+            placeholder="http://admin.ucm.example.com:8080"
             helperText={t('settings.protocolBaseUrlHelper')}
           />
           <Input
@@ -134,8 +136,28 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             ]}
             helperText={t('settings.acmePublicTlsCertIdHelper')}
           />
+          {canWrite('settings') && (
+            <div className="pt-2">
+              <Button
+                type="button"
+                onClick={async () => {
+                  await handleSave('general')
+                  setEndpointsRefresh((k) => k + 1)
+                }}
+                disabled={saving}
+              >
+                <FloppyDisk size={16} />
+                {t('common.saveChanges')}
+              </Button>
+            </div>
+          )}
         </div>
       </DetailSection>
+      <PublicEndpointsPanel
+        settings={settings}
+        updateSetting={updateSetting}
+        refreshKey={endpointsRefresh}
+      />
       <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
         <div className="space-y-4">
           <Input
