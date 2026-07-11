@@ -213,9 +213,34 @@ def new_account(slug=None):
 @_dual_route('/new-order', methods=['POST'], endpoint='proxy_new_order')
 def new_order(slug=None):
     """New order (RFC 8555 §7.4)"""
+    from models import SystemConfig
+
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
+
+    eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
+    eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
+    if eab_required:
+        if not jwk:
+            return proxy_error('malformed', 'Missing JWK in protected header')
+        try:
+            jws_data = request.get_json(silent=True) or {}
+            protected_b64 = jws_data.get('protected', '')
+            protected_b64 += '=' * (-len(protected_b64) % 4)
+            protected = json.loads(base64.urlsafe_b64decode(protected_b64))
+        except Exception:
+            return proxy_error('malformed', 'Invalid protected header')
+        kid = protected.get('kid', '')
+        if not kid:
+            return proxy_error('malformed', 'Account kid required when EAB is enabled')
+        account_id = kid.rstrip('/').rsplit('/', 1)[-1]
+        acme_svc = AcmeService()
+        account = acme_svc.get_account_by_kid(account_id)
+        if not account:
+            return proxy_error('accountDoesNotExist', 'Account not found', 404)
+        if account.status == 'deactivated':
+            return proxy_error('unauthorized', 'Account is deactivated', 401)
 
     try:
         identifiers = payload.get('identifiers')
@@ -345,11 +370,12 @@ def get_order(order_id, slug=None):
 @_dual_route('/order/<order_id>/finalize', methods=['POST'], endpoint='proxy_finalize')
 def finalize(order_id, slug=None):
     """Finalize order with CSR (RFC 8555 §7.4)"""
-    is_valid, payload, _, err = verify_proxy_jws()
+    is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
     requester_account_id = None
+    requester_thumbprint = None
     try:
         jws_data = request.get_json(silent=True) or {}
         protected_b64 = jws_data.get('protected', '')
@@ -359,6 +385,12 @@ def finalize(order_id, slug=None):
             kid = protected.get('kid', '')
             if kid:
                 requester_account_id = kid.rstrip('/').rsplit('/', 1)[-1]
+        if jwk:
+            import hashlib
+            jwk_canonical = json.dumps(jwk, separators=(',', ':'), sort_keys=True)
+            requester_thumbprint = base64.urlsafe_b64encode(
+                hashlib.sha256(jwk_canonical.encode()).digest()
+            ).rstrip(b'=').decode()
     except Exception:
         pass
 
@@ -373,8 +405,12 @@ def finalize(order_id, slug=None):
         csr_pem = csr_obj.public_bytes(serialization.Encoding.PEM).decode()
 
         svc = get_proxy_service(slug)
-        data = svc.finalize_order(order_id, csr_pem,
-                                  requester_account_id=requester_account_id)
+        data = svc.finalize_order(
+            order_id,
+            csr_pem,
+            requester_account_id=requester_account_id,
+            requester_thumbprint=requester_thumbprint,
+        )
 
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)

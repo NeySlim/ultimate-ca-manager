@@ -854,6 +854,30 @@ class AcmeProxyService:
             return pending_orders[0]
         return None
     
+    def _find_order_for_certificate(self, cert_url: str):
+        """Match a pending proxy order to the upstream certificate download URL."""
+        from models import AcmeClientOrder
+
+        pending_orders = AcmeClientOrder.query.filter(
+            AcmeClientOrder.is_proxy_order == True,
+            AcmeClientOrder.status == 'pending',
+        ).all()
+        for order in pending_orders:
+            if not order.upstream_order_url:
+                continue
+            try:
+                resp = self._post_with_account(order.upstream_order_url, "")
+                if resp.status_code != 200:
+                    continue
+                upstream_cert = resp.json().get('certificate')
+                if upstream_cert == cert_url:
+                    return order
+            except Exception as exc:
+                logger.warning(
+                    "ACME proxy: failed to resolve order for cert URL: %s", exc
+                )
+        return None
+
     @staticmethod
     def _urls_share_ca(url1, url2):
         """Check if two URLs belong to the same CA (same host)."""
@@ -925,26 +949,36 @@ class AcmeProxyService:
             
         return order
 
-    def finalize_order(self, order_id_b64, csr_pem, requester_account_id=None):
+    def finalize_order(self, order_id_b64, csr_pem, requester_account_id=None,
+                       requester_thumbprint=None):
         """Proxy finalize.
 
         If requester_account_id is provided, verify it matches the local
         AcmeClientOrder.account_id (set when the order was created from this
         same client's JWK thumbprint). Mismatch → PermissionError → ACME 403.
+        When client_jwk_thumbprint is stored on the order, the finalize JWK
+        must match even if no local account was registered.
         """
         from models import AcmeClientOrder
 
         order_url = self._decode_proxy_id(order_id_b64)
 
-        if requester_account_id:
-            local_order = AcmeClientOrder.query.filter_by(
-                upstream_order_url=order_url, is_proxy_order=True
-            ).first()
-            if local_order and local_order.account_id and \
+        local_order = AcmeClientOrder.query.filter_by(
+            upstream_order_url=order_url, is_proxy_order=True
+        ).first()
+        if local_order:
+            if requester_account_id and local_order.account_id and \
                     local_order.account_id != requester_account_id:
                 logger.warning(
                     "ACME proxy finalize: account %s tried to finalize order owned by %s",
                     requester_account_id, local_order.account_id
+                )
+                raise PermissionError("Order does not belong to this account")
+            if local_order.client_jwk_thumbprint and requester_thumbprint and \
+                    local_order.client_jwk_thumbprint != requester_thumbprint:
+                logger.warning(
+                    "ACME proxy finalize: JWK thumbprint mismatch for order %s",
+                    local_order.id,
                 )
                 raise PermissionError("Order does not belong to this account")
         
@@ -1052,10 +1086,7 @@ class AcmeProxyService:
             
             # Cleanup DNS records and link certificate to order
             from models import AcmeClientOrder, DnsProvider
-            order = AcmeClientOrder.query.filter(
-                AcmeClientOrder.is_proxy_order == True,
-                AcmeClientOrder.status == 'pending'
-            ).order_by(AcmeClientOrder.created_at.desc()).first()
+            order = self._find_order_for_certificate(cert_url)
             
             if order:
                 try:
