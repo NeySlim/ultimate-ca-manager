@@ -56,18 +56,18 @@ When `resolv.conf` already uses the internal nameserver, **local** and **interne
 Replace `LAB` with lab IP or admin FQDN.
 
 ```bash
-LAB=admin.ucm.pfcorp.eu
+LAB=admin.ucm.example.com
 PORT=8443
 ```
 
 | ID | Command | Expected |
 |----|---------|----------|
 | L-01 | `curl -sk https://${LAB}:${PORT}/api/health` | `"status":"ok"` |
-| L-02 | `curl -skI https://ucm.pfcorp.eu:${PORT}/` | 302 → admin URL |
+| L-02 | `curl -skI https://ucm.example.com:${PORT}/` | 302 → admin URL |
 | L-03 | `curl -skI https://172.31.10.8:${PORT}/` | 302 → admin URL |
 | L-04 | `curl -skI -H "Host: localhost" https://172.31.10.8:${PORT}/` | 302 → admin (not 200) |
-| L-05 | `curl -sk -o /dev/null -w "%{http_code}" -H "Host: acme.ucm.pfcorp.eu" https://127.0.0.1:${PORT}/` | 404 |
-| L-06 | `curl -sk -o /dev/null -w "%{http_code}" -H "Host: acme.ucm.pfcorp.eu" https://127.0.0.1:${PORT}/acme/directory` | 200 |
+| L-05 | `curl -sk -o /dev/null -w "%{http_code}" -H "Host: acme.ucm.example.com" https://127.0.0.1:${PORT}/` | 404 |
+| L-06 | `curl -sk -o /dev/null -w "%{http_code}" -H "Host: acme.ucm.example.com" https://127.0.0.1:${PORT}/acme/directory` | 200 |
 
 ## 3. Lab manual — authenticated API
 
@@ -96,17 +96,17 @@ Example PATCH (after login):
 
 ```bash
 curl -sk -b "$COOKIE" -X PATCH -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
-  -d '{"base_url":"https://admin.ucm.pfcorp.eu:8443","protocol_base_url":"http://admin.ucm.pfcorp.eu:8080","acme_public_vhost":"acme.ucm.pfcorp.eu"}' \
+  -d '{"base_url":"https://admin.ucm.example.com:8443","protocol_base_url":"http://admin.ucm.example.com:8080","acme_public_vhost":"acme.ucm.example.com"}' \
   "https://${LAB}:${PORT}/api/v2/settings/general"
 ```
 
 ## 4. GUI (browser)
 
-1. Open `https://admin.ucm.pfcorp.eu:8443` — login admin.
+1. Open `https://admin.ucm.example.com:8443` — login admin.
 2. **Paramètres → Général** — verify three URL fields.
 3. **Endpoints publics** — canonical URLs, preflight badges.
 4. **Utiliser l'URL du navigateur** → save → refresh effective block.
-5. Open `https://ucm.pfcorp.eu:8443` in browser → must land on admin URL.
+5. Open `https://ucm.example.com:8443` in browser → must land on admin URL.
 
 ## 5. Regression
 

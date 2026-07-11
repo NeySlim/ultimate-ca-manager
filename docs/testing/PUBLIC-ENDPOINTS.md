@@ -63,13 +63,13 @@ wildcard rejected for `acme_public_vhost` (TLS SAN only).
 
 Fallback for corporate DNS preflight: SystemConfig `acme.dns01_nameservers` (same format).
 
-Example lab (`90-docs-and-runbooks/ucm/ucm.env.admin-vhost`):
+Example `/etc/ucm/ucm.env` snippet:
 
 ```bash
-FQDN=admin.ucm.pfcorp.eu
+FQDN=admin.ucm.example.com
 HTTPS_PORT=8443
 HTTP_PROTOCOL_PORT=8080
-UCM_CORPORATE_DNS_SERVERS=172.31.10.190
+UCM_CORPORATE_DNS_SERVERS=10.0.0.53
 ```
 
 Behind nginx/traefik:
