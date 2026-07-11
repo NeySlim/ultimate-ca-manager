@@ -137,6 +137,8 @@ def create_app(config_name=None):
     else:
         _trusted_hops = 0
 
+    app.config['TRUSTED_PROXY_HOPS'] = _trusted_hops
+
     if _trusted_hops > 0:
         app.wsgi_app = ProxyFix(
             app.wsgi_app,
@@ -288,16 +290,32 @@ def create_app(config_name=None):
     init_websocket(app)
     app.logger.info("✓ WebSocket support enabled")
     
-    # CORS - only HTTPS origins (includes WebSocket)
+    # CORS - dynamic origins (admin base URL + localhost + env extras)
+    class _DynamicCorsOrigins:
+        """Iterable allowlist recomputed from SystemConfig on each CORS check."""
+        def __iter__(self):
+            from utils.public_endpoints import get_cors_origins
+            return iter(get_cors_origins())
+
+        def __contains__(self, origin):
+            from utils.public_endpoints import get_cors_origins
+            return origin in get_cors_origins()
+
+        def __len__(self):
+            from utils.public_endpoints import get_cors_origins
+            return len(get_cors_origins())
+
+    _cors_origins = _DynamicCorsOrigins()
+
     CORS(app, resources={
         r"/api/*": {
-            "origins": config.CORS_ORIGINS,
+            "origins": _cors_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
             "supports_credentials": True
         },
         r"/socket.io/*": {
-            "origins": config.CORS_ORIGINS,
+            "origins": _cors_origins,
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
@@ -839,41 +857,10 @@ def create_app(config_name=None):
         
         return response
     
-    # FQDN redirect middleware (redirect IP to FQDN if configured)
-    @app.before_request
-    def redirect_to_fqdn():
-        # Skip for health checks and static files
-        if request.path in ['/api/v2/health', '/api/health', '/health', '/metrics', '/api/v2/metrics', '/api/auth/verify', '/api/v2/auth/verify'] or request.path.startswith(('/static/', '/assets/', '/cdp/', '/ca/', '/ocsp/', '/scep/', '/acme/', '/.well-known/', '/tsa', '/ssh/setup/')):
-            return None
-        
-        # Get configured FQDN - check both UCM_FQDN (Docker) and FQDN env vars
-        fqdn = os.getenv('UCM_FQDN') or os.getenv('FQDN') or app.config.get('FQDN')
-        if not fqdn or fqdn in ['localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local', 'test.local']:
-            return None  # Skip if FQDN is default/localhost
-        
-        # Get current host
-        current_host = request.host.split(':')[0]  # Remove port
-        
-        # If accessing via IP or non-FQDN hostname, redirect to FQDN
-        if current_host != fqdn:
-            # Check if current host is an IP address
-            import re
-            if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', current_host):
-                # It's an IP, redirect to FQDN
-                scheme = 'https' if request.is_secure else 'http'
-                port_str = request.host.split(':')[1] if ':' in request.host else None
-                if port_str:
-                    new_url = f"{scheme}://{fqdn}:{port_str}{request.full_path.rstrip('?')}"
-                else:
-                    # Use default ports
-                    https_port = os.getenv('UCM_HTTPS_PORT', app.config.get('HTTPS_PORT', 8443))
-                    http_port = os.getenv('UCM_HTTP_PORT', app.config.get('HTTP_PORT', 80))
-                    port = https_port if request.is_secure else http_port
-                    new_url = f"{scheme}://{fqdn}:{port}{request.full_path.rstrip('?')}"
-                return redirect(new_url, code=302)
-        
-        return None
-    
+    # Canonical admin redirect + public Host-role enforcement (admin vs ACME split)
+    from middleware.public_host_middleware import init_public_host_middleware
+    init_public_host_middleware(app)
+
     # Context processor to inject variables into all templates
     @app.context_processor
     def inject_global_vars():

@@ -13,6 +13,7 @@ import logging
 
 from . import bp, get_config, set_config
 from utils.hsts import hsts_env_locked
+from utils.public_endpoints import validate_admin_base_url, validate_protocol_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,18 @@ def update_general_settings():
         'metrics_token',
     ]
 
+    if 'base_url' in data:
+        normalized, err = validate_admin_base_url(data.get('base_url') or '')
+        if err:
+            return error_response(err, 400)
+        data['base_url'] = normalized or ''
+
+    if 'protocol_base_url' in data:
+        normalized, err = validate_protocol_base_url(data.get('protocol_base_url') or '')
+        if err:
+            return error_response(err, 400)
+        data['protocol_base_url'] = normalized or ''
+
     # Validate http_protocol_port if provided
     if 'http_protocol_port' in data:
         try:
@@ -135,6 +148,10 @@ def update_general_settings():
                     'acme_public_vhost must be a valid FQDN (no scheme, port, or path)',
                     400,
                 )
+            from utils.public_endpoints import validate_acme_public_vhost_host
+            ssrf_err = validate_acme_public_vhost_host(host)
+            if ssrf_err:
+                return error_response(ssrf_err, 400)
         data['acme_public_vhost'] = host
 
     if 'acme_public_port' in data:

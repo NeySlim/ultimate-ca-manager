@@ -16,7 +16,16 @@ _LOCALHOST_NAMES = {'localhost', '127.0.0.1', '::1', 'localhost.localdomain'}
 
 def _get_fqdn():
     """Get the configured FQDN, preferring settings over request host."""
-    # 1. App-level FQDN config (from settings.py / env)
+    # 1. Admin base URL (Settings → General) or env FQDN
+    try:
+        from utils.public_endpoints import get_admin_public_host
+        admin_host = get_admin_public_host()
+        if admin_host and admin_host.lower() not in _LOCALHOST_NAMES:
+            return admin_host
+    except Exception:
+        pass
+
+    # 2. App-level FQDN config (from settings.py / env)
     try:
         fqdn = current_app.config.get('FQDN')
         if fqdn and fqdn.lower() not in _LOCALHOST_NAMES:
@@ -24,7 +33,7 @@ def _get_fqdn():
     except Exception:
         pass
 
-    # 2. Request hostname (what the browser used)
+    # 3. Request hostname (what the browser used)
     try:
         hostname = flask_request.host.split(':')[0]
         if hostname.lower() not in _LOCALHOST_NAMES:
@@ -39,18 +48,17 @@ def get_protocol_base_url():
     """
     Get the base URL for protocol endpoints.
     Priority:
-      1. protocol_base_url setting (user-configured explicit URL)
-      2. http_protocol_port setting > 0 → http://{fqdn}:{port}
+      1. Effective protocol_base_url (DB URL + HTTP_PROTOCOL_PORT / http_protocol_port)
+      2. Auto-generate from HTTP protocol port + FQDN
       3. Current request's host URL (HTTPS fallback, only if not localhost)
     Returns None if hostname resolves to localhost and no URL is configured.
     """
     try:
-        # 1. Explicit user-configured URL takes priority
-        config = SystemConfig.query.filter_by(key='protocol_base_url').first()
-        if config and config.value and config.value.strip():
-            return config.value.strip().rstrip('/')
+        from utils.public_endpoints import get_protocol_effective_url
+        effective = get_protocol_effective_url()
+        if effective:
+            return effective.rstrip('/')
 
-        # 2. Auto-generate from HTTP protocol port + FQDN
         from protocol_http_server import get_http_protocol_port
         http_port = get_http_protocol_port()
         if http_port > 0:
@@ -58,7 +66,7 @@ def get_protocol_base_url():
             if hostname:
                 suffix = '' if http_port == 80 else f':{http_port}'
                 return f'http://{hostname}{suffix}'
-            return None  # Cannot generate URL — no valid hostname
+            return None
     except Exception as e:
         logger.debug("Protocol URL fallback to request host: %s", e)
 

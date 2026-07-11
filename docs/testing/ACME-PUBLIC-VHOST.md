@@ -4,7 +4,7 @@ UCM peut annoncer des URLs ACME publiques distinctes de l’URL d’administrati
 Ce document décrit la topologie recommandée (noms `example.com` uniquement),
 les règles des certificats wildcard, le plan de test et les commandes pytest.
 
-Voir aussi : [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGATION.md](./ACME-DNS-PROPAGATION.md).
+Voir aussi : [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGATION.md](./ACME-DNS-PROPAGATION.md), [PUBLIC-ENDPOINTS.md](./PUBLIC-ENDPOINTS.md).
 
 ## Portée fonctionnelle (PR)
 
