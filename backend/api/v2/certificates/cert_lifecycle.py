@@ -82,19 +82,12 @@ def revoke_certificate(cert_id):
             username=username
         )
 
-        # AD CS Web Enrollment has no revocation endpoint, so a cert issued
-        # through a Microsoft CA connection is only marked revoked in UCM —
-        # tell the caller the upstream CA still considers it valid.
+        # A cert issued through a Microsoft CA connection: try to propagate the
+        # revocation to the Windows CA via the WinRM admin channel if one is
+        # configured. Web Enrollment (/certsrv) itself has no revocation
+        # endpoint, so without the admin channel the revocation stays local.
         if cert.source == 'msca':
-            return success_response(
-                data=cert.to_dict(),
-                message=(
-                    'Certificate revoked in UCM only — the issuing Microsoft CA '
-                    'was not notified (Web Enrollment does not support remote '
-                    'revocation). Revoke it on the Windows CA as well.'
-                ),
-                meta={'msca_local_only': True}
-            )
+            return _revoke_msca_on_ca(cert, reason)
 
         return success_response(
             data=cert.to_dict(),
@@ -106,6 +99,69 @@ def revoke_certificate(cert_id):
     except Exception as e:
         logger.error(f"Failed to revoke certificate: {e}")
         return error_response('Failed to revoke certificate', 500)
+
+
+def _find_msca_for_cert(cert):
+    """The MicrosoftCA connection that issued this cert, or None."""
+    from models.msca import MicrosoftCA, MSCARequest
+    req = (MSCARequest.query
+           .filter((MSCARequest.cert_id == cert.id) | (MSCARequest.csr_id == cert.id))
+           .order_by(MSCARequest.id.desc())
+           .first())
+    if req:
+        msca = db.session.get(MicrosoftCA, req.msca_id)
+        if msca:
+            return msca
+    if cert.imported_from and cert.imported_from.startswith('msca:'):
+        return MicrosoftCA.query.filter_by(name=cert.imported_from[len('msca:'):]).first()
+    return None
+
+
+def _revoke_msca_on_ca(cert, reason):
+    """After a local msca revocation, propagate to the Windows CA if possible."""
+    from services.msca_service import MicrosoftCAService, MSCAAdminChannelError
+
+    msca = _find_msca_for_cert(cert)
+    cert_dict = cert.to_dict()
+
+    if not msca or not MicrosoftCAService.admin_channel_available(msca):
+        return success_response(
+            data=cert_dict,
+            message=(
+                'Certificate revoked in UCM only — no Microsoft CA admin channel '
+                'is configured, so the Windows CA was not notified. Enable the '
+                'WinRM admin channel on the connection, or revoke it on the CA.'
+            ),
+            meta={'msca_local_only': True}
+        )
+
+    try:
+        MicrosoftCAService.revoke_on_ca(msca, cert.serial_number, reason=reason)
+    except MSCAAdminChannelError as e:
+        logger.error(f"MS CA admin-channel revoke failed for cert {cert.id}: {e}")
+        return success_response(
+            data=cert_dict,
+            message=(
+                'Certificate revoked in UCM, but propagating the revocation to '
+                f'the Windows CA failed: {e}. Revoke it on the CA manually.'
+            ),
+            meta={'msca_local_only': True, 'msca_ca_error': str(e)[:300]}
+        )
+
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='msca.revoke_on_ca',
+        resource_type='certificate',
+        resource_id=str(cert.id),
+        resource_name=cert.subject or cert.refid,
+        details=f"Revocation propagated to Microsoft CA '{msca.name}' (reason={reason})",
+        success=True,
+    )
+    return success_response(
+        data=cert_dict,
+        message='Certificate revoked in UCM and on the Microsoft CA',
+        meta={'msca_ca_revoked': True}
+    )
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/unhold', methods=['POST'])
@@ -166,6 +222,38 @@ def unhold_certificate(cert_id):
                     db.session.commit()
         except Exception:
             db.session.rollback()
+
+        # Propagate the unhold to the Windows CA if this cert came from an MS CA
+        # with an admin channel (certutil unrevoke only lifts a certificateHold).
+        if cert.source == 'msca':
+            from services.msca_service import MicrosoftCAService, MSCAAdminChannelError
+            msca = _find_msca_for_cert(cert)
+            if msca and MicrosoftCAService.admin_channel_available(msca):
+                try:
+                    MicrosoftCAService.unrevoke_on_ca(msca, cert.serial_number)
+                    AuditService.log_action(
+                        action='msca.unrevoke_on_ca',
+                        resource_type='certificate',
+                        resource_id=str(cert.id),
+                        resource_name=cert.subject or cert.refid,
+                        details=f"Hold lifted on Microsoft CA '{msca.name}'",
+                        success=True,
+                    )
+                    return success_response(
+                        data=cert.to_dict(),
+                        message='Certificate hold removed in UCM and on the Microsoft CA',
+                        meta={'msca_ca_unrevoked': True}
+                    )
+                except MSCAAdminChannelError as e:
+                    logger.error(f"MS CA admin-channel unrevoke failed for cert {cert.id}: {e}")
+                    return success_response(
+                        data=cert.to_dict(),
+                        message=(
+                            'Certificate hold removed in UCM, but lifting it on the '
+                            f'Windows CA failed: {e}. Unrevoke it on the CA manually.'
+                        ),
+                        meta={'msca_local_only': True, 'msca_ca_error': str(e)[:300]}
+                    )
 
         return success_response(
             data=cert.to_dict(),

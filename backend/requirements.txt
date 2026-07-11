@@ -91,6 +91,9 @@ matplotlib>=3.8
 certsrv>=2.1.0
 # requests-kerberos is optional: only needed for Kerberos auth to MS CA
 # Install manually if needed: pip install requests-kerberos
+# pywinrm is optional: only needed for the WinRM admin channel (revoke/unrevoke/
+# publish CRL/inventory on the CA). Lazy-imported; feature degrades gracefully
+# if absent. Install with: pip install pywinrm (add requests_ntlm for NTLM auth).
 # JKS export support (Java KeyStore).
 # pyjks itself is a pure-python wheel, but it declares `twofish` as a dependency.
 # twofish has NO prebuilt wheel on PyPI (sdist only) and would force gcc +

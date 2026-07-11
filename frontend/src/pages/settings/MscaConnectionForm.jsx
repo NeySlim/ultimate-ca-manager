@@ -28,7 +28,17 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     enabled: connection?.enabled ?? true,
     crl_sync_enabled: connection?.crl_sync_enabled ?? false,
     crl_url: connection?.crl_url || '',
+    winrm_enabled: connection?.winrm_enabled ?? false,
+    winrm_host: connection?.winrm_host || '',
+    winrm_port: connection?.winrm_port || 5986,
+    winrm_use_ssl: connection?.winrm_use_ssl ?? true,
+    winrm_verify_ssl: connection?.winrm_verify_ssl ?? true,
+    winrm_transport: connection?.winrm_transport || 'kerberos',
+    winrm_username: connection?.winrm_username || '',
+    winrm_password: '',
+    ca_config: connection?.ca_config || '',
   })
+  const [testingAdmin, setTestingAdmin] = useState(false)
   const [availableTemplates, setAvailableTemplates] = useState([])
   const [fetchingTemplates, setFetchingTemplates] = useState(false)
 
@@ -59,7 +69,21 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     // Don't send masked password if unchanged
     if (connection && !data.password) delete data.password
     if (connection && !data.client_key_pem) delete data.client_key_pem
+    if (connection && !data.winrm_password) delete data.winrm_password
     onSave(data)
+  }
+
+  const handleTestAdminChannel = async () => {
+    if (!connection?.id) return
+    setTestingAdmin(true)
+    try {
+      const res = await mscaService.testAdminChannel(connection.id)
+      showSuccess(t('msca.adminChannelTestSuccess', { status: res.data?.certsvc_status || '?' }))
+    } catch (error) {
+      showError(error.message || t('msca.adminChannelTestFailed'))
+    } finally {
+      setTestingAdmin(false)
+    }
   }
 
   const handleTestConnection = async () => {
@@ -238,6 +262,82 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
               placeholder={t('msca.crlUrlPlaceholder')}
             />
           </>
+        )}
+      </div>
+
+      {/* WinRM admin channel (revoke/unrevoke/publish CRL/inventory on the CA) */}
+      <div className="space-y-2 pt-2 border-t border-border">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={formData.winrm_enabled} onChange={(e) => updateField('winrm_enabled', e.target.checked)} className="rounded" />
+          {t('msca.winrmEnable')}
+        </label>
+        {formData.winrm_enabled && (
+          <div className="space-y-3 pl-1">
+            <p className="text-xs text-text-tertiary">{t('msca.winrmHint')}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label={t('msca.winrmHost')}
+                value={formData.winrm_host}
+                onChange={(e) => updateField('winrm_host', e.target.value)}
+                placeholder={formData.server || t('msca.winrmHostPlaceholder')}
+              />
+              <Input
+                label={t('msca.winrmPort')}
+                type="number"
+                value={formData.winrm_port}
+                onChange={(e) => updateField('winrm_port', e.target.value)}
+              />
+            </div>
+            <Select
+              label={t('msca.winrmTransport')}
+              options={[
+                { value: 'kerberos', label: `Kerberos (${t('common.recommended')})` },
+                { value: 'ntlm', label: 'NTLM' },
+              ]}
+              value={formData.winrm_transport}
+              onChange={(val) => updateField('winrm_transport', val)}
+            />
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={formData.winrm_use_ssl} onChange={(e) => updateField('winrm_use_ssl', e.target.checked)} className="rounded" />
+                {t('msca.winrmUseSsl')}
+              </label>
+              {formData.winrm_use_ssl && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={formData.winrm_verify_ssl} onChange={(e) => updateField('winrm_verify_ssl', e.target.checked)} className="rounded" />
+                  {t('msca.winrmVerifySsl')}
+                </label>
+              )}
+            </div>
+            <p className="text-xs text-text-tertiary">{t('msca.winrmCredsHint')}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label={t('msca.winrmUsername')}
+                value={formData.winrm_username}
+                onChange={(e) => updateField('winrm_username', e.target.value)}
+                placeholder={t('msca.winrmUsernamePlaceholder')}
+              />
+              <Input
+                label={t('msca.winrmPassword')}
+                type="password"
+                value={formData.winrm_password}
+                onChange={(e) => updateField('winrm_password', e.target.value)}
+                placeholder={connection?.winrm_username ? '••••••••' : ''}
+              />
+            </div>
+            <Input
+              label={t('msca.caConfig')}
+              value={formData.ca_config}
+              onChange={(e) => updateField('ca_config', e.target.value)}
+              placeholder={t('msca.caConfigPlaceholder')}
+            />
+            {connection?.id && (
+              <Button type="button" variant="secondary" size="sm" onClick={handleTestAdminChannel} disabled={testingAdmin}>
+                <TestTube size={14} />
+                {testingAdmin ? t('common.testing') : t('msca.testAdminChannel')}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 

@@ -51,6 +51,20 @@ class MicrosoftCA(db.Model):
     last_crl_sync_at = db.Column(db.DateTime)
     last_crl_sync_result = db.Column(db.String(500))
 
+    # WinRM admin channel (#185 phase A) — opt-in management operations
+    # (revoke/unrevoke/publish CRL/inventory) via certutil over PowerShell
+    # remoting. Credentials default to the connection's own; the winrm_*
+    # override fields allow a dedicated least-privilege officer account.
+    winrm_enabled = db.Column(db.Boolean, default=False)
+    winrm_host = db.Column(db.String(500))
+    winrm_port = db.Column(db.Integer, default=5986)
+    winrm_use_ssl = db.Column(db.Boolean, default=True)
+    winrm_verify_ssl = db.Column(db.Boolean, default=True)
+    winrm_transport = db.Column(db.String(20), default='kerberos')
+    winrm_username = db.Column(db.String(500))
+    _winrm_password = db.Column('winrm_password', db.Text)
+    ca_config = db.Column(db.String(500))
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=utc_now)
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
@@ -104,6 +118,50 @@ class MicrosoftCA(db.Model):
         else:
             self._client_key_pem = None
 
+    @property
+    def winrm_password(self):
+        if not self._winrm_password:
+            return None
+        try:
+            from utils.encryption import decrypt_if_needed
+            return decrypt_if_needed(self._winrm_password)
+        except Exception:
+            return self._winrm_password
+
+    @winrm_password.setter
+    def winrm_password(self, value):
+        if value:
+            # Fail-closed: never silently store the credential in plaintext.
+            from utils.encryption import encrypt_if_needed
+            self._winrm_password = encrypt_if_needed(value)
+        else:
+            self._winrm_password = None
+
+    # --- WinRM admin channel effective settings -------------------------
+    # The admin channel reuses the connection's own credentials unless an
+    # override is set. mTLS (certificate) enroll has no reusable WinRM
+    # credential, so those connections MUST provide winrm_username/password.
+
+    @property
+    def winrm_effective_host(self):
+        return self.winrm_host or self.server
+
+    @property
+    def winrm_effective_username(self):
+        if self.winrm_username:
+            return self.winrm_username
+        if self.auth_method == 'basic':
+            return self.username
+        return None
+
+    @property
+    def winrm_effective_password(self):
+        if self._winrm_password:
+            return self.winrm_password
+        if self.auth_method == 'basic':
+            return self.password
+        return None
+
     def to_dict(self, include_secrets=False):
         """Convert to dictionary, masking secrets by default"""
         data = {
@@ -123,6 +181,15 @@ class MicrosoftCA(db.Model):
             'crl_url': self.crl_url or '',
             'last_crl_sync_at': utc_isoformat(self.last_crl_sync_at),
             'last_crl_sync_result': self.last_crl_sync_result,
+            'winrm_enabled': bool(self.winrm_enabled),
+            'winrm_host': self.winrm_host or '',
+            'winrm_port': self.winrm_port or 5986,
+            'winrm_use_ssl': bool(self.winrm_use_ssl),
+            'winrm_verify_ssl': bool(self.winrm_verify_ssl),
+            'winrm_transport': self.winrm_transport or 'kerberos',
+            'winrm_username': self.winrm_username or '',
+            'winrm_password': '***' if self._winrm_password else None,
+            'ca_config': self.ca_config or '',
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at),
             'created_by': self.created_by,

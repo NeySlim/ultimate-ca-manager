@@ -1,1 +1,1 @@
-from services.msca import MicrosoftCAService  # noqa: F401
+from services.msca import MicrosoftCAService, MSCAAdminChannelError  # noqa: F401

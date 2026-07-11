@@ -32,6 +32,13 @@ const mscaService = {
   syncCrl: (id) =>
     apiClient.post(`/microsoft-cas/${id}/sync-crl`),
 
+  // WinRM admin channel
+  testAdminChannel: (id) =>
+    apiClient.post(`/microsoft-cas/${id}/admin-channel/test`),
+
+  publishCrl: (id) =>
+    apiClient.post(`/microsoft-cas/${id}/publish-crl`),
+
   // Templates
   getTemplates: (id) =>
     apiClient.get(`/microsoft-cas/${id}/templates`),

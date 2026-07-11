@@ -56,6 +56,44 @@ def _clean_crl_url(raw):
     return url, None
 
 
+_WINRM_TRANSPORTS = ('kerberos', 'ntlm')
+
+
+def _apply_winrm_fields(msca, data):
+    """Apply WinRM admin-channel fields from request data. Returns error_response or None."""
+    if 'winrm_enabled' in data:
+        msca.winrm_enabled = bool(data['winrm_enabled'])
+    if 'winrm_host' in data:
+        msca.winrm_host = (data['winrm_host'] or '').strip() or None
+    if 'winrm_port' in data:
+        try:
+            port = int(data['winrm_port'])
+        except (TypeError, ValueError):
+            return error_response("winrm_port must be an integer", 400)
+        if not (1 <= port <= 65535):
+            return error_response("winrm_port out of range", 400)
+        msca.winrm_port = port
+    if 'winrm_use_ssl' in data:
+        msca.winrm_use_ssl = bool(data['winrm_use_ssl'])
+    if 'winrm_verify_ssl' in data:
+        msca.winrm_verify_ssl = bool(data['winrm_verify_ssl'])
+    if 'winrm_transport' in data:
+        tr = (data['winrm_transport'] or '').strip().lower()
+        if tr not in _WINRM_TRANSPORTS:
+            return error_response(f"winrm_transport must be one of {_WINRM_TRANSPORTS}", 400)
+        msca.winrm_transport = tr
+    if 'winrm_username' in data:
+        msca.winrm_username = (data['winrm_username'] or '').strip() or None
+    if 'winrm_password' in data and data['winrm_password'] != '***':
+        msca.winrm_password = data['winrm_password'] or None
+    if 'ca_config' in data:
+        cfg = (data['ca_config'] or '').strip()
+        if cfg and any(c in cfg for c in '"\r\n`$;|&'):
+            return error_response("ca_config contains invalid characters", 400)
+        msca.ca_config = cfg or None
+    return None
+
+
 def _audit(action: str, msca, details: str, success: bool = True):
     try:
         AuditService.log_action(
@@ -159,6 +197,11 @@ def create_connection():
                 return err
             msca.crl_url = url
 
+        # WinRM admin channel (#185 phase A)
+        err = _apply_winrm_fields(msca, data)
+        if err:
+            return err
+
         db.session.add(msca)
         ok, err = safe_commit(logger, "Failed to create connection")
         if not ok:
@@ -242,6 +285,11 @@ def update_connection(msca_id):
             if err:
                 return err
             msca.crl_url = url
+
+        # WinRM admin channel (#185 phase A)
+        err = _apply_winrm_fields(msca, data)
+        if err:
+            return err
 
         # Auth method change: clear ALL stale credentials for the old method
         # so a basic→certificate switch doesn't leave the old encrypted password
@@ -378,6 +426,59 @@ def sync_crl(msca_id):
         logger.error(f"CRL sync failed for MS CA '{msca.name}': {e}", exc_info=True)
         _audit('msca.crl_sync_manual', msca, f"error={e}", success=False)
         return error_response("CRL sync failed", 500)
+
+
+# --- WinRM admin channel (#185 phase A) ---
+
+@bp.route('/<int:msca_id>/admin-channel/test', methods=['POST'])
+@require_auth(['admin:system'])
+def test_admin_channel(msca_id):
+    """Test the WinRM admin channel (connect + CA service/ping)."""
+    from services.msca_service import MSCAAdminChannelError
+
+    msca = db.session.get(MicrosoftCA, msca_id)
+    if not msca:
+        return error_response("Connection not found", 404)
+    if not msca.winrm_enabled:
+        return error_response("WinRM admin channel is not enabled on this connection", 400)
+
+    try:
+        result = MicrosoftCAService.test_admin_channel(msca_id)
+        _audit('msca.admin_channel_test', msca,
+               f"transport={msca.winrm_transport} certsvc={result.get('certsvc_status')}")
+        return success_response(data=result, message="Admin channel reachable")
+    except MSCAAdminChannelError as e:
+        _audit('msca.admin_channel_test', msca, f"error={e}", success=False)
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"Admin channel test failed for MS CA '{msca.name}': {e}", exc_info=True)
+        _audit('msca.admin_channel_test', msca, f"error={e}", success=False)
+        return error_response("Admin channel test failed", 500)
+
+
+@bp.route('/<int:msca_id>/publish-crl', methods=['POST'])
+@require_auth(['admin:system'])
+def publish_crl(msca_id):
+    """Force the Windows CA to publish a fresh CRL via the admin channel."""
+    from services.msca_service import MSCAAdminChannelError
+
+    msca = db.session.get(MicrosoftCA, msca_id)
+    if not msca:
+        return error_response("Connection not found", 404)
+    if not MicrosoftCAService.admin_channel_available(msca):
+        return error_response("WinRM admin channel is not configured", 400)
+
+    try:
+        result = MicrosoftCAService.publish_crl(msca_id)
+        _audit('msca.publish_crl', msca, "CRL published on CA")
+        return success_response(data=result, message="CRL published on the Microsoft CA")
+    except MSCAAdminChannelError as e:
+        _audit('msca.publish_crl', msca, f"error={e}", success=False)
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"Publish CRL failed for MS CA '{msca.name}': {e}", exc_info=True)
+        _audit('msca.publish_crl', msca, f"error={e}", success=False)
+        return error_response("Publish CRL failed", 500)
 
 
 # --- Templates ---
