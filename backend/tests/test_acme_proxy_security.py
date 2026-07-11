@@ -20,11 +20,11 @@ class TestAcmeProxyEabNewOrder:
         from api.acme import acme_api
 
         with app.app_context():
-            db.session.add(SystemConfig(
-                key='acme_eab_required',
-                value='true',
-                description='test',
-            ))
+            row = SystemConfig.query.filter_by(key='acme_eab_required').first()
+            if not row:
+                row = SystemConfig(key='acme_eab_required', description='test')
+                db.session.add(row)
+            row.value = 'true'
             db.session.commit()
 
         jwk = {'kty': 'RSA', 'n': 'abc', 'e': 'AQAB'}
