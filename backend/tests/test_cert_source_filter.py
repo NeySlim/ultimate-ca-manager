@@ -88,10 +88,31 @@ class TestSourceFilter:
         cns = [(c.get('common_name') or c.get('subject_cn')) for c in get_json(r)['data']]
         assert 'srcflt-legacy-null.test' in cns
 
-    def test_no_source_filter_returns_all_sources(self, app, auth_client):
-        _seed(app, [('srcflt-msca-3.test', 'msca'), ('srcflt-est-3.test', 'est')])
-        r = auth_client.get(f'{BASE}?per_page=100')
+    def test_no_source_filter_spans_multiple_sources(self, app, auth_client):
+        # Filter to just the two seeded sources (deterministic on a shared DB):
+        # an unfiltered page-1 assertion would be order/volume dependent.
+        _seed(app, [('srcflt-multi-msca.test', 'msca'), ('srcflt-multi-est.test', 'est')])
+        r = auth_client.get(f'{BASE}?source=msca&source=est&per_page=100')
         assert r.status_code == 200
-        got = _sources_in(r)
-        # Unfiltered list spans more than one source
-        assert 'msca' in got
+        assert _sources_in(r) == {'msca', 'est'}
+
+    def test_stats_exposes_present_sources(self, app, auth_client):
+        # The list filter builds its options from the stats 'sources' list, so
+        # every source actually present must be advertised there.
+        _seed(app, [('srcflt-stats-msca.test', 'msca'), ('srcflt-stats-acme_client.test', 'acme_client')])
+        r = auth_client.get(f'{BASE}/stats')
+        assert r.status_code == 200
+        sources = get_json(r)['data'].get('sources', [])
+        assert 'msca' in sources
+        assert 'acme_client' in sources  # drifted value still surfaced
+
+    def test_filter_matches_stats_advertised_source(self, app, auth_client):
+        # A source advertised by stats must be filterable and return only it.
+        _seed(app, [('srcflt-adv-acme_client.test', 'acme_client'),
+                    ('srcflt-adv-msca.test', 'msca')])
+        r = auth_client.get(f'{BASE}?source=acme_client&per_page=100')
+        assert r.status_code == 200
+        cns = [(c.get('common_name') or c.get('subject_cn')) for c in get_json(r)['data']]
+        assert 'srcflt-adv-acme_client.test' in cns
+        assert 'srcflt-adv-msca.test' not in cns
+        assert _sources_in(r) <= {'acme_client'}

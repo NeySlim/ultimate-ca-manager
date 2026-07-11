@@ -25,6 +25,28 @@ import { IssueCertificateForm } from './certificates/IssueCertificateForm'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { UploadKeyModal } from './certificates/UploadKeyModal'
 
+// i18n keys for known certificate issuance sources (labelKey pattern: store the
+// KEY at module level, resolve with t() in the component). Options are built
+// from the sources actually present in the DB (stats endpoint), so unknown /
+// legacy values still appear — humanized — and "select all" == "no filter".
+const SOURCE_LABEL_KEYS = {
+  manual: 'sourceManual',
+  import: 'sourceImport',
+  imported: 'sourceImport',
+  upload: 'sourceUpload',
+  acme: 'sourceAcme',
+  acme_client: 'sourceAcmeClient',
+  letsencrypt: 'sourceLetsencrypt',
+  scep: 'sourceScep',
+  est: 'sourceEst',
+  msca: 'sourceMsca',
+  approval: 'sourceApproval',
+  web: 'sourceWeb',
+}
+
+const humanizeSource = (s) =>
+  String(s).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
 export default function CertificatesPage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -451,17 +473,12 @@ export default function CertificatesPage() {
       value: filterSource,
       onChange: (val) => { setPage(1); setFilterSource(val) },
       placeholder: t('certificates.allSources'),
-      options: [
-        { value: 'manual', label: t('certificates.sourceManual') },
-        { value: 'import', label: t('certificates.sourceImport') },
-        { value: 'acme', label: t('certificates.sourceAcme') },
-        { value: 'letsencrypt', label: t('certificates.sourceLetsencrypt') },
-        { value: 'scep', label: t('certificates.sourceScep') },
-        { value: 'est', label: t('certificates.sourceEst') },
-        { value: 'msca', label: t('certificates.sourceMsca') }
-      ]
+      options: (certStats.sources || []).map(src => ({
+        value: src,
+        label: SOURCE_LABEL_KEYS[src] ? t(`certificates.${SOURCE_LABEL_KEYS[src]}`) : humanizeSource(src)
+      }))
     }
-  ], [filterStatus, filterCA, filterSource, cas, t])
+  ], [filterStatus, filterCA, filterSource, certStats.sources, cas, t])
 
   const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0) + (filterSource.length > 0 ? 1 : 0)
 
