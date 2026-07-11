@@ -95,18 +95,17 @@ class MicrosoftCAInventoryMixin:
             f"success: {len(imported)} imported, {skipped} known, {failed} failed"
         )
 
-        # Snapshot import payloads before emit (bus subscribers may commit).
-        import_snapshots = []
         try:
             db.session.commit()
-            for entry in imported:
-                cert = db.session.get(Certificate, entry['id'])
-                if cert:
-                    import_snapshots.append((cert.to_dict(), cert.caref))
         except Exception:
             db.session.rollback()
             raise
 
+        # NB: intentionally NO per-cert cert_issued event here. An initial full
+        # inventory can import thousands of pre-existing certs; emitting one
+        # lifecycle event each would flood webhook/email subscribers. These
+        # certs are catalogued, not freshly issued — the audit summary below is
+        # the record of the sync.
         from services.audit_service import AuditService
         AuditService.log_action(
             action='msca.inventory_sync',
@@ -119,10 +118,6 @@ class MicrosoftCAInventoryMixin:
             success=True,
             username=username,
         )
-
-        from services.webhook_service import emit_cert_issued
-        for snapshot, caref in import_snapshots:
-            emit_cert_issued(snapshot, ca_refid=caref, actor=f'inventory:{msca.name}')
 
         if imported:
             logger.info(

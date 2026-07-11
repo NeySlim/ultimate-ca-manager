@@ -5,6 +5,7 @@ from .requests import MicrosoftCARequestsMixin
 from .crl_sync import MicrosoftCACRLSyncMixin
 from .admin_channel import MicrosoftCAAdminChannelMixin, MSCAAdminChannelError
 from .inventory import MicrosoftCAInventoryMixin
+from .ca_control import MicrosoftCACAControlMixin
 
 
 class MicrosoftCAService(
@@ -15,5 +16,6 @@ class MicrosoftCAService(
     MicrosoftCACRLSyncMixin,
     MicrosoftCAAdminChannelMixin,
     MicrosoftCAInventoryMixin,
+    MicrosoftCACAControlMixin,
 ):
     pass

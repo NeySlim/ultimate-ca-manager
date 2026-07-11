@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { WindowsLogo, Plus, TestTube, ArrowsClockwise, ClockClockwise, Broadcast, Database, Power, PencilSimple, Trash } from '@phosphor-icons/react'
+import { WindowsLogo, Plus, TestTube, ArrowsClockwise, ClockClockwise, Broadcast, Database, Pulse, Power, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Button, Badge, HelpCard, DetailHeader, DetailContent, ExperimentalBadge } from '../../components'
 import { formatDate } from '../../lib/utils'
 
-export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaTesting, handleMscaCreate, handleMscaEdit, handleMscaToggle, handleMscaTest, handleMscaSyncCrl, handleMscaPublishCrl, handleMscaInventorySync, setMscaConfirmDelete, hasPermission }) {
+export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaTesting, handleMscaCreate, handleMscaEdit, handleMscaToggle, handleMscaTest, handleMscaSyncCrl, handleMscaPublishCrl, handleMscaInventorySync, handleMscaCaControl, setMscaConfirmDelete, hasPermission }) {
   const { t } = useTranslation()
   return (
     <DetailContent>
@@ -88,6 +88,11 @@ export default function MicrosoftCASection({ mscaConnections, mscaLoading, mscaT
                 <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaTest(conn)} disabled={mscaTesting} title={t('msca.testConnection')}>
                   {mscaTesting ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
                 </Button>
+                {conn.winrm_enabled && hasPermission('admin:system') && (
+                  <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaCaControl(conn)} disabled={!conn.enabled} title={t('msca.caControl')}>
+                    <Pulse size={14} />
+                  </Button>
+                )}
                 {conn.crl_sync_enabled && (
                   <Button type="button" size="sm" variant="secondary" onClick={() => handleMscaSyncCrl(conn)} disabled={mscaTesting || !conn.enabled} title={t('msca.syncCrlNow')}>
                     <ClockClockwise size={14} />

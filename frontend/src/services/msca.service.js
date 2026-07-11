@@ -46,6 +46,19 @@ const mscaService = {
   reconciliation: (id) =>
     apiClient.get(`/microsoft-cas/${id}/reconciliation`),
 
+  // CA control: health + pending request management
+  caHealth: (id) =>
+    apiClient.get(`/microsoft-cas/${id}/ca/health`),
+
+  caPending: (id) =>
+    apiClient.get(`/microsoft-cas/${id}/ca/pending`),
+
+  approveRequest: (id, requestId) =>
+    apiClient.post(`/microsoft-cas/${id}/ca/pending/${requestId}/approve`),
+
+  denyRequest: (id, requestId) =>
+    apiClient.post(`/microsoft-cas/${id}/ca/pending/${requestId}/deny`),
+
   // Templates
   getTemplates: (id) =>
     apiClient.get(`/microsoft-cas/${id}/templates`),

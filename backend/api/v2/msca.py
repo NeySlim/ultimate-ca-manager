@@ -549,6 +549,97 @@ def inventory_reconciliation(msca_id):
         return error_response("Reconciliation failed", 500)
 
 
+# --- CA control: pending requests + health (#185 phase C) ---
+
+@bp.route('/<int:msca_id>/ca/health', methods=['GET'])
+@require_auth(['read:certificates'])
+def ca_health(msca_id):
+    """CA health snapshot (service, CA cert, CRL, pending count)."""
+    from services.msca_service import MSCAAdminChannelError
+
+    msca = db.session.get(MicrosoftCA, msca_id)
+    if not msca:
+        return error_response("Connection not found", 404)
+    if not MicrosoftCAService.admin_channel_available(msca):
+        return error_response("WinRM admin channel is not configured", 400)
+    try:
+        return success_response(data=MicrosoftCAService.ca_health(msca_id))
+    except MSCAAdminChannelError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"CA health failed for MS CA '{msca.name}': {e}", exc_info=True)
+        return error_response("CA health check failed", 500)
+
+
+@bp.route('/<int:msca_id>/ca/pending', methods=['GET'])
+@require_auth(['read:certificates'])
+def list_pending_ca_requests(msca_id):
+    """List requests awaiting CA manager approval."""
+    from services.msca_service import MSCAAdminChannelError
+
+    msca = db.session.get(MicrosoftCA, msca_id)
+    if not msca:
+        return error_response("Connection not found", 404)
+    if not MicrosoftCAService.admin_channel_available(msca):
+        return error_response("WinRM admin channel is not configured", 400)
+    try:
+        return success_response(data=MicrosoftCAService.list_pending_requests(msca_id))
+    except MSCAAdminChannelError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"List pending failed for MS CA '{msca.name}': {e}", exc_info=True)
+        return error_response("Failed to list pending requests", 500)
+
+
+@bp.route('/<int:msca_id>/ca/pending/<int:request_id>/approve', methods=['POST'])
+@require_auth(['admin:system'])
+def approve_ca_request(msca_id, request_id):
+    """Approve (resubmit) a pending CA request and import the issued cert."""
+    from services.msca_service import MSCAAdminChannelError
+
+    msca = db.session.get(MicrosoftCA, msca_id)
+    if not msca:
+        return error_response("Connection not found", 404)
+    if not MicrosoftCAService.admin_channel_available(msca):
+        return error_response("WinRM admin channel is not configured", 400)
+    try:
+        result = MicrosoftCAService.approve_request(msca_id, request_id)
+        _audit('msca.approve_request', msca,
+               f"request_id={request_id} imported_cert_id={result.get('imported_cert_id')}")
+        return success_response(data=result, message="Request approved")
+    except MSCAAdminChannelError as e:
+        _audit('msca.approve_request', msca, f"request_id={request_id} error={e}", success=False)
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"Approve request failed for MS CA '{msca.name}': {e}", exc_info=True)
+        _audit('msca.approve_request', msca, f"request_id={request_id} error={e}", success=False)
+        return error_response("Failed to approve request", 500)
+
+
+@bp.route('/<int:msca_id>/ca/pending/<int:request_id>/deny', methods=['POST'])
+@require_auth(['admin:system'])
+def deny_ca_request(msca_id, request_id):
+    """Deny a pending CA request."""
+    from services.msca_service import MSCAAdminChannelError
+
+    msca = db.session.get(MicrosoftCA, msca_id)
+    if not msca:
+        return error_response("Connection not found", 404)
+    if not MicrosoftCAService.admin_channel_available(msca):
+        return error_response("WinRM admin channel is not configured", 400)
+    try:
+        result = MicrosoftCAService.deny_request(msca_id, request_id)
+        _audit('msca.deny_request', msca, f"request_id={request_id}")
+        return success_response(data=result, message="Request denied")
+    except MSCAAdminChannelError as e:
+        _audit('msca.deny_request', msca, f"request_id={request_id} error={e}", success=False)
+        return error_response(str(e), 400)
+    except Exception as e:
+        logger.error(f"Deny request failed for MS CA '{msca.name}': {e}", exc_info=True)
+        _audit('msca.deny_request', msca, f"request_id={request_id} error={e}", success=False)
+        return error_response("Failed to deny request", 500)
+
+
 # --- Templates ---
 
 @bp.route('/<int:msca_id>/templates', methods=['GET'])

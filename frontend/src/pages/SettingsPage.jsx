@@ -45,6 +45,7 @@ import MappingEditor from './settings/MappingEditor'
 import SsoProviderForm from './settings/SsoProviderForm'
 import WebhookForm from './settings/WebhookForm'
 import MscaConnectionForm from './settings/MscaConnectionForm'
+import MscaCaControlModal from '../components/MscaCaControlModal'
 import GeneralSection from './settings/GeneralSection'
 import EmailSection from './settings/EmailSection'
 import SecuritySection from './settings/SecuritySection'
@@ -172,6 +173,7 @@ export default function SettingsPage() {
   const [editingMsca, setEditingMsca] = useState(null)
   const [mscaTesting, setMscaTesting] = useState(false)
   const [mscaConfirmDelete, setMscaConfirmDelete] = useState(null)
+  const [mscaCaControl, setMscaCaControl] = useState(null)
 
   // Encryption states
   const [encryptionStatus, setEncryptionStatus] = useState(null)
@@ -1505,6 +1507,7 @@ export default function SettingsPage() {
             handleMscaSyncCrl={handleMscaSyncCrl}
             handleMscaPublishCrl={handleMscaPublishCrl}
             handleMscaInventorySync={handleMscaInventorySync}
+            handleMscaCaControl={setMscaCaControl}
             setMscaConfirmDelete={setMscaConfirmDelete}
             hasPermission={hasPermission}
           />
@@ -1747,6 +1750,13 @@ export default function SettingsPage() {
         message={t('msca.deleteConfirm')}
         confirmText={t('common.delete')}
         variant="danger"
+      />
+
+      {/* Microsoft CA Control Panel (pending requests + health) */}
+      <MscaCaControlModal
+        connection={mscaCaControl}
+        open={!!mscaCaControl}
+        onClose={() => setMscaCaControl(null)}
       />
       
       {/* Enable Encryption Modal */}
