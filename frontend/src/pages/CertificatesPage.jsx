@@ -25,6 +25,28 @@ import { IssueCertificateForm } from './certificates/IssueCertificateForm'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { UploadKeyModal } from './certificates/UploadKeyModal'
 
+// i18n keys for known certificate issuance sources (labelKey pattern: store the
+// KEY at module level, resolve with t() in the component). Options are built
+// from the sources actually present in the DB (stats endpoint), so unknown /
+// legacy values still appear — humanized — and "select all" == "no filter".
+const SOURCE_LABEL_KEYS = {
+  manual: 'sourceManual',
+  import: 'sourceImport',
+  imported: 'sourceImport',
+  upload: 'sourceUpload',
+  acme: 'sourceAcme',
+  acme_client: 'sourceAcmeClient',
+  letsencrypt: 'sourceLetsencrypt',
+  scep: 'sourceScep',
+  est: 'sourceEst',
+  msca: 'sourceMsca',
+  approval: 'sourceApproval',
+  web: 'sourceWeb',
+}
+
+const humanizeSource = (s) =>
+  String(s).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
 export default function CertificatesPage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -62,7 +84,8 @@ export default function CertificatesPage() {
   // Filters
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-certs-status', [])
   const [filterCA, setFilterCA] = usePersistedState('ucm-filter-certs-ca', [])
-  
+  const [filterSource, setFilterSource] = usePersistedState('ucm-filter-certs-source', [])
+
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1) // Reset to first page when applying preset
@@ -73,6 +96,8 @@ export default function CertificatesPage() {
     }
     if (filters.ca) setFilterCA(Array.isArray(filters.ca) ? filters.ca : [filters.ca])
     else setFilterCA([])
+    if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
+    else setFilterSource([])
   }, [])
   
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -83,7 +108,7 @@ export default function CertificatesPage() {
   useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), sortBy, sortOrder])
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), sortBy, sortOrder])
 
   // Reload when floating window actions change data
   useEffect(() => {
@@ -122,6 +147,9 @@ export default function CertificatesPage() {
       }
       if (filterCA.length > 0) {
         params.ca_id = filterCA
+      }
+      if (filterSource.length > 0) {
+        params.source = filterSource
       }
       
       const [certsRes, casRes, statsRes] = await Promise.all([
@@ -433,14 +461,26 @@ export default function CertificatesPage() {
       value: filterCA,
       onChange: (val) => { setPage(1); setFilterCA(val) },
       placeholder: t('common.allCAs'),
-      options: cas.map(ca => ({ 
-        value: String(ca.id), 
-        label: ca.descr || ca.common_name 
+      options: cas.map(ca => ({
+        value: String(ca.id),
+        label: ca.descr || ca.common_name
+      }))
+    },
+    {
+      key: 'source',
+      label: t('certificates.source'),
+      type: 'multiSelect',
+      value: filterSource,
+      onChange: (val) => { setPage(1); setFilterSource(val) },
+      placeholder: t('certificates.allSources'),
+      options: (certStats.sources || []).map(src => ({
+        value: src,
+        label: SOURCE_LABEL_KEYS[src] ? t(`certificates.${SOURCE_LABEL_KEYS[src]}`) : humanizeSource(src)
       }))
     }
-  ], [filterStatus, filterCA, cas, t])
+  ], [filterStatus, filterCA, filterSource, certStats.sources, cas, t])
 
-  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0)
+  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0) + (filterSource.length > 0 ? 1 : 0)
 
   // Help content
   const helpContent = (

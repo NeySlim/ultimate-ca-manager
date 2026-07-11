@@ -57,7 +57,10 @@ class Certificate(db.Model):
     created_at = db.Column(db.DateTime, default=utc_now)
     created_by = db.Column(db.String(80))
     
-    # Source tracking: 'manual', 'acme', 'scep', 'import', 'csr'
+    # Source tracking (issuance origin). Known values:
+    # 'manual', 'import', 'acme', 'letsencrypt', 'scep', 'est', 'msca'.
+    # NULL is treated as 'manual'. Kept in sync with the certificate list
+    # source filter (api/v2/certificates/cert_list.py) and the UI badges.
     source = db.Column(db.String(20), default='manual')
     
     # Template reference (optional - null if created without template)

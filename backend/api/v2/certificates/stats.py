@@ -41,12 +41,18 @@ def get_certificate_stats():
         Certificate.revoked == False
     ).count() - expiring  # Don't double-count expiring as valid
 
+    # Distinct issuance sources actually present, so the list "source" filter
+    # can offer exactly the values that exist (NULL is surfaced as 'manual').
+    source_rows = base_query.with_entities(Certificate.source).distinct().all()
+    sources = sorted({(row[0] or 'manual') for row in source_rows})
+
     return success_response(data={
         'total': total,
         'valid': valid,
         'expiring': expiring,
         'expired': expired,
-        'revoked': revoked
+        'revoked': revoked,
+        'sources': sources
     })
 
 
