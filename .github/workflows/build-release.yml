@@ -454,7 +454,7 @@ jobs:
           **Change the password immediately after first login!**
           
           ## Documentation
-          - [Installation Guide](docs/INSTALLATION.md)
+          - [Installation Guide](docs/installation/README.md)
           - [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API)
           
           INSTALL_EOF
