@@ -272,6 +272,34 @@ class TestSAMLMetadata:
         })
         assert r.status_code == 400
 
+    def test_fetch_metadata_uses_pinned_safe_request_get(self, auth_client, monkeypatch):
+        """Metadata fetch must use DNS-pinned safe_request_get (rebinding defense)."""
+        calls = []
+
+        class _Resp:
+            text = '<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"/>'
+            def raise_for_status(self):
+                return None
+
+        def fake_get(url, **kwargs):
+            calls.append((url, kwargs))
+            return _Resp()
+
+        monkeypatch.setattr(
+            'api.v2.sso.sessions.safe_request_get',
+            fake_get,
+        )
+        monkeypatch.setattr(
+            'api.v2.sso.sessions._parse_saml_metadata',
+            lambda _text: {'entity_id': 'https://idp.example.com', 'sso_url': 'https://idp.example.com/sso'},
+        )
+        r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch', {
+            'metadata_url': 'https://93.184.216.34/metadata',
+        })
+        assert r.status_code == 200
+        assert len(calls) == 1
+        assert calls[0][0] == 'https://93.184.216.34/metadata'
+
     def test_saml_certificates_list(self, auth_client):
         r = auth_client.get('/api/v2/sso/saml/certificates')
         assert r.status_code == 200

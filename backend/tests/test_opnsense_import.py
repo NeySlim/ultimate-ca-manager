@@ -113,3 +113,47 @@ def test_opnsense_import_uses_refid_and_links_cert_caref(app, auth_client, monke
         assert cert.caref == ca_refid
         assert cert.crt == base64.b64encode(cert_pem).decode("ascii")
         assert load_pem_bytes(cert.prv, context="opnsense cert") == cert_key_pem
+
+
+def test_opnsense_ca_import_requires_write_cas(app, auth_client, monkeypatch):
+    """OPNsense CA import must require write:cas, not only write:certificates."""
+    from api.v2 import import_opnsense
+
+    ca_rows = [{
+        "uuid": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "refid": "opn-ca-only",
+        "descr": "OPN Root",
+        "crt": "Zm9v",
+        "serial": "1",
+    }]
+    monkeypatch.setattr(
+        import_opnsense,
+        "create_session",
+        lambda verify_ssl=False: _Session(ca_rows, []),
+    )
+
+    r_key = auth_client.post(
+        '/api/v2/account/apikeys',
+        data=json.dumps({
+            'name': 'opn-cert-only',
+            'permissions': ['read:certificates', 'write:certificates'],
+        }),
+        content_type='application/json',
+    )
+    api_key = json.loads(r_key.data)['data']['key']
+
+    client = app.test_client()
+    r = client.post(
+        '/api/v2/import/opnsense/import',
+        data=json.dumps({
+            "host": "192.168.1.254",
+            "port": 443,
+            "api_key": "key",
+            "api_secret": "secret",
+            "verify_ssl": False,
+            "items": ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"],
+        }),
+        content_type='application/json',
+        headers={'X-API-Key': api_key},
+    )
+    assert r.status_code == 403

@@ -1,9 +1,9 @@
 """
 Global Search API - Search across all entities
 """
-from flask import Blueprint, request
+from flask import Blueprint, request, g
 from sqlalchemy import or_
-from auth.unified import require_auth
+from auth.unified import require_auth, has_permission
 from models import Certificate, CA, User, CertificateTemplate
 from utils.response import success_response
 from utils.datetime_utils import utc_now
@@ -91,23 +91,26 @@ def global_search():
         'is_root': ca.caref is None
     } for ca in cas]
     
-    # Search users
-    users = User.query.filter(
-        or_(
-            User.username.ilike(search_pattern),
-            User.email.ilike(search_pattern),
-            User.full_name.ilike(search_pattern)
-        )
-    ).limit(limit).all()
-    
-    results['users'] = [{
-        'id': u.id,
-        'name': u.full_name or u.username,
-        'username': u.username,
-        'email': u.email,
-        'type': 'user',
-        'role': u.role
-    } for u in users]
+    # Search users — same scope as /api/v2/users (read:users)
+    if has_permission('read:users', g.permissions):
+        users = User.query.filter(
+            or_(
+                User.username.ilike(search_pattern),
+                User.email.ilike(search_pattern),
+                User.full_name.ilike(search_pattern)
+            )
+        ).limit(limit).all()
+
+        results['users'] = [{
+            'id': u.id,
+            'name': u.full_name or u.username,
+            'username': u.username,
+            'email': u.email,
+            'type': 'user',
+            'role': u.role
+        } for u in users]
+    else:
+        results['users'] = []
     
     # Search templates
     templates = CertificateTemplate.query.filter(
