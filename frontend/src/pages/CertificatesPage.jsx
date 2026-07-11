@@ -62,7 +62,8 @@ export default function CertificatesPage() {
   // Filters
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-certs-status', [])
   const [filterCA, setFilterCA] = usePersistedState('ucm-filter-certs-ca', [])
-  
+  const [filterSource, setFilterSource] = usePersistedState('ucm-filter-certs-source', [])
+
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1) // Reset to first page when applying preset
@@ -73,6 +74,8 @@ export default function CertificatesPage() {
     }
     if (filters.ca) setFilterCA(Array.isArray(filters.ca) ? filters.ca : [filters.ca])
     else setFilterCA([])
+    if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
+    else setFilterSource([])
   }, [])
   
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -83,7 +86,7 @@ export default function CertificatesPage() {
   useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), sortBy, sortOrder])
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), sortBy, sortOrder])
 
   // Reload when floating window actions change data
   useEffect(() => {
@@ -122,6 +125,9 @@ export default function CertificatesPage() {
       }
       if (filterCA.length > 0) {
         params.ca_id = filterCA
+      }
+      if (filterSource.length > 0) {
+        params.source = filterSource
       }
       
       const [certsRes, casRes, statsRes] = await Promise.all([
@@ -433,14 +439,31 @@ export default function CertificatesPage() {
       value: filterCA,
       onChange: (val) => { setPage(1); setFilterCA(val) },
       placeholder: t('common.allCAs'),
-      options: cas.map(ca => ({ 
-        value: String(ca.id), 
-        label: ca.descr || ca.common_name 
+      options: cas.map(ca => ({
+        value: String(ca.id),
+        label: ca.descr || ca.common_name
       }))
+    },
+    {
+      key: 'source',
+      label: t('certificates.source'),
+      type: 'multiSelect',
+      value: filterSource,
+      onChange: (val) => { setPage(1); setFilterSource(val) },
+      placeholder: t('certificates.allSources'),
+      options: [
+        { value: 'manual', label: t('certificates.sourceManual') },
+        { value: 'import', label: t('certificates.sourceImport') },
+        { value: 'acme', label: t('certificates.sourceAcme') },
+        { value: 'letsencrypt', label: t('certificates.sourceLetsencrypt') },
+        { value: 'scep', label: t('certificates.sourceScep') },
+        { value: 'est', label: t('certificates.sourceEst') },
+        { value: 'msca', label: t('certificates.sourceMsca') }
+      ]
     }
-  ], [filterStatus, filterCA, cas, t])
+  ], [filterStatus, filterCA, filterSource, cas, t])
 
-  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0)
+  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0) + (filterSource.length > 0 ? 1 : 0)
 
   // Help content
   const helpContent = (

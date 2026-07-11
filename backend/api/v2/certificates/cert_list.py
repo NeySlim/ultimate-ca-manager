@@ -22,6 +22,7 @@ def list_certificates():
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     status_list = request.args.getlist('status')  # supports multi-select: ?status=valid&status=expired
     ca_id_list = request.args.getlist('ca_id', type=int)  # supports multi-select: ?ca_id=1&ca_id=2
+    source_list = request.args.getlist('source')  # supports multi-select: ?source=msca&source=acme
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
@@ -81,6 +82,20 @@ def list_certificates():
                 )
         if status_conditions:
             query = query.filter(or_(*status_conditions))
+
+    # Apply source filter (supports multi-select). Legacy rows may have NULL
+    # source; treat those as 'manual' so the manual filter still finds them.
+    if source_list:
+        source_conditions = []
+        for src in source_list:
+            if src == 'manual':
+                source_conditions.append(
+                    or_(Certificate.source == 'manual', Certificate.source.is_(None))
+                )
+            else:
+                source_conditions.append(Certificate.source == src)
+        if source_conditions:
+            query = query.filter(or_(*source_conditions))
 
     # Apply search filter (escape LIKE wildcards)
     if search:
