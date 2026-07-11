@@ -95,30 +95,16 @@ class MicrosoftCACertsMixin:
                 }
 
             except Exception as submit_err:
-                err_str = str(submit_err).lower()
-
-                is_pending = (
-                    'pending' in err_str
-                    or 'taken under submission' in err_str
-                )
-                is_denied = 'denied' in err_str
-
-                try:
-                    import certsrv as _certsrv
-                    if hasattr(_certsrv, 'CertificatePendingException'):
-                        is_pending = is_pending or isinstance(
-                            submit_err, _certsrv.CertificatePendingException
-                        )
-                    if hasattr(_certsrv, 'RequestDeniedException'):
-                        is_denied = is_denied or isinstance(
-                            submit_err, _certsrv.RequestDeniedException
-                        )
-                except ImportError:
-                    pass
+                # Locale-independent classification. certsrv only understands
+                # the English "Certificate Pending" page, so on a localized
+                # AD CS (e.g. French) it raises RequestDenied for a genuinely
+                # pending request — which UCM used to surface as a 400. The
+                # helper keys off certsrv's locale-independent HTML markers.
+                status, ms_request_id = MicrosoftCARequestsMixin._classify_certsrv_error(submit_err)
+                is_pending = status == 'pending'
+                is_denied = status == 'denied'
 
                 if is_pending:
-                    ms_request_id = MicrosoftCARequestsMixin._extract_request_id(str(submit_err))
-
                     try:
                         req = MSCARequest(
                             msca_id=msca_id,

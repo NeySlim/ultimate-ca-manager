@@ -51,10 +51,13 @@ class MicrosoftCARequestsMixin:
             return req.to_dict()
 
         except Exception as e:
-            err_str = str(e).lower()
-            if 'pending' in err_str or 'taken under submission' in err_str:
+            # Locale-independent classification: a French/localized AD CS
+            # returns generic error text for a still-pending request, which the
+            # old string matching mistook for a hard failure (500 on poll).
+            status, _rid = MicrosoftCARequestsMixin._classify_certsrv_error(e)
+            if status == 'pending':
                 return req.to_dict()
-            elif 'denied' in err_str:
+            elif status == 'denied':
                 req.status = 'denied'
                 req.error_message = str(e)[:500]
                 try:
@@ -81,6 +84,72 @@ class MicrosoftCARequestsMixin:
             if val > 0:
                 return val
         return None
+
+    @staticmethod
+    def _certsrv_response_html(err):
+        """Best-effort extraction of the raw ADCS HTML carried by a certsrv error."""
+        resp = getattr(err, 'response', None)
+        if isinstance(resp, str):
+            return resp
+        if resp is not None:
+            return getattr(resp, 'text', '') or ''
+        return ''
+
+    @staticmethod
+    def _classify_certsrv_error(err):
+        """Classify a certsrv exception in a locale-independent way.
+
+        The certsrv library recognizes only the *English* "Certificate Pending"
+        page, so against a localized AD CS (e.g. French) it misclassifies a
+        pending submission as RequestDenied, and a poll of a still-pending
+        request as a generic failure. The certsrv HTML tags pages with
+        locale-independent element ids and numeric disposition codes, which we
+        key off instead of the translated prose:
+
+        - ``certfnsh.asp`` pending page carries ``ID=locInfoReqID`` (+ the id).
+        - ``certnew.cer`` fetch of a pending request is an error page whose
+          disposition code (``ID=locDispSpacer``) is 5 (under submission);
+          code 2 is denied.
+
+        Returns ``(status, request_id)`` with status in
+        {'pending', 'denied', 'error'}; request_id may be None.
+        """
+        msg = str(err)
+        lower = msg.lower()
+        html = MicrosoftCARequestsMixin._certsrv_response_html(err)
+
+        is_pending = 'pending' in lower or 'taken under submission' in lower
+        try:
+            import certsrv as _certsrv
+            if hasattr(_certsrv, 'CertificatePendingException'):
+                is_pending = is_pending or isinstance(
+                    err, _certsrv.CertificatePendingException
+                )
+        except ImportError:
+            pass
+
+        request_id = None
+        if html:
+            if 'locinforeqid' in html.lower():
+                is_pending = True
+                m = re.search(r'locInfoReqID.*?(\d+)', html, re.IGNORECASE | re.DOTALL)
+                if m:
+                    request_id = int(m.group(1))
+            disp = re.search(r'(\d+)\s*<LocID\s+ID=locDispSpacer', html, re.IGNORECASE)
+            if disp:
+                code = int(disp.group(1))
+                if code == 5:
+                    is_pending = True
+                elif code == 2 and not is_pending:
+                    return 'denied', None
+
+        if is_pending:
+            if request_id is None:
+                request_id = MicrosoftCARequestsMixin._extract_request_id(msg)
+            return 'pending', request_id
+        if 'denied' in lower:
+            return 'denied', None
+        return 'error', None
 
     @staticmethod
     def get_pending_requests(msca_id=None):
