@@ -24,6 +24,7 @@ from api.v2.acme_client import bp
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db
 from models.acme_client_account import AcmeClientAccount
 from models.acme_models import AcmeClientOrder
@@ -31,6 +32,14 @@ from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYP
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_directory_url(url: str) -> None:
+    """Reject loopback/cloud-metadata targets for outbound ACME directory fetches."""
+    try:
+        validate_url_not_cloud_metadata(url)
+    except ValueError:
+        raise ValueError('directory_url cannot target cloud metadata or loopback')
 
 
 def _ensure_unique_proxy_slug(slug: str, except_id: int = None) -> str:
@@ -148,6 +157,11 @@ def create_ca_account():
         return error_response('email is required', 400)
     if len(email) > 254:
         return error_response('email too long (max 254 chars)', 400)
+
+    try:
+        _validate_directory_url(directory_url)
+    except ValueError as exc:
+        return error_response(str(exc), 400)
 
     if AcmeClientAccount.query.filter_by(directory_url=directory_url).first():
         return error_response('An account for this directory_url already exists', 409)
@@ -338,6 +352,11 @@ def register_ca_account(account_id):
     email = (data.get('email') or acct.email or '').strip()
     if not email or len(email) > 254:
         return error_response('A valid contact email is required', 400)
+
+    try:
+        _validate_directory_url(acct.directory_url)
+    except ValueError as exc:
+        return error_response(str(exc), 400)
 
     try:
         client = AcmeClientService(account=acct)

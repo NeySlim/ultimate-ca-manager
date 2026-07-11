@@ -738,3 +738,18 @@ class TestWebhooks:
         assert r.status_code == 400
         body = get_json(r)
         assert 'error' in body or 'message' in body
+
+    def test_test_webhook_uses_pinned_safe_request_post(self, auth_client, monkeypatch):
+        """Legacy webhook test must use DNS-pinned safe_request_post (GHSA-q7j8)."""
+        from unittest.mock import MagicMock
+
+        data = assert_success(post_json(auth_client, '/api/v2/settings/webhooks', {
+            'name': 'Pinned Test Hook',
+            'url': 'https://example.com/hook',
+            'events': ['test'],
+        }), 201)
+        mock_post = MagicMock(return_value=MagicMock(status_code=204))
+        monkeypatch.setattr('utils.ssrf_protection.safe_request_post', mock_post)
+        r = post_json(auth_client, f"/api/v2/settings/webhooks/{data['id']}/test", {})
+        assert_success(r, 200)
+        mock_post.assert_called_once()

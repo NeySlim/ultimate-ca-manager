@@ -55,6 +55,20 @@ def test_patch_ca_timing_rejects_out_of_range(auth_client, custom_ca_account):
     assert res.status_code == 400
 
 
+def test_create_ca_account_rejects_loopback_directory(auth_client):
+    res = auth_client.post(
+        '/api/v2/acme/client/accounts',
+        json={
+            'directory_url': 'https://127.0.0.1:8443/',
+            'label': 'ssrf-test',
+            'email': 'test@example.com',
+        },
+    )
+    assert res.status_code == 400
+    msg = (res.get_json().get('message') or '').lower()
+    assert 'loopback' in msg or 'metadata' in msg
+
+
 def test_get_poll_settings_from_account(custom_ca_account):
     svc = AcmeClientService(account=custom_ca_account)
     assert svc.get_poll_settings() == {
