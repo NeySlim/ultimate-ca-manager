@@ -669,6 +669,8 @@
     "noCertificates": "No certificates found",
     "confirmRevoke": "Are you sure you want to revoke this certificate?",
     "revokeWarning": "Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.",
+    "revokeMscaWarning": "This certificate was issued by a Microsoft CA. UCM cannot propagate the revocation to AD CS — it will only be marked revoked in UCM. Remember to revoke it on the Windows CA as well.",
+    "renewPendingMsca": "Renewal submitted to the Microsoft CA — pending approval",
     "confirmRenew": "Are you sure you want to renew this certificate?",
     "revokeReason": "Revocation reason",
     "selectCA": "Select issuing CA",

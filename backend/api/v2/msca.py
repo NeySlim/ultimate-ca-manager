@@ -619,6 +619,11 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
             csr.san_uri = json.dumps(san_uri) if san_uri else None
             csr.source = 'msca'
             csr.imported_from = f"msca:{msca.name}"
+            # A freshly issued cert is not revoked — matters on renewal, where
+            # the row being updated in place may carry flags from the old cert.
+            csr.revoked = False
+            csr.revoked_at = None
+            csr.revoke_reason = None
             cert = csr  # for downstream MSCARequest link
         else:
             # Fallback: no CSR record — create a new Certificate row
@@ -661,3 +666,69 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
     except Exception as e:
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)
         raise
+
+
+def renew_via_msca(cert, username=None):
+    """Renew an MS-CA-issued certificate by resubmitting its original CSR
+    (same key, same subject/SANs) to the connection and template that issued it.
+
+    Returns the submit_csr result dict: status 'issued' (cert updated in place)
+    or 'pending' (imported later by the request-status poll).
+    Raises ValueError for unrenewable certs, PermissionError for EOBO certs
+    renewed without admin:system.
+    """
+    import base64
+
+    # Recover the connection + template from the original signing request;
+    # fall back to imported_from ("msca:<name>") if the request row is gone
+    # (e.g. partial restore).
+    req = (MSCARequest.query
+           .filter((MSCARequest.cert_id == cert.id) | (MSCARequest.csr_id == cert.id))
+           .filter(MSCARequest.status == 'issued')
+           .order_by(MSCARequest.id.desc())
+           .first())
+
+    msca = db.session.get(MicrosoftCA, req.msca_id) if req else None
+    if not msca and cert.imported_from and cert.imported_from.startswith('msca:'):
+        msca = MicrosoftCA.query.filter_by(name=cert.imported_from[len('msca:'):]).first()
+    if not msca:
+        raise ValueError("The Microsoft CA connection that issued this certificate no longer exists")
+    if not msca.enabled:
+        raise ValueError("Microsoft CA connection is disabled")
+
+    template = (req.template if req else None) or msca.default_template
+    if not template:
+        raise ValueError("Original certificate template unknown; sign a new CSR via the Microsoft CA instead")
+
+    if not cert.csr:
+        raise ValueError("Original CSR not available; generate a new CSR and sign it via the Microsoft CA")
+
+    # EOBO renewals re-issue a cert for another principal — same elevated
+    # permission as the initial EOBO signing.
+    enrollee_name = req.enrollee_name if req else None
+    enrollee_upn = req.enrollee_upn if req else None
+    if enrollee_name or enrollee_upn:
+        user_perms = getattr(g, 'permissions', []) or []
+        if '*' not in user_perms and not _has_perm('admin:system', user_perms):
+            raise PermissionError("Renewing an EOBO-issued certificate requires admin:system permission")
+
+    try:
+        csr_pem = base64.b64decode(cert.csr).decode('utf-8')
+    except Exception:
+        csr_pem = cert.csr
+
+    result = MicrosoftCAService.submit_csr(
+        msca_id=msca.id,
+        csr_pem=csr_pem,
+        template=template,
+        csr_id=cert.id,
+        submitted_by=username,
+        enrollee_name=enrollee_name,
+        enrollee_upn=enrollee_upn,
+    )
+
+    if result['status'] == 'issued':
+        _import_signed_cert(cert, result.get('cert_pem'), msca, template, result['request_id'])
+
+    _audit('msca.renew', msca, f"cert_id={cert.id} template={template} status={result['status']}")
+    return result

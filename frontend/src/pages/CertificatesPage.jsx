@@ -213,8 +213,13 @@ export default function CertificatesPage() {
 
   // Revoke certificate
   const handleRevoke = async (id) => {
+    const cert = certificates.find(c => c.id === id) || (selectedCert?.id === id ? selectedCert : null)
+    let warning = t('certificates.revokeWarning', 'Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.')
+    if (cert?.source === 'msca') {
+      warning += '\n\n' + t('certificates.revokeMscaWarning', 'This certificate was issued by a Microsoft CA. UCM cannot propagate the revocation to AD CS — it will only be marked revoked in UCM. Remember to revoke it on the Windows CA as well.')
+    }
     const confirmed = await showConfirm(
-      t('certificates.revokeWarning', 'Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.'),
+      warning,
       {
         title: t('certificates.revokeCertificate'),
         confirmText: t('certificates.revokeCertificate').split(' ')[0],
@@ -246,8 +251,12 @@ export default function CertificatesPage() {
     if (!confirmed) return
     try {
       muteToasts()
-      await certificatesService.renew(id)
-      showSuccess(t('notifications.certificateIssued', { name: '' }).replace(': ', ''))
+      const res = await certificatesService.renew(id)
+      if (res?.meta?.msca_status === 'pending') {
+        showSuccess(t('certificates.renewPendingMsca', 'Renewal submitted to the Microsoft CA — pending approval'))
+      } else {
+        showSuccess(t('notifications.certificateIssued', { name: '' }).replace(': ', ''))
+      }
       loadData()
       setSelectedCert(null)
     } catch (error) {

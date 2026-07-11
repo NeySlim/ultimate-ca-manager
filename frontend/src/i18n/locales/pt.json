@@ -682,6 +682,8 @@
     "sanPlaceholder": "DNS:exemplo.com\nDNS:www.exemplo.com\nIP:192.168.1.1",
     "subtitle": "{{count}} certificados",
     "revokeWarning": "A revogação de um certificado é permanente e não pode ser desfeita. O certificado será adicionado à CRL e não será mais confiável por nenhum cliente que verifique o status de revogação. Prossiga apenas se tiver certeza de que este certificado deve ser permanentemente invalidado.",
+    "revokeMscaWarning": "Este certificado foi emitido por uma CA da Microsoft. O UCM não pode propagar a revogação para o AD CS — ele será marcado como revogado apenas no UCM. Lembre-se de revogá-lo também na CA do Windows.",
+    "renewPendingMsca": "Renovação enviada à CA da Microsoft — aguardando aprovação",
     "certType": "Tipo de certificado",
     "certTypeServer": "Servidor (TLS/HTTPS)",
     "certTypeClient": "Autenticação de cliente",

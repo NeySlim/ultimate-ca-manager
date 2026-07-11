@@ -682,6 +682,8 @@
     "sanPlaceholder": "DNS:example.com",
     "subtitle": "{{count}} 个证书",
     "revokeWarning": "吊销证书是永久性操作，不可撤销。该证书将被添加到 CRL 中，任何检查吊销状态的客户端都将不再信任该证书。请确认此证书确实需要被永久作废后再继续操作。",
+    "revokeMscaWarning": "此证书由 Microsoft CA 签发。UCM 无法将吊销操作传播到 AD CS — 该证书仅会在 UCM 中被标记为已吊销。请记得同时在 Windows CA 上吊销该证书。",
+    "renewPendingMsca": "续期请求已提交至 Microsoft CA — 等待批准",
     "certType": "证书类型",
     "certTypeServer": "服务器 (TLS/HTTPS)",
     "certTypeClient": "客户端认证",

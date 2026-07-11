@@ -682,6 +682,8 @@
     "sanPlaceholder": "DNS:beispiel.com\nDNS:www.beispiel.com\nIP:192.168.1.1",
     "subtitle": "{{count}} Zertifikate",
     "revokeWarning": "Das Widerrufen eines Zertifikats ist dauerhaft und kann nicht rückgängig gemacht werden. Das Zertifikat wird zur CRL hinzugefügt und von keinem Client mehr als vertrauenswürdig eingestuft, der den Widerrufsstatus prüft. Fahren Sie nur fort, wenn Sie sicher sind, dass dieses Zertifikat dauerhaft ungültig gemacht werden soll.",
+    "revokeMscaWarning": "Dieses Zertifikat wurde von einer Microsoft-CA ausgestellt. UCM kann den Widerruf nicht an AD CS weitergeben — es wird nur in UCM als widerrufen markiert. Denken Sie daran, es auch auf der Windows-CA zu widerrufen.",
+    "renewPendingMsca": "Erneuerung an die Microsoft-CA übermittelt — Genehmigung ausstehend",
     "certType": "Zertifikatstyp",
     "certTypeServer": "Server (TLS/HTTPS)",
     "certTypeClient": "Client-Authentifizierung",

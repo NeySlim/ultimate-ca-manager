@@ -35,6 +35,12 @@ def renew_certificate(cert_id):
     if not cert.crt:
         return error_response('Certificate data not available', 400)
 
+    # Certificates issued by a Microsoft AD CS connection can't be re-signed
+    # locally (the issuing CA's key lives on the Windows CA) — resubmit the
+    # original CSR through the connector instead.
+    if cert.source == 'msca':
+        return _renew_msca_certificate(cert)
+
     # Get the CA that issued this certificate
     # Try by refid first, then by matching issuer to CA subject
     ca = CA.query.filter_by(refid=cert.caref).first()
@@ -196,3 +202,54 @@ def renew_certificate(cert_id):
         db.session.rollback()
         logger.error(f"Failed to renew certificate: {e}")
         return error_response('Failed to renew certificate', 500)
+
+
+def _renew_msca_certificate(cert):
+    """Renew a Microsoft-CA-issued certificate through its AD CS connection."""
+    from api.v2.msca import renew_via_msca  # deferred: avoids circular import
+
+    username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+    cert_id = cert.id
+
+    try:
+        result = renew_via_msca(cert, username=username)
+    except PermissionError as e:
+        return error_response(str(e), 403)
+    except ValueError as e:
+        logger.error(f"Cannot renew certificate {cert_id} via Microsoft CA: {e}")
+        return error_response(str(e), 400)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to renew certificate {cert_id} via Microsoft CA: {e}", exc_info=True)
+        return error_response('Failed to renew certificate via Microsoft CA', 500)
+
+    if result.get('status') == 'pending':
+        return success_response(
+            data=cert.to_dict(),
+            message='Renewal submitted to Microsoft CA — pending CA manager approval',
+            meta={'msca_status': 'pending'}
+        )
+
+    # Issued: the certificate row was updated in place by the import
+    try:
+        AuditService.log_action(
+            action='certificate_renewed',
+            resource_type='certificate',
+            resource_id=str(cert_id),
+            resource_name=cert.subject,
+            details=f"Renewed via Microsoft CA until {cert.valid_to.isoformat() if cert.valid_to else 'unknown'}",
+            user_id=g.current_user.id if hasattr(g, 'current_user') else None
+        )
+    except Exception:
+        pass
+
+    cert_dict = cert.to_dict()
+    cert_caref = cert.caref
+    from services.webhook_service import emit_cert_renewed
+    emit_cert_renewed(cert_dict, ca_refid=cert_caref, actor=username)
+
+    return success_response(
+        data=cert_dict,
+        message='Certificate renewed by Microsoft CA',
+        meta={'msca_status': 'issued'}
+    )

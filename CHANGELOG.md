@@ -10,6 +10,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **Renewing a certificate issued by a Microsoft AD CS connection now goes through the connector** — renewal previously used the local re-sign path, which failed with "Issuing CA not found" (or "CA private key not available") because the issuing CA's key lives on the Windows CA. UCM now resubmits the certificate's original CSR (same key, subject and SANs) to the AD CS connection and template that issued it, and updates the certificate in place; if the CA holds the request for manager approval, the renewal is tracked like any pending MS CA request. EOBO-issued certificates require the same elevated permission to renew as to issue. Reported in #159. Verified end-to-end against a Windows Server 2025 AD CS.
+
+### Changed
+- **Revoking a Microsoft-CA-issued certificate now states that the revocation is local to UCM** — AD CS Web Enrollment has no revocation endpoint, so UCM cannot propagate the revocation to the Windows CA. The API response and the revoke confirmation dialog now say so explicitly (`meta.msca_local_only` for API consumers) and remind you to revoke the certificate on the CA itself. Reported in #159.
+
 
 ## [2.191] - 2026-07-10
 

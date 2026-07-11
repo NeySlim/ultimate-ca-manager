@@ -682,6 +682,8 @@
     "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
     "subtitle": "{{count}} 件の証明書",
     "revokeWarning": "証明書の失効は永久的であり、元に戻すことはできません。証明書はCRLに追加され、失効ステータスを確認するすべてのクライアントから信頼されなくなります。この証明書を永久に無効化する必要がある場合のみ続行してください。",
+    "revokeMscaWarning": "この証明書は Microsoft CA によって発行されました。UCM は失効を AD CS に伝達できないため、UCM 内でのみ失効としてマークされます。Windows CA 側でも忘れずに失効させてください。",
+    "renewPendingMsca": "更新リクエストを Microsoft CA に送信しました — 承認待ちです",
     "certType": "証明書タイプ",
     "certTypeServer": "サーバー (TLS/HTTPS)",
     "certTypeClient": "クライアント認証",

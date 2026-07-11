@@ -82,6 +82,20 @@ def revoke_certificate(cert_id):
             username=username
         )
 
+        # AD CS Web Enrollment has no revocation endpoint, so a cert issued
+        # through a Microsoft CA connection is only marked revoked in UCM —
+        # tell the caller the upstream CA still considers it valid.
+        if cert.source == 'msca':
+            return success_response(
+                data=cert.to_dict(),
+                message=(
+                    'Certificate revoked in UCM only — the issuing Microsoft CA '
+                    'was not notified (Web Enrollment does not support remote '
+                    'revocation). Revoke it on the Windows CA as well.'
+                ),
+                meta={'msca_local_only': True}
+            )
+
         return success_response(
             data=cert.to_dict(),
             message='Certificate revoked successfully'

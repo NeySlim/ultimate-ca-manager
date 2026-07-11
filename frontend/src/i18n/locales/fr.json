@@ -760,6 +760,8 @@
     "noCertificates": "Aucun certificat trouvé",
     "confirmRevoke": "Êtes-vous sûr de vouloir révoquer ce certificat ?",
     "revokeWarning": "La révocation d'un certificat est permanente et irréversible. Le certificat sera ajouté à la CRL et ne sera plus approuvé par aucun client vérifiant le statut de révocation. Ne procédez que si vous êtes certain que ce certificat doit être définitivement invalidé.",
+    "revokeMscaWarning": "Ce certificat a été émis par une CA Microsoft. UCM ne peut pas propager la révocation vers AD CS — il sera uniquement marqué comme révoqué dans UCM. Pensez à le révoquer également sur la CA Windows.",
+    "renewPendingMsca": "Renouvellement soumis à la CA Microsoft — en attente d'approbation",
     "confirmRenew": "Êtes-vous sûr de vouloir renouveler ce certificat ?",
     "revokeReason": "Motif de révocation",
     "selectCA": "Sélectionner l'AC émettrice",

@@ -682,6 +682,8 @@
     "sanPlaceholder": "DNS:ejemplo.com\nDNS:www.ejemplo.com\nIP:192.168.1.1",
     "subtitle": "{{count}} certificados",
     "revokeWarning": "La revocación de un certificado es permanente y no se puede deshacer. El certificado se agregará a la CRL y ya no será confiable para ningún cliente que verifique el estado de revocación. Solo proceda si está seguro de que este certificado debe ser invalidado permanentemente.",
+    "revokeMscaWarning": "Este certificado fue emitido por una CA de Microsoft. UCM no puede propagar la revocación a AD CS — solo se marcará como revocado en UCM. Recuerde revocarlo también en la CA de Windows.",
+    "renewPendingMsca": "Renovación enviada a la CA de Microsoft — pendiente de aprobación",
     "certType": "Tipo de certificado",
     "certTypeServer": "Servidor (TLS/HTTPS)",
     "certTypeClient": "Autenticación de cliente",
