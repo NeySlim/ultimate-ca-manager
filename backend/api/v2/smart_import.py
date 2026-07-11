@@ -6,8 +6,8 @@ Endpoints:
 - POST /api/v2/import/execute - Execute the import
 """
 
-from flask import Blueprint, request
-from auth.unified import require_auth
+from flask import Blueprint, request, g
+from auth.unified import require_auth, has_permission
 from services.smart_import import SmartImporter
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
@@ -112,8 +112,6 @@ def execute_import():
         }
     }
     """
-    from flask import g
-    
     data = request.get_json()
     
     if not data:
@@ -128,9 +126,15 @@ def execute_import():
     password = data.get('password')
     options = data.get('options', {})
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-    
+
     try:
         importer = SmartImporter()
+        import_cas = options.get('import_cas', True)
+        if import_cas and not has_permission('write:cas', g.permissions):
+            analysis = importer.analyze(content, password)
+            if analysis.summary.get('cas', 0) > 0:
+                return error_response('write:cas permission required to import CAs', 403)
+
         result = importer.execute(content, password, options, username)
         
         AuditService.log_action(

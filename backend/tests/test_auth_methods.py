@@ -48,19 +48,24 @@ class TestDetectAuthMethods:
         assert data['mtls_status'] == 'not_present'
 
     def test_post_methods_with_valid_username(self, client):
-        """POST with known username returns webauthn_credentials count."""
+        """POST with known username returns neutral credential counts (no oracle)."""
         r = _post(client, '/api/v2/auth/methods', {'username': 'admin'})
         assert r.status_code == 200
         data = get_json(r).get('data', {})
-        assert 'webauthn_credentials' in data
-        assert isinstance(data['webauthn_credentials'], int)
+        assert data['webauthn_credentials'] == 0
+        assert data['mtls_certificates'] == 0
 
     def test_post_methods_with_unknown_username(self, client):
-        """POST with unknown username still returns 200 (no user enumeration leak)."""
-        r = _post(client, '/api/v2/auth/methods', {'username': 'nonexistent_user_xyz'})
-        assert r.status_code == 200
-        data = get_json(r).get('data', {})
-        assert data['webauthn_credentials'] == 0
+        """POST with unknown username matches valid-user response shape."""
+        r_valid = _post(client, '/api/v2/auth/methods', {'username': 'admin'})
+        r_invalid = _post(client, '/api/v2/auth/methods', {'username': 'nonexistent_user_xyz'})
+        assert r_valid.status_code == 200
+        assert r_invalid.status_code == 200
+        valid = get_json(r_valid).get('data', {})
+        invalid = get_json(r_invalid).get('data', {})
+        assert valid.get('webauthn_credentials') == invalid.get('webauthn_credentials') == 0
+        assert valid.get('mtls_certificates') == invalid.get('mtls_certificates') == 0
+        assert 'mtls_certificates' in valid and 'mtls_certificates' in invalid
 
     def test_post_methods_empty_body(self, client):
         """POST with empty body returns global methods (no crash)."""

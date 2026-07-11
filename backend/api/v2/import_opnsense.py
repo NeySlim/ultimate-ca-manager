@@ -9,8 +9,8 @@ import requests
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
-from flask import Blueprint, request
-from auth.unified import require_auth
+from flask import Blueprint, request, g
+from auth.unified import require_auth, has_permission
 from models import db, CA, Certificate
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
@@ -328,7 +328,11 @@ def import_items():
 
         for row in cert_rows:
             all_certs[_item_id(row)] = row
-        
+
+        ca_selected = any(item_id in all_cas for item_id in selected_ids)
+        if ca_selected and not has_permission('write:cas', g.permissions):
+            return error_response('write:cas permission required to import CAs', 403)
+
         # Import CAs first so certificate caref links can resolve in the same transaction.
         for item_id in selected_ids:
             if item_id not in all_cas:

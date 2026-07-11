@@ -2,7 +2,7 @@ from . import bp, logger
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils.ssrf_protection import validate_url_not_cloud_metadata, safe_request_get
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
@@ -71,7 +71,7 @@ def fetch_idp_metadata():
                     os.close(fd)
                 verify = path
 
-        resp = http_requests.get(metadata_url, timeout=10, verify=verify)
+        resp = safe_request_get(metadata_url, timeout=10, verify=verify)
         resp.raise_for_status()
     except http_requests.exceptions.SSLError as e:
         logger.error(f"Failed to fetch IDP metadata (SSL): {e}")

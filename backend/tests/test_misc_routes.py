@@ -56,6 +56,14 @@ class TestSearch:
         r = auth_client.get('/api/v2/search?q=')
         assert r.status_code in (200, 400)
 
+    def test_search_hides_users_without_read_users(self, auth_client, viewer_client, create_user):
+        """Viewer role must not receive user email/role from global search."""
+        create_user(username='search_pii_user', email='search-pii@example.com', role='viewer')
+        r = viewer_client.get('/api/v2/search?q=search_pii')
+        data = assert_success(r)
+        payload = data if isinstance(data, dict) else get_json(r).get('data', {})
+        assert payload.get('users') == []
+
 
 # ============================================================
 # Reports
@@ -137,6 +145,72 @@ class TestSmartImport:
     def test_execute_without_content(self, auth_client):
         r = post_json(auth_client, '/api/v2/import/execute', {})
         assert r.status_code in (400, 500)
+
+    def test_execute_ca_import_requires_write_cas(self, auth_client, app, monkeypatch):
+        """write:certificates alone must not import CAs present in the content."""
+        from services.smart_import.importer import AnalysisResult
+
+        def fake_analyze(_self, _content, password=None):
+            result = AnalysisResult()
+            result.summary = {'cas': 1}
+            return result
+
+        monkeypatch.setattr(
+            'services.smart_import.importer.SmartImporter.analyze',
+            fake_analyze,
+        )
+
+        r = post_json(auth_client, '/api/v2/account/apikeys', {
+            'name': 'cert-only-smart-import',
+            'permissions': ['read:certificates', 'write:certificates'],
+        })
+        created = assert_success(r, 201)
+        api_key = created.get('key')
+        assert api_key
+
+        client = app.test_client()
+        r = client.post(
+            '/api/v2/import/execute',
+            data=json.dumps({
+                'content': '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----',
+                'options': {'import_cas': True},
+            }),
+            content_type=CONTENT_JSON,
+            headers={'X-API-Key': api_key},
+        )
+        assert r.status_code == 403
+
+    def test_execute_cert_only_import_allowed_without_write_cas(self, auth_client, app, monkeypatch):
+        """Cert-only smart import must not require write:cas when content has no CAs."""
+        from services.smart_import.importer import AnalysisResult
+
+        def fake_analyze(_self, _content, password=None):
+            result = AnalysisResult()
+            result.summary = {'cas': 0}
+            return result
+
+        monkeypatch.setattr(
+            'services.smart_import.importer.SmartImporter.analyze',
+            fake_analyze,
+        )
+
+        r = post_json(auth_client, '/api/v2/account/apikeys', {
+            'name': 'cert-only-no-ca-smart-import',
+            'permissions': ['read:certificates', 'write:certificates'],
+        })
+        created = assert_success(r, 201)
+        api_key = created.get('key')
+
+        client = app.test_client()
+        r = client.post(
+            '/api/v2/import/execute',
+            data=json.dumps({
+                'content': '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----',
+            }),
+            content_type=CONTENT_JSON,
+            headers={'X-API-Key': api_key},
+        )
+        assert r.status_code != 403
 
 
 # ============================================================

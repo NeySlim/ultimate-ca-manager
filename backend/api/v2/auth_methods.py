@@ -115,6 +115,7 @@ def detect_auth_methods():
         'mtls_status': 'not_present',
         'webauthn': True,
         'webauthn_credentials': 0,
+        'mtls_certificates': 0,
         'api_keys': True,
         'sso_providers': [],
     }
@@ -131,17 +132,7 @@ def detect_auth_methods():
     if request.method == 'POST' and request.json:
         username = request.json.get('username')
 
-    # User-specific info
-    if username:
-        user = User.query.filter_by(username=username).first()
-        if user and user.active:
-            from models.webauthn import WebAuthnCredential
-            webauthn_count = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).count()
-            methods['webauthn_credentials'] = webauthn_count
-
-            from models.auth_certificate import AuthCertificate
-            mtls_count = AuthCertificate.query.filter_by(user_id=user.id, enabled=True).count()
-            methods['mtls_certificates'] = mtls_count
+    # Pre-authentication: never expose per-user credential counts (username oracle).
 
     # Detect mTLS cert presence (use middleware's parsed cert if available)
     cert_info = getattr(g, 'mtls_cert_info', None)
