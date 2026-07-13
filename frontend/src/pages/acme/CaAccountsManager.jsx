@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   order_poll_timeout_sec: '180',
   order_poll_interval_sec: '3',
   http_timeout_sec: '60',
+  preferred_chain: '',
 }
 
 /**
@@ -63,6 +64,7 @@ export default function CaAccountsManager({
       order_poll_timeout_sec: String(acct.order_poll_timeout_sec ?? 180),
       order_poll_interval_sec: String(acct.order_poll_interval_sec ?? 3),
       http_timeout_sec: String(acct.http_timeout_sec ?? 60),
+      preferred_chain: acct.preferred_chain || '',
     })
     setShowForm(true)
   }
@@ -91,6 +93,7 @@ export default function CaAccountsManager({
           is_default: form.is_default,
           proxy_enabled: form.proxy_enabled,
           proxy_slug: form.proxy_slug,
+          preferred_chain: form.preferred_chain,
           ...timing,
         }
         if (form.eab_hmac_key) payload.eab_hmac_key = form.eab_hmac_key
@@ -156,6 +159,11 @@ export default function CaAccountsManager({
                         http: acct.http_timeout_sec ?? 60,
                       })}
                     </p>
+                    {acct.preferred_chain && (
+                      <p className="text-xs text-text-tertiary mt-0.5">
+                        {t('acme.preferredChainSummary', { chain: acct.preferred_chain })}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {canWrite && (
@@ -282,6 +290,14 @@ export default function CaAccountsManager({
               value={form.http_timeout_sec}
               onChange={(e) => setForm(p => ({ ...p, http_timeout_sec: e.target.value }))}
               helperText={t('acme.caHttpTimeoutHelper')}
+            />
+
+            <Input
+              label={t('acme.preferredChain')}
+              value={form.preferred_chain}
+              onChange={(e) => setForm(p => ({ ...p, preferred_chain: e.target.value }))}
+              placeholder="ISRG Root X1"
+              helperText={t('acme.preferredChainHelper')}
             />
 
             <label className="flex items-center gap-2 text-sm text-text-secondary">

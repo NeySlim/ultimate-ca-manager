@@ -271,14 +271,33 @@ class AcmeProxyService:
         self._account_url = account_url
         return account_url
 
+    @staticmethod
+    def _validate_outbound_acme_url(url: str) -> None:
+        """Block loopback/cloud-metadata targets for upstream ACME sub-URLs."""
+        from utils.ssrf_protection import validate_url_not_cloud_metadata
+
+        try:
+            validate_url_not_cloud_metadata(url)
+        except ValueError as exc:
+            raise ValueError(f'ACME outbound URL blocked: {exc}') from exc
+
+    def _http_timeout(self) -> int:
+        if self.account:
+            return self.account.get_http_timeout_sec()
+        from models.acme_client_account import AcmeClientAccount
+        return AcmeClientAccount.DEFAULT_HTTP_TIMEOUT_SEC
+
     def _ensure_directory(self):
         """Fetch upstream directory"""
         if not self.directory:
+            from utils.ssrf_protection import safe_request_get
+
+            self._validate_outbound_acme_url(self.upstream_directory_url)
             try:
-                resp = requests.get(
+                resp = safe_request_get(
                     self.upstream_directory_url,
                     timeout=15,
-                    verify=self.verify_ssl
+                    verify=self.verify_ssl,
                 )
                 resp.raise_for_status()
                 self.directory = resp.json()
@@ -297,11 +316,15 @@ class AcmeProxyService:
 
     def _get_nonce(self):
         """Get nonce from upstream"""
+        from utils.ssrf_protection import safe_request_head
+
         self._ensure_directory()
-        resp = requests.head(
-            self.directory['newNonce'],
+        nonce_url = self.directory['newNonce']
+        self._validate_outbound_acme_url(nonce_url)
+        resp = safe_request_head(
+            nonce_url,
             timeout=15,
-            verify=self.verify_ssl
+            verify=self.verify_ssl,
         )
         return resp.headers['Replay-Nonce']
 
@@ -333,11 +356,14 @@ class AcmeProxyService:
         }
 
         headers = {"Content-Type": "application/jose+json"}
-        return requests.post(
+        from utils.ssrf_protection import safe_request_post
+
+        self._validate_outbound_acme_url(url)
+        return safe_request_post(
             url,
             json=data,
             headers=headers,
-            timeout=30,
+            timeout=self._http_timeout(),
             verify=self.verify_ssl
         )
 

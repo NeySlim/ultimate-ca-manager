@@ -8,9 +8,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from services.acme.acme_chain_selection import (
+    chain_issuer_serials,
     chain_root_common_name,
     collect_link_header_values,
     parse_link_rel_alternate,
+    rebuild_acme_chain,
     select_acme_certificate_chain,
     split_pem_certificates,
 )
@@ -65,6 +67,19 @@ def _chain_pem(leaf_cn: str, root_cn: str) -> str:
     return (leaf + root).decode()
 
 
+def _chain_pem_with_intermediate(leaf_cn: str, intermediate_cn: str, root_cn: str) -> str:
+    root = _cert_pem(root_cn)
+    intermediate = _cert_pem(intermediate_cn, root_cn)
+    leaf = _cert_pem(leaf_cn, intermediate_cn)
+    return (leaf + intermediate + root).decode()
+
+
+def _issuer_chain_pem(intermediate_cn: str, root_cn: str) -> str:
+    root = _cert_pem(root_cn)
+    intermediate = _cert_pem(intermediate_cn, root_cn)
+    return (intermediate + root).decode()
+
+
 class TestLinkParsing:
     def test_parse_single_alternate(self):
         link = '<https://acme.example/cert/alt>;rel="alternate"'
@@ -116,7 +131,18 @@ class TestSelectAcmeCertificateChain:
         )
         assert result == default
 
-    def test_preference_matches_default_without_fetch(self):
+    def test_preference_skips_fetch_without_link_headers(self):
+        default = _chain_pem('leaf.example', 'ISRG Root X1')
+
+        result = select_acme_certificate_chain(
+            default,
+            None,
+            'ISRG Root X1',
+            lambda _url: pytest.fail('should not fetch'),
+        )
+        assert result == default
+
+    def test_preference_keeps_default_when_alternate_root_differs(self):
         default = _chain_pem('leaf.example', 'ISRG Root X1')
         fetched = []
 
@@ -131,7 +157,7 @@ class TestSelectAcmeCertificateChain:
             fetch,
         )
         assert result == default
-        assert fetched == []
+        assert fetched == ['https://acme.example/alt']
 
     def test_preference_selects_alternate_chain(self):
         default = _chain_pem('leaf.example', 'ISRG Root X2')
@@ -148,7 +174,8 @@ class TestSelectAcmeCertificateChain:
             'isrg root x1',
             fetch,
         )
-        assert result == alternate
+        assert chain_root_common_name(result) == 'ISRG Root X1'
+        assert chain_issuer_serials(result) == chain_issuer_serials(alternate)
 
     def test_preference_not_found_keeps_default(self):
         default = _chain_pem('leaf.example', 'ISRG Root X2')
@@ -175,6 +202,35 @@ class TestSelectAcmeCertificateChain:
             fetch,
         )
         assert result == default
+
+
+class TestRebuildAcmeChain:
+    def test_rebuild_issuer_only_alternate(self):
+        default = _chain_pem('leaf.example', 'ISRG Root X2')
+        issuer_only = _issuer_chain_pem('R3', 'ISRG Root X1')
+        rebuilt = rebuild_acme_chain(default, issuer_only)
+        blocks = split_pem_certificates(rebuilt)
+        assert len(blocks) == 3
+        assert chain_root_common_name(rebuilt) == 'ISRG Root X1'
+        issuer_serials = lambda pem: tuple(
+            x509.load_pem_x509_certificate(b.encode()).serial_number
+            for b in split_pem_certificates(pem)
+        )
+        assert issuer_serials(rebuilt)[1:] == issuer_serials(issuer_only)
+
+    def test_prefers_alternate_when_same_root_different_intermediates(self):
+        default = _chain_pem_with_intermediate('leaf.example', 'Int-Old', 'ISRG Root X1')
+        alternate = _chain_pem_with_intermediate('leaf.example', 'Int-New', 'ISRG Root X1')
+
+        result = select_acme_certificate_chain(
+            default,
+            '<https://acme.example/alt>;rel="alternate"',
+            'ISRG Root X1',
+            lambda _url: alternate,
+        )
+        assert chain_root_common_name(result) == 'ISRG Root X1'
+        assert chain_issuer_serials(result) == chain_issuer_serials(alternate)
+        assert chain_issuer_serials(result) != chain_issuer_serials(default)
 
 
 class TestPreferredChainApi:
