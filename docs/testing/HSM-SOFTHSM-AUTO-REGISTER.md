@@ -67,7 +67,7 @@ requires SoftHSM on the target host.
 
 ## Lab validation (native Debian — 2026-07-13)
 
-Host `172.31.10.8` (`admin.ucm.pfcorp.eu`):
+Host `10.42.0.8` (`admin.ucm.pfcorp.eu`):
 
 - SoftHSM2 installed; token **UCM-Default** in `/opt/ucm/data/softhsm/tokens/`
 - `HSM_DEFAULT_PIN` in `/etc/ucm/ucm.env` → auto-register **SoftHSM-Default**
