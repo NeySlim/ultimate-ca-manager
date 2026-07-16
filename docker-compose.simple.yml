@@ -9,6 +9,9 @@ services:
       - 8080:8080
     volumes:
       - ucm-data:/opt/ucm/data
+      - ucm-hsm-tokens:/var/lib/softhsm/tokens
 volumes:
   ucm-data:
     name: ucm-data
+  ucm-hsm-tokens:
+    name: ucm-hsm-tokens

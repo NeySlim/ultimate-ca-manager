@@ -12,7 +12,12 @@ services:
     volumes:
       # Persistent data volume (REQUIRED)
       - ucm-data:/opt/ucm/data
-      
+
+      # SoftHSM token storage (the entrypoint auto-initializes a token on
+      # first boot; without this volume it is lost when the container is
+      # re-created, orphaning the SoftHSM-Default provider and its keys)
+      - ucm-hsm-tokens:/var/lib/softhsm/tokens
+
       # Optional: Custom configuration
       # - ./.env:/opt/ucm/.env.custom:ro
       
@@ -151,4 +156,6 @@ networks:
 
 volumes:
   ucm-data:
+    driver: local
+  ucm-hsm-tokens:
     driver: local

@@ -10,6 +10,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **SoftHSM token persistence in Docker Compose** — `docker-compose.yml` and `docker-compose.simple.yml` now mount `ucm-hsm-tokens:/var/lib/softhsm/tokens` like `docker-compose.hsm.yml` already did. Without it, the token auto-initialized by the entrypoint was lost on container re-creation, orphaning the `SoftHSM-Default` provider row and any keys stored under it. (#195)
+
 ## [2.192] - 2026-07-11
 
 ### Security
