@@ -1419,7 +1419,16 @@
     "selectResponder": "Sélectionner le certificat répondeur",
     "noEligibleResponders": "Aucun certificat éligible trouvé. Un certificat nécessite l'EKU OCSPSigning et une clé privée.",
     "removeResponder": "Supprimer le répondeur",
-    "assignResponder": "Assigner le répondeur"
+    "assignResponder": "Assigner le répondeur",
+    "crlScheduleTitle": "Planification CRL complète",
+    "crlScheduleUpdated": "Planification CRL mise à jour",
+    "crlScheduleFailed": "Échec de la mise à jour de la planification CRL",
+    "crlValidity": "Validité",
+    "crlPublishInterval": "Publier toutes les",
+    "crlPublishAuto": "Auto (avant expiration)",
+    "crlDigest": "Empreinte de signature",
+    "crlScheduleNote": "Publier plus souvent que la fenêtre de validité offre une période de grâce aux clients si une publication est manquée.",
+    "nextPublish": "Prochaine publication"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",

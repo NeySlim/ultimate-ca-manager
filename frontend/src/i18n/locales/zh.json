@@ -1678,7 +1678,16 @@
     "selectResponder": "选择响应者证书",
     "noEligibleResponders": "未找到符合条件的证书。证书需要OCSPSigning EKU和私钥。",
     "removeResponder": "移除响应者",
-    "assignResponder": "分配响应者"
+    "assignResponder": "分配响应者",
+    "crlScheduleTitle": "完整CRL计划",
+    "crlScheduleUpdated": "CRL计划已更新",
+    "crlScheduleFailed": "更新CRL计划失败",
+    "crlValidity": "有效期",
+    "crlPublishInterval": "发布间隔",
+    "crlPublishAuto": "自动（到期前）",
+    "crlDigest": "签名摘要",
+    "crlScheduleNote": "发布频率高于有效期窗口，可在发布失败时为依赖方提供宽限期。",
+    "nextPublish": "下次发布"
   },
   "trustStore": {
     "caTrust": "CA 信任",

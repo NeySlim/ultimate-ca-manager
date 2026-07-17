@@ -198,6 +198,16 @@ export default function CRLOCSPPage() {
     }
   }
 
+  const handleCrlScheduleChange = async (ca, field, value) => {
+    try {
+      await crlService.configureCrl(ca.id, { [field]: value })
+      showSuccess(t('crlOcsp.crlScheduleUpdated'))
+      await loadData()
+    } catch (error) {
+      showError(error.message || t('crlOcsp.crlScheduleFailed'))
+    }
+  }
+
   const handleDeltaIntervalChange = async (ca, interval) => {
     if (!canWrite('crl')) return
     try {
@@ -322,6 +332,7 @@ export default function CRLOCSPPage() {
         revoked_count: crl?.revoked_count || 0,
         crl_updated: crl?.updated_at,
         crl_next_update: crl?.next_update,
+        crl_next_publish: crl?.next_publish,
         has_crl: !!crl,
         delta_crl: crl?.delta_crl || null
       }
@@ -971,6 +982,69 @@ export default function CRLOCSPPage() {
           )}
         </div>
       </CompactSection>
+
+      {/* Full CRL schedule (#207): validity vs publish cadence + digest */}
+      {selectedCA?.has_private_key && (
+        <div className="space-y-3 border-t border-border pt-4 mt-4">
+          <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.crlScheduleTitle')}</h4>
+          {selectedCA?.crl_next_publish && (
+            <CompactGrid cols={2}>
+              <CompactField autoIcon="nextUpdate" label={t('crlOcsp.nextPublish')} value={formatDate(selectedCA.crl_next_publish)} />
+            </CompactGrid>
+          )}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label htmlFor="crl-validity" className="text-xs text-text-secondary">{t('crlOcsp.crlValidity')}</label>
+              <select
+                id="crl-validity"
+                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+                value={selectedCA?.crl_validity_days || 7}
+                onChange={(e) => handleCrlScheduleChange(selectedCA, 'validity_days', parseInt(e.target.value))}
+                disabled={!canWrite('crl')}
+              >
+                <option value="1">1d</option>
+                <option value="2">2d</option>
+                <option value="3">3d</option>
+                <option value="7">7d</option>
+                <option value="14">14d</option>
+                <option value="30">30d</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="crl-publish-interval" className="text-xs text-text-secondary">{t('crlOcsp.crlPublishInterval')}</label>
+              <select
+                id="crl-publish-interval"
+                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+                value={selectedCA?.crl_publish_interval_hours || ''}
+                onChange={(e) => handleCrlScheduleChange(selectedCA, 'publish_interval_hours', e.target.value ? parseInt(e.target.value) : null)}
+                disabled={!canWrite('crl')}
+              >
+                <option value="">{t('crlOcsp.crlPublishAuto')}</option>
+                <option value="6">6h</option>
+                <option value="12">12h</option>
+                <option value="24">24h</option>
+                <option value="48">48h</option>
+                <option value="72">72h</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="crl-digest" className="text-xs text-text-secondary">{t('crlOcsp.crlDigest')}</label>
+              <select
+                id="crl-digest"
+                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
+                value={selectedCA?.crl_digest || 'sha256'}
+                onChange={(e) => handleCrlScheduleChange(selectedCA, 'digest', e.target.value)}
+                disabled={!canWrite('crl')}
+              >
+                <option value="sha256">SHA-256</option>
+                <option value="sha384">SHA-384</option>
+                <option value="sha512">SHA-512</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-text-tertiary">{t('crlOcsp.crlScheduleNote')}</p>
+        </div>
+      )}
 
       {/* Delta CRL Section */}
       {selectedCA?.cdp_enabled && selectedCA?.delta_crl_enabled && (

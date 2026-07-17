@@ -1678,7 +1678,16 @@
     "selectResponder": "Seleziona certificato responder",
     "noEligibleResponders": "Nessun certificato idoneo trovato. Un certificato necessita di EKU OCSPSigning e chiave privata.",
     "removeResponder": "Rimuovi responder",
-    "assignResponder": "Assegna responder"
+    "assignResponder": "Assegna responder",
+    "crlScheduleTitle": "Pianificazione CRL completa",
+    "crlScheduleUpdated": "Pianificazione CRL aggiornata",
+    "crlScheduleFailed": "Aggiornamento della pianificazione CRL non riuscito",
+    "crlValidity": "Validità",
+    "crlPublishInterval": "Pubblica ogni",
+    "crlPublishAuto": "Auto (prima della scadenza)",
+    "crlDigest": "Digest della firma",
+    "crlScheduleNote": "Pubblicare più spesso della finestra di validità offre ai client un periodo di tolleranza se una pubblicazione viene persa.",
+    "nextPublish": "Prossima pubblicazione"
   },
   "trustStore": {
     "caTrust": "Fiducia CA",

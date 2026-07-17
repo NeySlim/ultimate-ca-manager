@@ -12,11 +12,24 @@ from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
 from services.audit_service import AuditService
+from datetime import timedelta
 import logging
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('crl_v2', __name__)
+
+CRL_ALLOWED_DIGESTS = ('sha256', 'sha384', 'sha512')
+
+
+def _next_publish(ca, crl):
+    """Next scheduled publication (#207) — None when no cadence is configured."""
+    if not ca or not ca.crl_publish_interval_hours or not crl:
+        return None
+    from utils.datetime_utils import utc_isoformat
+    return utc_isoformat(
+        crl.this_update + timedelta(hours=ca.crl_publish_interval_hours)
+    )
 
 
 @bp.route('/api/v2/crl', methods=['GET'])
@@ -62,10 +75,11 @@ def list_crls():
         data = crl.to_dict()
         if crl.ca:
             data['caref'] = crl.ca.refid
+            data['next_publish'] = _next_publish(crl.ca, crl)
         if crl.ca_id in delta_map:
             data['delta_crl'] = delta_map[crl.ca_id].to_dict()
         result.append(data)
-    
+
     return success_response(data=result)
 
 
@@ -83,6 +97,7 @@ def get_crl(ca_id):
     
     data = crl.to_dict(include_crl_data=True)
     data['caref'] = ca.refid
+    data['next_publish'] = _next_publish(ca, crl)
     return success_response(data=data)
 
 
@@ -238,6 +253,111 @@ def regenerate_delta_crl(ca_id):
     except Exception as e:
         logger.error(f'Failed to generate delta CRL: {e}')
         return error_response("Failed to generate delta CRL", 500)
+
+
+@bp.route('/api/v2/crl/<int:ca_id>/config', methods=['GET'])
+@require_auth(['read:crl'])
+def get_crl_config(ca_id):
+    """Full CRL schedule config for a CA (#207)"""
+    ca = db.session.get(CA, ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+
+    latest = CRLMetadata.query.filter_by(ca_id=ca_id, is_delta=False).order_by(
+        CRLMetadata.crl_number.desc()
+    ).first()
+    return success_response(data={
+        'crl_validity_days': ca.crl_validity_days or 7,
+        'crl_publish_interval_hours': ca.crl_publish_interval_hours,
+        'crl_digest': ca.crl_digest or 'sha256',
+        'next_publish': _next_publish(ca, latest),
+    })
+
+
+@bp.route('/api/v2/crl/<int:ca_id>/config', methods=['POST'])
+@require_auth(['write:crl'])
+def configure_crl(ca_id):
+    """Configure full CRL schedule for a CA (#207).
+
+    Validity and publish cadence are decoupled: publishing more often than the
+    validity window gives relying parties a grace period, so the interval must
+    stay at or below the validity.
+    """
+    ca = db.session.get(CA, ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+
+    data = request.get_json() or {}
+
+    try:
+        if 'validity_days' in data:
+            validity = int(data['validity_days'])
+            if validity < 1 or validity > 365:
+                return error_response('validity_days must be between 1 and 365', 400)
+            ca.crl_validity_days = validity
+
+        if 'publish_interval_hours' in data:
+            if data['publish_interval_hours'] in (None, '', 0):
+                ca.crl_publish_interval_hours = None
+            else:
+                interval = int(data['publish_interval_hours'])
+                if interval < 1 or interval > 8760:
+                    return error_response(
+                        'publish_interval_hours must be between 1 and 8760', 400)
+                ca.crl_publish_interval_hours = interval
+
+        if 'digest' in data:
+            digest = str(data['digest']).lower().strip()
+            if digest not in CRL_ALLOWED_DIGESTS:
+                return error_response(
+                    f"digest must be one of {', '.join(CRL_ALLOWED_DIGESTS)}", 400)
+            ca.crl_digest = digest
+
+        effective_validity = ca.crl_validity_days or 7
+        if (ca.crl_publish_interval_hours
+                and ca.crl_publish_interval_hours > effective_validity * 24):
+            db.session.rollback()
+            return error_response(
+                'publish_interval_hours cannot exceed the CRL validity '
+                f'({effective_validity} days) — the validity margin is the grace period',
+                400)
+
+        AuditService.log_action(
+            action='crl_config',
+            resource_type='ca',
+            resource_id=str(ca.id),
+            resource_name=ca.descr,
+            details=(
+                f"CRL schedule: validity={ca.crl_validity_days or 7}d, "
+                f"publish={ca.crl_publish_interval_hours}h, "
+                f"digest={ca.crl_digest or 'sha256'}"
+            ),
+            success=True
+        )
+
+        ok, err = safe_commit(logger, 'Failed to update CRL schedule')
+        if not ok:
+            return err
+
+        latest = CRLMetadata.query.filter_by(ca_id=ca_id, is_delta=False).order_by(
+            CRLMetadata.crl_number.desc()
+        ).first()
+        return success_response(
+            data={
+                'crl_validity_days': ca.crl_validity_days or 7,
+                'crl_publish_interval_hours': ca.crl_publish_interval_hours,
+                'crl_digest': ca.crl_digest or 'sha256',
+                'next_publish': _next_publish(ca, latest),
+            },
+            message='CRL schedule updated'
+        )
+    except (ValueError, TypeError):
+        db.session.rollback()
+        return error_response('Invalid CRL schedule values', 400)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to configure CRL schedule: {e}')
+        return error_response('Failed to update CRL schedule', 500)
 
 
 @bp.route('/api/v2/crl/<int:ca_id>/delta-config', methods=['POST'])

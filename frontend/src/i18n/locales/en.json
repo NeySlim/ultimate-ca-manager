@@ -1678,7 +1678,16 @@
     "selectResponder": "Select Responder Certificate",
     "noEligibleResponders": "No eligible certificates found. A certificate needs OCSPSigning EKU and private key.",
     "removeResponder": "Remove Responder",
-    "assignResponder": "Assign Responder"
+    "assignResponder": "Assign Responder",
+    "crlScheduleTitle": "Full CRL Schedule",
+    "crlScheduleUpdated": "CRL schedule updated",
+    "crlScheduleFailed": "Failed to update CRL schedule",
+    "crlValidity": "Validity",
+    "crlPublishInterval": "Publish every",
+    "crlPublishAuto": "Auto (near expiry)",
+    "crlDigest": "Signature digest",
+    "crlScheduleNote": "Publishing more often than the validity window gives relying parties a grace period if a publication is missed.",
+    "nextPublish": "Next Publish"
   },
   "trustStore": {
     "caTrust": "CA Trust",

@@ -1678,7 +1678,16 @@
     "selectResponder": "Обрати сертифікат відповідача",
     "noEligibleResponders": "Придатних сертифікатів не знайдено. Сертифікат потребує EKU OCSPSigning та закритий ключ.",
     "removeResponder": "Видалити відповідач",
-    "assignResponder": "Призначити відповідач"
+    "assignResponder": "Призначити відповідач",
+    "crlScheduleTitle": "Розклад повного CRL",
+    "crlScheduleUpdated": "Розклад CRL оновлено",
+    "crlScheduleFailed": "Не вдалося оновити розклад CRL",
+    "crlValidity": "Термін дії",
+    "crlPublishInterval": "Публікувати кожні",
+    "crlPublishAuto": "Авто (перед закінченням)",
+    "crlDigest": "Дайджест підпису",
+    "crlScheduleNote": "Публікація частіше за вікно дії дає клієнтам пільговий період у разі пропущеної публікації.",
+    "nextPublish": "Наступна публікація"
   },
   "trustStore": {
     "caTrust": "Довіра CA",

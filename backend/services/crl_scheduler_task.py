@@ -59,6 +59,19 @@ class CRLSchedulerTask:
             if latest_crl.is_stale:
                 return True, f"CRL is stale for CA '{ca.descr}' - needs regeneration"
             
+            # Publish cadence decoupled from validity (#207): when configured,
+            # republish once the latest CRL is older than the interval, well
+            # before nextUpdate — the validity margin is the grace period.
+            if ca.crl_publish_interval_hours:
+                from utils.datetime_utils import utc_now
+                age_hours = (utc_now() - latest_crl.this_update).total_seconds() / 3600
+                if age_hours >= ca.crl_publish_interval_hours:
+                    return (
+                        True,
+                        f"CRL publish interval reached for CA '{ca.descr}' "
+                        f"(age {age_hours:.1f}h >= {ca.crl_publish_interval_hours}h)"
+                    )
+
             # Check if approaching expiration
             hours_until_expiry = latest_crl.days_until_expiry * 24
             if hours_until_expiry <= CRLSchedulerTask.REGENERATION_THRESHOLD_HOURS:
@@ -67,7 +80,7 @@ class CRLSchedulerTask:
                     f"CRL expires in {hours_until_expiry:.1f}h for CA '{ca.descr}' "
                     f"(threshold: {CRLSchedulerTask.REGENERATION_THRESHOLD_HOURS}h)"
                 )
-            
+
             return False, None
         
         except Exception as e:

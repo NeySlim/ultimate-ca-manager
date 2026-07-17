@@ -10,6 +10,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **Full CRL schedule per CA** — CRL validity (`nextUpdate` window) decoupled from the publish cadence, with `next_publish` exposed in CRL metadata and the scheduler republishing on the configured interval; configurable CRL signature digest (SHA-256/384/512). New `GET|POST /api/v2/crl/<ca_id>/config`, CRL & OCSP page UI, migration 059. (#207)
+
+### Fixed
+- **Template digest honored at issuance** — certificates issued from the certificate menu were always signed SHA-256 regardless of the template's configured digest; the template link (`template_id`) is now persisted on the issued row. (#207)
+- **Template usage counter** — the templates list/detail now return a live `usage_count` computed from issued certificates (the UI previously displayed a field the API never provided). (#207)
+
 ## [2.194] - 2026-07-17
 
 ### Fixed

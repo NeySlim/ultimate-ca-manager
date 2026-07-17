@@ -40,6 +40,11 @@ class CA(db.Model):
     cdp_url = db.Column(db.String(512))  # Ex: http://ucm.local:8443/cdp/{ca_refid}/crl.pem
     delta_crl_enabled = db.Column(db.Boolean, default=False)
     delta_crl_interval = db.Column(db.Integer, default=4)  # Hours between delta CRLs
+    # Full CRL schedule (#207): nextUpdate window, publish cadence (NULL =
+    # legacy regen-near-expiry behaviour), signature digest (NULL = sha256)
+    crl_validity_days = db.Column(db.Integer)
+    crl_publish_interval_hours = db.Column(db.Integer)
+    crl_digest = db.Column(db.String(20))
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -352,6 +357,9 @@ class CA(db.Model):
             "cdp_urls": self.get_cdp_urls(),
             "delta_crl_enabled": self.delta_crl_enabled,
             "delta_crl_interval": self.delta_crl_interval or 4,
+            "crl_validity_days": self.crl_validity_days or 7,
+            "crl_publish_interval_hours": self.crl_publish_interval_hours,
+            "crl_digest": self.crl_digest or 'sha256',
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.get_primary_ocsp_url(),

@@ -123,6 +123,19 @@ def _parse_revoked_serial(cert: Certificate, *, context: str) -> Optional[int]:
     return serial_int
 
 
+CRL_DIGESTS = {
+    'sha256': hashes.SHA256,
+    'sha384': hashes.SHA384,
+    'sha512': hashes.SHA512,
+}
+
+
+def _crl_signature_hash(ca: CA) -> hashes.HashAlgorithm:
+    """Signature digest for this CA's CRLs (#207) — sha256 unless configured."""
+    name = (ca.crl_digest or 'sha256').lower().strip()
+    return CRL_DIGESTS.get(name, hashes.SHA256)()
+
+
 class CRLGenerationMixin:
 
     DEFAULT_VALIDITY_DAYS = 7
@@ -130,12 +143,15 @@ class CRLGenerationMixin:
     @staticmethod
     def generate_crl(
         ca_id: int,
-        validity_days: int = 7,
+        validity_days: int | None = None,
         username: str = 'system'
     ) -> CRLMetadata:
         ca = db.session.get(CA, ca_id)
         if not ca:
             raise ValueError(f"CA with id {ca_id} not found")
+
+        if validity_days is None:
+            validity_days = ca.crl_validity_days or CRLGenerationMixin.DEFAULT_VALIDITY_DAYS
 
         if not ca.has_private_key:
             raise ValueError(f"CA {ca.descr} does not have a private key - cannot sign CRL")
@@ -183,7 +199,7 @@ class CRLGenerationMixin:
         # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
         builder = _add_freshest_crl(builder, ca)
 
-        crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
+        crl = builder.sign(ca_private_key, _crl_signature_hash(ca), default_backend())
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)
@@ -296,7 +312,7 @@ class CRLGenerationMixin:
             _authority_key_identifier_for_crl(ca_cert), critical=False
         )
 
-        crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
+        crl = builder.sign(ca_private_key, _crl_signature_hash(ca), default_backend())
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)

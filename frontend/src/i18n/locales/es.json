@@ -1678,7 +1678,16 @@
     "selectResponder": "Seleccionar certificado respondedor",
     "noEligibleResponders": "No se encontraron certificados elegibles. Un certificado necesita EKU OCSPSigning y clave privada.",
     "removeResponder": "Eliminar respondedor",
-    "assignResponder": "Asignar respondedor"
+    "assignResponder": "Asignar respondedor",
+    "crlScheduleTitle": "Programación de CRL completa",
+    "crlScheduleUpdated": "Programación de CRL actualizada",
+    "crlScheduleFailed": "Error al actualizar la programación de CRL",
+    "crlValidity": "Validez",
+    "crlPublishInterval": "Publicar cada",
+    "crlPublishAuto": "Auto (antes de expirar)",
+    "crlDigest": "Resumen de firma",
+    "crlScheduleNote": "Publicar con más frecuencia que la ventana de validez da a los clientes un período de gracia si se pierde una publicación.",
+    "nextPublish": "Próxima publicación"
   },
   "trustStore": {
     "caTrust": "Confianza de CA",

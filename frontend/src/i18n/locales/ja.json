@@ -1678,7 +1678,16 @@
     "selectResponder": "レスポンダー証明書を選択",
     "noEligibleResponders": "対象の証明書が見つかりません。証明書にはOCSPSigning EKUと秘密鍵が必要です。",
     "removeResponder": "レスポンダーを削除",
-    "assignResponder": "レスポンダーを割り当て"
+    "assignResponder": "レスポンダーを割り当て",
+    "crlScheduleTitle": "完全CRLスケジュール",
+    "crlScheduleUpdated": "CRLスケジュールを更新しました",
+    "crlScheduleFailed": "CRLスケジュールの更新に失敗しました",
+    "crlValidity": "有効期間",
+    "crlPublishInterval": "公開間隔",
+    "crlPublishAuto": "自動（期限前）",
+    "crlDigest": "署名ダイジェスト",
+    "crlScheduleNote": "有効期間より短い間隔で公開すると、公開が失敗した場合でも検証側に猶予期間が与えられます。",
+    "nextPublish": "次回公開"
   },
   "trustStore": {
     "caTrust": "CAトラスト",
