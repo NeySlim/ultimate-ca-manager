@@ -46,6 +46,14 @@ export const crlService = {
     return apiClient.post(`/crl/${caId}/delta-config`, config)
   },
 
+  async getConfig(caId) {
+    return apiClient.get(`/crl/${caId}/config`)
+  },
+
+  async updateConfig(caId, config) {
+    return apiClient.post(`/crl/${caId}/config`, config)
+  },
+
   async getOcspStatus() {
     return apiClient.get('/ocsp/status')
   },

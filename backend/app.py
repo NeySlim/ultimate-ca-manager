@@ -1017,6 +1017,9 @@ def init_database(app):
                 ('serial_number', 'VARCHAR(64)', None),
                 ('delta_crl_enabled', 'BOOLEAN', '0'),
                 ('delta_crl_interval', 'INTEGER', '4'),
+                ('crl_validity_days', 'INTEGER', '7'),
+                ('crl_publish_interval_hours', 'INTEGER', '168'),
+                ('crl_digest', 'VARCHAR(20)', "'sha256'"),
             ],
             'groups': [
                 ('description', 'TEXT', None),
@@ -1047,6 +1050,7 @@ def init_database(app):
             'crl_metadata': [
                 ('is_delta', 'BOOLEAN', '0'),
                 ('base_crl_number', 'INTEGER', None),
+                ('next_publish', 'DATETIME', None),
             ],
             'approval_requests': [
                 ('request_data', 'TEXT', None),

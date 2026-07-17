@@ -124,11 +124,13 @@ def update_general_settings():
             port = int(data['http_protocol_port'])
         except (ValueError, TypeError):
             return error_response("Invalid port number", 400)
-        if port != 0 and (port < 1024 or port > 65535):
-            return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
+        if port != 0 and (port < 1 or port > 65535):
+            return error_response("Port must be 0 (disabled) or between 1-65535", 400)
         from config.settings import Config
         if port == Config.HTTPS_PORT:
             return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
+        # Privileged ports (<1024), e.g. 80 for CDP/OCSP, need CAP_NET_BIND_SERVICE
+        # or a reverse proxy — allowed in config so operators can choose explicitly.
         data['http_protocol_port'] = str(port)
 
     if 'acme_public_vhost' in data:

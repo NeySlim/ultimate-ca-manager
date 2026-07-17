@@ -275,7 +275,7 @@ Second consolidated audit. Operator-transparent unless noted.
 | Area | Change | Action required |
 |------|--------|-----------------|
 | **OCSP (RFC 6960)** | Mixed-format serial lookup, cache invalidation on revoke, correct `keyHash`, `nonce` bypasses cache, delegated responder must carry `id-pkix-ocsp-nocheck` | None |
-| **CRL (RFC 5280)** | Mixed-format serial handling, no silent truncation of serials >159 bits, auto-regen of expired CRL on CDP fetch; AKI from signing CA SKI (§5.2.1, #202); IDP omitted on base+delta; FreshestCRL guarded; omit `unspecified` reasonCode; `removeFromCRL` delta-only; optional `invalidityDate`; unhold emits delta `removeFromCRL` when delta CRL enabled | Regenerate intermediate CRLs after upgrade |
+| **CRL (RFC 5280)** | Mixed-format serial handling, no silent truncation of serials >159 bits, auto-regen of expired CRL on CDP fetch; AKI from signing CA SKI (§5.2.1, #202); IDP omitted on base+delta; FreshestCRL guarded; omit `unspecified` reasonCode; `removeFromCRL` delta-only; optional `invalidityDate`; unhold emits delta `removeFromCRL` when delta CRL enabled; full CRL `nextUpdate` (validity) decoupled from publish cadence (`next_publish`, #207); configurable CRL digest | Regenerate intermediate CRLs after upgrade |
 | **Cert profile (RFC 5280)** | 5 issues fixed in CA/CSR signing paths (SKI/AKI format, BasicConstraints, EKU consistency, KU bit ordering, validity bounds); SKI/AKI never copied from CSR (forced from subject key + issuer SKI); CA AIA includes `caIssuers` when configured | NameConstraints IP subset and policy/`anyPolicy` product choices remain |
 | **ACME (RFC 8555/8737)** | EAB JWK match via thumbprint, JWS algorithm allowlist (asymmetric only), wildcard restricted to DNS-01, ALPN extension marked critical, case-insensitive domains; pre-authz §7.4.1 (migration `033`) | None |
 | **TSA (RFC 3161/5035)** | `signing-certificate-v2` mandatory, body cap 64 KiB, correct `PKIStatus` separation | None |
@@ -362,7 +362,7 @@ Access security metrics at Settings > Audit Logs:
 |------|----------|-------------|
 | `audit_log_cleanup` | Daily | Remove old audit logs |
 | `cert_expiry_alerts` | Daily | Send expiry notifications |
-| `crl_auto_regen` | Hourly | Regenerate expiring CRLs |
+| `crl_auto_regen` | Hourly | Regenerate full CRLs when `next_publish` is due or within 24h of `next_update`; delta CRLs by interval |
 
 ---
 
@@ -381,6 +381,7 @@ If you discover a security vulnerability, please report it responsibly:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| Unreleased | 2026-07-17 | Discussion #207: CRL validity vs publish (`next_publish`), configurable CRL digest, CDP download slug filename, cert notBefore skew, template digest + usage_count; HTTP protocol port may be 80 |
 | Unreleased | 2026-07-17 | CSR SKI/AKI never copied from enrollee CSR; EE/CA AKI from issuer SKI; CA AIA `caIssuers`; CRL `invalidityDate`; unhold → delta `removeFromCRL` |
 | 2.56 | 2026-07-17 | ACME/CSR certificates now include Extended Key Usage (serverAuth), empty subject populated from SAN |
 | 2.55 | 2026-07-17 | DN format fix (RFC 4514), auto-migration corrects existing records |

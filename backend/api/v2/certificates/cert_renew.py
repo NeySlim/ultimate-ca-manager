@@ -14,7 +14,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 from services.audit_service import AuditService
 from websocket.emitters import on_certificate_renewed
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import cert_not_before, utc_now
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -103,9 +103,8 @@ def renew_certificate(cert_id):
         if validity_days > 3650:
             validity_days = 3650
 
-        now = utc_now()
-        not_before = now
-        not_after = now + timedelta(days=validity_days)
+        not_before = cert_not_before()
+        not_after = utc_now() + timedelta(days=validity_days)
         # Don't exceed CA expiration
         ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
         if not_after > ca_not_after:

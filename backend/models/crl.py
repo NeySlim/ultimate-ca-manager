@@ -20,6 +20,8 @@ class CRLMetadata(db.Model):
     # Validity period (RFC 5280 - Section 5.1.2.4-5)
     this_update = db.Column(db.DateTime, nullable=False)
     next_update = db.Column(db.DateTime, nullable=False)
+    # Scheduler publish target (may be earlier than next_update) — discussion #207
+    next_publish = db.Column(db.DateTime, nullable=True)
     
     # CRL data in multiple formats
     crl_pem = db.Column(db.Text, nullable=False)  # PEM encoded CRL
@@ -66,6 +68,7 @@ class CRLMetadata(db.Model):
             "crl_number": self.crl_number,
             "this_update": utc_isoformat(self.this_update),
             "next_update": utc_isoformat(self.next_update),
+            "next_publish": utc_isoformat(self.next_publish),
             "revoked_count": self.revoked_count,
             "is_stale": self.is_stale,
             "days_until_expiry": self.days_until_expiry,

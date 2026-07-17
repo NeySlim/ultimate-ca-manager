@@ -444,6 +444,7 @@ class Certificate(db.Model):
             "created_at": utc_isoformat(self.created_at),
             "created_by": self.created_by,
             "source": self.source or 'manual',
+            "template_id": self.template_id,
             "has_private_key": self.has_private_key,
             "private_key_location": self.private_key_location,
             # Subject Alternative Names

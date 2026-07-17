@@ -47,6 +47,12 @@ class CertificateTemplate(db.Model):
     def to_dict(self):
         """Convert to dictionary"""
         import json
+        from models.certificate import Certificate
+
+        usage_count = 0
+        if self.id is not None:
+            usage_count = Certificate.query.filter_by(template_id=self.id).count()
+
         return {
             "id": self.id,
             "name": self.name,
@@ -59,6 +65,7 @@ class CertificateTemplate(db.Model):
             "extensions_template": json.loads(self.extensions_template) if self.extensions_template else {},
             "is_system": self.is_system,
             "is_active": self.is_active,
+            "usage_count": usage_count,
             "created_at": utc_isoformat(self.created_at),
             "created_by": self.created_by,
             "updated_at": utc_isoformat(self.updated_at),

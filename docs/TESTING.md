@@ -77,6 +77,7 @@ pytest --cov=. --cov-report=term-missing
 | test_crl_aki_rfc5280.py | 7 | RFC 5280 §5.2.1 — CRL AKI = issuing CA SKI (#202/#203) |
 | test_crl_rfc5280_profile.py | 13 | IDP/FreshestCRL/reasonCode profile (#204) |
 | test_rfc5280_cert_crl_profile_gaps.py | 8 | CSR SKI/AKI, CA AIA, invalidityDate, unhold removeFromCRL |
+| test_discussion_207_crl_cert_ux.py | 8 | CRL validity/publish/digest, CDP filename, template digest+usage, notBefore skew, port 80, auth gates (#207) |
 | test_hsm.py | 52 | HSM providers, keys |
 | test_sso_routes.py | 37 | SSO providers, sessions |
 | test_mtls.py | 25 | mTLS settings, certificates |
@@ -298,6 +299,16 @@ jobs:
       - name: Run E2E tests
         run: cd frontend && npm run test:e2e
 ```
+
+### Lab scripts (repo root)
+
+```bash
+python3 scripts/lab_crl_openssl_verify.py
+python3 scripts/lab_rfc5280_cert_crl_profile.py
+python3 scripts/lab_discussion_207_crl_cert_ux.py
+```
+
+Optional: create a gitignored `.env.lab` with `SECRET_KEY` / `JWT_SECRET_KEY` for stable lab runs.
 
 ## Coverage Goals
 

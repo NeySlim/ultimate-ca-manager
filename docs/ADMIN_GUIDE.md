@@ -356,14 +356,34 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 
 ### CRL Distribution
 
-Public CDP (HTTP, typically port 8080):
+Public CDP (HTTP, typically port 8080; **port 80** is allowed when the process can bind privileged ports):
 
 ```text
 http://your-server:8080/cdp/<ca_refid>.crl
 http://your-server:8080/cdp/<ca_refid>-delta.crl   # when delta CRL is enabled
 ```
 
+Download `Content-Disposition` uses a human-readable name `{ca-slug}-{refid8}.crl` (URL path still uses `refid`).
+
 Management UI: **CA → CRL / CDP** tab (enable CDP, optional delta, regeneration interval).
+
+**Full CRL schedule** (validity vs publish — discussion #207):
+
+| Setting | Default | Meaning |
+|---------|---------|---------|
+| `crl_validity_days` | 7 | `nextUpdate` window on the full CRL |
+| `crl_publish_interval_hours` | 168 | Scheduler republish target (`next_publish` in metadata) |
+| `crl_digest` | `sha256` | CRL signature hash (`sha224`/`sha256`/`sha384`/`sha512`) |
+
+```bash
+curl -k -H "Authorization: Bearer $TOKEN" \
+  https://your-server:8443/api/v2/crl/<ca_id>/config
+curl -k -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"crl_validity_days":14,"crl_publish_interval_hours":24,"crl_digest":"sha384"}' \
+  https://your-server:8443/api/v2/crl/<ca_id>/config
+```
+
+**HTTP protocol port 80**: set `http_protocol_port` to `80` under Settings → General (or `HTTP_PROTOCOL_PORT=80`). Binding port 80 requires `CAP_NET_BIND_SERVICE` (or root) on Linux, or terminate TLS/HTTP on a reverse proxy and forward to 8080.
 
 **Regenerate via API** (requires `write:crl`):
 
@@ -408,10 +428,15 @@ openssl x509 -in intermediate.pem -noout -text | grep -A1 'Subject Key Identifie
 **Certificate issuance profile:**
 - CSR-supplied SKI/AKI extensions are **ignored**; SKI comes from the subject public key and AKI from the issuing CA’s SKI.
 - Intermediate CAs inherit parent **AIA caIssuers** (and OCSP) when the parent has AIA/OCSP configured.
+- Issued certificates use a **15-minute notBefore backdate** (clock skew tolerance, #207).
+- Certificate-menu issuance honors the selected **template digest** and persists `template_id` (template `usage_count` is live).
 
 Lab scripts (repo root):
 - `python3 scripts/lab_crl_openssl_verify.py`
 - `python3 scripts/lab_rfc5280_cert_crl_profile.py`
+- `python3 scripts/lab_discussion_207_crl_cert_ux.py` — validity vs publish, CRL digest, download filename, notBefore skew (#207)
+
+**UI (discussion #207):** CRL/OCSP slide-over → *Full CRL schedule* (validity / publish interval / digest). Settings → General → HTTP Protocol Port may be `80` (needs bind capability or reverse proxy). Certificate issue form applies the selected template’s digest.
 
 ### OCSP Configuration
 

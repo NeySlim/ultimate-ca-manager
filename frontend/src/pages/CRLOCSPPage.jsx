@@ -209,6 +209,21 @@ export default function CRLOCSPPage() {
     }
   }
 
+  const handleFullCrlConfigChange = async (ca, patch) => {
+    if (!canWrite('crl')) return
+    try {
+      const result = await crlService.updateConfig(ca.id, patch)
+      const updated = result.data || result
+      showSuccess(t('crlOcsp.fullCrlConfigUpdated'))
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ...updated } : c))
+      if (selectedCA?.id === ca.id) {
+        setSelectedCA(prev => ({ ...prev, ...updated }))
+      }
+    } catch (error) {
+      showError(error.message || t('crlOcsp.fullCrlConfigFailed'))
+    }
+  }
+
   const handleToggleOcsp = async (ca) => {
     if (!canWrite('crl')) return
     try {
@@ -662,8 +677,62 @@ export default function CRLOCSPPage() {
           <CompactField autoIcon="revokedCount" label={t('crlOcsp.revokedCount')} value={selectedCRL?.revoked_count || 0} />
           <CompactField autoIcon="lastUpdate" label={t('common.lastUpdate')} value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
           <CompactField autoIcon="nextUpdate" label={t('crlOcsp.nextUpdate')} value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
+          <CompactField autoIcon="nextUpdate" label={t('crlOcsp.nextPublish')} value={selectedCRL?.next_publish ? formatDate(selectedCRL.next_publish) : '-'} />
         </CompactGrid>
       </CompactSection>
+
+      {/* Full CRL validity / publish / digest (#207) */}
+      {selectedCA?.has_private_key !== false && (
+        <div className="space-y-3 border-t border-border pt-4">
+          <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.fullCrlScheduleTitle')}</h4>
+          <p className="text-xs text-text-tertiary">{t('crlOcsp.fullCrlScheduleHelp')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="crl-validity-days" className="text-xs text-text-secondary">{t('crlOcsp.crlValidityDays')}</label>
+              <select
+                id="crl-validity-days"
+                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary"
+                value={selectedCA?.crl_validity_days ?? 7}
+                disabled={!canWrite('crl')}
+                onChange={(e) => handleFullCrlConfigChange(selectedCA, { crl_validity_days: parseInt(e.target.value, 10) })}
+              >
+                {Array.from(new Set([1, 3, 7, 14, 30, 90, selectedCA?.crl_validity_days ?? 7])).sort((a, b) => a - b).map((d) => (
+                  <option key={d} value={d}>{t('crlOcsp.crlValidityDaysOption', { count: d })}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="crl-publish-hours" className="text-xs text-text-secondary">{t('crlOcsp.crlPublishInterval')}</label>
+              <select
+                id="crl-publish-hours"
+                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary"
+                value={selectedCA?.crl_publish_interval_hours ?? 168}
+                disabled={!canWrite('crl')}
+                onChange={(e) => handleFullCrlConfigChange(selectedCA, { crl_publish_interval_hours: parseInt(e.target.value, 10) })}
+              >
+                {Array.from(new Set([1, 4, 12, 24, 48, 168, 336, selectedCA?.crl_publish_interval_hours ?? 168])).sort((a, b) => a - b).map((h) => (
+                  <option key={h} value={h}>{t('crlOcsp.crlPublishIntervalOption', { count: h })}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="crl-digest" className="text-xs text-text-secondary">{t('crlOcsp.crlDigest')}</label>
+              <select
+                id="crl-digest"
+                className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary"
+                value={selectedCA?.crl_digest || 'sha256'}
+                disabled={!canWrite('crl')}
+                onChange={(e) => handleFullCrlConfigChange(selectedCA, { crl_digest: e.target.value })}
+              >
+                <option value="sha256">SHA-256</option>
+                <option value="sha384">SHA-384</option>
+                <option value="sha512">SHA-512</option>
+                <option value="sha224">SHA-224</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* OCSP Configuration */}
       <CompactSection title={t('crlOcsp.ocspConfig')} icon={Pulse}>

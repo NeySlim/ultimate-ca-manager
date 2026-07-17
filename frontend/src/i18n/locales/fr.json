@@ -1419,7 +1419,17 @@
     "selectResponder": "Sélectionner le certificat répondeur",
     "noEligibleResponders": "Aucun certificat éligible trouvé. Un certificat nécessite l'EKU OCSPSigning et une clé privée.",
     "removeResponder": "Supprimer le répondeur",
-    "assignResponder": "Assigner le répondeur"
+    "assignResponder": "Assigner le répondeur",
+    "nextPublish": "Prochaine publication",
+    "fullCrlScheduleTitle": "Planning CRL complète",
+    "fullCrlScheduleHelp": "La validité définit nextUpdate sur la CRL. L’intervalle de publication pilote la republication automatique (next_publish). Le digest s’applique à la prochaine régénération.",
+    "crlValidityDays": "Validité CRL",
+    "crlValidityDaysOption": "{{count}} jours",
+    "crlPublishInterval": "Intervalle de publication",
+    "crlPublishIntervalOption": "{{count}} heures",
+    "crlDigest": "Digest de signature CRL",
+    "fullCrlConfigUpdated": "Planning CRL complète mis à jour",
+    "fullCrlConfigFailed": "Échec de la mise à jour du planning CRL"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",
@@ -2529,7 +2539,7 @@
     "currentReleaseNotes": "Notes de version — v{{version}}",
     "updateReleaseNotes": "Nouveautés de la v{{version}}",
     "httpProtocolPort": "Port HTTP protocole",
-    "httpProtocolPortHelper": "Port du serveur HTTP non chiffré pour les points d'accès CDP/OCSP. Mettre à 0 pour désactiver. Nécessite un redémarrage.",
+    "httpProtocolPortHelper": "Port du serveur HTTP non chiffré pour CDP/OCSP/AIA (défaut 8080). Le port 80 est autorisé ; il faut CAP_NET_BIND_SERVICE ou un reverse proxy. Mettre à 0 pour désactiver. Nécessite un redémarrage.",
     "ct": "Transparence des certificats",
     "ctDescription": "Soumettre les certificats aux journaux CT publics pour la transparence et l'auditabilité",
     "ctEnabled": "Activer la transparence des certificats",

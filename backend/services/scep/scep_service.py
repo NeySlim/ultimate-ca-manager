@@ -21,7 +21,7 @@ from cryptography.x509.oid import ExtensionOID
 from config.settings import Config
 from models import CA, Certificate, SCEPRequest, db
 from utils.key_codec import load_pem_bytes
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import cert_not_before, utc_now
 from utils.file_naming import cert_cert_path
 
 from services.scep.message_parser import (
@@ -637,8 +637,8 @@ class SCEPService:
         # Clamp validity to the CA's own expiry — issuing a leaf that outlives
         # its issuer is invalid per RFC 5280 §6.1 and breaks every chain
         # validator the moment the CA expires.
-        not_before = utc_now()
-        requested_not_after = not_before + timedelta(days=validity_days)
+        not_before = cert_not_before()
+        requested_not_after = utc_now() + timedelta(days=validity_days)
         # not_valid_after_utc is timezone-aware; utc_now() is naive-UTC (project
         # convention). Drop the tzinfo so the comparisons below stay naive-vs-naive
         # — mixing the two raises "can't compare offset-naive and offset-aware".

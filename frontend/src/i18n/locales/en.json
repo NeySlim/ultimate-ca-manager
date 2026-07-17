@@ -1678,7 +1678,17 @@
     "selectResponder": "Select Responder Certificate",
     "noEligibleResponders": "No eligible certificates found. A certificate needs OCSPSigning EKU and private key.",
     "removeResponder": "Remove Responder",
-    "assignResponder": "Assign Responder"
+    "assignResponder": "Assign Responder",
+    "nextPublish": "Next Publish",
+    "fullCrlScheduleTitle": "Full CRL schedule",
+    "fullCrlScheduleHelp": "Validity sets nextUpdate on the CRL. Publish interval drives automatic republishing (next_publish). Digest applies on the next regeneration.",
+    "crlValidityDays": "CRL validity",
+    "crlValidityDaysOption": "{{count}} days",
+    "crlPublishInterval": "Publish interval",
+    "crlPublishIntervalOption": "{{count}} hours",
+    "crlDigest": "CRL signature digest",
+    "fullCrlConfigUpdated": "Full CRL schedule updated",
+    "fullCrlConfigFailed": "Failed to update full CRL schedule"
   },
   "trustStore": {
     "caTrust": "CA Trust",
@@ -2360,7 +2370,7 @@
     "currentReleaseNotes": "Release Notes — v{{version}}",
     "updateReleaseNotes": "What's New in v{{version}}",
     "httpProtocolPort": "HTTP Protocol Port",
-    "httpProtocolPortHelper": "Port for the plain HTTP server serving CDP/OCSP endpoints. Set to 0 to disable. Requires restart.",
+    "httpProtocolPortHelper": "Port for the plain HTTP server serving CDP/OCSP/AIA (default 8080). Port 80 is allowed; binding it needs CAP_NET_BIND_SERVICE or a reverse proxy. Set to 0 to disable. Requires restart.",
     "ct": "Certificate Transparency",
     "ctDescription": "Submit certificates to public CT logs for transparency and auditability",
     "ctEnabled": "Enable Certificate Transparency",

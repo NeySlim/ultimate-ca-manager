@@ -10,6 +10,25 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **CRL validity vs publish schedule** — per-CA `crl_validity_days` (full CRL `nextUpdate`), `crl_publish_interval_hours` (scheduler `next_publish`), and `crl_digest` (migration **059**). API: `GET|POST /api/v2/crl/<ca_id>/config`. (#207)
+- **CRL download filename** — CDP `Content-Disposition` uses `{ca-slug}-{refid8}.crl` while URL paths stay refid-based. (#207)
+- **Certificate notBefore skew** — issuance backdates `notBefore` by 15 minutes to tolerate clock skew. (#207)
+- **Template usage_count** — template API reports live count from `Certificate.template_id`. (#207)
+- **CRL/OCSP UI** — CA detail panel configures full CRL validity / publish interval / digest; shows `next_publish`; certificate issue form applies template digest. (#207)
+
+### Fixed
+- **Template digest on certificate-menu path** — `POST /api/v2/certificates` honors template (or request) digest and persists `template_id`. (#207)
+- **HTTP protocol port 80** — Settings allow privileged ports 1–65535 (e.g. CDP/OCSP on 80); still requires bind capability or reverse proxy. (#207)
+
+### Tests
+- Discussion #207 suite: CRL config/`next_publish`/digest, CDP filename, template digest+usage, notBefore skew, port 80 settings.
+- Lab: `scripts/lab_discussion_207_crl_cert_ux.py`.
+- Frontend i18n: `discussion207CrlI18n.test.js` (9 locales).
+
+### Docs
+- ADMIN_GUIDE / API_REFERENCE / TESTING / SECURITY updated for CRL schedule, port 80, notBefore skew, template digest.
+
 ## [2.194] - 2026-07-17
 
 ### Fixed

@@ -9,7 +9,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 
-from utils.datetime_utils import utc_now, to_naive_utc
+from utils.datetime_utils import cert_not_before, to_naive_utc, utc_now
 from utils.ca_profile import (
     build_extended_key_usage_extension,
     build_key_usage_extension,
@@ -73,7 +73,7 @@ class CACertificateCreationMixin:
         builder = builder.serial_number(
             serial if serial else x509.random_serial_number()
         )
-        builder = builder.not_valid_before(utc_now())
+        builder = builder.not_valid_before(cert_not_before())
         not_after = utc_now() + timedelta(days=validity_days)
         max_end = to_naive_utc(not_valid_after_max)
         if max_end is not None and not_after > max_end:

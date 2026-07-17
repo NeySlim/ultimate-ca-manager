@@ -11,6 +11,7 @@ import logging
 from models import db, CA
 from services.crl_service import CRLService
 from utils.datetime_utils import utc_now
+from utils.sanitize import crl_download_filename
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,7 @@ def get_crl(ca_ref):
         status=200,
         mimetype='application/pkix-crl',
         headers={
-            'Content-Disposition': f'attachment; filename="{ca.refid}.crl"',
+            'Content-Disposition': f'attachment; filename="{crl_download_filename(ca)}"',
             'Cache-Control': 'public, max-age=3600, must-revalidate',
             'Last-Modified': crl_meta.this_update.strftime('%a, %d %b %Y %H:%M:%S GMT'),
         }
@@ -158,7 +159,7 @@ def get_delta_crl(ca_ref):
         status=200,
         mimetype='application/pkix-crl',
         headers={
-            'Content-Disposition': f'attachment; filename="{ca.refid}-delta.crl"',
+            'Content-Disposition': f'attachment; filename="{crl_download_filename(ca, delta=True)}"',
             'Cache-Control': 'public, max-age=900, must-revalidate',
             'Last-Modified': delta_crl.this_update.strftime('%a, %d %b %Y %H:%M:%S GMT'),
         }

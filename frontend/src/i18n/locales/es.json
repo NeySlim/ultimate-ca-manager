@@ -1678,7 +1678,17 @@
     "selectResponder": "Seleccionar certificado respondedor",
     "noEligibleResponders": "No se encontraron certificados elegibles. Un certificado necesita EKU OCSPSigning y clave privada.",
     "removeResponder": "Eliminar respondedor",
-    "assignResponder": "Asignar respondedor"
+    "assignResponder": "Asignar respondedor",
+    "nextPublish": "Próxima publicación",
+    "fullCrlScheduleTitle": "Programación de CRL completa",
+    "fullCrlScheduleHelp": "La validez define nextUpdate en la CRL. El intervalo de publicación controla la republicación automática (next_publish). El digest se aplica en la siguiente regeneración.",
+    "crlValidityDays": "Validez de la CRL",
+    "crlValidityDaysOption": "{{count}} días",
+    "crlPublishInterval": "Intervalo de publicación",
+    "crlPublishIntervalOption": "{{count}} horas",
+    "crlDigest": "Digest de firma de la CRL",
+    "fullCrlConfigUpdated": "Programación de CRL completa actualizada",
+    "fullCrlConfigFailed": "Error al actualizar la programación de CRL"
   },
   "trustStore": {
     "caTrust": "Confianza de CA",
@@ -2359,7 +2369,7 @@
     "currentReleaseNotes": "Notas de versión — v{{version}}",
     "updateReleaseNotes": "Novedades en v{{version}}",
     "httpProtocolPort": "Puerto HTTP protocolo",
-    "httpProtocolPortHelper": "Puerto del servidor HTTP sin cifrar para los endpoints CDP/OCSP. Establecer en 0 para deshabilitar. Requiere reinicio.",
+    "httpProtocolPortHelper": "Puerto del servidor HTTP sin cifrar para CDP/OCSP/AIA (predeterminado 8080). El puerto 80 está permitido; enlazarlo requiere CAP_NET_BIND_SERVICE o un proxy inverso. Establecer en 0 para deshabilitar. Requiere reinicio.",
     "ct": "Transparencia de certificados",
     "ctDescription": "Enviar certificados a registros CT públicos para transparencia y auditoría",
     "ctEnabled": "Habilitar transparencia de certificados",

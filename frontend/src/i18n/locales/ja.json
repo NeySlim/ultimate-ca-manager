@@ -1678,7 +1678,17 @@
     "selectResponder": "レスポンダー証明書を選択",
     "noEligibleResponders": "対象の証明書が見つかりません。証明書にはOCSPSigning EKUと秘密鍵が必要です。",
     "removeResponder": "レスポンダーを削除",
-    "assignResponder": "レスポンダーを割り当て"
+    "assignResponder": "レスポンダーを割り当て",
+    "nextPublish": "次回公開",
+    "fullCrlScheduleTitle": "完全CRLスケジュール",
+    "fullCrlScheduleHelp": "有効期間はCRLのnextUpdateを設定します。公開間隔は自動再公開（next_publish）を制御します。ダイジェストは次回再生成時に適用されます。",
+    "crlValidityDays": "CRL有効期間",
+    "crlValidityDaysOption": "{{count}}日",
+    "crlPublishInterval": "公開間隔",
+    "crlPublishIntervalOption": "{{count}}時間",
+    "crlDigest": "CRL署名ダイジェスト",
+    "fullCrlConfigUpdated": "完全CRLスケジュールを更新しました",
+    "fullCrlConfigFailed": "完全CRLスケジュールの更新に失敗しました"
   },
   "trustStore": {
     "caTrust": "CAトラスト",
@@ -2359,7 +2369,7 @@
     "currentReleaseNotes": "リリースノート — v{{version}}",
     "updateReleaseNotes": "v{{version}} の新機能",
     "httpProtocolPort": "HTTPプロトコルポート",
-    "httpProtocolPortHelper": "CDP/OCSPエンドポイント用のプレーンHTTPサーバーポート。0で無効化。再起動が必要です。",
+    "httpProtocolPortHelper": "CDP/OCSP/AIA用のプレーンHTTPサーバーポート（既定8080）。ポート80も設定可能ですが、バインドにはCAP_NET_BIND_SERVICEまたはリバースプロキシが必要です。0で無効化。再起動が必要です。",
     "ct": "証明書の透明性",
     "ctDescription": "透明性と監査性のために証明書を公開CTログに送信",
     "ctEnabled": "証明書の透明性を有効化",

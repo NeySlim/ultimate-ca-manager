@@ -1316,9 +1316,17 @@ GET /api/v2/crl/{ca_id}
 POST /api/v2/crl/{ca_id}/regenerate
 ```
 
-Requires `write:crl`. Offline CAs return `400`. Response metadata omits PEM by default; fetch PEM with `GET /api/v2/crl/{ca_id}`.
+Requires `write:crl`. Offline CAs return `400`. Response metadata omits PEM by default; fetch PEM with `GET /api/v2/crl/{ca_id}`. Metadata includes `next_publish` when a publish interval is configured.
 
 Generated CRLs include **Authority Key Identifier** = issuing CA **Subject Key Identifier** (RFC 5280 §5.2.1).
+
+### Full CRL configuration
+```http
+GET /api/v2/crl/{ca_id}/config
+POST /api/v2/crl/{ca_id}/config
+```
+
+Requires `read:crl` / `write:crl`. Body fields: `crl_validity_days` (1–365), `crl_publish_interval_hours` (1–8760), `crl_digest` (`sha224`|`sha256`|`sha384`|`sha512`). Decouples CRL `nextUpdate` from the auto-publish cadence.
 
 ### Get Delta CRL
 ```http

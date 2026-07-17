@@ -12,15 +12,16 @@ from utils.dn_validation import validate_dn_field
 from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 from models import Certificate, CA, db
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_issued
-from utils.datetime_utils import utc_now, utc_isoformat
+from utils.datetime_utils import cert_not_before, utc_now, utc_isoformat
 from utils.db_transaction import safe_commit
+from services.trust_store.constants import HASH_ALGORITHMS
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,20 @@ def create_certificate():
 
     if ca.offline:
         return error_response('CA is offline; restore it before issuing', 400)
+
+    # Optional certificate template (digest / validity defaults)
+    template = None
+    template_id = data.get('template_id')
+    if template_id is not None:
+        try:
+            template_id = int(template_id)
+        except (TypeError, ValueError):
+            return error_response('template_id must be an integer', 400)
+        from models.certificate_template import CertificateTemplate
+        template = db.session.get(CertificateTemplate, template_id)
+        if not template or not template.is_active:
+            return error_response('Certificate template not found or inactive', 404)
+        data['template_id'] = template_id
 
     # Policy evaluation — check if approval is required (admins bypass)
     try:
@@ -163,22 +178,35 @@ def create_certificate():
 
         # Validity (cap 1..3650 days; reject 0/negative/non-int)
         MAX_VALIDITY_DAYS = 3650  # ~10 years; CA/B Forum is 398 for public TLS, 3650 OK for internal PKI
+        default_validity = template.validity_days if template and template.validity_days else 365
         try:
-            validity_days = int(data.get('validity_days', 365))
+            validity_days = int(data.get('validity_days', default_validity))
         except (TypeError, ValueError):
             return error_response("validity_days must be an integer (1..3650)", 400)
         if validity_days < 1 or validity_days > MAX_VALIDITY_DAYS:
             return error_response(
                 f"validity_days must be between 1 and {MAX_VALIDITY_DAYS}", 400)
-        now = utc_now()
-        not_before = now
-        not_after = now + timedelta(days=validity_days)
+        not_before = cert_not_before()
+        not_after = utc_now() + timedelta(days=validity_days)
 
         # Cert validity must not exceed CA cert validity
         ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
         if not_after > ca_not_after:
             return error_response(
                 f"validity_days exceeds CA expiration ({ca_not_after.isoformat()})", 400)
+
+        digest_name = (
+            data.get('digest')
+            or (template.digest if template else None)
+            or 'sha256'
+        )
+        digest_name = str(digest_name).lower().strip()
+        hash_algo = HASH_ALGORITHMS.get(digest_name)
+        if hash_algo is None:
+            return error_response(
+                f"Unsupported digest '{digest_name}' (use: {', '.join(sorted(HASH_ALGORITHMS))})",
+                400,
+            )
 
         # Build certificate
         builder = x509.CertificateBuilder()
@@ -386,8 +414,8 @@ def create_certificate():
                 critical=False,
             )
 
-        # Sign certificate
-        new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
+        # Sign certificate (honor template / request digest — discussion #207)
+        new_cert = builder.sign(ca_key, hash_algo, default_backend())
 
         # Serialize
         cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
@@ -433,6 +461,7 @@ def create_certificate():
             san_uri=json.dumps(final_san_uri),
             san_upn=json.dumps(final_san_upn) if final_san_upn else None,
             ocsp_must_staple=bool(data.get('ocsp_must_staple')),
+            template_id=data.get('template_id'),
             created_by=g.current_user.username if hasattr(g, 'current_user') else None
         )
 

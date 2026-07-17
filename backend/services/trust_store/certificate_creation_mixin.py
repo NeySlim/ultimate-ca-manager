@@ -10,7 +10,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import cert_not_before, utc_now
 from .constants import HASH_ALGORITHMS
 from .constraints_mixin import ConstraintsMixin
 from .key_operations_mixin import KeyOperationsMixin
@@ -54,7 +54,7 @@ class CertificateCreationMixin:
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.public_key(private_key.public_key())
         builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.not_valid_before(utc_now())
+        builder = builder.not_valid_before(cert_not_before())
         builder = builder.not_valid_after(
             utc_now() + timedelta(days=validity_days)
         )

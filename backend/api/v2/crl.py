@@ -286,6 +286,93 @@ def configure_delta_crl(ca_id):
         return error_response("Failed to update delta CRL settings", 500)
 
 
+@bp.route('/api/v2/crl/<int:ca_id>/config', methods=['GET'])
+@require_auth(['read:crl'])
+def get_full_crl_config(ca_id):
+    """Get full CRL validity / publish / digest settings (discussion #207)."""
+    ca = db.session.get(CA, ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+
+    return success_response(data={
+        'crl_validity_days': ca.crl_validity_days if ca.crl_validity_days is not None else 7,
+        'crl_publish_interval_hours': (
+            ca.crl_publish_interval_hours
+            if ca.crl_publish_interval_hours is not None
+            else 168
+        ),
+        'crl_digest': ca.crl_digest or 'sha256',
+        'delta_crl_enabled': bool(ca.delta_crl_enabled),
+        'delta_crl_interval': ca.delta_crl_interval or 4,
+    })
+
+
+@bp.route('/api/v2/crl/<int:ca_id>/config', methods=['POST'])
+@require_auth(['write:crl'])
+def configure_full_crl(ca_id):
+    """Update full CRL validity / publish / digest settings (discussion #207)."""
+    ca = db.session.get(CA, ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+
+    data = request.get_json() or {}
+    allowed_digests = {'sha224', 'sha256', 'sha384', 'sha512'}
+
+    try:
+        if 'crl_validity_days' in data:
+            days = int(data['crl_validity_days'])
+            if days < 1 or days > 365:
+                return error_response('crl_validity_days must be between 1 and 365', 400)
+            ca.crl_validity_days = days
+        if 'crl_publish_interval_hours' in data:
+            hours = int(data['crl_publish_interval_hours'])
+            if hours < 1 or hours > 8760:
+                return error_response(
+                    'crl_publish_interval_hours must be between 1 and 8760', 400
+                )
+            ca.crl_publish_interval_hours = hours
+        if 'crl_digest' in data:
+            digest = str(data['crl_digest']).lower().strip()
+            if digest not in allowed_digests:
+                return error_response(
+                    f"crl_digest must be one of: {', '.join(sorted(allowed_digests))}",
+                    400,
+                )
+            ca.crl_digest = digest
+
+        AuditService.log_action(
+            action='crl_config',
+            resource_type='ca',
+            resource_id=str(ca.id),
+            resource_name=ca.descr,
+            details=(
+                f"CRL config: validity={ca.crl_validity_days}d, "
+                f"publish={ca.crl_publish_interval_hours}h, digest={ca.crl_digest}"
+            ),
+            success=True,
+        )
+
+        ok, err = safe_commit(logger, 'Failed to update CRL settings')
+        if not ok:
+            return err
+
+        return success_response(
+            data={
+                'crl_validity_days': ca.crl_validity_days,
+                'crl_publish_interval_hours': ca.crl_publish_interval_hours,
+                'crl_digest': ca.crl_digest or 'sha256',
+            },
+            message='CRL configuration updated',
+        )
+    except (TypeError, ValueError):
+        db.session.rollback()
+        return error_response('Invalid CRL configuration values', 400)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to configure CRL: {e}')
+        return error_response('Failed to update CRL settings', 500)
+
+
 @bp.route('/api/v2/ocsp/status', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_ocsp_status():

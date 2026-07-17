@@ -1678,7 +1678,17 @@
     "selectResponder": "Responder-Zertifikat auswählen",
     "noEligibleResponders": "Keine berechtigten Zertifikate gefunden. Ein Zertifikat benötigt OCSPSigning-EKU und einen privaten Schlüssel.",
     "removeResponder": "Responder entfernen",
-    "assignResponder": "Responder zuweisen"
+    "assignResponder": "Responder zuweisen",
+    "nextPublish": "Nächste Veröffentlichung",
+    "fullCrlScheduleTitle": "Vollständige CRL-Zeitplanung",
+    "fullCrlScheduleHelp": "Gültigkeit setzt nextUpdate auf der CRL. Das Veröffentlichungsintervall steuert die automatische Neuveröffentlichung (next_publish). Digest gilt bei der nächsten Regenerierung.",
+    "crlValidityDays": "CRL-Gültigkeit",
+    "crlValidityDaysOption": "{{count}} Tage",
+    "crlPublishInterval": "Veröffentlichungsintervall",
+    "crlPublishIntervalOption": "{{count}} Stunden",
+    "crlDigest": "CRL-Signatur-Digest",
+    "fullCrlConfigUpdated": "Vollständige CRL-Zeitplanung aktualisiert",
+    "fullCrlConfigFailed": "Aktualisierung der CRL-Zeitplanung fehlgeschlagen"
   },
   "trustStore": {
     "caTrust": "CA-Vertrauen",
@@ -2359,7 +2369,7 @@
     "currentReleaseNotes": "Versionshinweise — v{{version}}",
     "updateReleaseNotes": "Neuerungen in v{{version}}",
     "httpProtocolPort": "HTTP-Protokoll-Port",
-    "httpProtocolPortHelper": "Port für den unverschlüsselten HTTP-Server für CDP/OCSP-Endpunkte. Auf 0 setzen zum Deaktivieren. Neustart erforderlich.",
+    "httpProtocolPortHelper": "Port für den unverschlüsselten HTTP-Server für CDP/OCSP/AIA (Standard 8080). Port 80 ist erlaubt; Bindung erfordert CAP_NET_BIND_SERVICE oder einen Reverse-Proxy. Auf 0 setzen zum Deaktivieren. Neustart erforderlich.",
     "ct": "Zertifikatstransparenz",
     "ctDescription": "Zertifikate an öffentliche CT-Logs übermitteln für Transparenz und Nachvollziehbarkeit",
     "ctEnabled": "Zertifikatstransparenz aktivieren",

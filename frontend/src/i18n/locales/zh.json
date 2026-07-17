@@ -1678,7 +1678,17 @@
     "selectResponder": "选择响应者证书",
     "noEligibleResponders": "未找到符合条件的证书。证书需要OCSPSigning EKU和私钥。",
     "removeResponder": "移除响应者",
-    "assignResponder": "分配响应者"
+    "assignResponder": "分配响应者",
+    "nextPublish": "下次发布",
+    "fullCrlScheduleTitle": "完整CRL计划",
+    "fullCrlScheduleHelp": "有效期设置CRL的nextUpdate。发布间隔控制自动重新发布（next_publish）。摘要算法在下次重新生成时生效。",
+    "crlValidityDays": "CRL有效期",
+    "crlValidityDaysOption": "{{count}}天",
+    "crlPublishInterval": "发布间隔",
+    "crlPublishIntervalOption": "{{count}}小时",
+    "crlDigest": "CRL签名摘要",
+    "fullCrlConfigUpdated": "完整CRL计划已更新",
+    "fullCrlConfigFailed": "更新完整CRL计划失败"
   },
   "trustStore": {
     "caTrust": "CA 信任",
@@ -2359,7 +2369,7 @@
     "currentReleaseNotes": "发行说明 — v{{version}}",
     "updateReleaseNotes": "v{{version}} 新功能",
     "httpProtocolPort": "HTTP协议端口",
-    "httpProtocolPortHelper": "用于CDP/OCSP端点的HTTP明文服务器端口。设为0禁用。需要重启。",
+    "httpProtocolPortHelper": "用于CDP/OCSP/AIA的明文HTTP服务端口（默认8080）。允许使用80端口；绑定需要CAP_NET_BIND_SERVICE或反向代理。设为0禁用。需要重启。",
     "ct": "证书透明度",
     "ctDescription": "将证书提交到公共CT日志以提高透明度和可审计性",
     "ctEnabled": "启用证书透明度",

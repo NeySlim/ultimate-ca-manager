@@ -5,7 +5,10 @@ in this codebase represent UTC. This module provides a utc_now()
 function that uses the non-deprecated datetime.now(timezone.utc) API
 but returns a naive datetime for DB compatibility.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+# Default backdate for certificate notBefore (discussion #207 clock skew).
+DEFAULT_CERT_NOT_BEFORE_SKEW_MINUTES = 15
 
 
 def utc_now() -> datetime:
@@ -16,6 +19,20 @@ def utc_now() -> datetime:
     stored in SQLite via SQLAlchemy.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def cert_not_before(skew_minutes: int | None = None) -> datetime:
+    """UTC ``notBefore`` for issued certificates, backdated for clock skew.
+
+    Relying parties with clocks slightly behind the CA otherwise reject
+    freshly issued certificates. Default skew is 15 minutes (#207).
+    """
+    minutes = (
+        DEFAULT_CERT_NOT_BEFORE_SKEW_MINUTES
+        if skew_minutes is None
+        else max(0, int(skew_minutes))
+    )
+    return utc_now() - timedelta(minutes=minutes)
 
 
 def to_naive_utc(dt: datetime | None) -> datetime | None:
@@ -37,5 +54,4 @@ def utc_isoformat(dt):
         return None
     if dt.tzinfo is None:
         return dt.isoformat() + 'Z'
-    from datetime import timezone
     return dt.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')

@@ -10,6 +10,7 @@ from cryptography.hazmat.backends import default_backend
 
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
+from services.trust_store.constants import HASH_ALGORITHMS
 from utils.datetime_utils import utc_now
 from utils.serial_format import serial_to_int
 from utils.x509_aki import authority_key_identifier_from_issuer
@@ -17,6 +18,34 @@ from ._constants import REASON_MAP
 from .query import CRLQueryMixin
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CRL_VALIDITY_DAYS = 7
+DEFAULT_CRL_PUBLISH_INTERVAL_HOURS = 168
+
+
+def _crl_hash_algorithm(ca: CA):
+    digest = (getattr(ca, 'crl_digest', None) or 'sha256').lower().strip()
+    return HASH_ALGORITHMS.get(digest, hashes.SHA256())
+
+
+def _resolve_full_crl_validity_days(ca: CA, validity_days: Optional[int]) -> int:
+    if validity_days is not None:
+        days = int(validity_days)
+    else:
+        days = int(getattr(ca, 'crl_validity_days', None) or DEFAULT_CRL_VALIDITY_DAYS)
+    if days < 1 or days > 365:
+        raise ValueError('validity_days must be between 1 and 365')
+    return days
+
+
+def _next_publish_at(ca: CA, now):
+    hours = getattr(ca, 'crl_publish_interval_hours', None)
+    if hours is None:
+        hours = DEFAULT_CRL_PUBLISH_INTERVAL_HOURS
+    hours = int(hours)
+    if hours < 1:
+        return None
+    return now + timedelta(hours=hours)
 
 
 def _authority_key_identifier_for_crl(ca_cert: x509.Certificate) -> x509.AuthorityKeyIdentifier:
@@ -125,12 +154,12 @@ def _parse_revoked_serial(cert: Certificate, *, context: str) -> Optional[int]:
 
 class CRLGenerationMixin:
 
-    DEFAULT_VALIDITY_DAYS = 7
+    DEFAULT_VALIDITY_DAYS = DEFAULT_CRL_VALIDITY_DAYS
 
     @staticmethod
     def generate_crl(
         ca_id: int,
-        validity_days: int = 7,
+        validity_days: Optional[int] = None,
         username: str = 'system'
     ) -> CRLMetadata:
         ca = db.session.get(CA, ca_id)
@@ -139,6 +168,8 @@ class CRLGenerationMixin:
 
         if not ca.has_private_key:
             raise ValueError(f"CA {ca.descr} does not have a private key - cannot sign CRL")
+
+        validity_days = _resolve_full_crl_validity_days(ca, validity_days)
 
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
@@ -154,10 +185,12 @@ class CRLGenerationMixin:
         crl_number = 1 if not last_crl else last_crl.crl_number + 1
 
         now = utc_now()
+        next_update = now + timedelta(days=validity_days)
+        next_publish = _next_publish_at(ca, now)
         builder = x509.CertificateRevocationListBuilder()
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.last_update(now)
-        builder = builder.next_update(now + timedelta(days=validity_days))
+        builder = builder.next_update(next_update)
 
         entries = 0
         for cert in revoked_certs:
@@ -183,7 +216,7 @@ class CRLGenerationMixin:
         # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
         builder = _add_freshest_crl(builder, ca)
 
-        crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
+        crl = builder.sign(ca_private_key, _crl_hash_algorithm(ca), default_backend())
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)
@@ -192,7 +225,8 @@ class CRLGenerationMixin:
             ca_id=ca_id,
             crl_number=crl_number,
             this_update=now,
-            next_update=now + timedelta(days=validity_days),
+            next_update=next_update,
+            next_publish=next_publish,
             crl_pem=crl_pem,
             crl_der=crl_der,
             revoked_count=entries,
@@ -296,7 +330,7 @@ class CRLGenerationMixin:
             _authority_key_identifier_for_crl(ca_cert), critical=False
         )
 
-        crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
+        crl = builder.sign(ca_private_key, _crl_hash_algorithm(ca), default_backend())
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)
@@ -307,6 +341,7 @@ class CRLGenerationMixin:
                 crl_number=crl_number,
                 this_update=now,
                 next_update=now + timedelta(hours=validity_hours),
+                next_publish=None,
                 crl_pem=crl_pem,
                 crl_der=crl_der,
                 revoked_count=entries,
