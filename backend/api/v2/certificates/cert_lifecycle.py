@@ -63,6 +63,19 @@ def revoke_certificate(cert_id):
 
     data = request.json
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
+    invalidity_raw = None
+    if data:
+        invalidity_raw = data.get('invalidity_date') or data.get('invalidity_at')
+
+    invalidity_at = None
+    if invalidity_raw:
+        from datetime import datetime
+        from utils.datetime_utils import to_naive_utc
+        try:
+            raw = str(invalidity_raw).strip().replace('Z', '+00:00')
+            invalidity_at = to_naive_utc(datetime.fromisoformat(raw))
+        except (ValueError, TypeError, OverflowError) as e:
+            return error_response(f'Invalid invalidity_date: {e}', 400)
 
     cert = db.session.get(Certificate, cert_id)
     if not cert:
@@ -79,7 +92,8 @@ def revoke_certificate(cert_id):
         cert = CertificateService.revoke_certificate(
             cert_id=cert_id,
             reason=reason,
-            username=username
+            username=username,
+            invalidity_at=invalidity_at,
         )
 
         # A cert issued through a Microsoft CA connection: try to propagate the
@@ -185,10 +199,30 @@ def unhold_certificate(cert_id):
 
     try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        from utils.datetime_utils import utc_now
+
+        ca = None
+        if cert.caref:
+            ca = CA.query.filter_by(refid=cert.caref).first()
+
+        # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
+        # a delta before clearing the hold so relying parties drop the entry.
+        if ca and ca.delta_crl_enabled and ca.cdp_enabled:
+            try:
+                cert.revoke_reason = 'removeFromCRL'
+                cert.revoked_at = utc_now()
+                db.session.commit()
+                from services.crl_service import CRLService
+                CRLService.generate_delta_crl(ca.id, username=username)
+            except Exception as e:
+                logger.warning(f"Failed to emit removeFromCRL delta before unhold: {e}")
+                db.session.rollback()
+                cert = db.session.get(Certificate, cert_id)
 
         cert.revoked = False
         cert.revoked_at = None
         cert.revoke_reason = None
+        cert.invalidity_at = None
         db.session.commit()
 
         # Audit log
@@ -203,12 +237,10 @@ def unhold_certificate(cert_id):
 
         # Regenerate CRL for the issuing CA
         try:
-            if cert.caref:
-                ca = CA.query.filter_by(refid=cert.caref).first()
-                if ca:
-                    from services.crl_service import CRLService
-                    CRLService.generate_crl(ca.id, username=username)
-                    logger.info(f"Regenerated CRL for CA {ca.id} after unhold")
+            if ca:
+                from services.crl_service import CRLService
+                CRLService.generate_crl(ca.id, username=username)
+                logger.info(f"Regenerated CRL for CA {ca.id} after unhold")
         except Exception as e:
             logger.warning(f"Failed to regenerate CRL after unhold: {e}")
 

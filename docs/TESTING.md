@@ -74,8 +74,9 @@ pytest --cov=. --cov-report=term-missing
 | test_audit.py | 33 | Logs, export, cleanup |
 | test_acme.py | 150 | ACME server, client, domains |
 | test_crl.py | 21 | CRL generation, OCSP |
-| test_crl_aki_rfc5280.py | 7+ | RFC 5280 §5.2.1 — CRL AKI = issuing CA SKI (#202/#203) |
-| test_crl_rfc5280_profile.py | — | IDP/FreshestCRL/reasonCode profile (#204, when merged) |
+| test_crl_aki_rfc5280.py | 7 | RFC 5280 §5.2.1 — CRL AKI = issuing CA SKI (#202/#203) |
+| test_crl_rfc5280_profile.py | 13 | IDP/FreshestCRL/reasonCode profile (#204) |
+| test_rfc5280_cert_crl_profile_gaps.py | 8 | CSR SKI/AKI, CA AIA, invalidityDate, unhold removeFromCRL |
 | test_hsm.py | 52 | HSM providers, keys |
 | test_sso_routes.py | 37 | SSO providers, sessions |
 | test_mtls.py | 25 | mTLS settings, certificates |

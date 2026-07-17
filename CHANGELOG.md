@@ -11,12 +11,22 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Fixed
+- **CSR SKI/AKI injection** — Subject Key Identifier and Authority Key Identifier from a client CSR are no longer copied into the issued certificate. SKI is always derived from the subject public key; AKI always from the issuing CA's SKI (public-key fallback). Prevents enrollee-controlled key-identifier spoofing (RFC 5280 §4.2.1.1 / §4.2.1.2).
+- **EE and intermediate AKI** — end-entity and intermediate certificates set AKI from the issuer certificate's SKI when present, matching CRL AKI behaviour.
+- **CA AIA caIssuers** — intermediate CA certificates now include AIA `caIssuers` (and OCSP) from the parent CA when configured, mirroring the end-entity path (RFC 5280 §4.2.2.1).
+- **CRL invalidityDate** — optional `invalidity_at` / API `invalidity_date` on revoke is emitted as CRL entry extension §5.3.2 (migration **058**).
+- **Unhold + delta CRL** — lifting `certificateHold` emits a delta CRL entry with reason `removeFromCRL` when delta CRL is enabled, then regenerates the full CRL (§5.3.1).
 - **CRL Authority Key Identifier (RFC 5280 §5.2.1)** — full and delta CRLs now set AKI from the issuing CA's Subject Key Identifier (with public-key fallback if SKI is absent), instead of copying the CA certificate's AKI (which points at the parent for intermediates). Clients that match CRL AKI to the signing CA SKI no longer reject intermediate CRLs. (#202)
 - **CRL RFC 5280 profile follow-up** — omit `IssuingDistributionPoint` on delta CRLs so base+delta both omit IDP (§5.2.4); guard `FreshestCRL` so missing CDP no longer raises (§5.2.6); omit `unspecified` reasonCode and restrict `removeFromCRL` to delta CRLs (§5.3.1); shared AKI helper; accurate `revoked_count`.
 
 ### Tests
 - Regression coverage for #202: intermediate full/delta CRL AKI≠parent, root CRL, SKI-missing fallback, and unauthenticated regenerate gates.
 - RFC 5280 CRL profile suite: IDP parity, FreshestCRL, reasonCode, AKI smoke, auth gates, openssl lab text dump.
+- Cert/CRL profile gaps suite: CSR SKI/AKI overwrite, CA AIA caIssuers, invalidityDate, unhold removeFromCRL, auth gates, openssl lab.
+- Lab scripts: `scripts/lab_crl_openssl_verify.py`, `scripts/lab_rfc5280_cert_crl_profile.py`.
+
+### Docs
+- ADMIN_GUIDE / SECURITY / TESTING / API_REFERENCE updated for CRL profile, CSR SKI/AKI policy, and optional `invalidity_date`.
 
 ## [2.193] - 2026-07-17
 

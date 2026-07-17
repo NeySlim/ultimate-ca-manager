@@ -7,12 +7,12 @@ from urllib.parse import urlparse
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
-from cryptography.x509.oid import ExtensionOID
 
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
 from utils.datetime_utils import utc_now
 from utils.serial_format import serial_to_int
+from utils.x509_aki import authority_key_identifier_from_issuer
 from ._constants import REASON_MAP
 from .query import CRLQueryMixin
 
@@ -21,13 +21,27 @@ logger = logging.getLogger(__name__)
 
 def _authority_key_identifier_for_crl(ca_cert: x509.Certificate) -> x509.AuthorityKeyIdentifier:
     """RFC 5280 §5.2.1 — CRL AKI must identify the signing CA key (its SKI)."""
+    return authority_key_identifier_from_issuer(ca_cert)
+
+
+def _apply_invalidity_date(
+    revoked_builder: x509.RevokedCertificateBuilder,
+    cert: Certificate,
+) -> x509.RevokedCertificateBuilder:
+    """RFC 5280 §5.3.2 — emit invalidityDate when known (optional)."""
+    invalidity_at = getattr(cert, 'invalidity_at', None)
+    if not invalidity_at:
+        return revoked_builder
     try:
-        ski = ca_cert.extensions.get_extension_for_oid(
-            ExtensionOID.SUBJECT_KEY_IDENTIFIER
+        return revoked_builder.add_extension(
+            x509.InvalidityDate(invalidity_at),
+            critical=False,
         )
-        return x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski.value)
-    except x509.ExtensionNotFound:
-        return x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key())
+    except Exception as e:
+        logger.warning(
+            f"CRL: omitting invalidityDate for cert {cert.id}: {e}"
+        )
+        return revoked_builder
 
 
 def _apply_revoke_reason(
@@ -157,6 +171,7 @@ class CRLGenerationMixin:
             revoked_builder = _apply_revoke_reason(
                 revoked_builder, cert.revoke_reason, is_delta=False
             )
+            revoked_builder = _apply_invalidity_date(revoked_builder, cert)
             builder = builder.add_revoked_certificate(revoked_builder.build())
             entries += 1
 
@@ -268,6 +283,7 @@ class CRLGenerationMixin:
             revoked_builder = _apply_revoke_reason(
                 revoked_builder, cert.revoke_reason, is_delta=True
             )
+            revoked_builder = _apply_invalidity_date(revoked_builder, cert)
             builder = builder.add_revoked_certificate(revoked_builder.build())
             entries += 1
 

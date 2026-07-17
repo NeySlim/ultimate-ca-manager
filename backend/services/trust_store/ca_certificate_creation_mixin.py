@@ -29,12 +29,15 @@ class CACertificateCreationMixin:
         private_key,
         issuer: Optional[x509.Name] = None,
         issuer_private_key = None,
+        issuer_cert: Optional[x509.Certificate] = None,
         validity_days: int = 825,
         digest: str = 'sha256',
         ocsp_uri: Optional[str] = None,
         ocsp_uris: Optional[List[str]] = None,
         cdp_url: Optional[str] = None,
         cdp_urls: Optional[List[str]] = None,
+        aia_ca_issuers_url: Optional[str] = None,
+        aia_ca_issuers_urls: Optional[List[str]] = None,
         cps_uri: Optional[str] = None,
         cps_oid: Optional[str] = None,
         serial: Optional[int] = None,
@@ -53,6 +56,9 @@ class CACertificateCreationMixin:
         # Normalize URL params: merge singular into list
         all_cdp_urls = cdp_urls or ([cdp_url] if cdp_url else [])
         all_ocsp_uris = ocsp_uris or ([ocsp_uri] if ocsp_uri else [])
+        all_aia_issuers = aia_ca_issuers_urls or (
+            [aia_ca_issuers_url] if aia_ca_issuers_url else []
+        )
 
         # For self-signed, issuer is subject
         if issuer is None:
@@ -104,22 +110,32 @@ class CACertificateCreationMixin:
 
         # Authority Key Identifier (for intermediate CAs)
         if issuer != subject:
-            builder = builder.add_extension(
-                x509.AuthorityKeyIdentifier.from_issuer_public_key(
+            from utils.x509_aki import authority_key_identifier_from_issuer
+            if issuer_cert is not None:
+                aki = authority_key_identifier_from_issuer(issuer_cert)
+            else:
+                aki = x509.AuthorityKeyIdentifier.from_issuer_public_key(
                     issuer_private_key.public_key()
-                ),
-                critical=False,
-            )
+                )
+            builder = builder.add_extension(aki, critical=False)
 
-        # Authority Information Access — OCSP URIs
-        if all_ocsp_uris:
-            aia_descriptions = [
+        # Authority Information Access — OCSP + caIssuers (RFC 5280 §4.2.2.1)
+        aia_descriptions = []
+        for uri in all_ocsp_uris:
+            aia_descriptions.append(
                 x509.AccessDescription(
                     x509.oid.AuthorityInformationAccessOID.OCSP,
                     x509.UniformResourceIdentifier(uri)
                 )
-                for uri in all_ocsp_uris
-            ]
+            )
+        for url in all_aia_issuers:
+            aia_descriptions.append(
+                x509.AccessDescription(
+                    x509.oid.AuthorityInformationAccessOID.CA_ISSUERS,
+                    x509.UniformResourceIdentifier(url)
+                )
+            )
+        if aia_descriptions:
             builder = builder.add_extension(
                 x509.AuthorityInformationAccess(aia_descriptions),
                 critical=False,

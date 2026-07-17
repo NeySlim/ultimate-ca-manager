@@ -170,11 +170,10 @@ class CertificateCreationMixin:
             critical=False,
         )
 
-        # Authority Key Identifier
+        # Authority Key Identifier (issuer SKI when present — RFC 5280 §4.2.1.1)
+        from utils.x509_aki import authority_key_identifier_from_issuer
         builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(
-                ca_private_key.public_key()
-            ),
+            authority_key_identifier_from_issuer(ca_cert),
             critical=False,
         )
 
