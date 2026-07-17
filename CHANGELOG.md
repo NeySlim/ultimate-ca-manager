@@ -10,6 +10,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **CRL Authority Key Identifier (RFC 5280 §5.2.1)** — full and delta CRLs now set AKI from the issuing CA's Subject Key Identifier (with public-key fallback if SKI is absent), instead of copying the CA certificate's AKI (which points at the parent for intermediates). Clients that match CRL AKI to the signing CA SKI no longer reject intermediate CRLs. (#202)
+
+### Tests
+- Regression coverage for #202: intermediate full/delta CRL AKI≠parent, root CRL, SKI-missing fallback, and unauthenticated regenerate gates.
+
 ## [2.193] - 2026-07-17
 
 ### Changed
