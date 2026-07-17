@@ -746,7 +746,11 @@
     "offlineKeyFile": "Fichier de clé chiffré",
     "offlineKeyFilePick": "Choisir le fichier de clé",
     "offlineKeyFileTooLarge": "Fichier de clé trop volumineux (max 256 Ko)",
-    "restorePasswordHint": "Le mot de passe utilisé lors de la mise hors ligne de l'AC."
+    "restorePasswordHint": "Le mot de passe utilisé lors de la mise hors ligne de l'AC.",
+    "customValidityYears": "Années personnalisées (1–100)",
+    "customValidityDate": "Date de fin personnalisée",
+    "customValidityDateRequired": "Veuillez choisir une date de fin",
+    "customValidityYearsInvalid": "Les années doivent être entre 1 et 100"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -888,7 +892,13 @@
       "maxReached": "Maximum de {{max}} EKU atteint",
       "helper": "{{remaining}} EKU supplémentaires peuvent être ajoutés (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Par défaut pour ce type de certificat"
-    }
+    },
+    "friendlyName": "Nom convivial",
+    "friendlyNamePlaceholder": "ex. Répondeur OCSP — CA TEST",
+    "templateUsed": "Modèle utilisé",
+    "metadataSection": "Libellés",
+    "metadataSaved": "Libellés du certificat mis à jour",
+    "metadataSaveFailed": "Échec de la mise à jour des libellés"
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -1429,7 +1439,14 @@
     "crlPublishIntervalOption": "{{count}} heures",
     "crlDigest": "Digest de signature CRL",
     "fullCrlConfigUpdated": "Planning CRL complète mis à jour",
-    "fullCrlConfigFailed": "Échec de la mise à jour du planning CRL"
+    "fullCrlConfigFailed": "Échec de la mise à jour du planning CRL",
+    "protocolTransportTitle": "Transport des URL CDP / OCSP",
+    "protocolTransportHelp": "Par AC : URL HTTP sur le port protocole (défaut 8080, sans TLS) ou HTTPS sur le port admin. Le changement régénère les URL CDP/OCSP/AIA automatiques.",
+    "protocolHttpOption": "HTTP — port protocole (ex. :8080)",
+    "protocolHttpsOption": "HTTPS — port admin (ex. :8443)",
+    "protocolHttpEnabled": "URL CDP/OCSP passées en HTTP (port protocole)",
+    "protocolHttpsEnabled": "URL CDP/OCSP passées en HTTPS (port admin)",
+    "protocolHttpFailed": "Échec de la mise à jour du transport des URL"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",

@@ -435,8 +435,11 @@ Lab scripts (repo root):
 - `python3 scripts/lab_crl_openssl_verify.py`
 - `python3 scripts/lab_rfc5280_cert_crl_profile.py`
 - `python3 scripts/lab_discussion_207_crl_cert_ux.py` — validity vs publish, CRL digest, download filename, notBefore skew (#207)
+- `python3 scripts/lab_discussion_207_batch2.py` — friendly name, CA long validity, per-CA `protocol_http`
 
 **UI (discussion #207):** CRL/OCSP slide-over → *Full CRL schedule* (validity / publish interval / digest). Settings → General → HTTP Protocol Port may be `80` (needs bind capability or reverse proxy). Certificate issue form applies the selected template’s digest.
+
+**Discussion #207 batch-2:** editable certificate **description** / **friendly name** (`PATCH /api/v2/certificates/<id>`); list column **template used**; CA validity up to **100 years** or custom end date; per-CA **protocol_http** (HTTP `:8080` vs HTTPS admin) under CRL & OCSP → *CDP / OCSP URL transport*.
 
 ### OCSP Configuration
 

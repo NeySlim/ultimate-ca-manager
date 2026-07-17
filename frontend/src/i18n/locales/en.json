@@ -795,7 +795,13 @@
       "maxReached": "Maximum {{max}} EKUs reached",
       "helper": "{{remaining}} more EKUs can be added (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Default for this certificate type"
-    }
+    },
+    "friendlyName": "Friendly name",
+    "friendlyNamePlaceholder": "e.g. OCSP responder — CA TEST",
+    "templateUsed": "Template used",
+    "metadataSection": "Labels",
+    "metadataSaved": "Certificate labels updated",
+    "metadataSaveFailed": "Failed to update certificate labels"
   },
   "cas": {
     "parentCA": "Parent CA",
@@ -917,7 +923,11 @@
     "offlineKeyFile": "Encrypted key file",
     "offlineKeyFilePick": "Choose key file",
     "offlineKeyFileTooLarge": "Key file is too large (max 256 KB)",
-    "restorePasswordHint": "The password used when the CA was taken offline."
+    "restorePasswordHint": "The password used when the CA was taken offline.",
+    "customValidityYears": "Custom years (1–100)",
+    "customValidityDate": "Custom end date",
+    "customValidityDateRequired": "Please choose an end date",
+    "customValidityYearsInvalid": "Years must be between 1 and 100"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -1688,7 +1698,14 @@
     "crlPublishIntervalOption": "{{count}} hours",
     "crlDigest": "CRL signature digest",
     "fullCrlConfigUpdated": "Full CRL schedule updated",
-    "fullCrlConfigFailed": "Failed to update full CRL schedule"
+    "fullCrlConfigFailed": "Failed to update full CRL schedule",
+    "protocolTransportTitle": "CDP / OCSP URL transport",
+    "protocolTransportHelp": "Per CA: embed HTTP URLs on the protocol port (default 8080, no TLS) or HTTPS URLs on the admin port. Changing this regenerates auto CDP/OCSP/AIA URLs.",
+    "protocolHttpOption": "HTTP — protocol port (e.g. :8080)",
+    "protocolHttpsOption": "HTTPS — admin port (e.g. :8443)",
+    "protocolHttpEnabled": "CDP/OCSP URLs set to HTTP (protocol port)",
+    "protocolHttpsEnabled": "CDP/OCSP URLs set to HTTPS (admin port)",
+    "protocolHttpFailed": "Failed to update protocol URL transport"
   },
   "trustStore": {
     "caTrust": "CA Trust",

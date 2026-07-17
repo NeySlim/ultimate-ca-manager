@@ -15,7 +15,7 @@ from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
-from utils.protocol_url import get_protocol_base_url
+from utils.protocol_url import get_protocol_base_url, get_protocol_base_url_for_ca, apply_protocol_urls_for_ca
 from utils.decorators import require_json_body
 from utils.db_transaction import safe_commit
 from services.ca_service import CAService
@@ -263,10 +263,9 @@ def create_ca():
 
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
 
-        # Validate validity period — cap at 50 years (CA/B Forum max for roots
-        # is 25y; leave headroom for offline roots while preventing unbounded
-        # values like 10000 years). Use explicit None check so 0 is rejected
-        # (not silently replaced by the default).
+        # Validate validity period — cap at 100 years (lab / offline roots;
+        # CA/B Forum public roots are shorter). Use explicit None check so 0 is
+        # rejected (not silently replaced by the default).
         raw_validity = data.get('validityYears')
         if raw_validity is None or raw_validity == '':
             validity_years = 10
@@ -275,8 +274,32 @@ def create_ca():
                 validity_years = int(raw_validity)
             except (TypeError, ValueError):
                 return error_response('Invalid validityYears', 400)
-        if not 1 <= validity_years <= 50:
-            return error_response('validityYears must be between 1 and 50', 400)
+        if not 1 <= validity_years <= 100:
+            return error_response('validityYears must be between 1 and 100', 400)
+
+        # Optional absolute end date (lab / AD CS parity) — overrides years when set
+        raw_end = data.get('validityEndDate') or data.get('not_after')
+        validity_days = validity_years * 365
+        if raw_end:
+            try:
+                if isinstance(raw_end, str) and 'T' in raw_end:
+                    end_dt = datetime.fromisoformat(raw_end.replace('Z', '+00:00'))
+                else:
+                    end_dt = datetime.strptime(str(raw_end)[:10], '%Y-%m-%d').replace(
+                        tzinfo=timezone.utc
+                    )
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
+                days = (end_dt - datetime.now(timezone.utc)).days
+                if days < 1:
+                    return error_response('validityEndDate must be in the future', 400)
+                if days > 100 * 365:
+                    return error_response(
+                        'validityEndDate exceeds maximum of 100 years', 400
+                    )
+                validity_days = days
+            except (TypeError, ValueError) as exc:
+                return error_response(f'Invalid validityEndDate: {exc}', 400)
 
         # Cap description (stored in CA.descr, ends up in UI + audit logs)
         description = data.get('description') or data.get('commonName')
@@ -379,7 +402,7 @@ def create_ca():
             descr=description,
             dn=dn,
             key_type=key_type,
-            validity_days=validity_years * 365,
+            validity_days=validity_days,
             digest=digest,
             caref=caref,
             username=username,
@@ -528,7 +551,7 @@ def update_ca(ca_id):
         ca.ocsp_enabled = new_val
         primary_ocsp = ca.get_primary_ocsp_url()
         if ca.ocsp_enabled and _needs_protocol_url(primary_ocsp):
-            base_url = get_protocol_base_url()
+            base_url = get_protocol_base_url_for_ca(ca)
             if not base_url:
                 return error_response('Cannot auto-generate OCSP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.set_ocsp_urls([f"{base_url}/ocsp"])
@@ -549,7 +572,7 @@ def update_ca(ca_id):
         ca.cdp_enabled = new_val
         primary_cdp = ca.get_primary_cdp_url()
         if ca.cdp_enabled and _needs_protocol_url(primary_cdp):
-            base_url = get_protocol_base_url()
+            base_url = get_protocol_base_url_for_ca(ca)
             if not base_url:
                 return error_response('Cannot auto-generate CDP URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.set_cdp_urls([f"{base_url}/cdp/{ca.refid}.crl"])
@@ -570,7 +593,7 @@ def update_ca(ca_id):
         ca.aia_ca_issuers_enabled = new_val
         primary_aia = ca.get_primary_aia_url()
         if ca.aia_ca_issuers_enabled and _needs_protocol_url(primary_aia):
-            base_url = get_protocol_base_url()
+            base_url = get_protocol_base_url_for_ca(ca)
             if not base_url:
                 return error_response('Cannot auto-generate AIA URL: configure a FQDN or Protocol Base URL in Settings first', 400)
             ca.set_aia_urls([f"{base_url}/ca/{ca.refid}.cer"])
@@ -584,6 +607,16 @@ def update_ca(ca_id):
                 return error_response(err, 400)
             setter(urls or [])
             changed.append(field)
+
+    # Per-CA HTTP vs HTTPS for auto CDP/OCSP/AIA (#207 batch-2 follow-up)
+    if 'protocol_http' in data:
+        new_val = bool(data['protocol_http'])
+        old_val = True if ca.protocol_http is None else bool(ca.protocol_http)
+        ca.protocol_http = new_val
+        if new_val != old_val:
+            changed.append('protocol_http')
+            apply_protocol_urls_for_ca(ca)
+            changed.append('protocol_urls')
     # CPS fields
     if 'cps_enabled' in data:
         new_val = bool(data['cps_enabled'])

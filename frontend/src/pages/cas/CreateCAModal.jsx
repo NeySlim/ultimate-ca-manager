@@ -38,6 +38,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState('RSA')
   const [createFormKeySize, setCreateFormKeySize] = useState('2048')
   const [createFormValidity, setCreateFormValidity] = useState('10')
+  const [createFormValidityMode, setCreateFormValidityMode] = useState('preset') // preset | custom | date
+  const [createFormCustomYears, setCreateFormCustomYears] = useState('30')
+  const [createFormEndDate, setCreateFormEndDate] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [createFormPathLength, setCreateFormPathLength] = useState('')
   const [createFormDigest, setCreateFormDigest] = useState('auto')
@@ -136,7 +139,6 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       description: formData.get('description'),
       keyAlgo: createFormKeyAlgo,
       keySize: createFormKeyAlgo === 'ECDSA' ? createFormKeySize : parseInt(createFormKeySize),
-      validityYears: parseInt(createFormValidity),
       type: createFormType,
       parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null,
       ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
@@ -145,6 +147,24 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       ...(createFormType === 'intermediate' && {
         extendedKeyUsage: createFormEkuServerAuth ? ['serverAuth'] : [],
       }),
+    }
+
+    if (createFormValidityMode === 'date') {
+      if (!createFormEndDate) {
+        showError(t('cas.customValidityDateRequired'))
+        return
+      }
+      data.validityEndDate = createFormEndDate
+      data.validityYears = 10 // placeholder; server uses end date
+    } else if (createFormValidityMode === 'custom') {
+      const years = parseInt(createFormCustomYears, 10)
+      if (!years || years < 1 || years > 100) {
+        showError(t('cas.customValidityYearsInvalid'))
+        return
+      }
+      data.validityYears = years
+    } else {
+      data.validityYears = parseInt(createFormValidity, 10)
     }
 
     // HSM key storage — replaces local key fields
@@ -418,11 +438,47 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               { value: '5', label: t('cas.yearsValidity', { count: 5 }) },
               { value: '10', label: t('cas.yearsValidity', { count: 10 }) },
               { value: '15', label: t('cas.yearsValidity', { count: 15 }) },
-              { value: '20', label: t('cas.yearsValidity', { count: 20 }) }
+              { value: '20', label: t('cas.yearsValidity', { count: 20 }) },
+              { value: '25', label: t('cas.yearsValidity', { count: 25 }) },
+              { value: '30', label: t('cas.yearsValidity', { count: 30 }) },
+              { value: '40', label: t('cas.yearsValidity', { count: 40 }) },
+              { value: '50', label: t('cas.yearsValidity', { count: 50 }) },
+              { value: '75', label: t('cas.yearsValidity', { count: 75 }) },
+              { value: '100', label: t('cas.yearsValidity', { count: 100 }) },
+              { value: 'custom', label: t('cas.customValidityYears') },
+              { value: 'date', label: t('cas.customValidityDate') },
             ]}
-            value={createFormValidity}
-            onChange={(value) => setCreateFormValidity(value)}
+            value={createFormValidityMode === 'preset' ? createFormValidity : createFormValidityMode}
+            onChange={(value) => {
+              if (value === 'custom' || value === 'date') {
+                setCreateFormValidityMode(value)
+              } else {
+                setCreateFormValidityMode('preset')
+                setCreateFormValidity(value)
+                setCreateFormEndDate('')
+              }
+            }}
           />
+          {createFormValidityMode === 'custom' && (
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              label={t('cas.customValidityYears')}
+              value={createFormCustomYears}
+              onChange={(e) => setCreateFormCustomYears(e.target.value)}
+              required
+            />
+          )}
+          {createFormValidityMode === 'date' && (
+            <Input
+              type="date"
+              label={t('cas.customValidityDate')}
+              value={createFormEndDate}
+              onChange={(e) => setCreateFormEndDate(e.target.value)}
+              required
+            />
+          )}
         </div>
 
         <div className="space-y-4">

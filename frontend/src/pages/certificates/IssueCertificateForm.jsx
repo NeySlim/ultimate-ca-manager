@@ -19,6 +19,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     cn: '',
     cert_type: 'server',
     description: '',
+    friendly_name: '',
     organization: '',
     organizational_unit: '',
     country: '',
@@ -274,6 +275,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       cn: formData.cn,
       cert_type: formData.cert_type,
       description: formData.description || undefined,
+      friendly_name: formData.friendly_name || undefined,
       organization: formData.organization || undefined,
       organizational_unit: formData.organizational_unit || undefined,
       country: formData.country || undefined,
@@ -374,6 +376,13 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         value={formData.cn}
         onChange={(e) => update('cn', e.target.value)}
         required
+      />
+
+      <Input
+        label={t('certificates.friendlyName')}
+        placeholder={t('certificates.friendlyNamePlaceholder')}
+        value={formData.friendly_name}
+        onChange={(e) => update('friendly_name', e.target.value)}
       />
 
       <Input

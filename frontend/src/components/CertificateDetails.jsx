@@ -15,7 +15,7 @@
  *     canDelete={true}
  *   />
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getAppTimezone } from '../stores/timezoneStore'
 import { formatDate as formatDateUtil, formatSerialNumberHex } from '../lib/utils'
@@ -41,13 +41,17 @@ import {
   ArrowsClockwise,
   UploadSimple,
   LinkSimple,
-  SealCheck
+  SealCheck,
+  FloppyDisk
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
+import { Input } from './Input'
 import { ExportModal } from './ExportModal'
 import { CertificateLintModal } from './CertificateLintModal'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
+import { certificatesService } from '../services'
+import { useNotification } from '../contexts'
 import { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
 import { cn } from '../lib/utils'
 
@@ -115,6 +119,7 @@ export function CertificateDetails({
   onRenew,
   onUploadKey,
   onAddToTrustStore,
+  onUpdated,
   canWrite = false,
   canDelete = false,
   compact = false,
@@ -123,16 +128,47 @@ export function CertificateDetails({
   embedded = false,
 }) {
   const { t } = useTranslation()
+  const { showSuccess, showError } = useNotification()
   const [pemCopied, setPemCopied] = useState(false)
   const [showFullPem, setShowFullPem] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showLintModal, setShowLintModal] = useState(false)
+  const [friendlyName, setFriendlyName] = useState('')
+  const [description, setDescription] = useState('')
+  const [metaSaving, setMetaSaving] = useState(false)
+
+  useEffect(() => {
+    setFriendlyName(certificate?.friendly_name || '')
+    setDescription(certificate?.descr || certificate?.description || '')
+  }, [certificate?.id, certificate?.friendly_name, certificate?.descr, certificate?.description])
 
   if (!certificate) return null
   
   const cert = certificate
   const serialHex = formatSerialNumberHex(cert.serial_number)
   const status = cert.revoked ? 'revoked' : (cert.status || 'valid')
+  const displayTitle = cert.friendly_name || cert.cn || cert.common_name || cert.descr || t('common.certificate')
+
+  const handleSaveMeta = async () => {
+    setMetaSaving(true)
+    try {
+      const res = await certificatesService.update(cert.id, {
+        friendly_name: friendlyName,
+        description,
+      })
+      const updated = res?.data || res
+      showSuccess(t('certificates.metadataSaved'))
+      onUpdated?.(updated)
+    } catch (err) {
+      showError(err.message || t('certificates.metadataSaveFailed'))
+    } finally {
+      setMetaSaving(false)
+    }
+  }
+
+  const metaDirty =
+    (friendlyName || '') !== (cert.friendly_name || '') ||
+    (description || '') !== (cert.descr || cert.description || '')
   
   // Status badge config
   const statusConfig = {
@@ -169,7 +205,7 @@ export function CertificateDetails({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">
-              {cert.cn || cert.common_name || cert.descr || t('common.certificate')}
+              {displayTitle}
             </h3>
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
@@ -203,6 +239,46 @@ export function CertificateDetails({
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
         </div>
       </div>
+
+      {/* Editable metadata — description + friendly name (#207 batch-2) */}
+      <CompactSection title={t('certificates.metadataSection')}>
+        {canWrite ? (
+          <div className="space-y-3">
+            <Input
+              label={t('certificates.friendlyName')}
+              placeholder={t('certificates.friendlyNamePlaceholder')}
+              value={friendlyName}
+              onChange={(e) => setFriendlyName(e.target.value)}
+            />
+            <Input
+              label={t('common.description')}
+              placeholder={t('certificates.descriptionPlaceholder')}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            {(cert.template_name || cert.template_id) && (
+              <div className="text-xs text-text-tertiary">
+                {t('certificates.templateUsed')}: {cert.template_name || `#${cert.template_id}`}
+              </div>
+            )}
+            <Button
+              type="button"
+              size="xs"
+              variant="secondary"
+              disabled={!metaDirty || metaSaving}
+              onClick={handleSaveMeta}
+            >
+              <FloppyDisk size={14} /> {t('common.save')}
+            </Button>
+          </div>
+        ) : (
+          <CompactGrid>
+            <CompactField label={t('certificates.friendlyName')} value={cert.friendly_name || '—'} />
+            <CompactField label={t('common.description')} value={cert.descr || cert.description || '—'} />
+            <CompactField label={t('certificates.templateUsed')} value={cert.template_name || '—'} />
+          </CompactGrid>
+        )}
+      </CompactSection>
       
       {/* Actions - compact on mobile */}
       {showActions && (

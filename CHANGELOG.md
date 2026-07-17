@@ -16,19 +16,25 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **Certificate notBefore skew** — issuance backdates `notBefore` by 15 minutes to tolerate clock skew. (#207)
 - **Template usage_count** — template API reports live count from `Certificate.template_id`. (#207)
 - **CRL/OCSP UI** — CA detail panel configures full CRL validity / publish interval / digest; shows `next_publish`; certificate issue form applies template digest. (#207)
+- **Certificate friendly name + editable description** — `PATCH /api/v2/certificates/<id>`; list shows **template used** (`template_name`); migration **060**. (#207 batch-2)
+- **Per-CA CDP/OCSP HTTP vs HTTPS** — `protocol_http` (migration **061**): HTTP protocol port (:8080) or admin HTTPS; regenerates auto CDP/OCSP/AIA URLs. (#207)
+- **CA validity > 20 years** — UI presets up to 100 years, custom years, and custom end date (`validityEndDate`). (#207 batch-2)
 
 ### Fixed
 - **Template digest on certificate-menu path** — `POST /api/v2/certificates` honors template (or request) digest and persists `template_id`. (#207)
 - **HTTP protocol port 80** — Settings allow privileged ports 1–65535 (e.g. CDP/OCSP on 80); still requires bind capability or reverse proxy. (#207)
+- **HTTPS redirect port** — `enforce_https` now redirects to `HTTPS_PORT` (avoids `https://host:8080`). Protocol CDP/OCSP on :8080 stay plain HTTP. (#207 batch-2)
 
 ### Tests
 - Discussion #207 suite: CRL config/`next_publish`/digest, CDP filename, template digest+usage, notBefore skew, port 80 settings.
-- Lab: `scripts/lab_discussion_207_crl_cert_ux.py`.
-- Frontend i18n: `discussion207CrlI18n.test.js` (9 locales).
+- Discussion #207 batch-2: `test_discussion_207_batch2.py` (PATCH metadata, template_name, CA validity, protocol_http).
+- Discussion #207 batch-2 security: `test_discussion_207_batch2_security.py` (authz + validation gates).
+- Lab: `scripts/lab_discussion_207_crl_cert_ux.py`, `scripts/lab_discussion_207_batch2.py`.
+- Frontend i18n: `discussion207CrlI18n.test.js`, `discussion207Batch2I18n.test.js` (9 locales).
 
 ### Docs
-- ADMIN_GUIDE / API_REFERENCE / TESTING / SECURITY updated for CRL schedule, port 80, notBefore skew, template digest.
-- USER_GUIDE: CRL & OCSP operator workflow (Full CRL schedule, template digest/usage); PUBLIC-ENDPOINTS notes port 80.
+- ADMIN_GUIDE / API_REFERENCE / TESTING / SECURITY / USER_GUIDE updated for CRL schedule, port 80, notBefore skew, template digest, cert metadata, protocol_http, CA long validity.
+- Test plan: `docs/testing/DISCUSSION-207-CRL-CERT-UX.md`.
 
 ## [2.194] - 2026-07-17
 

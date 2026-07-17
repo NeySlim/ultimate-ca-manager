@@ -795,7 +795,13 @@
       "maxReached": "Se alcanzó el máximo de {{max}} EKU",
       "helper": "Se pueden añadir {{remaining}} EKU más (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Predeterminado para este tipo de certificado"
-    }
+    },
+    "friendlyName": "Friendly name",
+    "friendlyNamePlaceholder": "e.g. OCSP responder — CA TEST",
+    "templateUsed": "Template used",
+    "metadataSection": "Labels",
+    "metadataSaved": "Certificate labels updated",
+    "metadataSaveFailed": "Failed to update certificate labels"
   },
   "cas": {
     "parentCA": "CA padre",
@@ -917,7 +923,11 @@
     "offlineKeyFile": "Archivo de clave cifrado",
     "offlineKeyFilePick": "Elegir archivo de clave",
     "offlineKeyFileTooLarge": "El archivo de clave es demasiado grande (máx. 256 KB)",
-    "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea."
+    "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea.",
+    "customValidityYears": "Custom years (1–100)",
+    "customValidityDate": "Custom end date",
+    "customValidityDateRequired": "Please choose an end date",
+    "customValidityYearsInvalid": "Years must be between 1 and 100"
   },
   "csrs": {
     "uploadCSR": "Subir CSR",
@@ -1688,7 +1698,14 @@
     "crlPublishIntervalOption": "{{count}} horas",
     "crlDigest": "Digest de firma de la CRL",
     "fullCrlConfigUpdated": "Programación de CRL completa actualizada",
-    "fullCrlConfigFailed": "Error al actualizar la programación de CRL"
+    "fullCrlConfigFailed": "Error al actualizar la programación de CRL",
+    "protocolTransportTitle": "CDP / OCSP URL transport",
+    "protocolTransportHelp": "Per CA: embed HTTP URLs on the protocol port (default 8080, no TLS) or HTTPS URLs on the admin port. Changing this regenerates auto CDP/OCSP/AIA URLs.",
+    "protocolHttpOption": "HTTP — protocol port (e.g. :8080)",
+    "protocolHttpsOption": "HTTPS — admin port (e.g. :8443)",
+    "protocolHttpEnabled": "CDP/OCSP URLs set to HTTP (protocol port)",
+    "protocolHttpsEnabled": "CDP/OCSP URLs set to HTTPS (admin port)",
+    "protocolHttpFailed": "Failed to update protocol URL transport"
   },
   "trustStore": {
     "caTrust": "Confianza de CA",

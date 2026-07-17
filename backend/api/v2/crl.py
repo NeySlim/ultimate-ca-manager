@@ -11,7 +11,7 @@ from models.crl import CRLMetadata
 from services.audit_service import AuditService
 from services.crl_service import CRLService
 from utils.db_transaction import safe_commit
-from utils.protocol_url import get_protocol_base_url
+from utils.protocol_url import get_protocol_base_url_for_ca
 from utils.response import error_response, success_response
 from utils.trusted_proxy import client_ip
 
@@ -180,7 +180,7 @@ def toggle_auto_regen(ca_id):
         # Auto-generate CDP URL if enabling and no URLs configured
         primary_cdp = ca.get_primary_cdp_url()
         if enabled and (not primary_cdp or primary_cdp.startswith("https://")):
-            base_url = get_protocol_base_url()
+            base_url = get_protocol_base_url_for_ca(ca)
             if not base_url:
                 return error_response(
                     "Cannot auto-generate CDP URL: configure a FQDN or Protocol Base URL in Settings first",

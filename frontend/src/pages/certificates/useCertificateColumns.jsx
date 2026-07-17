@@ -34,7 +34,7 @@ export function useCertificateColumns(t) {
           )}>
             <Certificate size={14} weight="duotone" />
           </div>
-          <span className="font-medium truncate">{val}</span>
+          <span className="font-medium truncate">{row.friendly_name || val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
           {row.source === 'import' && <Badge variant="secondary" size="sm" dot>IMPORT</Badge>}
@@ -112,6 +112,18 @@ export function useCertificateColumns(t) {
           </Badge>
         )
       }
+    },
+    {
+      key: 'template_name',
+      header: t('certificates.templateUsed'),
+      priority: 3,
+      sortable: false,
+      hideOnMobile: true,
+      render: (val, row) => (
+        <span className="text-xs text-text-secondary truncate">
+          {val || row.template_name || '—'}
+        </span>
+      )
     },
     {
       key: 'issuer',

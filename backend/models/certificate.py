@@ -13,6 +13,8 @@ class Certificate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
     descr = db.Column(db.String(255), nullable=False)
+    # Operator label independent of CN (OCSP responder certs, etc.) — #207 batch-2
+    friendly_name = db.Column(db.String(255), nullable=True)
     caref = db.Column(db.String(36), db.ForeignKey("certificate_authorities.refid"))
     crt = db.Column(db.Text)  # Nullable - CSR doesn't have cert yet
     csr = db.Column(db.Text)  # Base64 encoded CSR
@@ -422,10 +424,19 @@ class Certificate(db.Model):
             elif self.valid_to < now + timedelta(days=30):
                 status = "expiring"
         
+        template_name = None
+        try:
+            if self.template is not None:
+                template_name = self.template.name
+        except Exception:
+            template_name = None
+
         data = {
             "id": self.id,
             "refid": self.refid,
             "descr": self.descr,
+            "description": self.descr,  # alias for API consumers
+            "friendly_name": self.friendly_name,
             "caref": self.caref,
             "cert_type": self.cert_type,
             "subject": self.subject,
@@ -445,6 +456,7 @@ class Certificate(db.Model):
             "created_by": self.created_by,
             "source": self.source or 'manual',
             "template_id": self.template_id,
+            "template_name": template_name,
             "has_private_key": self.has_private_key,
             "private_key_location": self.private_key_location,
             # Subject Alternative Names

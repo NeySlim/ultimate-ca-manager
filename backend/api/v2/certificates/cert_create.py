@@ -533,6 +533,7 @@ def create_certificate():
         db_cert = Certificate(
             refid=str(uuid.uuid4())[:8],
             descr=data.get("description", data["cn"]),
+            friendly_name=(data.get("friendly_name") or "").strip() or None,
             caref=ca.refid,
             crt=base64.b64encode(cert_pem.encode()).decode(),
             prv=base64.b64encode(key_pem.encode()).decode(),

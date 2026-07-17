@@ -16,6 +16,10 @@ export const certificatesService = {
     return apiClient.get(`/certificates/${id}`)
   },
 
+  async update(id, data) {
+    return apiClient.patch(`/certificates/${id}`, data)
+  },
+
   async create(data) {
     return apiClient.post('/certificates', data)
   },

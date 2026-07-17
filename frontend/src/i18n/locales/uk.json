@@ -795,7 +795,13 @@
       "maxReached": "Досягнуто максимум {{max}} EKU",
       "helper": "Можна додати ще {{remaining}} EKU (RFC 5280 §4.2.1.12).",
       "defaultLocked": "За замовчуванням для цього типу сертифіката"
-    }
+    },
+    "friendlyName": "Friendly name",
+    "friendlyNamePlaceholder": "e.g. OCSP responder — CA TEST",
+    "templateUsed": "Template used",
+    "metadataSection": "Labels",
+    "metadataSaved": "Certificate labels updated",
+    "metadataSaveFailed": "Failed to update certificate labels"
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
@@ -917,7 +923,11 @@
     "offlineKeyFile": "Зашифрований файл ключа",
     "offlineKeyFilePick": "Обрати файл ключа",
     "offlineKeyFileTooLarge": "Файл ключа занадто великий (макс. 256 КБ)",
-    "restorePasswordHint": "Пароль, що використовувався при переведенні ЦС в офлайн."
+    "restorePasswordHint": "Пароль, що використовувався при переведенні ЦС в офлайн.",
+    "customValidityYears": "Custom years (1–100)",
+    "customValidityDate": "Custom end date",
+    "customValidityDateRequired": "Please choose an end date",
+    "customValidityYearsInvalid": "Years must be between 1 and 100"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",
@@ -1688,7 +1698,14 @@
     "crlPublishIntervalOption": "{{count}} годин",
     "crlDigest": "Digest підпису CRL",
     "fullCrlConfigUpdated": "Розклад повної CRL оновлено",
-    "fullCrlConfigFailed": "Не вдалося оновити розклад CRL"
+    "fullCrlConfigFailed": "Не вдалося оновити розклад CRL",
+    "protocolTransportTitle": "CDP / OCSP URL transport",
+    "protocolTransportHelp": "Per CA: embed HTTP URLs on the protocol port (default 8080, no TLS) or HTTPS URLs on the admin port. Changing this regenerates auto CDP/OCSP/AIA URLs.",
+    "protocolHttpOption": "HTTP — protocol port (e.g. :8080)",
+    "protocolHttpsOption": "HTTPS — admin port (e.g. :8443)",
+    "protocolHttpEnabled": "CDP/OCSP URLs set to HTTP (protocol port)",
+    "protocolHttpsEnabled": "CDP/OCSP URLs set to HTTPS (admin port)",
+    "protocolHttpFailed": "Failed to update protocol URL transport"
   },
   "trustStore": {
     "caTrust": "Довіра CA",

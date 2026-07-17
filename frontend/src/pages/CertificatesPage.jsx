@@ -544,6 +544,14 @@ export default function CertificatesPage() {
       onDelete={() => handleDelete(selectedCert.id)}
       onUploadKey={() => setShowKeyModal(true)}
       onAddToTrustStore={handleAddToTrustStore}
+      onUpdated={(updated) => {
+        if (updated) {
+          setSelectedCert((prev) => ({ ...prev, ...updated }))
+          setCertificates((prev) =>
+            prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
+          )
+        }
+      }}
       canWrite={canWrite('certificates')}
       canDelete={canDelete('certificates')}
     />

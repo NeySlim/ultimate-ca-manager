@@ -876,8 +876,15 @@ def create_app(config_name=None):
                 # Skip protocol endpoints — CRL/OCSP/SCEP/ACME/EST clients often can't follow redirects
                 if request.path.startswith(('/cdp/', '/ca/', '/ocsp', '/scep/', '/acme/', '/.well-known/', '/tsa', '/ssh/setup/')):
                     return None
-                url = request.url.replace('http://', 'https://', 1)
-                url = url.replace(f':{config.HTTPS_PORT}', f':{config.HTTPS_PORT}')
+                from urllib.parse import urlsplit, urlunsplit
+                parts = urlsplit(request.url)
+                # Always land on the admin HTTPS port (avoid https://host:8080
+                # when a client hit HTTP on the protocol port by mistake).
+                https_port = int(getattr(config, 'HTTPS_PORT', 8443) or 8443)
+                netloc = parts.hostname or ''
+                if https_port not in (443, 0):
+                    netloc = f'{netloc}:{https_port}'
+                url = urlunsplit(('https', netloc, parts.path, parts.query, parts.fragment))
                 return redirect(url, code=301)
     
     # Safe mode middleware — block most API calls when key is missing
@@ -1005,6 +1012,8 @@ def init_database(app):
                 ('owner_group_id', 'INTEGER', None),
                 ('key_algo', 'VARCHAR(20)', None),
                 ('subject_cn', 'VARCHAR(255)', None),
+                ('invalidity_at', 'DATETIME', None),
+                ('friendly_name', 'VARCHAR(255)', None),
             ],
             'certificate_authorities': [
                 ('cdp_enabled', 'BOOLEAN', '0'),
@@ -1020,6 +1029,7 @@ def init_database(app):
                 ('crl_validity_days', 'INTEGER', '7'),
                 ('crl_publish_interval_hours', 'INTEGER', '168'),
                 ('crl_digest', 'VARCHAR(20)', "'sha256'"),
+                ('protocol_http', 'BOOLEAN', '1'),
             ],
             'groups': [
                 ('description', 'TEXT', None),

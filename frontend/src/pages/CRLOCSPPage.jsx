@@ -224,6 +224,21 @@ export default function CRLOCSPPage() {
     }
   }
 
+  const handleProtocolHttpChange = async (ca, useHttp) => {
+    if (!canWrite('cas') && !canWrite('crl')) return
+    try {
+      const result = await casService.update(ca.id, { protocol_http: useHttp })
+      const updated = result.data || result
+      showSuccess(t(useHttp ? 'crlOcsp.protocolHttpEnabled' : 'crlOcsp.protocolHttpsEnabled'))
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ...updated } : c))
+      if (selectedCA?.id === ca.id) {
+        setSelectedCA(prev => ({ ...prev, ...updated }))
+      }
+    } catch (error) {
+      showError(error.message || t('crlOcsp.protocolHttpFailed'))
+    }
+  }
+
   const handleToggleOcsp = async (ca) => {
     if (!canWrite('crl')) return
     try {
@@ -680,6 +695,21 @@ export default function CRLOCSPPage() {
           <CompactField autoIcon="nextUpdate" label={t('crlOcsp.nextPublish')} value={selectedCRL?.next_publish ? formatDate(selectedCRL.next_publish) : '-'} />
         </CompactGrid>
       </CompactSection>
+
+      {/* Per-CA CDP/OCSP transport: HTTP :8080 vs HTTPS admin */}
+      <div className="space-y-2 border-t border-border pt-4">
+        <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.protocolTransportTitle')}</h4>
+        <p className="text-xs text-text-tertiary">{t('crlOcsp.protocolTransportHelp')}</p>
+        <select
+          className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary w-full sm:w-auto"
+          value={(selectedCA?.protocol_http !== false) ? 'http' : 'https'}
+          disabled={!canWrite('cas') && !canWrite('crl')}
+          onChange={(e) => handleProtocolHttpChange(selectedCA, e.target.value === 'http')}
+        >
+          <option value="http">{t('crlOcsp.protocolHttpOption')}</option>
+          <option value="https">{t('crlOcsp.protocolHttpsOption')}</option>
+        </select>
+      </div>
 
       {/* Full CRL validity / publish / digest (#207) */}
       {selectedCA?.has_private_key !== false && (

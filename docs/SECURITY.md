@@ -381,6 +381,7 @@ If you discover a security vulnerability, please report it responsibly:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| Unreleased | 2026-07-17 | Discussion #207 batch-2: cert description/friendly_name PATCH (write:certificates); per-CA protocol_http; CA validityYears 1–100 + validityEndDate; HTTPS redirect uses HTTPS_PORT; authz gates in test_discussion_207_batch2_security.py |
 | Unreleased | 2026-07-17 | Discussion #207: CRL validity vs publish (`next_publish`), configurable CRL digest, CDP download slug filename, cert notBefore skew, template digest + usage_count; HTTP protocol port may be 80 |
 | Unreleased | 2026-07-17 | CSR SKI/AKI never copied from enrollee CSR; EE/CA AKI from issuer SKI; CA AIA `caIssuers`; CRL `invalidityDate`; unhold → delta `removeFromCRL` |
 | 2.56 | 2026-07-17 | ACME/CSR certificates now include Extended Key Usage (serverAuth), empty subject populated from SAN |

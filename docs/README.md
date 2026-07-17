@@ -31,6 +31,7 @@ Technical documentation for Ultimate Certificate Manager.
 - **[testing/ACME-PUBLIC-VHOST.md](./testing/ACME-PUBLIC-VHOST.md)** — Public ACME vhost, wildcard TLS, test plan
 - **[testing/ACME-PROXY-MULTI-CA.md](./testing/ACME-PROXY-MULTI-CA.md)** — Multi-CA proxy endpoints
 - **[testing/ACME-DNS-PROPAGATION.md](./testing/ACME-DNS-PROPAGATION.md)** — DNS-01 propagation checks
+- **[testing/DISCUSSION-207-CRL-CERT-UX.md](./testing/DISCUSSION-207-CRL-CERT-UX.md)** — Discussion #207 CRL/cert UX + batch-2 test plan
 
 ## Architecture
 

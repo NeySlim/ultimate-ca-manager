@@ -488,9 +488,12 @@ Content-Type: application/json
 
 {
   "name": "Updated Name",
-  "is_active": true
+  "is_active": true,
+  "protocol_http": true
 }
 ```
+
+Optional **`protocol_http`** (bool): when `true` (default), auto CDP/OCSP/AIA URLs use `http://fqdn:8080/...`; when `false`, use `https://fqdn:8443/...`. Changing this regenerates auto URLs for that CA only. Requires `write:cas`.
 
 ### Delete CA
 ```http
@@ -605,6 +608,21 @@ Content-Type: application/json
 ```http
 GET /api/v2/certificates/{cert_id}
 ```
+
+Response includes `friendly_name`, `description`, and `template_name` when set.
+
+### Update Certificate Metadata
+```http
+PATCH /api/v2/certificates/{cert_id}
+Content-Type: application/json
+
+{
+  "description": "VPN gateway leaf",
+  "friendly_name": "vpn-gw-01"
+}
+```
+
+Requires `write:certificates`. Updates **description** and/or **friendly_name** only (does not re-issue the certificate). Empty string clears a field.
 
 ### Export Certificate
 ```http

@@ -44,6 +44,9 @@ class CA(db.Model):
     crl_validity_days = db.Column(db.Integer, default=7)
     crl_publish_interval_hours = db.Column(db.Integer, default=168)
     crl_digest = db.Column(db.String(20), default='sha256')
+    # When True, auto CDP/OCSP/AIA URLs use HTTP protocol port (:8080).
+    # When False, they use admin HTTPS (:8443). Per-CA override of global default.
+    protocol_http = db.Column(db.Boolean, default=True)
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -363,6 +366,7 @@ class CA(db.Model):
                 else 168
             ),
             "crl_digest": self.crl_digest or 'sha256',
+            "protocol_http": True if self.protocol_http is None else bool(self.protocol_http),
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.get_primary_ocsp_url(),

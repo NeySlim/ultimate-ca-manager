@@ -270,8 +270,8 @@ class CACreationMixin:
 
         # Auto-enable CDP if protocol base URL is configured
         try:
-            from utils.protocol_url import get_protocol_base_url
-            base_url = get_protocol_base_url()
+            from utils.protocol_url import get_protocol_base_url_for_ca
+            base_url = get_protocol_base_url_for_ca(ca)
             if base_url:
                 ca.cdp_enabled = True
                 ca.set_cdp_urls([f"{base_url}/cdp/{ca.refid}.crl"])

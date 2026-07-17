@@ -78,6 +78,8 @@ pytest --cov=. --cov-report=term-missing
 | test_crl_rfc5280_profile.py | 13 | IDP/FreshestCRL/reasonCode profile (#204) |
 | test_rfc5280_cert_crl_profile_gaps.py | 8 | CSR SKI/AKI, CA AIA, invalidityDate, unhold removeFromCRL |
 | test_discussion_207_crl_cert_ux.py | 8 | CRL validity/publish/digest, CDP filename, template digest+usage, notBefore skew, port 80, auth gates (#207) |
+| test_discussion_207_batch2.py | 7 | Cert metadata PATCH, CA long validity, protocol_http, template_name (#207 batch-2) |
+| test_discussion_207_batch2_security.py | — | Authz/validation gates for cert PATCH + protocol_http (#207 batch-2) |
 | test_hsm.py | 52 | HSM providers, keys |
 | test_sso_routes.py | 37 | SSO providers, sessions |
 | test_mtls.py | 25 | mTLS settings, certificates |
@@ -306,7 +308,16 @@ jobs:
 python3 scripts/lab_crl_openssl_verify.py
 python3 scripts/lab_rfc5280_cert_crl_profile.py
 python3 scripts/lab_discussion_207_crl_cert_ux.py
+python3 scripts/lab_discussion_207_batch2.py
 ```
+
+Frontend i18n (9 locales) for #207:
+
+```bash
+cd frontend && npx vitest run src/i18n/__tests__/discussion207CrlI18n.test.js src/i18n/__tests__/discussion207Batch2I18n.test.js
+```
+
+See also [testing/DISCUSSION-207-CRL-CERT-UX.md](./testing/DISCUSSION-207-CRL-CERT-UX.md) for the full test plan.
 
 Optional: create a gitignored `.env.lab` with `SECRET_KEY` / `JWT_SECRET_KEY` for stable lab runs.
 

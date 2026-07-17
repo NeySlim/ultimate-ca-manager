@@ -104,6 +104,7 @@ def list_certificates():
                 Certificate.subject.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.issuer.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.descr.ilike(f'%{safe_search}%', escape='\\'),
+                Certificate.friendly_name.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\')
             )
         )
