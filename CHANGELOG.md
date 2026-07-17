@@ -10,10 +10,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.193] - 2026-07-17
+
 ### Changed
 - **WinRM admin channel dependencies bundled** — `pywinrm` and `requests-ntlm` are now part of the default requirements (pure-python wheels), so the Microsoft CA admin channel (revoke/unrevoke, CRL publish, inventory sync) works out of the box on Docker, DEB and RPM without a manual `pip install` — previously impossible in policy-restricted or air-gapped deployments. `requests-kerberos` stays optional (C-extension dependencies). (#159)
 
-### Added
 ### Added
 - **ACME preferred certificate chain** — per-account `preferred_chain` (trust-anchor CN, e.g. `ISRG Root X1`) selects an RFC 8555 `Link: rel="alternate"` chain during certificate download in the ACME client and proxy; matches last cert subject or issuer CN; alternate issuer chains are rebuilt with the primary leaf when intermediates differ; UI field on the multi-CA account manager. (#197)
 

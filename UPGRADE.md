@@ -157,6 +157,14 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v2.193
+
+**No breaking changes for typical deployments** — safe to upgrade directly.
+
+**ACME proxy — loopback upstreams now rejected.** The ACME proxy's upstream calls (directory, nonce, signed POST) now go through the same SSRF-hardened HTTP path as the ACME client: cloud-metadata and **loopback** targets are rejected. If your proxy upstream directory URL points at `localhost` / `127.0.0.1` (e.g. a self-referencing test setup), the proxy directory endpoint will return an error after upgrade. Point it at a routable address instead (a LAN IP or hostname — RFC1918 and `.lan`/`.local` remain fully supported). Regular upstreams (Let's Encrypt, internal CAs on LAN addresses) are unaffected.
+
+**SoftHSM provider config normalized automatically.** Migration 057 rewrites legacy `library_path`/`pin` config keys to `module_path`/`user_pin` on all PKCS#11 providers; the `SoftHSM-Default` provider's *Test connection* works again after upgrade with no manual action.
+
 ### Upgrading to v2.56 from v2.5x
 
 **No breaking changes** — safe to upgrade directly.
