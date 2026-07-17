@@ -365,6 +365,15 @@ http://your-server:8080/cdp/<ca_refid>-delta.crl   # when delta CRL is enabled
 
 Management UI: **CA → CRL / CDP** tab (enable CDP, optional delta, regeneration interval).
 
+### Publishing on TCP port 80
+
+UCM is unprivileged. Prefer one of:
+
+- **`HTTP_PROTOCOL_PORT=80`** in `/etc/ucm/ucm.env` **plus** `CAP_NET_BIND_SERVICE` on the service unit, **or**
+- Keep UCM on **8080** and put a reverse proxy on **:80** (recommended).
+
+Settings → HTTP protocol port in the GUI only allows **0** or **1024–65535**; use the environment for privileged 80. Details: [PUBLIC-ENDPOINTS.md](./testing/PUBLIC-ENDPOINTS.md) (Privileged protocol port 80).
+
 **Regenerate via API** (requires `write:crl`):
 
 ```bash
