@@ -133,8 +133,10 @@ class CACreationMixin:
         # Get parent CA if intermediate
         issuer = None
         issuer_private_key = None
+        parent_cert = None
         parent_cdp_urls = None
         parent_ocsp_urls = None
+        parent_aia_urls = None
         parent_cps_uri = None
         parent_cps_oid = None
         parent_not_after = None
@@ -160,12 +162,17 @@ class CACreationMixin:
             # Increment parent CA serial
             parent_ca.serial = (parent_ca.serial or 0) + 1
 
-            # Resolve parent CDP/OCSP URLs
+            # Resolve parent CDP/OCSP/AIA URLs
             if parent_ca.cdp_enabled:
                 parent_cdp_urls = [url.replace('{ca_refid}', parent_ca.refid or '')
                                   for url in parent_ca.get_cdp_urls()]
             if parent_ca.ocsp_enabled:
                 parent_ocsp_urls = parent_ca.get_ocsp_urls()
+            if parent_ca.aia_ca_issuers_enabled:
+                parent_aia_urls = [
+                    url.replace('{ca_refid}', parent_ca.refid or '')
+                    for url in parent_ca.get_aia_urls()
+                ]
             if parent_ca.cps_enabled and parent_ca.cps_uri:
                 parent_cps_uri = parent_ca.cps_uri
                 parent_cps_oid = parent_ca.cps_oid
@@ -176,10 +183,12 @@ class CACreationMixin:
             private_key=private_key,
             issuer=issuer,
             issuer_private_key=issuer_private_key,
+            issuer_cert=parent_cert,
             validity_days=validity_days,
             digest=digest,
             ocsp_uris=parent_ocsp_urls,
             cdp_urls=parent_cdp_urls,
+            aia_ca_issuers_urls=parent_aia_urls,
             cps_uri=parent_cps_uri,
             cps_oid=parent_cps_oid,
             path_length=path_length,

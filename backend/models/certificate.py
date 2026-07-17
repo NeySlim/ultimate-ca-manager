@@ -50,6 +50,8 @@ class Certificate(db.Model):
     revoked = db.Column(db.Boolean, default=False)
     revoked_at = db.Column(db.DateTime)
     revoke_reason = db.Column(db.String(100))
+    # RFC 5280 §5.3.2 — optional; may precede revoked_at (key compromise time)
+    invalidity_at = db.Column(db.DateTime)
     archived = db.Column(db.Boolean, default=False)  # For renewed certificates
     
     # Metadata
@@ -436,6 +438,7 @@ class Certificate(db.Model):
             "revoked": self.revoked,
             "revoked_at": utc_isoformat(self.revoked_at),
             "revoke_reason": self.revoke_reason,
+            "invalidity_at": utc_isoformat(self.invalidity_at),
             "archived": self.archived or False,
             "imported_from": self.imported_from,
             "created_at": utc_isoformat(self.created_at),

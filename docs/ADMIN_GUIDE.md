@@ -361,6 +361,22 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 2. Configure in CA settings > CRL tab
 3. Set regeneration interval
 
+**RFC 5280 profile (issuing CA + CRL):**
+- CRL **Authority Key Identifier** identifies the **signing CA** Subject Key Identifier (§5.2.1).
+- Base and delta CRLs both **omit** IssuingDistributionPoint (§5.2.4).
+- **FreshestCRL** points at the delta URL when CDP + delta CRL are enabled (§5.2.6).
+- Reason `unspecified` is omitted; `removeFromCRL` appears only on delta CRLs (§5.3.1).
+- Optional revoke field **`invalidity_date`** is emitted as CRL entry `invalidityDate` (§5.3.2).
+- Lifting a **certificateHold** (unhold) regenerates the full CRL; with delta CRL enabled, UCM first emits a delta entry with reason `removeFromCRL`.
+
+**Certificate issuance profile:**
+- CSR-supplied SKI/AKI extensions are **ignored**; SKI comes from the subject public key and AKI from the issuing CA’s SKI.
+- Intermediate CAs inherit parent **AIA caIssuers** (and OCSP) when the parent has AIA/OCSP configured.
+
+Lab scripts (repo root):
+- `python3 scripts/lab_crl_openssl_verify.py`
+- `python3 scripts/lab_rfc5280_cert_crl_profile.py`
+
 ### OCSP Configuration
 
 OCSP responder runs automatically:

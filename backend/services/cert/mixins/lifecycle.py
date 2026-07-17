@@ -264,7 +264,8 @@ class LifecycleMixin:
     def revoke_certificate(
         cert_id: int,
         reason: str = 'unspecified',
-        username: str = 'system'
+        username: str = 'system',
+        invalidity_at=None,
     ) -> Certificate:
         """
         Revoke a certificate
@@ -273,6 +274,7 @@ class LifecycleMixin:
             cert_id: Certificate ID
             reason: Revocation reason
             username: User revoking
+            invalidity_at: Optional RFC 5280 §5.3.2 invalidityDate (datetime)
 
         Returns:
             Updated certificate
@@ -287,6 +289,8 @@ class LifecycleMixin:
         certificate.revoked = True
         certificate.revoked_at = utc_now()
         certificate.revoke_reason = reason
+        if invalidity_at is not None:
+            certificate.invalidity_at = invalidity_at
 
         try:
             db.session.commit()

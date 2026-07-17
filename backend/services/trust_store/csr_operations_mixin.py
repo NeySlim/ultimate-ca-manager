@@ -143,7 +143,16 @@ class CSROperationsMixin:
         # SCEP / ACME enrollee could submit a CSR with BasicConstraints(ca=True)
         # and receive a working subordinate CA (trust escalation).
         issuing_ca = cert_type == 'intermediate_ca'
+        # Never copy SKI/AKI from the CSR — an enrollee could inject a wrong
+        # key identifier (RFC 5280 §4.2.1.1 / §4.2.1.2). Always set them from
+        # the subject public key and the issuing CA certificate below.
+        _skip_from_csr = {
+            ExtensionOID.SUBJECT_KEY_IDENTIFIER,
+            ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
+        }
         for extension in csr.extensions:
+            if extension.oid in _skip_from_csr:
+                continue
             if not issuing_ca and extension.oid == ExtensionOID.BASIC_CONSTRAINTS:
                 # Force a leaf BasicConstraints regardless of what the CSR asked
                 # for (the policy block below only fires when the CSR omits it).
@@ -348,23 +357,18 @@ class CSROperationsMixin:
                     critical=False
                 )
 
-        # SubjectKeyIdentifier
-        try:
-            csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-        except x509.ExtensionNotFound:
-            builder = builder.add_extension(
-                x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
-                critical=False
-            )
+        # SubjectKeyIdentifier — always from the CSR subject public key
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(csr.public_key()),
+            critical=False
+        )
 
-        # AuthorityKeyIdentifier
-        try:
-            csr.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
-        except x509.ExtensionNotFound:
-            builder = builder.add_extension(
-                x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key()),
-                critical=False
-            )
+        # AuthorityKeyIdentifier — always from the issuing CA's SKI
+        from utils.x509_aki import authority_key_identifier_from_issuer
+        builder = builder.add_extension(
+            authority_key_identifier_from_issuer(ca_cert),
+            critical=False
+        )
 
         # OCSP Must-Staple
         if ocsp_must_staple:

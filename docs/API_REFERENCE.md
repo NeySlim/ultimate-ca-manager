@@ -641,9 +641,12 @@ Content-Type: application/json
 
 {
   "reason": "keyCompromise",
-  "comments": "Private key was exposed"
+  "comments": "Private key was exposed",
+  "invalidity_date": "2026-07-10T12:00:00Z"
 }
 ```
+
+Optional **`invalidity_date`** / **`invalidity_at`** (ISO 8601): RFC 5280 §5.3.2 date on which the certificate became invalid (may precede revocation). Emitted as CRL entry `invalidityDate` when set.
 
 **Revocation Reasons:**
 - `unspecified`
@@ -652,6 +655,14 @@ Content-Type: application/json
 - `affiliationChanged`
 - `superseded`
 - `cessationOfOperation`
+- `certificateHold` (temporary; can be lifted via unhold)
+
+### Unhold Certificate (lift certificateHold)
+```http
+POST /api/v2/certificates/{cert_id}/unhold
+```
+
+Requires reason `certificateHold` / `certificate_hold`. When the issuing CA has delta CRL enabled, UCM emits a delta entry with reason `removeFromCRL` (RFC 5280 §5.3.1) before regenerating the full CRL.
 
 ### Import Certificate
 ```http
