@@ -623,14 +623,3 @@ class HsmService:
         except Exception as e:
             db.session.rollback()
             logger.warning(f"Failed to auto-register SoftHSM provider: {e}")
-
-    @staticmethod
-    def repair_all_pkcs11_provider_configs() -> int:
-        """Normalize legacy PKCS#11 config keys for every pkcs11 provider."""
-        repaired = 0
-        for provider in HsmProvider.query.filter_by(type='pkcs11').all():
-            if HsmService.repair_pkcs11_provider_config(provider):
-                repaired += 1
-        if repaired:
-            db.session.commit()
-        return repaired
