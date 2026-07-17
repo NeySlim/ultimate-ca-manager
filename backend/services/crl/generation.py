@@ -90,24 +90,17 @@ class CRLGenerationMixin:
             critical=False
         )
 
+        # RFC 5280 5.2.1: the CRL AKI must identify the key that signs the
+        # CRL, i.e. the issuing CA's own key (its SKI), not the AKI of its
+        # certificate (which points to the parent CA for intermediates).
         try:
-            aki = ca_cert.extensions.get_extension_for_oid(
-                ExtensionOID.AUTHORITY_KEY_IDENTIFIER
-            ).value
-            builder = builder.add_extension(aki, critical=False)
+            ski = ca_cert.extensions.get_extension_for_oid(
+                ExtensionOID.SUBJECT_KEY_IDENTIFIER
+            )
+            aki = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski.value)
         except x509.ExtensionNotFound:
-            try:
-                ski = ca_cert.extensions.get_extension_for_oid(
-                    ExtensionOID.SUBJECT_KEY_IDENTIFIER
-                ).value
-                aki = x509.AuthorityKeyIdentifier(
-                    key_identifier=ski.digest,
-                    authority_cert_issuer=None,
-                    authority_cert_serial_number=None
-                )
-                builder = builder.add_extension(aki, critical=False)
-            except x509.ExtensionNotFound:
-                pass
+            aki = x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key())
+        builder = builder.add_extension(aki, critical=False)
 
         if ca.delta_crl_enabled:
             primary_cdp = ca.get_primary_cdp_url()
@@ -265,24 +258,17 @@ class CRLGenerationMixin:
             except Exception as e:
                 logger.warning(f"Could not add IssuingDistributionPoint to delta CRL: {e}")
 
+        # RFC 5280 5.2.1: the CRL AKI must identify the key that signs the
+        # CRL, i.e. the issuing CA's own key (its SKI), not the AKI of its
+        # certificate (which points to the parent CA for intermediates).
         try:
-            aki = ca_cert.extensions.get_extension_for_oid(
-                ExtensionOID.AUTHORITY_KEY_IDENTIFIER
-            ).value
-            builder = builder.add_extension(aki, critical=False)
+            ski = ca_cert.extensions.get_extension_for_oid(
+                ExtensionOID.SUBJECT_KEY_IDENTIFIER
+            )
+            aki = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski.value)
         except x509.ExtensionNotFound:
-            try:
-                ski = ca_cert.extensions.get_extension_for_oid(
-                    ExtensionOID.SUBJECT_KEY_IDENTIFIER
-                ).value
-                aki = x509.AuthorityKeyIdentifier(
-                    key_identifier=ski.digest,
-                    authority_cert_issuer=None,
-                    authority_cert_serial_number=None
-                )
-                builder = builder.add_extension(aki, critical=False)
-            except x509.ExtensionNotFound:
-                pass
+            aki = x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key())
+        builder = builder.add_extension(aki, critical=False)
 
         crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
 
