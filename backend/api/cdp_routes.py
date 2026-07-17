@@ -3,19 +3,19 @@ CDP (CRL Distribution Point) Routes
 Serves CRLs from database (RFC 5280 §4.2.1.13)
 Supports both refid-based (preferred) and legacy numeric ID-based URLs.
 """
+
+import logging
 import threading
 
 from flask import Blueprint, Response, abort
-import logging
-
-from models import db, CA
+from models import CA, db
 from services.crl_service import CRLService
 from utils.datetime_utils import utc_now
 from utils.sanitize import crl_download_filename
 
 logger = logging.getLogger(__name__)
 
-cdp_bp = Blueprint('cdp', __name__)
+cdp_bp = Blueprint("cdp", __name__)
 
 
 # Per-CA in-memory locks for on-demand CRL generation. /cdp/<ca>.crl is a
@@ -59,7 +59,7 @@ def _resolve_ca(ca_ref):
         return None
 
 
-@cdp_bp.route('/<ca_ref>.crl')
+@cdp_bp.route("/<ca_ref>.crl")
 def get_crl(ca_ref):
     """
     Serve CRL file from database.
@@ -81,7 +81,7 @@ def get_crl(ca_ref):
         nu = crl_meta.next_update
         # Compare in UTC; DB stores naive UTC.
         now_naive = utc_now().replace(tzinfo=None) if utc_now().tzinfo else utc_now()
-        nu_naive = nu.replace(tzinfo=None) if getattr(nu, 'tzinfo', None) else nu
+        nu_naive = nu.replace(tzinfo=None) if getattr(nu, "tzinfo", None) else nu
         if nu_naive <= now_naive:
             needs_regen = True
 
@@ -95,21 +95,31 @@ def get_crl(ca_ref):
                 # finished — shed load instead of piling on.
                 logger.warning(
                     "CDP: CRL generation for CA %s busy >%ds, returning 503",
-                    ca.refid, _CRL_GEN_TIMEOUT_SECONDS,
+                    ca.refid,
+                    _CRL_GEN_TIMEOUT_SECONDS,
                 )
                 return Response(
-                    'CRL generation in progress, retry shortly',
+                    "CRL generation in progress, retry shortly",
                     status=503,
-                    headers={'Retry-After': '5'},
+                    headers={"Retry-After": "5"},
                 )
             try:
                 # Re-check the cache: the request that held the lock
                 # before us may have just populated it.
                 fresh = CRLService.get_latest_crl(ca.id)
                 fresh_expired = (
-                    fresh and fresh.next_update
-                    and (fresh.next_update.replace(tzinfo=None) if getattr(fresh.next_update, 'tzinfo', None) else fresh.next_update)
-                        <= (utc_now().replace(tzinfo=None) if utc_now().tzinfo else utc_now())
+                    fresh
+                    and fresh.next_update
+                    and (
+                        fresh.next_update.replace(tzinfo=None)
+                        if getattr(fresh.next_update, "tzinfo", None)
+                        else fresh.next_update
+                    )
+                    <= (
+                        utc_now().replace(tzinfo=None)
+                        if utc_now().tzinfo
+                        else utc_now()
+                    )
                 )
                 if not fresh or not fresh.crl_der or fresh_expired:
                     try:
@@ -133,34 +143,36 @@ def get_crl(ca_ref):
     return Response(
         crl_meta.crl_der,
         status=200,
-        mimetype='application/pkix-crl',
+        mimetype="application/pkix-crl",
         headers={
-            'Content-Disposition': f'attachment; filename="{crl_download_filename(ca)}"',
-            'Cache-Control': 'public, max-age=3600, must-revalidate',
-            'Last-Modified': crl_meta.this_update.strftime('%a, %d %b %Y %H:%M:%S GMT'),
-        }
+            "Content-Disposition": f'attachment; filename="{crl_download_filename(ca)}"',
+            "Cache-Control": "public, max-age=3600, must-revalidate",
+            "Last-Modified": crl_meta.this_update.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        },
     )
 
 
-@cdp_bp.route('/<ca_ref>-delta.crl')
+@cdp_bp.route("/<ca_ref>-delta.crl")
 def get_delta_crl(ca_ref):
     """Serve delta CRL file from database"""
     ca = _resolve_ca(ca_ref)
     if not ca:
         abort(404)
-    
+
     delta_crl = CRLService.get_latest_delta_crl(ca.id)
-    
+
     if not delta_crl or not delta_crl.crl_der:
         abort(404)
-    
+
     return Response(
         delta_crl.crl_der,
         status=200,
-        mimetype='application/pkix-crl',
+        mimetype="application/pkix-crl",
         headers={
-            'Content-Disposition': f'attachment; filename="{crl_download_filename(ca, delta=True)}"',
-            'Cache-Control': 'public, max-age=900, must-revalidate',
-            'Last-Modified': delta_crl.this_update.strftime('%a, %d %b %Y %H:%M:%S GMT'),
-        }
+            "Content-Disposition": f'attachment; filename="{crl_download_filename(ca, delta=True)}"',
+            "Cache-Control": "public, max-age=900, must-revalidate",
+            "Last-Modified": delta_crl.this_update.strftime(
+                "%a, %d %b %Y %H:%M:%S GMT"
+            ),
+        },
     )
