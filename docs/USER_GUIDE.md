@@ -147,8 +147,11 @@ Templates define default settings for certificates.
    - **Key Usage** - Digital Signature, Key Encipherment, etc.
    - **Extended Key Usage** - Server Auth, Client Auth, etc.
    - **Default Validity** - Days/months/years
+   - **Digest** - Signature hash for issued certificates (`sha256` default; `sha384` / `sha512` also supported)
    - **Subject Constraints** - Required/allowed fields
 4. Click **Save**
+
+When you issue a certificate from **Certificates → Issue** and select a template, UCM applies that template’s digest (and validity defaults) and records the template on the certificate. The Templates page shows a live **usage count** of certificates issued with each template.
 
 ### Built-in Templates
 
@@ -246,9 +249,24 @@ Enable device auto-enrollment:
 
 Real-time certificate validation:
 
-1. OCSP is enabled automatically
-2. URL: `https://your-server:8443/ocsp`
-3. Configure in CA settings for CDP/AIA extensions
+1. Enable OCSP per CA on the **CRL & OCSP** page (or CA settings)
+2. Public URL (typical): `http://your-server:8080/ocsp` on the protocol HTTP port, or via reverse proxy
+3. Configure CDP/AIA URLs on the CA so issued certificates advertise the responder
+
+### CRL distribution (CDP)
+
+1. Go to **CRL & OCSP**
+2. Select a CA and enable **Auto-Regen** / CDP as needed
+3. In the detail panel, use **Full CRL schedule** to set:
+   - **CRL validity** — `nextUpdate` window on the published CRL (default 7 days)
+   - **Publish interval** — when UCM should republish (`next_publish`; independent of validity)
+   - **CRL signature digest** — hash used when signing the CRL (default SHA-256)
+4. Optional: enable **Delta CRL** and its interval
+5. Relying parties fetch: `http://your-server:8080/cdp/<ca_refid>.crl` (download name is human-readable; URL stays refid-based)
+
+Issued certificates use a short **notBefore** backdate (~15 minutes) so clients with slightly skewed clocks still accept fresh certs.
+
+For privileged protocol port **80**, reverse-proxy notes, and API details, see [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) (Protocol Administration).
 
 ### EST Server
 
@@ -381,6 +399,14 @@ UCM is mobile-responsive:
 1. Verify CA has valid private key
 2. Check CA validity period
 3. Review error message in notification
+4. If clients reject a *just-issued* certificate as “not yet valid”, check client clock skew (UCM backdates `notBefore` by ~15 minutes)
+
+### CRL / CDP Not Updating
+
+1. Confirm CDP / Auto-Regen is enabled for the CA on **CRL & OCSP**
+2. Check **Full CRL schedule** — publish interval vs validity (publish can be due before `nextUpdate`)
+3. Offline CAs cannot sign new CRLs (existing CDP content may still be served)
+4. Protocol HTTP must be reachable (default port 8080; port 80 needs bind capability or a reverse proxy)
 
 ### SCEP/ACME Not Working
 

@@ -28,6 +28,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Docs
 - ADMIN_GUIDE / API_REFERENCE / TESTING / SECURITY updated for CRL schedule, port 80, notBefore skew, template digest.
+- USER_GUIDE: CRL & OCSP operator workflow (Full CRL schedule, template digest/usage); PUBLIC-ENDPOINTS notes port 80.
 
 ## [2.194] - 2026-07-17
 
