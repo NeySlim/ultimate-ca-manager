@@ -10,6 +10,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **CRL download filename** — CDP responses use a human-readable `Content-Disposition` attachment name (`{slug}-{refid8}.crl`); URL paths remain refid-based. (#207)
+
 ## [2.194] - 2026-07-17
 
 ### Fixed
