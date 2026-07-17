@@ -13,6 +13,7 @@ from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
 )
+from utils.pkcs11_config import normalize_pkcs11_config
 from utils.request_helpers import safe_call
 
 logger = logging.getLogger(__name__)
@@ -72,8 +73,9 @@ class Pkcs11Provider(BaseHsmProvider):
                 "Install with: pip install python-pkcs11"
             )
         
+        config = normalize_pkcs11_config(config)
         super().__init__(config)
-        
+
         # Validate config
         self.module_path = config.get('module_path')
         self.token_label = config.get('token_label')

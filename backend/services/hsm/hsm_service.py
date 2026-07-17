@@ -551,6 +551,22 @@ class HsmService:
             raise HsmOperationError(f"Failed to sync keys: {str(e)}")
 
     @staticmethod
+    def repair_pkcs11_provider_config(provider: HsmProvider) -> bool:
+        """Rewrite legacy PKCS#11 config keys (library_path/pin) in-place."""
+        from utils.pkcs11_config import (
+            normalize_pkcs11_config,
+            pkcs11_config_needs_normalization,
+        )
+
+        if provider.type != 'pkcs11':
+            return False
+        raw = provider.get_config()
+        if not pkcs11_config_needs_normalization(raw):
+            return False
+        provider.set_config(normalize_pkcs11_config(raw))
+        return True
+
+    @staticmethod
     def auto_register_softhsm():
         """
         Auto-register SoftHSM provider from Docker entrypoint env vars.
@@ -558,17 +574,32 @@ class HsmService:
           - HSM_DEFAULT_PIN env var is set (entrypoint initialized a token)
           - No provider named 'SoftHSM-Default' already exists
           - SoftHSM library is available on disk
+
+        Also repairs legacy config keys on an existing SoftHSM-Default row
+        (library_path/pin → module_path/user_pin).
         """
         import os
+        from utils.hsm_check import _find_softhsm
+
         pin = os.environ.get('HSM_DEFAULT_PIN')
+        existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
+        if existing:
+            if HsmService.repair_pkcs11_provider_config(existing):
+                try:
+                    db.session.commit()
+                    logger.info(
+                        "Repaired PKCS#11 config keys for SoftHSM-Default provider"
+                    )
+                except Exception as e:
+                    db.session.rollback()
+                    logger.warning(
+                        "Failed to repair SoftHSM-Default provider config: %s", e
+                    )
+            return
+
         if not pin:
             return
 
-        existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
-        if existing:
-            return
-
-        from utils.hsm_check import _find_softhsm
         lib_path = _find_softhsm()
         if not lib_path:
             logger.debug("HSM_DEFAULT_PIN set but SoftHSM library not found — skipping auto-register")
