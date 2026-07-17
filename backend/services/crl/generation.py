@@ -2,6 +2,7 @@ import base64
 import logging
 from datetime import timedelta
 from typing import Optional
+from urllib.parse import urlparse
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -16,6 +17,96 @@ from ._constants import REASON_MAP
 from .query import CRLQueryMixin
 
 logger = logging.getLogger(__name__)
+
+
+def _authority_key_identifier_for_crl(ca_cert: x509.Certificate) -> x509.AuthorityKeyIdentifier:
+    """RFC 5280 §5.2.1 — CRL AKI must identify the signing CA key (its SKI)."""
+    try:
+        ski = ca_cert.extensions.get_extension_for_oid(
+            ExtensionOID.SUBJECT_KEY_IDENTIFIER
+        )
+        return x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski.value)
+    except x509.ExtensionNotFound:
+        return x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key())
+
+
+def _apply_revoke_reason(
+    revoked_builder: x509.RevokedCertificateBuilder,
+    revoke_reason: Optional[str],
+    *,
+    is_delta: bool,
+) -> x509.RevokedCertificateBuilder:
+    """Attach CRLReason when RFC-conformant.
+
+    RFC 5280 §5.3.1:
+    - omit the extension instead of emitting ``unspecified``
+    - ``removeFromCRL`` may only appear on delta CRLs
+    """
+    if not revoke_reason:
+        return revoked_builder
+
+    if revoke_reason == 'unspecified':
+        return revoked_builder
+
+    if revoke_reason == 'removeFromCRL' and not is_delta:
+        logger.warning(
+            "CRL: omitting removeFromCRL reason on full CRL (RFC 5280 §5.3.1 — delta only)"
+        )
+        return revoked_builder
+
+    reason = REASON_MAP.get(revoke_reason)
+    if reason is None or reason is x509.ReasonFlags.unspecified:
+        logger.warning(f"CRL: omitting unknown/unspecified revoke_reason={revoke_reason!r}")
+        return revoked_builder
+
+    return revoked_builder.add_extension(x509.CRLReason(reason), critical=False)
+
+
+def _add_freshest_crl(builder: x509.CertificateRevocationListBuilder, ca: CA):
+    """RFC 5280 §5.2.6 — non-critical pointer to the delta CRL (complete CRLs only)."""
+    if not ca.delta_crl_enabled:
+        return builder
+
+    primary_cdp = ca.get_primary_cdp_url()
+    if not primary_cdp:
+        return builder
+
+    try:
+        parsed = urlparse(primary_cdp.replace('{ca_refid}', ca.refid))
+        delta_url = f"{parsed.scheme}://{parsed.netloc}/cdp/{ca.refid}-delta.crl"
+        return builder.add_extension(
+            x509.FreshestCRL([
+                x509.DistributionPoint(
+                    full_name=[x509.UniformResourceIdentifier(delta_url)],
+                    relative_name=None,
+                    reasons=None,
+                    crl_issuer=None,
+                )
+            ]),
+            critical=False,
+        )
+    except Exception as e:
+        logger.warning(f"Could not add FreshestCRL extension: {e}")
+        return builder
+
+
+def _parse_revoked_serial(cert: Certificate, *, context: str) -> Optional[int]:
+    if not cert.serial_number:
+        return None
+    serial_int = serial_to_int(cert.serial_number)
+    if serial_int is None or serial_int <= 0:
+        logger.warning(
+            f"{context}: skipping cert {cert.id} with unparseable serial {cert.serial_number!r}"
+        )
+        return None
+    if serial_int.bit_length() > 159:
+        # RFC 5280 §4.1.2.2 caps serials at 20 octets (≤159 bits effective).
+        logger.error(
+            f"{context}: cert {cert.id} serial exceeds 159 bits "
+            f"({serial_int.bit_length()} bits); skipping — revocation NOT in CRL"
+        )
+        return None
+    return serial_int
 
 
 class CRLGenerationMixin:
@@ -54,74 +145,28 @@ class CRLGenerationMixin:
         builder = builder.last_update(now)
         builder = builder.next_update(now + timedelta(days=validity_days))
 
+        entries = 0
         for cert in revoked_certs:
-            if not cert.serial_number:
-                continue
-
-            serial_int = serial_to_int(cert.serial_number)
-            if serial_int is None or serial_int <= 0:
-                logger.warning(f"CRL: skipping cert {cert.id} with unparseable serial {cert.serial_number!r}")
-                continue
-            if serial_int.bit_length() > 159:
-                # RFC 5280 §4.1.2.2 caps serials at 20 octets (≤159 bits effective).
-                # A cert issued above this bound is itself non-conformant; we cannot
-                # safely truncate (it would change the identity), so skip and log.
-                logger.error(
-                    f"CRL: cert {cert.id} serial exceeds 159 bits "
-                    f"({serial_int.bit_length()} bits); skipping — revocation NOT in CRL"
-                )
+            serial_int = _parse_revoked_serial(cert, context='CRL')
+            if serial_int is None:
                 continue
 
             revoked_builder = x509.RevokedCertificateBuilder()
             revoked_builder = revoked_builder.serial_number(serial_int)
             revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
-
-            if cert.revoke_reason:
-                reason = REASON_MAP.get(cert.revoke_reason, x509.ReasonFlags.unspecified)
-                revoked_builder = revoked_builder.add_extension(
-                    x509.CRLReason(reason),
-                    critical=False
-                )
-
-            builder = builder.add_revoked_certificate(revoked_builder.build())
-
-        builder = builder.add_extension(
-            x509.CRLNumber(crl_number),
-            critical=False
-        )
-
-        # RFC 5280 5.2.1: the CRL AKI must identify the key that signs the
-        # CRL, i.e. the issuing CA's own key (its SKI), not the AKI of its
-        # certificate (which points to the parent CA for intermediates).
-        try:
-            ski = ca_cert.extensions.get_extension_for_oid(
-                ExtensionOID.SUBJECT_KEY_IDENTIFIER
+            revoked_builder = _apply_revoke_reason(
+                revoked_builder, cert.revoke_reason, is_delta=False
             )
-            aki = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski.value)
-        except x509.ExtensionNotFound:
-            aki = x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key())
-        builder = builder.add_extension(aki, critical=False)
+            builder = builder.add_revoked_certificate(revoked_builder.build())
+            entries += 1
 
-        if ca.delta_crl_enabled:
-            primary_cdp = ca.get_primary_cdp_url()
-            if primary_cdp:
-                from urllib.parse import urlparse
-                parsed = urlparse(primary_cdp.replace('{ca_refid}', ca.refid))
-                delta_url = f"{parsed.scheme}://{parsed.netloc}/cdp/{ca.refid}-delta.crl"
-            try:
-                builder = builder.add_extension(
-                    x509.FreshestCRL([
-                        x509.DistributionPoint(
-                            full_name=[x509.UniformResourceIdentifier(delta_url)],
-                            relative_name=None,
-                            reasons=None,
-                            crl_issuer=None
-                        )
-                    ]),
-                    critical=False
-                )
-            except Exception as e:
-                logger.warning(f"Could not add FreshestCRL extension: {e}")
+        builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
+        builder = builder.add_extension(
+            _authority_key_identifier_for_crl(ca_cert), critical=False
+        )
+        # RFC 5280 §5.2.4: base and delta MUST both omit IDP or carry identical IDP.
+        # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
+        builder = _add_freshest_crl(builder, ca)
 
         crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
 
@@ -135,7 +180,7 @@ class CRLGenerationMixin:
             next_update=now + timedelta(days=validity_days),
             crl_pem=crl_pem,
             crl_der=crl_der,
-            revoked_count=len(revoked_certs),
+            revoked_count=entries,
             generated_by=username,
             is_delta=False,
             base_crl_number=None
@@ -144,16 +189,21 @@ class CRLGenerationMixin:
         db.session.add(crl_metadata)
 
         from services.audit_service import AuditService
-        AuditService.log_ca('generate_crl', ca,
-                            f"Generated CRL #{crl_number} for CA {ca.descr} with "
-                            f"{len(revoked_certs)} revoked certificates",
-                            username=username)
+        AuditService.log_ca(
+            'generate_crl', ca,
+            f"Generated CRL #{crl_number} for CA {ca.descr} with "
+            f"{entries} revoked certificates",
+            username=username,
+        )
 
         try:
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()
-            logger.error(f"Commit failed in services/crl/generation.py:155: {_commit_err}", exc_info=True)
+            logger.error(
+                f"Commit failed in services/crl/generation.py: {_commit_err}",
+                exc_info=True,
+            )
             raise
 
         return crl_metadata
@@ -206,69 +256,29 @@ class CRLGenerationMixin:
         builder = builder.last_update(now)
         builder = builder.next_update(now + timedelta(hours=validity_hours))
 
+        entries = 0
         for cert in revoked_certs:
-            if not cert.serial_number:
-                continue
-            serial_int = serial_to_int(cert.serial_number)
-            if serial_int is None or serial_int <= 0:
-                logger.warning(f"Delta CRL: skipping cert {cert.id} with unparseable serial {cert.serial_number!r}")
-                continue
-            if serial_int.bit_length() > 159:
-                logger.error(
-                    f"Delta CRL: cert {cert.id} serial exceeds 159 bits; skipping — revocation NOT in delta CRL"
-                )
+            serial_int = _parse_revoked_serial(cert, context='Delta CRL')
+            if serial_int is None:
                 continue
 
             revoked_builder = x509.RevokedCertificateBuilder()
             revoked_builder = revoked_builder.serial_number(serial_int)
             revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
-
-            if cert.revoke_reason:
-                reason = REASON_MAP.get(cert.revoke_reason, x509.ReasonFlags.unspecified)
-                revoked_builder = revoked_builder.add_extension(
-                    x509.CRLReason(reason), critical=False
-                )
-
+            revoked_builder = _apply_revoke_reason(
+                revoked_builder, cert.revoke_reason, is_delta=True
+            )
             builder = builder.add_revoked_certificate(revoked_builder.build())
+            entries += 1
 
-        builder = builder.add_extension(
-            x509.CRLNumber(crl_number), critical=False
-        )
-
+        builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
         builder = builder.add_extension(
             x509.DeltaCRLIndicator(base_crl.crl_number), critical=True
         )
-
-        primary_cdp = ca.get_primary_cdp_url()
-        if primary_cdp:
-            try:
-                cdp_resolved = primary_cdp.replace('{ca_refid}', ca.refid)
-                builder = builder.add_extension(
-                    x509.IssuingDistributionPoint(
-                        full_name=[x509.UniformResourceIdentifier(cdp_resolved)],
-                        relative_name=None,
-                        only_contains_user_certs=False,
-                        only_contains_ca_certs=False,
-                        only_some_reasons=None,
-                        indirect_crl=False,
-                        only_contains_attribute_certs=False
-                    ),
-                    critical=True
-                )
-            except Exception as e:
-                logger.warning(f"Could not add IssuingDistributionPoint to delta CRL: {e}")
-
-        # RFC 5280 5.2.1: the CRL AKI must identify the key that signs the
-        # CRL, i.e. the issuing CA's own key (its SKI), not the AKI of its
-        # certificate (which points to the parent CA for intermediates).
-        try:
-            ski = ca_cert.extensions.get_extension_for_oid(
-                ExtensionOID.SUBJECT_KEY_IDENTIFIER
-            )
-            aki = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(ski.value)
-        except x509.ExtensionNotFound:
-            aki = x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key())
-        builder = builder.add_extension(aki, critical=False)
+        # No IssuingDistributionPoint — must match the base CRL (both omit).
+        builder = builder.add_extension(
+            _authority_key_identifier_for_crl(ca_cert), critical=False
+        )
 
         crl = builder.sign(ca_private_key, hashes.SHA256(), default_backend())
 
@@ -283,7 +293,7 @@ class CRLGenerationMixin:
                 next_update=now + timedelta(hours=validity_hours),
                 crl_pem=crl_pem,
                 crl_der=crl_der,
-                revoked_count=len(revoked_certs),
+                revoked_count=entries,
                 generated_by=username,
                 is_delta=True,
                 base_crl_number=base_crl.crl_number
@@ -292,17 +302,21 @@ class CRLGenerationMixin:
             db.session.add(crl_metadata)
 
             from services.audit_service import AuditService
-            AuditService.log_ca('generate_delta_crl', ca,
-                                f"Generated delta CRL #{crl_number} (base #{base_crl.crl_number}) "
-                                f"with {len(revoked_certs)} new revocations",
-                                username=username)
+            AuditService.log_ca(
+                'generate_delta_crl', ca,
+                f"Generated delta CRL #{crl_number} (base #{base_crl.crl_number}) "
+                f"with {entries} new revocations",
+                username=username,
+            )
 
             db.session.commit()
         except Exception:
             db.session.rollback()
             raise
 
-        logger.info(f"Generated delta CRL #{crl_number} for CA {ca.descr} "
-                    f"(base #{base_crl.crl_number}, {len(revoked_certs)} entries)")
+        logger.info(
+            f"Generated delta CRL #{crl_number} for CA {ca.descr} "
+            f"(base #{base_crl.crl_number}, {entries} entries)"
+        )
 
         return crl_metadata

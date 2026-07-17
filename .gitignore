@@ -106,3 +106,7 @@ data/
 CLAUDE.md
 backend/static/
 SECURITY_AUDIT.md
+
+# Local lab secrets (OpenSSL / create_app)
+.env.lab
+.env*.local

@@ -12,9 +12,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - **CRL Authority Key Identifier (RFC 5280 §5.2.1)** — full and delta CRLs now set AKI from the issuing CA's Subject Key Identifier (with public-key fallback if SKI is absent), instead of copying the CA certificate's AKI (which points at the parent for intermediates). Clients that match CRL AKI to the signing CA SKI no longer reject intermediate CRLs. (#202)
+- **CRL RFC 5280 profile follow-up** — omit `IssuingDistributionPoint` on delta CRLs so base+delta both omit IDP (§5.2.4); guard `FreshestCRL` so missing CDP no longer raises (§5.2.6); omit `unspecified` reasonCode and restrict `removeFromCRL` to delta CRLs (§5.3.1); shared AKI helper; accurate `revoked_count`.
 
 ### Tests
 - Regression coverage for #202: intermediate full/delta CRL AKI≠parent, root CRL, SKI-missing fallback, and unauthenticated regenerate gates.
+- RFC 5280 CRL profile suite: IDP parity, FreshestCRL, reasonCode, AKI smoke, auth gates, openssl lab text dump.
 
 ## [2.193] - 2026-07-17
 
