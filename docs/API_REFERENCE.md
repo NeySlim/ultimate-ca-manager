@@ -1305,6 +1305,22 @@ GET /api/v2/crl/{ca_id}
 POST /api/v2/crl/{ca_id}/regenerate
 ```
 
+Requires `write:crl`. Offline CAs return `400`. Response metadata omits PEM by default; fetch PEM with `GET /api/v2/crl/{ca_id}`.
+
+Generated CRLs include **Authority Key Identifier** = issuing CA **Subject Key Identifier** (RFC 5280 §5.2.1).
+
+### Get Delta CRL
+```http
+GET /api/v2/crl/{ca_id}/delta
+```
+
+### Regenerate Delta CRL
+```http
+POST /api/v2/crl/{ca_id}/delta/regenerate
+```
+
+Requires CDP + delta CRL enabled on the CA, and an existing complete CRL.
+
 ### OCSP Status
 ```http
 GET /api/v2/ocsp/status
