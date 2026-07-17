@@ -35,7 +35,7 @@
 - **SCEP** -- RFC 8894 device auto-enrollment with approval workflows
 - **EST** -- RFC 7030 Enrollment over Secure Transport
 - **OCSP** -- RFC 6960 real-time certificate status
-- **CRL/CDP** -- Certificate Revocation List distribution with Delta CRL support (RFC 5280 §5.2.4)
+- **CRL/CDP** -- Certificate Revocation List distribution with Delta CRL support (RFC 5280 §5.2.4), per-CA schedule (validity decoupled from publish cadence) and configurable signature digest
 - **AIA CA Issuers** -- Authority Information Access CA certificate download (RFC 5280 §4.2.2.1)
 
 ### Integrations
