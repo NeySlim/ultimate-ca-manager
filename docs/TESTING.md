@@ -80,6 +80,8 @@ pytest --cov=. --cov-report=term-missing
 | test_discussion_207_crl_cert_ux.py | 8 | CRL validity/publish/digest, CDP filename, template digest+usage, notBefore skew, port 80, auth gates (#207) |
 | test_discussion_207_batch2.py | 7 | Cert metadata PATCH, CA long validity, protocol_http, template_name (#207 batch-2) |
 | test_discussion_207_batch2_security.py | — | Authz/validation gates for cert PATCH + protocol_http (#207 batch-2) |
+| test_protocol_url_flexibility.py | — | protocol_mode inherit/https/custom + endpoint overrides (#207) |
+| test_protocol_url_flexibility_security.py | — | Authz + URL injection gates for protocol overrides (#207) |
 | test_hsm.py | 52 | HSM providers, keys |
 | test_sso_routes.py | 37 | SSO providers, sessions |
 | test_mtls.py | 25 | mTLS settings, certificates |

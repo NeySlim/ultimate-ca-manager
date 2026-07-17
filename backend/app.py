@@ -1030,6 +1030,11 @@ def init_database(app):
                 ('crl_publish_interval_hours', 'INTEGER', '168'),
                 ('crl_digest', 'VARCHAR(20)', "'sha256'"),
                 ('protocol_http', 'BOOLEAN', '1'),
+                ('protocol_mode', 'VARCHAR(32)', "'inherit'"),
+                ('protocol_base_url_override', 'VARCHAR(512)', None),
+                ('cdp_base_url', 'VARCHAR(512)', None),
+                ('ocsp_base_url', 'VARCHAR(512)', None),
+                ('aia_base_url', 'VARCHAR(512)', None),
             ],
             'groups': [
                 ('description', 'TEXT', None),

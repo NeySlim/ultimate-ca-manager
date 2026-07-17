@@ -17,7 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **Template usage_count** — template API reports live count from `Certificate.template_id`. (#207)
 - **CRL/OCSP UI** — CA detail panel configures full CRL validity / publish interval / digest; shows `next_publish`; certificate issue form applies template digest. (#207)
 - **Certificate friendly name + editable description** — `PATCH /api/v2/certificates/<id>`; list shows **template used** (`template_name`); migration **060**. (#207 batch-2)
-- **Per-CA CDP/OCSP HTTP vs HTTPS** — `protocol_http` (migration **061**): HTTP protocol port (:8080) or admin HTTPS; regenerates auto CDP/OCSP/AIA URLs. (#207)
+- **Per-CA protocol URL flexibility** — `protocol_mode` (`inherit`\|`http_protocol`\|`https_admin`\|`custom`), `protocol_base_url_override`, and optional `cdp_base_url` / `ocsp_base_url` / `aia_base_url` (migration **062**). Legacy `protocol_http` (migration **061**) still supported. (#207)
 - **CA validity > 20 years** — UI presets up to 100 years, custom years, and custom end date (`validityEndDate`). (#207 batch-2)
 
 ### Fixed
@@ -29,6 +29,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Discussion #207 suite: CRL config/`next_publish`/digest, CDP filename, template digest+usage, notBefore skew, port 80 settings.
 - Discussion #207 batch-2: `test_discussion_207_batch2.py` (PATCH metadata, template_name, CA validity, protocol_http).
 - Discussion #207 batch-2 security: `test_discussion_207_batch2_security.py` (authz + validation gates).
+- Protocol URL flexibility: `test_protocol_url_flexibility.py` + `test_protocol_url_flexibility_security.py`.
 - Lab: `scripts/lab_discussion_207_crl_cert_ux.py`, `scripts/lab_discussion_207_batch2.py`.
 - Frontend i18n: `discussion207CrlI18n.test.js`, `discussion207Batch2I18n.test.js` (9 locales).
 

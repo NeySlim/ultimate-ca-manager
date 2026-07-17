@@ -224,12 +224,21 @@ export default function CRLOCSPPage() {
     }
   }
 
-  const handleProtocolHttpChange = async (ca, useHttp) => {
+  const handleProtocolTransportChange = async (ca, patch) => {
     if (!canWrite('cas') && !canWrite('crl')) return
     try {
-      const result = await casService.update(ca.id, { protocol_http: useHttp })
+      const result = await casService.update(ca.id, patch)
       const updated = result.data || result
-      showSuccess(t(useHttp ? 'crlOcsp.protocolHttpEnabled' : 'crlOcsp.protocolHttpsEnabled'))
+      const mode = updated.protocol_mode || patch.protocol_mode
+      showSuccess(
+        t(
+          mode === 'https_admin'
+            ? 'crlOcsp.protocolHttpsEnabled'
+            : mode === 'custom'
+              ? 'crlOcsp.protocolCustomEnabled'
+              : 'crlOcsp.protocolHttpEnabled'
+        )
+      )
       setCas(prev => prev.map(c => c.id === ca.id ? { ...c, ...updated } : c))
       if (selectedCA?.id === ca.id) {
         setSelectedCA(prev => ({ ...prev, ...updated }))
@@ -237,6 +246,12 @@ export default function CRLOCSPPage() {
     } catch (error) {
       showError(error.message || t('crlOcsp.protocolHttpFailed'))
     }
+  }
+
+  const handleProtocolHttpChange = async (ca, useHttp) => {
+    await handleProtocolTransportChange(ca, {
+      protocol_mode: useHttp ? 'inherit' : 'https_admin',
+    })
   }
 
   const handleToggleOcsp = async (ca) => {
@@ -696,19 +711,96 @@ export default function CRLOCSPPage() {
         </CompactGrid>
       </CompactSection>
 
-      {/* Per-CA CDP/OCSP transport: HTTP :8080 vs HTTPS admin */}
+      {/* Per-CA CDP/OCSP transport flexibility */}
       <div className="space-y-2 border-t border-border pt-4">
         <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.protocolTransportTitle')}</h4>
         <p className="text-xs text-text-tertiary">{t('crlOcsp.protocolTransportHelp')}</p>
         <select
           className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary w-full sm:w-auto"
-          value={(selectedCA?.protocol_http !== false) ? 'http' : 'https'}
+          value={
+            selectedCA?.protocol_mode
+            || (selectedCA?.protocol_http === false ? 'https_admin' : 'inherit')
+          }
           disabled={!canWrite('cas') && !canWrite('crl')}
-          onChange={(e) => handleProtocolHttpChange(selectedCA, e.target.value === 'http')}
+          onChange={(e) => {
+            const mode = e.target.value
+            if (mode === 'custom') {
+              // Show override fields first; persist on blur when URL is set
+              setSelectedCA(prev => (prev ? { ...prev, protocol_mode: 'custom' } : prev))
+              return
+            }
+            handleProtocolTransportChange(selectedCA, { protocol_mode: mode })
+          }}
         >
-          <option value="http">{t('crlOcsp.protocolHttpOption')}</option>
-          <option value="https">{t('crlOcsp.protocolHttpsOption')}</option>
+          <option value="inherit">{t('crlOcsp.protocolModeInherit')}</option>
+          <option value="http_protocol">{t('crlOcsp.protocolModeHttp')}</option>
+          <option value="https_admin">{t('crlOcsp.protocolModeHttps')}</option>
+          <option value="custom">{t('crlOcsp.protocolModeCustom')}</option>
         </select>
+
+        {(selectedCA?.protocol_mode === 'custom'
+          || (!selectedCA?.protocol_mode && selectedCA?.protocol_base_url_override)) && (
+          <div className="flex flex-col gap-1 max-w-xl">
+            <label className="text-xs text-text-secondary" htmlFor="ca-protocol-base-override">
+              {t('crlOcsp.protocolBaseOverride')}
+            </label>
+            <input
+              id="ca-protocol-base-override"
+              type="url"
+              className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary"
+              placeholder="http://pki-lab.example:8080"
+              defaultValue={selectedCA?.protocol_base_url_override || ''}
+              key={`pbase-${selectedCA?.id}-${selectedCA?.protocol_base_url_override || ''}`}
+              disabled={!canWrite('cas') && !canWrite('crl')}
+              onBlur={(e) => {
+                const v = e.target.value.trim()
+                if (v === (selectedCA?.protocol_base_url_override || '')) return
+                handleProtocolTransportChange(selectedCA, {
+                  protocol_mode: 'custom',
+                  protocol_base_url_override: v || null,
+                })
+              }}
+            />
+            <p className="text-xs text-text-tertiary">{t('crlOcsp.protocolBaseOverrideHelp')}</p>
+          </div>
+        )}
+
+        <details className="text-xs text-text-secondary">
+          <summary className="cursor-pointer select-none text-text-primary">
+            {t('crlOcsp.protocolAdvancedEndpoints')}
+          </summary>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {[
+              ['cdp_base_url', 'protocolCdpBase', 'protocolCdpBaseHelp'],
+              ['ocsp_base_url', 'protocolOcspBase', 'protocolOcspBaseHelp'],
+              ['aia_base_url', 'protocolAiaBase', 'protocolAiaBaseHelp'],
+            ].map(([field, labelKey, helpKey]) => (
+              <div key={field} className="flex flex-col gap-1">
+                <label className="text-xs text-text-secondary" htmlFor={`ca-${field}`}>
+                  {t(`crlOcsp.${labelKey}`)}
+                </label>
+                <input
+                  id={`ca-${field}`}
+                  type="url"
+                  className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1.5 text-text-primary"
+                  placeholder="http://…"
+                  defaultValue={selectedCA?.[field] || ''}
+                  key={`${field}-${selectedCA?.id}-${selectedCA?.[field] || ''}`}
+                  disabled={!canWrite('cas') && !canWrite('crl')}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim()
+                    if (v === (selectedCA?.[field] || '')) return
+                    handleProtocolTransportChange(selectedCA, { [field]: v || null })
+                  }}
+                />
+                <p className="text-[11px] text-text-tertiary">{t(`crlOcsp.${helpKey}`)}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+            {t('crlOcsp.protocolTlsLoopWarning')}
+          </p>
+        </details>
       </div>
 
       {/* Full CRL validity / publish / digest (#207) */}

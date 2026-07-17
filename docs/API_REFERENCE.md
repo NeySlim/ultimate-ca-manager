@@ -493,7 +493,15 @@ Content-Type: application/json
 }
 ```
 
-Optional **`protocol_http`** (bool): when `true` (default), auto CDP/OCSP/AIA URLs use `http://fqdn:8080/...`; when `false`, use `https://fqdn:8443/...`. Changing this regenerates auto URLs for that CA only. Requires `write:cas`.
+Optional **`protocol_http`** (bool, legacy): `true` → `protocol_mode=inherit`; `false` → `protocol_mode=https_admin`.
+
+Optional **`protocol_mode`**: `inherit` (default, Settings HTTP protocol URL) | `http_protocol` | `https_admin` | `custom`.
+
+Optional overrides (origin only, no path; max 512 chars; localhost rejected):
+- **`protocol_base_url_override`** — required (or an endpoint base) when `protocol_mode=custom`
+- **`cdp_base_url` / `ocsp_base_url` / `aia_base_url`** — per-endpoint bases
+
+Changing any of these regenerates enabled auto CDP/OCSP/AIA URLs. Requires `write:cas`.
 
 ### Delete CA
 ```http

@@ -263,13 +263,15 @@ Real-time certificate validation:
    - **CRL signature digest** — hash used when signing the CRL (default SHA-256)
 4. Optional: enable **Delta CRL** and its interval
 5. Relying parties fetch: `http://your-server:8080/cdp/<ca_refid>.crl` (download name is human-readable; URL stays refid-based)
-6. Optional: under **CDP / OCSP URL transport**, choose **HTTP (port 8080)** or **HTTPS (admin port)** for that CA’s embedded CDP/OCSP/AIA URLs
+6. Optional: under **CDP / OCSP URL transport**, choose **Inherit** (Settings HTTP — recommended), force HTTP protocol, HTTPS admin (TLS loop risk), or a **custom** base URL; advanced section allows separate CDP/OCSP/AIA bases
 
 Issued certificates use a short **notBefore** backdate (~15 minutes) so clients with slightly skewed clocks still accept fresh certs.
 
 On a certificate detail page you can edit **description** and **friendly name** after issuance (metadata only). The certificates list shows the **template used** when a template was selected at issue time.
 
 When creating a CA, validity presets go up to **100 years**, or you can set a custom end date.
+
+Configure the global protocol listener under **Settings → General** (`protocol_base_url` as `http://…`, HTTP protocol port). Per-CA transport chooses inherit / HTTP / HTTPS admin / custom (and optional per-endpoint bases).
 
 For privileged protocol port **80**, reverse-proxy notes, and API details, see [ADMIN_GUIDE.md](./ADMIN_GUIDE.md) (Protocol Administration).
 

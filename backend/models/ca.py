@@ -45,8 +45,15 @@ class CA(db.Model):
     crl_publish_interval_hours = db.Column(db.Integer, default=168)
     crl_digest = db.Column(db.String(20), default='sha256')
     # When True, auto CDP/OCSP/AIA URLs use HTTP protocol port (:8080).
-    # When False, they use admin HTTPS (:8443). Per-CA override of global default.
+    # When False, they use admin HTTPS (:8443). Legacy; prefer protocol_mode.
     protocol_http = db.Column(db.Boolean, default=True)
+    # Flexible protocol URL resolution (#207):
+    # inherit | http_protocol | https_admin | custom
+    protocol_mode = db.Column(db.String(32), default='inherit')
+    protocol_base_url_override = db.Column(db.String(512))  # mode=custom
+    cdp_base_url = db.Column(db.String(512))   # optional CDP-only base
+    ocsp_base_url = db.Column(db.String(512))  # optional OCSP-only base
+    aia_base_url = db.Column(db.String(512))   # optional AIA-only base
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -367,6 +374,16 @@ class CA(db.Model):
             ),
             "crl_digest": self.crl_digest or 'sha256',
             "protocol_http": True if self.protocol_http is None else bool(self.protocol_http),
+            "protocol_mode": (
+                (self.protocol_mode or '').strip().lower()
+                if (self.protocol_mode or '').strip().lower()
+                in ('inherit', 'http_protocol', 'https_admin', 'custom')
+                else ('https_admin' if self.protocol_http is False else 'inherit')
+            ),
+            "protocol_base_url_override": self.protocol_base_url_override,
+            "cdp_base_url": self.cdp_base_url,
+            "ocsp_base_url": self.ocsp_base_url,
+            "aia_base_url": self.aia_base_url,
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.get_primary_ocsp_url(),

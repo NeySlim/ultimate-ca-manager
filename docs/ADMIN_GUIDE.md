@@ -439,7 +439,15 @@ Lab scripts (repo root):
 
 **UI (discussion #207):** CRL/OCSP slide-over → *Full CRL schedule* (validity / publish interval / digest). Settings → General → HTTP Protocol Port may be `80` (needs bind capability or reverse proxy). Certificate issue form applies the selected template’s digest.
 
-**Discussion #207 batch-2:** editable certificate **description** / **friendly name** (`PATCH /api/v2/certificates/<id>`); list column **template used**; CA validity up to **100 years** or custom end date; per-CA **protocol_http** (HTTP `:8080` vs HTTPS admin) under CRL & OCSP → *CDP / OCSP URL transport*.
+**Discussion #207 batch-2:** editable certificate **description** / **friendly name** (`PATCH /api/v2/certificates/<id>`); list column **template used**; CA validity up to **100 years** or custom end date; per-CA **protocol_http** under CRL & OCSP → *CDP / OCSP URL transport*.
+
+**Important — layers for CDP/OCSP URLs:**
+1. **Settings → General** — `protocol_base_url` (must be `http://…` to avoid TLS verification loops) and **HTTP protocol port** (default `8080`; `0` disables; restart required). Source of truth for the plain-HTTP protocol listener (e.g. `http://pki.example:8080`).
+2. **Per-CA `protocol_mode`** (`inherit` \| `http_protocol` \| `https_admin` \| `custom`) under CRL & OCSP → *CDP / OCSP URL transport*.
+3. **Optional overrides** — `protocol_base_url_override` (custom mode) and/or per-endpoint `cdp_base_url` / `ocsp_base_url` / `aia_base_url`.
+4. Legacy **`protocol_http`** bool still accepted (`true`→inherit, `false`→https_admin).
+
+Prefer **inherit** + Settings HTTP. **https_admin** / `https://` bases can reintroduce TLS loops on CRL/OCSP fetch.
 
 ### OCSP Configuration
 

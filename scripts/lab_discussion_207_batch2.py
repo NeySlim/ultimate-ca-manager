@@ -95,6 +95,8 @@ def main() -> int:
             check(True, f'HTTP base={http_base!r} HTTPS base={https_base!r}')
 
             ca.protocol_http = False
+            ca.protocol_mode = 'https_admin'
+            ca.cdp_enabled = True
             apply_protocol_urls_for_ca(ca)
             db.session.commit()
             if https_base and ca.get_primary_cdp_url():
@@ -104,6 +106,26 @@ def main() -> int:
                 )
             else:
                 check(True, 'HTTPS base unavailable in lab env — skipped URL assert')
+
+            from utils.protocol_url import (
+                normalize_protocol_mode,
+                resolve_endpoint_base,
+                validate_protocol_base_override,
+            )
+            ca.protocol_mode = 'custom'
+            ca.protocol_base_url_override = 'http://pki-lab.example:8080'
+            check(normalize_protocol_mode(ca) == 'custom', 'protocol_mode=custom')
+            check(
+                resolve_endpoint_base(ca, 'default') == 'http://pki-lab.example:8080',
+                'custom base resolves',
+            )
+            ca.cdp_base_url = 'http://crl.example:8080'
+            check(
+                resolve_endpoint_base(ca, 'cdp') == 'http://crl.example:8080',
+                'cdp_base_url override',
+            )
+            cleaned, err = validate_protocol_base_override('http://127.0.0.1')
+            check(cleaned is None and err, 'localhost override rejected')
 
             cert = Certificate(
                 refid='lab207b2',

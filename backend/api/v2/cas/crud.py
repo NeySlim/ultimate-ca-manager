@@ -15,7 +15,15 @@ from auth.unified import require_auth, has_permission
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
-from utils.protocol_url import get_protocol_base_url, get_protocol_base_url_for_ca, apply_protocol_urls_for_ca
+from utils.protocol_url import (
+    get_protocol_base_url,
+    get_protocol_base_url_for_ca,
+    apply_protocol_urls_for_ca,
+    normalize_protocol_mode,
+    sync_protocol_http_from_mode,
+    validate_protocol_base_override,
+    PROTOCOL_MODES,
+)
 from utils.decorators import require_json_body
 from utils.db_transaction import safe_commit
 from services.ca_service import CAService
@@ -608,15 +616,68 @@ def update_ca(ca_id):
             setter(urls or [])
             changed.append(field)
 
-    # Per-CA HTTP vs HTTPS for auto CDP/OCSP/AIA (#207 batch-2 follow-up)
-    if 'protocol_http' in data:
+    # Per-CA protocol URL flexibility (#207): mode + optional overrides
+    protocol_fields_touched = False
+
+    if 'protocol_mode' in data:
+        raw_mode = data['protocol_mode']
+        if raw_mode is None or (isinstance(raw_mode, str) and not raw_mode.strip()):
+            new_mode = 'inherit'
+        elif not isinstance(raw_mode, str):
+            return error_response('protocol_mode must be a string', 400)
+        else:
+            new_mode = raw_mode.strip().lower()
+            if new_mode not in PROTOCOL_MODES:
+                return error_response(
+                    f"protocol_mode must be one of: {', '.join(sorted(PROTOCOL_MODES))}",
+                    400,
+                )
+        old_mode = normalize_protocol_mode(ca)
+        ca.protocol_mode = new_mode
+        sync_protocol_http_from_mode(ca)
+        if new_mode != old_mode or (ca.protocol_mode or '') != new_mode:
+            changed.append('protocol_mode')
+        protocol_fields_touched = True  # always re-apply URLs when mode is sent
+
+    # Legacy bool — maps to https_admin / inherit; ignored if protocol_mode also sent
+    if 'protocol_http' in data and 'protocol_mode' not in data:
         new_val = bool(data['protocol_http'])
         old_val = True if ca.protocol_http is None else bool(ca.protocol_http)
         ca.protocol_http = new_val
+        ca.protocol_mode = 'inherit' if new_val else 'https_admin'
         if new_val != old_val:
             changed.append('protocol_http')
-            apply_protocol_urls_for_ca(ca)
-            changed.append('protocol_urls')
+            protocol_fields_touched = True
+
+    for override_key in (
+        'protocol_base_url_override',
+        'cdp_base_url',
+        'ocsp_base_url',
+        'aia_base_url',
+    ):
+        if override_key not in data:
+            continue
+        cleaned, err = validate_protocol_base_override(data[override_key], override_key)
+        if err:
+            return error_response(err, 400)
+        if cleaned != getattr(ca, override_key):
+            setattr(ca, override_key, cleaned)
+            changed.append(override_key)
+            protocol_fields_touched = True
+
+    if protocol_fields_touched:
+        # custom mode without override → still ok (falls back to Settings HTTP)
+        if normalize_protocol_mode(ca) == 'custom' and not (
+            ca.protocol_base_url_override or ca.cdp_base_url or ca.ocsp_base_url or ca.aia_base_url
+        ):
+            return error_response(
+                'protocol_mode=custom requires protocol_base_url_override '
+                'or at least one of cdp_base_url / ocsp_base_url / aia_base_url',
+                400,
+            )
+        apply_protocol_urls_for_ca(ca)
+        changed.append('protocol_urls')
+
     # CPS fields
     if 'cps_enabled' in data:
         new_val = bool(data['cps_enabled'])
