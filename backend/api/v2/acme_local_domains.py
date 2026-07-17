@@ -54,7 +54,7 @@ def create_local_domain():
     ca = db.session.get(CA, issuing_ca_id)
     if not ca:
         return error_response('Issuing CA not found', 404)
-    if not ca.prv:
+    if not ca.has_private_key:
         return error_response('Selected CA has no private key', 400)
     
     existing = AcmeLocalDomain.query.filter_by(domain=domain_name).first()
@@ -103,7 +103,7 @@ def update_local_domain(domain_id):
         ca = db.session.get(CA, data['issuing_ca_id'])
         if not ca:
             return error_response('Issuing CA not found', 404)
-        if not ca.prv:
+        if not ca.has_private_key:
             return error_response('Selected CA has no private key', 400)
         domain.issuing_ca_id = data['issuing_ca_id']
     

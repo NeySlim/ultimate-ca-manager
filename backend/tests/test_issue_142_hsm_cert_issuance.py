@@ -12,6 +12,7 @@ Covers the certificate-issuance paths touched by the fix:
   - POST /api/v2/certificates/<id>/renew
   - bulk CSR signing gate (csrs.py)
   - ACME domain issuing-CA selector gate (acme_domains.py)
+  - ACME local domain issuing-CA selector gate (acme_local_domains.py)
 """
 import json
 import os
@@ -230,6 +231,20 @@ class TestIssue142GatePaths:
             data=json.dumps({
                 'domain': 'hsm-142-issuer.test',
                 'dns_provider_id': dp_id,
+                'issuing_ca_id': ca_id,
+            }),
+            content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        assert b'no private key' not in r.data.lower(), r.data
+
+    def test_acme_local_domain_issuing_ca_selector_accepts_hsm_ca(
+            self, app, auth_client, hsm_provider_and_key):
+        """acme_local_domains.py gate must allow selecting an HSM-backed issuing CA."""
+        ca_id = _make_hsm_ca(app, hsm_provider_and_key)
+        r = auth_client.post(
+            '/api/v2/acme/local-domains',
+            data=json.dumps({
+                'domain': 'hsm-142-local-issuer.test',
                 'issuing_ca_id': ca_id,
             }),
             content_type='application/json')
