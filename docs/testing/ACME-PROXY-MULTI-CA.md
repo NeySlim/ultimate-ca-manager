@@ -79,6 +79,16 @@ cd /opt/ucm/backend && runuser -u ucm -- /opt/ucm/venv/bin/python -m pytest test
 2. Confirmer → `account_url` / clé effacés sur le compte lié
 3. Ré-enregistrer possible
 
+### 7. `preferred_chain` (alternate chains) — optionnel
+
+1. Dans **Comptes CA externes**, éditez le compte CA que vous utilisez pour le proxy (ex. Let’s Encrypt).
+2. Dans le champ **Preferred chain**, saisissez le **CN du trust anchor** (ex. `ISRG Root X1`).
+   - Le match UCM est **case-insensitive** et se fait sur le **CN du dernier certificat** fourni dans le PEM : **subject CN** *ou* **issuer CN** (support des chaînes “short” où le root est omis).
+3. Émettez un certificat via Certbot sur `/acme/proxy/<slug>/directory`.
+4. Vérifiez la chaîne retournée : contrôlez que le **subject CN** *ou* l’**issuer CN** du **dernier certificat** vaut `ISRG Root X1`.
+   - Par exemple (si vous disposez d’un fichier de chaîne type `chain.pem`) :
+     `openssl storeutl -noout -text -certs chain.pem | grep -A1 'Subject:' | tail -2`
+
 ## Tests manuels — API
 
 ```bash

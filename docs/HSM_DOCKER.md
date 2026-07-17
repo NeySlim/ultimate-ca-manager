@@ -12,6 +12,21 @@ On first start, a default SoftHSM token (`UCM-Default`) is automatically initial
 
 **Auto-registration:** UCM automatically creates an `SoftHSM-Default` provider in the database when it detects the Docker entrypoint initialized a token (`HSM_DEFAULT_PIN` env var). The provider appears immediately in the HSM page — no manual setup needed.
 
+## Normalisation des clés PKCS#11 legacy (upgrade)
+
+Lors de l’upgrade, UCM assure la compatibilité des providers PKCS#11 créés par les anciens chemins de config :
+
+- Legacy : `library_path` / `pin`
+- Canonique : `module_path` / `user_pin`
+
+Le processus se fait à trois niveaux :
+
+1. **Migration 057** : réécriture automatique des champs JSON legacy dans toutes les lignes `pkcs11` de `hsm_providers`.
+2. **Startup repair** : si la ligne `SoftHSM-Default` existe déjà, UCM normalise aussi sa configuration au démarrage.
+3. **Fallback runtime** : `PKCS11Provider` accepte les alias legacy à la lecture (avant validation).
+
+**Conséquence attendue :** après upgrade, le provider `SoftHSM-Default` ne doit plus échouer sur un test de connexion (pas d’erreur du type `module_path is required`) et l’UI doit afficher `module_path` / `user_pin`.
+
 ## Persistent Tokens
 
 Mount a volume for `/var/lib/softhsm/tokens` to keep HSM keys across container restarts:
