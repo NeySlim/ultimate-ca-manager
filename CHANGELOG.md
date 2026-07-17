@@ -10,6 +10,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+- **Docs: protocol port 80** — document `HTTP_PROTOCOL_PORT=80` with `CAP_NET_BIND_SERVICE` or reverse proxy; no Settings API validator change (UCM stays unprivileged). (#207)
+
+
 ## [2.194] - 2026-07-17
 
 ### Fixed

@@ -63,6 +63,31 @@ wildcard rejected for `acme_public_vhost` (TLS SAN only).
 
 Fallback for corporate DNS preflight: SystemConfig `acme.dns01_nameservers` (same format).
 
+### Privileged protocol port 80 (ops)
+
+UCM runs **unprivileged**. The Settings API only accepts protocol ports **0** (disabled) or **1024–65535**, so **port 80 is not set through the GUI/API validator**.
+
+To publish CDP/OCSP on **:80**:
+
+1. **Environment** — set in `/etc/ucm/ucm.env` (or equivalent), then restart UCM:
+   ```bash
+   HTTP_PROTOCOL_PORT=80
+   ```
+   Keep `protocol_base_url` as plain `http://…` (no TLS) to avoid CRL/OCSP verification loops.
+
+2. **Bind capability** (direct listen on 80) — grant the service binary capability, e.g. systemd:
+   ```ini
+   # /etc/systemd/system/ucm.service.d/override.conf
+   [Service]
+   AmbientCapabilities=CAP_NET_BIND_SERVICE
+   CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+   ```
+   Then `systemctl daemon-reload && systemctl restart ucm`.
+
+3. **Reverse proxy** (recommended) — leave UCM on **8080** and terminate :80 on nginx/Caddy/Traefik, forwarding to `127.0.0.1:8080`. Set `protocol_base_url` / public URLs to `http://pki.example.com` (port 80 omitted) so embedded CDP/OCSP URIs match what clients fetch.
+
+Do **not** point CDP/OCSP at the admin HTTPS port unless you have a clear TLS trust story for relying parties.
+
 Example `/etc/ucm/ucm.env` snippet:
 
 ```bash
