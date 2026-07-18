@@ -919,7 +919,7 @@
     "offlineKeyFileTooLarge": "Schlüsseldatei zu groß (max 256 KB)",
     "restorePasswordHint": "Das beim Offline-Schalten der CA verwendete Passwort.",
     "namedUrls": "CA Namen in Protokoll URLs verwenden",
-    "namedUrlsHint": "CDP/OCSP/AIA Pfade verwenden einen Slug aus dem CA Namen statt der zufälligen ID. Einfacher manuell zu konfigurieren; der CA Name erscheint in den URLs. Später nicht änderbar."
+    "namedUrlsHint": "CDP/OCSP/AIA-Pfade verwenden einen aus dem CA-Namen abgeleiteten Slug statt der zufälligen ID. Einfacher manuell zu konfigurieren; der CA-Name wird in URLs sichtbar. Kann auch später aktiviert werden; einmal aktiviert, nicht rückgängig zu machen."
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",
@@ -1691,7 +1691,12 @@
     "crlPublishAuto": "Auto (vor Ablauf)",
     "crlDigest": "Signatur Digest",
     "crlScheduleNote": "Häufigeres Veröffentlichen als das Gültigkeitsfenster gibt den Clients eine Karenzzeit, falls eine Veröffentlichung ausfällt.",
-    "nextPublish": "Nächste Veröffentlichung"
+    "nextPublish": "Nächste Veröffentlichung",
+    "namedUrlsTitle": "Benannte URLs",
+    "namedUrlsOff": "CDP/AIA-Pfade verwenden die interne ID. Aktivieren, um in neuen Zertifikaten einen aus dem CA-Namen abgeleiteten Slug zu verwenden.",
+    "namedUrlsEnable": "CA-Namen verwenden",
+    "namedUrlsConfirm": "Benannte Protokoll-URLs für \"{{name}}\" aktivieren? Ein aus dem CA-Namen abgeleiteter Slug erscheint in den CDP/AIA-URLs neu ausgestellter Zertifikate. Bestehende URLs funktionieren weiterhin. Dies kann später nicht deaktiviert werden.",
+    "namedUrlsEnabled": "Benannte URLs aktiviert: {{slug}}"
   },
   "trustStore": {
     "caTrust": "CA-Vertrauen",

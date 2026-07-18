@@ -522,6 +522,26 @@ def update_ca(ca_id):
         if new_name != ca.descr:
             ca.descr = new_name
             changed.append('name')
+    if 'namedUrls' in data:
+        want = bool(data['namedUrls'])
+        if not want and ca.url_slug:
+            return error_response('Named URLs cannot be disabled once enabled', 400)
+        if want and not ca.url_slug:
+            from services.ca.ca_creation import CACreationMixin
+            slug = CACreationMixin._unique_url_slug(ca.descr)
+            if not slug:
+                return error_response('Cannot derive a URL slug from the CA name', 400)
+            old_ref = ca.refid or ''
+            ca.url_slug = slug
+            # Re-materialize the auto-generated protocol URLs so new issuance
+            # embeds the named form. Custom URLs are left untouched ({ca_refid}
+            # templates resolve through url_ref at issuance and follow the slug).
+            if old_ref:
+                ca.set_cdp_urls([u.replace(f'/cdp/{old_ref}.crl', f'/cdp/{slug}.crl')
+                                 for u in ca.get_cdp_urls()])
+                ca.set_aia_urls([u.replace(f'/ca/{old_ref}.cer', f'/ca/{slug}.cer')
+                                 for u in ca.get_aia_urls()])
+            changed.append('namedUrls')
     if 'ocsp_enabled' in data:
         new_val = bool(data['ocsp_enabled'])
         if new_val != bool(ca.ocsp_enabled):

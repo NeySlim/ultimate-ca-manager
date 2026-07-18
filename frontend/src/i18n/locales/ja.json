@@ -919,7 +919,7 @@
     "offlineKeyFileTooLarge": "鍵ファイルが大きすぎます（最大 256 KB）",
     "restorePasswordHint": "CA をオフラインにしたときに使用したパスワード。",
     "namedUrls": "プロトコルURLにCA名を使用",
-    "namedUrlsHint": "CDP/OCSP/AIAのパスにランダムIDの代わりにCA名由来のスラッグを使用します。手動設定が容易になりますが、URLにCA名が表示されます。後から変更できません。"
+    "namedUrlsHint": "CDP/OCSP/AIAパスにランダムIDの代わりにCA名から生成されたスラッグを使用します。手動設定が容易になりますが、URLにCA名が表示されます。後から有効にすることもできますが、一度有効にすると元に戻せません。"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",
@@ -1691,7 +1691,12 @@
     "crlPublishAuto": "自動（期限前）",
     "crlDigest": "署名ダイジェスト",
     "crlScheduleNote": "有効期間より短い間隔で公開すると、公開が失敗した場合でも検証側に猶予期間が与えられます。",
-    "nextPublish": "次回公開"
+    "nextPublish": "次回公開",
+    "namedUrlsTitle": "名前付きURL",
+    "namedUrlsOff": "CDP/AIAパスは内部IDを使用します。有効にすると、新しい証明書でCA名から生成されたスラッグを使用します。",
+    "namedUrlsEnable": "CA名を使用",
+    "namedUrlsConfirm": "「{{name}}」の名前付きプロトコルURLを有効にしますか?CA名から生成されたスラッグが、新しく発行される証明書のCDP/AIA URLに使用されます。既存のURLは引き続き機能します。後から無効にすることはできません。",
+    "namedUrlsEnabled": "名前付きURLを有効にしました: {{slug}}"
   },
   "trustStore": {
     "caTrust": "CAトラスト",

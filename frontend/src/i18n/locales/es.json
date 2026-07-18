@@ -919,7 +919,7 @@
     "offlineKeyFileTooLarge": "El archivo de clave es demasiado grande (máx. 256 KB)",
     "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea.",
     "namedUrls": "Usar el nombre de la CA en las URLs de protocolo",
-    "namedUrlsHint": "Las rutas CDP/OCSP/AIA usan un slug derivado del nombre de la CA en lugar del id aleatorio. Más fácil de configurar manualmente; revela el nombre de la CA en las URLs. No se puede cambiar después."
+    "namedUrlsHint": "Las rutas CDP/OCSP/AIA usan un slug derivado del nombre de la CA en lugar del id aleatorio. Más fácil de configurar manualmente; revela el nombre de la CA en las URLs. También puede activarse más tarde; una vez activado, es irreversible."
   },
   "csrs": {
     "uploadCSR": "Subir CSR",
@@ -1691,7 +1691,12 @@
     "crlPublishAuto": "Auto (antes de expirar)",
     "crlDigest": "Resumen de firma",
     "crlScheduleNote": "Publicar con más frecuencia que la ventana de validez da a los clientes un período de gracia si se pierde una publicación.",
-    "nextPublish": "Próxima publicación"
+    "nextPublish": "Próxima publicación",
+    "namedUrlsTitle": "URLs con nombre",
+    "namedUrlsOff": "Las rutas CDP/AIA usan el id interno. Actívelo para usar un slug derivado del nombre de la CA en los nuevos certificados.",
+    "namedUrlsEnable": "Usar nombre de la CA",
+    "namedUrlsConfirm": "¿Activar URLs de protocolo con nombre para «{{name}}»? Un slug derivado del nombre de la CA aparecerá en las URLs CDP/AIA de los nuevos certificados emitidos. Las URLs existentes seguirán funcionando. No se podrá desactivar más adelante.",
+    "namedUrlsEnabled": "URLs con nombre activadas: {{slug}}"
   },
   "trustStore": {
     "caTrust": "Confianza de CA",

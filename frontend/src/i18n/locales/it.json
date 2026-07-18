@@ -919,7 +919,7 @@
     "offlineKeyFileTooLarge": "File chiave troppo grande (max 256 KB)",
     "restorePasswordHint": "La password usata quando la CA è stata messa offline.",
     "namedUrls": "Usa il nome della CA negli URL di protocollo",
-    "namedUrlsHint": "I percorsi CDP/OCSP/AIA usano uno slug derivato dal nome della CA invece dell'id casuale. Più facile da configurare manualmente; rivela il nome della CA negli URL. Non modificabile in seguito."
+    "namedUrlsHint": "I percorsi CDP/OCSP/AIA usano uno slug derivato dal nome della CA invece dell'id casuale. Più facile da configurare manualmente; rivela il nome della CA negli URL. Può essere attivato anche in seguito; una volta attivato è irreversibile."
   },
   "csrs": {
     "uploadCSR": "Carica CSR",
@@ -1691,7 +1691,12 @@
     "crlPublishAuto": "Auto (prima della scadenza)",
     "crlDigest": "Digest della firma",
     "crlScheduleNote": "Pubblicare più spesso della finestra di validità offre ai client un periodo di tolleranza se una pubblicazione viene persa.",
-    "nextPublish": "Prossima pubblicazione"
+    "nextPublish": "Prossima pubblicazione",
+    "namedUrlsTitle": "URL con nome",
+    "namedUrlsOff": "I percorsi CDP/AIA usano l'id interno. Attiva per usare uno slug derivato dal nome della CA nei nuovi certificati.",
+    "namedUrlsEnable": "Usa nome della CA",
+    "namedUrlsConfirm": "Attivare gli URL di protocollo con nome per \"{{name}}\"? Uno slug derivato dal nome della CA comparirà negli URL CDP/AIA dei nuovi certificati emessi. Gli URL esistenti continueranno a funzionare. Non potrà essere disattivato in seguito.",
+    "namedUrlsEnabled": "URL con nome attivati: {{slug}}"
   },
   "trustStore": {
     "caTrust": "Fiducia CA",

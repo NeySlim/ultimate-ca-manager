@@ -919,7 +919,7 @@
     "offlineKeyFileTooLarge": "Key file is too large (max 256 KB)",
     "restorePasswordHint": "The password used when the CA was taken offline.",
     "namedUrls": "Use CA name in protocol URLs",
-    "namedUrlsHint": "CDP/OCSP/AIA paths use a slug from the CA name instead of the random id. Easier to configure manually; reveals the CA name in URLs. Cannot be changed later."
+    "namedUrlsHint": "CDP/OCSP/AIA paths use a slug from the CA name instead of the random id. Easier to configure manually; reveals the CA name in URLs. Can also be enabled later; once enabled it cannot be undone."
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -1691,7 +1691,12 @@
     "crlPublishAuto": "Auto (near expiry)",
     "crlDigest": "Signature digest",
     "crlScheduleNote": "Publishing more often than the validity window gives relying parties a grace period if a publication is missed.",
-    "nextPublish": "Next Publish"
+    "nextPublish": "Next Publish",
+    "namedUrlsTitle": "Named URLs",
+    "namedUrlsOff": "CDP/AIA paths use the internal id. Enable to use a slug from the CA name in new certificates.",
+    "namedUrlsEnable": "Use CA name",
+    "namedUrlsConfirm": "Enable named protocol URLs for \"{{name}}\"? A slug derived from the CA name will appear in CDP/AIA URLs of newly issued certificates. Existing URLs keep working. This cannot be disabled later.",
+    "namedUrlsEnabled": "Named URLs enabled: {{slug}}"
   },
   "trustStore": {
     "caTrust": "CA Trust",

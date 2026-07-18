@@ -25,7 +25,7 @@ import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn , downloadBlob} from '../lib/utils'
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showInfo } = useNotification()
+  const { showSuccess, showError, showInfo, showConfirm } = useNotification()
   const { canWrite } = usePermission()
   const { copy: clipboardCopy } = useClipboard()
   
@@ -250,6 +250,28 @@ export default function CRLOCSPPage() {
       loadData()
     } catch (error) {
       showError(error.message || t('crlOcsp.toggleAiaFailed'))
+    }
+  }
+
+  const handleEnableNamedUrls = async () => {
+    if (!selectedCA || !canWrite('crl')) return
+    const confirmed = await showConfirm(t('crlOcsp.namedUrlsConfirm', { name: selectedCA.descr }), {
+      title: t('crlOcsp.namedUrlsTitle'),
+      confirmText: t('crlOcsp.namedUrlsEnable'),
+    })
+    if (!confirmed) return
+    setSavingUrls(true)
+    try {
+      const result = await casService.update(selectedCA.id, { namedUrls: true })
+      const updated = result.data || result
+      showSuccess(t('crlOcsp.namedUrlsEnabled', { slug: updated.url_slug }))
+      setCas(prev => prev.map(c => c.id === selectedCA.id ? { ...c, ...updated } : c))
+      setSelectedCA(prev => ({ ...prev, ...updated }))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.saveFailed'))
+    } finally {
+      setSavingUrls(false)
     }
   }
 
@@ -760,6 +782,25 @@ export default function CRLOCSPPage() {
       {/* Distribution Points */}
       <CompactSection title={t('crlOcsp.cdpNote')} icon={LinkIcon}>
         <div className="space-y-3">
+          {/* Named protocol URLs (#207) — slug replaces refid in CDP/AIA paths */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-text-secondary">{t('crlOcsp.namedUrlsTitle')}</p>
+              {selectedCA.url_slug ? (
+                <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-0.5 rounded">
+                  {selectedCA.url_slug}
+                </code>
+              ) : (
+                <p className="text-xs text-text-tertiary">{t('crlOcsp.namedUrlsOff')}</p>
+              )}
+            </div>
+            {!selectedCA.url_slug && canWrite('crl') && (
+              <Button type="button" size="sm" variant="secondary" className="shrink-0 whitespace-nowrap" onClick={handleEnableNamedUrls} disabled={savingUrls}>
+                {t('crlOcsp.namedUrlsEnable')}
+              </Button>
+            )}
+          </div>
+
           {/* CDP URLs */}
           <div>
             <p className="text-xs font-medium text-text-secondary mb-1">{t('crlOcsp.cdp')}</p>

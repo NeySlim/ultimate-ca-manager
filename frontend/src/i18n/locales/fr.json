@@ -750,7 +750,7 @@
     "offlineKeyFileTooLarge": "Fichier de clé trop volumineux (max 256 Ko)",
     "restorePasswordHint": "Le mot de passe utilisé lors de la mise hors ligne de l'AC.",
     "namedUrls": "Utiliser le nom de la CA dans les URLs protocole",
-    "namedUrlsHint": "Les chemins CDP/OCSP/AIA utilisent un slug dérivé du nom de la CA au lieu de l'identifiant aléatoire. Plus simple à configurer manuellement ; révèle le nom de la CA dans les URLs. Non modifiable ensuite."
+    "namedUrlsHint": "Les chemins CDP/OCSP/AIA utilisent un slug issu du nom de la CA au lieu de l'identifiant aléatoire. Plus simple à configurer manuellement ; révèle le nom de la CA dans les URLs. Peut aussi être activé plus tard ; une fois activé, c'est irréversible."
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -1432,7 +1432,12 @@
     "crlPublishAuto": "Auto (avant expiration)",
     "crlDigest": "Empreinte de signature",
     "crlScheduleNote": "Publier plus souvent que la fenêtre de validité offre une période de grâce aux clients si une publication est manquée.",
-    "nextPublish": "Prochaine publication"
+    "nextPublish": "Prochaine publication",
+    "namedUrlsTitle": "URLs nommées",
+    "namedUrlsOff": "Les chemins CDP/AIA utilisent l'identifiant interne. Activez pour utiliser un slug issu du nom de la CA dans les nouveaux certificats.",
+    "namedUrlsEnable": "Utiliser le nom de la CA",
+    "namedUrlsConfirm": "Activer les URLs de protocole nommées pour « {{name}} » ? Un slug issu du nom de la CA apparaîtra dans les URLs CDP/AIA des nouveaux certificats émis. Les URLs existantes continuent de fonctionner. Cette option ne pourra plus être désactivée.",
+    "namedUrlsEnabled": "URLs nommées activées : {{slug}}"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",

@@ -919,7 +919,7 @@
     "offlineKeyFileTooLarge": "密钥文件过大（最大 256 KB）",
     "restorePasswordHint": "将 CA 设为离线时使用的密码。",
     "namedUrls": "在协议URL中使用CA名称",
-    "namedUrlsHint": "CDP/OCSP/AIA路径使用由CA名称生成的标识而非随机id。更便于手动配置；但URL中会显示CA名称。创建后不可更改。"
+    "namedUrlsHint": "CDP/OCSP/AIA 路径使用由 CA 名称生成的短标识替代随机 ID。便于手动配置;但会在 URL 中暴露 CA 名称。也可以稍后启用;一旦启用便无法撤销。"
   },
   "csrs": {
     "uploadCSR": "上传CSR",
@@ -1691,7 +1691,12 @@
     "crlPublishAuto": "自动（到期前）",
     "crlDigest": "签名摘要",
     "crlScheduleNote": "发布频率高于有效期窗口，可在发布失败时为依赖方提供宽限期。",
-    "nextPublish": "下次发布"
+    "nextPublish": "下次发布",
+    "namedUrlsTitle": "命名 URL",
+    "namedUrlsOff": "CDP/AIA 路径使用内部 ID。启用后,新证书将使用由 CA 名称生成的短标识。",
+    "namedUrlsEnable": "使用 CA 名称",
+    "namedUrlsConfirm": "为“{{name}}”启用命名协议 URL?由 CA 名称生成的短标识将出现在新签发证书的 CDP/AIA URL 中。现有 URL 仍然有效。启用后无法再禁用。",
+    "namedUrlsEnabled": "已启用命名 URL:{{slug}}"
   },
   "trustStore": {
     "caTrust": "CA 信任",
