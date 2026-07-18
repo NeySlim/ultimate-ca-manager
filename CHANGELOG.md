@@ -13,6 +13,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 - **Named protocol URLs can be enabled on existing CAs** — the opt-in previously available only at CA creation can now be enabled afterwards from the CRL & OCSP page (or `PATCH /api/v2/cas/<id>` with `namedUrls`). Auto-generated CDP/AIA URLs are rewritten to the slug form and newly issued certificates embed it; already-issued certificates keep their refid URLs, which continue to resolve. Enabling remains irreversible. (#207)
 
+### Fixed
+- **CRL & OCSP details panel layout** — the "Full CRL Schedule" and "Delta CRL" blocks now render as framed sections, consistent with the rest of the panel.
+
 ## [2.196] - 2026-07-18
 
 ### Added
