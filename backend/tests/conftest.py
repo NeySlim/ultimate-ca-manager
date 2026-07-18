@@ -10,8 +10,10 @@ Shared fixtures used by all test_*.py files:
   - create_cert: factory to create a certificate under a CA
   - create_user: factory to create a user
 """
+import atexit
 import pytest
 import os
+import shutil
 import sys
 import json
 import tempfile
@@ -26,6 +28,17 @@ os.environ.setdefault('UCM_ENV', 'test')
 os.environ.setdefault('HTTP_REDIRECT', 'false')
 os.environ.setdefault('INITIAL_ADMIN_PASSWORD', 'changeme123')
 os.environ.setdefault('CSRF_DISABLED', 'true')
+
+# Isolate DATA_DIR from the machine's live install. settings.py runs
+# load_dotenv("/etc/ucm/ucm.env"), which on a dev box points DATA_DIR at the
+# running service's data dir — tests would then write session files there
+# (root-owned, breaking the service's session pruning) and touch its
+# .restart_requested watcher signal. load_dotenv never overrides pre-set env
+# vars, so pinning a temp dir here keeps tests off the real data dir.
+if 'DATA_DIR' not in os.environ:
+    _tmp_data_dir = tempfile.mkdtemp(prefix='ucm-test-data-')
+    os.environ['DATA_DIR'] = _tmp_data_dir
+    atexit.register(shutil.rmtree, _tmp_data_dir, ignore_errors=True)
 os.environ.setdefault('UCM_DEV_MODE', 'true')
 
 # Add backend to Python path
