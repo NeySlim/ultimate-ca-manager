@@ -755,7 +755,7 @@ class AcmeProxyService:
         if match:
             authz_url = match.group(1)
             authz_id = base64.urlsafe_b64encode(authz_url.encode()).rstrip(b'=').decode()
-            return f'<{self.base_url}/acme/proxy/authz/{authz_id}>;rel="up"'
+            return f'<{self.base_url}/authz/{authz_id}>;rel="up"'
         return None
 
     def _bg_respond_challenge(self, app, chall_url, key_authz, domain, order_id):
@@ -856,7 +856,28 @@ class AcmeProxyService:
             provider.delete_txt_record(zone, record_name)
         except Exception as e:
             logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
-    
+
+    def _bg_cleanup_dns_records(self, app, records):
+        """Background task: delete DNS-01 TXT records after cert issuance (#218)."""
+        from models import DnsProvider
+        from services.acme.dns_providers import create_provider
+
+        with app.app_context():
+            try:
+                for record in records:
+                    try:
+                        provider_model = db.session.get(DnsProvider, record['provider_id'])
+                        if not provider_model:
+                            continue
+                        credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
+                        provider = create_provider(provider_model.provider_type, credentials)
+                        logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
+                        self._delete_dns_record(provider, record['domain'], record['record_name'])
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup DNS record {record.get('record_name')}: {e}")
+            finally:
+                db.session.remove()
+
     def _find_order_for_challenge(self, chall_url, AcmeClientOrder):
         """Find the proxy order associated with a challenge URL."""
         # Strategy: fetch the challenge to get its authz URL from Link header,
@@ -884,13 +905,43 @@ class AcmeProxyService:
             return pending_orders[0]
         return None
     
-    def _find_order_for_certificate(self, cert_url: str):
-        """Match a pending proxy order to the upstream certificate download URL."""
+    def _persist_certificate_url(self, order_url: str, cert_url: str):
+        """Persist the upstream certificate URL on the local proxy order row.
+
+        Lets _find_order_for_certificate resolve the order with an indexed
+        query instead of a live upstream scan (#219).
+        """
         from models import AcmeClientOrder
+        try:
+            row = AcmeClientOrder.query.filter_by(
+                is_proxy_order=True, upstream_order_url=order_url
+            ).first()
+            if row and row.certificate_url != cert_url:
+                row.certificate_url = cert_url
+                db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning(f"ACME proxy: failed to persist certificate URL: {exc}")
+
+    def _find_order_for_certificate(self, cert_url: str):
+        """Match a proxy order to the upstream certificate download URL.
+
+        Fast path: indexed lookup on the persisted certificate_url. The
+        upstream scan only remains as a fallback for orders that predate the
+        persistence (#219) and skips rows that already carry a URL.
+        """
+        from models import AcmeClientOrder
+
+        order = AcmeClientOrder.query.filter_by(
+            is_proxy_order=True, certificate_url=cert_url
+        ).first()
+        if order:
+            return order
 
         pending_orders = AcmeClientOrder.query.filter(
             AcmeClientOrder.is_proxy_order == True,
             AcmeClientOrder.status == 'pending',
+            AcmeClientOrder.certificate_url.is_(None),
         ).all()
         for order in pending_orders:
             if not order.upstream_order_url:
@@ -966,9 +1017,10 @@ class AcmeProxyService:
         order['finalize'] = f"{self.base_url}/order/{order_id_b64}/finalize"
         if 'certificate' in order:
             cert_url = order['certificate']
+            self._persist_certificate_url(order_url, cert_url)
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
             order['certificate'] = f"{self.base_url}/cert/{cert_id}"
-        
+
         # Rewrite authorization URLs
         if 'authorizations' in order:
             proxy_authzs = []
@@ -1052,9 +1104,10 @@ class AcmeProxyService:
         order['finalize'] = f"{self.base_url}/order/{order_id_b64}/finalize"
         if 'certificate' in order:
             cert_url = order['certificate']
+            self._persist_certificate_url(order_url, cert_url)
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
             order['certificate'] = f"{self.base_url}/cert/{cert_id}"
-            
+
         # Rewrite authorization URLs
         if 'authorizations' in order:
             proxy_authzs = []
@@ -1074,9 +1127,13 @@ class AcmeProxyService:
         cert_url = self._decode_proxy_id(cert_id_b64)
         
         resp = self._post_with_account(cert_url, "")
-        
-        # Extract Link header from upstream (contains issuer cert URL)
-        link_header = resp.headers.get('Link')
+
+        # Never forward the upstream Link header: its rel="alternate" entries
+        # point directly at the real CA and can only be authenticated with our
+        # upstream account key — a downstream client following them signs with
+        # a proxy-scoped kid and gets rejected by the CA (#220). The preferred
+        # chain is already resolved server-side below and served in the body.
+        link_header = None
 
         # Body served to the client — replaced by the selected chain below on 200.
         response_body = resp.content
@@ -1139,33 +1196,24 @@ class AcmeProxyService:
                 # Log but don't fail - cert was obtained
                 logger.error(f"[ACME Proxy] Error storing certificate: {e}")
             
-            # Cleanup DNS records and link certificate to order
-            from models import AcmeClientOrder, DnsProvider
+            # Link certificate to order; DNS cleanup runs in the background so
+            # the client is not blocked on DNS-provider API latency (#218).
             order = self._find_order_for_certificate(cert_url)
-            
+
             if order:
+                records_to_cleanup = []
                 try:
                     # Link certificate to order
                     if stored_cert:
                         order.certificate_id = stored_cert.id
-                    
-                    # Cleanup DNS records
+
+                    # Snapshot DNS records, then commit the order state before
+                    # any provider round-trip.
                     if order.dns_records_created:
-                        records = json.loads(order.dns_records_created)
-                        for record in records:
-                            provider_model = db.session.get(DnsProvider, record['provider_id'])
-                            if provider_model:
-                                credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
-                                provider = create_provider(provider_model.provider_type, credentials)
-                                try:
-                                    logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
-                                    provider.delete_txt_record(record['domain'], record['record_name'])
-                                except Exception as e:
-                                    logger.warning(f"Failed to cleanup DNS record {record.get('record_name')}: {e}")
-                    
-                    # Update order status
+                        records_to_cleanup = json.loads(order.dns_records_created)
+
                     order.status = 'valid'
-                    order.dns_records_created = None  # Clear after cleanup
+                    order.dns_records_created = None  # Cleanup dispatched below
                     try:
                         db.session.commit()
                     except Exception as e:
@@ -1174,6 +1222,19 @@ class AcmeProxyService:
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f"Failed during certificate cleanup: {e}")
+
+                if records_to_cleanup:
+                    import threading
+                    from flask import current_app
+                    app = current_app._get_current_object()
+
+                    thread = threading.Thread(
+                        target=self._bg_cleanup_dns_records,
+                        args=(app, records_to_cleanup)
+                    )
+                    thread.name = "ACMEProxy-DNS-Cleanup"
+                    thread.daemon = True
+                    thread.start()
         
         # Cert response is PEM stream usually
         return response_body, resp.headers.get('Content-Type', 'application/pem-certificate-chain'), link_header

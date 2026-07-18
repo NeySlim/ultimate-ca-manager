@@ -14,6 +14,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **Named protocol URLs can be enabled on existing CAs** — the opt-in previously available only at CA creation can now be enabled afterwards from the CRL & OCSP page (or `PATCH /api/v2/cas/<id>` with `namedUrls`). Auto-generated CDP/AIA URLs are rewritten to the slug form and newly issued certificates embed it; already-issued certificates keep their refid URLs, which continue to resolve. Enabling remains irreversible. (#207)
 
 ### Fixed
+- **ACME proxy `Link: rel="up"` header** — the authorization link returned on challenge responses doubled the `/acme/proxy` path segment, sending clients that re-poll their authorization (Traefik/lego) to a nonexistent URL. (#217)
+- **ACME proxy certificate download latency** — DNS-01 TXT cleanup now runs in a background thread instead of blocking the certificate response on live DNS-provider API calls. (#218)
+- **ACME proxy order lookup on certificate download** — the upstream certificate URL is now persisted on the proxy order when it first appears (finalize or order poll), so the download resolves its order with one indexed query instead of a live upstream round-trip per accumulated pending order. (#219)
+- **ACME proxy no longer forwards the upstream `Link` header** — its `rel="alternate"` entries point directly at the real CA and cannot be authenticated by proxy clients; the preferred chain is already resolved server-side and served in the body. (#220)
 - **CRL & OCSP details panel layout** — the "Full CRL Schedule" and "Delta CRL" blocks now render as framed sections, consistent with the rest of the panel.
 
 ## [2.196] - 2026-07-18
