@@ -1026,8 +1026,8 @@ export default function CRLOCSPPage() {
 
       {/* Full CRL schedule (#207): validity vs publish cadence + digest */}
       {selectedCA?.has_private_key && (
-        <div className="space-y-3 border-t border-border pt-4 mt-4">
-          <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.crlScheduleTitle')}</h4>
+        <CompactSection title={t('crlOcsp.crlScheduleTitle')} icon={Calendar}>
+        <div className="space-y-3">
           {selectedCA?.crl_next_publish && (
             <CompactGrid cols={2}>
               <CompactField autoIcon="nextUpdate" label={t('crlOcsp.nextPublish')} value={formatDate(selectedCA.crl_next_publish)} />
@@ -1085,14 +1085,15 @@ export default function CRLOCSPPage() {
           </div>
           <p className="text-xs text-text-tertiary">{t('crlOcsp.crlScheduleNote')}</p>
         </div>
+        </CompactSection>
       )}
 
       {/* Delta CRL Section */}
       {selectedCA?.cdp_enabled && selectedCA?.delta_crl_enabled && (
-        <div className="space-y-3 border-t border-border pt-4 mt-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-text-primary">{t('crlOcsp.deltaCrlTitle')}</h4>
-            {canWrite('crl') && (
+        <CompactSection title={t('crlOcsp.deltaCrlTitle')} icon={TreeStructure}>
+        <div className="space-y-3">
+          {canWrite('crl') && (
+            <div className="flex items-center justify-end">
               <Button
                 type="button"
                 size="sm"
@@ -1103,8 +1104,8 @@ export default function CRLOCSPPage() {
                 <ArrowsClockwise size={14} className={deltaRegenerating ? 'animate-spin' : ''} />
                 {deltaRegenerating ? t('common.generating') : t('crlOcsp.generateDelta')}
               </Button>
-            )}
-          </div>
+            </div>
+          )}
           
           {selectedCA?.delta_crl && (
             <CompactGrid cols={2}>
@@ -1132,6 +1133,7 @@ export default function CRLOCSPPage() {
             </select>
           </div>
         </div>
+        </CompactSection>
       )}
     </div>
   )
