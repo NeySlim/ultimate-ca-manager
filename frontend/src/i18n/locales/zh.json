@@ -2853,7 +2853,7 @@
     "lastUsed": "最近使用",
     "redirectUri": "重定向 URI",
     "roleMapping": "角色映射",
-    "roleMappingHelp": "将外部组或角色映射到 UCM 角色。匹配组中的用户将被分配相应的 UCM 角色。",
+    "roleMappingHelp": "将外部组或角色映射到 UCM 角色。匹配组中的用户将被分配相应的 UCM 角色。如果匹配多个组，将采用权限最高的角色（admin > operator > auditor > viewer）。",
     "signRequests": "签名认证请求",
     "spEntityId": "SP 实体 ID",
     "spMetadata": "服务提供者 (SP) 元数据",

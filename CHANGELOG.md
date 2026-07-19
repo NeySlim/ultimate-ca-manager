@@ -10,6 +10,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+- **SSO role mapping multi-match resolution is now formalized** — when several of a user's external groups match mapping entries, the highest-privilege role wins (admin > operator > auditor > viewer). Previously the result silently depended on the storage order of the mapping entries. Documented in the role mapping help text. (#221)
+
+### Fixed
+- **SSO mapping editor row shuffling** — editing the external-group name of any row no longer reorders the list on every keystroke, and transiently typing a name that collides with another entry no longer destroys that entry. Rows now keep a stable identity while editing. (#222)
+
 ## [2.197] - 2026-07-19
 
 ### Added

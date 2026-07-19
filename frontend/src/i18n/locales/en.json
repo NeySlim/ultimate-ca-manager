@@ -2860,7 +2860,7 @@
     "directoryType": "Directory Type",
     "attributeMappingHelp": "Map SSO provider attributes to UCM user fields (username, email, fullname).",
     "roleMapping": "Role Mapping",
-    "roleMappingHelp": "Map external groups or roles to UCM roles. Users in matched groups will be assigned the corresponding UCM role.",
+    "roleMappingHelp": "Map external groups or roles to UCM roles. Users in matched groups will be assigned the corresponding UCM role. If several groups match, the highest-privilege role wins (admin > operator > auditor > viewer).",
     "ssoAttribute": "SSO Attribute",
     "ucmField": "UCM Field",
     "externalGroup": "External Group",

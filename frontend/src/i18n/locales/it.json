@@ -2853,7 +2853,7 @@
     "lastUsed": "Ultimo utilizzo",
     "redirectUri": "URI di reindirizzamento",
     "roleMapping": "Mappatura ruoli",
-    "roleMappingHelp": "Mappa gruppi o ruoli esterni ai ruoli UCM. Gli utenti nei gruppi corrispondenti riceveranno il ruolo UCM associato.",
+    "roleMappingHelp": "Mappa gruppi o ruoli esterni ai ruoli UCM. Gli utenti nei gruppi corrispondenti riceveranno il ruolo UCM associato. Se più gruppi corrispondono, vince il ruolo con i privilegi più elevati (admin > operator > auditor > viewer).",
     "signRequests": "Firma le richieste di autenticazione",
     "spEntityId": "SP Entity ID",
     "spMetadata": "Metadati Service Provider (SP)",

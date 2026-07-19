@@ -2853,7 +2853,7 @@
     "lastUsed": "Último uso",
     "redirectUri": "URI de Redirecionamento",
     "roleMapping": "Mapeamento de Funções",
-    "roleMappingHelp": "Mapeie grupos ou funções externas para funções do UCM. Usuários nos grupos correspondentes receberão a função UCM associada.",
+    "roleMappingHelp": "Mapeie grupos ou funções externas para funções do UCM. Usuários nos grupos correspondentes receberão a função UCM associada. Se vários grupos corresponderem, vence a função com o maior nível de privilégio (admin > operator > auditor > viewer).",
     "signRequests": "Assinar solicitações de autenticação",
     "spEntityId": "ID da Entidade SP",
     "spMetadata": "Metadados do Provedor de Serviço (SP)",

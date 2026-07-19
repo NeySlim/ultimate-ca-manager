@@ -1109,7 +1109,7 @@ export const helpContent = {
         icon: UserPlus,
         items: [
           { label: 'Default Role', text: 'Applied ONLY when a user is auto-created on first SSO login. Role changes made later in UCM are preserved.' },
-          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). Used at user creation, and at every login when role sync is enabled.' },
+          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer) — entry order does not matter (#221).' },
           { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; users without a mapping match keep their stored role (default_role is never re-applied).' },
           { label: 'Auto-update users', text: 'Updates email and full name on each login. Does NOT touch the role.' },
         ]

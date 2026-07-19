@@ -298,6 +298,33 @@ class TestRoleResolution:
             role = _resolve_role(provider, {'groups': ['admins']})
             assert role == 'viewer'
 
+    def test_resolve_role_multi_match_highest_privilege_wins(self, app):
+        """Several matching groups → highest-privilege role regardless of entry order (#221)"""
+        with app.app_context():
+            from api.v2.sso import _resolve_role
+            from unittest.mock import MagicMock
+
+            provider = MagicMock()
+            # Least-privileged entry listed first — order must not matter.
+            provider.role_mapping = json.dumps({'staff': 'viewer', 'auditors': 'auditor', 'pki-admins': 'admin'})
+            provider.default_role = 'viewer'
+
+            role = _resolve_role(provider, {'groups': ['staff', 'pki-admins', 'auditors']})
+            assert role == 'admin'
+
+    def test_resolve_role_multi_match_ignores_invalid_entry(self, app):
+        """Multi-match with one invalid mapped role → invalid counts as viewer, not admin"""
+        with app.app_context():
+            from api.v2.sso import _resolve_role
+            from unittest.mock import MagicMock
+
+            provider = MagicMock()
+            provider.role_mapping = json.dumps({'staff': 'root', 'ops': 'operator'})
+            provider.default_role = 'viewer'
+
+            role = _resolve_role(provider, {'groups': ['staff', 'ops']})
+            assert role == 'operator'
+
     def test_resolve_role_groups_as_string(self, app):
         """External roles as string (not list) → still works"""
         with app.app_context():

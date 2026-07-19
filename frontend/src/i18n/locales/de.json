@@ -2853,7 +2853,7 @@
     "lastUsed": "Zuletzt verwendet",
     "redirectUri": "Redirect-URI",
     "roleMapping": "Rollenzuordnung",
-    "roleMappingHelp": "Ordnen Sie externe Gruppen oder Rollen den UCM-Rollen zu. Benutzer in zugeordneten Gruppen erhalten die entsprechende UCM-Rolle.",
+    "roleMappingHelp": "Ordnen Sie externe Gruppen oder Rollen den UCM-Rollen zu. Benutzer in zugeordneten Gruppen erhalten die entsprechende UCM-Rolle. Wenn mehrere Gruppen zutreffen, gewinnt die Rolle mit den höchsten Rechten (admin > operator > auditor > viewer).",
     "signRequests": "Authentifizierungsanfragen signieren",
     "spEntityId": "SP Entity ID",
     "spMetadata": "Service Provider (SP) Metadaten",

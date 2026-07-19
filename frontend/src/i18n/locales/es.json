@@ -2853,7 +2853,7 @@
     "lastUsed": "Último uso",
     "redirectUri": "URI de redirección",
     "roleMapping": "Mapeo de roles",
-    "roleMappingHelp": "Mapee grupos o roles externos a roles de UCM. Los usuarios en grupos coincidentes recibirán el rol de UCM correspondiente.",
+    "roleMappingHelp": "Mapee grupos o roles externos a roles de UCM. Los usuarios en grupos coincidentes recibirán el rol de UCM correspondiente. Si varios grupos coinciden, gana el rol con mayores privilegios (admin > operator > auditor > viewer).",
     "signRequests": "Firmar solicitudes de autenticación",
     "spEntityId": "ID de entidad SP",
     "spMetadata": "Metadatos del proveedor de servicios (SP)",

@@ -2853,7 +2853,7 @@
     "lastUsed": "最終使用日時",
     "redirectUri": "リダイレクトURI",
     "roleMapping": "ロールマッピング",
-    "roleMappingHelp": "外部グループまたはロールをUCMロールにマッピングします。一致するグループのユーザーには対応するUCMロールが割り当てられます。",
+    "roleMappingHelp": "外部グループまたはロールをUCMロールにマッピングします。一致するグループのユーザーには対応するUCMロールが割り当てられます。複数のグループが一致する場合、最も権限の高いロールが適用されます（admin > operator > auditor > viewer）。",
     "signRequests": "認証リクエストに署名",
     "spEntityId": "SPエンティティID",
     "spMetadata": "サービスプロバイダー（SP）メタデータ",

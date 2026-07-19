@@ -212,14 +212,20 @@ def _clear_ldap_failed_attempts(username):
             logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
 
 
+# Highest privilege first — multi-match resolution picks the greatest (#221).
+_ROLE_PRIVILEGE = {'admin': 3, 'operator': 2, 'auditor': 1, 'viewer': 0}
+
+
 def _resolve_role_from_mapping(provider, external_data):
     """Try to resolve a role from the configured role_mapping.
 
-    Returns the mapped UCM role (str) when one of the user's external
-    groups matches an entry in ``provider.role_mapping``. Returns ``None``
-    when no mapping is configured or no group matches — the caller is
-    then responsible for deciding whether to fall back to ``default_role``
-    (creation only) or to keep the stored role (existing user, see #81).
+    When several of the user's external groups match mapping entries, the
+    highest-privilege mapped role wins (admin > operator > auditor >
+    viewer, #221) — entry order in the mapping is irrelevant. Returns
+    ``None`` when no mapping is configured or no group matches — the
+    caller is then responsible for deciding whether to fall back to
+    ``default_role`` (creation only) or to keep the stored role
+    (existing user, see #81).
     """
     role_mapping = _parse_json_field(provider.role_mapping)
     if not role_mapping:
@@ -228,12 +234,16 @@ def _resolve_role_from_mapping(provider, external_data):
     if isinstance(external_roles, str):
         external_roles = [external_roles]
     logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
-    for ext_role, ucm_role in role_mapping.items():
-        if ext_role in external_roles:
-            resolved = ucm_role if ucm_role in VALID_ROLES else 'viewer'
-            logger.info(f"Role resolved via mapping: {ext_role} -> {resolved}")
-            return resolved
-    return None
+    matches = [
+        (ucm_role if ucm_role in VALID_ROLES else 'viewer', ext_role)
+        for ext_role, ucm_role in role_mapping.items()
+        if ext_role in external_roles
+    ]
+    if not matches:
+        return None
+    resolved, ext_role = max(matches, key=lambda m: _ROLE_PRIVILEGE[m[0]])
+    logger.info(f"Role resolved via mapping: {ext_role} -> {resolved} (highest privilege of {len(matches)} match(es))")
+    return resolved
 
 
 def _resolve_role(provider, external_data):
