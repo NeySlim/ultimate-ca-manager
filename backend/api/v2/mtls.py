@@ -346,8 +346,12 @@ def download_mtls_certificate(cert_id):
         if not cert.prv:
             return error_response('Private key not available for PKCS12 export', 400)
 
-        key_pem = load_pem_bytes(cert.prv, context=f"mTLS certificate {cert.id} for user {user.id}")
-        private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+        try:
+            key_pem = load_pem_bytes(cert.prv, context=f"mTLS certificate {cert.id} for user {user.id}")
+            private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+        except ValueError as e:
+            logger.error(f"PKCS12 export: unusable private key for mTLS certificate {cert.id}: {e}")
+            return error_response('Stored private key is unusable for PKCS12 export', 500)
         x509_cert = cx509.load_pem_x509_certificate(cert_pem, default_backend())
 
         # Build CA chain with cycle detection
