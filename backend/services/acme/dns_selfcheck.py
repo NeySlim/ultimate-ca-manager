@@ -43,7 +43,10 @@ def acme_allow_loopback_upstream() -> bool:
 
 def challenge_txt_name(domain: str, challenge: dict) -> str:
     """TXT owner name for a dns-01 challenge dict (renewal rows may omit dns_txt_name)."""
-    return challenge.get('dns_txt_name') or f"_acme-challenge.{domain.lstrip('*.')}"
+    # Strip a leading '*.' prefix only — lstrip('*.') would eat any run of
+    # '*' and '.' characters (same class of bug as the CAA wildcard strip).
+    base = domain[2:] if domain.startswith('*.') else domain
+    return challenge.get('dns_txt_name') or f"_acme-challenge.{base}"
 
 
 def wait_for_challenges(challenges: dict, timeout: int) -> dict:

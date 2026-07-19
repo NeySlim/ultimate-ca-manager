@@ -24,6 +24,8 @@ from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from services.certificate_parser import CertificateParser
 from utils.file_naming import cert_key_path
+from utils import trusted_proxy
+from utils.key_codec import load_pem_bytes
 from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
@@ -344,7 +346,7 @@ def download_mtls_certificate(cert_id):
         if not cert.prv:
             return error_response('Private key not available for PKCS12 export', 400)
 
-        key_pem = base64.b64decode(cert.prv)
+        key_pem = load_pem_bytes(cert.prv, context=f"mTLS certificate {cert.id} for user {user.id}")
         private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
         x509_cert = cx509.load_pem_x509_certificate(cert_pem, default_backend())
 
@@ -428,14 +430,13 @@ def enroll_presented_certificate():
     # Also try proxy headers — only when the immediate peer is trusted
     # (same gate as login_mtls in auth_methods.py).
     if not cert_info:
-        from utils.trusted_proxy import is_request_from_trusted_proxy
         headers = dict(request.headers)
         spoof_attempt = (
             'X-SSL-Client-Verify' in headers
             or 'X-SSL-Client-S-DN' in headers
             or 'X-SSL-Client-Cert' in headers
         )
-        if spoof_attempt and not is_request_from_trusted_proxy():
+        if spoof_attempt and not trusted_proxy.is_request_from_trusted_proxy():
             logger.warning(
                 "mTLS enroll: ignoring proxy cert headers from untrusted peer %s",
                 request.remote_addr,

@@ -8,6 +8,7 @@ Supports:
 """
 from flask import Blueprint, request, jsonify, make_response
 import base64
+import hashlib
 import json
 import logging
 from datetime import datetime
@@ -16,7 +17,10 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
 from services.acme.acme_proxy_service import AcmeProxyService
-from services.acme.acme_proxy_account import resolve_proxy_by_slug
+from services.acme.acme_proxy_account import (
+    ProxyEndpointNotConfiguredError,
+    resolve_proxy_by_slug,
+)
 from services.acme import AcmeService
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
@@ -166,9 +170,15 @@ def directory(slug=None):
     try:
         svc = get_proxy_service(slug)
         return proxy_response(svc.get_directory())
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
     except RuntimeError as e:
+        # Upstream failure — detail stays in the log, never echoed to the
+        # ACME client.
         logger.error(f"ACME proxy directory error: {e}")
-        return proxy_error("serverInternal", str(e), 500)
+        return proxy_error("serverInternal", "Failed to retrieve directory", 500)
     except Exception as e:
         logger.error(f"ACME proxy directory error: {e}")
         return proxy_error("serverInternal", "Failed to retrieve directory", 500)
@@ -177,8 +187,16 @@ def directory(slug=None):
 @_dual_route('/new-nonce', methods=['GET', 'HEAD'], endpoint='proxy_new_nonce')
 def new_nonce(slug=None):
     """New nonce (RFC 8555 §7.2)"""
-    svc = get_proxy_service(slug)
-    nonce = svc.new_nonce()
+    try:
+        svc = get_proxy_service(slug)
+        nonce = svc.new_nonce()
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
+    except RuntimeError as e:
+        logger.error(f"ACME proxy new-nonce error: {e}")
+        return proxy_error("serverInternal", "Failed to issue nonce", 500)
     resp = make_response('', 200)
     resp.status_code = 204 if request.method == 'HEAD' else 200
     resp.headers['Replay-Nonce'] = nonce
@@ -260,17 +278,11 @@ def new_order(slug=None):
     eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
     eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
     if eab_required:
-        try:
-            jws_data = request.get_json(silent=True) or {}
-            protected_b64 = jws_data.get('protected', '')
-            protected_b64 += '=' * (-len(protected_b64) % 4)
-            protected = json.loads(base64.urlsafe_b64decode(protected_b64))
-        except Exception:
-            return proxy_error('malformed', 'Invalid protected header')
-        kid = protected.get('kid', '')
-        if not kid:
+        # _request_protected_header() returns {} on undecodable input — the
+        # missing kid then fails closed below.
+        account_id = _kid_account_id(_request_protected_header())
+        if not account_id:
             return proxy_error('malformed', 'Account kid required when EAB is enabled')
-        account_id = kid.rstrip('/').rsplit('/', 1)[-1]
         acme_svc = AcmeService()
         account = acme_svc.get_account_by_kid(account_id)
         if not account:
@@ -315,9 +327,11 @@ def new_order(slug=None):
 
     except ValueError as e:
         return proxy_error("malformed", str(e))
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
     except RuntimeError as e:
         logger.warning(f"ACME proxy new-order: {e}")
-        return proxy_error("serverInternal", str(e))
+        return proxy_error("serverInternal", "Failed to create order", 500)
     except Exception as e:
         logger.error(f"ACME proxy new-order error: {e}")
         detail = str(e)
@@ -347,9 +361,11 @@ def authz(authz_id, slug=None):
         return proxy_response(data)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
     except RuntimeError as e:
         logger.warning(f"ACME proxy authz: {e}")
-        return proxy_error("unsupportedIdentifier", str(e))
+        return proxy_error("serverInternal", "Failed to retrieve authorization", 500)
     except Exception as e:
         logger.error(f"ACME proxy authz error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)
@@ -371,13 +387,11 @@ def challenge(chall_id, slug=None):
         return resp
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
     except RuntimeError as e:
         logger.warning(f"ACME proxy challenge: {e}")
-        detail = str(e)
-        error_type = "serverInternal"
-        if "dns-01" in detail.lower() or "unsupported" in detail.lower():
-            error_type = "unsupportedIdentifier"
-        return proxy_error(error_type, detail)
+        return proxy_error("serverInternal", "Failed to respond to challenge", 500)
     except Exception as e:
         logger.error(f"ACME proxy challenge error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)
@@ -403,6 +417,8 @@ def get_order(order_id, slug=None):
         return resp
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
     except Exception as e:
         logger.error(f"ACME proxy get-order error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)
@@ -415,22 +431,21 @@ def finalize(order_id, slug=None):
     if not is_valid:
         return proxy_error("malformed", err)
 
-    requester_account_id = None
-    requester_thumbprint = None
-    try:
-        protected = _request_protected_header()
-        requester_account_id = _kid_account_id(protected)
-        if jwk:
-            import hashlib
-            jwk_canonical = json.dumps(jwk, separators=(',', ':'), sort_keys=True)
-            requester_thumbprint = base64.urlsafe_b64encode(
-                hashlib.sha256(jwk_canonical.encode()).digest()
-            ).rstrip(b'=').decode()
-        else:
-            # kid-signed (RFC-compliant path): mirror new-order's binding.
-            requester_thumbprint = _kid_account_thumbprint(protected)
-    except Exception:
-        pass
+    # Ownership binding — mirrors new-order. The helpers never raise (they
+    # return {}/None on undecodable input); finalize_order() fails closed when
+    # the order carries owner info but no requester identity could be derived.
+    protected = _request_protected_header()
+    requester_account_id = _kid_account_id(protected)
+    if jwk:
+        jwk_canonical = json.dumps(jwk, separators=(',', ':'), sort_keys=True)
+        requester_thumbprint = base64.urlsafe_b64encode(
+            hashlib.sha256(jwk_canonical.encode()).digest()
+        ).rstrip(b'=').decode()
+    else:
+        # kid-signed (RFC-compliant path): mirror new-order's binding.
+        requester_thumbprint = _kid_account_thumbprint(protected)
+    if not requester_account_id and not requester_thumbprint:
+        logger.warning("ACME proxy finalize: no requester identity from verified JWS")
 
     try:
         csr_b64 = payload.get('csr')
@@ -487,6 +502,8 @@ def cert(cert_id, slug=None):
         return resp
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
     except Exception as e:
         logger.error(f"ACME proxy cert error: {e}")
         return proxy_error("serverInternal", "Internal server error", 500)

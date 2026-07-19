@@ -1,11 +1,11 @@
-# Plan de test — affichage serial hex (détails certificat)
+# Test plan — hex serial display (certificate details)
 
-**Branche** : `feat/cert-serial-hex-display`  
-**Portée** : UI certificats — section **Détails techniques** + utilitaire `formatSerialNumberHex`
+**Branch**: `feat/cert-serial-hex-display`
+**Scope**: Certificates UI — **Technical details** section + `formatSerialNumberHex` utility
 
 ---
 
-## 1. Tests automatisés (obligatoires)
+## 1. Automated tests (mandatory)
 
 ### Frontend (Vitest)
 
@@ -14,68 +14,68 @@ cd frontend
 npm run test -- src/lib/__tests__/utils.test.js --run
 ```
 
-| ID | Cas | Attendu |
-|----|-----|---------|
-| T1 | Serial décimal UCM (`4065849396…`) | `47:37:E6:35:…:D3:0B` |
-| T2 | Hex compact (`4737E635…`) | Même sortie colon-séparée uppercase |
-| T3 | Hex déjà avec `:` (minuscules) | Normalisé uppercase |
-| T4 | Entrée vide / invalide | `null` |
+| ID | Case | Expected |
+|----|------|----------|
+| T1 | UCM decimal serial (`4065849396…`) | `47:37:E6:35:…:D3:0B` |
+| T2 | Compact hex (`4737E635…`) | Same colon-separated uppercase output |
+| T3 | Hex already with `:` (lowercase) | Normalized to uppercase |
+| T4 | Empty / invalid input | `null` |
 
-Critère : **39/39 passed** (suite `utils.test.js` incluant les 4 cas ci-dessus).
+Criterion: **39/39 passed** (`utils.test.js` suite including the 4 cases above).
 
-### Backend (pytest — régression)
+### Backend (pytest — regression)
 
-Pas de changement backend ; exécuter la suite complète avant merge :
+No backend change; run the full suite before merge:
 
 ```bash
 cd backend
 pytest -q --tb=no
 ```
 
-Critère : **0 failed** (warnings acceptables).
+Criterion: **0 failed** (warnings acceptable).
 
 ---
 
-## 2. Test manuel UI
+## 2. Manual UI test
 
-1. Ouvrir **Certificats** → sélectionner un certificat émis par UCM.
-2. Panneau **Détails techniques** :
-   - **Série** : valeur décimale (ex. `406584939640065587371689749107479415526363616011`)
-   - **Série (hex)** : format navigateur (ex. `47:37:E6:35:30:D7:EA:91:39:2B:51:4E:34:55:DB:E2:2E:A1:D3:0B`)
-3. Copier la valeur hex (bouton copy) → coller dans `openssl x509 -serial` ou comparer au certificat PEM.
-4. Langue FR : libellé **Série (hex)** ; EN : **Serial (hex)**.
+1. Open **Certificates** → select a certificate issued by UCM.
+2. **Technical details** panel:
+   - **Serial**: decimal value (e.g. `406584939640065587371689749107479415526363616011`)
+   - **Serial (hex)**: browser format (e.g. `47:37:E6:35:30:D7:EA:91:39:2B:51:4E:34:55:DB:E2:2E:A1:D3:0B`)
+3. Copy the hex value (copy button) → paste into `openssl x509 -serial` or compare to the PEM certificate.
+4. FR locale: label **Série (hex)**; EN: **Serial (hex)**.
 
 ---
 
-## 3. Correspondance serial / OCSP
+## 3. Serial / OCSP correspondence
 
-| Décimal (UCM) | Hex (UI / navigateur) |
-|---------------|------------------------|
+| Decimal (UCM) | Hex (UI / browser) |
+|---------------|--------------------|
 | `406584939640065587371689749107479415526363616011` | `47:37:E6:35:30:D7:EA:91:39:2B:51:4E:34:55:DB:E2:2E:A1:D3:0B` |
 | `316154770811771731777519343495635219991455236293` | `37:60:DE:C7:AF:D7:7B:9A:B8:9D:86:BF:BD:08:D1:05:BA:A6:80:C5` |
 
-Vérification OpenSSL :
+OpenSSL verification:
 
 ```bash
 openssl x509 -in cert.pem -noout -serial
-# serial=4737E63530D7EA91392B514E3455DBE22EA1D30B  → même valeur sans les ':'
+# serial=4737E63530D7EA91392B514E3455DBE22EA1D30B  → same value without the ':'
 ```
 
 ---
 
-## 4. Résultats validation (2026-07-03)
+## 4. Validation results (2026-07-03)
 
-| Contrôle | Résultat |
-|----------|----------|
+| Check | Result |
+|-------|--------|
 | Vitest `utils.test.js` | **39 passed** |
-| pytest backend | voir CI / exécution locale |
-| Déploiement lab privé | Build + dist déployé, champ visible après hard refresh |
+| backend pytest | see CI / local run |
+| Deployment | build + dist deployed, field visible after hard refresh |
 
 ---
 
-## Fichiers modifiés
+## Modified files
 
 - `frontend/src/lib/utils.js` — `formatSerialNumberHex()`
-- `frontend/src/components/CertificateDetails.jsx` — champ **Série (hex)**
+- `frontend/src/components/CertificateDetails.jsx` — **Serial (hex)** field
 - `frontend/src/lib/__tests__/utils.test.js` — tests T1–T4
-- `frontend/src/i18n/locales/*.json` — clé `common.serialHex` (9 langues)
+- `frontend/src/i18n/locales/*.json` — `common.serialHex` key (9 languages)

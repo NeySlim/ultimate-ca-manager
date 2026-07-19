@@ -5,7 +5,7 @@ Settings - Webhooks CRUD + test routes
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
-from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils import ssrf_protection
 from models import db, SystemConfig
 from services.audit_service import AuditService
 from datetime import datetime, timezone
@@ -71,7 +71,7 @@ def create_webhook():
     # Narrow SSRF guard — internal webhooks (Slack/Teams/Mattermost on LAN)
     # are legitimate. Block only cloud metadata + loopback.
     try:
-        validate_url_not_cloud_metadata(data['url'])
+        ssrf_protection.validate_url_not_cloud_metadata(data['url'])
     except ValueError:
         return error_response('Webhook URL must not target cloud metadata services or loopback', 400)
 
@@ -135,8 +135,6 @@ def delete_webhook(webhook_id):
 @require_auth(['write:settings'])
 def test_webhook(webhook_id):
     """Test webhook by sending a test event"""
-    from utils.ssrf_protection import safe_request_post
-
     webhooks = get_webhooks()
     webhook = next((w for w in webhooks if w.get('id') == webhook_id), None)
 
@@ -145,7 +143,7 @@ def test_webhook(webhook_id):
 
     # Re-validate stored URL before sending (defense-in-depth, narrow guard)
     try:
-        validate_url_not_cloud_metadata(webhook['url'])
+        ssrf_protection.validate_url_not_cloud_metadata(webhook['url'])
     except ValueError as e:
         logger.warning(f"Blocked test of webhook {webhook_id} — URL targets cloud metadata or loopback: {e}")
         return error_response('Webhook URL targets cloud metadata services or loopback', 400)
@@ -157,7 +155,7 @@ def test_webhook(webhook_id):
     }
 
     try:
-        response = safe_request_post(
+        response = ssrf_protection.safe_request_post(
             webhook['url'],
             json=test_payload,
             timeout=10,

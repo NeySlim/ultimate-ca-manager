@@ -79,11 +79,11 @@ UCM_BEHIND_PROXY=1
 UCM_TRUSTED_PROXIES=10.0.0.5    # reverse-proxy IP only — not entire RFC1918
 ```
 
-## GUI — Paramètres → Général → Endpoints publics
+## GUI — Settings → General → Public endpoints
 
-- **URLs effectives** after save (canonical admin, protocol, ACME directory/proxy).
-- **Vérifier DNS et TLS** runs preflight (requires `write:settings`).
-- **Utiliser l'URL du navigateur** fills `base_url` from current tab.
+- **Effective URLs** after save (canonical admin, protocol, ACME directory/proxy).
+- **Check DNS and TLS** runs preflight (requires `write:settings`).
+- **Use browser URL** fills `base_url` from current tab.
 
 ### Preflight DNS badges
 

@@ -113,6 +113,10 @@ class TestCertificateUrlPersistence:
 
     def test_fallback_scan_skips_rows_with_url(self, app, monkeypatch):
         with app.app_context():
+            # Isolate from proxy orders leaked by other test modules — the
+            # fallback scan queries every pending proxy order without a URL.
+            AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+            db.session.commit()
             svc = _make_service(app)
             _seed_proxy_order(
                 upstream_order_url=f'{UPSTREAM}/order/3',

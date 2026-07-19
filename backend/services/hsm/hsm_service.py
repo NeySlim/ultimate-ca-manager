@@ -15,6 +15,7 @@ from services.hsm.base_provider import (
     HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
 )
 from utils.datetime_utils import utc_now
+from utils import hsm_check, pkcs11_config
 
 logger = logging.getLogger(__name__)
 
@@ -553,17 +554,12 @@ class HsmService:
     @staticmethod
     def repair_pkcs11_provider_config(provider: HsmProvider) -> bool:
         """Rewrite legacy PKCS#11 config keys (library_path/pin) in-place."""
-        from utils.pkcs11_config import (
-            normalize_pkcs11_config,
-            pkcs11_config_needs_normalization,
-        )
-
         if provider.type != 'pkcs11':
             return False
         raw = provider.get_config()
-        if not pkcs11_config_needs_normalization(raw):
+        if not pkcs11_config.pkcs11_config_needs_normalization(raw):
             return False
-        provider.set_config(normalize_pkcs11_config(raw))
+        provider.set_config(pkcs11_config.normalize_pkcs11_config(raw))
         return True
 
     @staticmethod
@@ -579,7 +575,6 @@ class HsmService:
         (library_path/pin → module_path/user_pin).
         """
         import os
-        from utils.hsm_check import _find_softhsm
 
         pin = os.environ.get('HSM_DEFAULT_PIN')
         existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
@@ -600,7 +595,7 @@ class HsmService:
         if not pin:
             return
 
-        lib_path = _find_softhsm()
+        lib_path = hsm_check._find_softhsm()
         if not lib_path:
             logger.debug("HSM_DEFAULT_PIN set but SoftHSM library not found — skipping auto-register")
             return

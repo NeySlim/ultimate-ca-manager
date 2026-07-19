@@ -65,9 +65,9 @@ npx playwright test e2e/hsm.spec.ts
 Smoke: page load, table/empty state, provider detail panel. Full connection test
 requires SoftHSM on the target host.
 
-## Lab validation (native Debian — 2026-07-13)
+## Lab validation (native Debian)
 
-Host `10.42.0.8` (`admin.ucm.example.com`):
+On your UCM host:
 
 - SoftHSM2 installed; token **UCM-Default** in `/opt/ucm/data/softhsm/tokens/`
 - `HSM_DEFAULT_PIN` in `/etc/ucm/ucm.env` → auto-register **SoftHSM-Default**

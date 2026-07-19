@@ -70,12 +70,22 @@ def slugify_proxy_label(label: str) -> str:
     return slug
 
 
+class ProxyEndpointNotConfiguredError(RuntimeError):
+    """Raised when a proxy URL slug matches no enabled endpoint.
+
+    Distinct from generic RuntimeError so API handlers can echo this
+    client-actionable message while still hiding upstream failure details.
+    """
+
+
 def resolve_proxy_by_slug(slug: str) -> AcmeClientAccount:
     """Resolve an enabled proxy endpoint by URL path slug."""
     slug = normalize_proxy_slug(slug)
     acct = AcmeClientAccount.query.filter_by(proxy_slug=slug, proxy_enabled=True).first()
     if not acct:
-        raise RuntimeError(f'ACME proxy endpoint {slug!r} is not configured or not enabled')
+        raise ProxyEndpointNotConfiguredError(
+            f'ACME proxy endpoint {slug!r} is not configured or not enabled'
+        )
     return acct
 
 

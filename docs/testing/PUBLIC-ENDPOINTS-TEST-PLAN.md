@@ -37,19 +37,19 @@ python3 -m pytest tests/test_public_endpoints.py tests/test_acme_public_url.py -
 | Badge | Source | Purpose |
 |-------|--------|---------|
 | **DNS (local)** | `getaddrinfo` → `/etc/hosts` + `resolv.conf` | What the UCM process uses at runtime |
-| **DNS (interne)** | `UCM_CORPORATE_DNS_SERVERS` or `acme.dns01_nameservers` | Split-horizon / corporate resolver (e.g. `10.0.0.53`) |
+| **DNS (internal)** | `UCM_CORPORATE_DNS_SERVERS` or `acme.dns01_nameservers` | Split-horizon / corporate resolver (e.g. `10.0.0.53`) |
 | **DNS (public)** | 9.9.9.9, 8.8.8.8, 1.1.1.1 | Internet clients without VPN |
 
 Configure corporate DNS in `/etc/ucm/ucm.env` (independent of `resolv.conf`):
 
 ```bash
-# Comma-separated IPs — used for preflight « DNS (interne) » only
+# Comma-separated IPs — used for preflight « DNS (internal) » only
 UCM_CORPORATE_DNS_SERVERS=10.0.0.53
 ```
 
 Fallback: SystemConfig `acme.dns01_nameservers` (same comma-separated format).
 
-When `resolv.conf` already uses the internal nameserver, **local** and **interne** should agree; **public** may still fail until records are published on the Internet.
+When `resolv.conf` already uses the internal nameserver, **local** and **internal** should agree; **public** may still fail until records are published on the Internet.
 
 ## 2. Lab manual — connectivity
 
@@ -103,9 +103,9 @@ curl -sk -b "$COOKIE" -X PATCH -H 'Content-Type: application/json' -H "X-CSRF-To
 ## 4. GUI (browser)
 
 1. Open `https://admin.ucm.example.com:8443` — login admin.
-2. **Paramètres → Général** — verify three URL fields.
-3. **Endpoints publics** — canonical URLs, preflight badges.
-4. **Utiliser l'URL du navigateur** → save → refresh effective block.
+2. **Settings → General** — verify three URL fields.
+3. **Public endpoints** — canonical URLs, preflight badges.
+4. **Use browser URL** → save → refresh effective block.
 5. Open `https://ucm.example.com:8443` in browser → must land on admin URL.
 
 ## 5. Regression

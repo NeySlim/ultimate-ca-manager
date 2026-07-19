@@ -38,8 +38,14 @@ _EC_ERROR_HINT = (
 
 
 def _ec_alias_key(token: str) -> str:
-    """Collapse whitespace/hyphens for alias lookup."""
-    return re.sub(r'[\s_]+', '', token.lower())
+    """Collapse whitespace, hyphens and underscores for alias lookup."""
+    return re.sub(r'[\s_-]+', '', token.lower())
+
+
+# Lookup keys are pre-collapsed with _ec_alias_key (no spaces/hyphens/underscores).
+_EC_COLLAPSED_ALIASES: dict[str, str] = {
+    _ec_alias_key(k): v for k, v in _EC_ALIASES.items()
+}
 
 
 def normalize_ec_curve(value: str) -> str:
@@ -48,13 +54,15 @@ def normalize_ec_curve(value: str) -> str:
     if not raw:
         raise ValueError(_EC_ERROR_HINT)
 
-    lowered = raw.lower()
-    lowered = re.sub(r'^(ecdsa|ec)\s*', '', lowered)
-    lowered = re.sub(r'^nist\s+', '', lowered)
+    key = _ec_alias_key(raw)
+    if key in _EC_COLLAPSED_ALIASES:
+        return _EC_COLLAPSED_ALIASES[key]
 
-    key = _ec_alias_key(lowered)
-    if key in _EC_ALIASES:
-        return _EC_ALIASES[key]
+    # Prefix-stripped forms: 'EC P-256', 'ECDSA-P384', 'NIST P-521', ...
+    stripped = re.sub(r'^(ecdsa|ec|nist)[\s_-]*', '', raw.lower())
+    key = _ec_alias_key(stripped)
+    if key in _EC_COLLAPSED_ALIASES:
+        return _EC_COLLAPSED_ALIASES[key]
 
     raise ValueError(_EC_ERROR_HINT)
 

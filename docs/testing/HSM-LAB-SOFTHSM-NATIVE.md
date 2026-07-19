@@ -1,7 +1,7 @@
 # SoftHSM on a native UCM install (lab / DEB)
 
 Guide for enabling **SoftHSM2** on a **non-Docker** UCM deployment (systemd + `/opt/ucm`).
-Validated on lab `10.42.0.8` (Debian 13, UCM native) — 2026-07-13.
+Validated on a native Debian 13 install.
 
 Docker deployments: see [HSM_DOCKER.md](../HSM_DOCKER.md) (auto-init via entrypoint).
 

@@ -244,6 +244,22 @@ class TestInvalidityDate:
                 assert inv.date() == invalidity.date()
         assert found, 'expected invalidityDate on at least one CRL entry'
 
+    def test_revoke_rejects_future_invalidity_date(self, app, auth_client, create_ca):
+        ca = create_ca(cn='Invalidity Future CA')
+        r = _post_json(auth_client, '/api/v2/certificates', {
+            'cn': 'future-invalidity.example.com',
+            'ca_id': ca['id'],
+            'validity_days': 30,
+        })
+        cert = assert_success(r, status=201)
+        future = (utc_now() + timedelta(days=1)).replace(microsecond=0)
+        r = _post_json(auth_client, f'/api/v2/certificates/{cert["id"]}/revoke', {
+            'reason': 'keyCompromise',
+            'invalidity_date': future.isoformat() + 'Z',
+        })
+        assert r.status_code == 400
+        assert 'future' in (get_json(r).get('message') or '').lower()
+
 
 class TestUnholdRemoveFromCrl:
     def test_unhold_emits_remove_from_crl_on_delta(self, app, auth_client, create_ca):

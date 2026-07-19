@@ -796,7 +796,7 @@ GET /api/v2/user-certificates?status=valid&page=1&per_page=50
         "has_private_key": true,
         "created_at": "2026-02-20T19:05:19",
         "not_valid_after": "2027-02-20T19:05:19",
-        "issuer": "CN=lan.pew.pet,O=Pew Pet",
+        "issuer": "CN=example.com,O=Example Org",
         "username": "admin"
       }
     ],

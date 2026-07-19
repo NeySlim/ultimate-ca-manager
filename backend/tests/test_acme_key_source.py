@@ -71,6 +71,35 @@ class TestAcmeClientKeySourceApi:
         })
         assert r.status_code == 400
 
+    def test_request_rejects_csr_with_invalid_signature(self, auth_client):
+        """A CSR whose self-signature does not verify must be rejected (400)."""
+        import textwrap
+
+        pem, _ = _make_csr(['example.com'])
+        csr = x509.load_pem_x509_csr(pem.encode(), default_backend())
+        der = bytearray(csr.public_bytes(serialization.Encoding.DER))
+        der[-10] ^= 0xFF  # corrupt the signature BIT STRING, keep ASN.1 valid
+        b64 = base64.b64encode(bytes(der)).decode()
+        bad_pem = (
+            '-----BEGIN CERTIFICATE REQUEST-----\n'
+            + '\n'.join(textwrap.wrap(b64, 64))
+            + '\n-----END CERTIFICATE REQUEST-----\n'
+        )
+        assert not x509.load_pem_x509_csr(
+            bad_pem.encode(), default_backend()
+        ).is_signature_valid
+
+        r = post_json(auth_client, '/api/v2/acme/client/request', {
+            'domains': ['example.com'],
+            'email': 'admin@example.com',
+            'challenge_type': 'http-01',
+            'environment': 'staging',
+            'key_source': 'csr',
+            'csr_pem': bad_pem,
+        })
+        assert r.status_code == 400
+        assert 'signature' in get_json(r).get('message', '').lower()
+
     def test_finalize_order_csr_path(self, app):
         from models.acme_models import AcmeClientOrder
         from services.acme.acme_client_service import AcmeClientService

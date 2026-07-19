@@ -229,3 +229,72 @@ class TestAcmeProxyCertOrderBinding:
             matched = svc._find_order_for_certificate(cert_url)
             assert matched is not None
             assert matched.id == order_b.id
+
+
+class TestFinalizeFailClosed:
+    """An owned order must never finalize without any requester identity."""
+
+    def _seed_owned_order(self, app, **overrides):
+        with app.app_context():
+            AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+            kwargs = dict(
+                domains='["owned.example.com"]',
+                environment='staging',
+                challenge_type='dns-01',
+                status='pending',
+                order_url='https://ca.example/acme/order/owned',
+                upstream_order_url='https://ca.example/acme/order/owned',
+                is_proxy_order=True,
+                account_id='acct-owner-1',
+                client_jwk_thumbprint='thumb-owner-1',
+            )
+            kwargs.update(overrides)
+            order = AcmeClientOrder(**kwargs)
+            db.session.add(order)
+            db.session.commit()
+            return order.id
+
+    def _make_svc(self, app, monkeypatch):
+        from services.acme.acme_proxy_service import AcmeProxyService
+
+        with app.app_context():
+            svc = AcmeProxyService('https://ucm.example/acme/proxy')
+        monkeypatch.setattr(
+            svc, '_decode_proxy_id',
+            lambda _id: 'https://ca.example/acme/order/owned',
+        )
+
+        def _no_upstream(*_a, **_k):
+            raise AssertionError('upstream must not be called on identity failure')
+
+        monkeypatch.setattr(svc, '_post_with_account', _no_upstream)
+        return svc
+
+    def test_finalize_without_identity_rejected(self, app, monkeypatch):
+        self._seed_owned_order(app)
+        svc = self._make_svc(app, monkeypatch)
+        with app.app_context(), pytest.raises(PermissionError):
+            svc.finalize_order(
+                'ignored',
+                '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----\n',
+                requester_account_id=None,
+                requester_thumbprint=None,
+            )
+
+    def test_finalize_with_matching_identity_passes_binding(self, app, monkeypatch):
+        self._seed_owned_order(app)
+        svc = self._make_svc(app, monkeypatch)
+
+        with app.app_context():
+            # Force an early stop once binding succeeded: no valid CSR needed.
+            try:
+                svc.finalize_order(
+                    'ignored',
+                    'not-a-real-csr',
+                    requester_account_id='acct-owner-1',
+                    requester_thumbprint='thumb-owner-1',
+                )
+            except PermissionError:
+                pytest.fail('matching identity must not raise PermissionError')
+            except Exception:
+                pass  # CSR/upstream handling is out of scope for this test

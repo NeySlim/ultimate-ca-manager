@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now, to_naive_utc, cert_not_before
+from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_profile import (
     build_extended_key_usage_extension,
     build_key_usage_extension,
@@ -110,7 +111,6 @@ class CACertificateCreationMixin:
 
         # Authority Key Identifier (for intermediate CAs)
         if issuer != subject:
-            from utils.x509_aki import authority_key_identifier_from_issuer
             if issuer_cert is not None:
                 aki = authority_key_identifier_from_issuer(issuer_cert)
             else:

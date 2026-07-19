@@ -226,6 +226,8 @@ def request_certificate():
             csr = load_pem_csr(csr_pem)
         except ValueError as exc:
             return error_response(str(exc), 400)
+        if not csr.is_signature_valid:
+            return error_response('CSR signature is invalid', 400)
         match_ok, match_msg = csr_domains_match_order(csr, domains)
         if not match_ok:
             return error_response(match_msg, 400)

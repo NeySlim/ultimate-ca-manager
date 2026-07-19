@@ -15,6 +15,16 @@ class TestNormalizeEcCurve:
         ('secp384r1', 'secp384r1'),
         ('EC P-521', 'secp521r1'),
         ('secp521r1', 'secp521r1'),
+        # Hyphen/underscore forms — same style as the ACME order key_type
+        # enum ('EC-P256'): previously rejected by a dead alias table.
+        ('EC-P256', 'prime256v1'),
+        ('ec-p384', 'secp384r1'),
+        ('EC-P521', 'secp521r1'),
+        ('ecdsa-p256', 'prime256v1'),
+        ('ECDSA-P384', 'secp384r1'),
+        ('nist-p521', 'secp521r1'),
+        ('EC_P-384', 'secp384r1'),
+        ('P_521', 'secp521r1'),
     ])
     def test_aliases(self, raw, expected):
         assert normalize_ec_curve(raw) == expected
@@ -22,6 +32,11 @@ class TestNormalizeEcCurve:
     def test_unknown_curve_raises(self):
         with pytest.raises(ValueError, match='P-256'):
             normalize_ec_curve('secp256k1')
+
+    @pytest.mark.parametrize('bad', ['P-192', 'brainpoolP256r1', 'RSA', ''])
+    def test_rejects_non_nist_and_empty(self, bad):
+        with pytest.raises(ValueError):
+            normalize_ec_curve(bad)
 
 
 class TestParseCsrKeyType:
@@ -33,6 +48,9 @@ class TestParseCsrKeyType:
 
     def test_ec_ui_label(self):
         assert parse_csr_key_type('EC P-256') == 'prime256v1'
+
+    def test_ec_hyphen_label(self):
+        assert parse_csr_key_type('EC-P256') == 'prime256v1'
 
     def test_invalid_rsa_size(self):
         with pytest.raises(ValueError, match='2048'):

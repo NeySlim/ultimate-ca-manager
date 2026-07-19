@@ -311,7 +311,7 @@ class TestProxyMultiPath:
 
     def test_unknown_slug_returns_error(self, client):
         r = client.get('/acme/proxy/unknown-ca/directory')
-        assert r.status_code == 500
+        assert r.status_code == 404
         assert 'not configured' in r.get_json().get('detail', '').lower()
 
     def test_reserved_slug_rejected_on_update(self, auth_client, app, clean_proxy_state):

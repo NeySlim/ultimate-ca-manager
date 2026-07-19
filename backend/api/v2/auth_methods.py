@@ -15,6 +15,7 @@ from flask import Blueprint, request, jsonify, session, current_app, g
 from auth.unified import AuthManager
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils import trusted_proxy
 from models import User, db
 from services.mtls_auth_service import MTLSAuthService
 from services.webauthn_service import WebAuthnService
@@ -145,14 +146,13 @@ def detect_auth_methods():
                 )
             else:
                 # Reverse-proxy headers — same trusted-proxy gate as login_mtls().
-                from utils.trusted_proxy import is_request_from_trusted_proxy
                 headers = dict(request.headers)
                 spoof_attempt = (
                     'X-SSL-Client-Verify' in headers
                     or 'X-SSL-Client-S-DN' in headers
                     or 'X-SSL-Client-Cert' in headers
                 )
-                if spoof_attempt and not is_request_from_trusted_proxy():
+                if spoof_attempt and not trusted_proxy.is_request_from_trusted_proxy():
                     logger.warning(
                         "auth/methods: ignoring proxy cert headers from untrusted peer %s",
                         request.remote_addr,
@@ -523,14 +523,13 @@ def login_mtls():
             # in UCM_TRUSTED_PROXIES (default: loopback). Without this gate
             # any caller who can reach gunicorn directly can spoof
             # X-SSL-Client-* headers and forge mTLS authentication.
-            from utils.trusted_proxy import is_request_from_trusted_proxy
             headers = dict(request.headers)
             spoof_attempt = (
                 'X-SSL-Client-Verify' in headers
                 or 'X-SSL-Client-S-DN' in headers
                 or 'X-SSL-Client-Cert' in headers
             )
-            if spoof_attempt and not is_request_from_trusted_proxy():
+            if spoof_attempt and not trusted_proxy.is_request_from_trusted_proxy():
                 logger.warning(
                     "mTLS login: ignoring proxy cert headers from untrusted peer %s",
                     request.remote_addr,

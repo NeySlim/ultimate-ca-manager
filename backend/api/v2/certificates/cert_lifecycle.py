@@ -1,7 +1,9 @@
 """Certificate lifecycle routes (delete, revoke, unhold)"""
 import logging
+from datetime import datetime, timedelta
 from flask import request, g
 from auth.unified import require_auth
+from utils.datetime_utils import to_naive_utc, utc_now
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
 from models.ocsp import OCSPResponse
@@ -69,13 +71,15 @@ def revoke_certificate(cert_id):
 
     invalidity_at = None
     if invalidity_raw:
-        from datetime import datetime
-        from utils.datetime_utils import to_naive_utc
         try:
             raw = str(invalidity_raw).strip().replace('Z', '+00:00')
             invalidity_at = to_naive_utc(datetime.fromisoformat(raw))
         except (ValueError, TypeError, OverflowError) as e:
             return error_response(f'Invalid invalidity_date: {e}', 400)
+        # RFC 5280 §5.3.2 — invalidityDate is a past compromise/invalidity
+        # time; a future date is always a client error (allow 5 min skew).
+        if invalidity_at > utc_now() + timedelta(minutes=5):
+            return error_response('invalidity_date cannot be in the future', 400)
 
     cert = db.session.get(Certificate, cert_id)
     if not cert:
@@ -199,7 +203,6 @@ def unhold_certificate(cert_id):
 
     try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-        from utils.datetime_utils import utc_now
 
         ca = None
         if cert.caref:
@@ -208,15 +211,21 @@ def unhold_certificate(cert_id):
         # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
         # a delta before clearing the hold so relying parties drop the entry.
         if ca and ca.delta_crl_enabled and ca.cdp_enabled:
+            cert.revoke_reason = 'removeFromCRL'
+            cert.revoked_at = utc_now()
             try:
-                cert.revoke_reason = 'removeFromCRL'
-                cert.revoked_at = utc_now()
                 db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to stage removeFromCRL before unhold: {e}")
+                return error_response('Failed to remove certificate hold', 500)
+            try:
                 from services.crl_service import CRLService
                 CRLService.generate_delta_crl(ca.id, username=username)
             except Exception as e:
+                # Delta emission failed — continue with the unhold anyway; the
+                # full CRL regenerated below no longer lists the certificate.
                 logger.warning(f"Failed to emit removeFromCRL delta before unhold: {e}")
-                db.session.rollback()
                 cert = db.session.get(Certificate, cert_id)
 
         cert.revoked = False

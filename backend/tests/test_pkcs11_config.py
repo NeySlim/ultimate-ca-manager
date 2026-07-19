@@ -15,6 +15,12 @@ from utils.pkcs11_config import (
     pkcs11_config_needs_normalization,
 )
 
+try:
+    import pkcs11 as _pkcs11  # noqa: F401
+    _PKCS11_AVAILABLE = True
+except ImportError:
+    _PKCS11_AVAILABLE = False
+
 
 class TestNormalizePkcs11Config:
     def test_maps_legacy_keys(self):
@@ -46,6 +52,11 @@ class TestNormalizePkcs11Config:
 
 
 class TestPkcs11ProviderLegacyConfig:
+    pytestmark = pytest.mark.skipif(
+        not _PKCS11_AVAILABLE,
+        reason="python-pkcs11 not installed in this environment",
+    )
+
     def test_accepts_library_path_and_pin(self, tmp_path):
         lib = tmp_path / 'fake.so'
         lib.write_bytes(b'\x00')

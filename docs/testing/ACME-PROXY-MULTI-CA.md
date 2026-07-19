@@ -1,15 +1,15 @@
-# ACME Proxy Multi-CA — Plan de test
+# ACME Proxy Multi-CA — Test plan
 
-Feature: le proxy ACME réutilise les comptes `AcmeClientAccount` (même registre que le client ACME). Chaque compte peut exposer un endpoint dédié `/acme/proxy/<slug>/directory` en plus du chemin legacy `/acme/proxy/directory`.
+Feature: the ACME proxy reuses `AcmeClientAccount` records (the same registry as the ACME client). Each account can expose a dedicated endpoint `/acme/proxy/<slug>/directory` in addition to the legacy path `/acme/proxy/directory`.
 
-## Prérequis lab
+## Prerequisites
 
-- UCM déployé avec migrations `050_acme_proxy_ca_account_link` et `051_acme_proxy_slug`
-- Au moins un compte CA externe enregistré (ex. Actalis, Let's Encrypt Staging)
-- Domaine configuré dans **ACME Domains** avec fournisseur DNS (ex. Gandi)
-- Droits `read:acme` / `write:acme`
+- UCM deployed with migrations `050_acme_proxy_ca_account_link` and `051_acme_proxy_slug`
+- At least one external CA account registered (e.g. Actalis, Let's Encrypt Staging)
+- A domain configured in **ACME Domains** with a DNS provider (e.g. Gandi)
+- `read:acme` / `write:acme` permissions
 
-## Tests automatisés (non-régression)
+## Automated tests (regression)
 
 ```bash
 cd backend
@@ -20,105 +20,105 @@ python -m pytest tests/test_acme_proxy_ca_account.py \
   -q
 ```
 
-Couverture ciblée :
+Targeted coverage:
 
-| Fichier | Scénarios |
-|---------|-----------|
-| `test_acme_proxy_ca_account.py` | Résolution compte, API settings, binding service, **multi-path** (`TestProxyMultiPath`) |
-| `test_acme_proxy_key_encrypted.py` | Chiffrement clé sur `AcmeClientAccount` |
-| `test_acme.py` | Register/unregister proxy par `acme_account_id`, champs settings |
+| File | Scenarios |
+|------|-----------|
+| `test_acme_proxy_ca_account.py` | Account resolution, settings API, service binding, **multi-path** (`TestProxyMultiPath`) |
+| `test_acme_proxy_key_encrypted.py` | Key encryption on `AcmeClientAccount` |
+| `test_acme.py` | Proxy register/unregister by `acme_account_id`, settings fields |
 
-Suite complète lab (référence 2026-07-06) :
+Full suite (reference 2026-07-06):
 
 ```bash
 cd /opt/ucm/backend && runuser -u ucm -- /opt/ucm/venv/bin/python -m pytest tests/ -q
-# Attendu : 2115 passed, 6 skipped
+# Expected: 2115 passed, 6 skipped
 ```
 
-## Tests manuels — UI
+## Manual tests — UI
 
-### 1. Sélection compte CA (proxy global)
+### 1. CA account selection (global proxy)
 
-1. ACME → Let's Encrypt → section **Proxy ACME**
-2. Activer le proxy
-3. Vérifier le sélecteur **Compte CA en amont** liste les comptes de **Comptes CA externes**
-4. Choisir un compte → l'URL directory s'affiche sous le sélecteur
-5. Recharger la page → sélection persistée
+1. ACME → Let's Encrypt → **ACME Proxy** section
+2. Enable the proxy
+3. Check that the **Upstream CA account** selector lists the accounts from **External CA accounts**
+4. Pick an account → the directory URL is shown under the selector
+5. Reload the page → selection persists
 
-### 2. Endpoint dédié par compte (slug)
+### 2. Dedicated endpoint per account (slug)
 
-1. **Comptes CA externes** → éditer un compte (ex. Actalis Production)
-2. Activer **Exposer via le proxy ACME**
-3. Définir un slug unique (ex. `actalis-production`) — pas de slug réservé (`directory`, `challenge`, …)
-4. Enregistrer → badge `/acme/proxy/actalis-production/directory` sur la carte compte
-5. Section proxy → **URL proxy dédiée** + liste **Tous les endpoints proxy activés**
-6. Copier l'URL → `curl -sk …/acme/proxy/actalis-production/directory` renvoie le directory upstream
+1. **External CA accounts** → edit an account (e.g. Actalis Production)
+2. Enable **Expose via ACME proxy**
+3. Set a unique slug (e.g. `actalis-production`) — no reserved slug (`directory`, `challenge`, …)
+4. Save → a `/acme/proxy/actalis-production/directory` badge appears on the account card
+5. Proxy section → **Dedicated proxy URL** + **All enabled proxy endpoints** list
+6. Copy the URL → `curl -sk …/acme/proxy/actalis-production/directory` returns the upstream directory
 
-### 3. Test connexion
+### 3. Connection test
 
-1. Avec un compte sélectionné, cliquer **Tester la connexion**
-2. Attendu : ✓ connecté + nom CA
-3. Sans compte sélectionné : bouton désactivé
+1. With an account selected, click **Test connection**
+2. Expected: ✓ connected + CA name
+3. With no account selected: button disabled
 
-### 4. Enregistrement upstream
+### 4. Upstream registration
 
-1. Sélectionner un compte non enregistré (`is_registered: false`)
-2. Saisir un email public (ex. `you@gmail.com`)
-3. **Enregistrer le compte** → succès, badge « Compte enregistré »
-4. Vérifier dans **Comptes CA externes** que le même compte affiche enregistré
+1. Select an unregistered account (`is_registered: false`)
+2. Enter a public email (e.g. `you@gmail.com`)
+3. **Register account** → success, "Account registered" badge
+4. Check in **External CA accounts** that the same account shows as registered
 
-### 5. Bascule entre CAs
+### 5. Switching between CAs
 
-1. Créer 2 comptes avec slugs distincts (Staging + Production)
-2. Enregistrer les deux
-3. Certbot / curl sur chaque slug → directory et émetteur cohérents avec le compte lié
+1. Create 2 accounts with distinct slugs (Staging + Production)
+2. Register both
+3. Certbot / curl against each slug → directory and issuer consistent with the linked account
 
-### 6. Reset compte
+### 6. Account reset
 
-1. Compte enregistré → icône reset (↻)
-2. Confirmer → `account_url` / clé effacés sur le compte lié
-3. Ré-enregistrer possible
+1. Registered account → reset icon (↻)
+2. Confirm → `account_url` / key cleared on the linked account
+3. Re-registration possible
 
-### 7. `preferred_chain` (alternate chains) — optionnel
+### 7. `preferred_chain` (alternate chains) — optional
 
-1. Dans **Comptes CA externes**, éditez le compte CA que vous utilisez pour le proxy (ex. Let’s Encrypt).
-2. Dans le champ **Preferred chain**, saisissez le **CN du trust anchor** (ex. `ISRG Root X1`).
-   - Le match UCM est **case-insensitive** et se fait sur le **CN du dernier certificat** fourni dans le PEM : **subject CN** *ou* **issuer CN** (support des chaînes “short” où le root est omis).
-3. Émettez un certificat via Certbot sur `/acme/proxy/<slug>/directory`.
-4. Vérifiez la chaîne retournée : contrôlez que le **subject CN** *ou* l’**issuer CN** du **dernier certificat** vaut `ISRG Root X1`.
-   - Par exemple (si vous disposez d’un fichier de chaîne type `chain.pem`) :
+1. In **External CA accounts**, edit the CA account you use for the proxy (e.g. Let's Encrypt).
+2. In the **Preferred chain** field, enter the **trust anchor CN** (e.g. `ISRG Root X1`).
+   - UCM matches **case-insensitively** against the **CN of the last certificate** provided in the PEM: **subject CN** *or* **issuer CN** (supports "short" chains where the root is omitted).
+3. Issue a certificate via Certbot against `/acme/proxy/<slug>/directory`.
+4. Check the returned chain: verify that the **subject CN** *or* **issuer CN** of the **last certificate** equals `ISRG Root X1`.
+   - For example (if you have a chain file like `chain.pem`):
      `openssl storeutl -noout -text -certs chain.pem | grep -A1 'Subject:' | tail -2`
 
-## Tests manuels — API
+## Manual tests — API
 
 ```bash
 # Settings
 curl -sk -H "Authorization: Bearer $TOKEN" \
   https://ucm.example:8443/api/v2/acme/client/settings | jq '.data | {proxy_acme_account_id, proxy_upstream_url, proxy_account_registered}'
 
-# Activer proxy + slug sur compte id=4
+# Enable proxy + slug on account id=4
 curl -sk -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"proxy_enabled":true,"proxy_slug":"actalis-production"}' \
   https://ucm.example:8443/api/v2/acme/client/accounts/4
 
-# Directory par slug (sans auth)
+# Directory by slug (no auth)
 curl -sk https://ucm.example:8443/acme/proxy/actalis-production/directory | jq .
 
-# Directory legacy (compte sélectionné dans settings)
+# Legacy directory (account selected in settings)
 curl -sk https://ucm.example:8443/acme/proxy/directory | jq .
 
-# Test connexion
+# Connection test
 curl -sk -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"acme_account_id":4}' \
   https://ucm.example:8443/api/v2/acme/client/proxy/test-connection
 ```
 
-## Tests manuels — Proxy ACME E2E (Certbot)
+## Manual tests — ACME proxy E2E (Certbot)
 
-Exemple validé en environnement lab (UCM + CA externe + fournisseur DNS) :
+Example validated in a lab environment (UCM + external CA + DNS provider):
 
 ```bash
-TEST_DOMAIN="cert-proxy-test.example.com"   # sous-domaine neuf à chaque run
+TEST_DOMAIN="cert-proxy-test.example.com"   # fresh subdomain per run
 CFG="/tmp/certbot-proxy-path"
 rm -rf "$CFG" && mkdir -p "$CFG"/{config,work,logs}
 
@@ -139,25 +139,25 @@ certbot certonly \
 openssl x509 -in "$CFG/config/live/$TEST_DOMAIN/cert.pem" -noout -issuer -subject
 ```
 
-Notes E2E :
+E2E notes:
 
-- UCM crée/supprime les TXT via le fournisseur DNS configuré ; les hooks Certbot peuvent rester `/bin/true`
-- Échec intermittent `unauthorized` : propagation DNS Actalis (~30 s) — réessayer avec un FQDN neuf
-- Logs : `/var/log/ucm/ucm.log` (lignes `[ACME Proxy BG]`)
+- UCM creates/deletes TXT records via the configured DNS provider; Certbot hooks can stay `/bin/true`
+- Intermittent `unauthorized` failure: Actalis DNS propagation (~30 s) — retry with a fresh FQDN
+- Logs: `/var/log/ucm/ucm.log` (lines starting with `[ACME Proxy BG]`)
 
-## Migration legacy (upgrade)
+## Legacy migration (upgrade)
 
-1. Migration **050** : lie `acme.proxy.acme_account_id` au registre `AcmeClientAccount`
-2. Migration **051** : colonnes `proxy_slug`, `proxy_enabled` ; backfill slug pour le compte proxy configuré
-3. Vérifier en DB : `SELECT id,label,proxy_slug,proxy_enabled FROM acme_client_accounts`
-4. `/acme/proxy/directory` reste compatible ; nouveaux clients peuvent cibler `/acme/proxy/<slug>/directory`
+1. Migration **050**: links `acme.proxy.acme_account_id` to the `AcmeClientAccount` registry
+2. Migration **051**: `proxy_slug`, `proxy_enabled` columns; backfills the slug for the configured proxy account
+3. Verify in DB: `SELECT id,label,proxy_slug,proxy_enabled FROM acme_client_accounts`
+4. `/acme/proxy/directory` stays compatible; new clients can target `/acme/proxy/<slug>/directory`
 
-## Critères d'acceptation
+## Acceptance criteria
 
-- [x] Sélection multi-CA dans l'UI proxy
-- [x] Un seul registre de comptes (pas de duplication EAB proxy)
-- [x] Endpoint dédié par compte (`proxy_slug` + `proxy_enabled`)
-- [x] Rétrocompat `/acme/proxy/directory`
-- [x] Tests pytest ciblés + suite lab verte
-- [x] E2E Certbot via slug (CA externe + fournisseur DNS)
-- [x] i18n 9 langues + guides d'aide + aide contextuelle GUI
+- [x] Multi-CA selection in the proxy UI
+- [x] A single account registry (no duplicate proxy EAB)
+- [x] Dedicated endpoint per account (`proxy_slug` + `proxy_enabled`)
+- [x] Backward-compatible `/acme/proxy/directory`
+- [x] Targeted pytest tests + green suite
+- [x] Certbot E2E via slug (external CA + DNS provider)
+- [x] i18n 9 languages + help guides + contextual GUI help

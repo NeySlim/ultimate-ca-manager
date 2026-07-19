@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now, cert_not_before
+from utils.x509_aki import authority_key_identifier_from_issuer
 from .constants import HASH_ALGORITHMS
 from .key_operations_mixin import KeyOperationsMixin
 from .constraints_mixin import ConstraintsMixin
@@ -364,7 +365,6 @@ class CSROperationsMixin:
         )
 
         # AuthorityKeyIdentifier — always from the issuing CA's SKI
-        from utils.x509_aki import authority_key_identifier_from_issuer
         builder = builder.add_extension(
             authority_key_identifier_from_issuer(ca_cert),
             critical=False

@@ -28,6 +28,7 @@ from services.acme.dns_selfcheck import (
     wait_for_txt,
 )
 from utils.acme_debug import acme_log
+from utils import ssrf_protection
 
 logger = logging.getLogger(__name__)
 
@@ -281,10 +282,8 @@ class AcmeProxyService:
 
         Loopback is allowed only when the operator opts in for a colocated
         upstream (see acme_allow_loopback_upstream); metadata stays blocked."""
-        from utils.ssrf_protection import validate_url_not_cloud_metadata
-
         try:
-            validate_url_not_cloud_metadata(url, allow_loopback=acme_allow_loopback_upstream())
+            ssrf_protection.validate_url_not_cloud_metadata(url, allow_loopback=acme_allow_loopback_upstream())
         except ValueError as exc:
             raise ValueError(f'ACME outbound URL blocked: {exc}') from exc
 
@@ -297,11 +296,9 @@ class AcmeProxyService:
     def _ensure_directory(self):
         """Fetch upstream directory"""
         if not self.directory:
-            from utils.ssrf_protection import safe_request_get
-
             self._validate_outbound_acme_url(self.upstream_directory_url)
             try:
-                resp = safe_request_get(
+                resp = ssrf_protection.safe_request_get(
                     self.upstream_directory_url,
                     allow_loopback=acme_allow_loopback_upstream(),
                     timeout=15,
@@ -324,12 +321,10 @@ class AcmeProxyService:
 
     def _get_nonce(self):
         """Get nonce from upstream"""
-        from utils.ssrf_protection import safe_request_head
-
         self._ensure_directory()
         nonce_url = self.directory['newNonce']
         self._validate_outbound_acme_url(nonce_url)
-        resp = safe_request_head(
+        resp = ssrf_protection.safe_request_head(
             nonce_url,
             allow_loopback=acme_allow_loopback_upstream(),
             timeout=15,
@@ -365,10 +360,8 @@ class AcmeProxyService:
         }
 
         headers = {"Content-Type": "application/jose+json"}
-        from utils.ssrf_protection import safe_request_post
-
         self._validate_outbound_acme_url(url)
-        return safe_request_post(
+        return ssrf_protection.safe_request_post(
             url,
             allow_loopback=acme_allow_loopback_upstream(),
             json=data,
@@ -1049,6 +1042,15 @@ class AcmeProxyService:
             upstream_order_url=order_url, is_proxy_order=True
         ).first()
         if local_order:
+            # Fail closed: an order bound to an owner must never finalize when
+            # the requester identity could not be established at all.
+            owner_bound = bool(local_order.account_id or local_order.client_jwk_thumbprint)
+            if owner_bound and not requester_account_id and not requester_thumbprint:
+                logger.warning(
+                    "ACME proxy finalize: no requester identity for owned order %s",
+                    local_order.id,
+                )
+                raise PermissionError("Order does not belong to this account")
             if requester_account_id and local_order.account_id and \
                     local_order.account_id != requester_account_id:
                 logger.warning(

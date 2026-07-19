@@ -25,6 +25,7 @@ from models import db, SystemConfig, Certificate, DnsProvider, AcmeClientOrder
 from services.acme.dns_providers import create_provider, get_provider_class
 from services.acme.dns_selfcheck import acme_allow_loopback_upstream
 from utils.safe_requests import create_session
+from utils import ssrf_protection
 
 logger = logging.getLogger(__name__)
 
@@ -327,10 +328,8 @@ class AcmeClientService:
     @staticmethod
     def _validate_outbound_acme_url(url: str) -> None:
         """Block loopback/cloud-metadata targets for ACME sub-URLs from directory JSON."""
-        from utils.ssrf_protection import validate_url_not_cloud_metadata
-
         try:
-            validate_url_not_cloud_metadata(url, allow_loopback=acme_allow_loopback_upstream())
+            ssrf_protection.validate_url_not_cloud_metadata(url, allow_loopback=acme_allow_loopback_upstream())
         except ValueError as exc:
             raise ValueError(f'ACME outbound URL blocked: {exc}') from exc
     
@@ -339,9 +338,7 @@ class AcmeClientService:
         if self.directory:
             return self.directory
 
-        from utils.ssrf_protection import safe_request_get
-
-        resp = safe_request_get(
+        resp = ssrf_protection.safe_request_get(
             self.directory_url,
             allow_loopback=acme_allow_loopback_upstream(),
             timeout=self._http_timeout(),
@@ -366,9 +363,7 @@ class AcmeClientService:
         last_exc: Optional[Exception] = None
         for attempt in range(3):
             try:
-                from utils.ssrf_protection import safe_request_head
-
-                resp = safe_request_head(
+                resp = ssrf_protection.safe_request_head(
                     nonce_url,
                     allow_loopback=acme_allow_loopback_upstream(),
                     timeout=30,
@@ -603,11 +598,9 @@ class AcmeClientService:
     
     def _post(self, url: str, payload: Any, use_jwk: bool = False) -> requests.Response:
         """POST signed JWS to ACME endpoint"""
-        from utils.ssrf_protection import safe_request_post
-
         self._validate_outbound_acme_url(url)
         jws = self._sign_jws(url, payload, use_jwk=use_jwk)
-        resp = safe_request_post(
+        resp = ssrf_protection.safe_request_post(
             url,
             allow_loopback=acme_allow_loopback_upstream(),
             json=jws,

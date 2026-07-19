@@ -17,6 +17,7 @@ from utils.public_endpoints import (
     skip_public_host_middleware,
 )
 from utils.response import error_response
+from utils import trusted_proxy
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +41,7 @@ def _is_trusted_local_request() -> bool:
 
 def _remote_is_trusted_proxy() -> bool:
     """True only when the immediate TCP peer is in UCM_TRUSTED_PROXIES (see utils.trusted_proxy)."""
-    from utils.trusted_proxy import is_request_from_trusted_proxy
-
-    return is_request_from_trusted_proxy()
+    return trusted_proxy.is_request_from_trusted_proxy()
 
 
 def _proxy_header_spoof_attempt() -> bool:
