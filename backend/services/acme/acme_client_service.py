@@ -266,7 +266,12 @@ class AcmeClientService:
         kid_cfg = SystemConfig.query.filter_by(key='acme.client.eab_kid').first()
         hmac_cfg = SystemConfig.query.filter_by(key='acme.client.eab_hmac_key').first()
         kid = (kid_cfg.value if kid_cfg and kid_cfg.value else '').strip() or None
-        hmac_key = (hmac_cfg.value if hmac_cfg and hmac_cfg.value else '').strip() or None
+        raw_hmac = (hmac_cfg.value if hmac_cfg and hmac_cfg.value else '').strip()
+        if raw_hmac:
+            from security.encryption import decrypt_text
+            hmac_key = decrypt_text(raw_hmac).strip() or None
+        else:
+            hmac_key = None
         if not (kid and hmac_key):
             return False
 

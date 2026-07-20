@@ -24,7 +24,7 @@ class AcmeClientAccount(db.Model):
     account_key = db.Column(db.Text, nullable=True)  # PEM, encrypted at rest (ENC:...)
     account_key_algorithm = db.Column(db.String(20), nullable=False, default='ES256')  # RS256/ES256/ES384
     eab_kid = db.Column(db.String(255), nullable=True)
-    eab_hmac_key = db.Column(db.Text, nullable=True)  # encrypted at rest
+    _eab_hmac_key = db.Column('eab_hmac_key', db.Text, nullable=True)
     is_default = db.Column(db.Boolean, default=False, nullable=False)
     # Optional dedicated ACME proxy path: /acme/proxy/<proxy_slug>/directory
     proxy_slug = db.Column(db.String(63), unique=True, nullable=True, index=True)
@@ -45,6 +45,29 @@ class AcmeClientAccount(db.Model):
 
     LE_STAGING_URL = "https://acme-staging-v02.api.letsencrypt.org/directory"
     LE_PRODUCTION_URL = "https://acme-v02.api.letsencrypt.org/directory"
+
+    @property
+    def eab_hmac_key(self):
+        """EAB HMAC secret, transparently decrypted on read.
+
+        ``decrypt_text`` passes through legacy plaintext rows so existing
+        installations remain readable until migration 061 rewrites them.
+        """
+        if not self._eab_hmac_key:
+            return self._eab_hmac_key
+        from security.encryption import decrypt_text
+        return decrypt_text(self._eab_hmac_key)
+
+    @eab_hmac_key.setter
+    def eab_hmac_key(self, value):
+        if not value:
+            self._eab_hmac_key = value
+            return
+        from security.encryption import encrypt_text, key_encryption
+        self._eab_hmac_key = (
+            value if key_encryption.is_string_encrypted(value)
+            else encrypt_text(value)
+        )
 
     def is_registered(self) -> bool:
         return bool(self.account_url and self.account_key)

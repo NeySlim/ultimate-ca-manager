@@ -15,6 +15,7 @@ from utils.acme_public_url import get_acme_public_base, get_acme_proxy_public_ba
 from models import db, SystemConfig
 from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
+from security.encryption import encrypt_text
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +288,12 @@ def update_settings():
         updates.append('eab_kid')
 
     if 'eab_hmac_key' in data:
-        _set_config('acme.client.eab_hmac_key', data['eab_hmac_key'] or '', 'ACME EAB HMAC Key')
+        hmac_val = data['eab_hmac_key'] or ''
+        _set_config(
+            'acme.client.eab_hmac_key',
+            encrypt_text(hmac_val) if hmac_val else '',
+            'ACME EAB HMAC Key',
+        )
         updates.append('eab_hmac_key')
 
     if 'key_type' in data:
@@ -422,7 +428,11 @@ def update_settings():
 
     if 'proxy_eab_hmac_key' in data:
         hmac_val = data['proxy_eab_hmac_key'] or ''
-        _set_config('acme.proxy.eab_hmac_key', hmac_val, 'ACME proxy EAB HMAC Key')
+        _set_config(
+            'acme.proxy.eab_hmac_key',
+            encrypt_text(hmac_val) if hmac_val else '',
+            'ACME proxy EAB HMAC Key',
+        )
         account_id_cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
         if account_id_cfg and account_id_cfg.value:
             try:

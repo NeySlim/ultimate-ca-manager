@@ -83,6 +83,79 @@ def test_proxy_account_key_encrypted_at_rest(app, encryption_enabled):
         db.session.commit()
 
 
+def test_acme_client_eab_hmac_encrypted_at_rest(app, encryption_enabled):
+    from sqlalchemy import text
+    from models import db, AcmeClientAccount
+    from security.encryption import key_encryption
+
+    plaintext = 'test-eab-hmac-key-base64url'
+    with app.app_context():
+        acct = AcmeClientAccount(
+            directory_url='https://eab-encrypt-test.example/directory',
+            label='EAB encryption test',
+            email='ops@example.com',
+            eab_kid='kid-test',
+            eab_hmac_key=plaintext,
+        )
+        db.session.add(acct)
+        db.session.commit()
+
+        raw = db.session.execute(
+            text('SELECT eab_hmac_key FROM acme_client_accounts WHERE id = :id'),
+            {'id': acct.id},
+        ).scalar_one()
+        assert raw != plaintext
+        assert key_encryption.is_string_encrypted(raw)
+        assert acct.eab_hmac_key == plaintext
+
+
+def test_acme_client_eab_legacy_plaintext_still_loads(app, encryption_enabled):
+    from sqlalchemy import text
+    from models import db, AcmeClientAccount
+
+    plaintext = 'legacy-eab-hmac-key'
+    with app.app_context():
+        acct = AcmeClientAccount(
+            directory_url='https://eab-legacy-test.example/directory',
+            label='Legacy EAB test',
+            email='ops@example.com',
+        )
+        db.session.add(acct)
+        db.session.flush()
+        db.session.execute(
+            text('UPDATE acme_client_accounts SET eab_hmac_key = :value WHERE id = :id'),
+            {'value': plaintext, 'id': acct.id},
+        )
+        db.session.commit()
+        db.session.expire_all()
+
+        reloaded = db.session.get(AcmeClientAccount, acct.id)
+        assert reloaded.eab_hmac_key == plaintext
+
+
+def test_legacy_system_config_eab_hmac_encrypted_at_rest(
+    app, auth_client, encryption_enabled
+):
+    from models import SystemConfig, db
+    from security.encryption import key_encryption
+
+    r = auth_client.patch('/api/v2/acme/client/settings', json={
+        'eab_hmac_key': 'client-system-config-secret',
+        'proxy_eab_hmac_key': 'proxy-system-config-secret',
+    })
+    assert r.status_code == 200
+
+    with app.app_context():
+        client_raw = SystemConfig.query.filter_by(
+            key='acme.client.eab_hmac_key'
+        ).one().value
+        proxy_raw = SystemConfig.query.filter_by(
+            key='acme.proxy.eab_hmac_key'
+        ).one().value
+        assert key_encryption.is_string_encrypted(client_raw)
+        assert key_encryption.is_string_encrypted(proxy_raw)
+
+
 def test_proxy_account_key_legacy_plaintext_still_loads(app, encryption_enabled):
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
