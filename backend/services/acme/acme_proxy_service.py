@@ -560,6 +560,7 @@ class AcmeProxyService:
             is_proxy_order=True,
             client_jwk_thumbprint=client_thumbprint,
             account_id=linked_account_id,
+            acme_client_account_id=self.account.id,
             # Use first domain's provider (provider dict contains 'provider' key with model)
             dns_provider_id=list(domain_providers.values())[0]['provider'].id if domain_providers else None
         )
@@ -1191,16 +1192,21 @@ class AcmeProxyService:
                     from cryptography import x509
                     cert_obj = x509.load_pem_x509_certificate(first_cert.encode(), default_backend())
                     cn = cert_obj.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
-                    descr = cn[0].value if cn else "Let's Encrypt Certificate"
-                    
-                    logger.info(f"[ACME Proxy] Storing LE certificate: {descr}")
-                    
-                    # Import the certificate with source='letsencrypt'
+                    descr = cn[0].value if cn else "External ACME Certificate"
+
+                    # self.account may be a stub without a label in some
+                    # legacy/proxy paths — stay defensive here.
+                    logger.info(
+                        "[ACME Proxy] Storing certificate issued by %s: %s",
+                        getattr(self.account, 'label', None) or 'External ACME CA',
+                        descr,
+                    )
+
                     stored_cert = CertificateService.import_certificate(
                         descr=descr,
                         cert_pem=first_cert,
                         chain_pem=chain,
-                        source='letsencrypt',
+                        source='acme_client',
                         username='acme_proxy'
                     )
                     logger.info(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")

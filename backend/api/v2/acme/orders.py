@@ -4,6 +4,7 @@ import json
 from flask import request
 from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, CA, Certificate
 from models.acme_models import AcmeClientOrder, DnsProvider
+from models.acme_client_account import AcmeClientAccount
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_isoformat
@@ -153,26 +154,27 @@ def list_account_challenges(account_id):
 @bp.route('/api/v2/acme/history', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_history():
-    """Get history of certificates issued via ACME (local and Let's Encrypt)
+    """Get history of certificates issued via ACME (local and external CAs).
 
     Query params:
         page: Page number (default: 1)
         per_page: Items per page (default: 50, max: 100)
-        source: Filter by source ('acme', 'letsencrypt', or 'all' - default: 'all')
+        source: Filter by source ('acme', 'acme_client', 'letsencrypt', or 'all')
     """
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 50, type=int), 100)
     source_filter = request.args.get('source', 'all')
 
-    # Whitelist source filter values
-    valid_sources = ['all', 'acme', 'letsencrypt']
+    # ``letsencrypt`` is retained for legacy rows. New certificates from any
+    # external ACME CA (Actalis, Let's Encrypt, ZeroSSL, ...) use acme_client.
+    external_sources = ['acme_client', 'letsencrypt']
+    valid_sources = ['all', 'acme', *external_sources]
     if source_filter not in valid_sources:
         source_filter = 'all'
 
-    # Get certificates with source='acme' or 'letsencrypt'
     if source_filter == 'all':
         query = Certificate.query.filter(
-            Certificate.source.in_(['acme', 'letsencrypt'])
+            Certificate.source.in_(['acme', *external_sources])
         )
     else:
         query = Certificate.query.filter_by(source=source_filter)
@@ -220,24 +222,45 @@ def get_acme_history():
     client_orders_map = {}
     if cert_ids:
         client_orders = AcmeClientOrder.query.filter(AcmeClientOrder.certificate_id.in_(cert_ids)).all()
+        external_account_ids = {
+            order.acme_client_account_id
+            for order in client_orders
+            if order.acme_client_account_id
+        }
+        external_accounts = (
+            AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(external_account_ids)).all()
+            if external_account_ids else []
+        )
+        external_account_labels = {
+            account.id: account.label for account in external_accounts
+        }
+        dns_provider_ids = {
+            order.dns_provider_id for order in client_orders if order.dns_provider_id
+        }
+        dns_provider_names = {
+            provider.id: provider.name
+            for provider in (
+                DnsProvider.query.filter(DnsProvider.id.in_(dns_provider_ids)).all()
+                if dns_provider_ids else []
+            )
+        }
         for order in client_orders:
-            dns_provider = None
-            if order.dns_provider_id:
-                provider = db.session.get(DnsProvider, order.dns_provider_id)
-                dns_provider = provider.name if provider else None
-
             client_orders_map[order.certificate_id] = {
                 'order_id': order.id,
                 'status': order.status,
                 'challenge_type': order.challenge_type,
                 'environment': order.environment,
-                'dns_provider': dns_provider
+                'dns_provider': dns_provider_names.get(order.dns_provider_id),
+                'ca_account_label': external_account_labels.get(
+                    order.acme_client_account_id
+                ),
             }
 
     data = []
     for cert in certs:
-        # For LE certs, use the issuer field directly; for local ACME, use CA name
-        if cert.source == 'letsencrypt':
+        # External ACME certificates use their X.509 issuer directly; local
+        # ACME certificates resolve the managed UCM CA name.
+        if cert.source in external_sources:
             issuer_name = cert.issuer_name if hasattr(cert, 'issuer_name') else cert.issuer
             order_data = client_orders_map.get(cert.id, {})
         else:
@@ -255,6 +278,7 @@ def get_acme_history():
             'challenge_type': order_data.get('challenge_type'),
             'environment': order_data.get('environment'),
             'dns_provider': order_data.get('dns_provider'),
+            'ca_account_label': order_data.get('ca_account_label'),
             'valid_from': utc_isoformat(cert.valid_from),
             'valid_to': utc_isoformat(cert.valid_to),
             'revoked': cert.revoked,

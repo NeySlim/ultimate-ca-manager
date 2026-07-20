@@ -100,8 +100,8 @@ def _import_cert_for_ari(app, aki_hex: str, serial_int: int):
             valid_to=datetime.now(timezone.utc) + timedelta(days=80),
             key_algo='RSA 2048',
             aki=aki_hex,
-            imported_from='letsencrypt',
-            source='letsencrypt',
+            imported_from='acme_client',
+            source='acme_client',
         )
         db.session.add(cert)
         db.session.commit()
@@ -187,7 +187,7 @@ class TestImportPopulatesAki:
 
         with app.app_context():
             imported = CertificateService.import_certificate(
-                descr='ari-aki-test', cert_pem=pem, source='letsencrypt', username='test'
+                descr='ari-aki-test', cert_pem=pem, source='acme_client', username='test'
             )
             assert imported.aki is not None and ':' in imported.aki
             assert imported.ski is not None and ':' in imported.ski

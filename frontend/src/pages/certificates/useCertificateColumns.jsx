@@ -20,6 +20,21 @@ export function useCertificateColumns(t) {
     return <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>{label}</Badge>
   }
 
+  const getSourceBadge = (row, size = 'sm') => {
+    const config = {
+      import: { variant: 'secondary', label: t('certificates.sourceImport') },
+      acme: { variant: 'cyan', label: t('certificates.sourceAcme') },
+      acme_client: { variant: 'green', label: t('certificates.sourceAcmeClient') },
+      letsencrypt: { variant: 'green', label: t('certificates.sourceLetsencrypt') },
+      scep: { variant: 'orange', label: t('certificates.sourceScep') },
+      msca: { variant: 'purple', label: t('certificates.sourceMsca') },
+      est: { variant: 'yellow', label: t('certificates.sourceEst') },
+    }
+    const source = config[row.source]
+    if (!source) return null
+    return <Badge variant={source.variant} size={size} dot>{source.label}</Badge>
+  }
+
   const columns = useMemo(() => [
     {
       key: 'cn',
@@ -37,12 +52,7 @@ export function useCertificateColumns(t) {
           <span className="font-medium truncate">{val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
-          {row.source === 'import' && <Badge variant="secondary" size="sm" dot>IMPORT</Badge>}
-          {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>LOCAL ACME</Badge>}
-          {row.source === 'letsencrypt' && <Badge variant="green" size="sm" dot>LET'S ENCRYPT</Badge>}
-          {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
-          {row.source === 'msca' && <Badge variant="purple" size="sm" dot>ADCS</Badge>}
-          {row.source === 'est' && <Badge variant="yellow" size="sm" dot>EST</Badge>}
+          {getSourceBadge(row, 'sm')}
         </div>
       ),
       // Mobile: Icon + CN left + status badge right
@@ -150,12 +160,7 @@ export function useCertificateColumns(t) {
             <span className="text-text-secondary font-mono">{formatDate(val)}</span>
           </div>
           {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>{t('certificates.orphan')}</Badge>}
-          {row.source === 'import' && <Badge variant="secondary" size="xs" dot>IMPORT</Badge>}
-          {row.source === 'acme' && <Badge variant="cyan" size="xs" dot>LOCAL ACME</Badge>}
-          {row.source === 'letsencrypt' && <Badge variant="green" size="xs" dot>LET'S ENCRYPT</Badge>}
-          {row.source === 'scep' && <Badge variant="orange" size="xs" dot>SCEP</Badge>}
-          {row.source === 'msca' && <Badge variant="purple" size="xs" dot>ADCS</Badge>}
-          {row.source === 'est' && <Badge variant="yellow" size="xs" dot>EST</Badge>}
+          {getSourceBadge(row, 'xs')}
         </div>
       )
     },

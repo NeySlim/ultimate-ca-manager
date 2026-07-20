@@ -81,6 +81,93 @@ class TestResolveProxyAccount:
             assert resolve_proxy_account().id == acct.id
 
 
+class TestProxyOrderMetadata:
+    def test_proxy_order_pins_external_ca_account(self, app, clean_proxy_state):
+        """Proxy orders must retain the external CA account (Actalis, LE, ...)."""
+        from unittest.mock import MagicMock, patch
+        from models import AcmeClientOrder, DnsProvider
+        from services.acme.acme_proxy_service import AcmeProxyService
+
+        with app.app_context():
+            acct = _seed_account(label='Actalis Test')
+            provider = DnsProvider(
+                name='DNS test', provider_type='manual', zones='["example.com"]'
+            )
+            db.session.add(provider)
+            db.session.commit()
+
+            upstream = MagicMock()
+            upstream.status_code = 201
+            upstream.headers = {
+                'Location': 'https://acme-proxy-test.example/order/1',
+            }
+            upstream.json.return_value = {
+                'status': 'pending',
+                'authorizations': ['https://acme-proxy-test.example/authz/1'],
+                'finalize': 'https://acme-proxy-test.example/order/1/finalize',
+            }
+
+            svc = AcmeProxyService('https://ucm.example/acme/proxy/actalis', account_id=acct.id)
+            svc.directory = {'newOrder': 'https://acme-proxy-test.example/new-order'}
+            with patch.object(svc, '_post_with_account', return_value=upstream), \
+                 patch('api.v2.acme_domains.find_provider_for_domain', return_value={'provider': provider}):
+                _, proxy_order_id = svc.new_order(
+                    [{'type': 'dns', 'value': 'test.example.com'}],
+                    client_thumbprint='client-thumbprint',
+                )
+
+            row = AcmeClientOrder.query.filter_by(
+                upstream_order_url='https://acme-proxy-test.example/order/1'
+            ).one()
+            assert proxy_order_id
+            assert row.acme_client_account_id == acct.id
+            assert row.acme_client_account.label == 'Actalis Test'
+
+    def test_proxy_certificate_uses_generic_external_acme_source(self, app, clean_proxy_state):
+        """Certificates from non-LE proxy accounts must not be labelled Let's Encrypt."""
+        import base64
+        from datetime import timedelta
+        from unittest.mock import MagicMock, patch
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+        from services.acme.acme_proxy_service import AcmeProxyService
+        from utils.datetime_utils import utc_now
+
+        with app.app_context():
+            acct = _seed_account(label='Actalis Test')
+            key = ec.generate_private_key(ec.SECP256R1())
+            name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'actalis.example.com')])
+            now = utc_now()
+            cert = (x509.CertificateBuilder()
+                    .subject_name(name).issuer_name(name).public_key(key.public_key())
+                    .serial_number(42)
+                    .not_valid_before(now - timedelta(hours=1))
+                    .not_valid_after(now + timedelta(days=90))
+                    .sign(key, hashes.SHA256()))
+            pem = cert.public_bytes(serialization.Encoding.PEM)
+
+            response = MagicMock()
+            response.status_code = 200
+            response.content = pem
+            response.headers = {'Content-Type': 'application/pem-certificate-chain'}
+
+            svc = AcmeProxyService('https://ucm.example/acme/proxy/actalis', account_id=acct.id)
+            cert_url = 'https://acme-proxy-test.example/cert/1'
+            cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
+
+            with patch.object(svc, '_post_with_account', return_value=response), \
+                 patch.object(svc, '_find_order_for_certificate', return_value=None), \
+                 patch('services.cert_service.CertificateService.import_certificate') as importer:
+                importer.return_value = MagicMock(id=123)
+                svc.get_certificate(cert_id)
+
+            kwargs = importer.call_args.kwargs
+            assert kwargs['source'] == 'acme_client'
+            assert kwargs['descr'] == 'actalis.example.com'
+
+
 class TestProxySettingsApi:
     def test_get_settings_includes_proxy_acme_account_id(self, auth_client, app, clean_proxy_state):
         with app.app_context():

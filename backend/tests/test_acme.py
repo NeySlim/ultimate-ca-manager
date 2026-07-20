@@ -336,6 +336,47 @@ class TestAcmeServerHistory:
         r = auth_client.get('/api/v2/acme/history?source=letsencrypt')
         assert r.status_code == 200
 
+    def test_history_source_filter_external_acme_includes_ca_label(self, app, auth_client):
+        import uuid
+        from models import Certificate, AcmeClientAccount, AcmeClientOrder, db
+
+        with app.app_context():
+            account = AcmeClientAccount(
+                directory_url=f'https://actalis-{uuid.uuid4()}.example/directory',
+                label='Actalis Test',
+                email='ops@example.com',
+            )
+            cert = Certificate(
+                refid=str(uuid.uuid4()),
+                descr='actalis-history.example.com',
+                subject_cn='actalis-history.example.com',
+                subject='CN=actalis-history.example.com',
+                issuer='CN=Actalis Test CA',
+                serial_number='123456',
+                source='acme_client',
+            )
+            db.session.add_all([account, cert])
+            db.session.flush()
+            order = AcmeClientOrder(
+                domains='["actalis-history.example.com"]',
+                environment='production',
+                challenge_type='dns-01',
+                status='valid',
+                certificate_id=cert.id,
+                acme_client_account_id=account.id,
+                is_proxy_order=True,
+            )
+            db.session.add(order)
+            db.session.commit()
+            cert_id = cert.id
+
+        r = auth_client.get('/api/v2/acme/history?source=acme_client&per_page=100')
+        assert r.status_code == 200
+        row = next(item for item in get_json(r)['data'] if item['id'] == cert_id)
+        assert row['source'] == 'acme_client'
+        assert row['ca_account_label'] == 'Actalis Test'
+        assert row['issuer'] == 'Actalis Test CA'
+
     def test_history_source_filter_all(self, auth_client):
         r = auth_client.get('/api/v2/acme/history?source=all')
         assert r.status_code == 200

@@ -188,15 +188,19 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
       header: t('common.source'),
       priority: 3,
       hideOnMobile: true,
-      render: (value) => (
-        <Badge 
-          variant={value === 'letsencrypt' ? 'green' : 'cyan'} 
-          size="sm"
-          dot
-        >
-          {value === 'letsencrypt' ? t('acme.letsEncryptLabel') : t('acme.localAcmeLabel')}
-        </Badge>
-      )
+      render: (value, row) => {
+        const isExternal = value === 'letsencrypt' || value === 'acme_client'
+        const label = value === 'letsencrypt'
+          ? t('acme.letsEncryptLabel')
+          : value === 'acme_client'
+            ? (row?.ca_account_label || t('certificates.sourceAcmeClient'))
+            : t('acme.localAcmeLabel')
+        return (
+          <Badge variant={isExternal ? 'green' : 'cyan'} size="sm" dot>
+            {label}
+          </Badge>
+        )
+      }
     },
     {
       key: 'challenge_type',
@@ -280,6 +284,7 @@ export default function HistoryTab({ history, filterStatus, onFilterStatusChange
           placeholder: t('acme.allSources'),
           options: [
             { value: 'acme', label: t('acme.localAcme') },
+            { value: 'acme_client', label: t('certificates.sourceAcmeClient') },
             { value: 'letsencrypt', label: t('acme.letsEncrypt') }
           ]
         },
