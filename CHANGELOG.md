@@ -10,6 +10,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.198] - 2026-07-20
+
 ### Changed
 - **SSO role mapping multi-match resolution is now formalized** — when several of a user's external groups match mapping entries, the highest-privilege role wins (admin > operator > auditor > viewer). Previously the result silently depended on the storage order of the mapping entries. Documented in the role mapping help text. (#221)
 
