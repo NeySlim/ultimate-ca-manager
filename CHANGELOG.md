@@ -10,6 +10,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.199] - 2026-07-20
+
+### Added
+- **ACME proxy advertises Renewal Information (ARI, RFC 9773)** — the proxy directory now exposes a `renewalInfo` endpoint served locally from the stored certificate, so ACME clients can schedule renewals of proxy-issued certificates. Imported certificates now populate AKI/SKI and serial number so their ARI `certID` resolves.
+- **Configurable trust store sync limit** — the maximum number of certificates fetched per sync is now adjustable from the Trust Store page instead of being hardcoded.
+
+### Changed
+- **Generic external-CA metadata for ACME proxy certificates** — certificates issued through the ACME proxy are stored with source `acme_client` and labelled with the external account name (e.g. Actalis, ZeroSSL) instead of the hardcoded "Let's Encrypt" identity. Proxy orders are pinned to their external CA account, and the ACME history view shows the account label with a new `acme_client` source filter.
+
+### Security
+- **ACME EAB HMAC keys encrypted at rest** — external account EAB secrets (`acme_client_accounts.eab_hmac_key` and the legacy `acme.client`/`acme.proxy` SystemConfig values) are now encrypted with the master key on write, transparently decrypted on read, and rewritten by migration 061 where encryption is enabled. Legacy plaintext values remain readable.
+
 ## [2.198] - 2026-07-20
 
 ### Changed
