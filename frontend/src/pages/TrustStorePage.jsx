@@ -31,13 +31,14 @@ export default function TrustStorePage() {
   const { openWindow } = useWindowManager()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
-  const { modals, open: openModal, close: closeModal } = useModals(['add'])
+  const { modals, open: openModal, close: closeModal } = useModals(['add', 'sync'])
   
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
   const [certStats, setCertStats] = useState({ total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
   const [selectedCert, setSelectedCert] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [syncLimit, setSyncLimit] = useState(500)
   const [showImportModal, setShowImportModal] = useState(false)
   const [filterPurpose, setFilterPurpose] = usePersistedState('ucm-filter-truststore-purpose', [])
   const [filterExpiryStatus, setFilterExpiryStatus] = usePersistedState('ucm-filter-truststore-expiry', [])
@@ -196,17 +197,13 @@ export default function TrustStorePage() {
   }
 
   const handleSyncFromSystem = async () => {
-    const confirmed = await showConfirm(
-      t('trustStore.syncConfirm'),
-      { title: t('trustStore.syncTitle'), confirmText: t('trustStore.sync'), variant: 'primary' }
-    )
-    if (!confirmed) return
-    
     setSyncing(true)
     try {
-      const response = await truststoreService.syncFromSystem(50)
+      const limit = Math.max(1, Math.min(1000, parseInt(syncLimit, 10) || 500))
+      const response = await truststoreService.syncFromSystem(limit)
       showSuccess(response.message || t('trustStore.syncedCerts', { count: response.data?.new_count || 0 }))
       loadCertificates()
+      closeModal('sync')
     } catch (error) {
       showError(error.message || t('trustStore.syncFailed'))
     } finally {
@@ -271,7 +268,7 @@ export default function TrustStorePage() {
       )}
       {canWrite('truststore') && (
         <>
-          <Button type="button" size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
+          <Button type="button" size="sm" variant="secondary" onClick={() => openModal('sync')} disabled={syncing}>
             <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">{syncing ? t('trustStore.syncing') : t('trustStore.sync')}</span>
           </Button>
@@ -691,6 +688,37 @@ export default function TrustStorePage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Sync from System Modal */}
+      <Modal
+        open={modals.sync}
+        onClose={() => closeModal('sync')}
+        title={t('trustStore.syncTitle')}
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleSyncFromSystem() }} className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">{t('trustStore.syncDescription')}</p>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">{t('trustStore.syncLimitLabel')}</label>
+            <Input
+              type="number"
+              min={1}
+              max={1000}
+              value={syncLimit}
+              onChange={(e) => setSyncLimit(e.target.value)}
+            />
+            <p className="text-xs text-text-tertiary">{t('trustStore.syncLimitHelp')}</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => closeModal('sync')}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={syncing}>
+              <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? t('trustStore.syncing') : t('trustStore.sync')}
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       {/* Smart Import Modal */}
