@@ -101,6 +101,27 @@ class ImportExportMixin:
         cn_attrs = cert.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
         subject_cn = cn_attrs[0].value if cn_attrs else None
 
+        # Extract AKI / SKI (populated so ARI and chain lookups work for
+        # imported certs, including those issued through the ACME proxy).
+        aki_value = None
+        ski_value = None
+        try:
+            aki_ext = cert.extensions.get_extension_for_oid(
+                x509.oid.ExtensionOID.AUTHORITY_KEY_IDENTIFIER
+            )
+            if aki_ext.value.key_identifier:
+                aki_value = aki_ext.value.key_identifier.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            ski_ext = cert.extensions.get_extension_for_oid(
+                x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER
+            )
+            if ski_ext.value.digest:
+                ski_value = ski_ext.value.digest.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+
         # Create certificate record - include chain in crt if provided
         full_cert = cert_pem
         if chain_pem:
@@ -118,6 +139,8 @@ class ImportExportMixin:
             valid_from=cert.not_valid_before_utc,
             valid_to=cert.not_valid_after_utc,
             key_algo=key_algo,
+            aki=aki_value,
+            ski=ski_value,
             # Store extracted SANs
             san_dns=json.dumps(san_dns_list) if san_dns_list else None,
             san_ip=json.dumps(san_ip_list) if san_ip_list else None,

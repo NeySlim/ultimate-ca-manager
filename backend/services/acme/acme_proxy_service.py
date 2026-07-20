@@ -451,7 +451,7 @@ class AcmeProxyService:
         eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
         eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
         meta['externalAccountRequired'] = eab_required
-        return {
+        directory = {
             "newNonce": f"{self.base_url}/new-nonce",
             "newAccount": f"{self.base_url}/new-account",
             "newOrder": f"{self.base_url}/new-order",
@@ -459,6 +459,16 @@ class AcmeProxyService:
             "keyChange": f"{self.base_url}/key-change",
             "meta": meta,
         }
+        # Advertise ARI (RFC 9773) when the upstream does. Served locally
+        # from the UCM database — proxy-issued certs are stored on import,
+        # so no upstream round-trip and no upstream host leak.
+        #
+        # RFC 9773 §3/§4.1: the directory entry is the BASE URL; clients
+        # append "/<certID>" to form the full request URL. Publishing the
+        # literal "<certID>" placeholder here would double the path segment.
+        if 'renewalInfo' in self.directory:
+            directory['renewalInfo'] = f"{self.base_url}/renewal-info"
+        return directory
 
     def new_nonce(self):
         """Proxy new-nonce"""

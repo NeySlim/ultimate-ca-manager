@@ -509,6 +509,41 @@ def cert(cert_id, slug=None):
         return proxy_error("serverInternal", "Internal server error", 500)
 
 
+@_dual_route('/renewal-info/<path:certid>', methods=['GET'], endpoint='proxy_renewal_info')
+def renewal_info(certid, slug=None):
+    """ACME Renewal Information (ARI) — RFC 9773 §4.2.
+
+    Unauthenticated GET. Serves the suggested renewal window for a
+    certificate issued through this proxy. The certificate is looked up
+    locally in the UCM database (proxy-issued certs are stored on import),
+    so there is no upstream round-trip and no upstream host leak.
+    """
+    from services.acme import ari
+    from models import SystemConfig
+
+    parsed = ari.parse_certid(certid)
+    if parsed is None:
+        return proxy_error('malformed', 'Malformed certificate identifier', 400)
+
+    aki_hex, serial_int = parsed
+    cert = ari.find_certificate(aki_hex, serial_int)
+    if cert is None:
+        return proxy_error('malformed', 'Unknown certificate', 404)
+
+    days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()
+    try:
+        renew_before_days = int(days_cfg.value) if days_cfg and days_cfg.value else None
+    except (TypeError, ValueError):
+        renew_before_days = None
+
+    data = ari.build_renewal_info(cert, renew_before_days)
+    resp = make_response(jsonify(data), 200)
+    resp.headers['Content-Type'] = 'application/json'
+    resp.headers['Retry-After'] = str(ari.RETRY_AFTER_SECONDS)
+    resp.headers['Cache-Control'] = f'public, max-age={ari.RETRY_AFTER_SECONDS}'
+    return resp
+
+
 @_dual_route('/revoke-cert', methods=['POST'], endpoint='proxy_revoke_cert')
 def revoke_cert(slug=None):
     """Revoke certificate (RFC 8555 §7.6)"""

@@ -182,6 +182,8 @@ def import_certificate():
             existing_cert.valid_to = cert_info['valid_to']
             existing_cert.aki = cert_info.get('aki')
             existing_cert.ski = cert_info.get('ski')
+            if cert_info.get('serial_number') is not None:
+                existing_cert.serial_number = str(cert_info['serial_number'])
             if cert_info.get('san_dns'):
                 existing_cert.san_dns = json.dumps(cert_info['san_dns'])
             if cert_info.get('san_ip'):
@@ -244,6 +246,7 @@ def import_certificate():
             issuer=cert_info['issuer'],
             aki=cert_info.get('aki'),
             ski=cert_info.get('ski'),
+            serial_number=str(cert_info['serial_number']) if cert_info.get('serial_number') is not None else None,
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
             san_dns=json.dumps(cert_info.get('san_dns', [])) if cert_info.get('san_dns') else None,
