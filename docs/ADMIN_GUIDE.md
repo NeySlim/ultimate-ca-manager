@@ -165,6 +165,8 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Entity ID, ACS URL, certificate configuration
 - Attribute mapping for username, email, roles
 
+**Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
+
 **Important:** After configuring SSO, test with a non-admin account first. Keep at least one local admin account as fallback.
 
 ---

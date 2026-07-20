@@ -13,8 +13,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Changed
 - **SSO role mapping multi-match resolution is now formalized** — when several of a user's external groups match mapping entries, the highest-privilege role wins (admin > operator > auditor > viewer). Previously the result silently depended on the storage order of the mapping entries. Documented in the role mapping help text. (#221)
 
+### Security
+- **ACME proxy no longer echoes upstream failure details** — directory, nonce, order, authorization and challenge errors now return a generic message to the ACME client, with the diagnostic kept in the server log. A URL slug matching no enabled proxy endpoint returns 404 instead of a 500.
+- **ACME proxy finalize fails closed** — an order bound to an owner is refused (403) when no requester identity can be derived from the verified JWS, instead of proceeding unbound.
+
 ### Fixed
 - **SSO mapping editor row shuffling** — editing the external-group name of any row no longer reorders the list on every keystroke, and transiently typing a name that collides with another entry no longer destroys that entry. Rows now keep a stable identity while editing. (#222)
+- **mTLS certificate PKCS12 export with encryption at rest enabled** — the export read the stored private key without decrypting it, so it failed whenever key encryption was active. An unusable stored key now returns a clear error instead of a generic server error.
+- **dns-01 challenge TXT name for wildcard domains** — the wildcard prefix strip removed any leading run of `*` and `.` characters, producing a wrong `_acme-challenge` owner name for domains whose label started with a dot-adjacent wildcard form.
+- **Certificate requests with an invalid CSR signature are now rejected** (400) instead of being accepted for issuance.
+- **Revocation with a future `invalidity_date` is now rejected** (400) — RFC 5280 §5.3.2 defines it as a past compromise time (5 minutes of clock skew allowed).
+- **Removing a certificate hold no longer leaves the certificate mis-staged** when the delta CRL `removeFromCRL` entry cannot be written; the failure is reported instead of silently continuing, and a failed delta emission no longer aborts the unhold.
+- **EC curve names containing hyphens** (`ECDSA-P384`, `NIST P-521`) are now accepted wherever a curve can be specified.
 
 ## [2.197] - 2026-07-19
 
