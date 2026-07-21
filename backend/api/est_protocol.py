@@ -11,13 +11,41 @@ from utils.db_transaction import safe_commit
 from utils.est_cms import build_server_generated_key_cms
 import base64
 import hmac
+import json
 import logging
+import re
 
 from cryptography.hazmat.primitives import serialization as _crypto_serialization
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('est', __name__, url_prefix='/.well-known/est')
+
+
+def _labelled_route(rule, methods, endpoint):
+    """Register an EST operation at both the default and labelled paths.
+
+    RFC 7030 §3.2.2: ``/.well-known/est/<label>/<operation>`` selects a
+    specific CA/policy, while ``/.well-known/est/<operation>`` keeps serving
+    the default configured CA (unchanged behaviour for existing clients).
+    """
+
+    def decorator(view_func):
+        bp.add_url_rule(
+            rule,
+            endpoint=endpoint,
+            view_func=lambda **kw: view_func(label=None, **kw),
+            methods=methods,
+        )
+        bp.add_url_rule(
+            f'/<label>{rule}',
+            endpoint=f'{endpoint}_labelled',
+            view_func=view_func,
+            methods=methods,
+        )
+        return view_func
+
+    return decorator
 
 # Hard upper bound on EST request bodies. A PKCS#10 CSR with a 4096-bit
 # RSA key + EC SAN list rarely exceeds 4 KB; 64 KB is generous and
@@ -199,13 +227,73 @@ def _est_enabled():
     return bool(row and (row.value or '').lower() == 'true')
 
 
-def _get_est_ca():
-    """Get CA configured for EST enrollment"""
+_EST_LABELS_KEY = 'est_labels'
+_LABEL_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+
+
+def _est_label_map():
+    """Return the configured {label: ca_refid} map, or {} when unset/invalid.
+
+    RFC 7030 §3.2.2 lets a server distinguish CAs/policies with an arbitrary
+    path label. Labels are **opt-in per deployment**: only CAs the operator
+    explicitly lists here are reachable, so adding label support does not
+    silently expose every CA in the system to EST enrollment.
+    """
     from models import SystemConfig
+
+    row = SystemConfig.query.filter_by(key=_EST_LABELS_KEY).first()
+    if not row or not row.value:
+        return {}
+    try:
+        parsed = json.loads(row.value)
+    except (TypeError, ValueError) as e:
+        logger.warning(f"Invalid {_EST_LABELS_KEY} configuration: {e}")
+        return {}
+    if not isinstance(parsed, dict):
+        logger.warning(f"{_EST_LABELS_KEY} must be a JSON object")
+        return {}
+    return {
+        label: refid for label, refid in parsed.items()
+        if isinstance(label, str) and _LABEL_RE.match(label)
+        and isinstance(refid, str) and refid
+    }
+
+
+def _get_est_ca(label=None):
+    """Get the CA serving this EST request.
+
+    With a label, resolve it through the configured label map; an unknown
+    label yields None rather than falling back to the default CA, so a client
+    can never be silently enrolled against a different authority than the one
+    it addressed. Without a label, the single configured EST CA.
+    """
+    from models import SystemConfig
+
+    if label is not None:
+        ca_refid = _est_label_map().get(label)
+        if not ca_refid:
+            return None
+        return CA.query.filter_by(refid=ca_refid).first()
+
     ca_refid = SystemConfig.query.filter_by(key='est_ca_refid').first()
     if not ca_refid:
         return None
     return CA.query.filter_by(refid=ca_refid.value).first()
+
+
+def _resolve_est_ca(label=None):
+    """Return ``(ca, error_response)`` for this request's CA.
+
+    The two failure modes are distinct and must not be conflated: an unknown
+    **label** is a wrong address (404 Not Found), whereas a missing default CA
+    means the operator never configured EST (503, the historical response).
+    """
+    ca = _get_est_ca(label)
+    if ca:
+        return ca, None
+    if label is not None:
+        return None, Response('Unknown EST label', status=404)
+    return None, Response('EST not configured', status=503)
 
 
 def _trusted_client_cert():
@@ -329,15 +417,15 @@ def _validate_est_csr(csr):
     return True, None
 
 
-@bp.route('/cacerts', methods=['GET'])
-def get_ca_certs():
+@_labelled_route('/cacerts', methods=['GET'], endpoint='get_ca_certs')
+def get_ca_certs(label=None):
     """
     EST /cacerts - Get CA certificate chain.
     Returns PKCS#7 degenerate certs-only message.
     """
-    ca = _get_est_ca()
-    if not ca:
-        return Response('EST not configured', status=503)
+    ca, ca_error = _resolve_est_ca(label)
+    if ca_error:
+        return ca_error
     
     try:
         # Build certificate chain
@@ -370,8 +458,8 @@ def get_ca_certs():
         return Response("Internal server error", status=500)
 
 
-@bp.route('/simpleenroll', methods=['POST'])
-def simple_enroll():
+@_labelled_route('/simpleenroll', methods=['POST'], endpoint='simple_enroll')
+def simple_enroll(label=None):
     """
     EST /simpleenroll - Enroll new certificate.
     Accepts PKCS#10 CSR, returns PKCS#7 certificate.
@@ -391,9 +479,9 @@ def simple_enroll():
             headers={'WWW-Authenticate': 'Basic realm="EST"'}
         )
     
-    ca = _get_est_ca()
-    if not ca:
-        return Response('EST not configured', status=503)
+    ca, ca_error = _resolve_est_ca(label)
+    if ca_error:
+        return ca_error
     
     try:
         # Get CSR from request body (base64 encoded PKCS#10), capped read
@@ -446,8 +534,8 @@ def simple_enroll():
         return Response("Enrollment failed", status=400)
 
 
-@bp.route('/simplereenroll', methods=['POST'])
-def simple_reenroll():
+@_labelled_route('/simplereenroll', methods=['POST'], endpoint='simple_reenroll')
+def simple_reenroll(label=None):
     """
     EST /simplereenroll - Renew existing certificate (RFC 7030 §3.3.2).
     Requires mTLS — client MUST present a valid certificate.
@@ -469,9 +557,9 @@ def simple_reenroll():
             headers={'WWW-Authenticate': 'Basic realm="EST"'}
         )
     
-    ca = _get_est_ca()
-    if not ca:
-        return Response('EST not configured', status=503)
+    ca, ca_error = _resolve_est_ca(label)
+    if ca_error:
+        return ca_error
     
     # Process enrollment directly (not delegating to simple_enroll which allows Basic auth)
     try:
@@ -538,8 +626,8 @@ def simple_reenroll():
         return Response("Re-enrollment failed", status=400)
 
 
-@bp.route('/csrattrs', methods=['GET'])
-def get_csr_attrs():
+@_labelled_route('/csrattrs', methods=['GET'], endpoint='get_csr_attrs')
+def get_csr_attrs(label=None):
     """
     EST /csrattrs - Get CSR attributes (RFC 7030 §4.5.2).
     Returns suggested/required CSR attributes for enrollment as a
@@ -563,8 +651,8 @@ def get_csr_attrs():
     )
 
 
-@bp.route('/serverkeygen', methods=['POST'])
-def server_keygen():
+@_labelled_route('/serverkeygen', methods=['POST'], endpoint='server_keygen')
+def server_keygen(label=None):
     """
     EST /serverkeygen - Server-side key generation (RFC 7030 §3.4).
     Generates key pair and certificate on server. Basic-authenticated
@@ -589,9 +677,9 @@ def server_keygen():
             headers={'WWW-Authenticate': 'Basic realm="EST"'}
         )
 
-    ca = _get_est_ca()
-    if not ca:
-        return Response('EST not configured', status=503)
+    ca, ca_error = _resolve_est_ca(label)
+    if ca_error:
+        return ca_error
 
     # Capture remote IP for audit BEFORE any failure path so denials
     # are visible too.
