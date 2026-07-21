@@ -8,8 +8,8 @@ from cryptography.x509.oid import NameOID, ExtensionOID
 from .validation_helpers import _name_value, _name_matches_subtree
 
 
-def validate_name_constraints(ca_cert, subject, san_names=None):
-    """Validate subject and SANs against CA NameConstraints (RFC 5280 §4.2.1.10)."""
+def _validate_against_cert(ca_cert, names_to_check):
+    """Validate names against a single CA cert's NameConstraints. Raises ValueError."""
     try:
         nc_ext = ca_cert.extensions.get_extension_for_oid(ExtensionOID.NAME_CONSTRAINTS)
         nc = nc_ext.value
@@ -20,21 +20,6 @@ def validate_name_constraints(ca_cert, subject, san_names=None):
     excluded = nc.excluded_subtrees or []
     if not permitted and not excluded:
         return
-
-    names_to_check = []
-    try:
-        cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        if cn_attrs:
-            cn_value = cn_attrs[0].value
-            if '@' in cn_value:
-                names_to_check.append(x509.RFC822Name(cn_value))
-            else:
-                names_to_check.append(x509.DNSName(cn_value))
-    except Exception:
-        pass
-
-    if san_names:
-        names_to_check.extend(san_names)
 
     excluded_names = []
     outside_permitted_names = []
@@ -66,6 +51,75 @@ def validate_name_constraints(ca_cert, subject, san_names=None):
         )
     if errors:
         raise ValueError("; ".join(errors))
+
+
+def _chain_certs_above(ca_cert):
+    """Return the issuer CA certs above ca_cert, walking the DB CA table by
+    subject/issuer name. Best-effort: on any error, returns what was collected
+    so far (the direct-CA check still applies). Bounded to avoid cycles."""
+    chain = []
+    try:
+        import base64
+        from models import CA
+    except Exception:
+        return chain
+
+    current = ca_cert
+    seen = set()
+    for _ in range(16):  # depth guard
+        issuer_bytes = current.issuer.public_bytes()
+        subject_bytes = current.subject.public_bytes()
+        if issuer_bytes == subject_bytes:
+            break  # self-signed root
+        if issuer_bytes in seen:
+            break  # cycle guard
+        seen.add(issuer_bytes)
+        parent = None
+        try:
+            for ca in CA.query.filter(CA.crt.isnot(None)).all():
+                try:
+                    pem = base64.b64decode(ca.crt)
+                    cert = x509.load_pem_x509_certificate(pem)
+                except Exception:
+                    continue
+                if cert.subject.public_bytes() == issuer_bytes:
+                    parent = cert
+                    break
+        except Exception:
+            break
+        if parent is None:
+            break
+        chain.append(parent)
+        current = parent
+    return chain
+
+
+def validate_name_constraints(ca_cert, subject, san_names=None):
+    """Validate subject and SANs against the NameConstraints of the whole CA
+    chain (RFC 5280 §4.2.1.10) — the direct issuer AND every CA above it, so a
+    constraint set on a root is enforced even when an intermediate carries none.
+    """
+    names_to_check = []
+    try:
+        cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if cn_attrs:
+            cn_value = cn_attrs[0].value
+            if '@' in cn_value:
+                names_to_check.append(x509.RFC822Name(cn_value))
+            else:
+                names_to_check.append(x509.DNSName(cn_value))
+    except Exception:
+        pass
+
+    if san_names:
+        names_to_check.extend(san_names)
+
+    if not names_to_check:
+        return
+
+    _validate_against_cert(ca_cert, names_to_check)
+    for parent_cert in _chain_certs_above(ca_cert):
+        _validate_against_cert(parent_cert, names_to_check)
 
 
 class ConstraintsMixin:

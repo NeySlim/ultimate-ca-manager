@@ -1010,12 +1010,23 @@ def new_order():
             )
 
         replaces = payload.get('replaces')
-        if replaces is not None and (
-            not isinstance(replaces, str) or ari.parse_certid(replaces) is None
-        ):
-            return acme_error(
-                'malformed', 'Malformed replacement certificate identifier'
-            )
+        if replaces is not None:
+            if not isinstance(replaces, str) or ari.parse_certid(replaces) is None:
+                return acme_error(
+                    'malformed', 'Malformed replacement certificate identifier'
+                )
+            # RFC 9773 §5: the replaced certificate must be one this account
+            # holds. If the certid points at another account's cert (or an
+            # unknown one), process the order as if `replaces` were omitted
+            # rather than recording it — otherwise account A could flip the ARI
+            # window of account B's certificate to the past. Dropping (vs hard
+            # 400) keeps interop with clients that cite a cert UCM can't link.
+            if not ari.certid_is_owned_by_account(replaces, account_id):
+                logger.info(
+                    "ACME newOrder: ignoring 'replaces' certid not owned by "
+                    f"account {account_id}"
+                )
+                replaces = None
 
         # RFC 9773 §5 allows replacement orders to bypass rate limits. UCM
         # currently has no ACME new-order rate limit; storing ``replaces``
@@ -1681,9 +1692,18 @@ def revoke_cert():
         # Revoke certificate
         try:
             from services.cert_service import CertificateService
+            # Map the RFC 5280 CRLReason code the client sent to UCM's reason
+            # string. Preserves the client's intent (superseded, cessation…)
+            # instead of collapsing everything but keyCompromise to unspecified.
+            _acme_revoke_reasons = {
+                0: 'unspecified', 1: 'keyCompromise', 2: 'cACompromise',
+                3: 'affiliationChanged', 4: 'superseded', 5: 'cessationOfOperation',
+                6: 'certificateHold', 8: 'removeFromCRL', 9: 'privilegeWithdrawn',
+                10: 'aACompromise',
+            }
             CertificateService.revoke_certificate(
                 cert_id=cert.id,
-                reason='keyCompromise' if reason == 1 else 'unspecified',
+                reason=_acme_revoke_reasons.get(reason, 'unspecified'),
                 username='acme'
             )
         except Exception as e:

@@ -103,6 +103,16 @@ class MicrosoftCACRLSyncMixin:
                 db.session.rollback()
                 raise
 
+            # Purge any cached OCSP "good" responses for the certs just marked
+            # revoked, so the responder stops serving stale good status before
+            # nextUpdate (RFC 6960 §2.2). Same step every other revoke path runs.
+            try:
+                from services.ocsp_service import OCSPService
+                for cert in newly_revoked:
+                    OCSPService.invalidate_cached_responses(cert.serial_number)
+            except Exception as exc:
+                logger.warning(f"OCSP cache invalidation after MSCA CRL sync failed: {exc}")
+
             from services.audit_service import AuditService
             AuditService.log_action(
                 action='msca.crl_sync',

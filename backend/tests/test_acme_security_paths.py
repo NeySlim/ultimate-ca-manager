@@ -9,6 +9,8 @@ import hmac
 import json
 from datetime import timedelta
 
+from utils.datetime_utils import utc_now
+
 import pytest
 
 from cryptography import x509
@@ -369,6 +371,75 @@ class TestPreAuthorizationAndWildcard:
             assert authz.status == 'valid'
             assert authz.order_id is None
 
+    def test_wildcard_order_does_not_reuse_base_domain_authz(self, app, acme_account):
+        """A valid non-wildcard authorization for example.com must NOT be reused
+        for a *.example.com order: identifiers normalize to the same JSON, but
+        reuse must honor the wildcard flag (RFC 8555 §8.4 — wildcard needs
+        dns-01). Otherwise apex web-control (http-01) would yield a wildcard."""
+        with app.app_context():
+            acct = acme_account['account_id']
+            # Existing VALID non-wildcard authz for the base domain.
+            base = AcmeAuthorization(
+                order_id=None,
+                account_id=acct,
+                identifier=json.dumps({'type': 'dns', 'value': 'reuse.example.com'}),
+                wildcard=False,
+                status='valid',
+                expires=utc_now() + timedelta(days=7),
+            )
+            db.session.add(base)
+            db.session.flush()
+            svc = AcmeService(base_url='http://localhost')
+            order = AcmeOrder(
+                account_id=acct,
+                status='pending',
+                identifiers=json.dumps([{'type': 'dns', 'value': '*.reuse.example.com'}]),
+            )
+            db.session.add(order)
+            db.session.flush()
+
+            authz = svc._create_authorization(
+                order.order_id,
+                {'type': 'dns', 'value': '*.reuse.example.com'},
+                account_id=acct,
+            )
+            # A fresh pending wildcard authz — the valid base-domain one is not reused.
+            assert authz.wildcard is True
+            assert authz.status == 'pending'
+            assert authz.authorization_id != base.authorization_id
+
+    def test_base_domain_order_does_not_reuse_wildcard_authz(self, app, acme_account):
+        """Converse: a valid wildcard authz must not satisfy a base-domain order."""
+        with app.app_context():
+            acct = acme_account['account_id']
+            wild = AcmeAuthorization(
+                order_id=None,
+                account_id=acct,
+                identifier=json.dumps({'type': 'dns', 'value': 'conv.example.com'}),
+                wildcard=True,
+                status='valid',
+                expires=utc_now() + timedelta(days=7),
+            )
+            db.session.add(wild)
+            db.session.flush()
+            svc = AcmeService(base_url='http://localhost')
+            order = AcmeOrder(
+                account_id=acct,
+                status='pending',
+                identifiers=json.dumps([{'type': 'dns', 'value': 'conv.example.com'}]),
+            )
+            db.session.add(order)
+            db.session.flush()
+
+            authz = svc._create_authorization(
+                order.order_id,
+                {'type': 'dns', 'value': 'conv.example.com'},
+                account_id=acct,
+            )
+            assert authz.wildcard is False
+            assert authz.status == 'pending'
+            assert authz.authorization_id != wild.authorization_id
+
     def test_new_order_accepts_wildcard_and_exposes_dns01_only(
         self, client, acme_account
     ):
@@ -570,7 +641,78 @@ class TestRfc8555ErrorTypes:
         assert response.status_code == 201
         assert response.get_json()['contact'] == [contact]
 
+    def _make_owned_cert_certid(self, app, account_id, aki_hex='aa:bb:cc:dd', serial=0x123456):
+        """Persist a certificate owned by account_id (linked via an AcmeOrder)
+        and return its RFC 9773 CertID (b64url(AKI).b64url(serial))."""
+        from models import Certificate
+        import base64 as _b64
+        # A real (self-signed) cert PEM so global iterators like export-all
+        # don't choke on undecodable data (shared session-scoped test DB).
+        _k = rsa.generate_private_key(65537, 2048)
+        _name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'owned.example.com')])
+        _crt = (x509.CertificateBuilder()
+                .subject_name(_name).issuer_name(_name)
+                .public_key(_k.public_key())
+                .serial_number(serial)
+                .not_valid_before(utc_now() - timedelta(minutes=5))
+                .not_valid_after(utc_now() + timedelta(days=90))
+                .sign(_k, hashes.SHA256()))
+        _crt_b64 = _b64.b64encode(_crt.public_bytes(serialization.Encoding.PEM)).decode()
+        with app.app_context():
+            cert = Certificate(
+                refid='ari-owned',
+                descr='ari owned',
+                crt=_crt_b64,
+                # Stored decimal, as the real issuance path does.
+                serial_number=str(serial),
+                aki=aki_hex,
+            )
+            db.session.add(cert)
+            db.session.flush()
+            order = AcmeOrder(
+                account_id=account_id,
+                status='valid',
+                identifiers=json.dumps([{'type': 'dns', 'value': 'owned.example.com'}]),
+                certificate_id=cert.id,
+            )
+            db.session.add(order)
+            db.session.commit()
+            aki_bytes = bytes.fromhex(aki_hex.replace(':', ''))
+            serial_bytes = serial.to_bytes((serial.bit_length() + 7) // 8, 'big')
+            return (b64.urlsafe_b64encode(aki_bytes).rstrip(b'=').decode()
+                    + '.' + b64.urlsafe_b64encode(serial_bytes).rstrip(b'=').decode())
+
     def test_new_order_stores_ari_replaces(self, app, client, acme_account):
+        path = '/acme/new-order'
+        # RFC 9773 §5: replaces must identify a cert this account holds.
+        replaces = self._make_owned_cert_certid(app, acme_account['account_id'])
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {
+                'identifiers': [
+                    {'type': 'dns', 'value': 'replacement.example.com'}
+                ],
+                'replaces': replaces,
+            },
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        assert response.status_code == 201
+        order_id = response.headers['Location'].rstrip('/').split('/')[-1]
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert order.replaces == replaces
+
+    def test_new_order_ignores_ari_replaces_not_owned_by_account(
+        self, app, client, acme_account
+    ):
+        """A well-formed certid pointing at a cert this account does not hold is
+        dropped (order created, replaces not recorded) — prevents tampering with
+        another account's ARI window (RFC 9773 §5)."""
         path = '/acme/new-order'
         replaces = f'{_int_to_b64(0xAABBCC)}.{_int_to_b64(0x123456)}'
         jws = _build_jws(
@@ -592,7 +734,7 @@ class TestRfc8555ErrorTypes:
         order_id = response.headers['Location'].rstrip('/').split('/')[-1]
         with app.app_context():
             order = AcmeOrder.query.filter_by(order_id=order_id).first()
-            assert order.replaces == replaces
+            assert order.replaces is None
 
     @pytest.mark.parametrize('replaces', ['not-a-certid', 'abc.***', 'abc=.def'])
     def test_new_order_rejects_malformed_ari_replaces(

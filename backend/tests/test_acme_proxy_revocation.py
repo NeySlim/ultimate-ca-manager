@@ -1,5 +1,6 @@
 """ACME proxy upstream certificate revocation (RFC 8555 §7.6)."""
 import base64
+import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -115,7 +116,8 @@ def test_proxy_new_order_forwards_replaces_when_present(client, monkeypatch):
 
     response = client.post(
         '/acme/proxy/new-order',
-        json={'protected': 'stub', 'payload': 'stub', 'signature': 'stub'},
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json',
     )
 
     assert response.status_code == 201
@@ -154,7 +156,8 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
 
     response = client.post(
         '/acme/proxy/revoke-cert',
-        json={'protected': 'stub', 'payload': 'stub', 'signature': 'stub'},
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json',
     )
 
     assert response.status_code == 200
@@ -184,7 +187,8 @@ def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows,
 
     response = client.post(
         '/acme/proxy/revoke-cert',
-        json={'protected': 'stub', 'payload': 'stub', 'signature': 'stub'},
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json',
     )
 
     assert response.status_code == 400
@@ -218,7 +222,8 @@ def test_proxy_revoke_relays_upstream_failure_status(
 
     response = client.post(
         '/acme/proxy/revoke-cert',
-        json={'protected': 'stub', 'payload': 'stub', 'signature': 'stub'},
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json',
     )
 
     assert response.status_code == 403

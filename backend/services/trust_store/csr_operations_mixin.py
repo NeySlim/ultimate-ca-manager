@@ -23,6 +23,17 @@ _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
     ExtensionOID.INHIBIT_ANY_POLICY,
 })
 
+# EKUs a leaf cert signed from a CSR must never carry: an OCSPSigning leaf that
+# chains to the CA is trusted by validators as a delegated OCSP responder for
+# the whole CA (it can sign "good" for revoked certs), and timeStamping grants
+# trusted-timestamp authority. Neither may be obtained by a protocol client
+# (ACME/EST) that only proved domain control or mTLS. Admin-configured delegated
+# responders are issued through the dedicated certificate-creation path, not here.
+_LEAF_FORBIDDEN_EKU_OIDS = frozenset({
+    x509.ExtendedKeyUsageOID.OCSP_SIGNING,
+    x509.ExtendedKeyUsageOID.TIME_STAMPING,
+})
+
 
 def _key_usage_with_ca_signing(usage, enabled):
     """Return a KeyUsage with CA signing bits forced to the policy value."""
@@ -203,6 +214,16 @@ class CSROperationsMixin:
                     usage,
                     critical=True if issuing_ca else extension.critical,
                 )
+                continue
+            if extension.oid == ExtensionOID.EXTENDED_KEY_USAGE and not issuing_ca:
+                safe_ekus = [
+                    oid for oid in extension.value
+                    if oid not in _LEAF_FORBIDDEN_EKU_OIDS
+                ]
+                if safe_ekus:
+                    builder = builder.add_extension(
+                        x509.ExtendedKeyUsage(safe_ekus), extension.critical
+                    )
                 continue
             builder = builder.add_extension(extension.value, extension.critical)
 
@@ -409,5 +430,14 @@ class CSROperationsMixin:
             algorithm=hash_algo,
             backend=default_backend()
         )
+
+        # Apply the Certificate Transparency policy (embed SCTs, enforce
+        # ct_required) for leaf certs. This is the shared issuance path for
+        # ACME finalize, EST and the API sign-CSR endpoint — previously only
+        # the web create-certificate path honored CT, so ct_required silently
+        # did nothing for ACME. Never applied to intermediate CAs.
+        if not issuing_ca:
+            from utils.ct_client import apply_ct_policy
+            certificate, _ = apply_ct_policy(certificate, ca_cert, ca_private_key)
 
         return certificate.public_bytes(serialization.Encoding.PEM)

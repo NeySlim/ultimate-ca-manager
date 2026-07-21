@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 _NONCE_OID = '1.3.6.1.5.5.7.48.1.2'
 _DEFAULT_RESPONSE_VALIDITY_HOURS = 24
+# Upper bound (7 days): a longer-lived response keeps a revocation masked for
+# any client that cached the HTTP response, defeating timely revocation.
+_MAX_RESPONSE_VALIDITY_HOURS = 168
 _HASH_ALGORITHMS = {
     'sha1': hashes.SHA1,
     'sha224': hashes.SHA224,
@@ -417,6 +420,12 @@ class OCSPService:
             hours = int(raw_value)
             if hours <= 0:
                 raise ValueError
+            if hours > _MAX_RESPONSE_VALIDITY_HOURS:
+                logger.warning(
+                    "ocsp_response_validity_hours %s exceeds max %s; clamping",
+                    hours, _MAX_RESPONSE_VALIDITY_HOURS,
+                )
+                return _MAX_RESPONSE_VALIDITY_HOURS
             return hours
         except (TypeError, ValueError):
             logger.warning(

@@ -33,6 +33,19 @@ logger = logging.getLogger(__name__)
 acme_proxy_bp = Blueprint('acme_proxy', __name__, url_prefix='/acme/proxy')
 
 
+@acme_proxy_bp.before_request
+def _require_jose_content_type():
+    """Require the RFC 8555 media type for every JWS POST (same as the native
+    ACME server — the proxy must not accept arbitrary Content-Types)."""
+    if request.method == 'POST' and request.mimetype != 'application/jose+json':
+        return proxy_error(
+            'malformed',
+            'POST requests must use Content-Type application/jose+json',
+            415,
+        )
+    return None
+
+
 # ==================== Helpers ====================
 
 def _proxy_base_url(slug=None):
@@ -310,7 +323,11 @@ def new_account(slug=None):
 
     if eab_data:
         acme_svc = AcmeService()
-        eab_valid, eab_err = acme_svc.validate_eab(eab_data, jwk)
+        # Bind the inner EAB JWS to this newAccount URL (RFC 8555 §7.3.4), same
+        # as the native server — otherwise an EAB signed for another endpoint
+        # could be replayed here.
+        new_account_url = f'{get_acme_public_origin(request)}{request.path}'
+        eab_valid, eab_err = acme_svc.validate_eab(eab_data, jwk, new_account_url)
         if not eab_valid:
             return proxy_error('malformed',
                                f'Invalid external account binding: {eab_err}', 400)

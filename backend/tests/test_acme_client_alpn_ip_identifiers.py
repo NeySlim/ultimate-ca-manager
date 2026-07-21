@@ -284,11 +284,11 @@ def test_proxy_rejects_ip_and_tls_alpn_requests(client, monkeypatch, payload, ex
     monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', service_factory)
     monkeypatch.setattr(acme_proxy_api, '_kid_account_thumbprint', lambda _protected: None)
 
-    response = client.post('/acme/proxy/new-order', json={
-        'protected': 'stub',
-        'payload': 'stub',
-        'signature': 'stub',
-    })
+    response = client.post(
+        '/acme/proxy/new-order',
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json',
+    )
 
     assert response.status_code == 400
     assert response.get_json()['type'].endswith(expected_type)

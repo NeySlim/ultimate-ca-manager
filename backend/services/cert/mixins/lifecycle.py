@@ -175,55 +175,12 @@ class LifecycleMixin:
         # internal template: when enabled it is replaced by a CA-signed
         # pre-certificate for CT submission, then by the final SCT-bearing
         # certificate before anything is persisted or returned.
-        embedded_scts = []
+        from utils.ct_client import apply_ct_policy
         ct_embed = SystemConfig.query.filter_by(key='ct_embed_sct').first()
-        if ct_embed and str(ct_embed.value).lower() == 'true':
-            ct_required_config = SystemConfig.query.filter_by(key='ct_required').first()
-            ct_required = bool(
-                ct_required_config
-                and str(ct_required_config.value).lower() == 'true'
-            )
-            ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
-            ct_log_urls = None
-            if ct_log_urls_config and ct_log_urls_config.value:
-                try:
-                    parsed_log_urls = json.loads(ct_log_urls_config.value)
-                    if not isinstance(parsed_log_urls, list):
-                        raise ValueError('ct_log_urls must be a JSON list')
-                    ct_log_urls = parsed_log_urls
-                except (json.JSONDecodeError, TypeError, ValueError) as e:
-                    logger.warning(f"Invalid CT log configuration: {e}")
-                    ct_log_urls = []
-
-            try:
-                cert, embedded_scts = embed_scts_in_certificate(
-                    certificate=cert,
-                    issuer_certificate=ca_cert,
-                    issuer_private_key=ca_private_key,
-                    ct_log_urls=ct_log_urls,
-                )
-            except Exception as e:
-                logger.warning(f"CT pre-certificate flow failed: {e}")
-                embedded_scts = []
-
-            if embedded_scts:
-                cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-                logger.info(
-                    f"Embedded {len(embedded_scts)} SCT(s) in certificate"
-                )
-            elif ct_required:
-                logger.error(
-                    "Certificate issuance refused because all CT log "
-                    "submissions failed"
-                )
-                raise ValueError(
-                    "Certificate Transparency is required but no CT log "
-                    "accepted the pre-certificate"
-                )
-            else:
-                logger.warning(
-                    "All CT log submissions failed; issuing without embedded SCT"
-                )
+        signed_cert, embedded_scts = apply_ct_policy(cert, ca_cert, ca_private_key)
+        if signed_cert is not cert:
+            cert = signed_cert
+            cert_pem = cert.public_bytes(serialization.Encoding.PEM)
 
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1

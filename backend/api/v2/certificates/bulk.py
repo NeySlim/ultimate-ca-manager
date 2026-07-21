@@ -125,6 +125,21 @@ def bulk_renew_certificates():
             if not_after > ca_not_after:
                 not_after = ca_not_after
 
+            try:
+                _bulk_sans = list(
+                    orig_cert.extensions.get_extension_for_oid(
+                        ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+                    ).value
+                )
+            except x509.ExtensionNotFound:
+                _bulk_sans = None
+            try:
+                from services.trust_store.constraints_mixin import validate_name_constraints
+                validate_name_constraints(ca_cert, orig_cert.subject, _bulk_sans)
+            except ValueError as exc:
+                results['failed'].append({'id': cert_id, 'error': f'Name constraints: {exc}'})
+                continue
+
             builder = (x509.CertificateBuilder()
                 .subject_name(orig_cert.subject)
                 .issuer_name(ca_cert.subject)

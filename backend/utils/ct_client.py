@@ -257,3 +257,70 @@ def embed_scts_in_certificate(
         critical=False,
     ).sign(issuer_private_key, algorithm, backend=default_backend())
     return final_certificate, valid_scts
+
+
+def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
+    """Apply the configured Certificate Transparency policy to a freshly signed
+    leaf certificate. Reads ``ct_embed_sct`` / ``ct_required`` / ``ct_log_urls``
+    from SystemConfig and, when embedding is enabled, re-issues the certificate
+    with an embedded SCT list via the pre-certificate flow.
+
+    Returns ``(certificate, embedded_scts)`` — the (possibly re-issued)
+    certificate and the list of embedded SCTs (empty when embedding is off or
+    produced none). Raises ValueError when ``ct_required`` is set but no CT log
+    accepted the pre-certificate — so the policy is enforced identically on
+    every issuance path (web, ACME, EST).
+    """
+    from flask import has_app_context
+    # No app/DB context (e.g. a pure-crypto unit test calling sign_csr
+    # directly) → CT config is unreadable and this isn't a real issuance
+    # request; treat as CT disabled.
+    if not has_app_context():
+        return certificate, []
+
+    from models import SystemConfig
+
+    ct_embed = SystemConfig.query.filter_by(key='ct_embed_sct').first()
+    if not (ct_embed and str(ct_embed.value).lower() == 'true'):
+        return certificate, []
+
+    ct_required_config = SystemConfig.query.filter_by(key='ct_required').first()
+    ct_required = bool(
+        ct_required_config and str(ct_required_config.value).lower() == 'true'
+    )
+
+    ct_log_urls = None
+    ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
+    if ct_log_urls_config and ct_log_urls_config.value:
+        try:
+            parsed = json.loads(ct_log_urls_config.value)
+            if not isinstance(parsed, list):
+                raise ValueError('ct_log_urls must be a JSON list')
+            ct_log_urls = parsed
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            logger.warning(f"Invalid CT log configuration: {e}")
+            ct_log_urls = []
+
+    embedded_scts = []
+    try:
+        certificate, embedded_scts = embed_scts_in_certificate(
+            certificate=certificate,
+            issuer_certificate=issuer_certificate,
+            issuer_private_key=issuer_private_key,
+            ct_log_urls=ct_log_urls,
+        )
+    except Exception as e:
+        logger.warning(f"CT pre-certificate flow failed: {e}")
+        embedded_scts = []
+
+    if embedded_scts:
+        logger.info(f"Embedded {len(embedded_scts)} SCT(s) in certificate")
+    elif ct_required:
+        raise ValueError(
+            "Certificate Transparency is required but no CT log accepted "
+            "the pre-certificate"
+        )
+    else:
+        logger.warning("All CT log submissions failed; issuing without embedded SCT")
+
+    return certificate, embedded_scts

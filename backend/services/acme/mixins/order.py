@@ -113,10 +113,16 @@ class OrderMixin:
         if account_id:
             try:
                 
-                # Check both order-linked and standalone (pre-auth) authorizations
+                # Check both order-linked and standalone (pre-auth) authorizations.
+                # Must match the wildcard flag too: after identifier normalization
+                # strips the "*." prefix, a wildcard and a base-domain authorization
+                # share the same identifier JSON. Reusing a non-wildcard authz
+                # (validatable via HTTP-01) for a wildcard order would let an
+                # apex web-control prove a wildcard, bypassing RFC 8555 §8.4.
                 valid_auth = AcmeAuthorization.query.filter(
                     AcmeAuthorization.account_id == account_id,
                     AcmeAuthorization.identifier == identifier_json,
+                    AcmeAuthorization.wildcard == is_wildcard,
                     AcmeAuthorization.status == 'valid',
                     AcmeAuthorization.expires > utc_now()
                 ).order_by(AcmeAuthorization.expires.desc()).first()
@@ -239,13 +245,17 @@ class OrderMixin:
         )
         identifier_json = json.dumps(authorization_identifier)
         
+        # wildcard must match: a normalized identifier is shared between a
+        # wildcard and its base domain, so reuse must not cross that boundary
+        # (RFC 8555 §8.4 — wildcard requires dns-01).
         existing = AcmeAuthorization.query.filter(
             AcmeAuthorization.account_id == account_id,
             AcmeAuthorization.identifier == identifier_json,
+            AcmeAuthorization.wildcard == is_wildcard,
             AcmeAuthorization.status == 'valid',
             AcmeAuthorization.expires > utc_now()
         ).first()
-        
+
         if existing:
             return existing
         

@@ -111,6 +111,25 @@ def renew_certificate(cert_id):
         if not_after > ca_not_after:
             not_after = ca_not_after
 
+        # Re-validate the subject/SANs against the CA chain's NameConstraints
+        # before re-issuing: the CA's constraints may have been tightened since
+        # the original certificate was signed, so a renewal must not blindly
+        # reproduce a now-out-of-scope name (RFC 5280 §4.2.1.10).
+        try:
+            renew_sans = list(
+                orig_cert.extensions.get_extension_for_oid(
+                    ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+                ).value
+            )
+        except x509.ExtensionNotFound:
+            renew_sans = None
+        try:
+            from services.trust_store.constraints_mixin import validate_name_constraints
+            validate_name_constraints(ca_cert, orig_cert.subject, renew_sans)
+        except ValueError as exc:
+            logger.info(f"Renewal rejected by CA NameConstraints: {exc}")
+            return error_response(f"Renewal violates CA name constraints: {exc}", 400)
+
         # Build new certificate with same subject and extensions
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(orig_cert.subject)
