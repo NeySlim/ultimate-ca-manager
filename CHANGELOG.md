@@ -10,6 +10,33 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **ACME client protocol coverage** — upstream certificate revocation through the proxy (previously answered 501), ARI consumption (RFC 9773: suggested renewal windows and the `replaces` field on renewal orders), TLS-ALPN-01 challenge support (RFC 8737) and IP identifiers (RFC 8738).
+- **ACME server conformance (RFC 8555)** — registered error types (`badNonce`, `badRevocationReason`, `caa`…), full order/authorization state machine (`processing`, `expired`, authorization failures propagate to the order), subproblem documents (§6.7.1), contact validation (`unsupportedContact`/`invalidContact`), `error` field exposed on orders, EAB `protected.url` verification, `application/jose+json` content type, ARI `replaces` tracking (migration 063).
+- **SCEP (RFC 8894)** — GetCert and GetCRL operations, mandatory 16-byte senderNonce, intermediate chain in GetCACert (degenerate PKCS#7), signingTime validation, signed GetNextCACert, AES-128-CBC encryption, PasswordRecipientInfo with PBKDF2 for non-RSA clients, strict SignerInfo/RecipientInfo/eContentType validation.
+- **OCSP (RFC 6960)** — multi-certificate requests (§4.1.1), unknown critical request extensions answered with `malformedRequest`, delegated responder validation (issued by the CA, within validity, OCSPSigning EKU), configurable response validity window.
+- **CAA (RFC 8657/8659)** — `accounturi` and `validationmethods` parameters enforced during ACME issuance, fail-closed on critical flags and on DNS failures (SERVFAIL/timeout), `iodef` reports logged.
+- **EST (RFC 7030)** — strict `application/pkcs10` content type, certs-only responses (`smime-type=certs-only`), subject+SAN comparison on re-enroll, unauthenticated `/csrattrs`, spec-conformant server-side key generation (CMS EnvelopedData §4.4).
+- **TSA (RFC 3161)** — `reqPolicy` validation (`unacceptedPolicy` on mismatch), signer EKU `timeStamping` verification, hash algorithm aligned with the message imprint, per-token audit.
+- **Certificate Transparency (RFC 6962)** — pre-certificate submission flow (`add-pre-chain`) with the SCT list embedded as an X.509 extension in the issued certificate (opt-in `ct_embed_sct`, with `ct_required` enforcement).
+- **Misc protocol hardening** — syslog RFC 6587 octet-counting framing with TLS verify option, WebAuthn authenticator clone detection (signature counter), SSH CA allowed-principals patterns (fnmatch) with CA/cert type checks, Kerberos PKINIT EKU in the EKU catalog, RFC 4514 LDAP DN parsing.
+
+### Security
+- **OCSP cache invalidated on revocation** — revoking a certificate now purges every cached OCSP response for it (per-algorithm cache entries were missed), so revoked certificates stop being reported `good` immediately (RFC 6960 §2.2). Nonced responses are no longer cached, and lookups are scoped to the issuing CA to prevent cross-CA serial collisions.
+- **ACME POST-as-GET enforced** — orders, authorizations and certificates now require a signed JWS request; they were previously readable without authentication (`renewalInfo` stays public per RFC 9773).
+- **OIDC SSO id_token verification** — signature, issuer, audience, expiry and nonce are now validated against the provider's JWKS (discovery with key caching, fail-closed; migration 062).
+- **Name constraints enforced on issuance** — leaf certificates are validated against the CA chain's NameConstraints, and unauthorized CSR extensions are filtered from issued certificates.
+- **SCEP GetNextCACert response is now signed** as required by RFC 8894.
+
+### Fixed
+- **ACME pre-authorization** (RFC 8555 §7.4.1) crashed when validating a challenge on an authorization not bound to an order.
+- **ACME wildcard orders** kept the `*.` prefix in the authorization identifier and omitted the `wildcard: true` flag.
+- **CRL scheduler** used delta CRL metadata to decide full-CRL regeneration timing.
+- **Microsoft AD CS: admin channel test now uses the form's unsaved values** — changing e.g. the WinRM transport no longer requires saving before testing, and a test never persists anything.
+- **Microsoft AD CS: inventory sync no longer duplicates certificates signed through UCM** — deduplication matches the CA's RequestId and compares serial numbers under both byte orders (`certutil` reports serials with reversed byte pairs).
+- **Microsoft AD CS: imported certificates can now be renewed** — when the original CSR/key is not in UCM, renewal generates a fresh key pair and a CSR with the same subject and SANs (rekey) and submits it to the issuing connection; a "No Key" badge on the certificate detail makes key-less imports explicit.
+- **SSH host CA setup script** printed an API signing example with a nonexistent endpoint and the CA name where its id belongs.
+
 ## [2.199] - 2026-07-20
 
 ### Added
