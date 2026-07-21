@@ -10,6 +10,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.200] - 2026-07-21
+
 ### Added
 - **ACME client protocol coverage** — upstream certificate revocation through the proxy (previously answered 501), ARI consumption (RFC 9773: suggested renewal windows and the `replaces` field on renewal orders), TLS-ALPN-01 challenge support (RFC 8737) and IP identifiers (RFC 8738).
 - **ACME server conformance (RFC 8555)** — registered error types (`badNonce`, `badRevocationReason`, `caa`…), full order/authorization state machine (`processing`, `expired`, authorization failures propagate to the order), subproblem documents (§6.7.1), contact validation (`unsupportedContact`/`invalidContact`), `error` field exposed on orders, EAB `protected.url` verification, `application/jose+json` content type, ARI `replaces` tracking (migration 063).
@@ -25,8 +27,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - **OCSP cache invalidated on revocation** — revoking a certificate now purges every cached OCSP response for it (per-algorithm cache entries were missed), so revoked certificates stop being reported `good` immediately (RFC 6960 §2.2). Nonced responses are no longer cached, and lookups are scoped to the issuing CA to prevent cross-CA serial collisions.
 - **ACME POST-as-GET enforced** — orders, authorizations and certificates now require a signed JWS request; they were previously readable without authentication (`renewalInfo` stays public per RFC 9773).
 - **OIDC SSO id_token verification** — signature, issuer, audience, expiry and nonce are now validated against the provider's JWKS (discovery with key caching, fail-closed; migration 062). **Upgrade note:** verification defaults to on; existing OIDC providers must have their **issuer** (and JWKS URI, or a discoverable issuer) configured in Settings → SSO, otherwise OIDC logins fail closed with "OIDC issuer is not configured" until set. Verification can be turned off per provider if needed.
-- **Name constraints enforced on issuance** — leaf certificates are validated against the CA chain's NameConstraints, and unauthorized CSR extensions are filtered from issued certificates.
+- **Name constraints enforced on every issuance path** — the subject and SANs are validated against the NameConstraints of the whole CA chain (not just the direct issuer) on web, ACME, EST, SCEP, renewal and approval-policy issuance; unauthorized CSR extensions are filtered from issued certificates.
+- **Delegated-authority EKUs restricted for protocol enrollees** — certificates issued from a CSR via ACME/EST/SCEP can no longer carry `id-kp-OCSPSigning` or `id-kp-timeStamping`, which would otherwise let a domain-validated client mint an OCSP delegated responder for the whole CA.
 - **SCEP GetNextCACert response is now signed** as required by RFC 8894.
+- **Certificate Transparency policy applied on all issuance paths** — SCT embedding and the `ct_required` gate now apply to ACME- and EST-issued certificates, not only the web issuance path.
 
 ### Fixed
 - **ACME pre-authorization** (RFC 8555 §7.4.1) crashed when validating a challenge on an authorization not bound to an order.
