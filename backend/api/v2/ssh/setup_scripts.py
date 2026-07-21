@@ -20,7 +20,7 @@ def _generate_setup_script(ca, pub_key, ca_type, hostname, platform='unix'):
     safe_key = pub_key.strip().replace("\n", " ").replace("'", "'\\''")
     if ca_type == 'user':
         return _user_ca_script(safe_key, ca_label)
-    return _host_ca_script(safe_key, ca_label, hostname)
+    return _host_ca_script(safe_key, ca_label, hostname, ca.id)
 
 
 def _user_ca_script(pub_key, ca_label):
@@ -270,7 +270,7 @@ fi
 '''
 
 
-def _host_ca_script(pub_key, ca_label, hostname):
+def _host_ca_script(pub_key, ca_label, hostname, ca_id):
     hostname_display = hostname if hostname else '$(hostname -f)'
     return rf'''#!/bin/sh
 # ============================================================================
@@ -462,10 +462,12 @@ else
     info "    4. Download the signed certificate"
     info "    5. Place it at: $CERT_FILE"
     printf "\\n"
-    info "  Option B: Sign via UCM API"
-    info "    curl -X POST https://<ucm-server>/api/v2/ssh/certificates/sign \\\\"
+    info "  Option B: Sign via UCM API (API key needs the write:ssh permission)"
+    info "    curl -sk -X POST https://<ucm-server>/api/v2/ssh/certificates \\\\"
+    info "      -H 'X-API-Key: <api-key>' \\\\"
     info "      -H 'Content-Type: application/json' \\\\"
-    info "      -d '{{\"ca_id\": {ca_label}, \"cert_type\": \"host\", ...}}'"
+    info "      -d '{{\"ca_id\": {ca_id}, \"cert_type\": \"host\", \"key_id\": \"$HOSTNAME\", \"principals\": [\"$HOSTNAME\"], \"public_key\": \"<contents of $HOST_KEY.pub>\"}}'"
+    info "    Then save the \"certificate\" field of the JSON response to: $CERT_FILE"
     printf "\\n"
 fi
 
