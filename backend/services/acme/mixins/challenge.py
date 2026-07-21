@@ -121,6 +121,8 @@ class ChallengeMixin:
         # Get identifier from authorization
         auth = challenge.authorization
         domain = auth.identifier_value if auth else ""
+        if domain.startswith('*.'):
+            domain = domain[2:]
         
         # Compute key authorization
         key_authz = self._compute_key_authorization(
@@ -340,8 +342,12 @@ class ChallengeMixin:
         if valid_challenges:
             auth.status = "valid"
             
-            # Update order status if all authorizations are valid
+            # Standalone pre-authorizations have no parent order.
             order = auth.order
+            if order is None:
+                return
+
+            # Update order status if all authorizations are valid
             all_valid = all(a.status == "valid" for a in order.authorizations)
             
             if all_valid:

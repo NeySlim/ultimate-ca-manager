@@ -10,7 +10,11 @@ from datetime import timedelta
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
+from models import db
+from models.crl import CRLMetadata
+from services.crl_scheduler_task import CRLSchedulerTask
 from tests.conftest import get_json
+from utils.datetime_utils import utc_now
 
 CONTENT_JSON = 'application/json'
 
@@ -70,7 +74,6 @@ class TestCrlGenerationHonorsSchedule:
 
     def _latest_crl_obj(self, app, ca_id):
         with app.app_context():
-            from models.crl import CRLMetadata
             row = CRLMetadata.query.filter_by(ca_id=ca_id, is_delta=False).order_by(
                 CRLMetadata.crl_number.desc()
             ).first()
@@ -109,6 +112,38 @@ class TestCrlGenerationHonorsSchedule:
 
 class TestSchedulerPublishInterval:
 
+    def test_recent_delta_does_not_mask_stale_base_crl(
+        self, app, auth_client, create_ca
+    ):
+        ca = create_ca(cn='Sched Delta Isolation CA')
+        auth_client.post(f"/api/v2/crl/{ca['id']}/regenerate")
+
+        with app.app_context():
+            base = CRLMetadata.query.filter_by(
+                ca_id=ca['id'], is_delta=False
+            ).first()
+            base.next_update = utc_now() - timedelta(hours=1)
+            base.created_at = utc_now() - timedelta(hours=2)
+
+            delta = CRLMetadata(
+                ca_id=ca['id'],
+                crl_number=base.crl_number + 1,
+                this_update=utc_now(),
+                next_update=utc_now() + timedelta(days=7),
+                crl_pem=base.crl_pem,
+                crl_der=base.crl_der,
+                revoked_count=0,
+                is_delta=True,
+                base_crl_number=base.crl_number,
+                generated_by='test',
+            )
+            db.session.add(delta)
+            db.session.commit()
+
+            should, reason = CRLSchedulerTask.should_regenerate_crl(ca['id'])
+            assert should is True
+            assert 'stale' in reason.lower()
+
     def test_interval_triggers_regeneration(self, app, auth_client, create_ca):
         ca = create_ca(cn='Sched Task CA')
         _post(auth_client, f"/api/v2/crl/{ca['id']}/config",
@@ -116,11 +151,6 @@ class TestSchedulerPublishInterval:
         auth_client.post(f"/api/v2/crl/{ca['id']}/regenerate")
 
         with app.app_context():
-            from models.crl import CRLMetadata
-            from models import db
-            from services.crl_scheduler_task import CRLSchedulerTask
-            from utils.datetime_utils import utc_now
-
             should, _ = CRLSchedulerTask.should_regenerate_crl(ca['id'])
             assert should is False  # fresh CRL, interval not reached
 

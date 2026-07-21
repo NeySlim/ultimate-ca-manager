@@ -4,14 +4,16 @@ Handles OCSP requests via GET and POST methods.
 """
 import base64
 import logging
+from datetime import timedelta
 from urllib.parse import unquote
 
 from flask import Blueprint, request, Response
 from cryptography import x509
 from cryptography.x509 import ocsp
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
-from models import db, CA
+from models import CA
 from services.ocsp_service import OCSPService
 from utils.datetime_utils import utc_now
 
@@ -124,7 +126,7 @@ def _process_ocsp_request(request_der: bytes) -> Response:
     # RFC 6960 §4.4.1: when client sends a nonce, the response MUST include
     # the same nonce. A cached response holds the nonce of an earlier
     # request, so we cannot reuse it here — regenerate fresh.
-    cached = None if request_nonce else ocsp_service.get_cached_response(
+    cached = None if request_nonce is not None else ocsp_service.get_cached_response(
         ca.id, cert_serial_hex, hash_algorithm)
     if cached:
         resp = Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
@@ -151,13 +153,12 @@ def _process_ocsp_request(request_der: bytes) -> Response:
 
 def _add_cache_headers(resp: Response, request_nonce):
     """Add RFC 6960 recommended Cache-Control and Expires headers"""
-    if request_nonce:
+    if request_nonce is not None:
         # Nonce present — response is unique, don't cache
         resp.headers['Cache-Control'] = 'no-cache, no-store'
     else:
         # No nonce — response can be cached (24h matches nextUpdate)
         resp.headers['Cache-Control'] = 'max-age=3600, public'
-        from datetime import datetime, timedelta
         expires = utc_now() + timedelta(hours=1)
         resp.headers['Expires'] = expires.strftime('%a, %d %b %Y %H:%M:%S GMT')
 
@@ -177,14 +178,21 @@ def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):
                 ca_cert = x509.load_pem_x509_certificate(ca_pem)
 
                 # Pick hash matching the request
-                if isinstance(hash_algorithm, hashes.SHA256):
+                if isinstance(hash_algorithm, hashes.SHA224):
+                    algo = hashes.SHA224()
+                elif isinstance(hash_algorithm, hashes.SHA256):
                     algo = hashes.SHA256()
                 elif isinstance(hash_algorithm, hashes.SHA384):
                     algo = hashes.SHA384()
                 elif isinstance(hash_algorithm, hashes.SHA512):
                     algo = hashes.SHA512()
-                else:
+                elif isinstance(hash_algorithm, hashes.SHA1):
                     algo = hashes.SHA1()
+                else:
+                    logger.debug(
+                        f"OCSP: unsupported issuer hash algorithm {hash_algorithm.name}"
+                    )
+                    return None
 
                 # Issuer name hash (over DER-encoded subject)
                 d = hashes.Hash(algo)
@@ -196,7 +204,6 @@ def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):
                 # Issuer key hash — RFC 6960 §4.1.1: SHA hash of the
                 # subjectPublicKey BIT STRING value (i.e. the contents of
                 # the BIT STRING, *not* the full SubjectPublicKeyInfo).
-                from cryptography.hazmat.primitives.asymmetric import rsa, ec
                 pubkey = ca_cert.public_key()
                 if isinstance(pubkey, rsa.RSAPublicKey):
                     spki_value = pubkey.public_bytes(

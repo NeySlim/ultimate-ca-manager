@@ -8,7 +8,13 @@ from utils.db_transaction import safe_commit
 from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
+from services.oidc_id_token import OIDCValidationError, verify_id_token
 from utils.datetime_utils import utc_now
+from utils.ssrf_protection import (
+    safe_request_get,
+    safe_request_post,
+    validate_url_not_cloud_metadata,
+)
 from datetime import timedelta
 import secrets as py_secrets
 import base64
@@ -18,7 +24,6 @@ import hmac
 import logging
 import traceback
 import json
-import requests as http_requests
 
 
 def _pkce_pair():
@@ -29,27 +34,24 @@ def _pkce_pair():
     return verifier, challenge
 
 
-def _decode_id_token_payload(id_token):
-    """
-    Best-effort decode of an OIDC id_token payload (middle JWT segment).
-    Returns a dict, or {} on any error. Signature is NOT verified here —
-    state + PKCE + TLS to the configured token endpoint already authenticate
-    the exchange; nonce is the additional replay guard.
-    """
-    try:
-        parts = id_token.split('.')
-        if len(parts) < 2:
-            return {}
-        payload_b64 = parts[1]
-        # base64url with missing padding
-        pad = '=' * (-len(payload_b64) % 4)
-        raw = base64.urlsafe_b64decode(payload_b64 + pad)
-        return json.loads(raw)
-    except Exception:
-        return {}
-
-
 logger = logging.getLogger(__name__)
+
+
+def _reject_oidc_login(provider, reason):
+    """Fail closed with a generic client error and a clear internal audit trail."""
+    logger.error("OIDC login rejected for provider %s: %s", provider.name, reason)
+    try:
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='sso',
+            resource_id=provider.id,
+            resource_name=provider.name,
+            details=f'OIDC ID token rejected: {reason}',
+            success=False,
+        )
+    except Exception as audit_error:
+        logger.error("Failed to audit OIDC login rejection: %s", audit_error)
+    return redirect('/login?error=invalid_credentials')
 
 # ============ Public SSO Endpoints (no auth) ============
 
@@ -151,6 +153,7 @@ def sso_callback(provider_type):
             return redirect('/login?error=invalid_state')
 
     if provider.provider_type == 'oauth2':
+        verify = True
         code = request.args.get('code')
         if not code:
             error = request.args.get('error', 'no_code')
@@ -175,15 +178,20 @@ def sso_callback(provider_type):
                 token_data['code_verifier'] = code_verifier
 
             verify = _get_ssl_verify(provider, 'oauth2')
-            token_response = http_requests.post(
-                provider.oauth2_token_url,
-                data=token_data,
-                timeout=10,
-                verify=verify
-            )
+            try:
+                validate_url_not_cloud_metadata(provider.oauth2_token_url)
+                token_response = safe_request_post(
+                    provider.oauth2_token_url,
+                    data=token_data,
+                    timeout=10,
+                    verify=verify,
+                    allow_redirects=False,
+                )
+            except (ValueError, TypeError) as token_error:
+                return _reject_oidc_login(provider, f'token endpoint rejected: {token_error}')
 
             if not token_response.ok:
-                logger.error(f"OAuth2 token exchange failed: {token_response.text}")
+                logger.error("OAuth2 token exchange failed for provider %s", provider.name)
                 return redirect('/login?error=token_exchange_failed')
 
             tokens = token_response.json()
@@ -192,36 +200,43 @@ def sso_callback(provider_type):
             if not access_token:
                 return redirect('/login?error=no_access_token')
 
-            # OIDC: if an id_token is present, validate the nonce binding to
-            # mitigate auth-code replay against this client. Signature is not
-            # verified here (no JWKS infra yet); PKCE + state + TLS already
-            # authenticate the exchange — nonce closes the replay window.
             id_token = tokens.get('id_token')
-            if id_token and expected_nonce:
-                claims = _decode_id_token_payload(id_token)
-                token_nonce = claims.get('nonce')
-                if not token_nonce or not hmac.compare_digest(str(token_nonce), expected_nonce):
-                    logger.error("OIDC id_token nonce mismatch")
-                    AuditService.log_action(
-                        action='login_failure',
-                        resource_type='sso',
-                        details=f'OIDC nonce mismatch for provider {provider.name}',
-                        success=False
+            verification_enabled = provider.id_token_verify is not False
+            trusted_id_claims = None
+            if verification_enabled and (not id_token or not expected_nonce):
+                return _reject_oidc_login(provider, 'missing ID token or session nonce')
+            if id_token:
+                try:
+                    trusted_id_claims = verify_id_token(
+                        id_token,
+                        provider,
+                        expected_nonce,
+                        verify=verification_enabled,
+                        ssl_verify=verify,
                     )
-                    return redirect('/login?error=invalid_nonce')
+                except OIDCValidationError as validation_error:
+                    return _reject_oidc_login(provider, str(validation_error))
 
-            # Get user info
-            userinfo_response = http_requests.get(
-                provider.oauth2_userinfo_url,
-                headers={'Authorization': f'Bearer {access_token}'},
-                timeout=10,
-                verify=verify
-            )
+            # Get user info. Revalidate and pin the IdP URL for every fetch.
+            try:
+                validate_url_not_cloud_metadata(provider.oauth2_userinfo_url)
+                userinfo_response = safe_request_get(
+                    provider.oauth2_userinfo_url,
+                    headers={'Authorization': f'Bearer {access_token}'},
+                    timeout=10,
+                    verify=verify,
+                    allow_redirects=False,
+                )
+            except (ValueError, TypeError) as userinfo_error:
+                return _reject_oidc_login(provider, f'userinfo endpoint rejected: {userinfo_error}')
 
             if not userinfo_response.ok:
                 return redirect('/login?error=userinfo_failed')
 
             userinfo = userinfo_response.json()
+            if trusted_id_claims is not None and verification_enabled:
+                if userinfo.get('sub') != trusted_id_claims.get('sub'):
+                    return _reject_oidc_login(provider, 'userinfo subject mismatch')
 
             # Map attributes
             attr_mapping = _parse_json_field(provider.attribute_mapping)

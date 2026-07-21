@@ -6,11 +6,18 @@
   - SCEP auto-approve: refuses to issue a certificate when the CA is offline,
     consistent with the CSR/CRL/EST signing paths.
 """
+import base64
 import json
+
+import asn1crypto.cms
 import pytest
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.serialization import pkcs7
 
 from models import db, CA
 from models.system_config import SystemConfig
+from services.scep.message_parser import verify_cms_signature
 
 
 def _set_config(key, value):
@@ -58,6 +65,59 @@ class TestTsaConfigGuard:
         finally:
             with app.app_context():
                 _clear_config('tsa_ca_refid')
+
+
+class TestScepGetNextCaCert:
+    """GetNextCACert must be signed by the current CA (RFC 8894 §4.7.1)."""
+
+    def test_response_is_signed_by_current_ca(self, app, client, create_ca):
+        current = create_ca(cn='SCEP Rollover CA', validityYears=5)
+        next_ca = create_ca(cn='SCEP Rollover CA', validityYears=10)
+
+        with app.app_context():
+            _set_config('scep_ca_id', str(current['id']))
+            current_obj = db.session.get(CA, current['id'])
+            next_obj = db.session.get(CA, next_ca['id'])
+            current_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(current_obj.crt), default_backend()
+            )
+            next_serial = x509.load_pem_x509_certificate(
+                base64.b64decode(next_obj.crt), default_backend()
+            ).serial_number
+
+        try:
+            response = client.get(
+                '/scep/pkiclient.exe?operation=GetNextCACert'
+            )
+            assert response.status_code == 200
+            assert response.content_type == 'application/x-x509-next-ca-cert'
+
+            outer = asn1crypto.cms.ContentInfo.load(response.data)
+            signed_data = outer['content']
+            assert len(signed_data['signer_infos']) == 1
+
+            verify_cms_signature(signed_data, current_cert)
+
+            inner_der = signed_data['encap_content_info']['content'].native
+            inner_certs = pkcs7.load_der_pkcs7_certificates(inner_der)
+            assert [cert.serial_number for cert in inner_certs] == [next_serial]
+        finally:
+            with app.app_context():
+                _clear_config('scep_ca_id')
+
+    def test_no_rollover_certificate_returns_404(self, app, client, create_ca):
+        current = create_ca(cn='SCEP No Rollover CA', validityYears=5)
+        with app.app_context():
+            _set_config('scep_ca_id', str(current['id']))
+
+        try:
+            response = client.get(
+                '/scep/pkiclient.exe?operation=GetNextCACert'
+            )
+            assert response.status_code == 404
+        finally:
+            with app.app_context():
+                _clear_config('scep_ca_id')
 
 
 class TestScepOfflineGuard:

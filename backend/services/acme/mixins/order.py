@@ -66,6 +66,23 @@ class OrderMixin:
         
         return order
     
+    @staticmethod
+    def _normalize_authorization_identifier(
+        identifier: Dict[str, str]
+    ) -> tuple[Dict[str, str], bool]:
+        """Return the RFC 8555 authorization identifier and wildcard flag."""
+        value = identifier.get('value', '')
+        is_wildcard = (
+            identifier.get('type') == 'dns'
+            and isinstance(value, str)
+            and value.startswith('*.')
+        )
+        normalized = {
+            **identifier,
+            'value': value[2:] if is_wildcard else value,
+        }
+        return normalized, is_wildcard
+
     def _create_authorization(
         self,
         order_id: str,
@@ -82,10 +99,14 @@ class OrderMixin:
         Returns:
             AcmeAuthorization object
         """
+        authorization_identifier, is_wildcard = self._normalize_authorization_identifier(
+            identifier
+        )
+        identifier_json = json.dumps(authorization_identifier)
+
         # Check for existing valid authorization for this account/identifier (Authorization Reuse)
         if account_id:
             try:
-                identifier_json = json.dumps(identifier)
                 
                 # Check both order-linked and standalone (pre-auth) authorizations
                 valid_auth = AcmeAuthorization.query.filter(
@@ -102,6 +123,7 @@ class OrderMixin:
                         account_id=account_id,
                         status="valid",
                         identifier=identifier_json,
+                        wildcard=is_wildcard,
                         expires=valid_auth.expires
                     )
                     
@@ -149,8 +171,8 @@ class OrderMixin:
                     order_id=order_id,
                     account_id=account_id,
                     status='valid',
-                    identifier=json.dumps(identifier),
-                    wildcard=identifier.get('value', '').startswith('*.'),
+                    identifier=identifier_json,
+                    wildcard=is_wildcard,
                     expires=utc_now() + timedelta(days=7),
                 )
                 db.session.add(auth)
@@ -169,7 +191,8 @@ class OrderMixin:
             order_id=order_id,
             account_id=account_id,
             status="pending",
-            identifier=json.dumps(identifier),
+            identifier=identifier_json,
+            wildcard=is_wildcard,
             expires=utc_now() + timedelta(days=7)
         )
         
@@ -206,7 +229,10 @@ class OrderMixin:
             AcmeAuthorization object
         """
         # Check for existing valid authorization
-        identifier_json = json.dumps(identifier)
+        authorization_identifier, is_wildcard = self._normalize_authorization_identifier(
+            identifier
+        )
+        identifier_json = json.dumps(authorization_identifier)
         
         existing = AcmeAuthorization.query.filter(
             AcmeAuthorization.account_id == account_id,
@@ -219,8 +245,6 @@ class OrderMixin:
             return existing
         
         # Create new pending authorization (no order_id)
-        is_wildcard = identifier.get('value', '').startswith('*.')
-
         # Issue #69: honor auto_approve on admin-configured domains (dns type only)
         domain_value = identifier.get('value', '')
         skip_challenges = (
@@ -327,7 +351,9 @@ class OrderMixin:
         # Detect identifier type and wildcard status
         identifier_type = auth.identifier_type
         value = auth.identifier_value
-        is_wildcard = isinstance(value, str) and value.startswith('*.')
+        is_wildcard = auth.wildcard is True or (
+            isinstance(value, str) and value.startswith('*.')
+        )
         is_ip = identifier_type == 'ip'
 
         # DNS-01 Challenge — DNS identifiers only (RFC 8738 forbids DNS-01 for IPs)

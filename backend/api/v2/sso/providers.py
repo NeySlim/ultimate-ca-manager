@@ -10,6 +10,7 @@ import json
 from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
+from services.oidc_id_token import clear_oidc_cache
 
 
 # SSO provider URL fields that the backend will dereference (metadata fetch,
@@ -21,6 +22,8 @@ _SSO_OUTBOUND_URL_FIELDS = (
     'oauth2_auth_url',
     'oauth2_token_url',
     'oauth2_userinfo_url',
+    'oauth2_issuer',
+    'oauth2_jwks_uri',
 )
 
 
@@ -121,6 +124,10 @@ def create_provider():
         provider.oauth2_token_url = data.get('oauth2_token_url')
         provider.oauth2_userinfo_url = data.get('oauth2_userinfo_url')
         provider.oauth2_scopes = json.dumps(data.get('oauth2_scopes', ['openid', 'profile', 'email']))
+        provider.oauth2_issuer = data.get('oauth2_issuer')
+        provider.oauth2_jwks_uri = data.get('oauth2_jwks_uri')
+        # Verification is fail-closed unless an administrator explicitly opts out.
+        provider.id_token_verify = data.get('id_token_verify', True) is not False
         provider.oauth2_verify_ssl = data.get('oauth2_verify_ssl', True)
         ca = data.get('oauth2_ca_bundle')
         provider.oauth2_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
@@ -162,6 +169,7 @@ def create_provider():
     ok, _err = safe_commit(logger, "Failed to create SSO provider")
     if not ok:
         return _err
+    clear_oidc_cache()
 
     AuditService.log_action(
         action='sso_provider_created',
@@ -241,6 +249,7 @@ def update_provider(provider_id=None, provider_type_name=None):
     elif provider.provider_type == 'oauth2':
         for field in ['oauth2_client_id', 'oauth2_auth_url',
                       'oauth2_token_url', 'oauth2_userinfo_url',
+                      'oauth2_issuer', 'oauth2_jwks_uri',
                       'oauth2_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
@@ -252,6 +261,8 @@ def update_provider(provider_id=None, provider_type_name=None):
             provider.oauth2_client_secret = data['oauth2_client_secret']
         if 'oauth2_scopes' in data:
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
+        if 'id_token_verify' in data:
+            provider.id_token_verify = data['id_token_verify'] is not False
 
     elif provider.provider_type == 'ldap':
         for field in ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
@@ -288,6 +299,7 @@ def update_provider(provider_id=None, provider_type_name=None):
     ok, _err = safe_commit(logger, "Failed to update SSO provider")
     if not ok:
         return _err
+    clear_oidc_cache()
     AuditService.log_action(
         action='sso_provider_updated',
         resource_type='sso_provider',
@@ -314,6 +326,7 @@ def delete_provider(provider_id):
     ok, _err = safe_commit(logger, "Failed to delete SSO provider")
     if not ok:
         return _err
+    clear_oidc_cache()
 
     AuditService.log_action(
         action='sso_provider_deleted',

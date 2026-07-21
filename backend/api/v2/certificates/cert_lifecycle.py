@@ -6,8 +6,8 @@ from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
-from models.ocsp import OCSPResponse
 from services.cert_service import CertificateService
+from services.ocsp_service import OCSPService
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_revoked, on_certificate_deleted
@@ -253,16 +253,10 @@ def unhold_certificate(cert_id):
         except Exception as e:
             logger.warning(f"Failed to regenerate CRL after unhold: {e}")
 
-        # Invalidate OCSP cache for this cert (cache uses hex serial — RFC 6960 §2.2)
-        try:
-            if cert.serial_number:
-                from utils.serial_format import serial_to_hex
-                serial_hex = serial_to_hex(cert.serial_number)
-                if serial_hex:
-                    OCSPResponse.query.filter_by(cert_serial=serial_hex).delete()
-                    db.session.commit()
-        except Exception:
-            db.session.rollback()
+        # Invalidate all per-algorithm OCSP cache entries (RFC 6960 §2.2).
+        if cert.serial_number:
+            OCSPService.invalidate_cached_responses(
+                cert.serial_number, ca_id=ca.id if ca else None)
 
         # Propagate the unhold to the Windows CA if this cert came from an MS CA
         # with an admin channel (certutil unrevoke only lifts a certificateHold).

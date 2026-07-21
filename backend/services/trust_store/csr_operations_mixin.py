@@ -17,6 +17,28 @@ from .key_operations_mixin import KeyOperationsMixin
 from .constraints_mixin import ConstraintsMixin
 
 
+_LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
+    ExtensionOID.NAME_CONSTRAINTS,
+    ExtensionOID.POLICY_CONSTRAINTS,
+    ExtensionOID.INHIBIT_ANY_POLICY,
+})
+
+
+def _key_usage_with_ca_signing(usage, enabled):
+    """Return a KeyUsage with CA signing bits forced to the policy value."""
+    return x509.KeyUsage(
+        digital_signature=usage.digital_signature,
+        content_commitment=usage.content_commitment,
+        key_encipherment=usage.key_encipherment,
+        data_encipherment=usage.data_encipherment,
+        key_agreement=usage.key_agreement,
+        key_cert_sign=enabled,
+        crl_sign=enabled,
+        encipher_only=usage.encipher_only if usage.key_agreement else False,
+        decipher_only=usage.decipher_only if usage.key_agreement else False,
+    )
+
+
 class CSROperationsMixin:
     """CSR generation and signing operations mixin"""
 
@@ -136,48 +158,51 @@ class CSROperationsMixin:
             utc_now() + timedelta(days=validity_days)
         )
 
-        # Copy extensions from CSR — but never let a requester confer CA powers
-        # on a non-CA (leaf) certificate through a crafted CSR. Only the explicit
-        # intermediate-CA signing flow (cert_type='intermediate_ca') may assert
-        # BasicConstraints CA:true / keyCertSign; for every other type the
-        # policy blocks below set the correct leaf values. Without this an EST /
-        # SCEP / ACME enrollee could submit a CSR with BasicConstraints(ca=True)
-        # and receive a working subordinate CA (trust escalation).
+        # Copy only extensions appropriate for the requested certificate role.
+        # CA-only constraints from an enrollee CSR must never reach a leaf.
         issuing_ca = cert_type == 'intermediate_ca'
-        # Never copy SKI/AKI from the CSR — an enrollee could inject a wrong
-        # key identifier (RFC 5280 §4.2.1.1 / §4.2.1.2). Always set them from
-        # the subject public key and the issuing CA certificate below.
-        _skip_from_csr = {
+        try:
+            csr_basic_constraints = csr.extensions.get_extension_for_oid(
+                ExtensionOID.BASIC_CONSTRAINTS
+            )
+        except x509.ExtensionNotFound:
+            csr_basic_constraints = None
+
+        if (
+            issuing_ca
+            and csr_basic_constraints is not None
+            and not csr_basic_constraints.value.ca
+        ):
+            raise ValueError(
+                "Intermediate CA CSR BasicConstraints must set ca=True"
+            )
+
+        # Never copy SKI/AKI from the CSR — always derive them from the keys.
+        skip_from_csr = {
             ExtensionOID.SUBJECT_KEY_IDENTIFIER,
             ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
         }
         for extension in csr.extensions:
-            if extension.oid in _skip_from_csr:
+            if extension.oid in skip_from_csr:
                 continue
-            if not issuing_ca and extension.oid == ExtensionOID.BASIC_CONSTRAINTS:
-                # Force a leaf BasicConstraints regardless of what the CSR asked
-                # for (the policy block below only fires when the CSR omits it).
-                builder = builder.add_extension(
-                    x509.BasicConstraints(ca=False, path_length=None),
-                    critical=True,
+            if not issuing_ca and extension.oid in _LEAF_CA_ONLY_EXTENSION_OIDS:
+                continue
+            if extension.oid == ExtensionOID.BASIC_CONSTRAINTS:
+                constraints = (
+                    extension.value
+                    if issuing_ca
+                    else x509.BasicConstraints(ca=False, path_length=None)
                 )
+                builder = builder.add_extension(constraints, critical=True)
                 continue
-            if not issuing_ca and extension.oid == ExtensionOID.KEY_USAGE:
-                ku = extension.value
-                if ku.key_cert_sign or ku.crl_sign:
-                    # Strip CA-only bits; keep the rest of the requested usage.
-                    ku = x509.KeyUsage(
-                        digital_signature=ku.digital_signature,
-                        content_commitment=ku.content_commitment,
-                        key_encipherment=ku.key_encipherment,
-                        data_encipherment=ku.data_encipherment,
-                        key_agreement=ku.key_agreement,
-                        key_cert_sign=False,
-                        crl_sign=False,
-                        encipher_only=ku.encipher_only if ku.key_agreement else False,
-                        decipher_only=ku.decipher_only if ku.key_agreement else False,
-                    )
-                builder = builder.add_extension(ku, extension.critical)
+            if extension.oid == ExtensionOID.KEY_USAGE:
+                usage = _key_usage_with_ca_signing(
+                    extension.value, enabled=issuing_ca
+                )
+                builder = builder.add_extension(
+                    usage,
+                    critical=True if issuing_ca else extension.critical,
+                )
                 continue
             builder = builder.add_extension(extension.value, extension.critical)
 

@@ -10,6 +10,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from models import db, CA, Certificate, CertificateTemplate
+from services.ocsp_service import OCSPService
 from services.trust_store import TrustStoreService
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now
@@ -313,23 +314,11 @@ class LifecycleMixin:
                 # Log error but don't fail revocation
                 AuditService.log_ca('crl_auto_generation_failed', ca, f'Failed to auto-generate CRL after revocation: {str(e)}', success=False)
 
-        # Invalidate OCSP cache if CA has OCSP enabled (RFC 6960 §2.2:
-        # revocation MUST take effect immediately for new responses).
-        if ca and ca.ocsp_enabled:
-            try:
-                from models import OCSPResponse
-                from utils.serial_format import serial_to_hex
-                serial_hex = serial_to_hex(certificate.serial_number)
-                if serial_hex:
-                    OCSPResponse.query.filter_by(
-                        ca_id=ca.id,
-                        cert_serial=serial_hex
-                    ).delete()
-                    db.session.commit()
-                    logger.info(f"Invalidated OCSP cache for certificate {certificate.refid}")
-            except Exception as e:
-                db.session.rollback()
-                logger.error(f"Failed to invalidate OCSP cache: {e}")
+        # RFC 6960 §2.2: revocation MUST take effect immediately for new
+        # responses, regardless of which CertID hash algorithm was requested.
+        if ca:
+            OCSPService.invalidate_cached_responses(
+                certificate.serial_number, ca_id=ca.id)
 
         from services.webhook_service import emit_cert_revoked
         emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref, actor=username)

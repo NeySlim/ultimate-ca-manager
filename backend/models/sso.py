@@ -42,6 +42,10 @@ class SSOProvider(db.Model):
     oauth2_token_url = db.Column(db.String(500))
     oauth2_userinfo_url = db.Column(db.String(500))
     oauth2_scopes = db.Column(db.String(500))  # JSON array
+    oauth2_issuer = db.Column(db.String(500))
+    oauth2_jwks_uri = db.Column(db.String(500))
+    # Explicit compatibility opt-out. OIDC ID tokens are verified by default.
+    id_token_verify = db.Column(db.Boolean, default=True, nullable=False)
     oauth2_verify_ssl = db.Column(db.Boolean, default=True)
     oauth2_ca_bundle = db.Column(db.Text)  # PEM content
     
@@ -186,6 +190,10 @@ class SSOProvider(db.Model):
                 'oauth2_token_url': self.oauth2_token_url,
                 'oauth2_userinfo_url': self.oauth2_userinfo_url,
                 'oauth2_scopes': json.loads(self.oauth2_scopes) if self.oauth2_scopes else [],
+                'oauth2_issuer': self.oauth2_issuer,
+                'oauth2_jwks_uri': self.oauth2_jwks_uri,
+                # Set false only for legacy providers that cannot publish JWKS.
+                'id_token_verify': self.id_token_verify is not False,
                 'oauth2_client_secret': '***' if self.oauth2_client_secret else None,
                 'oauth2_verify_ssl': self.oauth2_verify_ssl if self.oauth2_verify_ssl is not None else True,
                 'oauth2_ca_bundle': self.oauth2_ca_bundle or '',

@@ -3,11 +3,18 @@ SCEP Protocol Routes
 Implements RFC 8894 SCEP endpoints at /scep/pkiclient.exe
 """
 
-from flask import Blueprint, request, make_response
-from models import db, CA, SystemConfig
-from utils.trusted_proxy import client_ip
 import base64
 import logging
+
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from flask import Blueprint, make_response, request
+from sqlalchemy import and_
+
+from models import CA, SystemConfig, db
+from services.scep.crypto_helpers import create_degenerate_pkcs7, create_signed_pkcs7
+from services.scep.scep_service import SCEPService
+from utils.trusted_proxy import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +34,6 @@ def get_config(key, default=None):
 
 def get_scep_service():
     """Get configured SCEP service instance"""
-    from services.scep_service import SCEPService
-
     # Get SCEP configuration
     enabled = get_config('scep_enabled', 'true') == 'true'
     if not enabled:
@@ -156,7 +161,7 @@ def handle_get_ca_cert():
 
 
 def handle_get_next_ca_cert():
-    """Handle GetNextCACert operation (RFC 8894 §3.5)
+    """Handle GetNextCACert operation (RFC 8894 §4.7)
 
     Returns the next CA certificate for CA rollover scenarios.
     If the CA has a pending renewal certificate, return it in PKCS#7 format.
@@ -179,8 +184,6 @@ def handle_get_next_ca_cert():
         # ``CA.id != ca.id`` branch was dead code and the resulting SQL
         # silently filtered on the wrong column. Use proper SQLAlchemy
         # disjunction instead.
-        from sqlalchemy import and_, or_
-
         if ca.caref:
             same_chain = CA.caref == ca.caref
         else:
@@ -197,30 +200,28 @@ def handle_get_next_ca_cert():
         if not next_ca or not next_ca.crt:
             return make_error_response("No rollover CA certificate available", 404)
 
-        # Parse the next CA cert to verify it's actually newer
-        from cryptography import x509 as x509_mod
-        from cryptography.hazmat.backends import default_backend
-
+        # Parse the next CA cert to verify it's actually newer.
         try:
-            next_cert = x509_mod.load_pem_x509_certificate(
-                next_ca.crt.encode() if isinstance(next_ca.crt, str) else next_ca.crt,
-                default_backend()
+            next_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(next_ca.crt), default_backend()
             )
-            current_cert = x509_mod.load_pem_x509_certificate(
-                ca.crt.encode() if isinstance(ca.crt, str) else ca.crt,
-                default_backend()
-            )
-
-            if next_cert.not_valid_after_utc <= current_cert.not_valid_after_utc:
+            if next_cert.not_valid_after_utc <= service.ca_cert.not_valid_after_utc:
                 return make_error_response("No rollover CA certificate available", 404)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"SCEP rollover certificate is invalid: {e}")
             return make_error_response("No rollover CA certificate available", 404)
 
-        # Return as degenerate PKCS#7 (same format as GetCACert for intermediates)
-        from services.scep.crypto_helpers import create_degenerate_pkcs7
-        chain_der = create_degenerate_pkcs7([next_cert])
+        # RFC 8894 §4.7.1 requires an outer SignedData signed by the current
+        # CA. Its content is a degenerate certificates-only SignedData carrying
+        # the rollover certificate.
+        rollover_certs = create_degenerate_pkcs7([next_cert])
+        signed_response = create_signed_pkcs7(
+            rollover_certs,
+            service.ca_key,
+            service.ca_cert,
+        )
 
-        response = make_response(chain_der)
+        response = make_response(signed_response)
         response.headers['Content-Type'] = 'application/x-x509-next-ca-cert'
         return response
 

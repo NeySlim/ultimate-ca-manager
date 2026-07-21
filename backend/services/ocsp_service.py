@@ -8,12 +8,15 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from cryptography import x509
 from cryptography.x509 import ocsp
+from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding, utils
 from cryptography.hazmat.backends import default_backend
+from sqlalchemy import or_
 
 from models import db, CA, Certificate, OCSPResponse
 from utils.datetime_utils import utc_now
+from utils.serial_format import serial_to_hex
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,24 @@ class _HsmPrivateKeyWrapper:
         return self._public_key
 
 # Map revoke_reason strings to X.509 ReasonFlags
+def _build_unknown_certificate(serial: int, issuer: x509.Certificate) -> x509.Certificate:
+    """Build a transient certificate so older cryptography can encode UNKNOWN."""
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = utc_now()
+    return (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, 'Unknown OCSP certificate')
+        ]))
+        .issuer_name(issuer.subject)
+        .public_key(key.public_key())
+        .serial_number(serial)
+        .not_valid_before(now - timedelta(minutes=1))
+        .not_valid_after(now + timedelta(minutes=1))
+        .sign(key, hashes.SHA256())
+    )
+
+
 _REASON_MAP = {
     'unspecified': x509.ReasonFlags.unspecified,
     'key_compromise': x509.ReasonFlags.key_compromise,
@@ -265,9 +286,12 @@ class OCSPService:
             cert_serial_hex = format(cert_serial, 'x')
             # DB has historical mixed format (decimal vs lowercase hex). Try both.
             certificate = (
-                Certificate.query.filter_by(serial_number=cert_serial_dec).first()
-                or Certificate.query.filter_by(serial_number=cert_serial_hex).first()
-                or Certificate.query.filter_by(serial_number=cert_serial_hex.upper()).first()
+                Certificate.query.filter_by(
+                    caref=ca.refid, serial_number=cert_serial_dec).first()
+                or Certificate.query.filter_by(
+                    caref=ca.refid, serial_number=cert_serial_hex).first()
+                or Certificate.query.filter_by(
+                    caref=ca.refid, serial_number=cert_serial_hex.upper()).first()
             )
             
             # Determine certificate status
@@ -326,7 +350,6 @@ class OCSPService:
                     h_name.update(ca_cert.subject.public_bytes(
                         serialization.Encoding.DER))
                     issuer_name_hash = h_name.finalize()
-                    from cryptography.hazmat.primitives.asymmetric import rsa, ec
                     pubkey = ca_cert.public_key()
                     if isinstance(pubkey, rsa.RSAPublicKey):
                         spki_value = pubkey.public_bytes(
@@ -346,17 +369,34 @@ class OCSPService:
                     h_key = hashes.Hash(algo)
                     h_key.update(spki_value)
                     issuer_key_hash = h_key.finalize()
-                builder = builder.add_response_by_hash(
-                    issuer_name_hash=issuer_name_hash,
-                    issuer_key_hash=issuer_key_hash,
-                    serial_number=cert_serial,
-                    algorithm=algo,
-                    cert_status=status,
-                    this_update=this_update,
-                    next_update=next_update,
-                    revocation_time=revocation_time,
-                    revocation_reason=revocation_reason
-                )
+                if hasattr(builder, 'add_response_by_hash'):
+                    builder = builder.add_response_by_hash(
+                        issuer_name_hash=issuer_name_hash,
+                        issuer_key_hash=issuer_key_hash,
+                        serial_number=cert_serial,
+                        algorithm=algo,
+                        cert_status=status,
+                        this_update=this_update,
+                        next_update=next_update,
+                        revocation_time=revocation_time,
+                        revocation_reason=revocation_reason
+                    )
+                else:
+                    # cryptography <45 has no hash-only builder API. A
+                    # transient certificate with the requested serial lets it
+                    # encode the same UNKNOWN CertID without querying another
+                    # issuer's certificate.
+                    unknown_cert = _build_unknown_certificate(cert_serial, ca_cert)
+                    builder = builder.add_response(
+                        cert=unknown_cert,
+                        issuer=ca_cert,
+                        algorithm=algo,
+                        cert_status=status,
+                        this_update=this_update,
+                        next_update=next_update,
+                        revocation_time=revocation_time,
+                        revocation_reason=revocation_reason
+                    )
             
             builder = builder.responder_id(
                 ocsp.OCSPResponderEncoding.HASH, signing_cert
@@ -369,7 +409,7 @@ class OCSPService:
                 builder = builder.certificates([signing_cert])
 
             # Add nonce if provided (replay protection)
-            if request_nonce:
+            if request_nonce is not None:
                 builder = builder.add_extension(
                     x509.OCSPNonce(request_nonce),
                     critical=False
@@ -386,17 +426,18 @@ class OCSPService:
             # Cache response — key includes the hash algorithm because a SHA-1
             # and a SHA-256 response for the same serial are different DER blobs.
             # Reusing one for the other would re-introduce issue #143.
-            cache_serial = f"{cert_serial_hex}:{algo_name}"
-            self._cache_response(
-                ca_id=ca.id,
-                cert_serial=cache_serial,
-                response_der=response_der,
-                status=cert_status,
-                this_update=this_update,
-                next_update=next_update,
-                revocation_time=revocation_time,
-                revocation_reason=revocation_reason.value if revocation_reason else None
-            )
+            if request_nonce is None:
+                cache_serial = f"{cert_serial_hex}:{algo_name}"
+                self._cache_response(
+                    ca_id=ca.id,
+                    cert_serial=cache_serial,
+                    response_der=response_der,
+                    status=cert_status,
+                    this_update=this_update,
+                    next_update=next_update,
+                    revocation_time=revocation_time,
+                    revocation_reason=revocation_reason.value if revocation_reason else None
+                )
             
             logger.info(f"Generated OCSP response for serial {cert_serial_hex}: {cert_status}")
             return response_der, cert_status
@@ -408,6 +449,31 @@ class OCSPService:
             )
             return error_response.public_bytes(serialization.Encoding.DER), 'error'
     
+    @staticmethod
+    def invalidate_cached_responses(serial, ca_id: Optional[int] = None) -> int:
+        """Delete every cached response for a serial, across hash algorithms."""
+        serial_hex = serial_to_hex(serial)
+        if not serial_hex:
+            return 0
+
+        try:
+            query = OCSPResponse.query
+            if ca_id is not None:
+                query = query.filter(OCSPResponse.ca_id == ca_id)
+            deleted_count = query.filter(or_(
+                OCSPResponse.cert_serial == serial_hex,
+                OCSPResponse.cert_serial.like(f'{serial_hex}:%'),
+            )).delete(synchronize_session=False)
+            db.session.commit()
+            logger.info(
+                f"Invalidated {deleted_count} OCSP cache entries for serial {serial_hex}"
+            )
+            return deleted_count
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to invalidate OCSP cache for serial {serial_hex}: {e}")
+            return 0
+
     def _cache_response(
         self,
         ca_id: int,

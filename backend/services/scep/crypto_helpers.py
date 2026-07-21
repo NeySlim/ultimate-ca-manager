@@ -1,7 +1,8 @@
 """
-SCEP Crypto Helpers - degenerate PKCS#7 construction and client encryption.
+SCEP Crypto Helpers - PKCS#7 construction, signing, and client encryption.
 """
 import secrets
+from datetime import datetime, timezone
 from typing import Optional
 
 import asn1crypto.cms
@@ -9,7 +10,7 @@ import asn1crypto.core
 import asn1crypto.x509
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 
 
@@ -44,6 +45,80 @@ def create_degenerate_pkcs7(certs: list) -> bytes:
     })
 
     return content_info.dump()
+
+
+def create_signed_pkcs7(
+    data: Optional[bytes],
+    signer_key,
+    signer_cert: x509.Certificate,
+    signed_attributes: Optional[list] = None,
+) -> bytes:
+    """Build a CMS SignedData message signed by *signer_key*.
+
+    The encapsulated bytes are bound through the CMS messageDigest signed
+    attribute. The signer certificate is included so recipients can identify
+    and validate the signature.
+    """
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(data or b'')
+
+    attributes = asn1crypto.cms.CMSAttributes([
+        *(signed_attributes or []),
+        {'type': 'content_type', 'values': ['data']},
+        {
+            'type': 'message_digest',
+            'values': [asn1crypto.core.OctetString(digest.finalize())],
+        },
+        {
+            'type': 'signing_time',
+            'values': [asn1crypto.core.UTCTime(datetime.now(timezone.utc))],
+        },
+    ])
+
+    attributes_der = attributes.dump()
+    if attributes_der and attributes_der[0] == 0xA0:
+        attributes_for_signing = b'\x31' + attributes_der[1:]
+    else:
+        attributes_for_signing = attributes_der
+
+    signature = signer_key.sign(
+        attributes_for_signing,
+        asym_padding.PKCS1v15(),
+        hashes.SHA256(),
+    )
+    signer_cert_asn1 = asn1crypto.x509.Certificate.load(
+        signer_cert.public_bytes(serialization.Encoding.DER)
+    )
+
+    signer_info = asn1crypto.cms.SignerInfo({
+        'version': 'v1',
+        'sid': {
+            'issuer_and_serial_number': {
+                'issuer': signer_cert_asn1.issuer,
+                'serial_number': signer_cert_asn1.serial_number,
+            }
+        },
+        'digest_algorithm': {'algorithm': 'sha256'},
+        'signed_attrs': attributes,
+        'signature_algorithm': {'algorithm': 'rsassa_pkcs1v15'},
+        'signature': asn1crypto.core.OctetString(signature),
+    })
+
+    encap_content_info = {'content_type': 'data'}
+    if data is not None:
+        encap_content_info['content'] = asn1crypto.core.OctetString(data)
+
+    signed_data = asn1crypto.cms.SignedData({
+        'version': 'v1',
+        'digest_algorithms': [{'algorithm': 'sha256'}],
+        'encap_content_info': encap_content_info,
+        'certificates': [signer_cert_asn1],
+        'signer_infos': [signer_info],
+    })
+    return asn1crypto.cms.ContentInfo({
+        'content_type': 'signed_data',
+        'content': signed_data,
+    }).dump()
 
 
 def encrypt_for_client(

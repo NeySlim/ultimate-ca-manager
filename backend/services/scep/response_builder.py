@@ -3,17 +3,16 @@ SCEP Response Builder - signed CertRep PKCS#7 response construction.
 """
 import logging
 import secrets
-from datetime import datetime, timezone
 from typing import Optional
 
-import asn1crypto.cms
 import asn1crypto.core
-import asn1crypto.x509
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 
-from services.scep.crypto_helpers import create_degenerate_pkcs7, encrypt_for_client
+from services.scep.crypto_helpers import (
+    create_degenerate_pkcs7,
+    create_signed_pkcs7,
+    encrypt_for_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,67 +92,12 @@ def build_cert_rep(
             'values': [asn1crypto.core.OctetString(recipient_nonce)],
         })
 
-    if data:
-        encap_content = {
-            'content_type': 'data',
-            'content': asn1crypto.core.OctetString(data),
-        }
-    else:
-        encap_content = {'content_type': 'data'}
-
-    digest_obj = hashes.Hash(hashes.SHA256())
-    if data:
-        digest_obj.update(data)
-    message_digest = digest_obj.finalize()
-
-    signed_attrs = asn1crypto.cms.CMSAttributes(scep_attrs + [
-        {'type': 'content_type', 'values': ['data']},
-        {'type': 'message_digest', 'values': [asn1crypto.core.OctetString(message_digest)]},
-        {'type': 'signing_time', 'values': [asn1crypto.core.UTCTime(datetime.now(timezone.utc))]},
-    ])
-
-    signed_attrs_der = signed_attrs.dump()
-    # signed_attrs.dump() emits the IMPLICIT [0] tag (0xA0) used inside
-    # SignerInfo. RFC 5652 §5.4 says the bytes covered by the signature must
-    # use the explicit SET-OF tag (0x31). Re-tag here.
-    if signed_attrs_der and signed_attrs_der[0] == 0xA0:
-        signed_attrs_for_signing = b'\x31' + signed_attrs_der[1:]
-    else:
-        signed_attrs_for_signing = signed_attrs_der
-
-    signature = ca_key.sign(signed_attrs_for_signing, asym_padding.PKCS1v15(), hashes.SHA256())
-
-    ca_cert_der = ca_cert.public_bytes(serialization.Encoding.DER)
-    ca_cert_asn1 = asn1crypto.x509.Certificate.load(ca_cert_der)
-
-    signer_info = asn1crypto.cms.SignerInfo({
-        'version': 'v1',
-        'sid': asn1crypto.cms.SignerIdentifier({
-            'issuer_and_serial_number': {
-                'issuer': ca_cert_asn1.issuer,
-                'serial_number': ca_cert_asn1.serial_number,
-            }
-        }),
-        'digest_algorithm': {'algorithm': 'sha256'},
-        'signed_attrs': signed_attrs,
-        'signature_algorithm': {'algorithm': 'rsassa_pkcs1v15'},
-        'signature': asn1crypto.core.OctetString(signature),
-    })
-
-    signed_data = asn1crypto.cms.SignedData({
-        'version': 'v1',
-        'digest_algorithms': [{'algorithm': 'sha256'}],
-        'encap_content_info': encap_content,
-        'certificates': [ca_cert_asn1],
-        'signer_infos': [signer_info],
-    })
-
-    content_info = asn1crypto.cms.ContentInfo({
-        'content_type': 'signed_data',
-        'content': signed_data,
-    })
-
-    return content_info.dump()
+    return create_signed_pkcs7(
+        data if data else None,
+        ca_key,
+        ca_cert,
+        signed_attributes=scep_attrs,
+    )
 
 
 def build_cert_rep_success(

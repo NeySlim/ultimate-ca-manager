@@ -8,9 +8,14 @@ import json
 import base64
 from typing import Dict, Any, Tuple, Optional
 
-from models import db
+from models import db, CA, Certificate
 from services.acme import AcmeService
-from models.acme_models import AcmeAccount, AcmeOrder, AcmeChallenge
+from models.acme_models import (
+    AcmeAccount,
+    AcmeAuthorization,
+    AcmeChallenge,
+    AcmeOrder,
+)
 from config.settings import Config
 import logging
 import re
@@ -929,23 +934,20 @@ def order_info(order_id: str):
     service = get_acme_service()
     
     # Verify JWS (POST-as-GET: empty payload)
-    jws_data = request.get_json()
-    request_account_id = None
-    if jws_data:
-        expected_url = f"{service.base_url}/acme/order/{order_id}"
-        is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
-        if not is_valid:
-            return acme_error('malformed', f'Invalid JWS: {error}')
-        # RFC 8555 §6.3: POST-as-GET payload must be empty
-        if payload:
-            return acme_error('malformed', 'POST-as-GET must have empty payload')
-        # Extract account from kid for ownership check (RFC 8555 §7.4)
-        try:
-            protected = json.loads(base64.urlsafe_b64decode(jws_data['protected'] + '=='))
-            kid = protected.get('kid', '')
-            request_account_id = kid.rstrip('/').split('/')[-1] if kid else None
-        except Exception:
-            pass
+    jws_data = request.get_json(force=True, silent=True)
+    if not jws_data:
+        return acme_error('malformed', 'Request body must be JWS')
+
+    expected_url = f"{service.base_url}/acme/order/{order_id}"
+    is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
+    if not is_valid:
+        return acme_error('malformed', f'Invalid JWS: {error}')
+    if payload or jws_data.get('payload') != '':
+        return acme_error('malformed', 'POST-as-GET must have empty payload')
+
+    request_account_id = _account_id_from_jws(jws_data)
+    if not request_account_id:
+        return acme_error('unauthorized', 'Account kid required', 403)
     
     order = service.get_order(order_id)
     
@@ -953,7 +955,7 @@ def order_info(order_id: str):
         return acme_error('orderDoesNotExist', 'Order not found', 404)
     
     # RFC 8555 §7.4: Server MUST verify the account owns the order
-    if request_account_id and order.account_id != request_account_id:
+    if order.account_id != request_account_id:
         return acme_error('unauthorized', 'Order does not belong to this account', 403)
     
     order_url = f"{service.base_url}/acme/order/{order.order_id}"
@@ -1088,28 +1090,23 @@ def finalize_order(order_id: str):
 @acme_bp.route('/authz/<authorization_id>', methods=['POST'])
 def authorization_info(authorization_id: str):
     """Get authorization status (RFC 8555 Section 7.5) — POST-as-GET"""
-    from models.acme_models import AcmeAuthorization
-    
     service = get_acme_service()
     
     # Verify JWS (POST-as-GET: empty payload)
-    jws_data = request.get_json()
-    request_account_id = None
-    if jws_data:
-        expected_url = f"{service.base_url}/acme/authz/{authorization_id}"
-        is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
-        if not is_valid:
-            return acme_error('malformed', f'Invalid JWS: {error}')
-        # RFC 8555 §6.3: POST-as-GET payload must be empty
-        if payload:
-            return acme_error('malformed', 'POST-as-GET must have empty payload')
-        # Extract account from kid for ownership check
-        try:
-            protected = json.loads(base64.urlsafe_b64decode(jws_data['protected'] + '=='))
-            kid = protected.get('kid', '')
-            request_account_id = kid.rstrip('/').split('/')[-1] if kid else None
-        except Exception:
-            pass
+    jws_data = request.get_json(force=True, silent=True)
+    if not jws_data:
+        return acme_error('malformed', 'Request body must be JWS')
+
+    expected_url = f"{service.base_url}/acme/authz/{authorization_id}"
+    is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
+    if not is_valid:
+        return acme_error('malformed', f'Invalid JWS: {error}')
+    if payload or jws_data.get('payload') != '':
+        return acme_error('malformed', 'POST-as-GET must have empty payload')
+
+    request_account_id = _account_id_from_jws(jws_data)
+    if not request_account_id:
+        return acme_error('unauthorized', 'Account kid required', 403)
     
     auth = AcmeAuthorization.query.filter_by(
         authorization_id=authorization_id
@@ -1119,10 +1116,9 @@ def authorization_info(authorization_id: str):
         return acme_error('authzDoesNotExist', 'Authorization not found', 404)
     
     # RFC 8555 §7.5: verify account ownership (direct field or via parent order)
-    if request_account_id:
-        auth_account = auth.account_id or (auth.order.account_id if auth.order else None)
-        if auth_account and auth_account != request_account_id:
-            return acme_error('unauthorized', 'Authorization does not belong to this account', 403)
+    auth_account = auth.account_id or (auth.order.account_id if auth.order else None)
+    if auth_account != request_account_id:
+        return acme_error('unauthorized', 'Authorization does not belong to this account', 403)
     
     # Build challenges list
     challenges = []
@@ -1148,12 +1144,15 @@ def authorization_info(authorization_id: str):
         "challenges": challenges,
         "expires": auth.expires.isoformat() + 'Z'
     }
+    if auth.wildcard:
+        response_data["wildcard"] = True
     
     response = acme_response(response_data)
     
-    # Add Link header pointing to parent order (rel="up")
-    order_url = f"{service.base_url}/acme/order/{auth.order_id}"
-    response.headers.add('Link', f'<{order_url}>;rel="up"')
+    # Add Link header only when the authorization belongs to an order.
+    if auth.order_id:
+        order_url = f"{service.base_url}/acme/order/{auth.order_id}"
+        response.headers.add('Link', f'<{order_url}>;rel="up"')
     
     return response
 
@@ -1275,31 +1274,33 @@ def respond_to_challenge(challenge_id: str):
 
 # ==================== Certificate Download ====================
 
-@acme_bp.route('/cert/<order_id>', methods=['POST', 'GET'])
+@acme_bp.route('/cert/<order_id>', methods=['POST'])
 def download_certificate(order_id: str):
-    """Download certificate (RFC 8555 Section 7.4.2)
-    
-    Returns certificate chain in PEM format.
-    Accepts POST (POST-as-GET with JWS) and GET for compatibility.
-    """
+    """Download a certificate chain via authenticated POST-as-GET."""
     service = get_acme_service()
-    
-    # Verify JWS for POST requests (POST-as-GET)
-    if request.method == 'POST':
-        jws_data = request.get_json()
-        if jws_data:
-            expected_url = f"{service.base_url}/acme/cert/{order_id}"
-            is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
-            if not is_valid:
-                return acme_error('malformed', f'Invalid JWS: {error}')
-            # RFC 8555 §6.3: POST-as-GET payload must be empty
-            if payload:
-                return acme_error('malformed', 'POST-as-GET must have empty payload')
-    
+
+    jws_data = request.get_json(force=True, silent=True)
+    if not jws_data:
+        return acme_error('malformed', 'Request body must be JWS')
+
+    expected_url = f"{service.base_url}/acme/cert/{order_id}"
+    is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
+    if not is_valid:
+        return acme_error('malformed', f'Invalid JWS: {error}')
+    if payload or jws_data.get('payload') != '':
+        return acme_error('malformed', 'POST-as-GET must have empty payload')
+
+    request_account_id = _account_id_from_jws(jws_data)
+    if not request_account_id:
+        return acme_error('unauthorized', 'Account kid required', 403)
+
     # Get order
     order = service.get_order(order_id)
     if not order:
         return acme_error('notFound', 'Order not found', 404)
+
+    if order.account_id != request_account_id:
+        return acme_error('unauthorized', 'Certificate does not belong to this account', 403)
     
     if order.status != 'valid':
         return acme_error('orderNotReady', f'Order status is {order.status}, certificate not available', 403)
@@ -1308,7 +1309,6 @@ def download_certificate(order_id: str):
         return acme_error('serverInternal', 'Certificate not generated', 500)
     
     # Get certificate from database
-    from models import Certificate, CA
     cert = db.session.get(Certificate, order.certificate_id)
     if not cert or not cert.crt:
         return acme_error('serverInternal', 'Certificate not found in database', 500)

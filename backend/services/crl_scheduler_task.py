@@ -9,6 +9,7 @@ from typing import Optional
 from models import db, CA
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class CRLSchedulerTask:
             
             # Get latest CRL
             latest_crl = CRLMetadata.query.filter_by(
-                ca_id=ca_id
+                ca_id=ca_id, is_delta=False
             ).order_by(CRLMetadata.created_at.desc()).first()
             
             if not latest_crl:
@@ -63,7 +64,6 @@ class CRLSchedulerTask:
             # republish once the latest CRL is older than the interval, well
             # before nextUpdate — the validity margin is the grace period.
             if ca.crl_publish_interval_hours:
-                from utils.datetime_utils import utc_now
                 age_hours = (utc_now() - latest_crl.this_update).total_seconds() / 3600
                 if age_hours >= ca.crl_publish_interval_hours:
                     return (
@@ -193,8 +193,7 @@ class CRLSchedulerTask:
                     elif latest_delta.is_stale:
                         need_delta = True
                     else:
-                        from utils.datetime_utils import utc_now as _utc_now
-                        age_hours = (_utc_now() - latest_delta.this_update).total_seconds() / 3600
+                        age_hours = (utc_now() - latest_delta.this_update).total_seconds() / 3600
                         if age_hours >= interval_hours:
                             need_delta = True
                     

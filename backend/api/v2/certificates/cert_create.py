@@ -12,6 +12,7 @@ from utils.dn_validation import validate_dn_field
 from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 from models import Certificate, CertificateTemplate, CA, db
 from services.trust_store.constants import HASH_ALGORITHMS
+from services.trust_store.constraints_mixin import validate_name_constraints
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
@@ -314,6 +315,12 @@ def create_certificate():
         final_san_uri = [s.value for s in san_list if isinstance(s, x509.UniformResourceIdentifier)]
         from utils.upn_san import extract_upns_from_san_list
         final_san_upn = extract_upns_from_san_list(san_list)
+
+        try:
+            validate_name_constraints(ca_cert, subject, san_list or None)
+        except ValueError as exc:
+            logger.info(f"Certificate rejected by CA NameConstraints: {exc}")
+            return error_response(str(exc), 400)
 
         if san_list:
             builder = builder.add_extension(
