@@ -93,6 +93,8 @@ def extract_scep_attributes(signed_data) -> Dict[str, Any]:
                 attrs["messageType"] = _coerce_message_type(native)
             elif attr_type == "2.16.840.1.113733.1.9.5":  # senderNonce
                 attrs["senderNonce"] = native
+            elif attr_type == "signing_time":
+                attrs["signingTime"] = native
             elif attr_type == "1.2.840.113549.1.9.7":  # challengePassword
                 attrs["challengePassword"] = native
     except Exception as e:
@@ -214,7 +216,7 @@ def _consteq(a: bytes, b: bytes) -> bool:
     if len(a) != len(b):
         return False
     r = 0
-    for x, y in zip(a, b):
+    for x, y in zip(a, b, strict=True):
         r |= x ^ y
     return r == 0
 

@@ -18,6 +18,7 @@ from cryptography.hazmat.backends import default_backend
 from models import db, SystemConfig, DnsProvider
 from security.encryption import encrypt_text, decrypt_text
 from utils.datetime_utils import utc_isoformat
+from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_account import (
     resolve_proxy_account,
     legacy_upstream_directory_url,
@@ -435,6 +436,13 @@ class AcmeProxyService:
 
     # --- Proxy Methods ---
 
+    def revoke_certificate(self, certificate, reason: int = 0) -> requests.Response:
+        """Revoke a proxy-issued certificate with the linked upstream account."""
+        client = AcmeClientService(account=self.account)
+        if self.directory is not None:
+            client.directory = self.directory
+        return client.revoke_certificate(certificate, reason)
+
     def get_directory(self):
         """Return proxy directory.
 
@@ -482,8 +490,15 @@ class AcmeProxyService:
         svc = AcmeService(self.base_url)
         return svc.generate_nonce()
 
-    def new_order(self, identifiers, not_before=None, not_after=None, client_thumbprint=None):
-        """Proxy new-order with domain validation"""
+    def new_order(
+        self,
+        identifiers,
+        not_before=None,
+        not_after=None,
+        client_thumbprint=None,
+        replaces=None,
+    ):
+        """Proxy new-order with domain validation and RFC 9773 replacement."""
         from api.v2.acme_domains import find_provider_for_domain
         from models import AcmeClientOrder
         
@@ -514,9 +529,11 @@ class AcmeProxyService:
             "notBefore": utc_isoformat(not_before),
             "notAfter": utc_isoformat(not_after)
         }
-        # Filter None
+        # Filter None and forward RFC 9773 `replaces` only when supported.
         payload = {k: v for k, v in payload.items() if v is not None}
-        
+        if replaces and self.directory.get('renewalInfo'):
+            payload['replaces'] = replaces
+
         resp = self._post_with_account(self.directory['newOrder'], payload)
         
         if resp.status_code != 201:

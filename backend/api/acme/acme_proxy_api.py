@@ -15,13 +15,17 @@ from datetime import datetime
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
+from models import AcmeClientOrder, Certificate
+from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_service import AcmeProxyService
+from services.cert_service import CertificateService
 from services.acme.acme_proxy_account import (
     ProxyEndpointNotConfiguredError,
     resolve_proxy_by_slug,
 )
-from services.acme import AcmeService
+from services.acme import AcmeService, ari
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
 logger = logging.getLogger(__name__)
@@ -139,6 +143,86 @@ def _kid_account_thumbprint(protected):
         return acct.jwk_thumbprint if acct else None
     except Exception:
         return None
+
+
+def _decode_b64url(value):
+    """Strictly decode an unpadded base64url value."""
+    if not isinstance(value, str) or not value:
+        raise ValueError("Invalid base64url value")
+    try:
+        padded = value + '=' * (-len(value) % 4)
+        return base64.b64decode(padded, altchars=b'-_', validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise ValueError("Invalid base64url value") from exc
+
+
+def _resolve_proxy_certificate(cert_obj):
+    """Resolve an exact proxy-stored certificate from its DER value."""
+    serial = cert_obj.serial_number
+    serial_hex = format(serial, 'x')
+    candidates = {
+        str(serial), serial_hex, serial_hex.upper(),
+        f'0x{serial_hex}', f'0X{serial_hex.upper()}',
+    }
+    wanted_der = cert_obj.public_bytes(serialization.Encoding.DER)
+    rows = Certificate.query.filter(
+        Certificate.serial_number.in_(candidates),
+        Certificate.crt.isnot(None),
+    ).all()
+    for row in rows:
+        try:
+            stored = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        except (ValueError, TypeError, base64.binascii.Error):
+            continue
+        if stored.public_bytes(serialization.Encoding.DER) == wanted_der:
+            return row
+    return None
+
+
+def _jwk_public_key_der(jwk):
+    """Return SubjectPublicKeyInfo DER for a supported JWK."""
+    if not isinstance(jwk, dict):
+        return None
+    try:
+        if jwk.get('kty') == 'RSA':
+            public_key = rsa.RSAPublicNumbers(
+                int.from_bytes(_decode_b64url(jwk['e']), 'big'),
+                int.from_bytes(_decode_b64url(jwk['n']), 'big'),
+            ).public_key()
+        elif jwk.get('kty') == 'EC':
+            curves = {
+                'P-256': ec.SECP256R1,
+                'P-384': ec.SECP384R1,
+                'P-521': ec.SECP521R1,
+            }
+            curve_type = curves.get(jwk.get('crv'))
+            if curve_type is None:
+                return None
+            public_key = ec.EllipticCurvePublicNumbers(
+                int.from_bytes(_decode_b64url(jwk['x']), 'big'),
+                int.from_bytes(_decode_b64url(jwk['y']), 'big'),
+                curve_type(),
+            ).public_key()
+        else:
+            return None
+        return public_key.public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _revocation_orders(cert_id, upstream_account_id):
+    """Find proxy orders linking a certificate to the selected upstream."""
+    orders = AcmeClientOrder.query.filter_by(
+        is_proxy_order=True,
+        certificate_id=cert_id,
+    ).all()
+    return [
+        order for order in orders
+        if order.acme_client_account_id in (None, upstream_account_id)
+    ]
 
 
 def _dual_route(rule, methods, endpoint):
@@ -299,6 +383,12 @@ def new_order(slug=None):
         if not_before:
             not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
 
+        replaces = payload.get('replaces')
+        if replaces is not None and (
+            not isinstance(replaces, str) or ari.parse_certid(replaces) is None
+        ):
+            return proxy_error("malformed", "Invalid replacement certificate identifier")
+
         # Bind the order to its owner so finalize can reject cross-account use.
         # RFC 8555 new-order is kid-signed, so derive the binding from the
         # account the kid resolves to; fall back to the header JWK if present.
@@ -317,7 +407,10 @@ def new_order(slug=None):
 
         svc = get_proxy_service(slug)
         order_data, order_id = svc.new_order(
-            identifiers, not_before, client_thumbprint=client_thumbprint
+            identifiers,
+            not_before,
+            client_thumbprint=client_thumbprint,
+            replaces=replaces,
         )
 
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
@@ -518,7 +611,6 @@ def renewal_info(certid, slug=None):
     locally in the UCM database (proxy-issued certs are stored on import),
     so there is no upstream round-trip and no upstream host leak.
     """
-    from services.acme import ari
     from models import SystemConfig
 
     parsed = ari.parse_certid(certid)
@@ -546,16 +638,100 @@ def renewal_info(certid, slug=None):
 
 @_dual_route('/revoke-cert', methods=['POST'], endpoint='proxy_revoke_cert')
 def revoke_cert(slug=None):
-    """Revoke certificate (RFC 8555 §7.6)"""
-    is_valid, payload, _, err = verify_proxy_jws()
+    """Revoke a proxy-issued certificate upstream (RFC 8555 §7.6)."""
+    is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
-
-    if not payload or 'certificate' not in payload:
+    if not isinstance(payload, dict) or 'certificate' not in payload:
         return proxy_error("malformed", "Missing 'certificate' in payload")
 
-    logger.warning("ACME proxy revoke-cert called but not implemented")
-    return proxy_error("serverInternal", "Certificate revocation via proxy is not supported", 501)
+    try:
+        reason = AcmeClientService.validate_revocation_reason(
+            payload.get('reason', 0)
+        )
+        cert_der = _decode_b64url(payload['certificate'])
+        cert_obj = x509.load_der_x509_certificate(cert_der)
+    except ValueError as exc:
+        logger.warning(f"ACME proxy revoke-cert malformed request: {exc}")
+        return proxy_error("malformed", "Invalid certificate or reason", 400)
+
+    try:
+        svc = get_proxy_service(slug)
+        cert = _resolve_proxy_certificate(cert_obj)
+        if cert is None:
+            return proxy_error("malformed", "Certificate not found", 404)
+
+        orders = _revocation_orders(cert.id, svc.account.id)
+        if not orders:
+            return proxy_error("unauthorized", "Certificate is not managed by this proxy", 403)
+
+        protected = _request_protected_header()
+        requester_account_id = _kid_account_id(protected)
+        authorized = bool(
+            requester_account_id and any(
+                order.account_id == requester_account_id for order in orders
+            )
+        )
+        if not authorized and jwk:
+            requester_key = _jwk_public_key_der(jwk)
+            certificate_key = cert_obj.public_key().public_bytes(
+                serialization.Encoding.DER,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            authorized = requester_key == certificate_key
+        if not authorized:
+            return proxy_error(
+                "unauthorized", "Not authorized to revoke this certificate", 403
+            )
+
+        upstream_response = svc.revoke_certificate(cert_obj, reason)
+        status_code = upstream_response.status_code
+        if not 200 <= status_code < 300:
+            logger.warning(
+                "ACME proxy upstream revocation failed with HTTP %s",
+                status_code,
+            )
+            return proxy_error(
+                "serverInternal",
+                "Upstream certificate revocation failed",
+                status_code,
+            )
+
+        if not cert.revoked:
+            try:
+                CertificateService.revoke_certificate(
+                    cert_id=cert.id,
+                    reason={
+                        0: 'unspecified',
+                        1: 'keyCompromise',
+                        2: 'cACompromise',
+                        3: 'affiliationChanged',
+                        4: 'superseded',
+                        5: 'cessationOfOperation',
+                        6: 'certificateHold',
+                        8: 'removeFromCRL',
+                        9: 'privilegeWithdrawn',
+                        10: 'aACompromise',
+                    }[reason],
+                    username='acme_proxy',
+                )
+            except Exception as exc:
+                logger.error(
+                    "ACME proxy local revocation update failed for certificate %s: %s",
+                    cert.id,
+                    exc,
+                )
+
+        response = make_response('', status_code)
+        response.headers['Replay-Nonce'] = _get_nonce()
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['Link'] = f'<{_proxy_base_url(slug)}/directory>;rel="index"'
+        return response
+    except ProxyEndpointNotConfiguredError as exc:
+        return proxy_error("malformed", str(exc), 404)
+    except Exception as exc:
+        logger.error(f"ACME proxy revoke-cert error: {exc}")
+        return proxy_error("serverInternal", "Certificate revocation failed", 500)
 
 
 @_dual_route('/key-change', methods=['POST'], endpoint='proxy_key_change')

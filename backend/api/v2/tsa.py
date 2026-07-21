@@ -9,10 +9,27 @@ from utils.response import success_response, error_response
 from models import db, SystemConfig, CA, AuditLog
 from services.audit_service import AuditService
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('tsa_v2', __name__)
+
+_POLICY_OID_RE = re.compile(r'^[0-2](?:\.(?:0|[1-9]\d*)){1,}$')
+_MAX_POLICY_OID_LENGTH = 255
+
+
+def normalize_policy_oid(value):
+    """Return a canonical policy OID string, or None when malformed."""
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if len(candidate) > _MAX_POLICY_OID_LENGTH or not _POLICY_OID_RE.fullmatch(candidate):
+        return None
+    first, second = (int(arc) for arc in candidate.split('.', 2)[:2])
+    if first < 2 and second > 39:
+        return None
+    return candidate
 
 
 def get_config(key, default=None):
@@ -59,6 +76,12 @@ def update_tsa_config():
     """Update TSA configuration in database"""
     data = request.json or {}
 
+    policy_oid = None
+    if 'policy_oid' in data:
+        policy_oid = normalize_policy_oid(data['policy_oid'])
+        if policy_oid is None:
+            return error_response('policy_oid must be a valid OID', 400)
+
     if 'enabled' in data:
         set_config('tsa_enabled', 'true' if data['enabled'] else 'false')
     if 'ca_refid' in data:
@@ -66,8 +89,8 @@ def update_tsa_config():
     if 'ca_id' in data:
         ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
         set_config('tsa_ca_refid', ca.refid if ca else '')
-    if 'policy_oid' in data:
-        set_config('tsa_policy_oid', data['policy_oid'] or '1.2.3.4.1')
+    if policy_oid is not None:
+        set_config('tsa_policy_oid', policy_oid)
 
     try:
         db.session.commit()

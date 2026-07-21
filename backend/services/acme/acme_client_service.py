@@ -10,7 +10,8 @@ import hashlib
 import hmac
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Dict, Any, Optional, Tuple, List, Union
 
 import requests
@@ -618,6 +619,157 @@ class AcmeClientService:
         )
         return resp
     
+    @staticmethod
+    def validate_revocation_reason(reason: int) -> int:
+        """Validate an RFC 5280 CRLReason code accepted by ACME."""
+        valid_reasons = {0, 1, 2, 3, 4, 5, 6, 8, 9, 10}
+        if isinstance(reason, bool) or not isinstance(reason, int) or reason not in valid_reasons:
+            raise ValueError("Invalid certificate revocation reason code")
+        return reason
+
+    @staticmethod
+    def _load_x509_certificate(certificate) -> x509.Certificate:
+        """Load a certificate model, X.509 object, PEM, or DER value."""
+        if isinstance(certificate, x509.Certificate):
+            return certificate
+
+        if isinstance(certificate, Certificate):
+            if not certificate.crt:
+                raise ValueError("Certificate data is unavailable")
+            try:
+                raw = base64.b64decode(certificate.crt, validate=True)
+            except (ValueError, base64.binascii.Error) as exc:
+                raise ValueError("Invalid certificate data") from exc
+        elif isinstance(certificate, str):
+            raw = certificate.encode()
+        elif isinstance(certificate, (bytes, bytearray)):
+            raw = bytes(certificate)
+        else:
+            raise ValueError("Unsupported certificate value")
+
+        try:
+            if raw.lstrip().startswith(b'-----BEGIN CERTIFICATE-----'):
+                return x509.load_pem_x509_certificate(raw, default_backend())
+            return x509.load_der_x509_certificate(raw, default_backend())
+        except ValueError as exc:
+            raise ValueError("Invalid certificate data") from exc
+
+    @staticmethod
+    def _b64url(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
+
+    @classmethod
+    def certificate_identifier(cls, certificate) -> str:
+        """Build the RFC 9773 CertID: base64url(AKI).base64url(serial)."""
+        cert_obj = cls._load_x509_certificate(certificate)
+        try:
+            aki = cert_obj.extensions.get_extension_for_class(
+                x509.AuthorityKeyIdentifier
+            ).value.key_identifier
+        except x509.ExtensionNotFound as exc:
+            raise ValueError("Certificate has no Authority Key Identifier") from exc
+        if not aki:
+            raise ValueError("Certificate has no Authority Key Identifier")
+
+        serial_length = max(1, (cert_obj.serial_number.bit_length() + 7) // 8)
+        serial_bytes = cert_obj.serial_number.to_bytes(serial_length, 'big')
+        return f"{cls._b64url(aki)}.{cls._b64url(serial_bytes)}"
+
+    @staticmethod
+    def _parse_ari_datetime(value: str) -> datetime:
+        if not isinstance(value, str) or not value:
+            raise ValueError("Invalid ARI suggested window")
+        try:
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError as exc:
+            raise ValueError("Invalid ARI suggested window") from exc
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+
+    @staticmethod
+    def _parse_retry_after(value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        now = datetime.now(timezone.utc)
+        try:
+            seconds = int(value)
+            if seconds < 0:
+                raise ValueError
+            retry_at = now + timedelta(seconds=seconds)
+        except (TypeError, ValueError):
+            try:
+                retry_at = parsedate_to_datetime(value)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("Invalid ARI Retry-After header") from exc
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=timezone.utc)
+            retry_at = retry_at.astimezone(timezone.utc)
+        return retry_at.replace(tzinfo=None)
+
+    def revoke_certificate(self, certificate_pem_or_der, reason: int = 0) -> requests.Response:
+        """Revoke a certificate upstream using the registered account KID.
+
+        The certificate is encoded as base64url DER and the request is signed
+        with the external ACME account key, as required by RFC 8555 §7.6.
+        """
+        reason = self.validate_revocation_reason(reason)
+        cert_obj = self._load_x509_certificate(certificate_pem_or_der)
+        directory = self._fetch_directory()
+        revoke_url = directory.get('revokeCert')
+        if not revoke_url:
+            raise ValueError("ACME server does not advertise certificate revocation")
+
+        payload = {
+            'certificate': self._b64url(
+                cert_obj.public_bytes(serialization.Encoding.DER)
+            ),
+            'reason': reason,
+        }
+        return self._post(revoke_url, payload, use_jwk=False)
+
+    def get_renewal_info(self, certificate) -> Optional[Dict[str, Any]]:
+        """Fetch and parse upstream ACME Renewal Information (RFC 9773)."""
+        directory = self._fetch_directory()
+        renewal_base_url = directory.get('renewalInfo')
+        if not renewal_base_url:
+            return None
+
+        cert_id = self.certificate_identifier(certificate)
+        renewal_url = f"{renewal_base_url.rstrip('/')}/{cert_id}"
+        self._validate_outbound_acme_url(renewal_url)
+        response = ssrf_protection.safe_request_get(
+            renewal_url,
+            allow_loopback=acme_allow_loopback_upstream(),
+            timeout=self._http_timeout(),
+            verify=self.verify_ssl,
+            headers=dict(self.session.headers),
+        )
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"ACME renewal information request failed with HTTP {response.status_code}"
+            )
+
+        try:
+            data = response.json()
+        except (ValueError, requests.exceptions.JSONDecodeError) as exc:
+            raise ValueError("Invalid ACME renewal information response") from exc
+        window = data.get('suggestedWindow') if isinstance(data, dict) else None
+        if not isinstance(window, dict):
+            raise ValueError("Invalid ACME renewal information response")
+        start = self._parse_ari_datetime(window.get('start'))
+        end = self._parse_ari_datetime(window.get('end'))
+        if end <= start:
+            raise ValueError("Invalid ARI suggested window")
+
+        return {
+            'cert_id': cert_id,
+            'suggested_window': {'start': start, 'end': end},
+            'retry_after': self._parse_retry_after(
+                response.headers.get('Retry-After')
+            ),
+        }
+
     def _fetch_alternate_chain_pem(self, url: str) -> str:
         """POST-as-GET an alternate certificate URL from directory Link headers."""
         self._validate_outbound_acme_url(url)
@@ -758,11 +910,12 @@ class AcmeClientService:
     # =========================================================================
     
     def create_order(
-        self, 
+        self,
         domains: List[str],
         email: str,
         challenge_type: str = 'dns-01',
-        dns_provider_id: Optional[int] = None
+        dns_provider_id: Optional[int] = None,
+        replaces: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[AcmeClientOrder]]:
         """
         Create a new certificate order.
@@ -787,7 +940,9 @@ class AcmeClientService:
             
             identifiers = [{"type": "dns", "value": d} for d in domains]
             payload = {"identifiers": identifiers}
-            
+            if replaces and directory.get('renewalInfo'):
+                payload['replaces'] = replaces
+
             resp = self._post(directory['newOrder'], payload)
             
             if resp.status_code not in [200, 201]:

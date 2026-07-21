@@ -5,13 +5,20 @@ import base64
 import logging
 from typing import Dict, Any, Optional, Tuple
 
+from sqlalchemy import or_
+
 from models import db
 
 logger = logging.getLogger(__name__)
 
 
 class EabMixin:
-    def validate_eab(self, eab_data: Dict[str, Any], account_jwk: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def validate_eab(
+        self,
+        eab_data: Dict[str, Any],
+        account_jwk: Dict[str, Any],
+        new_account_url: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
         """Validate External Account Binding (RFC 8555 §7.3.4)
         
         The EAB is a JWS signed with a pre-shared HMAC key, binding
@@ -20,6 +27,7 @@ class EabMixin:
         Args:
             eab_data: The externalAccountBinding JWS object
             account_jwk: The account JWK being registered
+            new_account_url: URL from the outer newAccount JWS protected header
             
         Returns:
             Tuple of (is_valid, error_message)
@@ -36,6 +44,10 @@ class EabMixin:
             protected_json = base64.urlsafe_b64decode(protected_b64 + '==')
             protected = json.loads(protected_json)
             
+            # The EAB JWS is bound to the newAccount request URL.
+            if new_account_url is not None and protected.get('url') != new_account_url:
+                return False, 'EAB protected url does not match newAccount URL'
+
             # Verify algorithm is HS256 (HMAC-SHA256) per RFC 8555
             alg = protected.get('alg', '')
             if alg not in ('HS256', 'HS384', 'HS512'):
@@ -50,11 +62,9 @@ class EabMixin:
             # Preferred path: dedicated AcmeEabCredential table (v2.139+).
             # Fallback: legacy SystemConfig 'acme_eab_keys' JSON blob.
             from models import SystemConfig, AcmeEabCredential
-            from utils.datetime_utils import utc_now as _utc_now
 
             credential = AcmeEabCredential.query.filter_by(kid=kid).first()
             hmac_key_b64 = None
-            legacy = False
 
             if credential is not None:
                 if not credential.is_usable:
@@ -68,7 +78,6 @@ class EabMixin:
                 except Exception:
                     eab_keys = {}
                 hmac_key_b64 = eab_keys.get(kid)
-                legacy = True
 
             if not hmac_key_b64:
                 return False, "Unknown external account"
@@ -114,49 +123,60 @@ class EabMixin:
             if not hmac_lib.compare_digest(expected_sig, actual_sig):
                 return False, "EAB signature verification failed"
 
-            # Mark credential as used (single-use semantics, RFC 8555 §7.3.4).
-            # The actual binding to the freshly-created AcmeAccount is done
-            # by the caller (new_account handler) via mark_eab_used().
-            try:
-                if legacy:
-                    eab_config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
-                    eab_keys_json = eab_config.value if eab_config else '{}'
-                    try:
-                        eab_keys = json.loads(eab_keys_json)
-                    except Exception:
-                        eab_keys = {}
-                    eab_keys.pop(kid, None)
-                    if eab_config:
-                        eab_config.value = json.dumps(eab_keys)
-                    else:
-                        db.session.add(SystemConfig(key='acme_eab_keys', value=json.dumps(eab_keys)))
-                else:
-                    credential.status = 'used'
-                    credential.used_at = _utc_now()
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"Failed to persist EAB key consumption: {commit_err}")
-            
+            # Validation is intentionally side-effect free. The credential is
+            # consumed only after the account row has committed successfully.
             return True, None
             
         except Exception as e:
             logger.error(f"EAB validation error: {e}")
             return False, str(e)
 
-    def mark_eab_used(self, kid: str, account_id: str) -> None:
-        """Bind an EAB credential to the ACME account that consumed it.
-
-        Called from the new-account handler once the account row is
-        committed. Best-effort: does nothing for legacy SystemConfig
-        credentials or unknown kids.
-        """
+    def mark_eab_used(self, kid: str, account_id: str) -> bool:
+        """Consume and bind an EAB credential after account creation commits."""
         try:
-            from models import AcmeEabCredential
-            cred = AcmeEabCredential.query.filter_by(kid=kid).first()
-            if cred is not None and cred.used_by_account_id is None:
-                cred.used_by_account_id = account_id
-                db.session.commit()
+            from models import AcmeEabCredential, SystemConfig
+            from utils.datetime_utils import utc_now
+
+            credential = AcmeEabCredential.query.filter_by(kid=kid).first()
+            if credential is not None:
+                now = utc_now()
+                consumed = AcmeEabCredential.query.filter(
+                    AcmeEabCredential.kid == kid,
+                    AcmeEabCredential.status == 'active',
+                    AcmeEabCredential.used_by_account_id.is_(None),
+                    or_(
+                        AcmeEabCredential.expires_at.is_(None),
+                        AcmeEabCredential.expires_at > now,
+                    ),
+                ).update({
+                    'status': 'used',
+                    'used_at': now,
+                    'used_by_account_id': account_id,
+                }, synchronize_session=False)
+                if consumed == 0:
+                    db.session.rollback()
+                    current = AcmeEabCredential.query.filter_by(kid=kid).first()
+                    return bool(
+                        current
+                        and current.status == 'used'
+                        and current.used_by_account_id == account_id
+                    )
+            else:
+                config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
+                if config is None:
+                    return False
+                try:
+                    keys = json.loads(config.value or '{}')
+                except Exception:
+                    return False
+                if kid not in keys:
+                    return False
+                keys.pop(kid)
+                config.value = json.dumps(keys)
+
+            db.session.commit()
+            return True
         except Exception as e:
             db.session.rollback()
-            logger.warning(f"Failed to bind EAB credential {kid} to account {account_id}: {e}")
+            logger.warning(f"Failed to consume EAB credential {kid}: {e}")
+            return False

@@ -2,12 +2,20 @@
 ACME Auto-Renewal Service
 Automatically renews Let's Encrypt certificates before expiry.
 """
+import json
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
-from utils.datetime_utils import utc_now
+import time
+from datetime import timedelta
+
+from models import Certificate, DnsProvider, SystemConfig, db
+from models.acme_models import AcmeClientOrder
+from services.acme import dns_providers
+from services.acme.acme_client_service import AcmeClientService
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
+from services.cert_service import CertificateService
 from utils.acme_debug import acme_log
+from utils.datetime_utils import utc_now
+from utils.db_transaction import commit_or_rollback
 
 logger = logging.getLogger(__name__)
 
@@ -15,36 +23,118 @@ logger = logging.getLogger(__name__)
 DEFAULT_RENEWAL_DAYS = 30
 MAX_RENEWAL_FAILURES = 5
 
+# Successful ARI responses are cached until the upstream Retry-After time.
+# The scheduler is process-local, so this is sufficient to prevent repeated
+# polling on each scheduler tick without adding persistent schema state.
+_ARI_CACHE = {}
+
+
+def _cached_renewal_info(order, certificate, now):
+    """Return upstream ARI data while honoring Retry-After."""
+    cache_key = (order.acme_client_account_id, certificate.id)
+    cached = _ARI_CACHE.get(cache_key)
+    if cached and cached.get('retry_after') and now < cached['retry_after']:
+        return cached['info']
+
+    client = AcmeClientService.for_order(order)
+    info = client.get_renewal_info(certificate)
+    if info and info.get('retry_after') and info['retry_after'] > now:
+        _ARI_CACHE[cache_key] = {
+            'info': info,
+            'retry_after': info['retry_after'],
+        }
+    else:
+        _ARI_CACHE.pop(cache_key, None)
+    return info
+
+
+def _order_is_due(order, now, fallback_threshold):
+    """Decide renewal timing from ARI, falling back to the fixed threshold."""
+    certificate = db.session.get(Certificate, order.certificate_id)
+    if certificate is not None:
+        try:
+            info = _cached_renewal_info(order, certificate, now)
+            if info:
+                window = info['suggested_window']
+                return now >= window['start']
+        except Exception as exc:
+            logger.warning(
+                "Could not retrieve upstream renewal information for order %s: %s",
+                order.id,
+                exc,
+            )
+
+    return bool(order.expires_at and order.expires_at <= fallback_threshold)
+
+
+def _revoke_replaced_certificate(acme_client, certificate):
+    """Best-effort local and upstream revocation after successful renewal."""
+    try:
+        revoke_setting = SystemConfig.query.filter_by(
+            key='acme.revoke_on_renewal'
+        ).first()
+    except Exception as exc:
+        logger.warning("Could not read ACME renewal revocation setting: %s", exc)
+        return
+    if not revoke_setting or revoke_setting.value != 'true':
+        return
+
+    try:
+        CertificateService.revoke_certificate(
+            cert_id=certificate.id,
+            reason='superseded',
+            username='system',
+        )
+        logger.info(f"Revoked superseded certificate {certificate.id}")
+    except Exception as exc:
+        logger.warning(
+            "Failed to revoke old certificate %s locally: %s",
+            certificate.id,
+            exc,
+        )
+
+    try:
+        upstream = acme_client.revoke_certificate(certificate, reason=4)
+        if not 200 <= upstream.status_code < 300:
+            logger.warning(
+                "Upstream revocation of certificate %s failed with HTTP %s",
+                certificate.id,
+                upstream.status_code,
+            )
+    except Exception as exc:
+        logger.warning(
+            "Upstream revocation of certificate %s failed: %s",
+            certificate.id,
+            exc,
+        )
+
 
 def scheduled_acme_renewal():
     """
     Scheduled task to check and renew ACME certificates.
     Called by scheduler service.
     """
-    from flask import current_app
-    from models import db
-    from models.acme_models import AcmeClientOrder, DnsProvider
-    
     logger.info("Starting ACME auto-renewal check...")
     
     try:
         # Get renewal threshold from settings or use default
         renewal_days = DEFAULT_RENEWAL_DAYS
         
-        # Calculate threshold date
-        threshold_date = utc_now() + timedelta(days=renewal_days)
-        
-        # Find orders that need renewal:
-        # - renewal_enabled = True
-        # - status = 'issued'
-        # - expires_at <= threshold_date
-        # - renewal_failures < MAX_RENEWAL_FAILURES
-        orders_to_renew = AcmeClientOrder.query.filter(
+        now = utc_now()
+        threshold_date = now + timedelta(days=renewal_days)
+
+        # ARI may request renewal earlier than the local 30-day fallback, so
+        # evaluate every eligible issued order rather than pre-filtering by
+        # expires_at in SQL.
+        eligible_orders = AcmeClientOrder.query.filter(
             AcmeClientOrder.renewal_enabled == True,
             AcmeClientOrder.status == 'issued',
-            AcmeClientOrder.expires_at <= threshold_date,
-            AcmeClientOrder.renewal_failures < MAX_RENEWAL_FAILURES
+            AcmeClientOrder.renewal_failures < MAX_RENEWAL_FAILURES,
         ).all()
+        orders_to_renew = [
+            order for order in eligible_orders
+            if _order_is_due(order, now, threshold_date)
+        ]
         
         if not orders_to_renew:
             logger.info("No certificates need renewal")
@@ -60,7 +150,10 @@ def scheduled_acme_renewal():
                 order.renewal_failures += 1
                 order.last_error_at = utc_now()
                 order.error_message = str(e)
-                db.session.commit()
+                commit_or_rollback(
+                    logger,
+                    f"Failed to persist renewal failure for order {order.id}",
+                )
         
         logger.info("ACME auto-renewal check completed")
         
@@ -78,17 +171,14 @@ def renew_certificate(order) -> tuple:
     Returns:
         Tuple of (success: bool, message: str)
     """
-    from models import db
-    from models.acme_models import DnsProvider
-    from services.acme.acme_client_service import AcmeClientService
-    from services.acme.dns_providers import create_provider
-    import json
-    import time
-    
     logger.info(f"Renewing certificate for {order.primary_domain} (order {order.id})")
     
-    # Save old certificate ID for potential revocation
+    # Save the old certificate for RFC 9773 `replaces` and optional revocation.
     old_certificate_id = order.certificate_id
+    old_certificate = (
+        db.session.get(Certificate, old_certificate_id)
+        if old_certificate_id else None
+    )
     
     # Get DNS provider
     dns_provider_model = db.session.get(DnsProvider, order.dns_provider_id)
@@ -96,7 +186,10 @@ def renew_certificate(order) -> tuple:
         raise Exception("DNS provider not found")
     
     credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
-    dns_provider = create_provider(dns_provider_model.provider_type, credentials)
+    dns_provider = dns_providers.create_provider(
+        dns_provider_model.provider_type,
+        credentials,
+    )
     
     # Initialize ACME client for the same CA that issued the original order
     acme_client = AcmeClientService.for_order(order)
@@ -105,18 +198,31 @@ def renew_certificate(order) -> tuple:
     domains = order.domains_list
     
     # Get email from settings (same source as manual order creation)
-    from models import SystemConfig
     email_cfg = SystemConfig.query.filter_by(key='acme.client.email').first()
     email = email_cfg.value if email_cfg else None
     if not email:
         raise Exception("ACME client email not configured — cannot renew")
     
+    # RFC 9773 §5: identify the certificate being replaced when the CA
+    # advertises ARI. Failure to build a CertID must not block renewal.
+    replaces = None
+    try:
+        if old_certificate and acme_client._fetch_directory().get('renewalInfo'):
+            replaces = acme_client.certificate_identifier(old_certificate)
+    except Exception as exc:
+        logger.warning(
+            "Could not build ARI replaces identifier for order %s: %s",
+            order.id,
+            exc,
+        )
+
     # Create new ACME order
     success, message, new_order = acme_client.create_order(
         domains=domains,
         email=email,
         challenge_type=order.challenge_type or 'dns-01',
-        dns_provider_id=order.dns_provider_id
+        dns_provider_id=order.dns_provider_id,
+        replaces=replaces,
     )
     if not success:
         raise Exception(f"Order creation failed: {message}")
@@ -137,14 +243,10 @@ def renew_certificate(order) -> tuple:
                 f"Order {order.id} has key_source=reuse but no linked "
                 f"certificate; a new key will be generated on finalize"
             )
-    try:
-        db.session.commit()
-    except Exception as _ks_err:
-        db.session.rollback()
-        logger.warning(f"Could not persist key source on renewal order: {_ks_err}")
+    if not commit_or_rollback(logger, "Could not persist key source on renewal order"):
+        logger.warning("Renewal will continue with the in-memory key source settings")
     
     new_order_url = new_order.order_url
-    new_finalize_url = new_order.finalize_url
     challenges = new_order.challenges_dict
     dns_txt_created = False
 
@@ -239,40 +341,26 @@ def renew_certificate(order) -> tuple:
         order.last_error_at = None
 
         # Update expiry from new certificate
-        from models import Certificate
         new_cert = db.session.get(Certificate, cert_id)
         if new_cert and new_cert.valid_to:
             order.expires_at = new_cert.valid_to
 
-        try:
-            db.session.commit()
-        except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(
-                f"Commit failed in services/acme_renewal_service.py:182: {_commit_err}",
-                exc_info=True,
-            )
-            raise
+        if not commit_or_rollback(logger, "Failed to persist renewed certificate"):
+            raise RuntimeError("Failed to persist renewed certificate")
 
         logger.info(
             f"Successfully renewed certificate for {order.primary_domain} (new cert ID: {cert_id})"
         )
 
-        # Revoke old certificate if setting is enabled
-        if old_certificate_id and old_certificate_id != cert_id:
-            try:
-                from models import SystemConfig
-                revoke_setting = SystemConfig.query.filter_by(key='acme.revoke_on_renewal').first()
-                if revoke_setting and revoke_setting.value == 'true':
-                    from services.cert_service import CertificateService
-                    CertificateService.revoke_certificate(
-                        cert_id=old_certificate_id,
-                        reason='superseded',
-                        username='system',
-                    )
-                    logger.info(f"Revoked superseded certificate {old_certificate_id}")
-            except Exception as e:
-                logger.warning(f"Failed to revoke old certificate {old_certificate_id}: {e}")
+        if old_certificate is not None:
+            _ARI_CACHE.pop(
+                (order.acme_client_account_id, old_certificate.id),
+                None,
+            )
+
+        # Revoke the replaced certificate locally and upstream when enabled.
+        if old_certificate and old_certificate_id != cert_id:
+            _revoke_replaced_certificate(acme_client, old_certificate)
 
         return True, f"Successfully renewed (new certificate ID: {cert_id})"
     finally:

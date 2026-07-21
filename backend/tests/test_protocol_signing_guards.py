@@ -41,13 +41,30 @@ class TestTsaConfigGuard:
 
     def test_tsa_unconfigured_returns_503(self, app, client):
         with app.app_context():
+            _set_config('tsa_enabled', 'true')
             _clear_config('tsa_ca_refid')
-        # A minimal but well-formed-enough body; we must get 503 *before*
-        # any CA key is selected, regardless of payload.
-        r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
-                        content_type='application/timestamp-query')
-        assert r.status_code == 503
-        assert b'not configured' in r.data.lower()
+        try:
+            # A minimal but well-formed-enough body; we must get 503 *before*
+            # any CA key is selected, regardless of payload.
+            r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
+                            content_type='application/timestamp-query')
+            assert r.status_code == 503
+            assert b'not configured' in r.data.lower()
+        finally:
+            with app.app_context():
+                _clear_config('tsa_enabled')
+
+    def test_tsa_disabled_returns_503_unavailable(self, app, client):
+        with app.app_context():
+            _set_config('tsa_enabled', 'false')
+        try:
+            r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
+                            content_type='application/timestamp-query')
+            assert r.status_code == 503
+            assert b'unavailable' in r.data.lower()
+        finally:
+            with app.app_context():
+                _clear_config('tsa_enabled')
 
     def test_tsa_offline_ca_returns_503(self, app, client, create_ca):
         ca = create_ca(cn='TSA Offline CA')
@@ -56,6 +73,7 @@ class TestTsaConfigGuard:
             ca_obj.offline = True
             ca_obj.offline_reason = 'test'
             db.session.commit()
+            _set_config('tsa_enabled', 'true')
             _set_config('tsa_ca_refid', ca_obj.refid)
         try:
             r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
@@ -64,6 +82,25 @@ class TestTsaConfigGuard:
             assert b'unavailable' in r.data.lower()
         finally:
             with app.app_context():
+                _clear_config('tsa_enabled')
+                _clear_config('tsa_ca_refid')
+
+    def test_tsa_certificate_without_timestamping_eku_returns_503(
+        self, app, client, create_ca
+    ):
+        ca = create_ca(cn='TSA Invalid EKU CA')
+        with app.app_context():
+            ca_obj = db.session.get(CA, ca['id'])
+            _set_config('tsa_enabled', 'true')
+            _set_config('tsa_ca_refid', ca_obj.refid)
+        try:
+            r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
+                            content_type='application/timestamp-query')
+            assert r.status_code == 503
+            assert b'invalid' in r.data.lower()
+        finally:
+            with app.app_context():
+                _clear_config('tsa_enabled')
                 _clear_config('tsa_ca_refid')
 
 

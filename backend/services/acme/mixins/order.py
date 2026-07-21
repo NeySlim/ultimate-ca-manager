@@ -5,6 +5,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
+from sqlalchemy.orm.attributes import set_committed_value
+
 from models import db
 from models.acme_models import AcmeOrder, AcmeAuthorization, AcmeChallenge
 from utils.datetime_utils import utc_now
@@ -398,16 +400,108 @@ class OrderMixin:
         )
         auth.challenges.append(tls_challenge)
     
+    @staticmethod
+    def _problem(error_type: str, detail: str) -> str:
+        return json.dumps({
+            'type': f'urn:ietf:params:acme:error:{error_type}',
+            'detail': detail,
+        })
+
+    def expire_order_if_needed(self, order: AcmeOrder) -> bool:
+        """Lazily invalidate an expired non-final order."""
+        if order.status not in ('pending', 'ready') or order.expires >= utc_now():
+            return False
+
+        order.status = 'invalid'
+        order.error = self._problem('malformed', 'Order has expired')
+        for authorization in order.authorizations:
+            if authorization.status == 'pending':
+                self._expire_authorization(authorization, update_order=False)
+        self._commit_state_change('expire ACME order')
+        return True
+
+    def expire_authorization_if_needed(self, authorization: AcmeAuthorization) -> bool:
+        """Lazily invalidate an expired pending authorization."""
+        if authorization.status != 'pending' or authorization.expires >= utc_now():
+            return False
+
+        self._expire_authorization(authorization, update_order=True)
+        self._commit_state_change('expire ACME authorization')
+        return True
+
+    def _expire_authorization(
+        self,
+        authorization: AcmeAuthorization,
+        *,
+        update_order: bool,
+    ) -> None:
+        problem = self._problem('malformed', 'Authorization has expired')
+        authorization.status = 'invalid'
+        for challenge in authorization.challenges:
+            if challenge.status in ('pending', 'processing'):
+                challenge.status = 'invalid'
+                challenge.error = problem
+
+        order = authorization.order
+        if update_order and order and order.status in ('pending', 'ready'):
+            order.status = 'invalid'
+            order.error = problem
+
+    @staticmethod
+    def _commit_state_change(context: str) -> None:
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f'Failed to {context}: {e}')
+            raise
+
+    def begin_order_processing(self, order: AcmeOrder) -> None:
+        """Persist the ready-to-processing transition before issuance."""
+        order.status = 'processing'
+        self._commit_state_change('mark ACME order processing')
+
+    def restore_processing_order(self, order_id: str) -> None:
+        """Restore retryable finalize failures that did not invalidate the order."""
+        order = AcmeOrder.query.filter_by(order_id=order_id).first()
+        if order is None:
+            return
+        db.session.refresh(order)
+        if order.status == 'processing':
+            order.status = 'ready'
+            self._commit_state_change('restore ACME order ready status')
+
+    def invalidate_processing_order(
+        self,
+        order_id: str,
+        error_type: str,
+        detail: str,
+    ) -> None:
+        """Finish a processing order as invalid with an ACME problem."""
+        order = AcmeOrder.query.filter_by(order_id=order_id).first()
+        if order is None:
+            return
+        db.session.refresh(order)
+        if order.status == 'processing':
+            order.status = 'invalid'
+            order.error = self._problem(error_type, detail)
+            self._commit_state_change('mark ACME order invalid')
+
     def get_order(self, order_id: str) -> Optional[AcmeOrder]:
-        """Get order by ID
-        
-        Args:
-            order_id: Order identifier
-            
-        Returns:
-            AcmeOrder or None
+        """Get order by ID.
+
+        IssuanceMixin still validates its input as ``ready``. During the
+        synchronous finalize call the persisted RFC state is ``processing``;
+        expose ``ready`` only to that internal compatibility check.
         """
-        return AcmeOrder.query.filter_by(order_id=order_id).first()
+        order = AcmeOrder.query.filter_by(order_id=order_id).first()
+        if (
+            order is not None
+            and order.status == 'processing'
+            and getattr(self, '_finalizing_order_id', None) == order_id
+        ):
+            set_committed_value(order, 'status', 'ready')
+        return order
     
     def get_challenge(self, challenge_id: str) -> Optional[AcmeChallenge]:
         """Get challenge by ID

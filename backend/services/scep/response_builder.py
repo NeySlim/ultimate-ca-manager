@@ -53,9 +53,6 @@ def build_cert_rep(
     Returns:
         DER-encoded ContentInfo/SignedData CertRep
     """
-    if recipient_nonce is None:
-        recipient_nonce = secrets.token_bytes(16)
-
     scep_attrs = []
 
     if transaction_id:
@@ -116,6 +113,22 @@ def build_cert_rep_success(
     issuer/serial used in RecipientInfo.rid (RFC 5652 §6.2.1).
     """
     pkcs7_data = create_degenerate_pkcs7([cert, ca_cert])
+    encrypted_data = encrypt_for_client(pkcs7_data, recipient_cert)
+    return build_cert_rep(
+        STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert
+    )
+
+
+def build_crl_rep_success(
+    crl: x509.CertificateRevocationList,
+    transaction_id: str,
+    sender_nonce: bytes,
+    recipient_cert: x509.Certificate,
+    ca_cert: x509.Certificate,
+    ca_key,
+) -> bytes:
+    """Create a successful CertRep carrying only the requested CRL."""
+    pkcs7_data = create_degenerate_pkcs7([], crls=[crl])
     encrypted_data = encrypt_for_client(pkcs7_data, recipient_cert)
     return build_cert_rep(
         STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert

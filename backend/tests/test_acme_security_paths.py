@@ -5,16 +5,21 @@ pre-authorizations, wildcard authorizations, and key-change conflicts.
 """
 import base64 as b64
 import hashlib
+import hmac
 import json
+from datetime import timedelta
 
 import pytest
 
+from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.x509.oid import NameOID
 
-from models import db
+from models import db, SystemConfig
 from models.acme_models import (
     AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge,
+    AcmeEabCredential,
 )
 from services.acme.acme_service import AcmeService
 
@@ -63,13 +68,36 @@ def _nonce(client):
 
 def _thumbprint(jwk):
     # Mirror the service implementation (RFC 7638)
-    import hashlib
     canonical = json.dumps(
         {'e': jwk['e'], 'kty': jwk['kty'], 'n': jwk['n']},
         separators=(',', ':'), sort_keys=True,
     )
     digest = hashlib.sha256(canonical.encode()).digest()
     return b64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+
+
+def _post_jws(client, path, jws, content_type='application/jose+json'):
+    return client.post(
+        path,
+        data=json.dumps(jws),
+        content_type=content_type,
+    )
+
+
+def _csr_b64(key, common_name='finalize.example.com'):
+    csr = (
+        x509.CertificateSigningRequestBuilder()
+        .subject_name(x509.Name([
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+        ]))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(common_name)]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    der = csr.public_bytes(serialization.Encoding.DER)
+    return b64.urlsafe_b64encode(der).rstrip(b'=').decode()
 
 
 @pytest.fixture
@@ -220,7 +248,11 @@ class TestPostAsGetProtection:
         )
 
         for path in paths:
-            response = client.post(path, json={})
+            response = client.post(
+                path,
+                data='{}',
+                content_type='application/jose+json',
+            )
             assert response.status_code == 400, path
             assert response.get_json()['type'].endswith(':malformed'), path
 
@@ -443,6 +475,448 @@ class TestPreAuthorizationAndWildcard:
         assert response.get_json()['identifier']['value'] == 'prewild.example.com'
         assert response.get_json()['wildcard'] is True
         assert all('rel="up"' not in link for link in response.headers.getlist('Link'))
+
+
+class TestRfc8555ErrorTypes:
+    def test_post_jws_requires_jose_content_type(self, client):
+        response = client.post('/acme/new-account', json={})
+        assert response.status_code == 415
+        assert response.get_json()['type'].endswith(':malformed')
+
+    def test_consumed_nonce_returns_bad_nonce(self, client, acme_account):
+        path = '/acme/new-order'
+        nonce = _nonce(client)
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'identifiers': [{'type': 'dns', 'value': 'nonce.example.com'}]},
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=nonce,
+        )
+        first = _post_jws(client, path, jws)
+        assert first.status_code == 201
+
+        second = _post_jws(client, path, jws)
+        assert second.status_code == 400
+        assert second.get_json()['type'].endswith(':badNonce')
+
+    def test_new_account_invalid_jwk_returns_bad_public_key(self, client):
+        path = '/acme/new-account'
+        protected = _b64json({
+            'alg': 'RS256',
+            'nonce': _nonce(client),
+            'url': f'http://localhost{path}',
+            'jwk': {'kty': 'unsupported'},
+        })
+        jws = {
+            'protected': protected,
+            'payload': _b64json({'termsOfServiceAgreed': True}),
+            'signature': _b64json({'not': 'a signature'}),
+        }
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 400
+        assert response.get_json()['type'].endswith(':badPublicKey')
+
+    @pytest.mark.parametrize('reason', [-1, 7, 11, '1', None, True])
+    def test_invalid_revocation_reason(self, client, acme_account, reason):
+        path = '/acme/revoke-cert'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'certificate': 'AA', 'reason': reason},
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 400
+        assert response.get_json()['type'].endswith(':badRevocationReason')
+
+    @pytest.mark.parametrize('resource', ['order', 'authz', 'challenge', 'cert'])
+    def test_unknown_resource_uses_registered_malformed_type(
+        self, client, acme_account, resource
+    ):
+        path = f'/acme/{resource}/missing-resource'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            None if resource != 'challenge' else {},
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 404
+        assert response.get_json()['type'].endswith(':malformed')
+
+
+class TestRfc8555StateMachine:
+    def test_failed_challenge_invalidates_authorization_and_order(
+        self, app, acme_account, monkeypatch
+    ):
+        with app.app_context():
+            service = AcmeService(base_url='http://localhost')
+            order = service.create_order(
+                acme_account['account_id'],
+                [{'type': 'dns', 'value': 'failure.example.com'}],
+            )
+            authz = order.authorizations.first()
+            challenge = next(
+                candidate for candidate in authz.challenges
+                if candidate.type == 'http-01'
+            )
+
+            class Response:
+                text = 'wrong-key-authorization'
+
+                @staticmethod
+                def raise_for_status():
+                    return None
+
+            import requests
+            monkeypatch.setattr(requests, 'get', lambda *args, **kwargs: Response())
+            account = AcmeAccount.query.filter_by(
+                account_id=acme_account['account_id']
+            ).first()
+
+            assert service.validate_http01_challenge(challenge, account) is False
+            assert challenge.status == 'invalid'
+            assert authz.status == 'invalid'
+            assert order.status == 'invalid'
+            assert json.loads(order.error)['type'].endswith(':incorrectResponse')
+
+    def test_expired_order_is_lazily_marked_invalid(
+        self, app, client, acme_account
+    ):
+        with app.app_context():
+            from utils.datetime_utils import utc_now
+            order = AcmeOrder(
+                account_id=acme_account['account_id'],
+                status='pending',
+                identifiers=json.dumps([
+                    {'type': 'dns', 'value': 'expired-order.example.com'}
+                ]),
+                expires=utc_now() - timedelta(seconds=1),
+            )
+            db.session.add(order)
+            db.session.commit()
+            order_id = order.order_id
+
+        path = f'/acme/order/{order_id}'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            None,
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 200
+        assert response.get_json()['status'] == 'invalid'
+        assert response.get_json()['error']['detail'] == 'Order has expired'
+
+    def test_expired_authorization_invalidates_parent_order(
+        self, app, client, acme_account
+    ):
+        with app.app_context():
+            from utils.datetime_utils import utc_now
+            order = AcmeOrder(
+                account_id=acme_account['account_id'],
+                status='pending',
+                identifiers=json.dumps([
+                    {'type': 'dns', 'value': 'expired-authz.example.com'}
+                ]),
+            )
+            db.session.add(order)
+            db.session.flush()
+            authz = AcmeAuthorization(
+                order_id=order.order_id,
+                account_id=acme_account['account_id'],
+                identifier=json.dumps({
+                    'type': 'dns', 'value': 'expired-authz.example.com'
+                }),
+                status='pending',
+                expires=utc_now() - timedelta(seconds=1),
+            )
+            db.session.add(authz)
+            db.session.commit()
+            authz_id = authz.authorization_id
+            order_id = order.order_id
+
+        path = f'/acme/authz/{authz_id}'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            None,
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 200
+        assert response.get_json()['status'] == 'invalid'
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert order.status == 'invalid'
+            assert json.loads(order.error)['detail'] == 'Authorization has expired'
+
+    def test_invalid_order_response_includes_error(
+        self, app, client, acme_account
+    ):
+        problem = {
+            'type': 'urn:ietf:params:acme:error:caa',
+            'detail': 'CAA policy denied issuance',
+        }
+        with app.app_context():
+            order = AcmeOrder(
+                account_id=acme_account['account_id'],
+                status='invalid',
+                identifiers=json.dumps([
+                    {'type': 'dns', 'value': 'denied.example.com'}
+                ]),
+                error=json.dumps(problem),
+            )
+            db.session.add(order)
+            db.session.commit()
+            order_id = order.order_id
+
+        path = f'/acme/order/{order_id}'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            None,
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 200
+        assert response.get_json()['error'] == problem
+
+    def test_finalize_sets_processing_and_maps_caa_error(
+        self, app, client, acme_account, monkeypatch
+    ):
+        with app.app_context():
+            order = AcmeOrder(
+                account_id=acme_account['account_id'],
+                status='ready',
+                identifiers=json.dumps([
+                    {'type': 'dns', 'value': 'finalize.example.com'}
+                ]),
+            )
+            db.session.add(order)
+            db.session.commit()
+            order_id = order.order_id
+
+        observed = {}
+
+        def reject_caa(_service, candidate_order_id, _csr_pem):
+            current = AcmeOrder.query.filter_by(order_id=candidate_order_id).first()
+            observed['status'] = current.status
+            return False, 'CAA check failed: issuer is not authorized'
+
+        monkeypatch.setattr(AcmeService, 'finalize_order', reject_caa)
+        path = f'/acme/order/{order_id}/finalize'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'csr': _csr_b64(acme_account['key'])},
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 400
+        assert response.get_json()['type'].endswith(':caa')
+        assert observed['status'] == 'processing'
+        with app.app_context():
+            failed_order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert failed_order.status == 'invalid'
+            assert json.loads(failed_order.error)['type'].endswith(':caa')
+
+    def test_processing_transition_reaches_issuance_mixin(
+        self, app, acme_account, monkeypatch
+    ):
+        with app.app_context():
+            order = AcmeOrder(
+                account_id=acme_account['account_id'],
+                status='ready',
+                identifiers=json.dumps([
+                    {'type': 'dns', 'value': 'finalize.example.com'}
+                ]),
+            )
+            db.session.add(order)
+            db.session.commit()
+
+            service = AcmeService(base_url='http://localhost')
+            service.begin_order_processing(order)
+            service._finalizing_order_id = order.order_id
+
+            from utils import caa_checker
+            monkeypatch.setattr(
+                caa_checker,
+                'check_caa_for_domains',
+                lambda *_args, **_kwargs: (True, 'allowed'),
+            )
+            monkeypatch.setattr(
+                service,
+                '_resolve_ca_for_domains',
+                lambda _domains: 'test-ca',
+            )
+            monkeypatch.setattr(
+                service,
+                '_sign_certificate_with_ca',
+                lambda **_kwargs: (False, None, 'signing failed'),
+            )
+
+            csr_der = b64.urlsafe_b64decode(
+                _csr_b64(acme_account['key']) + '=='
+            )
+            csr_pem = x509.load_der_x509_csr(csr_der).public_bytes(
+                serialization.Encoding.PEM
+            ).decode()
+            success, error = service.finalize_order(order.order_id, csr_pem)
+            service._finalizing_order_id = None
+
+            assert success is False
+            assert error == 'signing failed'
+            db.session.refresh(order)
+            assert order.status == 'invalid'
+
+
+class TestExternalAccountBinding:
+    @staticmethod
+    def _eab(jwk, kid, key, url):
+        protected = _b64json({'alg': 'HS256', 'kid': kid, 'url': url})
+        payload = _b64json(jwk)
+        signature = b64.urlsafe_b64encode(
+            hmac.new(key, f'{protected}.{payload}'.encode(), hashlib.sha256).digest()
+        ).rstrip(b'=').decode()
+        return {
+            'protected': protected,
+            'payload': payload,
+            'signature': signature,
+        }
+
+    def test_eab_url_must_match_and_consumption_is_deferred(
+        self, app, acme_account
+    ):
+        kid = 'rfc8555-eab-deferred'
+        key = b'eab-regression-secret'
+        key_b64 = b64.urlsafe_b64encode(key).rstrip(b'=').decode()
+        with app.app_context():
+            config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
+            if config is None:
+                config = SystemConfig(key='acme_eab_keys', value='{}')
+                db.session.add(config)
+            config.value = json.dumps({kid: key_b64})
+            db.session.commit()
+
+            service = AcmeService(base_url='http://localhost')
+            wrong = self._eab(
+                acme_account['jwk'], kid, key,
+                'http://localhost/acme/not-new-account',
+            )
+            valid, error = service.validate_eab(
+                wrong,
+                acme_account['jwk'],
+                'http://localhost/acme/new-account',
+            )
+            assert valid is False
+            assert 'url' in error.lower()
+
+            correct = self._eab(
+                acme_account['jwk'], kid, key,
+                'http://localhost/acme/new-account',
+            )
+            valid, error = service.validate_eab(
+                correct,
+                acme_account['jwk'],
+                'http://localhost/acme/new-account',
+            )
+            assert valid is True, error
+            assert kid in json.loads(config.value)
+
+            service.mark_eab_used(kid, acme_account['account_id'])
+            assert kid not in json.loads(config.value)
+
+    def test_lost_single_use_race_does_not_leave_unbound_account(
+        self, app, client, monkeypatch
+    ):
+        kid = 'rfc8555-eab-race'
+        hmac_key = b'eab-race-secret'
+        key_b64 = b64.urlsafe_b64encode(hmac_key).rstrip(b'=').decode()
+        account_key, account_jwk = _gen_key_and_jwk()
+        with app.app_context():
+            config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
+            if config is None:
+                config = SystemConfig(key='acme_eab_keys', value='{}')
+                db.session.add(config)
+            config.value = json.dumps({kid: key_b64})
+            db.session.commit()
+
+        path = '/acme/new-account'
+        eab = self._eab(
+            account_jwk,
+            kid,
+            hmac_key,
+            f'http://localhost{path}',
+        )
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {
+                'termsOfServiceAgreed': True,
+                'externalAccountBinding': eab,
+            },
+            account_key,
+            jwk=account_jwk,
+            nonce=_nonce(client),
+        )
+        monkeypatch.setattr(
+            AcmeService,
+            'mark_eab_used',
+            lambda *_args, **_kwargs: False,
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 400
+        with app.app_context():
+            assert AcmeAccount.query.filter_by(
+                jwk_thumbprint=_thumbprint(account_jwk)
+            ).first() is None
+
+    def test_table_credential_is_consumed_and_bound_after_validation(
+        self, app, acme_account
+    ):
+        kid = 'rfc8555-eab-table'
+        key = b'eab-table-secret'
+        key_b64 = b64.urlsafe_b64encode(key).rstrip(b'=').decode()
+        with app.app_context():
+            credential = AcmeEabCredential(
+                kid=kid,
+                _hmac_key_b64=key_b64,
+                status='active',
+            )
+            db.session.add(credential)
+            db.session.commit()
+
+            service = AcmeService(base_url='http://localhost')
+            eab = self._eab(
+                acme_account['jwk'],
+                kid,
+                key,
+                'http://localhost/acme/new-account',
+            )
+            valid, error = service.validate_eab(
+                eab,
+                acme_account['jwk'],
+                'http://localhost/acme/new-account',
+            )
+            assert valid is True, error
+            assert credential.status == 'active'
+            assert credential.used_by_account_id is None
+
+            assert service.mark_eab_used(
+                kid,
+                acme_account['account_id'],
+            ) is True
+            assert credential.status == 'used'
+            assert credential.used_by_account_id == acme_account['account_id']
+            assert credential.used_at is not None
 
 
 class TestKeyChangeConflict:

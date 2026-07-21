@@ -7,7 +7,8 @@ from flask import Blueprint, request, make_response
 import logging
 
 from models import CA
-from config.settings import Config
+from services.audit_service import AuditService
+from utils.trusted_proxy import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,15 @@ def timestamp_request():
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
-        from services.tsa_service import TSAService
+        from services.tsa_service import TSAConfigurationError, TSAService
         from models import SystemConfig
-        
+
+        enabled_config = SystemConfig.query.filter_by(key='tsa_enabled').first()
+        if not enabled_config or str(enabled_config.value).lower() != 'true':
+            response = make_response('TSA temporarily unavailable', 503)
+            response.headers['Content-Type'] = 'text/plain'
+            return response
+
         # Get configured TSA CA. Timestamping is an explicit opt-in service:
         # without an admin-designated CA we do NOT silently fall back to an
         # arbitrary CA key (that would turn any deployment into an anonymous
@@ -97,13 +104,34 @@ def timestamp_request():
         # Process timestamp request
         tsa_policy_config = SystemConfig.query.filter_by(key='tsa_policy_oid').first()
         tsa_policy = tsa_policy_config.value if tsa_policy_config else '1.2.3.4.1'
-        service = TSAService(ca_cert, ca_key, tsa_policy)
+        try:
+            service = TSAService(ca_cert, ca_key, tsa_policy)
+        except TSAConfigurationError as exc:
+            logger.error(f'Invalid TSA configuration: {exc}')
+            response = make_response('TSA configuration invalid', 503)
+            response.headers['Content-Type'] = 'text/plain'
+            return response
+
         response_der, status_code = service.process_request(tsp_request)
-        
-        response = make_response(response_der)
+        metadata = service.issued_token_metadata(response_der)
+        if metadata is not None:
+            ip_address = client_ip()
+            AuditService.log_action(
+                action='tsa.timestamp_issued',
+                resource_type='tsa',
+                resource_id=str(metadata['serial']),
+                resource_name=metadata['policy_oid'],
+                details=(
+                    f"TSA timestamp issued: serial={metadata['serial']}; "
+                    f"policy={metadata['policy_oid']}; ip={ip_address}"
+                ),
+                success=True,
+            )
+
+        response = make_response(response_der, status_code)
         response.headers['Content-Type'] = 'application/timestamp-reply'
         return response
-        
+
     except ImportError as e:
         logger.error(f"TSA dependency missing: {e}")
         response = make_response('TSA not available', 503)

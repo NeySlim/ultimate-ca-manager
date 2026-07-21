@@ -58,11 +58,11 @@ class ChallengeMixin:
                 try:
                     validate_host_not_private(identifier_value)
                 except ValueError as ssrf_err:
-                    challenge.status = "invalid"
-                    challenge.error = json.dumps({
-                        "type": "urn:ietf:params:acme:error:rejectedIdentifier",
-                        "detail": "Domain resolves to a non-public address"
-                    })
+                    self._invalidate_challenge(
+                        challenge,
+                        'rejectedIdentifier',
+                        'Domain resolves to a non-public address',
+                    )
                     db.session.commit()
                     logger.warning(f"HTTP-01 SSRF blocked for {identifier_value}: {ssrf_err}")
                     return False
@@ -80,20 +80,16 @@ class ChallengeMixin:
                 db.session.commit()
                 return True
             else:
-                challenge.status = "invalid"
-                challenge.error = json.dumps({
-                    "type": "urn:ietf:params:acme:error:incorrectResponse",
-                    "detail": "Key authorization mismatch"
-                })
+                self._invalidate_challenge(
+                    challenge,
+                    'incorrectResponse',
+                    'Key authorization mismatch',
+                )
                 db.session.commit()
                 return False
-                
+
         except Exception as e:
-            challenge.status = "invalid"
-            challenge.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:connection",
-                "detail": str(e)
-            })
+            self._invalidate_challenge(challenge, 'connection', str(e))
             try:
                 db.session.commit()
             except Exception as commit_err:
@@ -177,20 +173,16 @@ class ChallengeMixin:
                     return True
             
             # No matching TXT record found
-            challenge.status = "invalid"
-            challenge.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:incorrectResponse",
-                "detail": f"No matching TXT record found at {txt_record}"
-            })
+            self._invalidate_challenge(
+                challenge,
+                'incorrectResponse',
+                f'No matching TXT record found at {txt_record}',
+            )
             db.session.commit()
             return False
-            
+
         except Exception as e:
-            challenge.status = "invalid"
-            challenge.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:dns",
-                "detail": str(e)
-            })
+            self._invalidate_challenge(challenge, 'dns', str(e))
             try:
                 db.session.commit()
             except Exception as commit_err:
@@ -242,11 +234,11 @@ class ChallengeMixin:
                 try:
                     validate_host_not_private(identifier_value)
                 except ValueError as ssrf_err:
-                    challenge.status = "invalid"
-                    challenge.error = json.dumps({
-                        "type": "urn:ietf:params:acme:error:rejectedIdentifier",
-                        "detail": "Domain resolves to a non-public address"
-                    })
+                    self._invalidate_challenge(
+                        challenge,
+                        'rejectedIdentifier',
+                        'Domain resolves to a non-public address',
+                    )
                     db.session.commit()
                     logger.warning(f"TLS-ALPN-01 SSRF blocked for {identifier_value}: {ssrf_err}")
                     return False
@@ -317,11 +309,7 @@ class ChallengeMixin:
                         raise ValueError("Certificate missing acmeIdentifier extension")
         
         except Exception as e:
-            challenge.status = "invalid"
-            challenge.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:tls",
-                "detail": str(e)
-            })
+            self._invalidate_challenge(challenge, 'tls', str(e))
             try:
                 db.session.commit()
             except Exception as commit_err:
@@ -330,6 +318,30 @@ class ChallengeMixin:
                 raise
             return False
     
+    def _invalidate_challenge(
+        self,
+        challenge: AcmeChallenge,
+        error_type: str,
+        detail: str,
+    ) -> None:
+        """Propagate a failed challenge through its authorization and order."""
+        problem = {
+            'type': f'urn:ietf:params:acme:error:{error_type}',
+            'detail': detail,
+        }
+        challenge.status = 'invalid'
+        challenge.error = json.dumps(problem)
+
+        authorization = challenge.authorization
+        if authorization is None:
+            return
+        authorization.status = 'invalid'
+
+        order = authorization.order
+        if order is not None and order.status in ('pending', 'ready'):
+            order.status = 'invalid'
+            order.error = json.dumps(problem)
+
     def _update_authorization_status(self, auth: AcmeAuthorization):
         """Update authorization status based on challenges
         

@@ -107,7 +107,16 @@ def acme_error(error_type: str, detail: str, status_code: int = 400) -> Any:
         Flask Response object with application/problem+json
     """
     service = get_acme_service()
-    
+
+    # Preserve the compact verify_jws return contract while emitting the
+    # registered RFC 8555 problem types required for specific JWS failures.
+    if error_type == 'malformed' and detail.endswith('Invalid or expired nonce'):
+        error_type = 'badNonce'
+    elif error_type == 'malformed' and any(marker in detail for marker in (
+        'Invalid JWK:', 'Unsupported key type:', 'Key is not a dict',
+    )):
+        error_type = 'badPublicKey'
+
     error_data = {
         "type": f"urn:ietf:params:acme:error:{error_type}",
         "detail": detail,
@@ -120,6 +129,22 @@ def acme_error(error_type: str, detail: str, status_code: int = 400) -> Any:
     response.headers['Link'] = f'<{service.base_url}/acme/directory>;rel="index"'
     
     return response
+
+
+@acme_bp.before_request
+def require_jose_content_type():
+    """Require the RFC 8555 media type for every JWS POST."""
+    if request.method == 'POST' and request.mimetype != 'application/jose+json':
+        return acme_error(
+            'malformed',
+            'POST requests must use Content-Type application/jose+json',
+            415,
+        )
+    return None
+
+
+def _is_caa_failure(error: Any) -> bool:
+    return bool(re.search(r'\bcaa\b', str(error or ''), re.IGNORECASE))
 
 
 def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -283,15 +308,18 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             # Convert JWK dict to josepy JWK object
             import json as json_module
             if not isinstance(key_to_verify, dict):
-                return False, None, None, f"Key is not a dict, it's a {type(key_to_verify)}: {key_to_verify}"
-            
+                return False, None, None, f"Key is not a dict, it's a {type(key_to_verify)}"
+
             kty = key_to_verify.get('kty')
-            if kty == 'RSA':
-                public_key = jose.JWKRSA.json_loads(json_module.dumps(key_to_verify))
-            elif isinstance(key_to_verify, dict) and kty == 'EC':
-                public_key = jose.JWKEC.json_loads(json_module.dumps(key_to_verify))
-            else:
-                return False, None, None, f"Unsupported key type: {kty}"
+            try:
+                if kty == 'RSA':
+                    public_key = jose.JWKRSA.json_loads(json_module.dumps(key_to_verify))
+                elif kty == 'EC':
+                    public_key = jose.JWKEC.json_loads(json_module.dumps(key_to_verify))
+                else:
+                    return False, None, None, f"Unsupported key type: {kty}"
+            except Exception:
+                return False, None, None, 'Invalid JWK: malformed public key parameters'
             
             # Reconstruct JWS for verification
             # Format: base64url(protected).base64url(payload)
@@ -574,7 +602,14 @@ def new_account():
             return acme_error('externalAccountRequired', 'External account binding required')
         
         if eab_data:
-            eab_valid, eab_error = service.validate_eab(eab_data, jwk)
+            outer_protected = json.loads(base64.urlsafe_b64decode(
+                jws_data['protected'] + '=' * (-len(jws_data['protected']) % 4)
+            ))
+            eab_valid, eab_error = service.validate_eab(
+                eab_data,
+                jwk,
+                outer_protected.get('url'),
+            )
             if not eab_valid:
                 return acme_error('malformed', f'Invalid external account binding: {eab_error}')
 
@@ -585,17 +620,31 @@ def new_account():
             terms_of_service_agreed=terms_agreed
         )
 
-        # Bind the EAB credential (if any) to the freshly-created account
-        # so the admin UI can show "this k8s cluster registered acct/abc".
+        # Consume the EAB only after account creation committed. If another
+        # registration won the single-use race, remove this unbound account.
         if eab_data and is_new:
-            try:
-                import base64 as _b64
-                eab_protected = json.loads(_b64.urlsafe_b64decode(eab_data['protected'] + '=='))
-                eab_kid = eab_protected.get('kid', '')
-                if eab_kid:
-                    service.mark_eab_used(eab_kid, account.account_id)
-            except Exception as bind_err:
-                logger.warning(f"Failed to bind EAB credential to account: {bind_err}")
+            eab_protected = json.loads(base64.urlsafe_b64decode(
+                eab_data['protected'] + '=' * (-len(eab_data['protected']) % 4)
+            ))
+            eab_kid = eab_protected.get('kid', '')
+            if not eab_kid or not service.mark_eab_used(
+                eab_kid,
+                account.account_id,
+            ):
+                try:
+                    db.session.delete(account)
+                    db.session.commit()
+                except Exception as cleanup_error:
+                    db.session.rollback()
+                    logger.error(
+                        f'Failed to remove account after EAB race: {cleanup_error}'
+                    )
+                    return acme_error('serverInternal', 'Internal server error', 500)
+                return acme_error(
+                    'malformed',
+                    'External account binding credential is no longer usable',
+                    400,
+                )
         
         # Build response
         account_url = f"{service.base_url}/acme/acct/{account.account_id}"
@@ -952,12 +1001,13 @@ def order_info(order_id: str):
     order = service.get_order(order_id)
     
     if not order:
-        return acme_error('orderDoesNotExist', 'Order not found', 404)
+        return acme_error('malformed', 'Order not found', 404)
     
     # RFC 8555 §7.4: Server MUST verify the account owns the order
     if order.account_id != request_account_id:
         return acme_error('unauthorized', 'Order does not belong to this account', 403)
-    
+
+    service.expire_order_if_needed(order)
     order_url = f"{service.base_url}/acme/order/{order.order_id}"
     
     # Get authorization URLs
@@ -974,9 +1024,13 @@ def order_info(order_id: str):
         "finalize": f"{order_url}/finalize"
     }
     
+    if order.error and order.status == 'invalid':
+        response_data["error"] = (
+            json.loads(order.error) if isinstance(order.error, str) else order.error
+        )
     if order.certificate_url:
         response_data["certificate"] = order.certificate_url
-    
+
     response = acme_response(response_data)
     response.headers['Location'] = order_url
     
@@ -1035,10 +1089,44 @@ def finalize_order(order_id: str):
         csr = x509.load_der_x509_csr(csr_der, default_backend())
         csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode()
         
-        # Finalize order
-        success, error = service.finalize_order(order_id, csr_pem)
-        
+        if existing_order.status != 'ready':
+            return acme_error(
+                'orderNotReady',
+                f'Order status is {existing_order.status}, must be ready',
+                403,
+            )
+
+        # Persist the RFC 8555 processing transition before signing begins.
+        service.begin_order_processing(existing_order)
+        service._finalizing_order_id = order_id
+        try:
+            success, error = service.finalize_order(order_id, csr_pem)
+        except Exception as finalize_error:
+            if _is_caa_failure(finalize_error):
+                service.invalidate_processing_order(
+                    order_id,
+                    'caa',
+                    str(finalize_error),
+                )
+                _audit_acme(
+                    'acme.order.finalize',
+                    resource_type='acme_order',
+                    resource_id=order_id,
+                    details=f'failed: {finalize_error}',
+                    success=False,
+                )
+                return acme_error('caa', str(finalize_error), 400)
+            service.restore_processing_order(order_id)
+            raise
+        finally:
+            service._finalizing_order_id = None
+
         if not success:
+            is_caa_failure = _is_caa_failure(error)
+            if is_caa_failure:
+                service.invalidate_processing_order(order_id, 'caa', error)
+            else:
+                service.restore_processing_order(order_id)
             _audit_acme(
                 'acme.order.finalize',
                 resource_type='acme_order',
@@ -1046,8 +1134,9 @@ def finalize_order(order_id: str):
                 details=f"failed: {error}",
                 success=False,
             )
-            return acme_error('badCSR', error)
-        
+            error_type = 'caa' if is_caa_failure else 'badCSR'
+            return acme_error(error_type, error)
+
         # Return updated order
         order = service.get_order(order_id)
         order_url = f"{service.base_url}/acme/order/{order.order_id}"
@@ -1113,13 +1202,15 @@ def authorization_info(authorization_id: str):
     ).first()
     
     if not auth:
-        return acme_error('authzDoesNotExist', 'Authorization not found', 404)
+        return acme_error('malformed', 'Authorization not found', 404)
     
     # RFC 8555 §7.5: verify account ownership (direct field or via parent order)
     auth_account = auth.account_id or (auth.order.account_id if auth.order else None)
     if auth_account != request_account_id:
         return acme_error('unauthorized', 'Authorization does not belong to this account', 403)
-    
+
+    service.expire_authorization_if_needed(auth)
+
     # Build challenges list
     challenges = []
     for challenge in auth.challenges:
@@ -1178,7 +1269,7 @@ def respond_to_challenge(challenge_id: str):
             challenge = AcmeChallenge.query.filter_by(challenge_id=challenge_id).first()
         
         if not challenge:
-            return acme_error('challengeDoesNotExist', 'Challenge not found', 404)
+            return acme_error('malformed', 'Challenge not found', 404)
         
         expected_url = challenge.url or f"{service.base_url}/acme/challenge/{challenge_id}"
         is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
@@ -1232,7 +1323,7 @@ def respond_to_challenge(challenge_id: str):
         elif challenge.type == "tls-alpn-01":
             success = service.validate_tls_alpn01_challenge(challenge, account)
         else:
-            return acme_error('unsupportedType', f'Challenge type {challenge.type} not supported')
+            return acme_error('malformed', f'Challenge type {challenge.type} not supported')
 
         # Audit only on terminal state transitions (avoids polling noise)
         if challenge.status in ('valid', 'invalid'):
@@ -1297,7 +1388,7 @@ def download_certificate(order_id: str):
     # Get order
     order = service.get_order(order_id)
     if not order:
-        return acme_error('notFound', 'Order not found', 404)
+        return acme_error('malformed', 'Order not found', 404)
 
     if order.account_id != request_account_id:
         return acme_error('unauthorized', 'Certificate does not belong to this account', 403)
@@ -1390,7 +1481,19 @@ def revoke_cert():
             return acme_error('malformed', 'Certificate required in payload')
         
         reason = payload.get('reason', 0)  # RFC 5280 CRLReason
-        
+        if (
+            isinstance(reason, bool)
+            or not isinstance(reason, int)
+            or reason < 0
+            or reason > 10
+            or reason == 7
+        ):
+            return acme_error(
+                'badRevocationReason',
+                'Revocation reason must be an integer from 0 to 10, excluding 7',
+                400,
+            )
+
         # Decode certificate
         try:
             cert_der = base64.urlsafe_b64decode(cert_b64 + '==')

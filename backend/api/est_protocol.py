@@ -2,13 +2,13 @@
 EST Protocol Implementation (RFC 7030)
 Enrollment over Secure Transport for automated certificate enrollment.
 """
-from flask import Blueprint, request, Response, current_app
-from models import db, CA, Certificate
+from flask import Blueprint, request, Response
+from models import db, CA
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from utils.trusted_proxy import client_ip
 from utils.db_transaction import safe_commit
-from datetime import datetime
+from utils.est_cms import build_server_generated_key_cms
 import base64
 import hmac
 import logging
@@ -67,8 +67,129 @@ def _enforce_est_enabled():
 
 # Content types
 PKCS7_MIME = 'application/pkcs7-mime'
+PKCS7_CERTS_ONLY = f'{PKCS7_MIME}; smime-type=certs-only'
 PKCS10_MIME = 'application/pkcs10'
 MULTIPART_MIXED = 'multipart/mixed'
+
+DECRYPT_KEY_IDENTIFIER_OID = '1.2.840.113549.1.9.16.2.37'
+ASYMMETRIC_DECRYPT_KEY_IDENTIFIER_OID = '1.2.840.113549.1.9.16.2.54'
+
+
+def _require_pkcs10_content_type():
+    """Enforce the RFC 7030 PKCS#10 media type while allowing parameters."""
+    if (request.mimetype or '').lower() != PKCS10_MIME:
+        return Response('Content-Type must be application/pkcs10', status=415)
+    return None
+
+
+def _decode_est_csr(csr_data):
+    """Decode a base64 DER PKCS#10 request, accepting MIME whitespace."""
+    normalized = ''.join(csr_data.split())
+    return base64.b64decode(normalized, validate=True)
+
+
+def _certs_only_base64(cert):
+    """Serialize exactly one issued certificate as a certs-only response."""
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    der = pkcs7.serialize_certificates(
+        [cert], encoding=_crypto_serialization.Encoding.DER
+    )
+    return base64.b64encode(der).decode('ascii')
+
+
+def _certs_only_response(cert):
+    return Response(
+        _certs_only_base64(cert),
+        status=200,
+        content_type=PKCS7_CERTS_ONLY,
+        headers={'Content-Transfer-Encoding': 'base64'},
+    )
+
+
+def _subject_alt_name(cert_or_csr):
+    from cryptography import x509
+    try:
+        return cert_or_csr.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        )
+    except x509.ExtensionNotFound:
+        return None
+
+
+def _copy_csr_extensions(builder, csr):
+    """Copy requested extensions while replacing the ignored CSR public key."""
+    for extension in csr.extensions:
+        builder = builder.add_extension(extension.value, extension.critical)
+    return builder
+
+
+def _server_keygen_identifiers(csr):
+    identifiers = {}
+    for attribute in csr.attributes:
+        oid = attribute.oid.dotted_string
+        if oid in (
+            DECRYPT_KEY_IDENTIFIER_OID,
+            ASYMMETRIC_DECRYPT_KEY_IDENTIFIER_OID,
+        ):
+            identifiers[oid] = attribute.value
+    if identifiers:
+        logger.info(
+            'EST serverkeygen: parsed key identifier attribute(s): %s',
+            ', '.join(sorted(identifiers)),
+        )
+    else:
+        logger.info(
+            'EST serverkeygen: no decrypt key identifier supplied; '
+            'using authentication-derived key protection'
+        )
+    return identifiers
+
+
+def _certificate_key_identifier(cert):
+    from cryptography import x509
+    try:
+        return cert.extensions.get_extension_for_class(
+            x509.SubjectKeyIdentifier
+        ).value.digest
+    except x509.ExtensionNotFound:
+        return x509.SubjectKeyIdentifier.from_public_key(
+            cert.public_key()
+        ).digest
+
+
+def _fallback_csrattrs_der():
+    """Return a valid DER CsrAttrs when pyasn1 is unavailable."""
+    # RFC 7030 §4.5 example shape: an OID plus an extensionRequest
+    # Attribute whose SET contains the requested certificate extension OIDs.
+    return bytes.fromhex(
+        '3029'
+        '06092a864886f70d010907'
+        '301c06092a864886f70d01090e310f'
+        '0603551d0f0603551d110603551d25'
+    )
+
+
+def _build_csrattrs_der():
+    try:
+        from pyasn1.type import univ
+        from pyasn1.codec.der import encoder as der_encoder
+    except ImportError:
+        return _fallback_csrattrs_der()
+
+    attrs = univ.SequenceOf(componentType=univ.Any())
+    challenge_password = univ.ObjectIdentifier('1.2.840.113549.1.9.7')
+    attrs.append(univ.Any(der_encoder.encode(challenge_password)))
+
+    extension_request = univ.Sequence()
+    extension_request.setComponentByPosition(
+        0, univ.ObjectIdentifier('1.2.840.113549.1.9.14')
+    )
+    requested_extensions = univ.SetOf(componentType=univ.ObjectIdentifier())
+    for oid in ('2.5.29.17', '2.5.29.15', '2.5.29.37'):
+        requested_extensions.append(univ.ObjectIdentifier(oid))
+    extension_request.setComponentByPosition(1, requested_extensions)
+    attrs.append(univ.Any(der_encoder.encode(extension_request)))
+    return der_encoder.encode(attrs)
 
 
 def _est_enabled():
@@ -239,7 +360,7 @@ def get_ca_certs():
         return Response(
             p7_b64,
             status=200,
-            mimetype=PKCS7_MIME,
+            content_type=PKCS7_CERTS_ONLY,
             headers={
                 'Content-Transfer-Encoding': 'base64'
             }
@@ -258,6 +379,9 @@ def simple_enroll():
     too_big = _enforce_body_limit()
     if too_big is not None:
         return too_big
+    bad_content_type = _require_pkcs10_content_type()
+    if bad_content_type is not None:
+        return bad_content_type
 
     authenticated, username = _authenticate_est_client()
     if not authenticated:
@@ -273,23 +397,15 @@ def simple_enroll():
     
     try:
         # Get CSR from request body (base64 encoded PKCS#10), capped read
-        content_type = request.content_type or ''
         csr_data, err = _read_est_body_text()
         if err is not None:
             return err
 
-        if PKCS10_MIME in content_type:
-            # Decode base64 CSR
-            csr_der = base64.b64decode(csr_data)
-            
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            csr = x509.load_der_x509_csr(csr_der, default_backend())
-        else:
-            # Try PEM format
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            csr = x509.load_pem_x509_csr(csr_data.encode(), default_backend())
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+        csr = x509.load_der_x509_csr(
+            _decode_est_csr(csr_data), default_backend()
+        )
 
         ok, deny = _validate_est_csr(csr)
         if not ok:
@@ -321,28 +437,9 @@ def simple_enroll():
         if not safe_commit(logger, "EST enrollment commit failed"):
             pass
         
-        # Return PKCS#7 with certificate + CA chain (RFC 7030 §4.2.3)
-        from cryptography.hazmat.primitives.serialization import pkcs7
+        # RFC 7030 §4.2.3 requires only the newly issued certificate.
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-        certs_for_p7 = [cert]
-        
-        # Include issuing CA chain
-        chain = CAService.get_certificate_chain(ca.refid)
-        for chain_pem in chain:
-            chain_cert = x509.load_pem_x509_certificate(chain_pem.encode(), default_backend())
-            certs_for_p7.append(chain_cert)
-        
-        p7_der = pkcs7.serialize_certificates(certs_for_p7, encoding=_crypto_serialization.Encoding.DER)
-        p7_b64 = base64.b64encode(p7_der).decode()
-        
-        return Response(
-            p7_b64,
-            status=200,
-            mimetype=PKCS7_MIME,
-            headers={
-                'Content-Transfer-Encoding': 'base64'
-            }
-        )
+        return _certs_only_response(cert)
         
     except Exception as e:
         logger.error(f"EST simpleenroll failed: {e}")
@@ -359,6 +456,9 @@ def simple_reenroll():
     too_big = _enforce_body_limit()
     if too_big is not None:
         return too_big
+    bad_content_type = _require_pkcs10_content_type()
+    if bad_content_type is not None:
+        return bad_content_type
 
     # Re-enrollment requires mTLS only (RFC 7030 §3.3.2)
     client_cert = _trusted_client_cert()
@@ -375,19 +475,15 @@ def simple_reenroll():
     
     # Process enrollment directly (not delegating to simple_enroll which allows Basic auth)
     try:
-        content_type = request.content_type or ''
         csr_data, err = _read_est_body_text()
         if err is not None:
             return err
 
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
-        
-        if PKCS10_MIME in content_type:
-            csr_der = base64.b64decode(csr_data)
-            csr = x509.load_der_x509_csr(csr_der, default_backend())
-        else:
-            csr = x509.load_pem_x509_csr(csr_data.encode(), default_backend())
+        csr = x509.load_der_x509_csr(
+            _decode_est_csr(csr_data), default_backend()
+        )
 
         ok, deny = _validate_est_csr(csr)
         if not ok:
@@ -402,6 +498,14 @@ def simple_reenroll():
             if client_cert_obj.subject != csr.subject:
                 logger.warning(f"EST reenroll: client cert subject {client_cert_obj.subject} does not match CSR subject {csr.subject}")
                 return Response('CSR subject does not match client certificate', status=403)
+            if _subject_alt_name(client_cert_obj) != _subject_alt_name(csr):
+                logger.warning(
+                    'EST reenroll: CSR SubjectAltName differs from client certificate'
+                )
+                return Response(
+                    'CSR SubjectAltName does not match client certificate',
+                    status=403,
+                )
         except Exception as e:
             logger.error(f"EST reenroll: failed to parse client cert: {e}")
             return Response('Invalid client certificate', status=400)
@@ -426,23 +530,8 @@ def simple_reenroll():
         if not safe_commit(logger, "EST re-enrollment commit failed"):
             pass
         
-        from cryptography.hazmat.primitives.serialization import pkcs7
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-        certs_for_p7 = [cert]
-        
-        # Include issuing CA chain (RFC 7030 §4.2.3)
-        chain = CAService.get_certificate_chain(ca.refid)
-        for chain_pem in chain:
-            chain_cert = x509.load_pem_x509_certificate(chain_pem.encode(), default_backend())
-            certs_for_p7.append(chain_cert)
-        
-        p7_der = pkcs7.serialize_certificates(certs_for_p7, encoding=_crypto_serialization.Encoding.DER)
-        p7_b64 = base64.b64encode(p7_der).decode()
-        
-        return Response(
-            p7_b64, status=200, mimetype=PKCS7_MIME,
-            headers={'Content-Transfer-Encoding': 'base64'}
-        )
+        return _certs_only_response(cert)
         
     except Exception as e:
         logger.error(f"EST simplereenroll failed: {e}")
@@ -453,72 +542,34 @@ def simple_reenroll():
 def get_csr_attrs():
     """
     EST /csrattrs - Get CSR attributes (RFC 7030 §4.5.2).
-    Returns suggested/required CSR attributes for enrollment as
-    ASN.1 DER-encoded SEQUENCE of OIDs, base64-encoded.
+    Returns suggested/required CSR attributes for enrollment as a
+    DER-encoded CsrAttrs sequence, base64-encoded.
     """
-    authenticated, _ = _authenticate_est_client()
-    if not authenticated:
-        return Response(
-            'Authentication required',
-            status=401,
-            headers={'WWW-Authenticate': 'Basic realm="EST"'}
-        )
-    
+    # RFC 7030 §4.5 recommends serving CSR attributes without requiring
+    # client authentication.
     # Build ASN.1 DER-encoded CsrAttrs per RFC 7030 §4.5.2
     # CsrAttrs ::= SEQUENCE SIZE (1..MAX) OF AttrOrOID
     # AttrOrOID ::= CHOICE { oid OBJECT IDENTIFIER, attribute Attribute }
     #
-    # We return commonly requested OIDs:
-    #   - subjectAltName (2.5.29.17)
-    #   - keyUsage (2.5.29.15)
-    #   - extendedKeyUsage (2.5.29.37)
-    #   - challengePassword (1.2.840.113549.1.9.7)
-    try:
-        from pyasn1.type import univ, tag
-        from pyasn1.codec.der import encoder as der_encoder
-        
-        oids = [
-            univ.ObjectIdentifier((2, 5, 29, 17)),   # subjectAltName
-            univ.ObjectIdentifier((2, 5, 29, 15)),   # keyUsage
-            univ.ObjectIdentifier((2, 5, 29, 37)),   # extendedKeyUsage
-            univ.ObjectIdentifier((1, 2, 840, 113549, 1, 9, 7)),  # challengePassword
-        ]
-        
-        seq = univ.Sequence()
-        for i, oid in enumerate(oids):
-            seq.setComponentByPosition(i, oid)
-        
-        der_bytes = der_encoder.encode(seq)
-        b64_content = base64.b64encode(der_bytes).decode('ascii')
-        
-        return Response(
-            b64_content,
-            status=200,
-            mimetype='application/csrattrs',
-            headers={'Content-Transfer-Encoding': 'base64'}
-        )
-    except ImportError:
-        # pyasn1 not available — return hardcoded DER
-        # SEQUENCE { OID 2.5.29.17, OID 2.5.29.15, OID 2.5.29.37 }
-        der_hex = '300e0603551d110603551d0f0603551d25'
-        der_bytes = bytes.fromhex(der_hex)
-        b64_content = base64.b64encode(der_bytes).decode('ascii')
-        
-        return Response(
-            b64_content,
-            status=200,
-            mimetype='application/csrattrs',
-            headers={'Content-Transfer-Encoding': 'base64'}
-        )
+    # Request challengePassword as an OID and descriptive certificate
+    # extensions as values of an extensionRequest Attribute.
+    der_bytes = _build_csrattrs_der()
+    b64_content = base64.b64encode(der_bytes).decode('ascii')
+    return Response(
+        b64_content,
+        status=200,
+        mimetype='application/csrattrs',
+        headers={'Content-Transfer-Encoding': 'base64'}
+    )
 
 
 @bp.route('/serverkeygen', methods=['POST'])
 def server_keygen():
     """
     EST /serverkeygen - Server-side key generation (RFC 7030 §3.4).
-    Generates key pair and certificate on server.
-    Private key is encrypted using CMS EnvelopedData with the client's
-    password as a PBKDF2-derived AES key for transport security.
+    Generates key pair and certificate on server. Basic-authenticated
+    clients receive password-encrypted PKCS#8; mTLS clients receive CMS
+    SignedData protected by KeyTransRecipientInfo EnvelopedData.
     """
     # Defensive: cap body size before parsing. RSA keygen is the most
     # CPU-intensive EST endpoint, so reject obviously-bogus payloads
@@ -526,6 +577,9 @@ def server_keygen():
     too_big = _enforce_body_limit()
     if too_big is not None:
         return too_big
+    bad_content_type = _require_pkcs10_content_type()
+    if bad_content_type is not None:
+        return bad_content_type
 
     authenticated, username = _authenticate_est_client()
     if not authenticated:
@@ -556,33 +610,52 @@ def server_keygen():
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import (
-            Encoding, PrivateFormat, NoEncryption, BestAvailableEncryption, pkcs7
+            Encoding, PrivateFormat, BestAvailableEncryption
         )
         
-        # Parse CSR to get subject
-        csr_der = base64.b64decode(csr_data)
-        csr = x509.load_der_x509_csr(csr_der, default_backend())
+        # RFC 7030 §4.4.1 requires the request public key and signature to be
+        # ignored. Only the requested subject, attributes, and extensions are
+        # consumed before a fresh key pair is generated below.
+        csr = x509.load_der_x509_csr(
+            _decode_est_csr(csr_data), default_backend()
+        )
+        key_identifiers = _server_keygen_identifiers(csr)
+        mtls_cert_obj = None
+        if auth_method == 'mtls':
+            client_cert_pem = _trusted_client_cert()
+            try:
+                mtls_cert_obj = x509.load_pem_x509_certificate(
+                    client_cert_pem.encode()
+                    if isinstance(client_cert_pem, str)
+                    else client_cert_pem,
+                    default_backend(),
+                )
+            except Exception as e:
+                logger.error(f"EST serverkeygen: bad client mTLS cert: {e}")
+                return Response('Invalid client mTLS certificate', status=400)
 
-        # Proof of Possession on the supplied CSR. Even though we generate
-        # a fresh keypair below and use it for signing, an unverifiable
-        # CSR signature means we cannot trust the subject either — refuse.
-        try:
-            if not csr.is_signature_valid:
-                AuditService.log_action(
-                    action='est_serverkeygen_denied',
-                    resource_type='est',
-                    details=(
-                        f'EST /serverkeygen rejected invalid CSR signature '
-                        f'(auth={auth_method}, user={username}, ip={remote_ip})'
-                    ),
-                    success=False,
+            symmetric_id = key_identifiers.get(DECRYPT_KEY_IDENTIFIER_OID)
+            if symmetric_id is not None:
+                logger.warning(
+                    'EST serverkeygen: symmetric DecryptKeyIdentifier is unsupported'
                 )
-                return Response(
-                    'CSR signature invalid (proof of possession failed)',
-                    status=400,
+                return Response('Requested symmetric key is unavailable', status=400)
+            asymmetric_id = key_identifiers.get(
+                ASYMMETRIC_DECRYPT_KEY_IDENTIFIER_OID
+            )
+            if (
+                asymmetric_id is not None
+                and not hmac.compare_digest(
+                    asymmetric_id, _certificate_key_identifier(mtls_cert_obj)
                 )
-        except Exception:
-            return Response('CSR signature invalid', status=400)
+            ):
+                logger.warning(
+                    'EST serverkeygen: AsymmetricDecryptKeyIdentifier does not '
+                    'match the authenticated client certificate'
+                )
+                return Response('Requested asymmetric key is unavailable', status=400)
+            if not isinstance(mtls_cert_obj.public_key(), rsa.RSAPublicKey):
+                return Response('Unsupported client key transport', status=400)
 
         # RFC 7030 implies the subject in the CSR identifies the
         # enrollee. We refuse empty / whitespace-only CNs so a
@@ -623,10 +696,13 @@ def server_keygen():
             backend=default_backend()
         )
         
-        # Create new CSR with server-generated key
-        new_csr = x509.CertificateSigningRequestBuilder().subject_name(
+        # Create a new CSR with the server-generated key while retaining the
+        # subject and requested extensions (including SubjectAltName).
+        new_csr_builder = x509.CertificateSigningRequestBuilder().subject_name(
             csr.subject
-        ).sign(key, hashes.SHA256(), default_backend())
+        )
+        new_csr_builder = _copy_csr_extensions(new_csr_builder, csr)
+        new_csr = new_csr_builder.sign(key, hashes.SHA256(), default_backend())
         
         from models import SystemConfig
         validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
@@ -638,103 +714,57 @@ def server_keygen():
         
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         
-        # PKCS#7 certificate + CA chain (RFC 7030 §4.2.3)
-        certs_for_p7 = [cert]
-        chain = CAService.get_certificate_chain(ca.refid)
-        for chain_pem in chain:
-            chain_cert = x509.load_pem_x509_certificate(chain_pem.encode(), default_backend())
-            certs_for_p7.append(chain_cert)
-        
-        p7_der = pkcs7.serialize_certificates(certs_for_p7, encoding=_crypto_serialization.Encoding.DER)
-        p7_b64 = base64.b64encode(p7_der).decode()
-        
-        # Private key — encrypt with password if Basic Auth was used (RFC 7030 §4.4.2)
-        auth = request.authorization
-        if auth and auth.password:
+        # The certificate part exactly matches /simpleenroll: one certificate.
+        p7_b64 = _certs_only_base64(cert)
+
+        if auth_method == 'basic':
+            # RFC 7030 §4.4.2 permits password-encrypted PKCS#8 for clients
+            # authenticated with HTTP Basic credentials.
+            auth = request.authorization
             key_der = key.private_bytes(
                 encoding=Encoding.DER,
                 format=PrivateFormat.PKCS8,
                 encryption_algorithm=BestAvailableEncryption(auth.password.encode())
             )
+            key_content_type = 'application/pkcs8'
         else:
-            # mTLS client — encrypt with the CLIENT'S mTLS certificate public
-            # key (RFC 7030 §4.4.2). Encrypting with the *newly issued* cert's
-            # public key would be useless: the client doesn't yet have that
-            # private key (it's exactly what we're trying to deliver).
-            from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-            client_cert_pem = _trusted_client_cert()
-            if not client_cert_pem:
-                logger.error(
-                    "EST serverkeygen: mTLS branch reached without a trusted "
-                    "client cert — refusing to deliver key in the clear"
+            try:
+                key_der = build_server_generated_key_cms(
+                    key, cert, mtls_cert_obj
                 )
+            except ValueError as e:
+                logger.warning(f"EST serverkeygen: unsupported key transport: {e}")
+                return Response('Unsupported client key transport', status=400)
+            except Exception as e:
+                logger.error(f"EST serverkeygen: failed to wrap private key: {e}")
                 return Response(
-                    'Server key generation failed: client cert unavailable for key transport',
+                    'Server key generation failed: unable to encrypt private key',
                     status=500,
                 )
-            try:
-                mtls_cert_obj = x509.load_pem_x509_certificate(
-                    client_cert_pem.encode() if isinstance(client_cert_pem, str) else client_cert_pem,
-                    default_backend()
-                )
-                client_pub = mtls_cert_obj.public_key()
-            except Exception as e:
-                logger.error(f"EST serverkeygen: bad client mTLS cert: {e}")
-                return Response('Invalid client mTLS certificate', status=400)
-            key_plain = key.private_bytes(
-                encoding=Encoding.DER,
-                format=PrivateFormat.PKCS8,
-                encryption_algorithm=NoEncryption()
+            key_content_type = (
+                'application/pkcs7-mime; smime-type=server-generated-key'
             )
-            try:
-                from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-                import secrets as sec_mod
-                # AES-256-CBC wrap: encrypt key material, then encrypt AES key with RSA
-                aes_key = sec_mod.token_bytes(32)
-                aes_iv = sec_mod.token_bytes(16)
-                aes_cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv))
-                encryptor = aes_cipher.encryptor()
-                # PKCS#7 pad
-                pad_len = 16 - (len(key_plain) % 16)
-                padded = key_plain + bytes([pad_len] * pad_len)
-                encrypted_key_data = encryptor.update(padded) + encryptor.finalize()
-                # Encrypt AES key with RSA-OAEP under the client's mTLS pubkey
-                encrypted_aes_key = client_pub.encrypt(
-                    aes_key,
-                    asym_padding.OAEP(
-                        mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
-                    )
-                )
-                # Combine: IV + encrypted AES key length (2 bytes) + encrypted AES key + encrypted data
-                enc_key_len = len(encrypted_aes_key).to_bytes(2, 'big')
-                key_der = aes_iv + enc_key_len + encrypted_aes_key + encrypted_key_data
-                logger.info("EST serverkeygen: private key encrypted to client mTLS public key")
-            except Exception as e:
-                logger.error(f"EST serverkeygen: failed to encrypt private key: {e}")
-                return Response('Server key generation failed: unable to encrypt private key', status=500)
-        key_b64 = base64.b64encode(key_der).decode()
+        key_b64 = base64.b64encode(key_der).decode('ascii')
         
         # Create multipart response
-        boundary = 'est-boundary-' + serial[:8]
+        boundary = 'est-boundary-' + str(serial)[:8]
         body = f"""--{boundary}\r
-Content-Type: application/pkcs8\r
-Content-Transfer-Encoding: base64\r
-\r
-{key_b64}\r
---{boundary}\r
-Content-Type: application/pkcs7-mime; smime-type=certs-only\r
+Content-Type: {PKCS7_CERTS_ONLY}\r
 Content-Transfer-Encoding: base64\r
 \r
 {p7_b64}\r
+--{boundary}\r
+Content-Type: {key_content_type}\r
+Content-Transfer-Encoding: base64\r
+\r
+{key_b64}\r
 --{boundary}--\r
 """
         
         return Response(
             body,
             status=200,
-            mimetype=f'{MULTIPART_MIXED}; boundary={boundary}'
+            content_type=f'{MULTIPART_MIXED}; boundary={boundary}'
         )
         
     except Exception as e:

@@ -115,24 +115,8 @@ def scep_endpoint():
 
 
 def handle_get_ca_caps():
-    """Handle GetCACaps operation - return CA capabilities.
-
-    The list intentionally omits SHA-1 (deprecated, MUST NOT be used to sign
-    new certs per RFC 8894 §3.5.2), DES (insecure, rejected on input), and
-    SCEPStandard (would require the full RFC 8894 conformance set, including
-    failInfoText, which we don't yet implement).
-    """
-    capabilities = [
-        "POSTPKIOperation",
-        "SHA-256",
-        "SHA-384",
-        "SHA-512",
-        "AES",
-        "Renewal",
-        "GetNextCACert",
-    ]
-
-    response = make_response("\n".join(capabilities))
+    """Handle GetCACaps operation - return implemented RFC 8894 capabilities."""
+    response = make_response("\n".join(SCEPService.CAPABILITIES))
     response.headers['Content-Type'] = 'text/plain'
     return response
 
@@ -145,14 +129,15 @@ def handle_get_ca_cert():
         return make_error_response(error, 500)
 
     try:
-        # Always return the single CA cert as DER with application/x-x509-ca-cert.
-        # application/x-x509-ca-ra-cert is only correct when a separate RA cert
-        # exists (distinct from the CA cert); UCM uses the CA itself as the RA,
-        # so that content-type causes Apple clients to fail validation looking for
-        # dedicated RA signing/encryption certs that aren't there (-67731).
-        ca_cert_der = service.get_ca_cert()
-        response = make_response(ca_cert_der)
-        response.headers['Content-Type'] = 'application/x-x509-ca-cert'
+        if service.ca.caref:
+            ca_data = create_degenerate_pkcs7(service.get_ca_chain())
+            content_type = 'application/x-x509-ca-ra-cert'
+        else:
+            ca_data = service.get_ca_cert()
+            content_type = 'application/x-x509-ca-cert'
+
+        response = make_response(ca_data)
+        response.headers['Content-Type'] = content_type
         return response
 
     except Exception as e:

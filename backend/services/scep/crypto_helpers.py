@@ -7,6 +7,7 @@ from typing import Optional
 
 import asn1crypto.cms
 import asn1crypto.core
+import asn1crypto.crl
 import asn1crypto.x509
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
@@ -14,30 +15,33 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 
 
-def create_degenerate_pkcs7(certs: list) -> bytes:
-    """
-    Build a degenerate (certs-only) PKCS#7 SignedData structure.
-
-    Args:
-        certs: List of cryptography.x509.Certificate objects
-
-    Returns:
-        DER-encoded ContentInfo wrapping the degenerate SignedData
-    """
+def create_degenerate_pkcs7(certs: list, crls: Optional[list] = None) -> bytes:
+    """Build a degenerate PKCS#7 SignedData carrying certificates or CRLs."""
     cert_ders = [
         asn1crypto.x509.Certificate.load(
             cert.public_bytes(serialization.Encoding.DER)
         )
         for cert in certs
     ]
+    crl_ders = [
+        asn1crypto.crl.CertificateList.load(
+            crl.public_bytes(serialization.Encoding.DER)
+        )
+        for crl in (crls or [])
+    ]
 
-    signed_data = asn1crypto.cms.SignedData({
+    signed_data_fields = {
         'version': 1,
         'digest_algorithms': [],
         'encap_content_info': {'content_type': 'data'},
-        'certificates': cert_ders,
         'signer_infos': [],
-    })
+    }
+    if cert_ders:
+        signed_data_fields['certificates'] = cert_ders
+    if crl_ders:
+        signed_data_fields['crls'] = crl_ders
+
+    signed_data = asn1crypto.cms.SignedData(signed_data_fields)
 
     content_info = asn1crypto.cms.ContentInfo({
         'content_type': 'signed_data',
