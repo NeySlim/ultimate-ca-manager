@@ -503,6 +503,13 @@ def directory():
         'caaIdentities': [get_acme_public_host(request)],
         'externalAccountRequired': eab_required
     }
+
+    # ACME Profiles Extension (draft-ietf-acme-profiles): advertise the
+    # selectable issuance profiles, only when the operator configured some.
+    from services.acme import profiles as acme_profiles
+    advertised_profiles = acme_profiles.directory_meta()
+    if advertised_profiles:
+        directory_data['meta']['profiles'] = advertised_profiles
     
     return acme_response(directory_data)
 
@@ -1031,7 +1038,19 @@ def new_order():
         # RFC 9773 §5 allows replacement orders to bypass rate limits. UCM
         # currently has no ACME new-order rate limit; storing ``replaces``
         # preserves the signal for a future limiter to exempt these orders.
-        
+
+        # ACME Profiles Extension: an explicitly requested profile must be one
+        # the directory advertises, else the order is refused (a silent
+        # fallback would issue under a policy the client did not ask for).
+        profile = payload.get('profile')
+        if profile is not None:
+            from services.acme import profiles as acme_profiles
+            if not isinstance(profile, str) or not acme_profiles.is_known(profile):
+                return acme_error(
+                    'invalidProfile',
+                    'The requested certificate profile is not offered by this server',
+                )
+
         # Parse optional dates
         not_before = payload.get('notBefore')
         not_after = payload.get('notAfter')
@@ -1048,6 +1067,7 @@ def new_order():
             not_before=not_before,
             not_after=not_after,
             replaces=replaces,
+            profile=profile,
         )
         
         # Build response
@@ -1071,7 +1091,9 @@ def new_order():
             response_data["notBefore"] = order.not_before.isoformat() + 'Z'
         if order.not_after:
             response_data["notAfter"] = order.not_after.isoformat() + 'Z'
-        
+        if order.profile:
+            response_data["profile"] = order.profile
+
         response = acme_response(response_data, 201)
         response.headers['Location'] = order_url
 
@@ -1136,6 +1158,8 @@ def order_info(order_id: str):
         "finalize": f"{order_url}/finalize"
     }
     
+    if order.profile:
+        response_data["profile"] = order.profile
     if order.error and order.status == 'invalid':
         response_data["error"] = (
             json.loads(order.error) if isinstance(order.error, str) else order.error

@@ -22,16 +22,18 @@ class OrderMixin:
         not_before: Optional[datetime] = None,
         not_after: Optional[datetime] = None,
         replaces: Optional[str] = None,
+        profile: Optional[str] = None,
     ) -> AcmeOrder:
         """Create a new certificate order
-        
+
         Args:
             account_id: ACME account ID
             identifiers: List of identifiers [{"type": "dns", "value": "example.com"}]
             not_before: Requested validity start (optional)
             not_after: Requested validity end (optional)
             replaces: RFC 9773 CertID replaced by this order (optional)
-            
+            profile: Selected ACME certificate profile name (optional)
+
         Returns:
             AcmeOrder object
         """
@@ -42,6 +44,7 @@ class OrderMixin:
             not_before=not_before,
             not_after=not_after,
             replaces=replaces,
+            profile=profile,
             expires=utc_now() + timedelta(days=7)
         )
         

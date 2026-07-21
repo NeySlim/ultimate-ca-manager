@@ -401,12 +401,18 @@ class IssuanceMixin:
         try:
             from services.cert_service import CertificateService
             
+            # Issuance parameters come from the order's selected ACME profile
+            # (draft-ietf-acme-profiles); with no profile these are UCM's
+            # historical ACME defaults (90 days, sha256).
+            from services.acme import profiles as acme_profiles
+            params = acme_profiles.issuance_params(getattr(order, 'profile', None))
+
             signed_cert = CertificateService.sign_csr(
                 cert_id=cert.id,
                 caref=ca.refid,
                 cert_type='server_cert',
-                validity_days=90,  # ACME certificates typically 90 days
-                digest='sha256',
+                validity_days=params['validity_days'],
+                digest=params['digest'],
                 username='acme'
             )
             

@@ -65,6 +65,7 @@ class AcmeOrder(db.Model):
     not_before = db.Column(db.DateTime)  # Requested validity start
     not_after = db.Column(db.DateTime)   # Requested validity end
     replaces = db.Column(db.String(255), index=True)  # RFC 9773 replacement CertID
+    profile = db.Column(db.String(64))  # ACME Profiles Extension: selected profile name
     
     error = db.Column(db.Text)  # JSON error object if status=invalid
     csr = db.Column(db.Text)  # Certificate Signing Request (PEM)
