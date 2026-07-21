@@ -293,10 +293,8 @@ def require_auth(permissions=None):
             auth_result = auth_manager.authenticate_request(request)
             
             if not auth_result:
-                return jsonify({
-                    'error': 'Unauthorized',
-                    'message': 'Authentication required'
-                }), 401
+                from utils.response import error_response
+                return error_response('Authentication required', 401)
 
             # Forced-2FA-enrolment gate (#141): a session flagged for mandatory
             # enrolment may only reach the enrolment endpoints (and logout) until

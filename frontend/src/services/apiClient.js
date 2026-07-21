@@ -43,8 +43,11 @@ const HTTP_ERROR_MESSAGES = {
  * Priority: backend message > status-code message > generic fallback.
  */
 function buildErrorMessage(status, data, fallback = 'Request failed') {
+  // Backend errors are an RFC 7807 problem document that also carries the
+  // legacy keys: `message` (legacy) and `detail` (7807) hold the same text.
+  // `data.error` is a boolean in that shape, so it must never be used as text.
   const backendMsg = (typeof data === 'object' && data !== null)
-    ? (data.message || data.error)
+    ? (data.message || data.detail || (typeof data.error === 'string' ? data.error : null))
     : null
   return backendMsg || HTTP_ERROR_MESSAGES[status] || fallback
 }

@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
+- **RFC 7807 problem details on API errors** — error responses now carry the standard `type`, `title`, `status`, `detail` and `instance` members and are served as `application/problem+json`. **Not a breaking change:** the historical `error`, `message` and `code` keys are still present alongside them, so existing API clients and integrations keep working unchanged. Authentication, permission and unrouted-path errors follow the same shape as handler errors.
 - **ACME certificate profiles** (draft-ietf-acme-profiles) — the directory can advertise named issuance profiles under `meta.profiles`, and clients select one with the `profile` field in newOrder; the selected profile drives the issued certificate's validity and signature digest, and is echoed on the order. Opt-in: configure the `acme_profiles` system setting (a JSON map of name → `description`/`validity_days`/`digest`); with none configured the directory advertises no profiles and behaviour is unchanged. An unknown or malformed profile is rejected with `invalidProfile` (migration 064).
 
 ## [2.200] - 2026-07-21

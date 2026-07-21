@@ -114,15 +114,13 @@ def require_permission(permission: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            from utils.response import error_response
             if not hasattr(g, 'current_user') or not g.current_user:
-                return jsonify({'error': 'Unauthorized', 'message': 'Authentication required'}), 401
-            
+                return error_response('Authentication required', 401)
+
             user_role = g.current_user.role
             if not has_permission(user_role, permission):
-                return jsonify({
-                    'error': 'Forbidden',
-                    'message': f'Permission required: {permission}'
-                }), 403
+                return error_response(f'Permission required: {permission}', 403)
             
             return f(*args, **kwargs)
         return decorated_function

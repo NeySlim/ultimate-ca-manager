@@ -917,7 +917,12 @@ def create_app(config_name=None):
     # Ensure ALL errors return JSON (not HTML) for API requests
     
     def _json_error(code, message):
-        return flask_jsonify({'error': True, 'code': code, 'message': message}), code
+        # Same RFC 7807 + legacy superset as utils.response.error_response, so
+        # framework-level errors are shaped like handler-level ones.
+        from utils.response import build_problem, PROBLEM_CONTENT_TYPE
+        response = flask_jsonify(build_problem(message, code))
+        response.mimetype = PROBLEM_CONTENT_TYPE
+        return response, code
     
     @app.errorhandler(400)
     def handle_400(e):
