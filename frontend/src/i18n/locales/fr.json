@@ -514,7 +514,15 @@
     "caAccountDeleted": "Compte CA ACME supprimé",
     "caAccountDefaultSet": "CA ACME par défaut mise à jour",
     "caAccountRegistered": "Compte CA ACME enregistré",
-    "registrationFailed": "Échec de l'enregistrement"
+    "registrationFailed": "Échec de l'enregistrement",
+    "profiles": "Profils de certificat",
+    "profilesDesc": "Politiques d'émission nommées annoncées dans l'annuaire ACME. Les clients peuvent en choisir une lors d'une commande ; laisser vide pour n'en annoncer aucune.",
+    "profileName": "Nom",
+    "profileValidity": "Validité (jours)",
+    "profileDigest": "Empreinte",
+    "profileNamePlaceholder": "ex. courte-duree",
+    "profileDescriptionPlaceholder": "Affiché aux clients ACME",
+    "addProfile": "Ajouter un profil"
   },
   "audit": {
     "event": "Événement",
@@ -3904,7 +3912,11 @@
     "groups": {
       "management": "Gestion",
       "settings": "Paramètres"
-    }
+    },
+    "labels": "Libellés de CA",
+    "labelsDesc": "Servir des CA supplémentaires sous /.well-known/est/<libellé>/. Seules les CA listées ici sont accessibles ; un libellé inconnu est rejeté.",
+    "labelName": "Libellé",
+    "labelPlaceholder": "ex. agence"
   },
   "discovery": {
     "aboutDiscovery": "À propos de la découverte",

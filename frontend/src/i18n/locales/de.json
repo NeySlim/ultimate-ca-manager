@@ -1546,7 +1546,15 @@
     "caAccountDeleted": "ACME-CA-Konto gelöscht",
     "caAccountDefaultSet": "Standard-ACME-CA aktualisiert",
     "caAccountRegistered": "ACME-CA-Konto registriert",
-    "registrationFailed": "Registrierung fehlgeschlagen"
+    "registrationFailed": "Registrierung fehlgeschlagen",
+    "profiles": "Zertifikatsprofile",
+    "profilesDesc": "Benannte Ausstellungsrichtlinien, die im ACME-Verzeichnis angekündigt werden. Clients können bei einer Bestellung eines auswählen; leer lassen, um keines anzukündigen.",
+    "profileName": "Name",
+    "profileValidity": "Gültigkeit (Tage)",
+    "profileDigest": "Hash",
+    "profileNamePlaceholder": "z. B. kurzlebig",
+    "profileDescriptionPlaceholder": "Für ACME-Clients sichtbar",
+    "addProfile": "Profil hinzufügen"
   },
   "scep": {
     "title": "SCEP-Protokoll",
@@ -3901,7 +3909,11 @@
     "groups": {
       "management": "Verwaltung",
       "settings": "Einstellungen"
-    }
+    },
+    "labels": "CA-Labels",
+    "labelsDesc": "Weitere CAs unter /.well-known/est/<label>/ bereitstellen. Nur die hier aufgeführten CAs sind erreichbar; ein unbekanntes Label wird abgelehnt.",
+    "labelName": "Label",
+    "labelPlaceholder": "z. B. filiale"
   },
   "discovery": {
     "aboutDiscovery": "Über Entdeckung",

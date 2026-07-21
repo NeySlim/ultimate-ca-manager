@@ -1546,7 +1546,15 @@
     "caAccountDeleted": "ACME CA アカウントを削除しました",
     "caAccountDefaultSet": "デフォルトの ACME CA を更新しました",
     "caAccountRegistered": "ACME CA アカウントを登録しました",
-    "registrationFailed": "登録に失敗しました"
+    "registrationFailed": "登録に失敗しました",
+    "profiles": "証明書プロファイル",
+    "profilesDesc": "ACME ディレクトリで公開される名前付き発行ポリシーです。クライアントは注文時に選択できます。空にすると公開されません。",
+    "profileName": "名前",
+    "profileValidity": "有効期間（日）",
+    "profileDigest": "ダイジェスト",
+    "profileNamePlaceholder": "例: shortlived",
+    "profileDescriptionPlaceholder": "ACME クライアントに表示されます",
+    "addProfile": "プロファイルを追加"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -3901,7 +3909,11 @@
     "groups": {
       "management": "管理",
       "settings": "設定"
-    }
+    },
+    "labels": "CA ラベル",
+    "labelsDesc": "/.well-known/est/<label>/ で追加の CA を提供します。ここに登録された CA のみ利用可能で、未知のラベルは拒否されます。",
+    "labelName": "ラベル",
+    "labelPlaceholder": "例: branch-office"
   },
   "discovery": {
     "aboutDiscovery": "ディスカバリーについて",

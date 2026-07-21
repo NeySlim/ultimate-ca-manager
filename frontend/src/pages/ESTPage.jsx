@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Globe, Gear, Copy, Info, ShieldCheck, Plugs, Warning, CheckCircle,
-  ChartBar, Lock, ArrowsClockwise
+  ChartBar, Lock, ArrowsClockwise, Tag
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -18,6 +18,7 @@ import { estService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+import MappingEditor from './settings/MappingEditor'
 
 export default function ESTPage() {
   const { t } = useTranslation()
@@ -43,7 +44,15 @@ export default function ESTPage() {
         casService.getAll(),
         estService.getStats()
       ])
-      setConfig(configRes.data || {})
+      // The API returns labels enriched ({label: {ca_refid, ca_name}}); the
+      // editor and the PATCH both work on the flat {label: ca_refid} shape.
+      const rawConfig = configRes.data || {}
+      const flatLabels = Object.fromEntries(
+        Object.entries(rawConfig.labels || {}).map(
+          ([label, v]) => [label, (v && typeof v === 'object') ? (v.ca_refid || '') : v]
+        )
+      )
+      setConfig({ ...rawConfig, labels: flatLabels })
       setCas(casRes.data || [])
       setStats(statsRes.data || { total: 0, successful: 0, failed: 0 })
     } catch (error) {
@@ -193,6 +202,24 @@ export default function ESTPage() {
               max="3650"
               disabled={!config.enabled}
               helperText={t('est.validityDaysHelp')}
+            />
+          </Card>
+
+          <Card className="p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Tag size={16} />
+              {t('est.labels')}
+            </h3>
+            <p className="text-xs text-text-secondary">{t('est.labelsDesc')}</p>
+            <MappingEditor
+              value={config.labels || {}}
+              onChange={(labels) => setConfig({ ...config, labels })}
+              keyLabel={t('est.labelName')}
+              valueLabel={t('common.issuingCA')}
+              keyPlaceholder={t('est.labelPlaceholder')}
+              valueOptions={cas
+                .filter(ca => ca.refid)
+                .map(ca => ({ value: ca.refid, label: ca.name || ca.subject }))}
             />
           </Card>
 

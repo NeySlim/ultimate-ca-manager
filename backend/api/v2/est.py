@@ -9,9 +9,14 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, SystemConfig, CA, AuditLog
 from services.audit_service import AuditService
+import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+# Same safe charset the EST protocol layer accepts for a path label.
+_EST_LABEL_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
 
 bp = Blueprint('est_v2', __name__)
 
@@ -45,6 +50,21 @@ def get_est_config():
             ca_id = ca.id
             ca_name = ca.descr
 
+    # RFC 7030 §3.2.2 CA labels: {label: ca_refid}. Enriched with the CA name
+    # so the UI can show which authority each label serves.
+    labels = {}
+    try:
+        raw_labels = json.loads(get_config('est_labels', '') or '{}')
+        if isinstance(raw_labels, dict):
+            for label, refid in raw_labels.items():
+                ca_row = CA.query.filter_by(refid=refid).first()
+                labels[label] = {
+                    'ca_refid': refid,
+                    'ca_name': ca_row.descr if ca_row else None,
+                }
+    except (TypeError, ValueError):
+        logger.warning('Invalid est_labels configuration; reporting none')
+
     return success_response(data={
         'enabled': get_config('est_enabled', 'false') == 'true',
         'ca_refid': ca_refid,
@@ -53,6 +73,7 @@ def get_est_config():
         'username': get_config('est_username', ''),
         'password_set': bool(get_config('est_password', '')),
         'validity_days': int(get_config('est_validity_days', '365') or 365),
+        'labels': labels,
     })
 
 
@@ -93,6 +114,31 @@ def update_est_config():
         if vd < 1 or vd > 3650:
             return error_response('validity_days must be between 1 and 3650', 400)
         set_config('est_validity_days', str(vd))
+
+    if 'labels' in data:
+        # RFC 7030 §3.2.2 CA labels. Accepts {label: ca_refid} or the enriched
+        # {label: {ca_refid: ...}} shape the GET returns, so a client can round
+        # -trip what it read. Every CA must exist: a label pointing at nothing
+        # would 404 at enrollment time with no hint of the misconfiguration.
+        labels_in = data['labels'] or {}
+        if not isinstance(labels_in, dict):
+            return error_response('labels must be an object', 400)
+        if len(labels_in) > 50:
+            return error_response('too many EST labels (max 50)', 400)
+
+        cleaned = {}
+        for label, value in labels_in.items():
+            if not isinstance(label, str) or not _EST_LABEL_RE.match(label):
+                return error_response(
+                    f"Invalid EST label '{str(label)[:20]}': use letters, digits, "
+                    "dot, dash or underscore (max 64 characters)", 400)
+            refid = value.get('ca_refid') if isinstance(value, dict) else value
+            if not isinstance(refid, str) or not refid:
+                return error_response(f"Label '{label}' has no CA", 400)
+            if not CA.query.filter_by(refid=refid).first():
+                return error_response(f"Label '{label}': CA not found", 404)
+            cleaned[label] = refid
+        set_config('est_labels', json.dumps(cleaned))
 
     ok, _err = safe_commit(logger, "Failed to update EST configuration")
     if not ok:

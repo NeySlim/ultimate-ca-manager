@@ -1546,7 +1546,15 @@
     "caAccountDeleted": "Обліковий запис ACME CA видалено",
     "caAccountDefaultSet": "Стандартний ACME CA оновлено",
     "caAccountRegistered": "Обліковий запис ACME CA зареєстровано",
-    "registrationFailed": "Помилка реєстрації"
+    "registrationFailed": "Помилка реєстрації",
+    "profiles": "Профілі сертифікатів",
+    "profilesDesc": "Іменовані політики випуску, що оголошуються в каталозі ACME. Клієнти можуть обрати одну під час замовлення; залиште порожнім, щоб не оголошувати жодної.",
+    "profileName": "Назва",
+    "profileValidity": "Термін дії (днів)",
+    "profileDigest": "Хеш",
+    "profileNamePlaceholder": "напр. shortlived",
+    "profileDescriptionPlaceholder": "Показується клієнтам ACME",
+    "addProfile": "Додати профіль"
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -3901,7 +3909,11 @@
     "groups": {
       "management": "Управління",
       "settings": "Налаштування"
-    }
+    },
+    "labels": "Мітки ЦС",
+    "labelsDesc": "Обслуговувати додаткові ЦС за адресою /.well-known/est/<мітка>/. Доступні лише перелічені тут ЦС; невідома мітка відхиляється.",
+    "labelName": "Мітка",
+    "labelPlaceholder": "напр. filiya"
   },
   "discovery": {
     "aboutDiscovery": "Про виявлення",

@@ -1546,7 +1546,15 @@
     "caAccountDeleted": "已删除 ACME CA 账户",
     "caAccountDefaultSet": "已更新默认 ACME CA",
     "caAccountRegistered": "已注册 ACME CA 账户",
-    "registrationFailed": "注册失败"
+    "registrationFailed": "注册失败",
+    "profiles": "证书配置文件",
+    "profilesDesc": "在 ACME 目录中公布的命名签发策略。客户端下单时可选择其一；留空则不公布任何配置文件。",
+    "profileName": "名称",
+    "profileValidity": "有效期（天）",
+    "profileDigest": "摘要",
+    "profileNamePlaceholder": "例如 shortlived",
+    "profileDescriptionPlaceholder": "向 ACME 客户端显示",
+    "addProfile": "添加配置文件"
   },
   "scep": {
     "title": "SCEP协议",
@@ -3901,7 +3909,11 @@
     "groups": {
       "management": "管理",
       "settings": "设置"
-    }
+    },
+    "labels": "CA 标签",
+    "labelsDesc": "在 /.well-known/est/<label>/ 下提供其他 CA。仅此处列出的 CA 可访问；未知标签将被拒绝。",
+    "labelName": "标签",
+    "labelPlaceholder": "例如 branch-office"
   },
   "discovery": {
     "aboutDiscovery": "关于发现",

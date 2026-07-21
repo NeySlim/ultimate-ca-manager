@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.acme_public_url import get_acme_public_base
+from services.acme import profiles as acme_profiles
 
 from . import bp, logger
 
@@ -137,6 +138,9 @@ def get_acme_settings():
         'revoke_on_renewal': revoke_on_renewal,
         'superseded_count': superseded_count,
         'terms_of_service': terms_of_service,
+        # ACME Profiles Extension (draft-ietf-acme-profiles). Returned
+        # normalised (defaults filled in) so the UI shows what clients get.
+        'profiles': acme_profiles.get_profiles(),
     })
 
 
@@ -184,6 +188,22 @@ def update_acme_settings():
             })
         else:
             tos_cfg.value = json.dumps({'title': '', 'body': ''})
+
+    # Update certificate profiles (draft-ietf-acme-profiles)
+    if 'profiles' in data:
+        profiles_value = data['profiles'] or {}
+        valid, err = acme_profiles.validate_config(profiles_value)
+        if not valid:
+            return error_response(f'Invalid profiles: {err}', 400)
+        profiles_cfg = SystemConfig.query.filter_by(
+            key=acme_profiles.CONFIG_KEY).first()
+        if not profiles_cfg:
+            profiles_cfg = SystemConfig(
+                key=acme_profiles.CONFIG_KEY,
+                description='ACME certificate profiles (draft-ietf-acme-profiles)',
+            )
+            db.session.add(profiles_cfg)
+        profiles_cfg.value = json.dumps(profiles_value)
 
     ok, _err = safe_commit(logger, "Failed to update ACME settings")
     if not ok:

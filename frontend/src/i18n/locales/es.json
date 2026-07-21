@@ -1546,7 +1546,15 @@
     "caAccountDeleted": "Cuenta de CA ACME eliminada",
     "caAccountDefaultSet": "CA ACME predeterminada actualizada",
     "caAccountRegistered": "Cuenta de CA ACME registrada",
-    "registrationFailed": "Error de registro"
+    "registrationFailed": "Error de registro",
+    "profiles": "Perfiles de certificado",
+    "profilesDesc": "Políticas de emisión con nombre anunciadas en el directorio ACME. Los clientes pueden elegir una al crear un pedido; dejar vacío para no anunciar ninguna.",
+    "profileName": "Nombre",
+    "profileValidity": "Validez (días)",
+    "profileDigest": "Resumen",
+    "profileNamePlaceholder": "p. ej. corta-duracion",
+    "profileDescriptionPlaceholder": "Visible para los clientes ACME",
+    "addProfile": "Añadir perfil"
   },
   "scep": {
     "title": "Protocolo SCEP",
@@ -3901,7 +3909,11 @@
     "groups": {
       "management": "Gestión",
       "settings": "Configuración"
-    }
+    },
+    "labels": "Etiquetas de CA",
+    "labelsDesc": "Servir CAs adicionales en /.well-known/est/<etiqueta>/. Solo las CAs listadas aquí son accesibles; una etiqueta desconocida se rechaza.",
+    "labelName": "Etiqueta",
+    "labelPlaceholder": "p. ej. sucursal"
   },
   "discovery": {
     "aboutDiscovery": "Acerca del descubrimiento",

@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
 import { publicBaseUrl } from '../../lib/utils'
-import { FloppyDisk, Globe, ArrowsClockwise, Lightning, FileText, PencilSimple } from '@phosphor-icons/react'
+import { FloppyDisk, Globe, ArrowsClockwise, Lightning, FileText, PencilSimple, Stack } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { Select, Button, HelpCard, CompactSection, CompactGrid, CompactField, Input, Modal } from '../../components'
 import { useState, useMemo } from 'react'
+import ProfilesEditor from './ProfilesEditor'
 
 /** Render markdown-like preview: paragraphs, bold, italic, auto-links */
 function renderTosPreview(body) {
@@ -71,6 +72,17 @@ export default function ConfigTab({ acmeSettings, cas, updateSetting, onSaveConf
               value: ca.id.toString(), 
               label: ca.name || ca.common_name 
             }))}
+          />
+        </div>
+      </CompactSection>
+
+      <CompactSection title={t('acme.profiles')} icon={Stack}>
+        <div className="space-y-3">
+          <p className="text-xs text-text-secondary">{t('acme.profilesDesc')}</p>
+          <ProfilesEditor
+            value={acmeSettings.profiles || {}}
+            onChange={(profiles) => updateSetting('profiles', profiles)}
+            disabled={!canWrite}
           />
         </div>
       </CompactSection>

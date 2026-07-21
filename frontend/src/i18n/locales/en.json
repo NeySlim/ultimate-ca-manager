@@ -1546,7 +1546,15 @@
     "caAccountDeleted": "ACME CA account deleted",
     "caAccountDefaultSet": "Default ACME CA updated",
     "caAccountRegistered": "ACME CA account registered",
-    "registrationFailed": "Registration failed"
+    "registrationFailed": "Registration failed",
+    "profiles": "Certificate profiles",
+    "profilesDesc": "Named issuance policies advertised in the ACME directory. Clients may select one when placing an order; leave empty to advertise none.",
+    "profileName": "Name",
+    "profileValidity": "Validity (days)",
+    "profileDigest": "Digest",
+    "profileNamePlaceholder": "e.g. shortlived",
+    "profileDescriptionPlaceholder": "Shown to ACME clients",
+    "addProfile": "Add profile"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -3904,7 +3912,11 @@
     "groups": {
       "management": "Management",
       "settings": "Settings"
-    }
+    },
+    "labels": "CA labels",
+    "labelsDesc": "Serve additional CAs under /.well-known/est/<label>/. Only the CAs listed here are reachable; an unknown label is rejected.",
+    "labelName": "Label",
+    "labelPlaceholder": "e.g. branch-office"
   },
   "discovery": {
     "aboutDiscovery": "About Discovery",

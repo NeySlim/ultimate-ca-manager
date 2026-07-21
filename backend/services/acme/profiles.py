@@ -89,6 +89,54 @@ def _sanitize(name, spec):
     }
 
 
+def validate_config(obj):
+    """Validate an operator-supplied profile map before storing it.
+
+    Returns ``(True, None)`` or ``(False, error_message)``. Unlike the lenient
+    read path (which silently drops bad entries so a bad row can never break
+    issuance), writes are strict so the operator gets told what is wrong.
+    """
+    if not isinstance(obj, dict):
+        return False, 'profiles must be an object'
+    if len(obj) > 50:
+        return False, 'too many profiles (max 50)'
+
+    for name, spec in obj.items():
+        if not isinstance(name, str) or not name:
+            return False, 'profile names must be non-empty strings'
+        if len(name) > _MAX_NAME_LEN:
+            return False, f"profile name '{name[:20]}…' is too long (max {_MAX_NAME_LEN})"
+        if not isinstance(spec, dict):
+            return False, f"profile '{name}' must be an object"
+
+        description = spec.get('description')
+        if description is not None and not isinstance(description, str):
+            return False, f"profile '{name}': description must be a string"
+        if isinstance(description, str) and len(description) > 255:
+            return False, f"profile '{name}': description too long (max 255)"
+
+        if 'validity_days' in spec:
+            try:
+                validity = int(spec['validity_days'])
+            except (TypeError, ValueError):
+                return False, f"profile '{name}': validity_days must be an integer"
+            if validity < 1 or validity > _MAX_VALIDITY_DAYS:
+                return False, (
+                    f"profile '{name}': validity_days must be between 1 "
+                    f"and {_MAX_VALIDITY_DAYS}"
+                )
+
+        if 'digest' in spec:
+            digest = spec['digest']
+            if not isinstance(digest, str) or digest.lower() not in _ALLOWED_DIGESTS:
+                return False, (
+                    f"profile '{name}': digest must be one of "
+                    f"{', '.join(_ALLOWED_DIGESTS)}"
+                )
+
+    return True, None
+
+
 def get_profiles():
     """Return {name: {description, validity_days, digest}} for valid profiles."""
     profiles = {}
