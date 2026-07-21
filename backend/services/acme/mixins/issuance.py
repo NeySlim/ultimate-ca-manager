@@ -129,7 +129,11 @@ class IssuanceMixin:
                     return False, f"CAA check failed: {caa_reason}"
                 logger.debug(f"CAA check passed for {order_domains}: {caa_reason}")
             except ImportError:
-                logger.debug("dns.resolver not available, skipping CAA check")
+                # dnspython is a hard dependency; if it's genuinely missing we
+                # cannot check CAA, and silently skipping would let issuance
+                # proceed against a CAA record that forbids it. Fail closed.
+                logger.error("CAA check unavailable: dns.resolver import failed")
+                return False, "CAA check failed: DNS resolver unavailable"
             except Exception as e:
                 logger.warning(f"CAA check error: {e}")
                 return False, "CAA check failed: DNS lookup error"

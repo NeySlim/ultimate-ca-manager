@@ -288,6 +288,44 @@ class TestCsrExtensionPolicy:
         bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
         assert bc.ca is True
 
+    @staticmethod
+    def _eku_csr(ekus):
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        k = rsa.generate_private_key(65537, 2048)
+        return (x509.CertificateSigningRequestBuilder()
+                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'eku.example.com')]))
+                .add_extension(x509.ExtendedKeyUsage(ekus), critical=False)
+                .sign(k, hashes.SHA256()))
+
+    def test_leaf_csr_cannot_obtain_ocsp_signing_or_timestamping_eku(self):
+        """A protocol enrollee (ACME/EST) must not mint an OCSP delegated-
+        responder or timestamping cert by putting those EKUs in its CSR —
+        they would let it speak for the whole CA."""
+        from cryptography import x509
+        from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID
+        from cryptography.hazmat.primitives import serialization
+        from services.trust_store import TrustStoreService
+        ca_cert, ca_key = self._ca()
+        csr = self._eku_csr([
+            ExtendedKeyUsageOID.SERVER_AUTH,
+            ExtendedKeyUsageOID.OCSP_SIGNING,
+            ExtendedKeyUsageOID.TIME_STAMPING,
+        ])
+        pem = TrustStoreService.sign_csr(
+            csr_pem=csr.public_bytes(serialization.Encoding.PEM),
+            ca_cert=ca_cert, ca_private_key=ca_key, validity_days=90,
+            cert_type='server_cert')
+        cert = x509.load_pem_x509_certificate(pem if isinstance(pem, bytes) else pem.encode())
+        eku = cert.extensions.get_extension_for_oid(
+            ExtensionOID.EXTENDED_KEY_USAGE).value
+        oids = set(eku)
+        assert ExtendedKeyUsageOID.SERVER_AUTH in oids
+        assert ExtendedKeyUsageOID.OCSP_SIGNING not in oids
+        assert ExtendedKeyUsageOID.TIME_STAMPING not in oids
+
 
 class TestScepChallengeGuard:
     """RFC 8894 §2.4: no challengePassword + auto-approve must not auto-issue.

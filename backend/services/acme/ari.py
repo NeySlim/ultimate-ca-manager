@@ -101,6 +101,29 @@ def has_valid_replacement(certid: str) -> bool:
     ).first() is not None
 
 
+def certid_is_owned_by_account(certid: str, account_id: str) -> bool:
+    """Return whether ``certid`` (RFC 9773 CertID) resolves to a certificate
+    that this ACME account was issued through a prior order.
+
+    RFC 9773 §5: a replacement order's ``replaces`` must identify a certificate
+    the requesting account holds. Without this check, account A could name
+    account B's certificate, and completing the order would push B's client to
+    renew immediately (its ARI window flips to the past). Returns False for an
+    unparseable/unknown certid or one belonging to another account.
+    """
+    parsed = parse_certid(certid)
+    if parsed is None:
+        return False
+    aki_hex, serial_int = parsed
+    cert = find_certificate(aki_hex, serial_int)
+    if cert is None:
+        return False
+    return AcmeOrder.query.filter_by(
+        account_id=account_id,
+        certificate_id=cert.id,
+    ).first() is not None
+
+
 def suggested_window(
     cert: Certificate,
     renew_before_days: Optional[int] = None,

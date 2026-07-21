@@ -355,8 +355,12 @@ class WebAuthnService:
             
         except Exception as e:
             db.session.rollback()
+            # A non-increasing sign counter (cloned/replayed authenticator) is
+            # surfaced by the verifier as an exception here — log the detail
+            # (incl. possible clone detection) but never leak the library's
+            # message to the client (generic-error rule).
             logger.error(f"WebAuthn auth error: {str(e)}", exc_info=True)
-            return False, f"Authentication failed: {str(e)}", None
+            return False, "Authentication failed", None
     
     @staticmethod
     def get_user_credentials(user_id: int) -> List[WebAuthnCredential]:

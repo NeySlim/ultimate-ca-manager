@@ -623,9 +623,13 @@ class SCEPService:
         try:
             requested = asn1crypto.cms.IssuerAndSerialNumber.load(message_data)
             ca_asn1 = asn1crypto.x509.Certificate.load(self.get_ca_cert())
+            # RFC 8894 §4.6: the issuer name identifies the CA whose CRL is
+            # requested; the serial is that of the certificate whose status is
+            # being checked (NOT the CA's own serial). Match on the issuer DN
+            # only — UCM serves the single CRL for that CA regardless of which
+            # leaf serial the client cited.
             identifies_ca = (
-                requested["issuer"].dump() == ca_asn1.issuer.dump()
-                and requested["serial_number"].native == self.ca_cert.serial_number
+                requested["issuer"].dump() == ca_asn1.subject.dump()
             )
         except Exception as e:
             logger.warning(f"SCEP GetCRL: malformed IssuerAndSerialNumber: {e}")
@@ -919,6 +923,21 @@ class SCEPService:
         cert_refid = str(uuid.uuid4())
         public_key = csr.public_key()
 
+        # Enforce the CA chain's NameConstraints on the CSR's subject + SANs
+        # (RFC 5280 §4.2.1.10). SCEP is unauthenticated beyond the challenge,
+        # so a constrained CA must not be tricked into issuing out-of-scope
+        # names here just as on the web/ACME/EST paths.
+        try:
+            _scep_sans = list(
+                csr.extensions.get_extension_for_oid(
+                    ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+                ).value
+            )
+        except x509.ExtensionNotFound:
+            _scep_sans = None
+        from services.trust_store.constraints_mixin import validate_name_constraints
+        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans)
+
         # Clamp validity to the CA's own expiry — issuing a leaf that outlives
         # its issuer is invalid per RFC 5280 §6.1 and breaks every chain
         # validator the moment the CA expires.
@@ -954,13 +973,15 @@ class SCEPService:
         # would accept the issued cert for purposes the operator never
         # authorised. Whitelist what an end-entity SCEP cert may legitimately
         # carry.
+        # NB: OCSPSigning and timeStamping are deliberately EXCLUDED. A SCEP
+        # client that only knows the challenge password must not be able to mint
+        # an OCSP delegated-responder cert (which validators trust to sign OCSP
+        # responses for the whole CA) or a trusted timestamping cert.
         _ALLOWED_EKU_OIDS = {
             x509.ExtendedKeyUsageOID.SERVER_AUTH,
             x509.ExtendedKeyUsageOID.CLIENT_AUTH,
             x509.ExtendedKeyUsageOID.EMAIL_PROTECTION,
             x509.ExtendedKeyUsageOID.CODE_SIGNING,
-            x509.ExtendedKeyUsageOID.TIME_STAMPING,
-            x509.ExtendedKeyUsageOID.OCSP_SIGNING,
             x509.ExtendedKeyUsageOID.IPSEC_IKE,
         }
         try:

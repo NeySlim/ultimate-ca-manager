@@ -24,7 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 - **OCSP cache invalidated on revocation** — revoking a certificate now purges every cached OCSP response for it (per-algorithm cache entries were missed), so revoked certificates stop being reported `good` immediately (RFC 6960 §2.2). Nonced responses are no longer cached, and lookups are scoped to the issuing CA to prevent cross-CA serial collisions.
 - **ACME POST-as-GET enforced** — orders, authorizations and certificates now require a signed JWS request; they were previously readable without authentication (`renewalInfo` stays public per RFC 9773).
-- **OIDC SSO id_token verification** — signature, issuer, audience, expiry and nonce are now validated against the provider's JWKS (discovery with key caching, fail-closed; migration 062).
+- **OIDC SSO id_token verification** — signature, issuer, audience, expiry and nonce are now validated against the provider's JWKS (discovery with key caching, fail-closed; migration 062). **Upgrade note:** verification defaults to on; existing OIDC providers must have their **issuer** (and JWKS URI, or a discoverable issuer) configured in Settings → SSO, otherwise OIDC logins fail closed with "OIDC issuer is not configured" until set. Verification can be turned off per provider if needed.
 - **Name constraints enforced on issuance** — leaf certificates are validated against the CA chain's NameConstraints, and unauthorized CSR extensions are filtered from issued certificates.
 - **SCEP GetNextCACert response is now signed** as required by RFC 8894.
 

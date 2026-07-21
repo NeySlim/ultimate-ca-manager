@@ -94,6 +94,18 @@ def _issuer_and_serial(cert):
     }).dump()
 
 
+def _crl_issuer_and_serial(ca_cert, leaf_serial):
+    """RFC 8894 §4.6 GetCRL identifier: issuer = the CA's subject DN, serial =
+    the serial of the certificate whose status is queried (a leaf, not the CA)."""
+    cert_asn1 = asn1crypto.x509.Certificate.load(
+        ca_cert.public_bytes(serialization.Encoding.DER)
+    )
+    return asn1crypto.cms.IssuerAndSerialNumber({
+        "issuer": cert_asn1.subject,
+        "serial_number": leaf_serial,
+    }).dump()
+
+
 def _build_request(
     ca_cert,
     signer_cert,
@@ -653,9 +665,11 @@ class TestScepGetCrl:
             ca, ca_cert, _ = _load_ca_material(ca_data["id"])
             expected = CRLService.generate_crl(ca.id, username="scep-test")
             signer_cert, signer_key = _client_identity()
+            # RFC-correct identifier: CA subject + an arbitrary leaf serial that
+            # is NOT the CA's own serial — the serial must be ignored.
             request = _build_request(
                 ca_cert, signer_cert, signer_key, 22,
-                _issuer_and_serial(ca_cert), nonce,
+                _crl_issuer_and_serial(ca_cert, 0xDEADBEEF), nonce,
             )
             response, status = SCEPService(ca.refid).process_pkcs_req(request, "127.0.0.1")
 
@@ -680,7 +694,7 @@ class TestScepGetCrl:
             signer_cert, signer_key = _client_identity()
             request = _build_request(
                 ca_cert, signer_cert, signer_key, 22,
-                _issuer_and_serial(ca_cert), nonce,
+                _crl_issuer_and_serial(ca_cert, 0xDEADBEEF), nonce,
             )
             monkeypatch.setattr(CRLService, "get_latest_crl", lambda _ca_id: None)
             monkeypatch.setattr(CRLService, "generate_crl", lambda _ca_id, **_kwargs: None)
