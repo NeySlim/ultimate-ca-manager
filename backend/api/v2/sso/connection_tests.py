@@ -10,6 +10,7 @@ import ssl
 import logging
 import requests as http_requests
 from utils.datetime_utils import utc_isoformat
+from utils.dn_parse import get_dn_attribute, get_parent_dn
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
@@ -213,15 +214,12 @@ def _ldap_authenticate_user(provider, username, password):
                         entry = memberof_conn.entries[0]
                         if hasattr(entry, 'memberOf'):
                             group_dns = entry.memberOf.values if hasattr(entry.memberOf, 'values') else [str(entry.memberOf)]
-                            # Extract CN from each group DN
-                            for gdn in group_dns:
-                                gdn_str = str(gdn)
-                                # Parse CN from DN like "CN=Grp_IT_ADM,OU=Groups,DC=example,DC=com"
-                                for part in gdn_str.split(','):
-                                    part = part.strip()
-                                    if part.upper().startswith('CN='):
-                                        groups.append(part[3:])
-                                        break
+                            # Extract CN from each group DN without breaking
+                            # escaped separators or multivalued RDNs.
+                            for group_dn in group_dns:
+                                common_name = get_dn_attribute(str(group_dn), 'CN')
+                                if common_name is not None:
+                                    groups.append(common_name)
                     memberof_conn.unbind()
                     logger.info(f"LDAP memberOf groups for {username}: {groups}")
                 else:
@@ -232,7 +230,7 @@ def _ldap_authenticate_user(provider, username, password):
                         password=_decrypt_ldap_password(provider),
                         auto_bind=True
                     )
-                    group_base = ','.join(provider.ldap_base_dn.split(',')[1:]) or provider.ldap_base_dn
+                    group_base = get_parent_dn(provider.ldap_base_dn) or provider.ldap_base_dn
                     # Ensure group_filter has parentheses
                     gf = provider.ldap_group_filter.strip()
                     if not gf.startswith('('):

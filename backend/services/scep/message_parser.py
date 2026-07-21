@@ -13,7 +13,8 @@ from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric import padding
 
 logger = logging.getLogger(__name__)
@@ -103,24 +104,43 @@ def extract_scep_attributes(signed_data) -> Dict[str, Any]:
 
 
 def extract_signer_certificate(signed_data) -> Optional[x509.Certificate]:
-    """Return the first end-entity Certificate carried in SignedData, if any."""
+    """Resolve the certificate identified by the first SignerInfo.sid."""
     try:
+        signer_infos = signed_data["signer_infos"]
         certs = signed_data["certificates"]
-    except KeyError:
+    except (KeyError, ValueError):
         return None
-    if not certs or len(certs) == 0:
+    if not signer_infos or not certs:
         return None
+
+    try:
+        sid = signer_infos[0]["sid"]
+    except (KeyError, ValueError, IndexError):
+        return None
+
     for choice in certs:
-        # CertificateChoices: only 'certificate' carries an X.509 cert
-        try:
-            name = choice.name
-        except AttributeError:
-            name = None
-        if name and name != "certificate":
+        if getattr(choice, "name", None) != "certificate":
             continue
         try:
-            cert_der = choice.chosen.dump() if name == "certificate" else choice.dump()
-            return x509.load_der_x509_certificate(cert_der, default_backend())
+            candidate = choice.chosen
+            if sid.name == "issuer_and_serial_number":
+                identifier = sid.chosen
+                matches = (
+                    candidate.issuer.dump() == identifier["issuer"].dump()
+                    and candidate.serial_number
+                    == identifier["serial_number"].native
+                )
+            elif sid.name == "subject_key_identifier":
+                matches = (
+                    candidate.key_identifier is not None
+                    and candidate.key_identifier == sid.chosen.native
+                )
+            else:
+                matches = False
+            if matches:
+                return x509.load_der_x509_certificate(
+                    candidate.dump(), default_backend()
+                )
         except Exception:
             continue
     return None
@@ -151,9 +171,6 @@ def verify_cms_signature(signed_data, signer_cert: x509.Certificate) -> None:
         raise ValueError(f"Unknown digest algorithm: {digest_name}")
 
     sig_alg = signer_info["signature_algorithm"]["algorithm"].native
-    if sig_alg not in ("rsassa_pkcs1v15", "rsa", "sha1_rsa", "sha256_rsa",
-                       "sha384_rsa", "sha512_rsa"):
-        raise ValueError(f"Unsupported CMS signature algorithm: {sig_alg}")
 
     signature = signer_info["signature"].native
     if not isinstance(signature, (bytes, bytearray)):
@@ -171,12 +188,29 @@ def verify_cms_signature(signed_data, signer_cert: x509.Certificate) -> None:
         signed_bytes = b"\x31" + raw[1:]
 
     public_key = signer_cert.public_key()
-    public_key.verify(
-        bytes(signature),
-        signed_bytes,
-        padding.PKCS1v15(),
-        hash_cls(),
-    )
+    if isinstance(public_key, rsa.RSAPublicKey):
+        if sig_alg not in (
+            "rsassa_pkcs1v15", "rsa", "sha1_rsa", "sha256_rsa",
+            "sha384_rsa", "sha512_rsa",
+        ):
+            raise ValueError(f"Unsupported RSA CMS signature algorithm: {sig_alg}")
+        public_key.verify(
+            bytes(signature), signed_bytes, padding.PKCS1v15(), hash_cls()
+        )
+    elif isinstance(public_key, ec.EllipticCurvePublicKey):
+        if sig_alg != f"{digest_name}_ecdsa":
+            raise ValueError(f"Unsupported ECDSA CMS signature algorithm: {sig_alg}")
+        public_key.verify(bytes(signature), signed_bytes, ec.ECDSA(hash_cls()))
+    elif isinstance(public_key, dsa.DSAPublicKey):
+        if sig_alg != f"{digest_name}_dsa":
+            raise ValueError(f"Unsupported DSA CMS signature algorithm: {sig_alg}")
+        public_key.verify(bytes(signature), signed_bytes, hash_cls())
+    elif isinstance(public_key, ed25519.Ed25519PublicKey):
+        if sig_alg != "ed25519" or digest_name != "sha512":
+            raise ValueError(f"Unsupported Ed25519 CMS algorithms: {sig_alg}")
+        public_key.verify(bytes(signature), signed_bytes)
+    else:
+        raise ValueError("Unsupported CMS signer public key type")
 
     # Additionally enforce that the messageDigest signed-attribute matches
     # the actual encapsulated content (RFC 5652 §11.2). Without this check,
@@ -221,71 +255,105 @@ def _consteq(a: bytes, b: bytes) -> bool:
     return r == 0
 
 
-def decrypt_scep_envelope(encrypted_bytes: bytes, ca_key) -> bytes:
-    """
-    Decrypt a SCEP EnvelopedData structure using the CA private key.
+def _remove_pkcs7_padding(plaintext: bytes, block_size: int) -> bytes:
+    if not plaintext:
+        raise ValueError("Empty encrypted content in SCEP message")
+    pad_len = plaintext[-1]
+    if (
+        pad_len < 1
+        or pad_len > block_size
+        or not all(byte == pad_len for byte in plaintext[-pad_len:])
+    ):
+        raise ValueError("Invalid PKCS#7 padding in SCEP message")
+    return plaintext[:-pad_len]
 
-    Args:
-        encrypted_bytes: DER-encoded ContentInfo containing EnvelopedData
-        ca_key: CA RSA private key for CEK decryption
 
-    Returns:
-        Decrypted plaintext (the CSR DER bytes for PKCSReq/RenewalReq, or
-        IssuerAndSubject DER for GetCertInitial).
-
-    Raises:
-        ValueError: on unsupported algorithm or bad padding
-    """
+def decrypt_scep_envelope(
+    encrypted_bytes: bytes,
+    ca_key,
+    recipient_cert: x509.Certificate,
+) -> bytes:
+    """Decrypt and validate a SCEP CMS EnvelopedData value."""
     envdata = asn1crypto.cms.ContentInfo.load(encrypted_bytes)
-
     if envdata["content_type"].native != "enveloped_data":
-        # Not enveloped — return as-is (shouldn't happen in modern SCEP)
-        return encrypted_bytes
+        raise ValueError("SCEP messageData must be CMS EnvelopedData")
 
-    # asn1crypto handles both DER and BER (including Apple's indefinite-length
-    # BER encoding) — pyasn1's DER decoder rejected it with "Indefinite length
-    # encoding not supported".
+    # asn1crypto handles both DER and BER, including indefinite-length BER.
     env = envdata["content"]
+    recipient_asn1 = asn1crypto.x509.Certificate.load(
+        recipient_cert.public_bytes(serialization.Encoding.DER)
+    )
 
-    # Get recipient info — KTRI (RSA key transport) for SCEP
-    ktri = env["recipient_infos"][0].chosen
-    encrypted_key_bytes = ktri["encrypted_key"].native
+    matching_ktri = None
+    for recipient_info in env["recipient_infos"]:
+        if recipient_info.name != "ktri":
+            continue
+        ktri = recipient_info.chosen
+        rid = ktri["rid"]
+        if rid.name != "issuer_and_serial_number":
+            continue
+        identifier = rid.chosen
+        if (
+            identifier["issuer"].dump() == recipient_asn1.issuer.dump()
+            and identifier["serial_number"].native
+            == recipient_asn1.serial_number
+        ):
+            matching_ktri = ktri
+            break
 
-    content_encryption_key = ca_key.decrypt(encrypted_key_bytes, padding.PKCS1v15())
+    if matching_ktri is None:
+        raise ValueError("SCEP RecipientInfo does not identify configured CA")
+    if (
+        matching_ktri["key_encryption_algorithm"]["algorithm"].native
+        != "rsaes_pkcs1v15"
+    ):
+        raise ValueError("Unsupported SCEP key transport algorithm")
+
+    content_encryption_key = ca_key.decrypt(
+        matching_ktri["encrypted_key"].native,
+        padding.PKCS1v15(),
+    )
 
     eci = env["encrypted_content_info"]
+    if eci["content_type"].native != "data":
+        raise ValueError("SCEP EnvelopedData content type must be data")
     encrypted_content_bytes = eci["encrypted_content"].native
     alg_id = eci["content_encryption_algorithm"]
     alg_oid = alg_id["algorithm"].dotted
-
-    # Extract IV — CBC parameter is a plain OctetString (RFC 3370/3565)
     params = alg_id["parameters"]
-    if params:
-        iv = asn1crypto.core.OctetString.load(params.dump()).native
-    else:
-        iv = b"\x00" * 8
+    if params is None or not params.contents:
+        raise ValueError("SCEP CBC encryption algorithm is missing an IV")
+    iv = asn1crypto.core.OctetString.load(params.dump()).native
 
-    if "1.3.14.3.2.7" in alg_oid:  # DES
+    if alg_oid == "1.3.14.3.2.7":
         logger.warning("SCEP client using DES encryption — rejected (insecure)")
         raise ValueError("DES encryption is not supported — use AES or 3DES")
-    elif "1.2.840.113549.3.7" in alg_oid:  # 3DES
+
+    if alg_oid == "1.2.840.113549.3.7":
+        if len(iv) != 8:
+            raise ValueError("Invalid 3DES-CBC IV length")
         logger.warning("SCEP client using 3DES encryption — deprecated, prefer AES")
-        decryptor = Cipher(TripleDES(content_encryption_key), modes.CBC(iv)).decryptor()
-        plaintext = decryptor.update(encrypted_content_bytes) + decryptor.finalize()
-        pad_len = plaintext[-1]
-        if pad_len < 1 or pad_len > 8 or not all(  # 3DES block size = 8 bytes
-            b == pad_len for b in plaintext[-pad_len:]
-        ):
-            raise ValueError("Invalid PKCS#7 padding in SCEP message")
-        return plaintext[:-pad_len]
-    elif "2.16.840.1.101.3.4.1" in alg_oid:  # AES (any variant)
-        decryptor = Cipher(algorithms.AES(content_encryption_key), modes.CBC(iv)).decryptor()
-        plaintext = decryptor.update(encrypted_content_bytes) + decryptor.finalize()
-        pad_len = plaintext[-1]
-        if pad_len < 1 or pad_len > 16 or not all(  # AES block size = 16 bytes
-            b == pad_len for b in plaintext[-pad_len:]
-        ):
-            raise ValueError("Invalid PKCS#7 padding in SCEP message")
-        return plaintext[:-pad_len]
-    else:
-        raise ValueError(f"Unsupported encryption algorithm: {alg_oid}")
+        decryptor = Cipher(
+            TripleDES(content_encryption_key), modes.CBC(iv)
+        ).decryptor()
+        plaintext = (
+            decryptor.update(encrypted_content_bytes) + decryptor.finalize()
+        )
+        return _remove_pkcs7_padding(plaintext, 8)
+
+    if alg_oid in {
+        "2.16.840.1.101.3.4.1.2",   # AES-128-CBC
+        "2.16.840.1.101.3.4.1.22",  # AES-192-CBC
+        "2.16.840.1.101.3.4.1.42",  # AES-256-CBC
+    }:
+        if len(iv) != 16:
+            raise ValueError("Invalid AES-CBC IV length")
+        decryptor = Cipher(
+            algorithms.AES(content_encryption_key), modes.CBC(iv)
+        ).decryptor()
+        plaintext = (
+            decryptor.update(encrypted_content_bytes) + decryptor.finalize()
+        )
+        return _remove_pkcs7_padding(plaintext, 16)
+
+    raise ValueError(f"Unsupported encryption algorithm: {alg_oid}")

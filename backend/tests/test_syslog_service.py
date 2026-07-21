@@ -111,14 +111,30 @@ class TestBuildMessage:
             assert 'evil"] [fake@0' not in msg
             assert re.search(r'resource_name="evil\\"\\\] \[fake@0 x=\\"y"', msg)
 
-    def test_multiline_details_flattened(self, app, forwarder):
+    def test_multiline_details_flattened_with_line_framing(self, app, forwarder):
         with app.app_context():
             forwarder._protocol = 'tcp'
+            forwarder._framing = 'line'
             log = make_audit_log(details='line one\nline two')
             msg = forwarder._build_message(log).decode()
             # Only the trailing TCP frame delimiter remains
             assert msg.count('\n') == 1 and msg.endswith('\n')
             assert 'line one line two' in msg
+
+    def test_tcp_octet_counting_uses_utf8_byte_length(self, app, forwarder):
+        with app.app_context():
+            forwarder._protocol = 'tcp'
+            forwarder._framing = 'octet'
+            framed = forwarder._build_message(
+                make_audit_log(details='Connexion réussie')
+            )
+            length, message = framed.split(b' ', 1)
+            assert int(length) == len(message)
+            assert not message.endswith(b'\n')
+
+    def test_tls_defaults_to_octet_counting(self, forwarder):
+        forwarder.configure(protocol='tcp', tls=True)
+        assert forwarder.config['framing'] == 'octet'
 
     def test_message_is_rfc5424_shaped(self, app, forwarder):
         with app.app_context():
@@ -134,6 +150,13 @@ class TestBuildMessage:
             assert forwarder._hostname
             forwarder.configure(enabled=False)
             assert forwarder._hostname == ''
+
+    def test_config_exposes_framing_and_tls_verify(self, forwarder):
+        forwarder.configure(
+            protocol='tcp', tls=True, tls_verify=False, framing='line'
+        )
+        assert forwarder.config['framing'] == 'line'
+        assert forwarder.config['tls_verify'] is False
 
 
 if __name__ == '__main__':

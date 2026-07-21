@@ -68,6 +68,7 @@ class SyslogForwarder:
         self._protocol = 'udp'
         self._tls = False
         self._tls_verify = True
+        self._framing = 'line'
         self._categories = list(self.ALL_CATEGORIES)  # all enabled by default
         self._socket = None
         self._hostname = ''
@@ -98,7 +99,7 @@ class SyslogForwarder:
         return self._hostname
 
     def configure(self, enabled=False, host='', port=514, protocol='udp',
-                  tls=False, tls_verify=True, categories=None):
+                  tls=False, tls_verify=True, categories=None, framing=None):
         """Configure the syslog forwarder."""
         if not self._initialized:
             self._initialize()
@@ -111,6 +112,10 @@ class SyslogForwarder:
         self._protocol = protocol.lower() if protocol else 'udp'
         self._tls = tls and self._protocol == 'tcp'
         self._tls_verify = tls_verify
+        default_framing = 'octet' if self._tls else 'line'
+        self._framing = framing.lower() if framing else default_framing
+        if self._framing not in ('octet', 'line'):
+            raise ValueError("Syslog framing must be 'octet' or 'line'")
         self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
         # Force re-resolution of the HOSTNAME field on next send
         self._hostname = ''
@@ -118,7 +123,7 @@ class SyslogForwarder:
 
         if self._enabled and self._host:
             logger.info(f"📡 Syslog forwarder configured: {self._protocol.upper()}://{self._host}:{self._port} "
-                        f"(tls={self._tls}, categories={self._categories})")
+                        f"(tls={self._tls}, framing={self._framing}, categories={self._categories})")
         else:
             logger.info("📡 Syslog forwarder disabled")
 
@@ -155,8 +160,17 @@ class SyslogForwarder:
             self._socket = None
             return None
 
+    def _frame_message(self, message: str) -> bytes:
+        """Apply RFC 6587 framing to a TCP syslog message."""
+        encoded = message.encode('utf-8')
+        if self._protocol != 'tcp':
+            return encoded
+        if self._framing == 'octet':
+            return str(len(encoded)).encode('ascii') + b' ' + encoded
+        return encoded + b'\n'
+
     def _build_message(self, audit_log) -> bytes:
-        """Build RFC 5424 syslog message from audit log entry."""
+        """Build and frame an RFC 5424 syslog message."""
         facility_code = FACILITY_MAP['local0']
         severity_code = SEVERITY_MAP['info'] if audit_log.success else SEVERITY_MAP['warning']
         pri = (facility_code * 8) + severity_code
@@ -187,9 +201,7 @@ class SyslogForwarder:
         msg_text = ' '.join(str(msg_text).splitlines())
         message = f'<{pri}>1 {timestamp} {hostname} UCM - - {sd} {msg_text}'
 
-        if self._protocol == 'tcp':
-            return (message + '\n').encode('utf-8')
-        return message.encode('utf-8')
+        return self._frame_message(message)
 
     def send(self, audit_log):
         """Send an audit log entry to the remote syslog server. Non-blocking on failure."""
@@ -250,10 +262,11 @@ class SyslogForwarder:
             hostname = self._resolve_hostname()
             message = f'<{pri}>1 {timestamp} {hostname} UCM - - [ucm@0 action="test"] UCM syslog test message'
 
+            framed_message = self._frame_message(message)
             if self._protocol == 'tcp':
-                sock.sendall((message + '\n').encode('utf-8'))
+                sock.sendall(framed_message)
             else:
-                sock.sendto(message.encode('utf-8'), (self._host, self._port))
+                sock.sendto(framed_message, (self._host, self._port))
 
             return {'success': True, 'message': f'Test message sent via {self._protocol.upper()} to {self._host}:{self._port}'}
         except Exception as e:
@@ -279,6 +292,8 @@ class SyslogForwarder:
                 port=int(_get('syslog_port', '514')),
                 protocol=_get('syslog_protocol', 'udp'),
                 tls=_get('syslog_tls', 'false').lower() == 'true',
+                tls_verify=_get('syslog_tls_verify', 'true').lower() == 'true',
+                framing=_get('syslog_framing'),
                 categories=categories,
             )
         except Exception as e:
@@ -297,6 +312,8 @@ class SyslogForwarder:
             'port': self._port,
             'protocol': self._protocol,
             'tls': self._tls,
+            'tls_verify': self._tls_verify,
+            'framing': self._framing,
             'categories': self._categories,
         }
 

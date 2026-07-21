@@ -8,10 +8,12 @@ from typing import Dict, List, Optional
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
-from models import db, CA, Certificate, CertificateTemplate
+from models import db, CA, Certificate, CertificateTemplate, SystemConfig
 from services.ocsp_service import OCSPService
 from services.trust_store import TrustStoreService
+from utils.ct_client import collect_scts, embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now
 
@@ -169,6 +171,60 @@ class LifecycleMixin:
         # Parse certificate
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
 
+        # RFC 6962 pre-certificate flow. The first signature above is an
+        # internal template: when enabled it is replaced by a CA-signed
+        # pre-certificate for CT submission, then by the final SCT-bearing
+        # certificate before anything is persisted or returned.
+        embedded_scts = []
+        ct_embed = SystemConfig.query.filter_by(key='ct_embed_sct').first()
+        if ct_embed and str(ct_embed.value).lower() == 'true':
+            ct_required_config = SystemConfig.query.filter_by(key='ct_required').first()
+            ct_required = bool(
+                ct_required_config
+                and str(ct_required_config.value).lower() == 'true'
+            )
+            ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
+            ct_log_urls = None
+            if ct_log_urls_config and ct_log_urls_config.value:
+                try:
+                    parsed_log_urls = json.loads(ct_log_urls_config.value)
+                    if not isinstance(parsed_log_urls, list):
+                        raise ValueError('ct_log_urls must be a JSON list')
+                    ct_log_urls = parsed_log_urls
+                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                    logger.warning(f"Invalid CT log configuration: {e}")
+                    ct_log_urls = []
+
+            try:
+                cert, embedded_scts = embed_scts_in_certificate(
+                    certificate=cert,
+                    issuer_certificate=ca_cert,
+                    issuer_private_key=ca_private_key,
+                    ct_log_urls=ct_log_urls,
+                )
+            except Exception as e:
+                logger.warning(f"CT pre-certificate flow failed: {e}")
+                embedded_scts = []
+
+            if embedded_scts:
+                cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+                logger.info(
+                    f"Embedded {len(embedded_scts)} SCT(s) in certificate"
+                )
+            elif ct_required:
+                logger.error(
+                    "Certificate issuance refused because all CT log "
+                    "submissions failed"
+                )
+                raise ValueError(
+                    "Certificate Transparency is required but no CT log "
+                    "accepted the pre-certificate"
+                )
+            else:
+                logger.warning(
+                    "All CT log submissions failed; issuing without embedded SCT"
+                )
+
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
 
@@ -220,31 +276,49 @@ class LifecycleMixin:
         from services.audit_service import AuditService
         AuditService.log_certificate('cert_created', certificate, f'Created certificate: {descr}')
 
-        # Submit to Certificate Transparency if enabled
+        # Persist embedded SCT metadata. If embedding is disabled, preserve the
+        # legacy post-issuance add-chain auto-submission behavior.
         try:
-            from models import SystemConfig
-            ct_enabled = SystemConfig.query.filter_by(key='ct_enabled').first()
-            ct_auto = SystemConfig.query.filter_by(key='ct_auto_submit').first()
-            if ct_enabled and ct_enabled.value == 'true' and ct_auto and ct_auto.value == 'true':
-                ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
-                ct_log_urls = json.loads(ct_log_urls_config.value) if ct_log_urls_config and ct_log_urls_config.value else None
+            scts_to_store = embedded_scts
+            if not scts_to_store:
+                ct_enabled = SystemConfig.query.filter_by(key='ct_enabled').first()
+                ct_auto = SystemConfig.query.filter_by(key='ct_auto_submit').first()
+                if (
+                    not (ct_embed and str(ct_embed.value).lower() == 'true')
+                    and ct_enabled and ct_enabled.value == 'true'
+                    and ct_auto and ct_auto.value == 'true'
+                ):
+                    ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
+                    ct_log_urls = json.loads(ct_log_urls_config.value) \
+                        if ct_log_urls_config and ct_log_urls_config.value else None
+                    chain = [cert_pem.decode('utf-8') if isinstance(cert_pem, bytes) else cert_pem]
+                    chain.append(
+                        ca_cert_pem.decode('utf-8')
+                        if isinstance(ca_cert_pem, bytes) else ca_cert_pem
+                    )
+                    scts_to_store = collect_scts(chain, ct_log_urls)
 
-                chain = [cert_pem.decode('utf-8') if isinstance(cert_pem, bytes) else cert_pem]
-                ca_pem_str = ca_cert_pem.decode('utf-8') if isinstance(ca_cert_pem, bytes) else ca_cert_pem
-                chain.append(ca_pem_str)
-
-                from utils.ct_client import collect_scts
-                scts = collect_scts(chain, ct_log_urls)
-                if scts:
-                    config = SystemConfig(key=f'cert_scts_{certificate.id}', value=json.dumps(scts))
-                    db.session.add(config)
-                    try:
-                        db.session.commit()
-                    except Exception:
-                        db.session.rollback()
-                    logger.info(f"Certificate {certificate.id} submitted to {len(scts)} CT log(s)")
+            if scts_to_store:
+                config = SystemConfig(
+                    key=f'cert_scts_{certificate.id}',
+                    value=json.dumps(scts_to_store),
+                )
+                db.session.add(config)
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    logger.warning(
+                        f"Failed to store SCT metadata for cert "
+                        f"{certificate.id}: {e}"
+                    )
+                else:
+                    logger.info(
+                        f"Certificate {certificate.id} recorded "
+                        f"{len(scts_to_store)} SCT(s)"
+                    )
         except Exception as e:
-            logger.warning(f"CT auto-submission failed for cert {certificate.id}: {e}")
+            logger.warning(f"CT metadata handling failed for cert {certificate.id}: {e}")
 
         # Save files
         cert_path = cert_cert_path(certificate)

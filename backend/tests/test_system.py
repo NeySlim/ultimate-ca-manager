@@ -701,6 +701,40 @@ class TestSyslogUpdate:
                             content_type='application/json')
         assert r.status_code == 400
 
+    def test_persists_framing_and_tls_verify(self, auth_client, app):
+        r = auth_client.put('/api/v2/system/audit/syslog',
+                            data=json.dumps({
+                                'enabled': False,
+                                'host': 'syslog.example.com',
+                                'port': 6514,
+                                'protocol': 'tcp',
+                                'tls': True,
+                                'tls_verify': False,
+                                'framing': 'octet',
+                            }),
+                            content_type='application/json')
+        assert r.status_code == 200
+        config = assert_success(r)
+        assert config['framing'] == 'octet'
+        assert config['tls_verify'] is False
+
+        with app.app_context():
+            from models import SystemConfig
+            framing = SystemConfig.query.filter_by(key='syslog_framing').first()
+            tls_verify = SystemConfig.query.filter_by(key='syslog_tls_verify').first()
+            assert framing.value == 'octet'
+            assert tls_verify.value == 'false'
+
+    def test_invalid_framing_returns_400(self, auth_client):
+        r = auth_client.put('/api/v2/system/audit/syslog',
+                            data=json.dumps({
+                                'enabled': False,
+                                'protocol': 'tcp',
+                                'framing': 'delimiter',
+                            }),
+                            content_type='application/json')
+        assert r.status_code == 400
+
 
 class TestSyslogTest:
     """POST /system/audit/syslog/test"""

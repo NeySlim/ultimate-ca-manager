@@ -43,6 +43,38 @@ class TestSignCertificate:
                 SSHCertificateService.sign_certificate(
                     ca.id, _client_pubkey(), 'user', [])
 
+    def test_allowed_principal_shell_pattern_matches(self, app):
+        with app.app_context():
+            ca = SSHCAService.create_ca(
+                descr='Pattern CA', ca_type='user', key_type='ed25519',
+                username='t', allowed_principals=['team-*', 'deploy?'],
+            )
+            cert = SSHCertificateService.sign_certificate(
+                ca.id, _client_pubkey(), 'user', ['team-alice', 'deploy1']
+            )
+            assert cert.get_principals() == ['team-alice', 'deploy1']
+
+    def test_allowed_principal_shell_pattern_rejects_non_match(self, app):
+        with app.app_context():
+            ca = SSHCAService.create_ca(
+                descr='Restricted CA', ca_type='user', key_type='ed25519',
+                username='t', allowed_principals=['team-*'],
+            )
+            with pytest.raises(ValueError, match='allowed principals'):
+                SSHCertificateService.sign_certificate(
+                    ca.id, _client_pubkey(), 'user', ['admin']
+                )
+
+    def test_rejects_certificate_type_mismatching_ca_type(self, app):
+        with app.app_context():
+            ca = SSHCAService.create_ca(
+                descr='Host CA', ca_type='host', key_type='ed25519', username='t'
+            )
+            with pytest.raises(ValueError, match='cannot sign user certificates'):
+                SSHCertificateService.sign_certificate(
+                    ca.id, _client_pubkey(), 'user', ['alice']
+                )
+
 
 class TestRevokeAndKrl:
     def test_revoke_marks_revoked(self, app):

@@ -88,12 +88,19 @@ def update_syslog_config():
         protocol = data.get('protocol', 'udp').lower()
         enabled = bool(data.get('enabled', False))
         tls = bool(data.get('tls', False))
+        tls_verify = bool(data.get('tls_verify', True))
+        framing = data.get('framing') or (
+            'octet' if protocol == 'tcp' and tls else 'line'
+        )
+        framing = framing.lower() if isinstance(framing, str) else ''
         categories = data.get('categories', list(syslog_forwarder.ALL_CATEGORIES))
 
         if protocol not in ('udp', 'tcp'):
             return error_response("Protocol must be 'udp' or 'tcp'", 400)
         if port < 1 or port > 65535:
             return error_response("Port must be between 1 and 65535", 400)
+        if framing not in ('octet', 'line'):
+            return error_response("Framing must be 'octet' or 'line'", 400)
         if enabled and not host:
             return error_response("Host is required when syslog is enabled", 400)
 
@@ -103,6 +110,8 @@ def update_syslog_config():
         set_config('syslog_port', str(port))
         set_config('syslog_protocol', protocol)
         set_config('syslog_tls', str(tls).lower())
+        set_config('syslog_tls_verify', str(tls_verify).lower())
+        set_config('syslog_framing', framing)
         set_config('syslog_categories', ','.join(categories) if categories else '')
         ok, err = safe_commit(logger, "Failed to update syslog config")
         if not ok:
@@ -111,7 +120,8 @@ def update_syslog_config():
         # Reconfigure forwarder
         syslog_forwarder.configure(
             enabled=enabled, host=host, port=port,
-            protocol=protocol, tls=tls, categories=categories
+            protocol=protocol, tls=tls, tls_verify=tls_verify,
+            framing=framing, categories=categories
         )
 
         AuditService.log_system(

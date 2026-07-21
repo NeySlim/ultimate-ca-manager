@@ -26,6 +26,8 @@ EKU_NAMES = {
     '1.3.6.1.5.5.7.3.8': 'timeStamping',
     '1.3.6.1.5.5.7.3.9': 'OCSPSigning',
     '1.3.6.1.5.5.8.2.2': 'iKEIntermediate',
+    '1.3.6.1.5.2.3.4': 'id-pkinit-KPClientAuth',
+    '1.3.6.1.5.2.3.5': 'id-pkinit-KPkdc',
     '1.3.6.1.4.1.311.10.3.1': 'msCTLSign',
     '1.3.6.1.4.1.311.10.3.3': 'msCodeSGC',
     '1.3.6.1.4.1.311.10.3.4': 'msEFS',

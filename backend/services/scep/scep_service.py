@@ -17,6 +17,7 @@ from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtensionOID
 
 from config.settings import Config
@@ -26,6 +27,10 @@ from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.file_naming import cert_cert_path
 
+from services.scep.crypto_helpers import (
+    AES128_CBC,
+    select_response_content_encryption_algorithm,
+)
 from services.scep.message_parser import (
     decrypt_scep_envelope,
     extract_scep_attributes,
@@ -171,6 +176,8 @@ class SCEPService:
         # errors (4xx/5xx) are reserved for transport problems.
         transaction_id = ''
         sender_nonce = None
+        challenge_pwd = None
+        response_encryption_algorithm = AES128_CBC
         try:
             content_info = asn1crypto.cms.ContentInfo.load(pkcs7_data)
             if content_info["content_type"].native != "signed_data":
@@ -185,6 +192,14 @@ class SCEPService:
             sender_nonce = attrs.get("senderNonce")
             challenge_pwd = attrs.get("challengePassword")
             signing_time = attrs.get("signingTime")
+
+            if signed_data["encap_content_info"]["content_type"].native != "data":
+                return self._create_error_response(
+                    self.FAIL_BAD_MESSAGE_CHECK,
+                    "SignedData encapsulated content type must be data",
+                    transaction_id=transaction_id,
+                    recipient_nonce=sender_nonce,
+                ), 200
 
             # ---- 1. Outer CMS signature MUST verify (RFC 8894 §3.1) ----
             signer_cert = extract_signer_certificate(signed_data)
@@ -255,15 +270,11 @@ class SCEPService:
                 f"client_ip={client_ip} ca={self.ca_refid}"
             )
 
-            # ---- 3. Dispatch on messageType ----
-            if message_type == self.MSG_TYPE_GET_CERT_INITIAL:
-                return self._handle_get_cert_initial(
-                    transaction_id, sender_nonce
-                ), 200
-
+            # ---- 3. Validate messageType ----
             supported_enveloped_types = (
                 self.MSG_TYPE_PKI_REQ,
                 self.MSG_TYPE_RENEWAL_REQ,
+                self.MSG_TYPE_GET_CERT_INITIAL,
                 self.MSG_TYPE_GET_CERT,
                 self.MSG_TYPE_GET_CRL,
             )
@@ -283,7 +294,12 @@ class SCEPService:
                 else bytes(encrypted_content)
             )
             try:
-                message_data = decrypt_scep_envelope(encrypted_bytes, self.ca_key)
+                response_encryption_algorithm = (
+                    select_response_content_encryption_algorithm(encrypted_bytes)
+                )
+                message_data = decrypt_scep_envelope(
+                    encrypted_bytes, self.ca_key, self.ca_cert
+                )
             except Exception as e:
                 logger.error(f"SCEP: Failed to decrypt envelopedData: {e}")
                 return self._create_error_response(
@@ -292,13 +308,45 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
+            if message_type in {
+                self.MSG_TYPE_GET_CERT_INITIAL,
+                self.MSG_TYPE_GET_CERT,
+                self.MSG_TYPE_GET_CRL,
+            } and self._recipient_requires_password(
+                signer_cert
+            ) and not self._has_usable_challenge_password(challenge_pwd):
+                return self._create_error_response(
+                    self.FAIL_BAD_MESSAGE_CHECK,
+                    "challengePassword required for signing-only recipient key",
+                    transaction_id=transaction_id,
+                    recipient_nonce=sender_nonce,
+                ), 200
+
+            if message_type == self.MSG_TYPE_GET_CERT_INITIAL:
+                return self._handle_get_cert_initial(
+                    transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_pwd,
+                    response_encryption_algorithm,
+                ), 200
             if message_type == self.MSG_TYPE_GET_CERT:
                 return self._handle_get_cert(
-                    message_data, transaction_id, sender_nonce, signer_cert
+                    message_data,
+                    transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_pwd,
+                    response_encryption_algorithm,
                 ), 200
             if message_type == self.MSG_TYPE_GET_CRL:
                 return self._handle_get_crl(
-                    message_data, transaction_id, sender_nonce, signer_cert
+                    message_data,
+                    transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_pwd,
+                    response_encryption_algorithm,
                 ), 200
 
             try:
@@ -336,7 +384,7 @@ class SCEPService:
                 ), 200
 
             # ---- 6. Also check challengePassword in CSR attributes (scepclient) ----
-            if not challenge_pwd:
+            if not self._has_usable_challenge_password(challenge_pwd):
                 try:
                     from cryptography.x509.oid import AttributeOID
                     for attr in csr.attributes:
@@ -351,9 +399,21 @@ class SCEPService:
                 except Exception as e:
                     logger.debug(f"SCEP: Could not extract challenge from CSR: {e}")
 
+            if self._recipient_requires_password(
+                signer_cert
+            ) and not self._has_usable_challenge_password(challenge_pwd):
+                return self._create_error_response(
+                    self.FAIL_BAD_MESSAGE_CHECK,
+                    "challengePassword required for signing-only recipient key",
+                    transaction_id=transaction_id,
+                    recipient_nonce=sender_nonce,
+                ), 200
+
             # ---- 7. Validate challenge password (constant-time) ----
             if self.challenge_password:
-                if not challenge_pwd or not hmac.compare_digest(
+                if not self._has_usable_challenge_password(
+                    challenge_pwd
+                ) or not hmac.compare_digest(
                     challenge_pwd.encode() if isinstance(challenge_pwd, str)
                     else challenge_pwd,
                     self.challenge_password.encode()
@@ -406,7 +466,11 @@ class SCEPService:
             ).first()
             if existing:
                 return self._status_for_existing(
-                    existing, sender_nonce, signer_cert
+                    existing,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_pwd,
+                    response_encryption_algorithm,
                 ), 200
 
             # ---- 10. Persist new request ----
@@ -448,7 +512,12 @@ class SCEPService:
                     logger.error(f"Webhook emit (SCEP issuance) failed: {e}")
                 logger.debug("SCEP: Returning SUCCESS response")
                 return self._create_cert_rep_success(
-                    cert_obj, transaction_id, sender_nonce, signer_cert
+                    cert_obj,
+                    transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_pwd,
+                    response_encryption_algorithm,
                 ), 200
             else:
                 logger.debug("SCEP: auto_approve=False, returning PENDING")
@@ -479,6 +548,8 @@ class SCEPService:
         transaction_id: str,
         sender_nonce: bytes,
         signer_cert: x509.Certificate,
+        challenge_password,
+        content_encryption_algorithm: str,
     ) -> bytes:
         """Return a certificate identified by issuer and serial (RFC 8894 §4.5)."""
         try:
@@ -526,7 +597,12 @@ class SCEPService:
                 and cert.issuer == self.ca_cert.subject
             ):
                 return self._create_cert_rep_success(
-                    cert, transaction_id, sender_nonce, signer_cert
+                    cert,
+                    transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_password,
+                    content_encryption_algorithm,
                 )
 
         return self._create_error_response(
@@ -540,6 +616,8 @@ class SCEPService:
         transaction_id: str,
         sender_nonce: bytes,
         signer_cert: x509.Certificate,
+        challenge_password,
+        content_encryption_algorithm: str,
     ) -> bytes:
         """Return the configured CA's current CRL (RFC 8894 §4.6)."""
         try:
@@ -576,19 +654,28 @@ class SCEPService:
                 transaction_id=transaction_id, recipient_nonce=sender_nonce,
             )
         return self._create_crl_rep_success(
-            crl, transaction_id, sender_nonce, signer_cert
+            crl,
+            transaction_id,
+            sender_nonce,
+            signer_cert,
+            challenge_password,
+            content_encryption_algorithm,
         )
 
     def _handle_get_cert_initial(
-        self, transaction_id: str, sender_nonce
+        self,
+        transaction_id: str,
+        sender_nonce,
+        signer_cert: x509.Certificate,
+        challenge_password,
+        content_encryption_algorithm: str,
     ) -> bytes:
         """Polling request (RFC 8894 §3.3.2.2).
 
         The client re-sends the *same* transactionID it used for the original
         PKCSReq; we look it up scoped to this CA and return the current
-        status. We don't bother decrypting the IssuerAndSubject payload
-        because transactionID is unique per (client, CA) and the lookup is
-        cheaper.
+        status. The IssuerAndSubject envelope is validated and decrypted by
+        the caller, but transactionID is the scoped lookup key.
         """
         existing = SCEPRequest.query.filter_by(
             transaction_id=transaction_id, ca_refid=self.ca_refid
@@ -598,21 +685,21 @@ class SCEPService:
                 self.FAIL_BAD_CERT_ID, "Unknown transactionID",
                 transaction_id=transaction_id, recipient_nonce=sender_nonce,
             )
-        # For GetCertInitial the recipient cert is not in our message — best
-        # effort: load the CSR and synthesize a self-signed-like recipient by
-        # reusing the cert we already issued (success path), or just return
-        # PENDING/FAILURE which carry no encrypted payload.
+        # PENDING and FAILURE carry no encrypted payload. SUCCESS is encrypted
+        # to the signer certificate carried by this polling request.
         if existing.status == "approved" and existing.cert_refid:
             cert = Certificate.query.filter_by(refid=existing.cert_refid).first()
             if cert:
                 cert_obj = x509.load_pem_x509_certificate(
                     base64.b64decode(cert.crt), default_backend()
                 )
-                # In the absence of a client signer cert (it's not transmitted
-                # in GetCertInitial), encrypt to the issued cert's public key:
-                # the requester proved possession of that key during PKCSReq.
                 return self._create_cert_rep_success(
-                    cert_obj, transaction_id, sender_nonce, cert_obj
+                    cert_obj,
+                    transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_password,
+                    content_encryption_algorithm,
                 )
         if existing.status == "rejected":
             return self._create_error_response(
@@ -682,6 +769,18 @@ class SCEPService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _recipient_requires_password(signer_cert: x509.Certificate) -> bool:
+        """Return whether the signer key cannot receive an RSA KTRI response."""
+        return not isinstance(signer_cert.public_key(), rsa.RSAPublicKey)
+
+    @staticmethod
+    def _has_usable_challenge_password(challenge_password) -> bool:
+        return (
+            isinstance(challenge_password, (str, bytes))
+            and len(challenge_password) > 0
+        )
 
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:
@@ -775,6 +874,8 @@ class SCEPService:
         existing: SCEPRequest,
         sender_nonce,
         signer_cert: x509.Certificate,
+        challenge_password,
+        content_encryption_algorithm: str,
     ) -> bytes:
         """Return an appropriate CertRep for an already-seen transaction ID."""
         if existing.status == "approved" and existing.cert_refid:
@@ -784,7 +885,12 @@ class SCEPService:
                     base64.b64decode(cert.crt), default_backend()
                 )
                 return self._create_cert_rep_success(
-                    cert_obj, existing.transaction_id, sender_nonce, signer_cert
+                    cert_obj,
+                    existing.transaction_id,
+                    sender_nonce,
+                    signer_cert,
+                    challenge_password,
+                    content_encryption_algorithm,
                 )
 
         if existing.status == "rejected":
@@ -1026,10 +1132,18 @@ class SCEPService:
         transaction_id: str,
         sender_nonce,
         recipient_cert: x509.Certificate,
+        challenge_password=None,
+        content_encryption_algorithm: str = AES128_CBC,
     ) -> bytes:
         return build_cert_rep_success(
-            cert, transaction_id, sender_nonce, recipient_cert,
-            self.ca_cert, self.ca_key,
+            cert,
+            transaction_id,
+            sender_nonce,
+            recipient_cert,
+            self.ca_cert,
+            self.ca_key,
+            challenge_password=challenge_password,
+            content_encryption_algorithm=content_encryption_algorithm,
         )
 
     def _create_crl_rep_success(
@@ -1038,10 +1152,18 @@ class SCEPService:
         transaction_id: str,
         sender_nonce: bytes,
         recipient_cert: x509.Certificate,
+        challenge_password=None,
+        content_encryption_algorithm: str = AES128_CBC,
     ) -> bytes:
         return build_crl_rep_success(
-            crl, transaction_id, sender_nonce, recipient_cert,
-            self.ca_cert, self.ca_key,
+            crl,
+            transaction_id,
+            sender_nonce,
+            recipient_cert,
+            self.ca_cert,
+            self.ca_key,
+            challenge_password=challenge_password,
+            content_encryption_algorithm=content_encryption_algorithm,
         )
 
     def _create_cert_rep_pending(

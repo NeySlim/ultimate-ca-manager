@@ -21,13 +21,18 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
-from services.acme.acme_client_service import AcmeClientService, AUTHZ_INVALID_USER_MSG
+from services.acme.acme_client_service import (
+    AcmeClientService,
+    AUTHZ_INVALID_USER_MSG,
+    csr_identifiers_match_order,
+)
 from services.audit_service import AuditService
 from services.acme.dns_selfcheck import (
     dns_propagation_timeout as _shared_dns_propagation_timeout,
     wait_for_challenges as _shared_wait_for_challenges,
 )
 from utils.acme_debug import acme_log
+from utils.acme_ip import normalize_ip_for_identifier
 from utils.dns_txt_lookup import txt_record_present
 
 logger = logging.getLogger(__name__)
@@ -113,9 +118,9 @@ def request_certificate():
 
     Body:
     {
-        "domains": ["example.com", "www.example.com"],
+        "domains": ["example.com", "www.example.com", "192.0.2.1"],
         "email": "admin@example.com",  // Optional, uses default if not set
-        "challenge_type": "dns-01",    // dns-01 or http-01
+        "challenge_type": "dns-01",    // dns-01, http-01, or tls-alpn-01
         "environment": "staging",      // staging or production
         "dns_provider_id": 1           // Required for dns-01
     }
@@ -140,13 +145,22 @@ def request_certificate():
     # 1+ labels separated by dots; allow leading "*." for wildcards.
     _label = r'(?!-)[A-Za-z0-9-]{1,63}(?<!-)'
     _fqdn_re = _re.compile(rf'^(\*\.)?({_label}\.)+{_label}$')
+    normalized_domains = []
+    has_ip_identifier = False
     for domain in domains:
         if not isinstance(domain, str) or not domain:
             return error_response('Invalid domain (empty or not a string)', 400)
+        normalized_ip = normalize_ip_for_identifier(domain)
+        if normalized_ip is not None:
+            normalized_domains.append(normalized_ip)
+            has_ip_identifier = True
+            continue
         if len(domain) > 253:
             return error_response(f'Invalid domain (>253 chars): {domain[:60]}...', 400)
         if not _fqdn_re.match(domain):
             return error_response(f'Invalid domain syntax: {domain}', 400)
+        normalized_domains.append(domain)
+    domains = normalized_domains
 
     # Get email (from request or settings)
     email = data.get('email')
@@ -159,8 +173,12 @@ def request_certificate():
 
     # Challenge type
     challenge_type = data.get('challenge_type', 'dns-01')
-    if challenge_type not in ['dns-01', 'http-01']:
-        return error_response('Challenge type must be dns-01 or http-01', 400)
+    if challenge_type not in ['dns-01', 'http-01', 'tls-alpn-01']:
+        return error_response(
+            'Challenge type must be dns-01, http-01, or tls-alpn-01', 400
+        )
+    if has_ip_identifier and challenge_type == 'dns-01':
+        return error_response('dns-01 cannot be used with IP identifiers', 400)
 
     # Environment — fall back to configured default, NOT hardcoded staging.
     # Without this, a frontend race (modal opened before settings finished loading)
@@ -221,14 +239,14 @@ def request_certificate():
     if key_source == 'csr':
         if not csr_pem:
             return error_response('csr_pem is required when key_source is csr', 400)
-        from utils.acme_csr import load_pem_csr, csr_domains_match_order
+        from utils.acme_csr import load_pem_csr
         try:
             csr = load_pem_csr(csr_pem)
         except ValueError as exc:
             return error_response(str(exc), 400)
         if not csr.is_signature_valid:
             return error_response('CSR signature is invalid', 400)
-        match_ok, match_msg = csr_domains_match_order(csr, domains)
+        match_ok, match_msg = csr_identifiers_match_order(csr, domains)
         if not match_ok:
             return error_response(match_msg, 400)
     elif csr_pem:
@@ -802,8 +820,10 @@ def preflight_certificate():
             email = email_cfg.value
 
     challenge_type = data.get('challenge_type', 'dns-01')
-    if challenge_type not in ('dns-01', 'http-01'):
-        return error_response('Challenge type must be dns-01 or http-01', 400)
+    if challenge_type not in ('dns-01', 'http-01', 'tls-alpn-01'):
+        return error_response(
+            'Challenge type must be dns-01, http-01, or tls-alpn-01', 400
+        )
 
     mode = (data.get('mode') or 'full').lower()
     if mode not in ('full', 'validate_only'):

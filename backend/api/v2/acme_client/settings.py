@@ -97,12 +97,17 @@ def get_settings():
         proxy_eab_kid = proxy_eab_kid_cfg.value if proxy_eab_kid_cfg else None
         proxy_eab_hmac_set = bool(proxy_eab_hmac_cfg and proxy_eab_hmac_cfg.value)
     dns_timeout_cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
+    tls_alpn_port_cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
     debug_logging_cfg = SystemConfig.query.filter_by(key='acme.client.debug_logging').first()
     allow_loopback_cfg = SystemConfig.query.filter_by(key='acme.client.allow_loopback_upstream').first()
     try:
         dns_timeout = int(dns_timeout_cfg.value) if dns_timeout_cfg else 120
     except (ValueError, TypeError):
         dns_timeout = 120
+    try:
+        tls_alpn_port = int(tls_alpn_port_cfg.value) if tls_alpn_port_cfg else 443
+    except (ValueError, TypeError):
+        tls_alpn_port = 443
 
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
@@ -110,6 +115,7 @@ def get_settings():
         'renewal_enabled': renewal_enabled.value == 'true' if renewal_enabled else True,
         'renewal_days': int(renewal_days.value) if renewal_days else 30,
         'dns_propagation_timeout': dns_timeout,
+        'tls_alpn_port': tls_alpn_port,
         'debug_logging': _coerce_bool(debug_logging_cfg.value if debug_logging_cfg else None, False),
         'allow_loopback_upstream': _coerce_bool(allow_loopback_cfg.value if allow_loopback_cfg else None, False),
         'has_staging_account': bool(staging_account and staging_account.is_registered()),
@@ -195,6 +201,22 @@ def update_settings():
         _set_config('acme.client.dns_propagation_timeout', str(dns_to),
                     'Seconds to self-check DNS-01 TXT propagation before submitting to the CA')
         updates.append('dns_propagation_timeout')
+
+    if 'tls_alpn_port' in data:
+        try:
+            tls_alpn_port = int(data['tls_alpn_port'])
+        except (TypeError, ValueError):
+            return error_response('TLS-ALPN-01 listen port must be an integer', 400)
+        if tls_alpn_port < 1 or tls_alpn_port > 65535:
+            return error_response(
+                'TLS-ALPN-01 listen port must be between 1 and 65535', 400
+            )
+        _set_config(
+            'acme.client.tls_alpn_port',
+            str(tls_alpn_port),
+            'TCP port for the ACME client TLS-ALPN-01 proof listener',
+        )
+        updates.append('tls_alpn_port')
 
     if 'debug_logging' in data:
         try:

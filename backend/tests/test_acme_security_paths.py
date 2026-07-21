@@ -478,6 +478,145 @@ class TestPreAuthorizationAndWildcard:
 
 
 class TestRfc8555ErrorTypes:
+    def test_new_order_collects_identifier_subproblems(
+        self, client, acme_account
+    ):
+        path = '/acme/new-order'
+        identifiers = [
+            {'type': 'email', 'value': 'admin@example.com'},
+            {'type': 'ip', 'value': 'not-an-ip'},
+            {'type': 'dns', 'value': 'valid.example.com'},
+        ]
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'identifiers': identifiers},
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        assert response.status_code == 400
+        problem = response.get_json()
+        assert problem['type'].endswith(':compound')
+        assert [item['identifier'] for item in problem['subproblems']] == identifiers[:2]
+        assert [item['type'] for item in problem['subproblems']] == [
+            'urn:ietf:params:acme:error:unsupportedIdentifier',
+            'urn:ietf:params:acme:error:malformed',
+        ]
+        assert all(item['detail'] for item in problem['subproblems'])
+
+    def test_new_order_single_identifier_error_keeps_specific_type(
+        self, client, acme_account
+    ):
+        path = '/acme/new-order'
+        identifier = {'type': 'uri', 'value': 'https://example.com'}
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'identifiers': [identifier]},
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        problem = response.get_json()
+        assert problem['type'].endswith(':unsupportedIdentifier')
+        assert problem['subproblems'][0]['identifier'] == identifier
+
+    @pytest.mark.parametrize(
+        ('contact', 'error_type'),
+        [
+            ('tel:+12025550123', 'unsupportedContact'),
+            ('https://example.com/contact', 'unsupportedContact'),
+            ('mailto:not-an-email', 'invalidContact'),
+            ('mailto:@example.com', 'invalidContact'),
+        ],
+    )
+    def test_new_account_validates_contact_uris(
+        self, client, contact, error_type
+    ):
+        key, jwk = _gen_key_and_jwk()
+        path = '/acme/new-account'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'termsOfServiceAgreed': True, 'contact': [contact]},
+            key,
+            jwk=jwk,
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        assert response.status_code == 400
+        assert response.get_json()['type'].endswith(f':{error_type}')
+
+    def test_new_account_accepts_mailto_contact(self, client):
+        key, jwk = _gen_key_and_jwk()
+        path = '/acme/new-account'
+        contact = 'mailto:admin@example.com'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {'termsOfServiceAgreed': True, 'contact': [contact]},
+            key,
+            jwk=jwk,
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        assert response.status_code == 201
+        assert response.get_json()['contact'] == [contact]
+
+    def test_new_order_stores_ari_replaces(self, app, client, acme_account):
+        path = '/acme/new-order'
+        replaces = f'{_int_to_b64(0xAABBCC)}.{_int_to_b64(0x123456)}'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {
+                'identifiers': [
+                    {'type': 'dns', 'value': 'replacement.example.com'}
+                ],
+                'replaces': replaces,
+            },
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        assert response.status_code == 201
+        order_id = response.headers['Location'].rstrip('/').split('/')[-1]
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert order.replaces == replaces
+
+    @pytest.mark.parametrize('replaces', ['not-a-certid', 'abc.***', 'abc=.def'])
+    def test_new_order_rejects_malformed_ari_replaces(
+        self, client, acme_account, replaces
+    ):
+        path = '/acme/new-order'
+        jws = _build_jws(
+            f'http://localhost{path}',
+            {
+                'identifiers': [
+                    {'type': 'dns', 'value': 'replacement.example.com'}
+                ],
+                'replaces': replaces,
+            },
+            acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}',
+            nonce=_nonce(client),
+        )
+
+        response = _post_jws(client, path, jws)
+
+        assert response.status_code == 400
+        assert response.get_json()['type'].endswith(':malformed')
+
     def test_post_jws_requires_jose_content_type(self, client):
         response = client.post('/acme/new-account', json={})
         assert response.status_code == 415
@@ -582,6 +721,45 @@ class TestRfc8555StateMachine:
             assert authz.status == 'invalid'
             assert order.status == 'invalid'
             assert json.loads(order.error)['type'].endswith(':incorrectResponse')
+
+    def test_multiple_failed_authorizations_create_compound_order_error(
+        self, app, acme_account
+    ):
+        with app.app_context():
+            service = AcmeService(base_url='http://localhost')
+            order = service.create_order(
+                acme_account['account_id'],
+                [
+                    {'type': 'dns', 'value': 'first-failure.example.com'},
+                    {'type': 'dns', 'value': 'second-failure.example.com'},
+                ],
+            )
+            authorizations = order.authorizations.all()
+            first_challenge = authorizations[0].challenges.first()
+            second_challenge = authorizations[1].challenges.first()
+
+            service._invalidate_challenge(
+                first_challenge, 'dns', 'First authorization failed'
+            )
+            db.session.commit()
+            assert json.loads(order.error)['type'].endswith(':dns')
+
+            service._invalidate_challenge(
+                second_challenge, 'incorrectResponse',
+                'Second authorization failed',
+            )
+            db.session.commit()
+
+            problem = json.loads(order.error)
+            assert problem['type'].endswith(':compound')
+            assert [item['identifier'] for item in problem['subproblems']] == [
+                {'type': 'dns', 'value': 'first-failure.example.com'},
+                {'type': 'dns', 'value': 'second-failure.example.com'},
+            ]
+            assert [item['detail'] for item in problem['subproblems']] == [
+                'First authorization failed',
+                'Second authorization failed',
+            ]
 
     def test_expired_order_is_lazily_marked_invalid(
         self, app, client, acme_account

@@ -33,6 +33,11 @@ from utils import ssrf_protection
 
 logger = logging.getLogger(__name__)
 
+
+class ProxyDns01OnlyError(ValueError):
+    """The ACME proxy deliberately supports DNS identifiers/DNS-01 only."""
+
+
 class AcmeProxyService:
     # Default upstream (Let's Encrypt Staging for safety by default, user can change)
     DEFAULT_UPSTREAM = "https://acme-staging-v02.api.letsencrypt.org/directory"
@@ -507,11 +512,19 @@ class AcmeProxyService:
         
         self._ensure_directory()
         
-        # Extract domains from identifiers
+        # The proxy performs validation itself through configured DNS providers.
+        # Never forward IP identifiers: RFC 8738 requires HTTP-01/TLS-ALPN-01,
+        # neither of which can be fulfilled by this DNS-01-only gateway.
         domains = []
         for ident in identifiers:
-            if ident.get('type') == 'dns':
-                domains.append(ident.get('value'))
+            if not isinstance(ident, dict) or not ident.get('value'):
+                raise ValueError('Each identifier must contain type and value')
+            if ident.get('type') != 'dns':
+                raise ProxyDns01OnlyError(
+                    'The ACME proxy supports DNS identifiers with dns-01 only; '
+                    'IP identifiers are not supported.'
+                )
+            domains.append(ident['value'])
         
         # Verify each domain has a DNS provider configured
         domain_providers = {}
@@ -688,9 +701,9 @@ class AcmeProxyService:
                 f"Upstream authz for {identifier.get('value', '?')} has no dns-01 challenge. "
                 f"Available types: {[c.get('type') for c in authz.get('challenges', [])]}"
             )
-            raise RuntimeError(
+            raise ProxyDns01OnlyError(
                 f"Upstream CA does not offer dns-01 challenge for {identifier.get('value', '?')}. "
-                "The ACME proxy only supports dns-01 validation."
+                "The ACME proxy only supports dns-01 validation; tls-alpn-01 is not supported."
             )
             
         authz['challenges'] = proxy_challenges
@@ -714,7 +727,7 @@ class AcmeProxyService:
         status = challenge_data.get('status')
         
         if challenge_type != 'dns-01':
-            raise RuntimeError(
+            raise ProxyDns01OnlyError(
                 f"Unsupported challenge type: {challenge_type}. "
                 "The ACME proxy only supports dns-01 validation."
             )

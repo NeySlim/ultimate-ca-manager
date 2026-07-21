@@ -856,7 +856,7 @@ class TestAcmeClientRequestValidation:
     def test_request_invalid_challenge_type(self, auth_client):
         r = post_json(auth_client, '/api/v2/acme/client/request',
                       {'domains': ['example.com'], 'email': 'a@b.com',
-                       'challenge_type': 'tls-alpn-01', 'environment': 'staging'})
+                       'challenge_type': 'invalid-01', 'environment': 'staging'})
         assert_error(r, 400)
 
     def test_request_invalid_environment(self, auth_client):

@@ -64,6 +64,7 @@ class AcmeOrder(db.Model):
     identifiers = db.Column(db.Text, nullable=False)  # JSON array of identifier objects
     not_before = db.Column(db.DateTime)  # Requested validity start
     not_after = db.Column(db.DateTime)   # Requested validity end
+    replaces = db.Column(db.String(255), index=True)  # RFC 9773 replacement CertID
     
     error = db.Column(db.Text)  # JSON error object if status=invalid
     csr = db.Column(db.Text)  # Certificate Signing Request (PEM)
@@ -351,7 +352,7 @@ class AcmeClientOrder(db.Model):
     domains = db.Column(db.Text, nullable=False)  # JSON array of domains
     
     # Challenge configuration
-    challenge_type = db.Column(db.String(20), nullable=False, default='dns-01')  # http-01, dns-01
+    challenge_type = db.Column(db.String(20), nullable=False, default='dns-01')  # http-01, dns-01, tls-alpn-01
     environment = db.Column(db.String(20), nullable=False, default='staging')  # staging, production
     key_type = db.Column(db.String(20), default='RSA-2048')  # RSA-2048, RSA-4096, EC-P256, EC-P384
     key_source = db.Column(db.String(20), default='generate', nullable=False)  # generate, reuse, csr

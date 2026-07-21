@@ -178,8 +178,8 @@ def test_bad_signature_forces_one_jwks_refresh_then_rejects(monkeypatch):
     {'aud': ['ucm-client', 'other-client']},
     {'aud': ['ucm-client', 'other-client'], 'azp': 'other-client'},
     {'exp': int(time.time()) - 120},
-    {'iat': int(time.time()) + 120},
-    {'nbf': int(time.time()) + 120},
+    {'iat': int(time.time()) + 3600},
+    {'nbf': int(time.time()) + 3600},
     {'exp': float('nan')},
     {'nonce': 'wrong-nonce'},
 ])

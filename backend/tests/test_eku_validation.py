@@ -92,6 +92,16 @@ class TestEkuNames:
     def test_server_auth_known(self):
         assert EKU_NAMES.get('1.3.6.1.5.5.7.3.1') == 'serverAuth'
 
+    def test_pkinit_key_purposes_known(self):
+        assert EKU_NAMES.get('1.3.6.1.5.2.3.4') == 'id-pkinit-KPClientAuth'
+        assert EKU_NAMES.get('1.3.6.1.5.2.3.5') == 'id-pkinit-KPkdc'
+
+        oids, err = normalize_extra_ekus([
+            'id-pkinit-KPClientAuth', 'id-pkinit-KPkdc'
+        ])
+        assert err is None
+        assert oids == ['1.3.6.1.5.2.3.4', '1.3.6.1.5.2.3.5']
+
     def test_code_signing_purposes_known(self):
         # v2.171: Authenticode / kernel-mode / macOS code-signing EKUs
         assert EKU_NAMES.get('1.3.6.1.4.1.311.2.1.21') == 'msIndividualCodeSigning'

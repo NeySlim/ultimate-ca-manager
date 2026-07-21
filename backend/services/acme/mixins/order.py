@@ -20,7 +20,8 @@ class OrderMixin:
         account_id: str,
         identifiers: List[Dict[str, str]],
         not_before: Optional[datetime] = None,
-        not_after: Optional[datetime] = None
+        not_after: Optional[datetime] = None,
+        replaces: Optional[str] = None,
     ) -> AcmeOrder:
         """Create a new certificate order
         
@@ -29,6 +30,7 @@ class OrderMixin:
             identifiers: List of identifiers [{"type": "dns", "value": "example.com"}]
             not_before: Requested validity start (optional)
             not_after: Requested validity end (optional)
+            replaces: RFC 9773 CertID replaced by this order (optional)
             
         Returns:
             AcmeOrder object
@@ -39,6 +41,7 @@ class OrderMixin:
             identifiers=json.dumps(identifiers),
             not_before=not_before,
             not_after=not_after,
+            replaces=replaces,
             expires=utc_now() + timedelta(days=7)
         )
         
@@ -401,11 +404,73 @@ class OrderMixin:
         auth.challenges.append(tls_challenge)
     
     @staticmethod
-    def _problem(error_type: str, detail: str) -> str:
-        return json.dumps({
+    def _problem_data(error_type: str, detail: str) -> Dict[str, Any]:
+        return {
             'type': f'urn:ietf:params:acme:error:{error_type}',
             'detail': detail,
-        })
+        }
+
+    @classmethod
+    def _problem(cls, error_type: str, detail: str) -> str:
+        return json.dumps(cls._problem_data(error_type, detail))
+
+    @staticmethod
+    def _challenge_problem(challenge: AcmeChallenge) -> Dict[str, Any]:
+        try:
+            problem = (
+                json.loads(challenge.error)
+                if isinstance(challenge.error, str)
+                else challenge.error
+            )
+        except (TypeError, ValueError):
+            problem = None
+        if not isinstance(problem, dict):
+            return {
+                'type': 'urn:ietf:params:acme:error:malformed',
+                'detail': 'Authorization failed',
+            }
+        return {
+            'type': problem.get(
+                'type', 'urn:ietf:params:acme:error:malformed'
+            ),
+            'detail': problem.get('detail', 'Authorization failed'),
+        }
+
+    def _set_order_authorization_error(
+        self,
+        order: AcmeOrder,
+        fallback: Dict[str, Any],
+    ) -> None:
+        """Store a compound problem when multiple authorizations failed."""
+        failed_authorizations = order.authorizations.filter_by(
+            status='invalid'
+        ).order_by(AcmeAuthorization.id).all()
+        subproblems = []
+        for authorization in failed_authorizations:
+            challenge = authorization.challenges.filter_by(
+                status='invalid'
+            ).order_by(AcmeChallenge.id).first()
+            problem = (
+                self._challenge_problem(challenge)
+                if challenge is not None
+                else {
+                    'type': 'urn:ietf:params:acme:error:malformed',
+                    'detail': 'Authorization failed',
+                }
+            )
+            subproblems.append({
+                **problem,
+                'identifier': dict(authorization.identifier_obj),
+            })
+
+        if len(subproblems) > 1:
+            order.error = json.dumps({
+                'type': 'urn:ietf:params:acme:error:compound',
+                'detail': 'Multiple authorization failures',
+                'subproblems': subproblems,
+            })
+        else:
+            order.error = json.dumps(fallback)
 
     def expire_order_if_needed(self, order: AcmeOrder) -> bool:
         """Lazily invalidate an expired non-final order."""
@@ -413,10 +478,12 @@ class OrderMixin:
             return False
 
         order.status = 'invalid'
-        order.error = self._problem('malformed', 'Order has expired')
+        problem = self._problem_data('malformed', 'Order has expired')
+        order.error = json.dumps(problem)
         for authorization in order.authorizations:
             if authorization.status == 'pending':
                 self._expire_authorization(authorization, update_order=False)
+        self._set_order_authorization_error(order, problem)
         self._commit_state_change('expire ACME order')
         return True
 
@@ -435,17 +502,19 @@ class OrderMixin:
         *,
         update_order: bool,
     ) -> None:
-        problem = self._problem('malformed', 'Authorization has expired')
+        problem = self._problem_data('malformed', 'Authorization has expired')
         authorization.status = 'invalid'
         for challenge in authorization.challenges:
             if challenge.status in ('pending', 'processing'):
                 challenge.status = 'invalid'
-                challenge.error = problem
+                challenge.error = json.dumps(problem)
 
         order = authorization.order
-        if update_order and order and order.status in ('pending', 'ready'):
-            order.status = 'invalid'
-            order.error = problem
+        if update_order and order:
+            if order.status in ('pending', 'ready'):
+                order.status = 'invalid'
+            if order.status == 'invalid':
+                self._set_order_authorization_error(order, problem)
 
     @staticmethod
     def _commit_state_change(context: str) -> None:

@@ -13,10 +13,12 @@ window, which is not sensitive.
 from __future__ import annotations
 
 import base64
+import re
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 from models import Certificate
+from models.acme_models import AcmeOrder
 from utils.datetime_utils import utc_now
 from utils.serial_format import serial_to_int
 
@@ -29,9 +31,15 @@ _DEFAULT_RENEW_BEFORE_DAYS = 30
 
 
 def _b64url_decode(segment: str) -> bytes:
-    """Decode an unpadded base64url segment (RFC 9773 uses no padding)."""
+    """Decode a canonical unpadded base64url segment."""
+    if not re.fullmatch(r'[A-Za-z0-9_-]+', segment):
+        raise ValueError('Invalid base64url segment')
     pad = '=' * (-len(segment) % 4)
-    return base64.urlsafe_b64decode(segment + pad)
+    decoded = base64.urlsafe_b64decode(segment + pad)
+    canonical = base64.urlsafe_b64encode(decoded).rstrip(b'=').decode('ascii')
+    if canonical != segment:
+        raise ValueError('Non-canonical base64url segment')
+    return decoded
 
 
 def parse_certid(certid: str) -> Optional[Tuple[str, int]]:
@@ -85,7 +93,20 @@ def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
     return None
 
 
-def suggested_window(cert: Certificate, renew_before_days: Optional[int] = None) -> Tuple[datetime, datetime]:
+def has_valid_replacement(certid: str) -> bool:
+    """Return whether a completed ACME order replaced ``certid``."""
+    return AcmeOrder.query.filter_by(
+        replaces=certid,
+        status='valid',
+    ).first() is not None
+
+
+def suggested_window(
+    cert: Certificate,
+    renew_before_days: Optional[int] = None,
+    *,
+    replaced: bool = False,
+) -> Tuple[datetime, datetime]:
     """Compute the ARI suggested renewal window for a certificate.
 
     Centered on ``notAfter - renew_before``, where ``renew_before`` follows
@@ -98,7 +119,7 @@ def suggested_window(cert: Certificate, renew_before_days: Optional[int] = None)
     not_before = cert.valid_from
     not_after = cert.valid_to
 
-    if cert.revoked or not_after is None or not_before is None:
+    if replaced or cert.revoked or not_after is None or not_before is None:
         return now - timedelta(hours=1), now
 
     # Normalize to naive/aware consistently with utc_now (naive UTC in UCM).
@@ -125,9 +146,16 @@ def _rfc3339(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat() + 'Z'
 
 
-def build_renewal_info(cert: Certificate, renew_before_days: Optional[int] = None) -> dict:
+def build_renewal_info(
+    cert: Certificate,
+    renew_before_days: Optional[int] = None,
+    *,
+    replaced: bool = False,
+) -> dict:
     """Build the RFC 9773 RenewalInfo JSON object for a certificate."""
-    start, end = suggested_window(cert, renew_before_days)
+    start, end = suggested_window(
+        cert, renew_before_days, replaced=replaced
+    )
     return {
         'suggestedWindow': {
             'start': _rfc3339(start),

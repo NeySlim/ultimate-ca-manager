@@ -1,7 +1,7 @@
 """Regression test for the SCEP pyCrypto -> cryptography migration.
 
 The SCEP crypto modules must not import the unmaintained pyCrypto (`Crypto`), and the
-CBC ciphers they now use (AES-256-CBC and 3DES-CBC) must round-trip. These are standard
+CBC ciphers they now use (AES-128/256-CBC and 3DES-CBC) must round-trip. These are standard
 algorithms, so the ciphertext is byte-identical to what pyCrypto produced — existing SCEP
 clients' messages keep decrypting unchanged.
 """
@@ -41,6 +41,10 @@ def _cbc_roundtrip(alg, key_len, block):
     dec = Cipher(alg(key), modes.CBC(iv)).decryptor()
     pt = dec.update(ct) + dec.finalize()
     assert pt[:-pt[-1]] == data
+
+
+def test_aes128_cbc_roundtrip():
+    _cbc_roundtrip(algorithms.AES, 16, 16)
 
 
 def test_aes256_cbc_roundtrip():

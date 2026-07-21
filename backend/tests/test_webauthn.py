@@ -8,6 +8,8 @@ Uses shared fixtures from conftest.py:
 """
 import pytest
 import json
+from types import SimpleNamespace
+
 from tests.conftest import get_json
 
 def _post(client, url, data=None):
@@ -82,6 +84,106 @@ class TestWebAuthnDeleteToggle:
             'enabled': False,
         })
         assert r.status_code == 404
+
+
+# ============================================================
+# Authentication sign counter
+# ============================================================
+class TestWebAuthnSignCount:
+    @staticmethod
+    def _credential_data(credential_id, challenge):
+        from services.webauthn_service import base64url_encode
+        client_data = base64url_encode(json.dumps({
+            'challenge': challenge,
+        }).encode('utf-8'))
+        return {
+            'id': base64url_encode(credential_id),
+            'response': {'clientDataJSON': client_data},
+        }
+
+    @staticmethod
+    def _records(user_id, credential_id, challenge, sign_count):
+        from datetime import timedelta
+        from models import db
+        from models.webauthn import WebAuthnChallenge, WebAuthnCredential
+        from utils.datetime_utils import utc_now
+
+        credential = WebAuthnCredential(
+            user_id=user_id,
+            credential_id=credential_id,
+            public_key=b'public-key',
+            sign_count=sign_count,
+            enabled=True,
+        )
+        db.session.add(credential)
+        db.session.add(WebAuthnChallenge(
+            user_id=user_id,
+            challenge=challenge,
+            challenge_type='authentication',
+            expires_at=utc_now() + timedelta(minutes=5),
+        ))
+        db.session.commit()
+        return credential
+
+    def test_passes_stored_count_and_persists_returned_count(
+            self, app, monkeypatch):
+        from models import User
+        from services import webauthn_service
+
+        with app.app_context():
+            user = User.query.filter_by(username='admin').first()
+            credential = self._records(
+                user.id, b'counter-credential', 'Y291bnRlci1jaGFsbGVuZ2U', 7
+            )
+            seen = {}
+
+            def verify(**kwargs):
+                seen.update(kwargs)
+                return SimpleNamespace(new_sign_count=8)
+
+            monkeypatch.setattr(
+                webauthn_service, 'verify_authentication_response', verify
+            )
+            ok, _, _ = webauthn_service.WebAuthnService.verify_authentication(
+                user.id,
+                self._credential_data(
+                    credential.credential_id, 'Y291bnRlci1jaGFsbGVuZ2U'
+                ),
+                'example.test',
+            )
+
+            assert ok is True
+            assert seen['credential_current_sign_count'] == 7
+            assert credential.sign_count == 8
+
+    def test_authenticator_with_zero_counter_remains_supported(
+            self, app, monkeypatch):
+        from models import User
+        from services import webauthn_service
+
+        with app.app_context():
+            user = User.query.filter_by(username='admin').first()
+            credential = self._records(
+                user.id, b'zero-credential', 'emVyby1jaGFsbGVuZ2U', 0
+            )
+
+            def verify(**kwargs):
+                assert kwargs['credential_current_sign_count'] == 0
+                return SimpleNamespace(new_sign_count=0)
+
+            monkeypatch.setattr(
+                webauthn_service, 'verify_authentication_response', verify
+            )
+            ok, _, _ = webauthn_service.WebAuthnService.verify_authentication(
+                user.id,
+                self._credential_data(
+                    credential.credential_id, 'emVyby1jaGFsbGVuZ2U'
+                ),
+                'example.test',
+            )
+
+            assert ok is True
+            assert credential.sign_count == 0
 
 
 # ============================================================

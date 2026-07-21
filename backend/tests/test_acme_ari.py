@@ -1,11 +1,12 @@
 """Tests for ACME Renewal Information (ARI) — RFC 9773."""
 import base64
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from models import db, Certificate
+from models.acme_models import AcmeAccount, AcmeOrder
 from services.acme import ari
 from utils.serial_format import serial_to_int
 
@@ -105,6 +106,38 @@ class TestRenewalInfoEndpoint:
         # No JWS, no auth header — must still succeed (RFC 9773 §4.1).
         r = client.get(f"/acme/renewalInfo/{issued_cert['certid']}")
         assert r.status_code == 200
+
+    def test_replaced_certificate_gets_past_window(
+        self, app, client, issued_cert
+    ):
+        with app.app_context():
+            account = AcmeAccount(
+                account_id='ari-replacement-account',
+                jwk='{}',
+                jwk_thumbprint='ari-replacement-thumbprint',
+                status='valid',
+            )
+            db.session.add(account)
+            db.session.flush()
+            db.session.add(AcmeOrder(
+                account_id=account.account_id,
+                status='valid',
+                identifiers=json.dumps([
+                    {'type': 'dns', 'value': 'ari-test.example.com'}
+                ]),
+                replaces=issued_cert['certid'],
+            ))
+            db.session.commit()
+
+        response = client.get(
+            f"/acme/renewalInfo/{issued_cert['certid']}"
+        )
+
+        assert response.status_code == 200
+        end = datetime.fromisoformat(
+            response.get_json()['suggestedWindow']['end'].replace('Z', '+00:00')
+        )
+        assert end <= datetime.now(timezone.utc)
 
     def test_malformed_certid(self, client):
         r = client.get('/acme/renewalInfo/not-a-valid-certid')

@@ -116,6 +116,8 @@ def scep_endpoint():
 
 def handle_get_ca_caps():
     """Handle GetCACaps operation - return implemented RFC 8894 capabilities."""
+    # RFC 8894 §3.5.2 defines "AES" specifically as AES128-CBC. There is no
+    # registered AES-256 capability keyword; support is inferred from requests.
     response = make_response("\n".join(SCEPService.CAPABILITIES))
     response.headers['Content-Type'] = 'text/plain'
     return response

@@ -338,9 +338,11 @@ class ChallengeMixin:
         authorization.status = 'invalid'
 
         order = authorization.order
-        if order is not None and order.status in ('pending', 'ready'):
-            order.status = 'invalid'
-            order.error = json.dumps(problem)
+        if order is not None:
+            if order.status in ('pending', 'ready'):
+                order.status = 'invalid'
+            if order.status == 'invalid':
+                self._set_order_authorization_error(order, problem)
 
     def _update_authorization_status(self, auth: AcmeAuthorization):
         """Update authorization status based on challenges

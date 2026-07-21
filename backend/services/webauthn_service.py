@@ -329,19 +329,19 @@ class WebAuthnService:
             if not challenge_record or not challenge_record.is_valid():
                 return False, "Invalid or expired challenge", None
             
-            # Verify authentication response
-            # Note: Some authenticators always return sign_count=0, so we pass 0 to skip check
+            # The verifier rejects a non-increasing non-zero counter, while
+            # allowing authenticators that report 0 on every authentication.
             verification = verify_authentication_response(
                 credential=credential_data,
                 expected_challenge=base64url_decode(challenge_record.challenge),
                 expected_rp_id=rp_id,
                 expected_origin=f"https://{hostname}",
                 credential_public_key=credential.public_key,
-                credential_current_sign_count=0,  # Skip sign count check for compatibility
+                credential_current_sign_count=credential.sign_count or 0,
             )
-            
-            # Update credential
-            credential.sign_count = max(verification.new_sign_count, credential.sign_count + 1)
+
+            # Persist the authenticator's actual counter for the next check.
+            credential.sign_count = verification.new_sign_count
             credential.last_used_at = utc_now()
             
             # Delete used challenge

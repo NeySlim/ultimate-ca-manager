@@ -9,6 +9,7 @@ import asn1crypto.core
 from cryptography import x509
 
 from services.scep.crypto_helpers import (
+    AES128_CBC,
     create_degenerate_pkcs7,
     create_signed_pkcs7,
     encrypt_for_client,
@@ -104,16 +105,17 @@ def build_cert_rep_success(
     recipient_cert: x509.Certificate,
     ca_cert: x509.Certificate,
     ca_key,
+    challenge_password: Optional[str | bytes] = None,
+    content_encryption_algorithm: str = AES128_CBC,
 ) -> bytes:
-    """Create a successful CertRep with the issued certificate encrypted for the client.
-
-    *recipient_cert* is the client's signer cert from the original request
-    (self-signed bootstrap cert for PKCSReq, previously-issued cert for
-    RenewalReq); it provides both the encryption public key and the
-    issuer/serial used in RecipientInfo.rid (RFC 5652 §6.2.1).
-    """
+    """Create a successful CertRep encrypted for the SCEP client."""
     pkcs7_data = create_degenerate_pkcs7([cert, ca_cert])
-    encrypted_data = encrypt_for_client(pkcs7_data, recipient_cert)
+    encrypted_data = encrypt_for_client(
+        pkcs7_data,
+        recipient_cert,
+        password=challenge_password,
+        content_encryption_algorithm=content_encryption_algorithm,
+    )
     return build_cert_rep(
         STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert
     )
@@ -126,10 +128,17 @@ def build_crl_rep_success(
     recipient_cert: x509.Certificate,
     ca_cert: x509.Certificate,
     ca_key,
+    challenge_password: Optional[str | bytes] = None,
+    content_encryption_algorithm: str = AES128_CBC,
 ) -> bytes:
     """Create a successful CertRep carrying only the requested CRL."""
     pkcs7_data = create_degenerate_pkcs7([], crls=[crl])
-    encrypted_data = encrypt_for_client(pkcs7_data, recipient_cert)
+    encrypted_data = encrypt_for_client(
+        pkcs7_data,
+        recipient_cert,
+        password=challenge_password,
+        content_encryption_algorithm=content_encryption_algorithm,
+    )
     return build_cert_rep(
         STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert
     )

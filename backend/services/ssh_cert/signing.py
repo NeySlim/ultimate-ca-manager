@@ -1,3 +1,4 @@
+import fnmatch
 import json
 import logging
 import time
@@ -29,6 +30,11 @@ class SSHCertificateSigningMixin:
         if cert_type not in SSHCertificate.VALID_CERT_TYPES:
             raise ValueError(f"Invalid certificate type: {cert_type}")
 
+        if ca.ca_type != cert_type:
+            raise ValueError(
+                f"SSH {ca.ca_type} CA cannot sign {cert_type} certificates"
+            )
+
         if not principals or not isinstance(principals, list):
             raise ValueError("At least one principal is required")
 
@@ -38,10 +44,13 @@ class SSHCertificateSigningMixin:
 
         allowed = ca.get_allowed_principals()
         if allowed:
-            for p in principals:
-                if p not in allowed:
+            for principal in principals:
+                if not any(
+                    fnmatch.fnmatchcase(principal, pattern)
+                    for pattern in allowed
+                ):
                     raise ValueError(
-                        f"Principal '{p}' is not in the CA's allowed principals list"
+                        f"Principal '{principal}' is not in the CA's allowed principals list"
                     )
 
         public_key = SSHCertificateUtilsMixin._parse_public_key(public_key_data)

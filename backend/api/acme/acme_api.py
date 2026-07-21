@@ -9,7 +9,7 @@ import base64
 from typing import Dict, Any, Tuple, Optional
 
 from models import db, CA, Certificate
-from services.acme import AcmeService
+from services.acme import AcmeService, ari
 from models.acme_models import (
     AcmeAccount,
     AcmeAuthorization,
@@ -95,14 +95,20 @@ def acme_response(data: Dict[str, Any], status_code: int = 200) -> Any:
     return response
 
 
-def acme_error(error_type: str, detail: str, status_code: int = 400) -> Any:
-    """Create ACME error response per RFC 7807 (Problem Details)
-    
+def acme_error(
+    error_type: str,
+    detail: str,
+    status_code: int = 400,
+    subproblems: Optional[list] = None,
+) -> Any:
+    """Create ACME error response per RFC 7807 (Problem Details).
+
     Args:
         error_type: ACME error type (e.g., 'malformed', 'unauthorized')
         detail: Human-readable error description
         status_code: HTTP status code
-        
+        subproblems: Identifier-specific ACME problems (RFC 8555 §6.7.1)
+
     Returns:
         Flask Response object with application/problem+json
     """
@@ -122,12 +128,14 @@ def acme_error(error_type: str, detail: str, status_code: int = 400) -> Any:
         "detail": detail,
         "status": status_code
     }
-    
+    if subproblems:
+        error_data['subproblems'] = subproblems
+
     response = make_response(jsonify(error_data), status_code)
     response.headers['Content-Type'] = 'application/problem+json'
     response.headers['Replay-Nonce'] = service.generate_nonce()
     response.headers['Link'] = f'<{service.base_url}/acme/directory>;rel="index"'
-    
+
     return response
 
 
@@ -160,7 +168,11 @@ def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional
         error_type and detail are None and ``identifier['value']`` may have
         been rewritten to its canonical form.
     """
-    if not identifier or 'type' not in identifier or 'value' not in identifier:
+    if (
+        not isinstance(identifier, dict)
+        or 'type' not in identifier
+        or 'value' not in identifier
+    ):
         return False, 'malformed', 'Valid identifier required'
 
     # Support both DNS (RFC 8555) and IP (RFC 8738) identifiers
@@ -175,6 +187,54 @@ def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional
             return False, 'malformed', result
         # Normalize to canonical form
         identifier['value'] = result
+
+    return True, None, None
+
+
+def _identifier_subproblem(
+    identifier: Any,
+    error_type: str,
+    detail: str,
+) -> Dict[str, Any]:
+    identifier_data = identifier if isinstance(identifier, dict) else {}
+    return {
+        'type': f'urn:ietf:params:acme:error:{error_type}',
+        'detail': detail,
+        'identifier': {
+            'type': identifier_data.get('type'),
+            'value': identifier_data.get('value'),
+        },
+    }
+
+
+def _validate_contact_uris(contact: Any) -> Tuple[bool, Optional[str], Optional[str]]:
+    """Validate RFC 8555 account contact URIs supported by this server."""
+    if not isinstance(contact, list):
+        return False, 'invalidContact', 'Contact must be an array of mailto URIs'
+
+    for contact_uri in contact:
+        if not isinstance(contact_uri, str):
+            return False, 'invalidContact', 'Contact URI must be a string'
+        scheme, separator, target = contact_uri.partition(':')
+        if not separator or scheme.lower() != 'mailto':
+            return False, 'unsupportedContact', 'Only mailto contact URIs are supported'
+
+        address = target.split('?', 1)[0]
+        if (
+            not address
+            or address.count('@') != 1
+            or any(character.isspace() for character in address)
+        ):
+            return False, 'invalidContact', 'Malformed mailto contact URI'
+        local_part, domain = address.rsplit('@', 1)
+        if (
+            not local_part
+            or not domain
+            or domain.startswith('.')
+            or domain.endswith('.')
+            or '..' in domain
+        ):
+            return False, 'invalidContact', 'Malformed mailto contact URI'
 
     return True, None, None
 
@@ -574,6 +634,12 @@ def new_account():
         contact = payload.get('contact', [])
         terms_agreed = payload.get('termsOfServiceAgreed', False)
         only_return_existing = payload.get('onlyReturnExisting', False)
+
+        contact_valid, contact_error, contact_detail = _validate_contact_uris(
+            contact
+        )
+        if not contact_valid:
+            return acme_error(contact_error, contact_detail)
         
         # Handle onlyReturnExisting (RFC 8555 Section 7.3.1)
         if only_return_existing:
@@ -915,11 +981,45 @@ def new_order():
         if not identifiers:
             return acme_error('malformed', 'At least one identifier required')
         
-        # Validate all identifiers (RFC 8555 DNS + RFC 8738 IP)
+        if not isinstance(identifiers, list):
+            return acme_error('malformed', 'Identifiers must be an array')
+
+        # RFC 8555 §6.7.1: validate every identifier and report each
+        # independent failure instead of stopping at the first one.
+        identifier_errors = []
         for identifier in identifiers:
             ok, err_type, err_detail = validate_acme_identifier(identifier)
             if not ok:
-                return acme_error(err_type, err_detail)
+                identifier_errors.append(_identifier_subproblem(
+                    identifier, err_type, err_detail
+                ))
+        if identifier_errors:
+            primary_type = (
+                'compound' if len(identifier_errors) > 1
+                else identifier_errors[0]['type'].rsplit(':', 1)[-1]
+            )
+            detail = (
+                'Multiple identifiers could not be accepted'
+                if len(identifier_errors) > 1
+                else identifier_errors[0]['detail']
+            )
+            return acme_error(
+                primary_type,
+                detail,
+                subproblems=identifier_errors,
+            )
+
+        replaces = payload.get('replaces')
+        if replaces is not None and (
+            not isinstance(replaces, str) or ari.parse_certid(replaces) is None
+        ):
+            return acme_error(
+                'malformed', 'Malformed replacement certificate identifier'
+            )
+
+        # RFC 9773 §5 allows replacement orders to bypass rate limits. UCM
+        # currently has no ACME new-order rate limit; storing ``replaces``
+        # preserves the signal for a future limiter to exempt these orders.
         
         # Parse optional dates
         not_before = payload.get('notBefore')
@@ -935,7 +1035,8 @@ def new_order():
             account_id=account.account_id,
             identifiers=identifiers,
             not_before=not_before,
-            not_after=not_after
+            not_after=not_after,
+            replaces=replaces,
         )
         
         # Build response
@@ -1773,8 +1874,6 @@ def renewal_info(certid: str):
     to renew the certificate identified by ``certid``
     (base64url(AKI)."."base64url(serial)).
     """
-    from services.acme import ari
-
     parsed = ari.parse_certid(certid)
     if parsed is None:
         return acme_error('malformed', 'Malformed certificate identifier', 400)
@@ -1791,7 +1890,11 @@ def renewal_info(certid: str):
     except (TypeError, ValueError):
         renew_before_days = None
 
-    data = ari.build_renewal_info(cert, renew_before_days)
+    data = ari.build_renewal_info(
+        cert,
+        renew_before_days,
+        replaced=ari.has_valid_replacement(certid),
+    )
     response = make_response(jsonify(data), 200)
     response.headers['Content-Type'] = 'application/json'
     # ARI responses are cacheable (RFC 9773 §4.2); advise re-poll cadence.

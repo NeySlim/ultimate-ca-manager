@@ -8,11 +8,12 @@ import json
 import base64
 import hashlib
 import hmac
+import ipaddress
 import time
 import logging
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
-from typing import Dict, Any, Optional, Tuple, List, Union
+from typing import Dict, Any, Optional, Tuple, List, Union, TYPE_CHECKING
 
 import requests
 from cryptography.hazmat.primitives import serialization, hashes
@@ -26,7 +27,16 @@ from models import db, SystemConfig, Certificate, DnsProvider, AcmeClientOrder
 from services.acme.dns_providers import create_provider, get_provider_class
 from services.acme.dns_selfcheck import acme_allow_loopback_upstream
 from utils.safe_requests import create_session
+from utils.acme_csr import extract_domains_from_csr
+from utils.acme_ip import (
+    extract_ip_from_csr_san,
+    normalize_ip_for_identifier,
+    TlsAlpn01Listener,
+)
 from utils import ssrf_protection
+
+if TYPE_CHECKING:
+    from models.acme_client_account import AcmeClientAccount
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +57,41 @@ CERT_KEY_TYPES = {
     'EC-P256': lambda: ec.generate_private_key(ec.SECP256R1(), default_backend()),
     'EC-P384': lambda: ec.generate_private_key(ec.SECP384R1(), default_backend()),
 }
+
+
+def csr_identifiers_match_order(
+    csr: x509.CertificateSigningRequest,
+    order_identifiers: List[str],
+) -> Tuple[bool, str]:
+    """Compare DNS and RFC 8738 IP SAN identifiers with an ACME order."""
+    csr_values = {
+        ('dns', value.lower().rstrip('.'))
+        for value in extract_domains_from_csr(csr)
+        if normalize_ip_for_identifier(value) is None
+    }
+    csr_values.update(
+        ('ip', normalize_ip_for_identifier(value))
+        for value in extract_ip_from_csr_san(csr)
+    )
+
+    order_values = set()
+    for value in order_identifiers:
+        normalized_ip = normalize_ip_for_identifier(value)
+        if normalized_ip is not None:
+            order_values.add(('ip', normalized_ip))
+        else:
+            order_values.add(('dns', value.lower().rstrip('.')))
+
+    if not csr_values:
+        return False, 'CSR contains no DNS or IP identifiers'
+    if csr_values != order_values:
+        csr_display = sorted(value for _kind, value in csr_values)
+        order_display = sorted(value for _kind, value in order_values)
+        return False, (
+            f"CSR identifiers {csr_display} don't match order identifiers "
+            f'{order_display}'
+        )
+    return True, 'CSR identifiers match order'
 
 
 def _legacy_directory_url() -> Optional[str]:
@@ -73,7 +118,8 @@ class AcmeClientService:
     LE_PRODUCTION = "https://acme-v02.api.letsencrypt.org/directory"
 
     def __init__(self, environment: str = None, directory_url: str = None,
-                 account: 'AcmeClientAccount' = None):
+                 account: 'AcmeClientAccount' = None,
+                 tls_alpn_port: Optional[int] = None):
         """
         Initialize ACME client.
 
@@ -96,6 +142,7 @@ class AcmeClientService:
         self.directory = None
         self.account_key = None  # lazy-loaded from self.account.account_key
         self.account_url = self.account.account_url
+        self._tls_alpn_port_override = tls_alpn_port
 
         self.verify_ssl = self._get_verify_ssl()
         self.session = create_session(verify_ssl=self.verify_ssl)
@@ -921,24 +968,40 @@ class AcmeClientService:
         Create a new certificate order.
         
         Args:
-            domains: List of domain names
+            domains: List of DNS names and/or IP addresses
             email: Contact email
-            challenge_type: 'http-01' or 'dns-01'
+            challenge_type: 'http-01', 'dns-01', or 'tls-alpn-01'
             dns_provider_id: DNS provider for DNS-01 challenges
         
         Returns:
             Tuple of (success, message, order)
         """
         try:
+            if challenge_type not in ('dns-01', 'http-01', 'tls-alpn-01'):
+                return False, 'Unsupported ACME challenge type', None
+
+            identifiers = []
+            normalized_domains = []
+            for value in domains:
+                normalized_ip = normalize_ip_for_identifier(value)
+                identifier_type = 'ip' if normalized_ip is not None else 'dns'
+                normalized_value = normalized_ip or value
+                identifiers.append({'type': identifier_type, 'value': normalized_value})
+                normalized_domains.append(normalized_value)
+
+            if challenge_type == 'dns-01' and any(
+                identifier['type'] == 'ip' for identifier in identifiers
+            ):
+                return False, 'dns-01 cannot be used with IP identifiers', None
+
             # Ensure account exists
             success, msg = self.ensure_account(email)
             if not success:
                 return False, msg, None
-            
-            # Create order at Let's Encrypt
+
+            # Create order at the external ACME CA.
             directory = self._fetch_directory()
-            
-            identifiers = [{"type": "dns", "value": d} for d in domains]
+
             payload = {"identifiers": identifiers}
             if replaces and directory.get('renewalInfo'):
                 payload['replaces'] = replaces
@@ -954,7 +1017,7 @@ class AcmeClientService:
             
             # Create local order record
             order = AcmeClientOrder(
-                domains=json.dumps(domains),
+                domains=json.dumps(normalized_domains),
                 challenge_type=challenge_type,
                 environment=self.environment,
                 status='pending',
@@ -974,8 +1037,11 @@ class AcmeClientService:
                 authz_resp = self._post(authz_url, "")  # POST-as-GET
                 if authz_resp.status_code == 200:
                     authz = authz_resp.json()
-                    domain = authz['identifier']['value']
-                    
+                    authz_identifier = authz['identifier']
+                    domain = authz_identifier['value']
+                    if authz_identifier.get('type') == 'ip':
+                        domain = normalize_ip_for_identifier(domain) or domain
+
                     for challenge in authz.get('challenges', []):
                         if challenge['type'] == challenge_type:
                             # Calculate key authorization
@@ -995,6 +1061,7 @@ class AcmeClientService:
                                 'authz_url': authz_url,
                                 'token': token,
                                 'key_authorization': key_auth,
+                                'identifier_type': authz_identifier.get('type', 'dns'),
                                 'dns_txt_name': f"_acme-challenge.{domain.lstrip('*.')}",
                                 'dns_txt_value': dns_value if challenge_type == 'dns-01' else None,
                                 'status': challenge['status'],
@@ -1006,7 +1073,7 @@ class AcmeClientService:
             db.session.add(order)
             db.session.commit()
             
-            logger.info(f"Created ACME order for {domains}: {order_url}")
+            logger.info(f"Created ACME order for {normalized_domains}: {order_url}")
             return True, "Order created successfully", order
             
         except Exception as e:
@@ -1155,8 +1222,11 @@ class AcmeClientService:
             if authz_status == 'valid' or challenge.get('status') == 'valid':
                 return True, 'Authorization already valid'
 
+            if order.challenge_type == 'tls-alpn-01':
+                return self._verify_tls_alpn_challenge(order, domain)
+
             challenge_url = challenge['url']
-            
+
             # POST empty object to trigger validation
             resp = self._post(challenge_url, {})
             
@@ -1177,7 +1247,87 @@ class AcmeClientService:
         except Exception as e:
             logger.error(f"Challenge verification error: {e}")
             return False, str(e)
-    
+
+    def _tls_alpn_listen_port(self) -> int:
+        """Resolve the proof-listener port (443, overrideable for test setups)."""
+        if self._tls_alpn_port_override is not None:
+            port = int(self._tls_alpn_port_override)
+        else:
+            cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
+            try:
+                port = int(cfg.value) if cfg and cfg.value else 443
+            except (TypeError, ValueError):
+                port = 443
+        if not 1 <= port <= 65535:
+            raise ValueError('TLS-ALPN-01 listen port must be between 1 and 65535')
+        return port
+
+    def _create_tls_alpn_listener(self, identifier: str, key_authorization: str):
+        return TlsAlpn01Listener(
+            identifier,
+            key_authorization,
+            port=self._tls_alpn_listen_port(),
+        )
+
+    def _verify_tls_alpn_challenge(
+        self, order: AcmeClientOrder, identifier: str,
+    ) -> Tuple[bool, str]:
+        """Serve the RFC 8737 proof while the external CA validates it."""
+        challenges = order.challenges_dict
+        challenge = challenges.get(identifier)
+        if not challenge:
+            return False, f'No challenge found for {identifier}'
+
+        listener = self._create_tls_alpn_listener(
+            identifier, challenge['key_authorization']
+        )
+        try:
+            listener.start()
+            response = self._post(challenge['url'], {})
+            if response.status_code != 200:
+                try:
+                    detail = response.json().get('detail', 'Unknown error')
+                except Exception:
+                    detail = 'Unknown error'
+                return False, f'Challenge submission failed: {detail}'
+
+            result = response.json()
+            challenge['status'] = result.get('status', 'processing')
+            order.set_challenges_dict(challenges)
+            db.session.commit()
+            if challenge['status'] == 'valid':
+                return True, 'TLS-ALPN-01 challenge validated'
+
+            poll = self.get_poll_settings()
+            timeout = max(1, int(poll['order_poll_timeout_sec']))
+            interval = max(1, int(poll['order_poll_interval_sec']))
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                authz_status, authz_data = self.check_authorization_status(
+                    order, identifier
+                )
+                if authz_status == 'valid':
+                    return True, 'TLS-ALPN-01 challenge validated'
+                if authz_status == 'invalid':
+                    detail = self._authz_error_detail(authz_data)
+                    message = AUTHZ_INVALID_USER_MSG
+                    if detail:
+                        message = f'{message} ({detail})'
+                    return False, message
+                remaining = deadline - time.monotonic()
+                if remaining > 0:
+                    time.sleep(min(interval, remaining))
+
+            return False, (
+                f'TLS-ALPN-01 validation timed out after {timeout}s while '
+                f'the listener was active on port {listener.port}'
+            )
+        except Exception as exc:
+            logger.error('TLS-ALPN-01 verification failed for %s: %s', identifier, exc)
+            return False, str(exc)
+        finally:
+            listener.stop()
+
     def check_order_status(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
         """
         Check current order status from ACME server.
@@ -1228,16 +1378,12 @@ class AcmeClientService:
             if key_source == 'csr':
                 if not order.csr_pem:
                     return False, 'External CSR not stored on order', None
-                from utils.acme_csr import (
-                    load_pem_csr,
-                    csr_domains_match_order,
-                    csr_to_b64url_der,
-                )
+                from utils.acme_csr import load_pem_csr, csr_to_b64url_der
                 try:
                     csr = load_pem_csr(order.csr_pem)
                 except ValueError as exc:
                     return False, str(exc), None
-                match_ok, match_msg = csr_domains_match_order(csr, domains)
+                match_ok, match_msg = csr_identifiers_match_order(csr, domains)
                 if not match_ok:
                     return False, match_msg, None
                 csr_b64 = csr_to_b64url_der(csr)
@@ -1426,7 +1572,13 @@ class AcmeClientService:
         subject = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
         ])
-        san_list = [x509.DNSName(d) for d in domains]
+        san_list = []
+        for identifier in domains:
+            normalized_ip = normalize_ip_for_identifier(identifier)
+            if normalized_ip is not None:
+                san_list.append(x509.IPAddress(ipaddress.ip_address(normalized_ip)))
+            else:
+                san_list.append(x509.DNSName(identifier))
         csr = x509.CertificateSigningRequestBuilder().subject_name(
             subject
         ).add_extension(

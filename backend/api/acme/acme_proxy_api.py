@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from models import AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
-from services.acme.acme_proxy_service import AcmeProxyService
+from services.acme.acme_proxy_service import AcmeProxyService, ProxyDns01OnlyError
 from services.cert_service import CertificateService
 from services.acme.acme_proxy_account import (
     ProxyEndpointNotConfiguredError,
@@ -378,6 +378,24 @@ def new_order(slug=None):
         identifiers = payload.get('identifiers')
         if not identifiers:
             return proxy_error("malformed", "Missing 'identifiers' in payload")
+        if any(
+            not isinstance(identifier, dict) or identifier.get('type') != 'dns'
+            for identifier in identifiers
+        ):
+            return proxy_error(
+                'unsupportedIdentifier',
+                'The ACME proxy supports DNS identifiers with dns-01 only; '
+                'IP identifiers are not supported.',
+                400,
+            )
+        requested_challenge = payload.get('challenge_type') or payload.get('challengeType')
+        if requested_challenge and requested_challenge != 'dns-01':
+            return proxy_error(
+                'malformed',
+                f'Challenge type {requested_challenge} is not supported by the '
+                'ACME proxy; use dns-01.',
+                400,
+            )
 
         not_before = payload.get('notBefore')
         if not_before:
@@ -418,6 +436,8 @@ def new_order(slug=None):
         resp.headers['Location'] = order_url
         return resp
 
+    except ProxyDns01OnlyError as e:
+        return proxy_error('unsupportedIdentifier', str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e))
     except ProxyEndpointNotConfiguredError as e:
@@ -452,6 +472,8 @@ def authz(authz_id, slug=None):
 
         data, _ = result
         return proxy_response(data)
+    except ProxyDns01OnlyError as e:
+        return proxy_error('malformed', str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except ProxyEndpointNotConfiguredError as e:
@@ -478,6 +500,8 @@ def challenge(chall_id, slug=None):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except ProxyDns01OnlyError as e:
+        return proxy_error('malformed', str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except ProxyEndpointNotConfiguredError as e:
