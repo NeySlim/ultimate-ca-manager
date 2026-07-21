@@ -1,13 +1,17 @@
 """Tests for the OCSP responder service (previously 0 coverage)."""
 import base64
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from asn1crypto import core as asn1_core
+from asn1crypto import ocsp as asn1_ocsp
 from cryptography import x509
 from cryptography.x509 import ocsp
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from api.ocsp_routes import OCSP_REQUEST_TYPE, _find_ca_by_issuer_hash
-from models import db, CA, Certificate, OCSPResponse
+from models import db, CA, Certificate, OCSPResponse, SystemConfig
 from services.cert_service import CertificateService
 from services.ocsp_service import OCSPService
 
@@ -30,6 +34,77 @@ def _cache_entries(ca_id, serial):
         OCSPResponse.ca_id == ca_id,
         OCSPResponse.cert_serial.startswith(prefix),
     ).all()
+
+
+def _cert_id(cert, issuer, algorithm):
+    request_der = (
+        ocsp.OCSPRequestBuilder()
+        .add_certificate(cert, issuer, algorithm)
+        .build()
+        .public_bytes(serialization.Encoding.DER)
+    )
+    parsed = asn1_ocsp.OCSPRequest.load(request_der)
+    return parsed['tbs_request']['request_list'][0]['req_cert']
+
+
+def _build_asn1_request(cert_ids, extension=None):
+    tbs_request = {
+        'request_list': [
+            asn1_ocsp.Request({'req_cert': cert_id}) for cert_id in cert_ids
+        ],
+    }
+    if extension is not None:
+        tbs_request['request_extensions'] = [extension]
+    return asn1_ocsp.OCSPRequest({'tbs_request': tbs_request}).dump()
+
+
+def _request_extension(oid, critical):
+    return asn1_ocsp.TBSRequestExtension({
+        'extn_id': oid,
+        'critical': critical,
+        'extn_value': asn1_core.ParsableOctetString(b'test'),
+    })
+
+
+def _delegated_certificate(
+    ca_cert, ca_key, responder_key, *, issuer=None, signer_key=None,
+    not_before=None, not_after=None,
+):
+    now = datetime.now(timezone.utc)
+    return (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name([
+            x509.NameAttribute(x509.NameOID.COMMON_NAME, 'OCSP Responder')
+        ]))
+        .issuer_name(issuer or ca_cert.subject)
+        .public_key(responder_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(not_before or now - timedelta(minutes=5))
+        .not_valid_after(not_after or now + timedelta(days=30))
+        .add_extension(
+            x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]),
+            critical=False,
+        )
+        .add_extension(x509.OCSPNoCheck(), critical=False)
+        .sign(signer_key or ca_key, hashes.SHA256())
+    )
+
+
+def _configure_delegated_responder(ca_obj, cert_obj, responder_cert, responder_key):
+    cert_obj.crt = base64.b64encode(
+        responder_cert.public_bytes(serialization.Encoding.PEM)
+    ).decode()
+    cert_obj.prv = base64.b64encode(
+        responder_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    ).decode()
+    db.session.add(SystemConfig(
+        key=f'ocsp_responder_cert_{ca_obj.id}', value=str(cert_obj.id)
+    ))
+    db.session.commit()
 
 
 class TestParseRequest:
@@ -188,6 +263,196 @@ class TestGenerateResponse:
             response = ocsp.load_der_ocsp_response(der)
             assert response.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL
             assert response.certificate_status == ocsp.OCSPCertStatus.UNKNOWN
+
+    def test_configurable_response_validity(self, app, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='OCSP Validity CA')
+            cert = create_cert(cn='validity.example.com', ca_id=ca['id'])
+            db.session.add(SystemConfig(
+                key='ocsp_response_validity_hours', value='6'
+            ))
+            db.session.commit()
+
+            der, status = OCSPService().generate_response(
+                _ca_model(ca), _load_x509(_cert_model(cert)).serial_number
+            )
+
+            assert status == 'good'
+            response = ocsp.load_der_ocsp_response(der)
+            assert (
+                response.next_update_utc - response.this_update_utc
+                == timedelta(hours=6)
+            )
+
+
+class TestMultiCertificateRequest:
+    def test_response_contains_status_for_each_requested_cert_id(
+        self, app, client, create_ca, create_cert
+    ):
+        with app.app_context():
+            ca = create_ca(cn='OCSP Multi CA')
+            good = create_cert(cn='multi-good.example.com', ca_id=ca['id'])
+            revoked = create_cert(cn='multi-revoked.example.com', ca_id=ca['id'])
+            seed = create_cert(cn='multi-seed.example.com', ca_id=ca['id'])
+            CertificateService.revoke_certificate(
+                revoked['id'], reason='keyCompromise', username='test'
+            )
+            ca_obj = _ca_model(ca)
+            ca_obj.ocsp_enabled = True
+            db.session.commit()
+            issuer = _load_x509(ca_obj)
+            good_cert = _load_x509(_cert_model(good))
+            revoked_cert = _load_x509(_cert_model(revoked))
+            seed_cert = _load_x509(_cert_model(seed))
+
+            good_id = _cert_id(good_cert, issuer, hashes.SHA1())
+            revoked_id = _cert_id(revoked_cert, issuer, hashes.SHA256())
+            unknown_id = asn1_ocsp.CertId.load(
+                _cert_id(seed_cert, issuer, hashes.SHA384()).dump()
+            )
+            unknown_serial = x509.random_serial_number()
+            unknown_id['serial_number'] = unknown_serial
+            request_der = _build_asn1_request(
+                [good_id, revoked_id, unknown_id]
+            )
+
+            response = client.post(
+                '/ocsp', data=request_der, content_type=OCSP_REQUEST_TYPE
+            )
+
+            assert response.status_code == 200
+            parsed = ocsp.load_der_ocsp_response(response.data)
+            assert parsed.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL
+            single_responses = list(parsed.responses)
+            assert len(single_responses) == 3
+            by_serial = {item.serial_number: item for item in single_responses}
+            assert by_serial[good_cert.serial_number].certificate_status == (
+                ocsp.OCSPCertStatus.GOOD
+            )
+            assert isinstance(
+                by_serial[good_cert.serial_number].hash_algorithm, hashes.SHA1
+            )
+            assert by_serial[revoked_cert.serial_number].certificate_status == (
+                ocsp.OCSPCertStatus.REVOKED
+            )
+            assert isinstance(
+                by_serial[revoked_cert.serial_number].hash_algorithm, hashes.SHA256
+            )
+            assert by_serial[unknown_serial].certificate_status == (
+                ocsp.OCSPCertStatus.UNKNOWN
+            )
+            assert isinstance(
+                by_serial[unknown_serial].hash_algorithm, hashes.SHA384
+            )
+
+
+class TestRequestExtensions:
+    @pytest.mark.parametrize('critical', [False, True])
+    def test_unknown_extension_is_rejected_only_when_critical(
+        self, app, client, create_ca, create_cert, critical
+    ):
+        with app.app_context():
+            ca = create_ca(cn=f'OCSP Extension CA {critical}')
+            cert = create_cert(
+                cn=f'extension-{critical}.example.com', ca_id=ca['id']
+            )
+            ca_obj = _ca_model(ca)
+            ca_obj.ocsp_enabled = True
+            db.session.commit()
+            request_der = _build_asn1_request(
+                [_cert_id(
+                    _load_x509(_cert_model(cert)),
+                    _load_x509(ca_obj),
+                    hashes.SHA256(),
+                )],
+                extension=_request_extension('1.2.3.4.5.6.7', critical),
+            )
+
+            response = client.post(
+                '/ocsp', data=request_der, content_type=OCSP_REQUEST_TYPE
+            )
+
+            parsed = ocsp.load_der_ocsp_response(response.data)
+            expected = (
+                ocsp.OCSPResponseStatus.MALFORMED_REQUEST
+                if critical else ocsp.OCSPResponseStatus.SUCCESSFUL
+            )
+            assert parsed.response_status == expected
+
+
+class TestDelegatedResponderValidation:
+    def test_accepts_valid_ca_issued_responder(
+        self, app, create_ca, create_cert, monkeypatch
+    ):
+        with app.app_context():
+            ca = create_ca(cn='OCSP Delegated Valid CA')
+            record = create_cert(cn='delegated-valid.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            ca_key = OCSPService()._load_ca_key(ca_obj)
+            responder_key = rsa.generate_private_key(
+                public_exponent=65537, key_size=2048
+            )
+            responder_cert = _delegated_certificate(
+                ca_cert, ca_key, responder_key
+            )
+            _configure_delegated_responder(
+                ca_obj, _cert_model(record), responder_cert, responder_key
+            )
+            monkeypatch.setattr(
+                'security.encryption.decrypt_private_key', lambda value: value
+            )
+
+            loaded_cert, loaded_key = OCSPService()._get_delegated_responder(ca_obj)
+
+            assert loaded_cert.fingerprint(hashes.SHA256()) == (
+                responder_cert.fingerprint(hashes.SHA256())
+            )
+            assert loaded_key.public_key().public_numbers() == (
+                responder_key.public_key().public_numbers()
+            )
+
+    @pytest.mark.parametrize('invalid_kind', ['issuer', 'signature', 'expired'])
+    def test_rejects_responder_not_validly_issued_by_ca(
+        self, app, create_ca, create_cert, caplog, invalid_kind
+    ):
+        with app.app_context():
+            ca = create_ca(cn=f'OCSP Delegated Invalid CA {invalid_kind}')
+            record = create_cert(
+                cn=f'delegated-invalid-{invalid_kind}.example.com', ca_id=ca['id']
+            )
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            ca_key = OCSPService()._load_ca_key(ca_obj)
+            responder_key = rsa.generate_private_key(
+                public_exponent=65537, key_size=2048
+            )
+            kwargs = {}
+            if invalid_kind == 'issuer':
+                kwargs['issuer'] = x509.Name([
+                    x509.NameAttribute(x509.NameOID.COMMON_NAME, 'Other CA')
+                ])
+            elif invalid_kind == 'signature':
+                kwargs['signer_key'] = rsa.generate_private_key(
+                    public_exponent=65537, key_size=2048
+                )
+            else:
+                now = datetime.now(timezone.utc)
+                kwargs['not_before'] = now - timedelta(days=2)
+                kwargs['not_after'] = now - timedelta(days=1)
+            responder_cert = _delegated_certificate(
+                ca_cert, ca_key, responder_key, **kwargs
+            )
+            _configure_delegated_responder(
+                ca_obj, _cert_model(record), responder_cert, responder_key
+            )
+
+            loaded_cert, loaded_key = OCSPService()._get_delegated_responder(ca_obj)
+
+            assert (loaded_cert, loaded_key) == (None, None)
+            assert any(
+                invalid_kind in message.lower() for message in caplog.messages
+            )
 
 
 class TestCacheInvalidation:

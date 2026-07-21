@@ -98,36 +98,51 @@ def _process_ocsp_request(request_der: bytes) -> Response:
     if not request_der:
         return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
 
-    ocsp_req = ocsp_service.parse_request(request_der)
-    if not ocsp_req:
+    parsed_request = ocsp_service.parse_request_details(request_der)
+    if not parsed_request:
+        return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
+    if parsed_request.has_unsupported_critical_extension:
         return _error_response(ocsp.OCSPResponseStatus.MALFORMED_REQUEST)
 
-    cert_serial = ocsp_req.serial_number
-    issuer_name_hash = ocsp_req.issuer_name_hash
-    issuer_key_hash = ocsp_req.issuer_key_hash
-    hash_algorithm = ocsp_req.hash_algorithm
+    matched_cas = []
+    for item in parsed_request.requests:
+        ca = _find_ca_by_issuer_hash(
+            item.issuer_name_hash,
+            item.issuer_key_hash,
+            item.hash_algorithm,
+        )
+        if not ca or not ca.ocsp_enabled:
+            return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
+        matched_cas.append(ca)
 
-    # Extract nonce for replay protection
-    request_nonce = None
-    try:
-        nonce_ext = ocsp_req.extensions.get_extension_for_class(x509.OCSPNonce)
-        request_nonce = nonce_ext.value.nonce
-    except x509.ExtensionNotFound:
-        pass
-
-    ca = _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm)
-    if not ca:
+    ca = matched_cas[0]
+    if any(item_ca.id != ca.id for item_ca in matched_cas[1:]):
+        # One BasicOCSPResponse signer must be authorized for every CertID.
         return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
 
-    if not ca.ocsp_enabled:
-        return _error_response(ocsp.OCSPResponseStatus.UNAUTHORIZED)
+    request_nonce = parsed_request.nonce
+    if len(parsed_request.requests) > 1:
+        response_der, statuses = ocsp_service.generate_multi_response(
+            ca=ca,
+            request_items=parsed_request.requests,
+            request_nonce=request_nonce,
+        )
+        logger.info(
+            "OCSP multi-response for %d CertIDs: %s",
+            len(parsed_request.requests),
+            ','.join(statuses),
+        )
+        resp = Response(response_der, status=200, content_type=OCSP_CONTENT_TYPE)
+        _add_cache_headers(resp, request_nonce)
+        return resp
 
-    cert_serial_hex = format(cert_serial, 'x')
+    item = parsed_request.requests[0]
+    cert_serial_hex = format(item.serial_number, 'x')
     # RFC 6960 §4.4.1: when client sends a nonce, the response MUST include
     # the same nonce. A cached response holds the nonce of an earlier
     # request, so we cannot reuse it here — regenerate fresh.
     cached = None if request_nonce is not None else ocsp_service.get_cached_response(
-        ca.id, cert_serial_hex, hash_algorithm)
+        ca.id, cert_serial_hex, item.hash_algorithm)
     if cached:
         resp = Response(cached, status=200, content_type=OCSP_CONTENT_TYPE)
         _add_cache_headers(resp, request_nonce)
@@ -135,14 +150,13 @@ def _process_ocsp_request(request_der: bytes) -> Response:
 
     response_der, status_str = ocsp_service.generate_response(
         ca=ca,
-        cert_serial=cert_serial,
+        cert_serial=item.serial_number,
         request_nonce=request_nonce,
         # Echo the request CertID verbatim (RFC 6960 §4.2.1): strict clients
-        # (Cisco ASA, RFC 5019 lightweight profile) reject a SingleResponse
-        # whose CertID hash algorithm differs from the request (#143).
-        hash_algorithm=hash_algorithm,
-        issuer_name_hash=issuer_name_hash,
-        issuer_key_hash=issuer_key_hash,
+        # reject a SingleResponse whose CertID differs from the request.
+        hash_algorithm=item.hash_algorithm,
+        issuer_name_hash=item.issuer_name_hash,
+        issuer_key_hash=item.issuer_key_hash,
     )
 
     logger.info(f"OCSP response for serial {cert_serial_hex}: {status_str}")

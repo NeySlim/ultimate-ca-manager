@@ -11,6 +11,36 @@ logger = logging.getLogger(__name__)
 
 
 class IssuanceMixin:
+    def _caa_request_context(self, order):
+        """Return the RFC 8657 account URL and validation method per DNS authz."""
+        account_url = f"{self.base_url}/acme/acct/{order.account_id}"
+        validation_methods = {}
+
+        for authorization in order.authorizations:
+            identifier = authorization.identifier_obj
+            if identifier.get('type') != 'dns':
+                continue
+
+            domain = identifier.get('value', '')
+            if authorization.wildcard and not domain.startswith('*.'):
+                domain = f"*.{domain}"
+
+            valid_methods = {
+                challenge.type.lower()
+                for challenge in authorization.challenges
+                if challenge.status == 'valid' and challenge.type
+            }
+            validation_methods[domain] = (
+                next(iter(valid_methods)) if len(valid_methods) == 1 else None
+            )
+            if len(valid_methods) != 1:
+                logger.warning(
+                    "Cannot determine a unique ACME validation method for %s",
+                    domain,
+                )
+
+        return account_url, validation_methods
+
     def finalize_order(
         self,
         order_id: str,
@@ -87,7 +117,13 @@ class IssuanceMixin:
                     except Exception:
                         pass
                 
-                caa_allowed, caa_reason = check_caa_for_domains(order_domains, caa_identifiers)
+                account_url, validation_methods = self._caa_request_context(order)
+                caa_allowed, caa_reason = check_caa_for_domains(
+                    order_domains,
+                    caa_identifiers,
+                    account_url=account_url,
+                    validation_methods=validation_methods,
+                )
                 if not caa_allowed:
                     logger.warning(f"CAA check failed for order {order_id}: {caa_reason}")
                     return False, f"CAA check failed: {caa_reason}"
@@ -95,7 +131,8 @@ class IssuanceMixin:
             except ImportError:
                 logger.debug("dns.resolver not available, skipping CAA check")
             except Exception as e:
-                logger.warning(f"CAA check error (non-blocking): {e}")
+                logger.warning(f"CAA check error: {e}")
+                return False, "CAA check failed: DNS lookup error"
         
         # Resolve CA: domain-specific → global default → first available
         # IP-only orders have no domains: skips the per-domain mappings and

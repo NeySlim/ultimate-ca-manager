@@ -3,22 +3,60 @@ OCSP Service - Online Certificate Status Protocol (RFC 6960)
 Handles OCSP request parsing and response generation
 """
 import base64
+import hashlib
 import logging
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
+
+from asn1crypto import core as asn1_core
+from asn1crypto import ocsp as asn1_ocsp
+from asn1crypto import x509 as asn1_x509
 from cryptography import x509
 from cryptography.x509 import ocsp
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding, utils
+from cryptography.hazmat.primitives.asymmetric import (
+    dsa, ec, ed25519, ed448, padding, rsa, utils,
+)
 from cryptography.hazmat.backends import default_backend
 from sqlalchemy import or_
 
-from models import db, CA, Certificate, OCSPResponse
+from models import db, CA, Certificate, OCSPResponse, SystemConfig
 from utils.datetime_utils import utc_now
 from utils.serial_format import serial_to_hex
 
 logger = logging.getLogger(__name__)
+
+_NONCE_OID = '1.3.6.1.5.5.7.48.1.2'
+_DEFAULT_RESPONSE_VALIDITY_HOURS = 24
+_HASH_ALGORITHMS = {
+    'sha1': hashes.SHA1,
+    'sha224': hashes.SHA224,
+    'sha256': hashes.SHA256,
+    'sha384': hashes.SHA384,
+    'sha512': hashes.SHA512,
+}
+
+
+@dataclass(frozen=True)
+class OCSPRequestItem:
+    """One RFC 6960 CertID from an OCSP request list."""
+
+    serial_number: int
+    issuer_name_hash: bytes
+    issuer_key_hash: bytes
+    hash_algorithm: hashes.HashAlgorithm
+    cert_id_der: bytes
+
+
+@dataclass(frozen=True)
+class ParsedOCSPRequest:
+    """Request-wide extensions and every requested CertID."""
+
+    requests: Tuple[OCSPRequestItem, ...]
+    nonce: Optional[bytes]
+    has_unsupported_critical_extension: bool
 
 
 class _HsmPrivateKeyWrapper:
@@ -95,21 +133,86 @@ class OCSPService:
     
     def parse_request(self, request_der: bytes) -> Optional[ocsp.OCSPRequest]:
         """
-        Parse OCSP request from DER-encoded bytes
-        
-        Args:
-            request_der: DER-encoded OCSP request
-            
-        Returns:
-            OCSPRequest object or None if parsing fails
+        Parse a single-entry OCSP request with cryptography.
+
+        Multi-entry requests must use :meth:`parse_request_details` because
+        cryptography currently rejects requestList sequences longer than one.
         """
         try:
-            ocsp_request = ocsp.load_der_ocsp_request(request_der)
-            return ocsp_request
+            return ocsp.load_der_ocsp_request(request_der)
         except Exception as e:
             logger.error(f"Failed to parse OCSP request: {e}")
             return None
-    
+
+    def parse_request_details(
+        self, request_der: bytes
+    ) -> Optional[ParsedOCSPRequest]:
+        """Parse every CertID and request extension from DER (RFC 6960 §4.1)."""
+        try:
+            parsed = asn1_ocsp.OCSPRequest.load(request_der, strict=True)
+            tbs_request = parsed['tbs_request']
+            request_list = tbs_request['request_list']
+            if len(request_list) == 0:
+                raise ValueError('OCSP requestList must not be empty')
+
+            items = tuple(self._parse_request_item(item) for item in request_list)
+            nonce, unsupported_critical = self._parse_request_extensions(
+                tbs_request
+            )
+            return ParsedOCSPRequest(
+                requests=items,
+                nonce=nonce,
+                has_unsupported_critical_extension=unsupported_critical,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to parse OCSP request details: {e}")
+            return None
+
+    @staticmethod
+    def _parse_request_item(request_item) -> OCSPRequestItem:
+        cert_id = request_item['req_cert']
+        algorithm_name = cert_id['hash_algorithm']['algorithm'].native
+        algorithm_type = _HASH_ALGORITHMS.get(algorithm_name)
+        if algorithm_type is None:
+            raise ValueError(f'Unsupported OCSP CertID hash algorithm: {algorithm_name}')
+        serial_number = cert_id['serial_number'].native
+        if serial_number <= 0:
+            raise ValueError('OCSP CertID serial number must be positive')
+        return OCSPRequestItem(
+            serial_number=serial_number,
+            issuer_name_hash=cert_id['issuer_name_hash'].native,
+            issuer_key_hash=cert_id['issuer_key_hash'].native,
+            hash_algorithm=algorithm_type(),
+            cert_id_der=cert_id.dump(),
+        )
+
+    @staticmethod
+    def _parse_request_extensions(tbs_request) -> Tuple[Optional[bytes], bool]:
+        nonce = None
+        unsupported_critical = False
+        extensions = tbs_request['request_extensions']
+        if extensions.native is not None:
+            for extension in extensions:
+                oid = extension['extn_id'].dotted
+                if extension['critical'].native and oid != _NONCE_OID:
+                    unsupported_critical = True
+                if oid == _NONCE_OID:
+                    if nonce is not None:
+                        raise ValueError('Duplicate OCSP nonce extension')
+                    nonce = extension['extn_value'].parsed.native
+                    if not isinstance(nonce, bytes):
+                        raise ValueError('Malformed OCSP nonce extension')
+
+        for request_item in tbs_request['request_list']:
+            single_extensions = request_item['single_request_extensions']
+            if single_extensions.native is None:
+                continue
+            for extension in single_extensions:
+                if (extension['critical'].native
+                        and extension['extn_id'].dotted != _NONCE_OID):
+                    unsupported_critical = True
+        return nonce, unsupported_critical
+
     def _load_ca_key(self, ca: CA):
         """Load CA private key, supporting both local and HSM storage"""
         if ca.uses_hsm:
@@ -165,8 +268,6 @@ class OCSPService:
         
         Returns (responder_cert, responder_key) or (None, None) if not configured.
         """
-        from models import SystemConfig
-        
         # Check if delegated responder is configured for this CA
         config_row = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{ca.id}').first()
         responder_cert_id = config_row.value if config_row else ''
@@ -179,11 +280,38 @@ class OCSPService:
                 logger.warning(f"Delegated OCSP responder cert {responder_cert_id} not found or incomplete")
                 return None, None
             
-            # Load and verify responder certificate has OCSPSigning EKU
+            # Verify the responder is currently valid and was directly issued
+            # by the CA it is configured to answer for (RFC 6960 §4.2.2.2).
             resp_cert = self._load_cert(responder_record)
             if not resp_cert:
+                logger.warning(
+                    f"Delegated responder cert {responder_cert_id} could not be parsed"
+                )
                 return None, None
-            
+            ca_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(ca.crt), self.backend
+            )
+            if resp_cert.issuer != ca_cert.subject:
+                logger.warning(
+                    f"Delegated responder cert {responder_cert_id} issuer does not "
+                    f"match CA {ca.id} subject"
+                )
+                return None, None
+            if not self._certificate_is_currently_valid(resp_cert):
+                logger.warning(
+                    f"Delegated responder cert {responder_cert_id} is expired or "
+                    f"not yet valid"
+                )
+                return None, None
+            try:
+                self._verify_certificate_signature(resp_cert, ca_cert)
+            except Exception as e:
+                logger.warning(
+                    f"Delegated responder cert {responder_cert_id} signature is "
+                    f"not valid for CA {ca.id}: {e}"
+                )
+                return None, None
+
             try:
                 eku = resp_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
                 if x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in eku.value:
@@ -228,7 +356,242 @@ class OCSPService:
         except Exception as e:
             logger.error(f"Failed to load delegated OCSP responder: {e}")
             return None, None
-    
+
+    @staticmethod
+    def _certificate_is_currently_valid(cert: x509.Certificate) -> bool:
+        now = datetime.now(timezone.utc)
+        not_before = (
+            cert.not_valid_before_utc
+            if hasattr(cert, 'not_valid_before_utc')
+            else cert.not_valid_before.replace(tzinfo=timezone.utc)
+        )
+        not_after = (
+            cert.not_valid_after_utc
+            if hasattr(cert, 'not_valid_after_utc')
+            else cert.not_valid_after.replace(tzinfo=timezone.utc)
+        )
+        return not_before <= now <= not_after
+
+    @staticmethod
+    def _verify_certificate_signature(
+        certificate: x509.Certificate, issuer: x509.Certificate
+    ) -> None:
+        public_key = issuer.public_key()
+        signature_hash = certificate.signature_hash_algorithm
+        if isinstance(public_key, rsa.RSAPublicKey):
+            signature_padding = getattr(
+                certificate, 'signature_algorithm_parameters', None
+            ) or padding.PKCS1v15()
+            public_key.verify(
+                certificate.signature,
+                certificate.tbs_certificate_bytes,
+                signature_padding,
+                signature_hash,
+            )
+        elif isinstance(public_key, ec.EllipticCurvePublicKey):
+            public_key.verify(
+                certificate.signature,
+                certificate.tbs_certificate_bytes,
+                ec.ECDSA(signature_hash),
+            )
+        elif isinstance(public_key, dsa.DSAPublicKey):
+            public_key.verify(
+                certificate.signature,
+                certificate.tbs_certificate_bytes,
+                signature_hash,
+            )
+        elif isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
+            public_key.verify(
+                certificate.signature, certificate.tbs_certificate_bytes
+            )
+        else:
+            raise ValueError('Unsupported delegated responder issuer key type')
+
+    @staticmethod
+    def _response_validity_hours() -> int:
+        config = SystemConfig.query.filter_by(
+            key='ocsp_response_validity_hours'
+        ).first()
+        raw_value = config.value if config else str(_DEFAULT_RESPONSE_VALIDITY_HOURS)
+        try:
+            hours = int(raw_value)
+            if hours <= 0:
+                raise ValueError
+            return hours
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid ocsp_response_validity_hours value %r; using default %s",
+                raw_value,
+                _DEFAULT_RESPONSE_VALIDITY_HOURS,
+            )
+            return _DEFAULT_RESPONSE_VALIDITY_HOURS
+
+    @staticmethod
+    def _status_for_serial(ca: CA, cert_serial: int):
+        serial_dec = str(cert_serial)
+        serial_hex = format(cert_serial, 'x')
+        certificate = (
+            Certificate.query.filter_by(
+                caref=ca.refid, serial_number=serial_dec).first()
+            or Certificate.query.filter_by(
+                caref=ca.refid, serial_number=serial_hex).first()
+            or Certificate.query.filter_by(
+                caref=ca.refid, serial_number=serial_hex.upper()).first()
+        )
+        if not certificate:
+            return None, 'unknown', None, None
+        if not certificate.revoked:
+            return certificate, 'good', None, None
+        return (
+            certificate,
+            'revoked',
+            certificate.revoked_at or utc_now(),
+            _REASON_MAP.get(
+                certificate.revoke_reason, x509.ReasonFlags.unspecified
+            ),
+        )
+
+    @staticmethod
+    def _asn1_time(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        else:
+            value = value.astimezone(timezone.utc)
+        return value.replace(microsecond=0)
+
+    @staticmethod
+    def _asn1_certificate_status(
+        status: str,
+        revocation_time: Optional[datetime],
+        revocation_reason: Optional[x509.ReasonFlags],
+    ):
+        if status == 'good':
+            return {'good': None}
+        if status == 'unknown':
+            return {'unknown': None}
+        revoked_info = {
+            'revocation_time': OCSPService._asn1_time(revocation_time),
+        }
+        if revocation_reason is not None:
+            revoked_info['revocation_reason'] = revocation_reason.name
+        return {'revoked': revoked_info}
+
+    @staticmethod
+    def _sign_response_data(signing_key, response_data_der: bytes):
+        public_key = signing_key.public_key()
+        if isinstance(public_key, rsa.RSAPublicKey):
+            signature = signing_key.sign(
+                response_data_der, padding.PKCS1v15(), hashes.SHA256()
+            )
+            return signature, 'sha256_rsa'
+        if isinstance(public_key, ec.EllipticCurvePublicKey):
+            signature = signing_key.sign(
+                response_data_der, ec.ECDSA(hashes.SHA256())
+            )
+            return signature, 'sha256_ecdsa'
+        if isinstance(public_key, ed25519.Ed25519PublicKey):
+            return signing_key.sign(response_data_der), 'ed25519'
+        if isinstance(public_key, ed448.Ed448PublicKey):
+            return signing_key.sign(response_data_der), 'ed448'
+        raise ValueError('Unsupported OCSP response signing key type')
+
+    def generate_multi_response(
+        self,
+        ca: CA,
+        request_items: Tuple[OCSPRequestItem, ...],
+        request_nonce: Optional[bytes] = None,
+    ) -> Tuple[bytes, Tuple[str, ...]]:
+        """Build one BasicOCSPResponse containing every requested CertID."""
+        try:
+            ca_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(ca.crt), self.backend
+            )
+            ca_key = self._load_ca_key(ca)
+            responder_cert, responder_key = self._get_delegated_responder(ca)
+            use_delegated = responder_cert is not None and responder_key is not None
+            signing_cert = responder_cert if use_delegated else ca_cert
+            signing_key = responder_key if use_delegated else ca_key
+
+            this_update = utc_now().replace(microsecond=0)
+            next_update = this_update + timedelta(
+                hours=self._response_validity_hours()
+            )
+            single_responses = []
+            statuses = []
+            for item in request_items:
+                _, status, revoked_at, revoked_reason = self._status_for_serial(
+                    ca, item.serial_number
+                )
+                single_responses.append(asn1_ocsp.SingleResponse({
+                    'cert_id': asn1_ocsp.CertId.load(
+                        item.cert_id_der, strict=True
+                    ),
+                    'cert_status': self._asn1_certificate_status(
+                        status, revoked_at, revoked_reason
+                    ),
+                    'this_update': self._asn1_time(this_update),
+                    'next_update': self._asn1_time(next_update),
+                }))
+                statuses.append(status)
+
+            signing_cert_asn1 = asn1_x509.Certificate.load(
+                signing_cert.public_bytes(serialization.Encoding.DER)
+            )
+            subject_public_key = signing_cert_asn1[
+                'tbs_certificate'
+            ]['subject_public_key_info']['public_key'].contents[1:]
+            response_data_fields = {
+                'responder_id': {
+                    'by_key': hashlib.sha1(subject_public_key).digest()
+                },
+                'produced_at': self._asn1_time(this_update),
+                'responses': single_responses,
+            }
+            if request_nonce is not None:
+                response_data_fields['response_extensions'] = [
+                    asn1_ocsp.ResponseDataExtension({
+                        'extn_id': 'nonce',
+                        'critical': False,
+                        'extn_value': asn1_core.OctetString(request_nonce),
+                    })
+                ]
+            response_data = asn1_ocsp.ResponseData(response_data_fields)
+            signature, signature_algorithm = self._sign_response_data(
+                signing_key, response_data.dump()
+            )
+            basic_response_fields = {
+                'tbs_response_data': response_data,
+                'signature_algorithm': {'algorithm': signature_algorithm},
+                'signature': signature,
+            }
+            if use_delegated:
+                basic_response_fields['certs'] = [signing_cert_asn1]
+            basic_response = asn1_ocsp.BasicOCSPResponse(basic_response_fields)
+            response = asn1_ocsp.OCSPResponse({
+                'response_status': 'successful',
+                'response_bytes': {
+                    'response_type': 'basic_ocsp_response',
+                    'response': basic_response,
+                },
+            })
+            logger.info(
+                "Generated multi-certificate OCSP response with %d entries",
+                len(single_responses),
+            )
+            return response.dump(), tuple(statuses)
+        except Exception as e:
+            logger.error(
+                f"Failed to generate multi-certificate OCSP response: {e}",
+                exc_info=True,
+            )
+            error_response = ocsp.OCSPResponseBuilder.build_unsuccessful(
+                ocsp.OCSPResponseStatus.INTERNAL_ERROR
+            )
+            return (
+                error_response.public_bytes(serialization.Encoding.DER),
+                ('error',),
+            )
+
     def generate_response(
         self,
         ca: CA,
@@ -315,7 +678,9 @@ class OCSPService:
             
             # Build OCSP response
             this_update = utc_now()
-            next_update = this_update + timedelta(hours=24)
+            next_update = this_update + timedelta(
+                hours=self._response_validity_hours()
+            )
             
             builder = ocsp.OCSPResponseBuilder()
             

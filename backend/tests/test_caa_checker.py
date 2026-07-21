@@ -6,6 +6,7 @@ zone returns as we walk up the domain tree.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -54,9 +55,18 @@ class TestNoRecords:
         assert ok is True
         assert 'No CAA record' in reason
 
-    def test_dns_error_treated_as_no_record(self):
-        with patch('dns.resolver.resolve',
-                   side_effect=dns.exception.Timeout()):
+    @pytest.mark.parametrize('dns_error', [
+        dns.exception.Timeout(),
+        dns.resolver.NoNameservers(),
+    ])
+    def test_dns_error_denies_issuance(self, dns_error):
+        with patch('dns.resolver.resolve', side_effect=dns_error):
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is False
+        assert 'DNS lookup failed' in reason
+
+    def test_nodata_continues_to_parent(self):
+        with _patch({'example.com': [_FakeCAA('issue', 'ucm.example.com')]}):
             ok, _ = check_caa('www.example.com', ['ucm.example.com'])
         assert ok is True
 
@@ -79,11 +89,86 @@ class TestIssueMatching:
             ok, _ = check_caa('www.example.com', ['ucm.example.com'])
         assert ok is True
 
-    def test_issue_parameters_are_stripped(self):
-        # "issue" value may carry ;accounturi=... parameters (RFC 8657)
-        rec = _FakeCAA('issue', 'ucm.example.com; accounturi=https://a/1')
+    def test_accounturi_match_allows(self):
+        rec = _FakeCAA(
+            'issue',
+            'ucm.example.com; accounturi=https://ca.example/acme/acct/account-1',
+        )
+        with _patch({'example.com': [rec]}):
+            ok, _ = check_caa(
+                'www.example.com',
+                ['ucm.example.com'],
+                account_url='https://ca.example/acme/acct/account-1',
+            )
+        assert ok is True
+
+    def test_accounturi_mismatch_denies(self):
+        rec = _FakeCAA(
+            'issue',
+            'ucm.example.com; accounturi=https://ca.example/acme/acct/account-1',
+        )
+        with _patch({'example.com': [rec]}):
+            ok, reason = check_caa(
+                'www.example.com',
+                ['ucm.example.com'],
+                account_url='https://ca.example/acme/acct/account-2',
+            )
+        assert ok is False
+        assert 'accounturi' in reason
+
+    def test_accounturi_without_request_account_denies(self):
+        rec = _FakeCAA(
+            'issue',
+            'ucm.example.com; accounturi=https://ca.example/acme/acct/account-1',
+        )
         with _patch({'example.com': [rec]}):
             ok, _ = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is False
+
+    def test_validationmethods_allows_used_method(self):
+        rec = _FakeCAA(
+            'issue',
+            'ucm.example.com; validationmethods=http-01,dns-01',
+        )
+        with _patch({'example.com': [rec]}):
+            ok, _ = check_caa(
+                'www.example.com',
+                ['ucm.example.com'],
+                validation_method='dns-01',
+            )
+        assert ok is True
+
+    def test_validationmethods_denies_other_method(self):
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=http-01')
+        with _patch({'example.com': [rec]}):
+            ok, reason = check_caa(
+                'www.example.com',
+                ['ucm.example.com'],
+                validation_method='dns-01',
+            )
+        assert ok is False
+        assert 'validationmethods' in reason
+
+    def test_validationmethods_without_used_method_denies(self):
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
+        with _patch({'example.com': [rec]}):
+            ok, _ = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is False
+
+    def test_alternate_matching_record_can_authorize(self):
+        zones = {'example.com': [
+            _FakeCAA(
+                'issue',
+                'ucm.example.com; accounturi=https://ca.example/acme/acct/other',
+            ),
+            _FakeCAA('issue', 'ucm.example.com'),
+        ]}
+        with _patch(zones):
+            ok, _ = check_caa(
+                'www.example.com',
+                ['ucm.example.com'],
+                account_url='https://ca.example/acme/acct/account-1',
+            )
         assert ok is True
 
     def test_empty_issue_denies_all(self):
@@ -92,12 +177,36 @@ class TestIssueMatching:
         assert ok is False
         assert 'denies all' in reason
 
-    def test_record_without_issue_tags_allows(self):
+    def test_record_without_issue_tags_allows(self, caplog):
         # Only an iodef tag present → no issue restriction
+        caplog.set_level('INFO', logger='utils.caa_checker')
         with _patch({'example.com': [_FakeCAA('iodef', 'mailto:x@example.com')]}):
             ok, reason = check_caa('www.example.com', ['ucm.example.com'])
         assert ok is True
         assert 'no issue tags' in reason
+        assert 'mailto:x@example.com' in caplog.text
+
+
+class TestCriticalFlag:
+    def test_unknown_critical_property_denies(self):
+        zones = {'example.com': [
+            _FakeCAA('future-property', 'value', flags=128),
+            _FakeCAA('issue', 'ucm.example.com'),
+        ]}
+        with _patch(zones):
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is False
+        assert 'critical' in reason.lower()
+        assert 'future-property' in reason
+
+    def test_unknown_noncritical_property_is_ignored(self):
+        zones = {'example.com': [
+            _FakeCAA('future-property', 'value', flags=0),
+            _FakeCAA('issue', 'ucm.example.com'),
+        ]}
+        with _patch(zones):
+            ok, _ = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is True
 
 
 class TestTreeClimb:
@@ -170,6 +279,53 @@ class TestWildcard:
         assert ok is True
 
 
+class TestIssuanceContext:
+    def test_account_url_and_per_authorization_method(self):
+        from services.acme.mixins.issuance import IssuanceMixin
+
+        authorization = SimpleNamespace(
+            identifier_obj={'type': 'dns', 'value': 'www.example.com'},
+            wildcard=False,
+            challenges=[
+                SimpleNamespace(type='dns-01', status='pending'),
+                SimpleNamespace(type='http-01', status='valid'),
+            ],
+        )
+        order = SimpleNamespace(
+            account_id='account-1',
+            authorizations=[authorization],
+        )
+        mixin = IssuanceMixin()
+        mixin.base_url = 'https://ca.example'
+
+        account_url, methods = mixin._caa_request_context(order)
+
+        assert account_url == 'https://ca.example/acme/acct/account-1'
+        assert methods == {'www.example.com': 'http-01'}
+
+    def test_ambiguous_valid_methods_fail_closed(self):
+        from services.acme.mixins.issuance import IssuanceMixin
+
+        authorization = SimpleNamespace(
+            identifier_obj={'type': 'dns', 'value': 'example.com'},
+            wildcard=True,
+            challenges=[
+                SimpleNamespace(type='dns-01', status='valid'),
+                SimpleNamespace(type='http-01', status='valid'),
+            ],
+        )
+        order = SimpleNamespace(
+            account_id='account-1',
+            authorizations=[authorization],
+        )
+        mixin = IssuanceMixin()
+        mixin.base_url = 'https://ca.example'
+
+        _, methods = mixin._caa_request_context(order)
+
+        assert methods == {'*.example.com': None}
+
+
 class TestMultipleDomains:
     def test_all_must_pass(self):
         zones = {
@@ -190,6 +346,28 @@ class TestMultipleDomains:
         with _patch(zones):
             ok, _ = check_caa_for_domains(
                 ['a.example.com', 'b.example.com'], ['ucm.example.com'])
+        assert ok is True
+
+    def test_per_domain_validation_methods_are_forwarded(self):
+        zones = {
+            'a.example.com': [
+                _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
+            ],
+            'b.example.com': [
+                _FakeCAA('issue', 'ucm.example.com; validationmethods=http-01')
+            ],
+        }
+        methods = {
+            'a.example.com': 'dns-01',
+            'b.example.com': 'http-01',
+        }
+        with _patch(zones):
+            ok, _ = check_caa_for_domains(
+                ['a.example.com', 'b.example.com'],
+                ['ucm.example.com'],
+                account_url='https://ca.example/acme/acct/account-1',
+                validation_methods=methods,
+            )
         assert ok is True
 
     def test_empty_issuer_list_denies_when_any_issue_tag_present(self):
