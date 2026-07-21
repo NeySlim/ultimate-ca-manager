@@ -32,9 +32,10 @@ const mscaService = {
   syncCrl: (id) =>
     apiClient.post(`/microsoft-cas/${id}/sync-crl`),
 
-  // WinRM admin channel
-  testAdminChannel: (id) =>
-    apiClient.post(`/microsoft-cas/${id}/admin-channel/test`),
+  // WinRM admin channel — overrides carry unsaved form values so the test
+  // reflects what is about to be saved, not the stored config
+  testAdminChannel: (id, overrides) =>
+    apiClient.post(`/microsoft-cas/${id}/admin-channel/test`, overrides || {}),
 
   publishCrl: (id) =>
     apiClient.post(`/microsoft-cas/${id}/publish-crl`),

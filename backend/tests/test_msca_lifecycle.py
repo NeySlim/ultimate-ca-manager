@@ -174,11 +174,66 @@ class TestMscaRenew:
         assert body['meta']['msca_status'] == 'pending'
         assert 'pending' in body['message'].lower()
 
-    def test_renew_msca_without_csr_fails(self, app, auth_client):
-        cert_id, _, _ = _create_msca_cert(app, 'renew-nocsr.test.local', with_csr=False)
+    def test_renew_msca_without_csr_rekeys(self, app, auth_client, monkeypatch):
+        """Imported certs with no CSR/key are renewed by rekey: a fresh key
+        pair + CSR with the same subject is generated, stored on the cert,
+        and submitted to the connection."""
+        cert_id, msca_id, req_id = _create_msca_cert(
+            app, 'renew-nocsr.test.local', with_csr=False)
+        _, _, new_cert_pem = _make_key_csr_cert('renew-nocsr.test.local', days=730)
+        captured = {}
+
+        def fake_submit_csr(msca_id, csr_pem, template, csr_id=None,
+                            submitted_by=None, enrollee_name=None, enrollee_upn=None):
+            captured['csr_pem'] = csr_pem
+            return {'status': 'issued', 'request_id': req_id, 'cert_pem': new_cert_pem}
+
+        from services.msca_service import MicrosoftCAService
+        monkeypatch.setattr(MicrosoftCAService, 'submit_csr', staticmethod(fake_submit_csr))
+
         r = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
-        assert r.status_code == 400
-        assert 'CSR' in get_json(r)['message']
+        assert r.status_code == 200, r.data
+        assert get_json(r)['meta']['msca_status'] == 'issued'
+
+        # The generated CSR carries the original subject and validates.
+        csr = x509.load_pem_x509_csr(captured['csr_pem'].encode())
+        assert csr.subject.rfc4514_string() == 'CN=renew-nocsr.test.local'
+        assert csr.is_signature_valid
+
+        with app.app_context():
+            from models import Certificate, db
+            from utils.key_codec import load_pem_bytes
+            cert = db.session.get(Certificate, cert_id)
+            assert cert.csr  # CSR stored for future renewals
+            key_pem = load_pem_bytes(cert.prv, context='rekey test')
+            key = serialization.load_pem_private_key(key_pem, password=None)
+            # New key matches the CSR's public key
+            assert key.public_key().public_numbers() == \
+                csr.public_key().public_numbers()
+
+    def test_renew_msca_without_csr_pending_persists_key(self, app, auth_client, monkeypatch):
+        """On a rekey renewal that lands in manager approval, the key + CSR
+        must already be persisted so the status poll can finalize."""
+        cert_id, _, _ = _create_msca_cert(
+            app, 'renew-nocsr-pending.test.local', with_csr=False)
+
+        def fake_submit_csr(**kwargs):
+            return {'status': 'pending', 'request_id': None, 'ms_request_id': 77,
+                    'message': 'Request pending manager approval'}
+
+        from services.msca_service import MicrosoftCAService
+        monkeypatch.setattr(MicrosoftCAService, 'submit_csr', staticmethod(fake_submit_csr))
+
+        r = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
+        assert r.status_code == 200, r.data
+        assert get_json(r)['meta']['msca_status'] == 'pending'
+
+        with app.app_context():
+            from models import Certificate, db
+            from utils.key_codec import load_pem_bytes
+            cert = db.session.get(Certificate, cert_id)
+            assert cert.csr
+            load_pem_bytes(cert.prv, context='rekey pending test')
 
     def test_renew_msca_disabled_connection_fails(self, app, auth_client):
         cert_id, msca_id, _ = _create_msca_cert(app, 'renew-disabled.test.local')

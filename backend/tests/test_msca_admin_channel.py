@@ -175,6 +175,88 @@ class TestAdminChannelEndpoints:
         r = post_json(auth_client, f'{BASE}/{msca_id}/admin-channel/test')
         assert r.status_code == 400
 
+    def test_test_channel_uses_unsaved_overrides(self, app, auth_client, monkeypatch):
+        """The test must run against the form's current (unsaved) values, not
+        the stored row — and must not persist anything."""
+        msca_id, _, _ = _make_msca_cert(app, 'chan-override.test.local')
+        from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+        seen = {}
+
+        def fake_run_ps(cfg, script):
+            seen['host'] = cfg.winrm_effective_host
+            seen['transport'] = cfg.winrm_transport
+            seen['username'] = cfg.winrm_effective_username
+            seen['password'] = cfg.winrm_effective_password
+            return 'UCM_CERTSVC=Running\n'
+
+        monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps',
+                            staticmethod(fake_run_ps))
+        r = post_json(auth_client, f'{BASE}/{msca_id}/admin-channel/test', {
+            'winrm_host': 'other-dc.test.local',
+            'winrm_transport': 'ntlm',
+            'winrm_username': 'officer',
+            'winrm_password': 'override-secret',
+        })
+        assert r.status_code == 200, r.data
+        assert seen['host'] == 'other-dc.test.local'
+        assert seen['transport'] == 'ntlm'
+        assert seen['username'] == 'officer'
+        assert seen['password'] == 'override-secret'
+
+        # Nothing persisted: the row keeps its saved values.
+        with app.app_context():
+            from models import db
+            from models.msca import MicrosoftCA
+            msca = db.session.get(MicrosoftCA, msca_id)
+            assert msca.winrm_host is None
+            assert msca.winrm_username is None
+            assert msca._winrm_password is None
+
+    def test_test_channel_masked_password_uses_saved(self, app, auth_client, monkeypatch):
+        msca_id, _, _ = _make_msca_cert(app, 'chan-masked.test.local')
+        with app.app_context():
+            from models import db
+            from models.msca import MicrosoftCA
+            db.session.get(MicrosoftCA, msca_id).winrm_password = 'saved-secret'
+            db.session.commit()
+
+        from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+        seen = {}
+
+        def fake_run_ps(cfg, script):
+            seen['password'] = cfg.winrm_effective_password
+            return 'UCM_CERTSVC=Running\n'
+
+        monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps',
+                            staticmethod(fake_run_ps))
+        r = post_json(auth_client, f'{BASE}/{msca_id}/admin-channel/test',
+                      {'winrm_password': '***'})
+        assert r.status_code == 200, r.data
+        assert seen['password'] == 'saved-secret'
+
+    def test_test_channel_override_enables_before_save(self, app, auth_client, monkeypatch):
+        """Enabling the channel in the form allows testing before saving."""
+        msca_id, _, _ = _make_msca_cert(app, 'chan-presave.test.local', winrm=False)
+        from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+        monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps',
+                            staticmethod(lambda cfg, script: 'UCM_CERTSVC=Running\n'))
+        r = post_json(auth_client, f'{BASE}/{msca_id}/admin-channel/test', {
+            'winrm_enabled': True,
+            'winrm_transport': 'ntlm',
+            'winrm_username': 'officer',
+            'winrm_password': 's3cret',
+        })
+        assert r.status_code == 200, r.data
+
+    def test_test_channel_invalid_override_rejected(self, app, auth_client):
+        msca_id, _, _ = _make_msca_cert(app, 'chan-badoverride.test.local')
+        r = post_json(auth_client, f'{BASE}/{msca_id}/admin-channel/test',
+                      {'winrm_transport': 'telnet'})
+        assert r.status_code == 400
+        r = post_json(auth_client, f'{BASE}/{msca_id}/admin-channel/test',
+                      {'ca_config': 'HOST\\CA"; certutil -shutdown'})
+        assert r.status_code == 400
+
     def test_publish_crl(self, app, auth_client, monkeypatch):
         msca_id, _, _ = _make_msca_cert(app, 'chan-crl.test.local')
         from services.msca.admin_channel import MicrosoftCAAdminChannelMixin

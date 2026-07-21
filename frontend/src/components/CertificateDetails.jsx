@@ -146,6 +146,7 @@ export function CertificateDetails({
   const sourceConfig = {
     acme: { variant: 'info', label: 'ACME' },
     scep: { variant: 'warning', label: 'SCEP' },
+    msca: { variant: 'info', label: 'AD CS' },
     import: { variant: 'default', label: t('common.imported') },
     csr: { variant: 'default', label: t('details.fromCSR') },
     manual: { variant: 'default', label: t('common.manual') }
@@ -173,6 +174,7 @@ export function CertificateDetails({
             </h3>
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
+            {!cert.has_private_key && <Badge variant="warning" size="sm">{t('details.noKey')}</Badge>}
           </div>
           <p className="text-2xs sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
         </div>

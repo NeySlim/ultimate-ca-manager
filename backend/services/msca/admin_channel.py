@@ -56,7 +56,15 @@ class MicrosoftCAAdminChannelMixin:
         msca = db.session.get(MicrosoftCA, msca_id)
         if not msca:
             raise MSCAAdminChannelError('Connection not found')
+        return MicrosoftCAAdminChannelMixin.test_admin_channel_config(msca)
 
+    @staticmethod
+    def test_admin_channel_config(config):
+        """Validate a WinRM channel from a saved connection OR a transient
+        config object (unsaved form overrides). Never persists anything —
+        the object only needs the winrm_*/ca_config attributes and the
+        winrm_effective_* values a MicrosoftCA row exposes.
+        """
         script = (
             "$ErrorActionPreference='Stop';"
             "chcp 65001 | Out-Null;"
@@ -64,7 +72,7 @@ class MicrosoftCAAdminChannelMixin:
             "certutil -ping;"
             "Write-Output \"UCM_CERTSVC=$svc\""
         )
-        out = MicrosoftCAAdminChannelMixin._run_ps(msca, script)
+        out = MicrosoftCAAdminChannelMixin._run_ps(config, script)
         svc = None
         m = re.search(r'UCM_CERTSVC=(\w+)', out)
         if m:
@@ -72,8 +80,8 @@ class MicrosoftCAAdminChannelMixin:
         return {
             'success': True,
             'certsvc_status': svc,
-            'transport': msca.winrm_transport,
-            'host': msca.winrm_effective_host,
+            'transport': config.winrm_transport,
+            'host': config.winrm_effective_host,
         }
 
     @staticmethod

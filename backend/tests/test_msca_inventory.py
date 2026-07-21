@@ -209,6 +209,63 @@ class TestInventorySyncService:
             assert len(matches) == 1  # not re-imported
             assert matches[0].id == pre_id
 
+    def test_dedup_by_swapped_serial(self, app, fake_ca):
+        """certutil -view may print the serial with its byte pairs reversed
+        (AD CS quirk) — a cert UCM knows under the straight byte order must
+        not be re-imported as a duplicate."""
+        msca_id = _make_msca(app, 'Inv Swap S')
+        fake_ca.add(15, 'inv-s-known.test.local')
+        row = fake_ca.rows[0]
+        # UCM knows the cert under the straight serial…
+        pre_id = _add_ucm_cert(app, msca_id, 'Inv Swap S',
+                               row['cn'], row['serial'], row['pem'])
+        # …but the CA listing shows the byte pairs reversed.
+        s = row['serial'] if len(row['serial']) % 2 == 0 else '0' + row['serial']
+        pairs = [s[i:i + 2] for i in range(0, len(s), 2)]
+        row['serial'] = ''.join(reversed(pairs))
+
+        with app.app_context():
+            from services.msca_service import MicrosoftCAService
+            summary = MicrosoftCAService.inventory_sync(msca_id)
+            assert summary['imported'] == 0
+            assert summary['skipped'] == 1
+
+            from models import Certificate
+            assert Certificate.query.filter(
+                Certificate.subject_cn == 'inv-s-known.test.local').count() == 1
+            assert Certificate.query.filter(
+                Certificate.subject_cn == 'inv-s-known.test.local').one().id == pre_id
+
+    def test_dedup_by_request_id(self, app, fake_ca):
+        """A row whose RequestId is already tracked by UCM is skipped even if
+        the serial comparison would miss (exact-link dedup)."""
+        msca_id = _make_msca(app, 'Inv ReqId R')
+        fake_ca.add(25, 'inv-r-known.test.local')
+        row = fake_ca.rows[0]
+        with app.app_context():
+            from models import Certificate, db
+            from models.msca import MSCARequest
+            cert = Certificate(
+                refid='inv-r-known', descr=f'MSCA: {row["cn"]}',
+                crt=base64.b64encode(row['pem'].encode()).decode(),
+                cert_type='server', subject=f'CN={row["cn"]}',
+                subject_cn=row['cn'],
+                serial_number='not-a-matching-serial',
+                source='msca', imported_from='msca:Inv ReqId R',
+            )
+            db.session.add(cert)
+            db.session.flush()
+            db.session.add(MSCARequest(msca_id=msca_id, cert_id=cert.id,
+                                       request_id=25, template='WebServer',
+                                       status='issued'))
+            db.session.commit()
+
+        with app.app_context():
+            from services.msca_service import MicrosoftCAService
+            summary = MicrosoftCAService.inventory_sync(msca_id)
+            assert summary['imported'] == 0
+            assert summary['skipped'] == 1
+
     def test_incremental_high_water_mark_and_full_rescan(self, app, fake_ca):
         msca_id = _make_msca(app, 'Inv Incr C')
         fake_ca.add(20, 'inv-c1.test.local')
@@ -305,4 +362,21 @@ class TestReconcileService:
             assert result['ca_total'] == 2
             assert result['ucm_total'] == 1
             assert [r['request_id'] for r in result['ca_only']] == [51]
+            assert result['ucm_only'] == []
+
+    def test_reconcile_matches_swapped_serials(self, app, fake_ca):
+        """Reconciliation must match certs even when certutil reports the
+        serial with reversed byte pairs."""
+        msca_id = _make_msca(app, 'Inv Rec I')
+        fake_ca.add(60, 'inv-i-both.test.local')
+        row = fake_ca.rows[0]
+        _add_ucm_cert(app, msca_id, 'Inv Rec I', row['cn'], row['serial'], row['pem'])
+        s = row['serial'] if len(row['serial']) % 2 == 0 else '0' + row['serial']
+        pairs = [s[i:i + 2] for i in range(0, len(s), 2)]
+        row['serial'] = ''.join(reversed(pairs))
+
+        with app.app_context():
+            from services.msca_service import MicrosoftCAService
+            result = MicrosoftCAService.reconcile_inventory(msca_id)
+            assert result['ca_only'] == []
             assert result['ucm_only'] == []

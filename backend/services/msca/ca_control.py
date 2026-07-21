@@ -229,9 +229,7 @@ class MicrosoftCACAControlMixin:
         try:
             from cryptography import x509
             from .inventory import MicrosoftCAInventoryMixin
-            serial = format(
-                x509.load_pem_x509_certificate(pem.encode()).serial_number, 'x'
-            )
-            return serial.lower() in MicrosoftCAInventoryMixin._known_serials()
+            serial = x509.load_pem_x509_certificate(pem.encode()).serial_number
+            return serial in MicrosoftCAInventoryMixin._known_serial_ints()
         except Exception:
             return False

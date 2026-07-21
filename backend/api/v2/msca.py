@@ -94,6 +94,55 @@ def _apply_winrm_fields(msca, data):
     return None
 
 
+_WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_use_ssl',
+                          'winrm_verify_ssl', 'winrm_transport', 'winrm_username',
+                          'winrm_password', 'ca_config')
+
+
+def _transient_winrm_config(msca, overrides):
+    """Build a transient config for the admin-channel test: saved connection
+    values + unsaved form overrides. Plain attributes (no ORM, no encryption
+    setters) — the object is NEVER persisted. Returns (config, error) where
+    error is an error_response tuple on invalid override values.
+    """
+    from types import SimpleNamespace
+
+    cfg = SimpleNamespace(
+        name=msca.name,
+        server=msca.server,
+        auth_method=msca.auth_method,
+        username=msca.username,
+        password=msca.password,
+        kerberos_principal=msca.kerberos_principal,
+        kerberos_keytab_path=msca.kerberos_keytab_path,
+        winrm_enabled=bool(msca.winrm_enabled),
+        winrm_host=msca.winrm_host,
+        winrm_port=msca.winrm_port,
+        winrm_use_ssl=bool(msca.winrm_use_ssl),
+        winrm_verify_ssl=bool(msca.winrm_verify_ssl),
+        winrm_transport=msca.winrm_transport or 'kerberos',
+        winrm_username=msca.winrm_username,
+        winrm_password=msca.winrm_password,
+        ca_config=msca.ca_config,
+    )
+
+    data = {k: v for k, v in (overrides or {}).items() if k in _WINRM_OVERRIDE_FIELDS}
+    # Empty or masked password means "use the saved one".
+    if not data.get('winrm_password') or data.get('winrm_password') == '***':
+        data.pop('winrm_password', None)
+    err = _apply_winrm_fields(cfg, data)
+    if err:
+        return None, err
+
+    # Mirror MicrosoftCA.winrm_effective_* on the transient object.
+    cfg.winrm_effective_host = cfg.winrm_host or cfg.server
+    cfg.winrm_effective_username = cfg.winrm_username or (
+        cfg.username if cfg.auth_method == 'basic' else None)
+    cfg.winrm_effective_password = cfg.winrm_password or (
+        cfg.password if cfg.auth_method == 'basic' else None)
+    return cfg, None
+
+
 def _actor():
     """Current username for audit/attribution, or 'system'."""
     try:
@@ -446,19 +495,28 @@ def sync_crl(msca_id):
 @bp.route('/<int:msca_id>/admin-channel/test', methods=['POST'])
 @require_auth(['admin:system'])
 def test_admin_channel(msca_id):
-    """Test the WinRM admin channel (connect + CA service/ping)."""
+    """Test the WinRM admin channel (connect + CA service/ping).
+
+    Accepts an optional JSON body of unsaved winrm_*/ca_config form values so
+    the test reflects what the operator is about to save, not the stored row.
+    """
     from services.msca_service import MSCAAdminChannelError
 
     msca = db.session.get(MicrosoftCA, msca_id)
     if not msca:
         return error_response("Connection not found", 404)
-    if not msca.winrm_enabled:
+
+    overrides = request.get_json(silent=True) or {}
+    cfg, err = _transient_winrm_config(msca, overrides)
+    if err:
+        return err
+    if not cfg.winrm_enabled:
         return error_response("WinRM admin channel is not enabled on this connection", 400)
 
     try:
-        result = MicrosoftCAService.test_admin_channel(msca_id)
+        result = MicrosoftCAService.test_admin_channel_config(cfg)
         _audit('msca.admin_channel_test', msca,
-               f"transport={msca.winrm_transport} certsvc={result.get('certsvc_status')}")
+               f"transport={cfg.winrm_transport} certsvc={result.get('certsvc_status')}")
         return success_response(data=result, message="Admin channel reachable")
     except MSCAAdminChannelError as e:
         _audit('msca.admin_channel_test', msca, f"error={e}", success=False)
@@ -995,9 +1053,61 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         raise
 
 
+def _generate_rekey_csr(cert):
+    """Generate a new key pair + CSR (same subject and SANs) for an imported
+    MS CA certificate that has no CSR/private key in UCM (AD CS never exports
+    private keys). Stores the CSR and the encrypted key on the cert row and
+    returns the CSR PEM string. Raises ValueError on unusable cert data.
+    """
+    import base64
+    import json
+
+    from cryptography import x509 as cx509
+    from cryptography.hazmat.primitives.asymmetric import rsa as crsa
+    from services.trust_store.csr_operations_mixin import CSROperationsMixin
+    from utils.key_codec import store_pem_bytes
+
+    if not cert.crt:
+        raise ValueError("Certificate data not available")
+    try:
+        orig = cx509.load_pem_x509_certificate(base64.b64decode(cert.crt))
+    except Exception:
+        raise ValueError("Stored certificate is unreadable; cannot rekey for renewal")
+
+    # Match the original RSA key size when supported; default RSA 2048.
+    key_type = '2048'
+    try:
+        pub = orig.public_key()
+        if isinstance(pub, crsa.RSAPublicKey) and str(pub.key_size) in ('2048', '3072', '4096', '8192'):
+            key_type = str(pub.key_size)
+    except Exception:
+        pass
+
+    def _san(col):
+        try:
+            return json.loads(col) if col else []
+        except Exception:
+            return []
+
+    csr_pem_bytes, key_pem_bytes = CSROperationsMixin.generate_csr(
+        subject=orig.subject,
+        key_type=key_type,
+        san_dns=_san(cert.san_dns),
+        san_ip=_san(cert.san_ip),
+        san_email=_san(cert.san_email),
+        san_uri=_san(cert.san_uri),
+        san_upn=cert.san_upn_list,
+    )
+    cert.csr = base64.b64encode(csr_pem_bytes).decode('utf-8')
+    cert.prv = store_pem_bytes(key_pem_bytes)
+    return csr_pem_bytes.decode('utf-8')
+
+
 def renew_via_msca(cert, username=None):
     """Renew an MS-CA-issued certificate by resubmitting its original CSR
-    (same key, same subject/SANs) to the connection and template that issued it.
+    (same key, same subject/SANs) to the connection and template that issued
+    it. Imported certs without a CSR/key are renewed by rekey: a fresh key
+    pair + CSR with the same subject/SANs is generated and stored on the cert.
 
     Returns the submit_csr result dict: status 'issued' (cert updated in place)
     or 'pending' (imported later by the request-status poll).
@@ -1023,12 +1133,12 @@ def renew_via_msca(cert, username=None):
     if not msca.enabled:
         raise ValueError("Microsoft CA connection is disabled")
 
+    # Inventory-imported requests carry template 'unknown' — not submittable.
     template = (req.template if req else None) or msca.default_template
+    if not template or template == 'unknown':
+        template = msca.default_template
     if not template:
         raise ValueError("Original certificate template unknown; sign a new CSR via the Microsoft CA instead")
-
-    if not cert.csr:
-        raise ValueError("Original CSR not available; generate a new CSR and sign it via the Microsoft CA")
 
     # EOBO renewals re-issue a cert for another principal — same elevated
     # permission as the initial EOBO signing.
@@ -1039,10 +1149,20 @@ def renew_via_msca(cert, username=None):
         if '*' not in user_perms and not _has_perm('admin:system', user_perms):
             raise PermissionError("Renewing an EOBO-issued certificate requires admin:system permission")
 
-    try:
-        csr_pem = base64.b64decode(cert.csr).decode('utf-8')
-    except Exception:
-        csr_pem = cert.csr
+    if cert.csr:
+        try:
+            csr_pem = base64.b64decode(cert.csr).decode('utf-8')
+        except Exception:
+            csr_pem = cert.csr
+    else:
+        # Imported cert (e.g. inventory sync) with no CSR/key in UCM — renew
+        # by REKEY: fresh key pair + CSR with the same subject and SANs.
+        # Persist both BEFORE submission so a 'pending' approval can still be
+        # finalized by the request-status poll.
+        csr_pem = _generate_rekey_csr(cert)
+        ok, _resp = safe_commit(logger, "Failed to persist renewal key material")
+        if not ok:
+            raise ValueError("Failed to persist renewal key material")
 
     result = MicrosoftCAService.submit_csr(
         msca_id=msca.id,

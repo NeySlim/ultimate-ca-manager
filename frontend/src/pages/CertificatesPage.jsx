@@ -413,7 +413,7 @@ export default function CertificatesPage() {
   const rowActions = useCallback((row) => [
     { label: t('common.details'), icon: Info, onClick: () => handleSelectCert(row) },
     { label: t('export.title'), icon: Download, onClick: () => setExportRowCert(row) },
-    ...(canWrite('certificates') && !row.revoked && row.has_private_key ? [
+    ...(canWrite('certificates') && !row.revoked && (row.has_private_key || row.source === 'msca') ? [
       { label: t('certificates.renewCertificate').split(' ')[0], icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
     ] : []),
     ...(canWrite('certificates') && !row.revoked ? [
@@ -540,7 +540,7 @@ export default function CertificatesPage() {
       certificate={selectedCert}
       onExport={handleExport}
       onRevoke={() => handleRevoke(selectedCert.id)}
-      onRenew={selectedCert.has_private_key && !selectedCert.revoked ? () => handleRenew(selectedCert.id) : null}
+      onRenew={(selectedCert.has_private_key || selectedCert.source === 'msca') && !selectedCert.revoked ? () => handleRenew(selectedCert.id) : null}
       onDelete={() => handleDelete(selectedCert.id)}
       onUploadKey={() => setShowKeyModal(true)}
       onAddToTrustStore={handleAddToTrustStore}

@@ -13,6 +13,7 @@ import re
 from models import db, Certificate
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
+from utils.serial_format import serial_to_int
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ _DISPOSITION_REVOKED = 21
 _VIEW_COLUMNS = "RequestId,SerialNumber,NotAfter,CertificateTemplate,CommonName"
 
 _INT_RE = re.compile(r'^\d+$')
+_HEX_RE = re.compile(r'^[0-9a-fA-F]+$')
 
 
 class MicrosoftCAInventoryMixin:
@@ -60,18 +62,28 @@ class MicrosoftCAInventoryMixin:
         imported, skipped, failed = [], 0, 0
         max_request_id = start_id
 
-        # Preload known serials once (normalized) so dedup is O(1) per row.
-        known_serials = MicrosoftCAInventoryMixin._known_serials()
+        # Preload known serials (as ints) and CA request ids so dedup is O(1)
+        # per row.
+        known_serials = MicrosoftCAInventoryMixin._known_serial_ints()
+        known_request_ids = MicrosoftCAInventoryMixin._known_request_ids(msca)
 
         for row in rows:
             req_id, serial, template, cn = row
             max_request_id = max(max_request_id, req_id)
 
-            # Dedup: a cert with this serial already in UCM is left untouched.
-            if serial in known_serials:
+            # Dedup level 1: this CA RequestId is already tracked by UCM
+            # (exact link — covers certs signed through UCM itself).
+            if req_id in known_request_ids:
                 skipped += 1
                 continue
-            known_serials.add(serial)  # avoid re-importing a dup within this run
+            # Dedup level 2: serial already known. certutil -view displays the
+            # serial with its byte pairs in reversed order on some AD CS
+            # builds, so match both interpretations against UCM's store.
+            variants = MicrosoftCAInventoryMixin._serial_int_variants(serial)
+            if variants & known_serials:
+                skipped += 1
+                continue
+            known_serials |= variants  # avoid re-importing a dup within this run
 
             try:
                 pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, req_id)
@@ -149,25 +161,49 @@ class MicrosoftCAInventoryMixin:
             raise MSCAAdminChannelError('WinRM admin channel is not configured')
 
         ca_rows = MicrosoftCAInventoryMixin._list_issued(msca, 0)
-        ca_serials = {r[1].lower(): r for r in ca_rows}
+        known_request_ids = MicrosoftCAInventoryMixin._known_request_ids(msca)
+        ca_row_ids = {r[0] for r in ca_rows}
 
-        ucm_certs = MicrosoftCAInventoryMixin._ucm_connection_certs(msca)
-        ucm_serials = {
-            (c.serial_number or '').lower(): c for c in ucm_certs if c.serial_number
+        ucm_certs = [
+            c for c in MicrosoftCAInventoryMixin._ucm_connection_certs(msca)
+            if c.serial_number
+        ]
+        ucm_ints = set()
+        for c in ucm_certs:
+            ucm_ints |= MicrosoftCAInventoryMixin._db_serial_variants(c.serial_number)
+
+        # Map UCM cert id → CA RequestId (exact link, when known).
+        req_ids_by_cert = {
+            row[0]: row[1] for row in
+            db.session.query(MSCARequest.cert_id, MSCARequest.request_id)
+            .filter(MSCARequest.msca_id == msca.id,
+                    MSCARequest.cert_id.isnot(None),
+                    MSCARequest.request_id.isnot(None)).all()
         }
 
-        ca_only = [
-            {'request_id': r[0], 'serial_number': r[1], 'template': r[2], 'subject_cn': r[3]}
-            for s, r in ca_serials.items() if s not in ucm_serials
-        ]
+        # Serial matching handles both certutil byte orders (see inventory_sync).
+        ca_only, ca_all_ints = [], set()
+        for r in ca_rows:
+            variants = MicrosoftCAInventoryMixin._serial_int_variants(r[1])
+            ca_all_ints |= variants
+            if r[0] in known_request_ids:
+                continue
+            if variants & ucm_ints:
+                continue
+            ca_only.append({'request_id': r[0], 'serial_number': r[1],
+                            'template': r[2], 'subject_cn': r[3]})
+
         ucm_only = [
             {'id': c.id, 'serial_number': c.serial_number, 'subject_cn': c.subject_cn,
              'descr': c.descr}
-            for s, c in ucm_serials.items() if s not in ca_serials
+            for c in ucm_certs
+            if not (MicrosoftCAInventoryMixin._db_serial_variants(c.serial_number)
+                    & ca_all_ints)
+            and req_ids_by_cert.get(c.id) not in ca_row_ids
         ]
         return {
-            'ca_total': len(ca_serials),
-            'ucm_total': len(ucm_serials),
+            'ca_total': len(ca_rows),
+            'ucm_total': len(ucm_certs),
             'ca_only': sorted(ca_only, key=lambda x: x['request_id']),
             'ucm_only': ucm_only,
         }
@@ -224,12 +260,56 @@ class MicrosoftCAInventoryMixin:
         return m.group(0) if m else None
 
     @staticmethod
-    def _known_serials():
-        """Set of all known cert serials, normalized to lowercase hex (no colons)."""
+    def _serial_int_variants(serial):
+        """Integer interpretations of a certutil serial: as-is and with the
+        byte pairs reversed (AD CS displays serials in reversed byte order in
+        some certutil views, so a straight compare misses known certs).
+        Returns a set of ints (empty for non-hex input)."""
+        s = (serial or '').replace(':', '').strip().lower()
+        if s.startswith('0x'):
+            s = s[2:]
+        if not s or not _HEX_RE.match(s):
+            return set()
+        if len(s) % 2:
+            s = '0' + s
+        pairs = [s[i:i + 2] for i in range(0, len(s), 2)]
+        return {int(s, 16), int(''.join(reversed(pairs)), 16)}
+
+    @staticmethod
+    def _db_serial_variants(raw):
+        """Integer interpretations of a DB-stored serial. Rows are a
+        historical mix of decimal and hex strings, so ambiguous all-digit
+        values are included under both readings."""
+        s = (raw or '').replace(':', '').strip().lower()
+        if s.startswith('0x'):
+            s = s[2:]
+        if not s:
+            return set()
+        out = set()
+        n = serial_to_int(s)
+        if n is not None:
+            out.add(n)
+        if _HEX_RE.match(s):
+            out.add(int(s, 16))
+        return out
+
+    @staticmethod
+    def _known_serial_ints():
+        """Set of all known cert serials as integers (all interpretations)."""
+        ints = set()
+        for row in (db.session.query(Certificate.serial_number)
+                    .filter(Certificate.serial_number.isnot(None)).all()):
+            ints |= MicrosoftCAInventoryMixin._db_serial_variants(row[0])
+        return ints
+
+    @staticmethod
+    def _known_request_ids(msca):
+        """CA-side RequestIds already tracked by UCM for this connection."""
         return {
-            (row[0] or '').replace(':', '').lower()
-            for row in db.session.query(Certificate.serial_number)
-            .filter(Certificate.serial_number.isnot(None)).all()
+            row[0] for row in
+            db.session.query(MSCARequest.request_id)
+            .filter(MSCARequest.msca_id == msca.id,
+                    MSCARequest.request_id.isnot(None)).all()
         }
 
     @staticmethod

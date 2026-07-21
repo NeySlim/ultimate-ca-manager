@@ -78,7 +78,19 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     if (!connection?.id) return
     setTestingAdmin(true)
     try {
-      const res = await mscaService.testAdminChannel(connection.id)
+      // Send the current form values so the test matches what will be saved
+      const overrides = {
+        winrm_enabled: formData.winrm_enabled,
+        winrm_host: formData.winrm_host,
+        winrm_port: formData.winrm_port,
+        winrm_use_ssl: formData.winrm_use_ssl,
+        winrm_verify_ssl: formData.winrm_verify_ssl,
+        winrm_transport: formData.winrm_transport,
+        winrm_username: formData.winrm_username,
+        ca_config: formData.ca_config,
+      }
+      if (formData.winrm_password) overrides.winrm_password = formData.winrm_password
+      const res = await mscaService.testAdminChannel(connection.id, overrides)
       showSuccess(t('msca.adminChannelTestSuccess', { status: res.data?.certsvc_status || '?' }))
     } catch (error) {
       showError(error.message || t('msca.adminChannelTestFailed'))

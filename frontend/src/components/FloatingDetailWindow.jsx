@@ -229,7 +229,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     entityName: title,
     onLint: (isCert || isUserCert) ? () => setLintOpen(true) : null,
     onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
-    onRenew: isCert && canWrite('certificates') && !data.revoked && data.has_private_key ? handleRenew : null,
+    onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
     onRevoke: (isCert || isUserCert) && canWrite(resource) && !data.revoked ? handleRevoke : null,
     onUnhold: isCert && canWrite('certificates') && data.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold') ? handleUnhold : null,
     onOffline: isCA && canWrite('cas') && !data.offline ? handleOffline : null,
