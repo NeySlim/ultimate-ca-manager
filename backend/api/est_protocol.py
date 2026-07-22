@@ -287,12 +287,18 @@ def _resolve_est_ca(label=None):
     The two failure modes are distinct and must not be conflated: an unknown
     **label** is a wrong address (404 Not Found), whereas a missing default CA
     means the operator never configured EST (503, the historical response).
+
+    Both used to return silently, so a client that reached this endpoint and
+    was turned away left no trace — the same "did it even arrive" ambiguity
+    SCEP had before its configuration-driven refusals were logged.
     """
     ca = _get_est_ca(label)
     if ca:
         return ca, None
     if label is not None:
+        logger.warning("EST request refused: unknown label %r", label)
         return None, Response('Unknown EST label', status=404)
+    logger.warning("EST request refused: EST not configured")
     return None, Response('EST not configured', status=503)
 
 
