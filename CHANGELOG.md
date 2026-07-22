@@ -8,7 +8,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ---
 
 
-## [Unreleased]
+## [2.202] - 2026-07-22
 
 ### Fixed
 - **Security keys stopped working after upgrading to 2.200** — signature-counter clone detection began being enforced against a stored value that earlier releases had incremented on every login, including for the many authenticators (platform passkeys, and most FIDO2 keys) that always report a counter of zero. Those users could never present a value high enough and were locked out of their own key with `Authentication failed`. Clone detection is now only applied when the authenticator actually maintains a counter, and the inflated stored values are reset once on upgrade (migration 065); a genuine counter that fails to increase is still refused.
