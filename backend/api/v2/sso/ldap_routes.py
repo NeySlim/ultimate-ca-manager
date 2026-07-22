@@ -191,8 +191,8 @@ def ldap_login():
         pass
 
     # Get role permissions
-    from auth.permissions import get_role_permissions
-    permissions = get_role_permissions(user.role)
+    from auth.permissions import get_effective_permissions
+    permissions = get_effective_permissions(user)
 
     # Get display settings for frontend
     from models import SystemConfig

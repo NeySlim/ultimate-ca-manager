@@ -104,6 +104,7 @@ class SCEPService:
         ca_refid: str,
         challenge_password: Optional[str] = None,
         auto_approve: bool = False,
+        challenge_expired: bool = False,
     ):
         """
         Initialize SCEP service for a specific CA.
@@ -112,10 +113,15 @@ class SCEPService:
             ca_refid: Reference ID of the CA to use for SCEP
             challenge_password: Optional challenge password for enrollment
             auto_approve: If True, automatically approve enrollment requests
+            challenge_expired: True when a challenge IS configured but has
+                outlived ``scep_challenge_validity``. Kept separate from a
+                blank challenge so expiry is an explicit refusal rather than a
+                fallback to the weaker no-challenge path.
         """
         self.ca_refid = ca_refid
         self.challenge_password = challenge_password
         self.auto_approve = auto_approve
+        self.challenge_expired = challenge_expired
 
         self.ca = CA.query.filter_by(refid=ca_refid).first()
         if not self.ca:
@@ -410,6 +416,17 @@ class SCEPService:
                 ), 200
 
             # ---- 7. Validate challenge password (constant-time) ----
+            # An expired challenge is refused outright: renewals stay allowed
+            # because they authenticate with the existing certificate
+            # (_validate_renewal), so an expired secret does not strand a fleet
+            # that is already enrolled.
+            if self.challenge_expired and message_type != self.MSG_TYPE_RENEWAL_REQ:
+                return self._create_error_response(
+                    self.FAIL_BAD_MESSAGE_CHECK,
+                    "Challenge password has expired",
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
+
             if self.challenge_password:
                 if not self._has_usable_challenge_password(
                     challenge_pwd

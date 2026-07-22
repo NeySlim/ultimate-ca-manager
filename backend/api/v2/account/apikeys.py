@@ -5,7 +5,7 @@ from flask import request, g, current_app
 from models import db
 from models.api_key import APIKey
 from auth.unified import AuthManager, require_auth, has_permission
-from auth.permissions import get_role_permissions, VALID_RESOURCES
+from auth.permissions import get_effective_permissions, VALID_RESOURCES
 from services.audit_service import AuditService
 from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
@@ -61,7 +61,7 @@ def create_api_key():
         return error_response('Permissions must be a list', 400)
 
     # Validate permissions format — users cannot grant permissions they don't have
-    user_perms = get_role_permissions(g.current_user.role)
+    user_perms = get_effective_permissions(g.current_user)
     valid_categories = ['read', 'write', 'delete', 'admin']
     # Canonical resource set (ROLE_PERMISSIONS + admin-only resources) — see auth/permissions.py
     valid_resources = VALID_RESOURCES

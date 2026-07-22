@@ -177,8 +177,8 @@ class AuthManager:
         # Update last activity timestamp
         session['last_activity'] = now.isoformat()
         
-        from auth.permissions import get_role_permissions
-        permissions = get_role_permissions(user.role)
+        from auth.permissions import get_effective_permissions
+        permissions = get_effective_permissions(user)
         
         return {
             'user_id': user.id,
