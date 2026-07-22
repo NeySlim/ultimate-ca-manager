@@ -10,6 +10,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.201] - 2026-07-22
+
 ### Security
 - **Group permissions are now enforced** — `Group.permissions` was stored and editable but never consulted by authorization, so every grant made through a group was silently inert. A user's effective permissions are now their role's unioned with those of their groups, and the login response advertises the same set the API enforces. Groups can only grant permissions that are actually enforced (the previous list offered `read:certs` while endpoints require `read:certificates`) and can **never** grant `admin:*` or the `*` wildcard, so group membership is not a path to administrator. Permissions outside that set are ignored on read as well as on write, so a value introduced by an old backup or direct SQL stays inert.
 - **SCEP challenge passwords now expire** — `scep_challenge_validity` was validated and stored but never applied, leaving a leaked challenge usable indefinitely. The challenge generation time is recorded and enrollment is refused once the configured window has passed. An expired challenge is an explicit refusal rather than a fall-through to the weaker no-challenge path, and renewals keep working since they authenticate with the existing certificate. Challenges created before this release are adopted on first use rather than expired on the spot, so upgrading does not lock out a deployed fleet. The challenge API now reports `expired` and `expires_at`.

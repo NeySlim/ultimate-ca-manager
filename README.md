@@ -48,7 +48,7 @@
 ### Security & Access
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
 - **SSO** -- LDAP, OAuth2 (Azure/Google/GitHub), SAML single sign-on with role mapping; **per-user `auth_source` tracking** and opt-in role sync on login
-- **RBAC** -- 4 built-in roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions
+- **RBAC** -- 4 built-in roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions; **groups grant additional permissions** on top of a user's role (never administrator)
 - **Policies & Approvals** -- Certificate issuance policies with approval workflows
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
 - **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own
