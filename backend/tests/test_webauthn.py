@@ -153,7 +153,9 @@ class TestWebAuthnSignCount:
             )
 
             assert ok is True
-            assert seen['credential_current_sign_count'] == 7
+            # clone detection is enforced by UCM, not the library, so the
+            # stored value is never handed over as a floor
+            assert seen['credential_current_sign_count'] == 0
             assert credential.sign_count == 8
 
     def test_authenticator_with_zero_counter_remains_supported(

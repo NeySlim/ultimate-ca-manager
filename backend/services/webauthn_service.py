@@ -329,16 +329,34 @@ class WebAuthnService:
             if not challenge_record or not challenge_record.is_valid():
                 return False, "Invalid or expired challenge", None
             
-            # The verifier rejects a non-increasing non-zero counter, while
-            # allowing authenticators that report 0 on every authentication.
+            # Signature-counter (clone) check is enforced here rather than by the
+            # library, which refuses whenever *either* side is non-zero and the
+            # response is not greater. Many authenticators — Apple passkeys,
+            # Windows Hello, plenty of FIDO2 keys — always report 0: they simply
+            # do not implement a counter. For those, a stored value above 0 can
+            # never be beaten, so library-side enforcement locks the user out of
+            # their own credential permanently. A response of 0 carries no
+            # anti-cloning information, so it is not evidence of a clone.
             verification = verify_authentication_response(
                 credential=credential_data,
                 expected_challenge=base64url_decode(challenge_record.challenge),
                 expected_rp_id=rp_id,
                 expected_origin=f"https://{hostname}",
                 credential_public_key=credential.public_key,
-                credential_current_sign_count=credential.sign_count or 0,
+                credential_current_sign_count=0,  # enforced below instead
             )
+
+            stored_count = credential.sign_count or 0
+            if verification.new_sign_count > 0 and verification.new_sign_count <= stored_count:
+                # The authenticator *does* keep a counter and it did not move
+                # forward — the RFC-intended signal that the credential may have
+                # been cloned (WebAuthn L2 §6.1.1 step 17).
+                logger.warning(
+                    "WebAuthn: possible cloned authenticator for credential %s "
+                    "(response counter %s did not exceed stored %s)",
+                    credential.id, verification.new_sign_count, stored_count,
+                )
+                return False, "Authentication failed", None
 
             # Persist the authenticator's actual counter for the next check.
             credential.sign_count = verification.new_sign_count
