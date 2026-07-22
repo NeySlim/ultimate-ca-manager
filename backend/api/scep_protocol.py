@@ -32,16 +32,29 @@ def get_config(key, default=None):
     return config.value if config else default
 
 
+def _reject(reason):
+    """Refuse to build a SCEP service, recording why.
+
+    Every configuration-driven refusal below used to return silently, so a
+    client whose request DID arrive and was turned away (CA offline, no private
+    key, HSM-backed CA...) left no trace at all — indistinguishable in the log
+    from a request that never reached the server. That ambiguity cost real
+    troubleshooting time, so each refusal is now recorded with its reason.
+    """
+    logger.warning("SCEP request refused: %s", reason)
+    return None, reason
+
+
 def get_scep_service():
     """Get configured SCEP service instance"""
     # Get SCEP configuration
     enabled = get_config('scep_enabled', 'true') == 'true'
     if not enabled:
-        return None, "SCEP is disabled"
+        return _reject("SCEP is disabled")
 
     ca_id = get_config('scep_ca_id')
     if not ca_id:
-        return None, "No CA configured for SCEP"
+        return _reject("No CA configured for SCEP")
 
     # Find CA
     try:
@@ -52,23 +65,22 @@ def get_scep_service():
         ca = CA.query.filter_by(refid=ca_id).first()
 
     if not ca:
-        return None, "Configured CA not found"
+        return _reject(f"Configured CA not found (scep_ca_id={ca_id!r})")
 
     if not ca.has_private_key:
-        return None, "CA does not have a private key"
+        return _reject(f"CA {ca.descr!r} has no private key")
 
     if ca.offline:
-        return None, "CA is offline; restore it before using it for SCEP"
+        return _reject(f"CA {ca.descr!r} is offline; restore it before using it for SCEP")
 
     # SCEP enrollment decrypts the client's PKCS#7 envelope with the CA's
     # RSA private key (RFC 8894 §3.4). HSM-resident signing keys do not
     # expose decryption in the current providers, so SCEP is not supported
     # for HSM-backed CAs. Local CAs work normally.
     if ca.uses_hsm:
-        return None, (
-            "SCEP is not supported for HSM-backed CAs: the protocol "
-            "requires RSA envelope decryption, which is not available "
-            "for HSM-resident keys"
+        return _reject(
+            f"CA {ca.descr!r} is HSM-backed: SCEP requires RSA envelope "
+            "decryption, which is not available for HSM-resident keys"
         )
 
     # Get challenge password and auto-approve setting. An expired challenge is
