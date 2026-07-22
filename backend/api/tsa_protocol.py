@@ -56,6 +56,7 @@ def timestamp_request():
 
         enabled_config = SystemConfig.query.filter_by(key='tsa_enabled').first()
         if not enabled_config or str(enabled_config.value).lower() != 'true':
+            logger.warning("TSA request refused: TSA is disabled")
             response = make_response('TSA temporarily unavailable', 503)
             response.headers['Content-Type'] = 'text/plain'
             return response
@@ -67,12 +68,17 @@ def timestamp_request():
         tsa_ca_config = SystemConfig.query.filter_by(key='tsa_ca_refid').first()
         tsa_ca_refid = tsa_ca_config.value if tsa_ca_config else ''
         if not tsa_ca_refid:
+            logger.warning("TSA request refused: no CA configured for TSA")
             response = make_response('TSA not configured', 503)
             response.headers['Content-Type'] = 'text/plain'
             return response
         ca = CA.query.filter_by(refid=tsa_ca_refid).first()
 
         if not ca or not ca.crt or not ca.prv:
+            logger.warning(
+                "TSA request refused: configured CA %r not found or missing cert/key",
+                tsa_ca_refid,
+            )
             response = make_response('TSA not configured', 503)
             response.headers['Content-Type'] = 'text/plain'
             return response
