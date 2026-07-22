@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Fixed
+- **Test runs no longer write to the production log** — the suite inherited the native logging configuration and appended to `/var/log/ucm/ucm.log`. On a host that also runs UCM this polluted real logs and, when the suite ran as a different user, took ownership of the file at rotation — after which the service could no longer write its own log at all.
 - **Access log was never written** — the WebSocket-capable Gunicorn worker bypassed Gunicorn's access logger entirely, so `/var/log/ucm/access.log` stayed empty on every native install no matter how many requests were served. This made it impossible to tell whether a protocol client (SCEP/EST/ACME) had even reached the server when troubleshooting. Requests are logged again.
 - **SCEP configuration refusals are now logged** — a request that reached the server and was turned away by a configuration check (CA offline, no private key, HSM-backed CA, no CA assigned) returned a 500 without recording anything, which was indistinguishable in the log from a request that never arrived. Each refusal now names its reason and the CA involved. Reported by @Hemsby.
 - **Inbound SCEP requests are now logged** — only failures were recorded, so a silent log was ambiguous between "the device never reached us" and "it reached us and succeeded". Each request now logs its operation, HTTP method, source address and client User-Agent.

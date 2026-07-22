@@ -93,6 +93,14 @@ def create_app(config_name=None):
         _sh = _logging.StreamHandler(sys.stdout)
         _sh.setFormatter(_log_fmt)
         root_logger.addHandler(_sh)
+    elif app.config.get('TESTING'):
+        # Never touch the production log from a test run: on a host that also
+        # runs UCM, writing there pollutes real logs and — if the suite runs as
+        # a different user — silently steals ownership of the file at rotation,
+        # after which the service can no longer write its own log at all.
+        _sh = _logging.StreamHandler(sys.stderr)
+        _sh.setFormatter(_log_fmt)
+        root_logger.addHandler(_sh)
     else:
         # Native: write to /var/log/ucm/ucm.log (same file the docs reference)
         _log_path = os.getenv('UCM_LOG_FILE', '/var/log/ucm/ucm.log')
