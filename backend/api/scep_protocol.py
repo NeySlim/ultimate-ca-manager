@@ -111,6 +111,16 @@ def scep_endpoint():
     """
     operation = request.args.get('operation', '')
 
+    # Log every inbound request. Only failures were logged before, so a silent
+    # log was ambiguous: it could mean "the device never reached us" or "it
+    # reached us and succeeded". That distinction is the first thing needed when
+    # a network appliance reports a generic enrollment failure.
+    logger.info(
+        "SCEP request: operation=%s method=%s from=%s ua=%r",
+        operation or '(none)', request.method, client_ip(),
+        request.headers.get('User-Agent', ''),
+    )
+
     if not operation:
         # Return capabilities by default (common client behavior)
         return handle_get_ca_caps()
@@ -123,6 +133,7 @@ def scep_endpoint():
     elif operation == 'PKIOperation':
         return handle_pki_operation()
     else:
+        logger.warning("SCEP: unknown operation %r from %s", operation, client_ip())
         return make_error_response(f"Unknown operation: {operation}", 400)
 
 
