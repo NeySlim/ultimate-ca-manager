@@ -1,6 +1,9 @@
 """
 Role-based permissions for UCM
 """
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Role permissions mapping — format: action:resource (matches @require_auth decorators)
 ROLE_PERMISSIONS = {
@@ -76,9 +79,66 @@ VALID_RESOURCES = sorted(
 )
 
 
+# Permissions a group may grant. Derived from ROLE_PERMISSIONS so a group can
+# only hand out scopes that @require_auth actually enforces — an earlier
+# hardcoded list had drifted (it offered `read:certs` while every endpoint
+# requires `read:certificates`, so those grants could never have matched).
+# `admin:*` and the `*` wildcard are deliberately excluded: group membership
+# must never be a path to administrator.
+GROUP_GRANTABLE_PERMISSIONS = sorted(
+    {perm
+     for perms in ROLE_PERMISSIONS.values()
+     for perm in perms
+     if ':' in perm and not perm.startswith('admin:')}
+)
+
+
 def get_role_permissions(role: str) -> list:
     """Get permissions for a role"""
     return ROLE_PERMISSIONS.get(role, [])
+
+
+def get_group_permissions(user) -> list:
+    """Permissions granted to ``user`` through group membership.
+
+    Filtered against GROUP_GRANTABLE_PERMISSIONS on read as well as on write:
+    a permission that reached the database by another route (restore of an old
+    backup, direct SQL) still cannot confer more than a group is allowed to.
+    Never raises — an unavailable group table degrades to "no extra rights".
+    """
+    if user is None or getattr(user, 'id', None) is None:
+        return []
+    try:
+        from models.group import Group, GroupMember
+
+        rows = (Group.query
+                .join(GroupMember, GroupMember.group_id == Group.id)
+                .filter(GroupMember.user_id == user.id)
+                .with_entities(Group.permissions)
+                .all())
+    except Exception as e:  # noqa: BLE001 — authorisation must not 500 on this
+        logger.warning(f"Could not resolve group permissions for user {getattr(user, 'id', '?')}: {e}")
+        return []
+
+    grantable = set(GROUP_GRANTABLE_PERMISSIONS)
+    granted = []
+    for (perms,) in rows:
+        for perm in (perms or []):
+            if perm in grantable and perm not in granted:
+                granted.append(perm)
+    return granted
+
+
+def get_effective_permissions(user) -> list:
+    """Role permissions unioned with those granted by the user's groups.
+
+    This is what authorisation and the login response must both use, so the UI
+    gates on exactly what the API enforces.
+    """
+    role_perms = list(get_role_permissions(getattr(user, 'role', None)))
+    if '*' in role_perms:
+        return role_perms  # administrator: nothing to add
+    return role_perms + [p for p in get_group_permissions(user) if p not in role_perms]
 
 
 def has_permission(user_role: str, required_permission: str) -> bool:

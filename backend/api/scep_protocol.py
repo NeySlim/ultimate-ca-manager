@@ -71,15 +71,27 @@ def get_scep_service():
             "for HSM-resident keys"
         )
 
-    # Get challenge password and auto-approve setting
-    challenge = get_config(f'scep_challenge_{ca.id}')
+    # Get challenge password and auto-approve setting. An expired challenge is
+    # passed through with the expiry flag rather than blanked: dropping it would
+    # make the request look like a "no challenge configured" enrollment, which
+    # is a *weaker* check (it falls through to the manual-approval path) instead
+    # of the outright refusal an expired secret must produce.
+    from api.v2.scep import challenge_age_state
+    challenge, challenge_expired, _expires_at = challenge_age_state(ca.id)
     auto_approve = get_config('scep_auto_approve', 'false') == 'true'
+
+    if challenge_expired:
+        logger.warning(
+            "SCEP: challenge password for CA %s expired; regenerate it to "
+            "allow enrollment", ca.id
+        )
 
     try:
         service = SCEPService(
             ca_refid=ca.refid,
             challenge_password=challenge,
-            auto_approve=auto_approve
+            auto_approve=auto_approve,
+            challenge_expired=challenge_expired,
         )
         return service, None
     except Exception as e:

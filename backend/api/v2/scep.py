@@ -9,7 +9,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import secrets
 import logging
 
@@ -216,6 +216,48 @@ def get_scep_stats():
     })
 
 
+def challenge_age_state(ca_id):
+    """Return ``(challenge, expired, expires_at)`` for a CA's SCEP challenge.
+
+    ``scep_challenge_validity`` (hours) bounds how long a generated challenge
+    stays usable. Challenges created before this was enforced carry no
+    timestamp: they are stamped on first inspection rather than expired on the
+    spot, so upgrading does not lock out an already-deployed fleet — they then
+    expire normally one validity window later.
+    """
+    challenge = get_config(f'scep_challenge_{ca_id}')
+    if not challenge:
+        return None, False, None
+
+    try:
+        validity_hours = int(get_config('scep_challenge_validity', '24'))
+    except (TypeError, ValueError):
+        validity_hours = 24
+
+    stamp_key = f'scep_challenge_{ca_id}_generated_at'
+    raw = get_config(stamp_key)
+    generated_at = None
+    if raw:
+        try:
+            generated_at = datetime.fromisoformat(raw)
+            if generated_at.tzinfo is None:
+                generated_at = generated_at.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            generated_at = None
+
+    if generated_at is None:
+        # Legacy challenge: adopt it now instead of failing every enrollment.
+        generated_at = datetime.now(timezone.utc)
+        set_config(stamp_key, generated_at.isoformat())
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    expires_at = generated_at + timedelta(hours=validity_hours)
+    return challenge, datetime.now(timezone.utc) >= expires_at, expires_at
+
+
 @bp.route('/api/v2/scep/challenge/<int:ca_id>', methods=['GET'])
 @require_auth(['write:scep'])
 def get_challenge_password(ca_id):
@@ -230,7 +272,7 @@ def get_challenge_password(ca_id):
     if not ca:
         return error_response('CA not found', 404)
 
-    challenge = get_config(f'scep_challenge_{ca_id}')
+    challenge, expired, expires_at = challenge_age_state(ca_id)
 
     AuditService.log_action(
         action='scep_challenge_read',
@@ -243,7 +285,9 @@ def get_challenge_password(ca_id):
 
     return success_response(data={
         'ca_id': ca_id,
-        'challenge': challenge or 'Not configured'
+        'challenge': challenge or 'Not configured',
+        'expired': expired,
+        'expires_at': expires_at.isoformat() if expires_at else None,
     })
 
 
@@ -258,6 +302,9 @@ def regenerate_challenge_password(ca_id):
     # Generate a secure random challenge password
     new_challenge = secrets.token_urlsafe(24)
     set_config(f'scep_challenge_{ca_id}', new_challenge)
+    # Stamp the generation time so `scep_challenge_validity` can expire it.
+    set_config(f'scep_challenge_{ca_id}_generated_at',
+               datetime.now(timezone.utc).isoformat())
     ok, _err = safe_commit(logger, "Failed to regenerate SCEP challenge")
     if not ok:
         return _err

@@ -339,8 +339,8 @@ def login_password():
     session.permanent = True
 
     # Get permissions
-    from auth.permissions import get_role_permissions
-    permissions = get_role_permissions(user.role)
+    from auth.permissions import get_effective_permissions
+    permissions = get_effective_permissions(user)
 
     # Audit log success
     AuditService.log_action(
@@ -393,7 +393,7 @@ def login_2fa():
     Requires a pending 2FA session (from password login)
     """
     import pyotp
-    from auth.permissions import get_role_permissions
+    from auth.permissions import get_effective_permissions
     from services.audit_service import AuditService
 
     # Check for pending 2FA session
@@ -464,7 +464,7 @@ def login_2fa():
     session['last_activity'] = now.isoformat()
     session.permanent = True
 
-    permissions = get_role_permissions(user.role)
+    permissions = get_effective_permissions(user)
 
     AuditService.log_action(
         action='login_success',
@@ -571,8 +571,8 @@ def login_mtls():
     session.permanent = True
 
     # Get permissions
-    from auth.permissions import get_role_permissions
-    permissions = get_role_permissions(user.role)
+    from auth.permissions import get_effective_permissions
+    permissions = get_effective_permissions(user)
 
     logger.info(f"✅ mTLS login successful: {user.username} (cert: {auth_cert.cert_serial})")
 
@@ -757,8 +757,8 @@ def webauthn_verify():
         session.permanent = True
 
         # Get permissions
-        from auth.permissions import get_role_permissions
-        permissions = get_role_permissions(user.role)
+        from auth.permissions import get_effective_permissions
+        permissions = get_effective_permissions(user)
 
         # Audit log success
         AuditService.log_action(

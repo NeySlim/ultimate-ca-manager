@@ -13,16 +13,12 @@ from services.audit_service import AuditService
 bp = Blueprint('groups_v2', __name__)
 
 # Valid permissions for groups
-VALID_GROUP_PERMISSIONS = [
-    'read:cas', 'write:cas', 'delete:cas',
-    'read:certs', 'write:certs', 'delete:certs',
-    'read:csrs', 'write:csrs', 'delete:csrs',
-    'read:templates', 'write:templates',
-    'read:users', 'write:users',
-    'read:groups', 'write:groups', 'delete:groups',
-    'read:audit', 'export:audit',
-    'read:settings', 'write:settings',
-]
+# Derived from the permissions @require_auth actually enforces, so a group can
+# only grant something that has an effect. The previous hardcoded list had
+# drifted from the enforcement vocabulary (`read:certs` vs `read:certificates`,
+# `write:users`/`export:audit` which no role grants), which was invisible while
+# group permissions were never evaluated.
+from auth.permissions import GROUP_GRANTABLE_PERMISSIONS as VALID_GROUP_PERMISSIONS
 
 
 def validate_permissions(permissions):
