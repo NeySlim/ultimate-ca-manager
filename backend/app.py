@@ -1316,6 +1316,18 @@ def init_database(app):
             
             db.session.commit()
             app.logger.info(f"✓ Created {len(templates)} system certificate templates")
+
+        # System templates added after initial install (upgraded instances
+        # skip the count()==0 block above) — ensure they exist by name
+        if not CertificateTemplate.query.filter_by(name="OCSP Signing").first():
+            from services.template_service import TemplateService
+            ocsp_def = next(t for t in TemplateService.SYSTEM_TEMPLATES
+                            if t['name'] == 'OCSP Signing')
+            tmpl = CertificateTemplate(**ocsp_def)
+            tmpl.created_by = 'system'
+            db.session.add(tmpl)
+            db.session.commit()
+            app.logger.info("✓ Created OCSP Signing system template")
     except IntegrityError:
         db.session.rollback()
         app.logger.info("✓ System templates already exist")

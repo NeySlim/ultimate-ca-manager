@@ -10,6 +10,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **Templates now govern the issued certificate's Key Usage and Extended Key Usage** — issuing from a template previously ignored its configured KU/EKU entirely: the certificate type's built-in profile was applied instead and its EKUs were always merged in, so a template restricted to `OCSPSigning` still produced a certificate carrying `serverAuth`. When a template is selected its `extensions_template` is now the source of truth (extra EKUs are still added on top), and the certificate type selector in the issue form is disabled since the template defines it. Reported in #226.
+- **Changing a template's type now updates its Key Usage / Extended Key Usage checkboxes** — the type selector previously changed nothing in the form, so every new template started from the web-server defaults regardless of the chosen type. Reported in #226.
+
+### Added
+- **`custom` certificate type at issuance** — imposes no Extended Key Usage: only the EKUs you pick end up in the certificate, and with none selected the EKU extension is omitted entirely. This makes single-purpose certificates (e.g. an OCSP responder with only `OCSPSigning`) possible from the issue form. Requested in #226.
+- **OCSP Signing system template** (`ocsp_signing` type) — delegated OCSP responder profile (RFC 6960): `digitalSignature` + `OCSPSigning` only, 90-day validity. Existing installations receive it automatically on upgrade. `OCSPSigning` is also selectable in the template editor's EKU checkboxes. Requested in #226.
+
 ## [2.202] - 2026-07-22
 
 ### Fixed

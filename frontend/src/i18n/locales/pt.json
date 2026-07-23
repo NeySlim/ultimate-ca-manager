@@ -704,6 +704,8 @@
     "certTypeCombined": "Servidor + Cliente (Combinado)",
     "certTypeCodeSigning": "Assinatura de código",
     "certTypeEmail": "E-mail (S/MIME)",
+    "certTypeCustom": "Personalizado",
+    "certTypeFromTemplate": "Definido pelo modelo selecionado",
     "subjectDetails": "Detalhes do sujeito",
     "sanEntry": "Entrada SAN",
     "sanType": "Tipo",

@@ -704,6 +704,8 @@
     "certTypeCombined": "サーバー + クライアント (複合)",
     "certTypeCodeSigning": "コード署名",
     "certTypeEmail": "メール (S/MIME)",
+    "certTypeCustom": "カスタム",
+    "certTypeFromTemplate": "選択したテンプレートで定義されます",
     "subjectDetails": "サブジェクト詳細",
     "sanEntry": "SANエントリ",
     "sanType": "タイプ",

@@ -809,6 +809,8 @@
     "certTypeCombined": "Serveur + Client (Combiné)",
     "certTypeCodeSigning": "Signature de code",
     "certTypeEmail": "Email (S/MIME)",
+    "certTypeCustom": "Personnalisé",
+    "certTypeFromTemplate": "Défini par le template sélectionné",
     "subjectDetails": "Détails du sujet",
     "sanEntry": "Entrée SAN",
     "sanType": "Type",

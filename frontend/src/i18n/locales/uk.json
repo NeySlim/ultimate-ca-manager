@@ -704,6 +704,8 @@
     "certTypeCombined": "Сервер + Клієнт (Комбінований)",
     "certTypeCodeSigning": "Підпис коду",
     "certTypeEmail": "Електронна пошта (S/MIME)",
+    "certTypeCustom": "Власний",
+    "certTypeFromTemplate": "Визначається вибраним шаблоном",
     "subjectDetails": "Деталі суб'єкта",
     "sanEntry": "Запис SAN",
     "sanType": "Тип",

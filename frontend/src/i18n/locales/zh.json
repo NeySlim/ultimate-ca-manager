@@ -704,6 +704,8 @@
     "certTypeCombined": "服务器 + 客户端 (组合)",
     "certTypeCodeSigning": "代码签名",
     "certTypeEmail": "电子邮件 (S/MIME)",
+    "certTypeCustom": "自定义",
+    "certTypeFromTemplate": "由所选模板定义",
     "subjectDetails": "主题详情",
     "sanEntry": "SAN 条目",
     "sanType": "类型",

@@ -704,6 +704,8 @@
     "certTypeCombined": "Server + Client (Combined)",
     "certTypeCodeSigning": "Code Signing",
     "certTypeEmail": "Email (S/MIME)",
+    "certTypeCustom": "Custom",
+    "certTypeFromTemplate": "Defined by the selected template",
     "subjectDetails": "Subject Details",
     "sanEntry": "SAN Entry",
     "sanType": "Type",

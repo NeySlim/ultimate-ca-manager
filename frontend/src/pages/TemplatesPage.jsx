@@ -587,7 +587,7 @@ export default function TemplatesPage() {
 
 const TEMPLATE_TYPE_OPTIONS = [
   'web_server', 'email', 'vpn_server', 'vpn_client',
-  'code_signing', 'client_auth', 'custom'
+  'code_signing', 'client_auth', 'ocsp_signing', 'custom'
 ]
 const KEY_TYPE_OPTIONS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384']
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
@@ -597,9 +597,20 @@ const KEY_USAGE_OPTIONS = [
 ]
 const EXT_KEY_USAGE_OPTIONS = [
   'serverAuth', 'clientAuth', 'codeSigning',
-  'emailProtection', 'ipsecEndSystem', 'ipsecUser'
+  'emailProtection', 'ipsecEndSystem', 'ipsecUser', 'OCSPSigning'
 ]
 const SAN_TYPE_OPTIONS = ['dns', 'ip', 'email', 'uri']
+
+// KU/EKU/SAN presets applied when the template type changes (mirrors system templates)
+const TYPE_EXTENSION_DEFAULTS = {
+  web_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth'], san_types: ['dns', 'ip'] },
+  email:        { key_usage: ['digitalSignature', 'keyEncipherment', 'dataEncipherment'], extended_key_usage: ['emailProtection'], san_types: ['email'] },
+  vpn_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth', 'ipsecEndSystem'], san_types: ['dns', 'ip'] },
+  vpn_client:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'ipsecUser'], san_types: ['email'] },
+  code_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['codeSigning'], san_types: [] },
+  client_auth:  { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth'], san_types: ['email'] },
+  ocsp_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['OCSPSigning'], san_types: [] },
+}
 
 function buildInitialState(template) {
   if (!template) {
@@ -696,7 +707,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
         <Select
           label={t('templates.templateType')}
           value={formData.template_type}
-          onChange={(val) => set('template_type', val)}
+          onChange={(val) => setFormData(p => ({ ...p, template_type: val, ...(TYPE_EXTENSION_DEFAULTS[val] || {}) }))}
           options={TEMPLATE_TYPE_OPTIONS.map(v => ({ value: v, label: v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) }))}
         />
       </div>

@@ -140,6 +140,30 @@ class TemplateService:
             "is_active": True
         },
         {
+            "name": "OCSP Signing",
+            "description": "Delegated OCSP responder signing certificate (RFC 6960). Short validity recommended; issue from the CA whose responses it signs.",
+            "template_type": "ocsp_signing",
+            "key_type": "RSA-2048",
+            "validity_days": 90,
+            "digest": "sha256",
+            "dn_template": json.dumps({
+                "CN": "{hostname}",
+                "O": "",
+                "OU": "PKI",
+                "C": "",
+                "ST": "",
+                "L": ""
+            }),
+            "extensions_template": json.dumps({
+                "key_usage": ["digitalSignature"],
+                "extended_key_usage": ["OCSPSigning"],
+                "basic_constraints": {"ca": False},
+                "san_types": []
+            }),
+            "is_system": True,
+            "is_active": True
+        },
+        {
             "name": "Client Authentication",
             "description": "Client authentication certificate for user/device authentication. Compatible with 802.1X, RADIUS, mTLS.",
             "template_type": "client_auth",

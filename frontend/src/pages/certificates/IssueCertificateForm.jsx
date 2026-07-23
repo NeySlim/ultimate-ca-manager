@@ -51,6 +51,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     combined:     ['1.3.6.1.5.5.7.3.1', '1.3.6.1.5.5.7.3.2'],
     code_signing: ['1.3.6.1.5.5.7.3.3'],
     email:        ['1.3.6.1.5.5.7.3.4'],
+    custom:       [],
   }
 
   const [sans, setSans] = useState([{ type: 'dns', value: '' }])
@@ -154,14 +155,15 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     }
     if (tpl.validity_days) updates.validity_days = String(tpl.validity_days)
 
-    // Map template_type to cert_type
+    // Map template_type to cert_type (unmapped types fall back to custom:
+    // the template's own KU/EKU govern issuance, no profile is imposed)
     const typeMap = {
       'web_server': 'server', 'vpn_server': 'server',
-      'client_auth': 'client', 'vpn_client': 'client',
+      'client_auth': 'client', 'vpn_client': 'client', 'piv': 'client',
       'email': 'email', 'code_signing': 'code_signing',
     }
-    if (tpl.template_type && typeMap[tpl.template_type]) {
-      updates.cert_type = typeMap[tpl.template_type]
+    if (tpl.template_type) {
+      updates.cert_type = typeMap[tpl.template_type] || 'custom'
     }
 
     // Apply DN template
@@ -302,7 +304,26 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     { value: 'combined', label: t('certificates.certTypeCombined') },
     { value: 'code_signing', label: t('certificates.certTypeCodeSigning') },
     { value: 'email', label: t('certificates.certTypeEmail') },
+    { value: 'custom', label: t('certificates.certTypeCustom') },
   ]
+
+  // When a template is selected it governs KU/EKU: show its EKUs as the
+  // locked defaults instead of the cert_type profile
+  const templateEkuDefaults = useMemo(() => {
+    if (!selectedTemplate) return null
+    const tpl = templates.find(tp => String(tp.id) === selectedTemplate)
+    if (!tpl) return null
+    let ext = tpl.extensions_template
+    if (typeof ext === 'string') {
+      try { ext = JSON.parse(ext) } catch { ext = null }
+    }
+    const names = ext?.extended_key_usage
+    if (!Array.isArray(names) || names.length === 0) return null
+    const byName = Object.fromEntries(knownEkus.map(e => [String(e.name).toLowerCase(), e.oid]))
+    return names
+      .map(n => /^[0-2](?:\.\d+)+$/.test(n) ? n : byName[String(n).toLowerCase()])
+      .filter(Boolean)
+  }, [selectedTemplate, templates, knownEkus])
 
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -348,19 +369,25 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           placeholder={t('certificates.selectCA')}
           options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
         />
-        <Select
-          label={t('certificates.certType')}
-          value={formData.cert_type}
-          onChange={(val) => update('cert_type', val)}
-          options={certTypeOptions}
-        />
+        <div>
+          <Select
+            label={t('certificates.certType')}
+            value={formData.cert_type}
+            onChange={(val) => update('cert_type', val)}
+            options={certTypeOptions}
+            disabled={!!selectedTemplate}
+          />
+          {selectedTemplate && (
+            <p className="mt-1 text-[10px] text-text-tertiary">{t('certificates.certTypeFromTemplate')}</p>
+          )}
+        </div>
       </div>
 
       {/* Custom EKU OIDs (RFC 5280 §4.2.1.12) */}
       <EkuMultiSelect
         value={formData.extra_ekus}
         onChange={(v) => update('extra_ekus', v)}
-        defaults={EKU_DEFAULTS_BY_TYPE[formData.cert_type] || []}
+        defaults={templateEkuDefaults ?? (EKU_DEFAULTS_BY_TYPE[formData.cert_type] || [])}
         knownEkus={knownEkus}
       />
 

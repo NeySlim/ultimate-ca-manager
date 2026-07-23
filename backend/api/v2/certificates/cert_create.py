@@ -240,18 +240,72 @@ def create_certificate():
                            crl_sign=False, encipher_only=False, decipher_only=False),
                 'eku': [ExtendedKeyUsageOID.EMAIL_PROTECTION],
             },
+            # No implied EKU: only extra_ekus / template EKUs end up in the cert
+            'custom': {
+                'ku': dict(digital_signature=True, key_encipherment=False, content_commitment=False,
+                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
+                           crl_sign=False, encipher_only=False, decipher_only=False),
+                'eku': [],
+            },
         }
 
         profile = cert_profiles.get(cert_type, cert_profiles['server'])
-        builder = builder.add_extension(x509.KeyUsage(**profile['ku']), critical=True)
+
+        # When issuing from a template, its extensions_template overrides the
+        # cert_type profile for KU/EKU (issue #226) — the template is the
+        # source of truth; extra_ekus are still merged on top.
+        tpl_ext = {}
+        if template and template.extensions_template:
+            try:
+                tpl_ext = template.extensions_template
+                # tolerate double-encoded JSON from older/import payloads
+                for _ in range(2):
+                    if isinstance(tpl_ext, str):
+                        tpl_ext = json.loads(tpl_ext)
+                if not isinstance(tpl_ext, dict):
+                    tpl_ext = {}
+            except (ValueError, TypeError):
+                tpl_ext = {}
+
+        ku_flags = profile['ku']
+        tpl_ku = tpl_ext.get('key_usage')
+        if isinstance(tpl_ku, list) and tpl_ku:
+            ku_name_to_flag = {
+                'digitalsignature': 'digital_signature',
+                'keyencipherment': 'key_encipherment',
+                'contentcommitment': 'content_commitment',
+                'nonrepudiation': 'content_commitment',
+                'dataencipherment': 'data_encipherment',
+                'keyagreement': 'key_agreement',
+                'keycertsign': 'key_cert_sign',
+                'crlsign': 'crl_sign',
+            }
+            ku_flags = dict.fromkeys(profile['ku'], False)
+            for name in tpl_ku:
+                flag = ku_name_to_flag.get(str(name).lower())
+                if flag:
+                    ku_flags[flag] = True
+            if not any(ku_flags.values()):
+                ku_flags = profile['ku']
+        builder = builder.add_extension(x509.KeyUsage(**ku_flags), critical=True)
+
+        base_ekus = profile['eku']
+        tpl_eku = tpl_ext.get('extended_key_usage')
+        if isinstance(tpl_eku, list) and tpl_eku:
+            tpl_oid_strs, tpl_err = normalize_extra_ekus(tpl_eku)
+            if tpl_err:
+                return error_response(f'Invalid template EKUs: {tpl_err}', 400)
+            base_ekus = to_object_identifiers(tpl_oid_strs)
 
         # Custom Extended Key Usage OIDs (RFC 5280 §4.2.1.12)
         extra_ekus_input = data.get('extra_ekus')
         extra_oid_strs, extra_err = normalize_extra_ekus(extra_ekus_input)
         if extra_err:
             return error_response(f'Invalid extra_ekus: {extra_err}', 400)
-        eku_oids = merge_eku_lists(profile['eku'], to_object_identifiers(extra_oid_strs))
-        builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
+        eku_oids = merge_eku_lists(base_ekus, to_object_identifiers(extra_oid_strs))
+        # EKU is SEQUENCE SIZE (1..MAX) — omit the extension entirely when empty
+        if eku_oids:
+            builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
 
         # Subject Alternative Names
         san_list = []

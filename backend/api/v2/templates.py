@@ -50,7 +50,7 @@ _VALID_KEY_TYPES = {
 _VALID_DIGESTS = {'sha256', 'sha384', 'sha512'}
 _VALID_TEMPLATE_TYPES = {
     'web_server', 'email', 'vpn_server', 'vpn_client',
-    'code_signing', 'client_auth', 'piv', 'custom',
+    'code_signing', 'client_auth', 'ocsp_signing', 'piv', 'custom',
 }
 
 
@@ -220,6 +220,12 @@ def create_template():
             extensions = {
                 "key_usage": ["digitalSignature"],
                 "extended_key_usage": ["codeSigning"],
+                "basic_constraints": {"ca": False}
+            }
+        elif data['template_type'] == 'ocsp_signing':
+            extensions = {
+                "key_usage": ["digitalSignature"],
+                "extended_key_usage": ["OCSPSigning"],
                 "basic_constraints": {"ca": False}
             }
     
