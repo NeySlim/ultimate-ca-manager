@@ -10,6 +10,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+## [2.203] - 2026-07-23
+
 ### Fixed
 - **TSA works again for existing installations** — 2.200 required the timestamp signer to carry a critical, exclusive `timeStamping` EKU, but the signer is the configured CA's own certificate, which carries no EKU at all: every deployment that timestamped before the upgrade got a 503 on all requests, and the product offered no way to mint a compliant signer. A CA certificate is accepted again (with a recommendation to use a dedicated TSA certificate), the new `tsa_enabled` gate no longer refuses installs that configured a TSA CA before the flag existed, and a client-pinned `reqPolicy` is honored by issuing under that policy (RFC 3161 §2.4.1) instead of rejecting.
 - **ACME issuance no longer fails closed on CAA DNS errors** — 2.200 turned any CAA lookup failure (SERVFAIL, timeout, unreachable resolver) into a denial and terminally invalidated the order, which broke every renewal on air-gapped and split-horizon networks. DNS errors are non-blocking again by default (a warning is logged); strict fail-closed behaviour is available with the new "fail issuance on DNS lookup errors" toggle, and a transient DNS error never invalidates the order anymore. An RFC 8657 `validationmethods` parameter is no longer enforced when the validation method is indeterminable (reused or auto-approved authorizations).
