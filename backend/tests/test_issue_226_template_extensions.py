@@ -156,6 +156,86 @@ class TestCustomCertType:
         assert _eku_oids(cert) == {SERVER_AUTH_OID}
 
 
+class TestTemplateDefaultsAtIssuance:
+    """Template key_type / validity_days are the defaults when the request
+    omits them (API parity with the UI prefill), and explicit values win."""
+
+    def _issue_raw(self, auth_client, payload):
+        return auth_client.post('/api/v2/certificates',
+                                data=json.dumps(payload),
+                                content_type=CONTENT_JSON)
+
+    def test_template_key_and_validity_used_as_defaults(self, app, auth_client, create_ca):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        ca = create_ca(cn='Issue226 Defaults CA')
+        tpl = _create_template(
+            auth_client, name='issue226-defaults',
+            key_type='EC-P384', validity_days=120,
+            extensions_template={'extended_key_usage': ['clientAuth']})
+
+        r = self._issue_raw(auth_client, {
+            'cn': 'defaults.test', 'ca_id': ca['id'], 'template_id': tpl['id']})
+        assert r.status_code in (200, 201), r.data
+        cert = _issued_cert_obj(app, get_json(r)['data']['id'])
+
+        pub = cert.public_key()
+        assert isinstance(pub, ec.EllipticCurvePublicKey)
+        assert pub.curve.name == 'secp384r1'
+        days = (cert.not_valid_after_utc - cert.not_valid_before_utc).days
+        assert 119 <= days <= 121
+
+    def test_template_rsa_key_default(self, app, auth_client, create_ca):
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        ca = create_ca(cn='Issue226 RSA Defaults CA')
+        tpl = _create_template(
+            auth_client, name='issue226-rsa-defaults',
+            key_type='RSA-4096',
+            extensions_template={'extended_key_usage': ['clientAuth']})
+
+        r = self._issue_raw(auth_client, {
+            'cn': 'rsa-defaults.test', 'ca_id': ca['id'], 'template_id': tpl['id']})
+        assert r.status_code in (200, 201), r.data
+        cert = _issued_cert_obj(app, get_json(r)['data']['id'])
+
+        pub = cert.public_key()
+        assert isinstance(pub, rsa.RSAPublicKey)
+        assert pub.key_size == 4096
+
+    def test_explicit_request_values_override_template(self, app, auth_client, create_ca):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        ca = create_ca(cn='Issue226 Override Defaults CA')
+        tpl = _create_template(
+            auth_client, name='issue226-override-defaults',
+            key_type='RSA-2048', validity_days=120,
+            extensions_template={'extended_key_usage': ['clientAuth']})
+
+        r = self._issue_raw(auth_client, {
+            'cn': 'override-defaults.test', 'ca_id': ca['id'],
+            'template_id': tpl['id'],
+            'key_type': 'ecdsa', 'key_size': 256, 'validity_days': 30})
+        assert r.status_code in (200, 201), r.data
+        cert = _issued_cert_obj(app, get_json(r)['data']['id'])
+
+        pub = cert.public_key()
+        assert isinstance(pub, ec.EllipticCurvePublicKey)
+        assert pub.curve.name == 'secp256r1'
+        days = (cert.not_valid_after_utc - cert.not_valid_before_utc).days
+        assert 29 <= days <= 31
+
+    def test_no_template_keeps_current_defaults(self, app, auth_client, create_ca):
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        ca = create_ca(cn='Issue226 Plain Defaults CA')
+        r = self._issue_raw(auth_client, {'cn': 'plain-defaults.test', 'ca_id': ca['id']})
+        assert r.status_code in (200, 201), r.data
+        cert = _issued_cert_obj(app, get_json(r)['data']['id'])
+
+        pub = cert.public_key()
+        assert isinstance(pub, rsa.RSAPublicKey)
+        assert pub.key_size == 2048
+        days = (cert.not_valid_after_utc - cert.not_valid_before_utc).days
+        assert 364 <= days <= 366
+
+
 class TestOcspSigningTemplateType:
 
     def test_ocsp_signing_type_accepted_with_defaults(self, auth_client):

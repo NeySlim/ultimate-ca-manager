@@ -129,8 +129,18 @@ def create_certificate():
 
         from utils.key_type import parse_issue_key_type
 
-        key_type_in = data.get('key_type') or data.get('keyType', 'rsa')
-        key_size_in = data.get('key_size') or data.get('keySize', '2048')
+        key_type_in = data.get('key_type') or data.get('keyType')
+        key_size_in = data.get('key_size') or data.get('keySize')
+        # Template key_type ("RSA-2048", "EC-P384") is the default when the
+        # request doesn't pick a key — API parity with the UI, which prefills
+        # these fields from the template (issue #226 follow-up).
+        if not key_type_in and template and template.key_type:
+            tpl_algo, _, tpl_size = template.key_type.partition('-')
+            key_type_in = tpl_algo
+            if not key_size_in:
+                key_size_in = tpl_size
+        key_type_in = key_type_in or 'rsa'
+        key_size_in = key_size_in or '2048'
         try:
             normalized_key = parse_issue_key_type(
                 key_type_in,
@@ -173,8 +183,14 @@ def create_certificate():
 
         # Validity (cap 1..3650 days; reject 0/negative/non-int)
         MAX_VALIDITY_DAYS = 3650  # ~10 years; CA/B Forum is 398 for public TLS, 3650 OK for internal PKI
+        # Template validity is the default when the request doesn't set one
+        # (same rationale as key_type above); an explicit value still wins.
+        raw_validity = data.get('validity_days')
+        if raw_validity in (None, ''):
+            raw_validity = (template.validity_days if template and template.validity_days
+                            else 365)
         try:
-            validity_days = int(data.get('validity_days', 365))
+            validity_days = int(raw_validity)
         except (TypeError, ValueError):
             return error_response("validity_days must be an integer (1..3650)", 400)
         if validity_days < 1 or validity_days > MAX_VALIDITY_DAYS:

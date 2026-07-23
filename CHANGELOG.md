@@ -10,6 +10,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- **Delegated OCSP responder certificates renew automatically** — a daily task re-issues a responder certificate before it expires (same key pair and extensions, renewed at par) and rebinds the CA's responder configuration to the new certificate, so a short-lived OCSP signing certificate (e.g. the 90-day system template) rotates without manual action. Enabled by default; can be disabled and the renewal window tuned via configuration. Requested in #226.
+- **Template key type and validity are honored at issuance via the API** — an issuance request carrying a `template_id` but no `key_type`/`validity_days` now inherits them from the template (the UI already prefilled them); explicit request values still win. Requested in #226.
+
 ## [2.203] - 2026-07-23
 
 ### Fixed
