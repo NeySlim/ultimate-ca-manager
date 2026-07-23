@@ -143,6 +143,7 @@ class CSRMixin:
         digest: str = 'sha256',
         username: str = 'system',
         extra_ekus: list = None,
+        allow_sensitive_ekus: bool = False,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -227,6 +228,7 @@ class CSRMixin:
             cps_oid=cps_oid,
             ocsp_must_staple=getattr(certificate, 'ocsp_must_staple', False) or False,
             extra_ekus=extra_ekus,
+            allow_sensitive_ekus=allow_sensitive_ekus,
         )
 
         # Parse signed certificate

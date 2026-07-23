@@ -1003,11 +1003,30 @@ class AcmeClientService:
             directory = self._fetch_directory()
 
             payload = {"identifiers": identifiers}
-            if replaces and directory.get('renewalInfo'):
+            sent_replaces = bool(replaces and directory.get('renewalInfo'))
+            if sent_replaces:
                 payload['replaces'] = replaces
 
             resp = self._post(directory['newOrder'], payload)
-            
+
+            # RFC 9773 `replaces` is best-effort: Boulder rejects a newOrder
+            # whose replaces designates an already-replaced certificate
+            # (alreadyReplaced/409). Without a fallback the renewal fails on
+            # every cycle until expiry — retry once without the field.
+            if resp.status_code not in [200, 201] and sent_replaces:
+                try:
+                    err_body = resp.json()
+                except Exception:
+                    err_body = {}
+                err_text = f"{err_body.get('type', '')} {err_body.get('detail', '')}".lower()
+                if (resp.status_code == 409 or 'replace' in err_text):
+                    logger.warning(
+                        "newOrder with replaces rejected (%s); retrying without "
+                        "replaces: %s", resp.status_code, err_body.get('detail'),
+                    )
+                    payload.pop('replaces', None)
+                    resp = self._post(directory['newOrder'], payload)
+
             if resp.status_code not in [200, 201]:
                 error = resp.json()
                 return False, f"Order creation failed: {error.get('detail', 'Unknown error')}", None

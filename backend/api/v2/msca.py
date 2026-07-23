@@ -1149,6 +1149,7 @@ def renew_via_msca(cert, username=None):
         if '*' not in user_perms and not _has_perm('admin:system', user_perms):
             raise PermissionError("Renewing an EOBO-issued certificate requires admin:system permission")
 
+    rekey_previous = None
     if cert.csr:
         try:
             csr_pem = base64.b64decode(cert.csr).decode('utf-8')
@@ -1159,23 +1160,40 @@ def renew_via_msca(cert, username=None):
         # by REKEY: fresh key pair + CSR with the same subject and SANs.
         # Persist both BEFORE submission so a 'pending' approval can still be
         # finalized by the request-status poll.
+        rekey_previous = (cert.csr, cert.prv)
         csr_pem = _generate_rekey_csr(cert)
         ok, _resp = safe_commit(logger, "Failed to persist renewal key material")
         if not ok:
             raise ValueError("Failed to persist renewal key material")
 
-    result = MicrosoftCAService.submit_csr(
-        msca_id=msca.id,
-        csr_pem=csr_pem,
-        template=template,
-        csr_id=cert.id,
-        submitted_by=username,
-        enrollee_name=enrollee_name,
-        enrollee_upn=enrollee_upn,
-    )
+    def _rollback_rekey():
+        """A failed submission must not leave the active cert paired with a
+        key/CSR that never got signed — the row would lose its 'No Key' badge
+        and a PKCS12 export would bundle the wrong private key."""
+        if rekey_previous is None:
+            return
+        cert.csr, cert.prv = rekey_previous
+        safe_commit(logger, "Failed to roll back rekey material")
+
+    try:
+        result = MicrosoftCAService.submit_csr(
+            msca_id=msca.id,
+            csr_pem=csr_pem,
+            template=template,
+            csr_id=cert.id,
+            submitted_by=username,
+            enrollee_name=enrollee_name,
+            enrollee_upn=enrollee_upn,
+        )
+    except Exception:
+        _rollback_rekey()
+        raise
 
     if result['status'] == 'issued':
         _import_signed_cert(cert, result.get('cert_pem'), msca, template, result['request_id'])
+    elif result['status'] != 'pending':
+        # denied/failed: the submission is terminal, restore the row
+        _rollback_rekey()
 
     _audit('msca.renew', msca, f"cert_id={cert.id} template={template} status={result['status']}")
     return result

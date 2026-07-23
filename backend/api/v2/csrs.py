@@ -688,6 +688,10 @@ def sign_csr(csr_id):
             validity_days=validity_days,
             cert_type=backend_cert_type,
             extra_ekus=extra_ekus,
+            # An operator explicitly signing a CSR may issue delegated
+            # OCSP/timestamping certs (the documented responder workflow);
+            # protocol enrollees (ACME/EST) never get these EKUs
+            allow_sensitive_ekus=True,
         )
         
         # Determine if result is a CA or Certificate
@@ -770,7 +774,8 @@ def bulk_sign_csrs():
                 continue
 
             signed_cert = CertificateService.sign_csr(
-                cert_id=csr_id, caref=ca.refid, validity_days=validity_days)
+                cert_id=csr_id, caref=ca.refid, validity_days=validity_days,
+                allow_sensitive_ekus=True)
             results['success'].append(csr_id)
         except Exception as e:
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})

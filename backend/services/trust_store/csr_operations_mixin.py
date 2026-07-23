@@ -2,6 +2,7 @@
 CSR operations mixin for TrustStoreService
 """
 import ipaddress
+import logging
 from datetime import timedelta
 from typing import List, Optional, Tuple
 
@@ -15,6 +16,8 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from .constants import HASH_ALGORITHMS
 from .key_operations_mixin import KeyOperationsMixin
 from .constraints_mixin import ConstraintsMixin
+
+logger = logging.getLogger(__name__)
 
 
 _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
@@ -129,9 +132,13 @@ class CSROperationsMixin:
         ocsp_must_staple: bool = False,
         extra_ekus: Optional[List[str]] = None,
         renewal_of=None,
+        allow_sensitive_ekus: bool = False,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
-        signing renews — its names are graced by NameConstraints validation."""
+        signing renews — its names are graced by NameConstraints validation.
+        ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
+        reserved for the admin Sign-CSR path (an operator explicitly signing a
+        delegated responder/TSA CSR); protocol enrollees never get them."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -220,10 +227,23 @@ class CSROperationsMixin:
                 )
                 continue
             if extension.oid == ExtensionOID.EXTENDED_KEY_USAGE and not issuing_ca:
-                safe_ekus = [
-                    oid for oid in extension.value
-                    if oid not in _LEAF_FORBIDDEN_EKU_OIDS
-                ]
+                if allow_sensitive_ekus:
+                    safe_ekus = list(extension.value)
+                else:
+                    safe_ekus = [
+                        oid for oid in extension.value
+                        if oid not in _LEAF_FORBIDDEN_EKU_OIDS
+                    ]
+                    dropped = [
+                        oid.dotted_string for oid in extension.value
+                        if oid in _LEAF_FORBIDDEN_EKU_OIDS
+                    ]
+                    if dropped:
+                        logger.warning(
+                            "sign_csr: dropped sensitive EKU(s) %s from CSR "
+                            "(protocol enrollees may not request delegated "
+                            "OCSP/timestamping authority)", dropped,
+                        )
                 if safe_ekus:
                     builder = builder.add_extension(
                         x509.ExtendedKeyUsage(safe_ekus), extension.critical
@@ -330,7 +350,15 @@ class CSROperationsMixin:
                     critical=False,
                 )
         elif extra_oids:
-            merged = merge_eku_lists(list(existing_eku.value), extra_oids)
+            # Re-merging the CSR's original EKUs must not resurrect the
+            # sensitive ones the copy loop above just dropped
+            csr_ekus = list(existing_eku.value)
+            if not allow_sensitive_ekus:
+                csr_ekus = [
+                    oid for oid in csr_ekus
+                    if oid not in _LEAF_FORBIDDEN_EKU_OIDS
+                ]
+            merged = merge_eku_lists(csr_ekus, extra_oids)
             new_builder = x509.CertificateBuilder()
             new_builder = new_builder.subject_name(builder._subject_name)
             new_builder = new_builder.issuer_name(builder._issuer_name)
