@@ -142,13 +142,42 @@ def _unpad_aes_cbc(ciphertext, key, iv):
 
 
 class TestSimpleEnroll:
-    def test_rejects_non_pkcs10_content_type(self, client, est_config):
+    def test_reenroll_san_match_ignores_order_and_allows_missing(self):
+        # RFC 7030 identity match must not depend on GeneralName order or
+        # extension criticality; a CSR without SAN is issued as-is (pre-2.200)
+        from cryptography import x509
+        from api.est_protocol import _reenroll_san_matches
+
+        cert_csr, _ = _make_csr(san_names=('a.test', 'b.test'))
+        reordered_csr, _ = _make_csr(san_names=('b.test', 'a.test'))
+        no_san_csr, _ = _make_csr()
+        other_csr, _ = _make_csr(san_names=('a.test', 'c.test'))
+
+        assert _reenroll_san_matches(cert_csr, reordered_csr) is True
+        assert _reenroll_san_matches(cert_csr, no_san_csr) is True
+        assert _reenroll_san_matches(cert_csr, other_csr) is False
+
+    def test_accepts_pem_csr_body(self, client, est_config):
+        # Legacy clients post the CSR as PEM instead of base64 DER
+        csr, _ = _make_csr()
+        response = client.post(
+            f'{EST_BASE}/simpleenroll',
+            data=csr.public_bytes(serialization.Encoding.PEM),
+            headers=_basic_auth(),
+            content_type='application/pkcs10',
+        )
+        assert response.status_code == 200
+        assert 'certs-only' in response.headers['Content-Type']
+
+    def test_tolerates_non_pkcs10_content_type(self, client, est_config):
+        # Existing integrations post CSRs with curl's default Content-Type;
+        # a 415 broke them on upgrade — accepted with a deprecation warning.
         csr, _ = _make_csr()
         response = _post_csr(
             client, 'simpleenroll', csr, headers=_basic_auth(),
             content_type='application/octet-stream',
         )
-        assert response.status_code == 415
+        assert response.status_code == 200
 
     def test_accepts_charset_and_returns_only_issued_certificate(self, client, est_config):
         csr, _ = _make_csr(san_names=('device.example.test',))

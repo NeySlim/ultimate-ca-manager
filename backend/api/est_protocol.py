@@ -104,15 +104,38 @@ ASYMMETRIC_DECRYPT_KEY_IDENTIFIER_OID = '1.2.840.113549.1.9.16.2.54'
 
 
 def _require_pkcs10_content_type():
-    """Enforce the RFC 7030 PKCS#10 media type while allowing parameters."""
-    if (request.mimetype or '').lower() != PKCS10_MIME:
-        return Response('Content-Type must be application/pkcs10', status=415)
+    """Warn when the RFC 7030 PKCS#10 media type is missing, without
+    refusing. Existing integrations post CSRs with curl's default
+    Content-Type (or none at all); a 415 broke them on upgrade."""
+    mimetype = (request.mimetype or '').lower()
+    if mimetype != PKCS10_MIME:
+        logger.warning(
+            "EST request Content-Type is %r; RFC 7030 specifies "
+            "application/pkcs10 (accepted for compatibility, deprecated)",
+            mimetype or 'missing',
+        )
     return None
 
 
 def _decode_est_csr(csr_data):
-    """Decode a base64 DER PKCS#10 request, accepting MIME whitespace."""
-    normalized = ''.join(csr_data.split())
+    """Decode a PKCS#10 request: base64 DER per RFC 7030, with a PEM
+    fallback for legacy clients that post the CSR as-is."""
+    if isinstance(csr_data, bytes):
+        csr_text = csr_data.decode('utf-8', errors='replace')
+    else:
+        csr_text = csr_data
+    if '-----BEGIN' in csr_text:
+        # PEM body: extract the base64 between the armor lines
+        lines = [
+            line.strip() for line in csr_text.splitlines()
+            if line.strip() and not line.startswith('-----')
+        ]
+        logger.warning(
+            "EST request posted a PEM CSR; RFC 7030 specifies base64 DER "
+            "(accepted for compatibility, deprecated)"
+        )
+        return base64.b64decode(''.join(lines), validate=True)
+    normalized = ''.join(csr_text.split())
     return base64.b64decode(normalized, validate=True)
 
 
@@ -125,9 +148,39 @@ def _certs_only_base64(cert):
     return base64.b64encode(der).decode('ascii')
 
 
-def _certs_only_response(cert):
+def _certs_only_response(cert, ca=None):
+    """RFC 7030 §4.2.3: the enroll response contains only the issued
+    certificate. Legacy clients that built their TLS bundle from this
+    response (without calling /cacerts) can opt back into receiving the CA
+    chain with est_response_include_chain=true."""
+    certs = [cert]
+    if ca is not None:
+        try:
+            from models import SystemConfig
+            row = SystemConfig.query.filter_by(
+                key='est_response_include_chain'
+            ).first()
+            if row and str(row.value).lower() == 'true':
+                from cryptography import x509 as _x509
+                from services.ca_service import CAService
+                for pem in CAService.get_certificate_chain(ca.refid) or []:
+                    try:
+                        chain_cert = _x509.load_pem_x509_certificate(
+                            pem.encode() if isinstance(pem, str) else pem
+                        )
+                        if chain_cert.serial_number != cert.serial_number:
+                            certs.append(chain_cert)
+                    except Exception:
+                        continue
+        except Exception as exc:
+            logger.warning("EST: failed to append CA chain to response: %s", exc)
+
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    der = pkcs7.serialize_certificates(
+        certs, encoding=_crypto_serialization.Encoding.DER
+    )
     return Response(
-        _certs_only_base64(cert),
+        base64.b64encode(der).decode('ascii'),
         status=200,
         content_type=PKCS7_CERTS_ONLY,
         headers={'Content-Transfer-Encoding': 'base64'},
@@ -142,6 +195,27 @@ def _subject_alt_name(cert_or_csr):
         )
     except x509.ExtensionNotFound:
         return None
+
+
+def _san_values(cert_or_csr):
+    """SAN entries as a set of (type, value) pairs — order and the
+    extension's critical flag are irrelevant to the identity match."""
+    ext = _subject_alt_name(cert_or_csr)
+    if ext is None:
+        return None
+    return {(type(name).__name__, str(getattr(name, 'value', name)))
+            for name in ext.value}
+
+
+def _reenroll_san_matches(client_cert_obj, csr):
+    """RFC 7030 §4.2.2: re-enroll must keep the same identity. Compare SANs
+    as sets (clients reorder entries and toggle criticality when regenerating
+    CSRs); a CSR without SAN is accepted — pre-2.200 issued it as-is."""
+    csr_sans = _san_values(csr)
+    if csr_sans is None:
+        return True
+    cert_sans = _san_values(client_cert_obj) or set()
+    return csr_sans == cert_sans
 
 
 def _copy_csr_extensions(builder, csr):
@@ -533,7 +607,7 @@ def simple_enroll(label=None):
         
         # RFC 7030 §4.2.3 requires only the newly issued certificate.
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-        return _certs_only_response(cert)
+        return _certs_only_response(cert, ca=ca)
         
     except Exception as e:
         logger.error(f"EST simpleenroll failed: {e}")
@@ -592,7 +666,7 @@ def simple_reenroll(label=None):
             if client_cert_obj.subject != csr.subject:
                 logger.warning(f"EST reenroll: client cert subject {client_cert_obj.subject} does not match CSR subject {csr.subject}")
                 return Response('CSR subject does not match client certificate', status=403)
-            if _subject_alt_name(client_cert_obj) != _subject_alt_name(csr):
+            if not _reenroll_san_matches(client_cert_obj, csr):
                 logger.warning(
                     'EST reenroll: CSR SubjectAltName differs from client certificate'
                 )
@@ -626,7 +700,7 @@ def simple_reenroll(label=None):
             pass
         
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-        return _certs_only_response(cert)
+        return _certs_only_response(cert, ca=ca)
         
     except Exception as e:
         logger.error(f"EST simplereenroll failed: {e}")
