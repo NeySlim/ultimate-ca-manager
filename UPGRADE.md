@@ -157,6 +157,18 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading past v2.200 (protocol conformance sweep)
+
+v2.200 tightened many protocol paths in ways that broke existing deployments; later releases restore compatible defaults. If you upgraded to 2.200–2.202 and saw any of the following, upgrading to the latest release fixes them without manual action: TSA answering 503 on every request, ACME finalize failing with `CAA check failed` on networks without public DNS, renewals rejected by `name constraints`, SCEP devices failing with `badMessageCheck`/`badTime`, EST scripts getting 415, syslog TCP+TLS streams corrupted after upgrade.
+
+Notes:
+
+- **Strictness is now opt-in.** The 2.200 fail-closed behaviours remain available as explicit settings: CAA enforcement (ACME settings), SCEP signingTime enforcement + clock skew (SCEP settings), SCEP GetCACert full chain, EST chain-in-response, CT require-SCTs. Review them if you operate a public-facing CA.
+- **OIDC SSO**: ID-token verification (introduced in 2.200, fail-closed) is now configurable in Settings → SSO, including the issuer and JWKS URI it requires. Existing OIDC providers need their issuer set there for logins to work with verification enabled.
+- **EST `/serverkeygen` response format changed in 2.200** and stays RFC 7030-conformant: the private key is delivered as CMS EnvelopedData (`smime-type=server-generated-key`) and the multipart part order follows the RFC. Clients written against the pre-2.200 proprietary format must be updated; mTLS clients using non-RSA certificates are not supported for key transport.
+- **OCSP cache** is purged once at upgrade (migration 066) so responses cached before the revocation-invalidation fix cannot outlive it; the cache repopulates on demand.
+- **Wildcard ACME authorizations** stored before 2.200 are normalized at upgrade (migration 067) so authorization reuse works again.
+
 ### Upgrading to v2.193
 
 **No breaking changes for typical deployments** — safe to upgrade directly.
