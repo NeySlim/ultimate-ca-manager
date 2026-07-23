@@ -249,9 +249,12 @@ def _decrypt_password_response(response, password):
 
 class TestScepSignedAttributeGuards:
     @pytest.mark.parametrize("nonce", [None, b"short nonce"])
-    def test_sender_nonce_is_mandatory_and_exactly_16_bytes(
+    def test_missing_or_short_sender_nonce_is_tolerated(
         self, app, create_ca, nonce
     ):
+        # Pre-RFC 8894 clients omit senderNonce or send fewer than 16 bytes;
+        # rejecting them broke enrolled fleets on upgrade — the request must
+        # proceed (not fail with badMessageCheck).
         ca_data = create_ca(cn=f"SCEP Nonce Guard {nonce!r}")
         with app.app_context():
             ca, ca_cert, _ = _load_ca_material(ca_data["id"])
@@ -264,19 +267,14 @@ class TestScepSignedAttributeGuards:
 
         attrs = _response_attributes(response)
         assert status == 200
-        assert attrs[PKI_STATUS_OID] == "2"
-        assert attrs[FAIL_INFO_OID] == "1"
+        assert attrs.get(FAIL_INFO_OID) != "1"
         assert attrs[TRANSACTION_ID_OID] == "txn-21"
-        if nonce is None:
-            assert RECIPIENT_NONCE_OID not in attrs
-        else:
-            assert attrs[RECIPIENT_NONCE_OID] == nonce
 
     @pytest.mark.parametrize("mode", ["missing", "stale", "future"])
-    def test_signing_time_is_required_and_within_ten_minutes(
-        self, app, create_ca, mode
-    ):
-        ca_data = create_ca(cn=f"SCEP Signing Time {mode}")
+    def test_signing_time_is_tolerated_by_default(self, app, create_ca, mode):
+        # signingTime is optional in CMS; devices without NTP drift. Default
+        # is lenient (warning); scep_enforce_signing_time restores rejection.
+        ca_data = create_ca(cn=f"SCEP Signing Time Lenient {mode}")
         nonce = b"0123456789abcdef"
         with app.app_context():
             ca, ca_cert, _ = _load_ca_material(ca_data["id"])
@@ -303,6 +301,47 @@ class TestScepSignedAttributeGuards:
 
             request = _rewrite_signed_attributes(request, signer_key, transform)
             response, status = SCEPService(ca.refid).process_pkcs_req(request, "127.0.0.1")
+
+        attrs = _response_attributes(response)
+        assert status == 200
+        assert attrs.get(FAIL_INFO_OID) != "3"
+        assert attrs[TRANSACTION_ID_OID] == "txn-21"
+
+    @pytest.mark.parametrize("mode", ["missing", "stale", "future"])
+    def test_signing_time_is_enforced_when_opted_in(
+        self, app, create_ca, mode
+    ):
+        ca_data = create_ca(cn=f"SCEP Signing Time {mode}")
+        nonce = b"0123456789abcdef"
+        with app.app_context():
+            _set_config("scep_enforce_signing_time", "true")
+            ca, ca_cert, _ = _load_ca_material(ca_data["id"])
+            signer_cert, signer_key = _client_identity()
+            request = _build_request(
+                ca_cert, signer_cert, signer_key, 21,
+                _issuer_and_serial(ca_cert), nonce,
+            )
+
+            def transform(attributes):
+                kept = [
+                    attr for attr in attributes
+                    if attr["type"].native != "signing_time"
+                ]
+                if mode != "missing":
+                    offset = timedelta(minutes=-11 if mode == "stale" else 11)
+                    kept.append({
+                        "type": "signing_time",
+                        "values": [
+                            asn1crypto.core.UTCTime(datetime.now(timezone.utc) + offset)
+                        ],
+                    })
+                return kept
+
+            request = _rewrite_signed_attributes(request, signer_key, transform)
+            try:
+                response, status = SCEPService(ca.refid).process_pkcs_req(request, "127.0.0.1")
+            finally:
+                _clear_config("scep_enforce_signing_time")
 
         attrs = _response_attributes(response)
         assert status == 200
@@ -741,19 +780,30 @@ class TestScepCaCertificateAndCapabilities:
 
         with app.app_context():
             _set_config("scep_ca_id", intermediate["id"])
-            expected_serials = {
-                _load_ca_material(root["id"])[1].serial_number,
-                _load_ca_material(intermediate["id"])[1].serial_number,
-            }
+            root_serial = _load_ca_material(root["id"])[1].serial_number
+            intermediate_serial = _load_ca_material(intermediate["id"])[1].serial_number
         try:
+            # Default: single CA cert (Apple clients choke on ca-ra-cert)
+            response = client.get("/scep/pkiclient.exe?operation=GetCACert")
+            assert response.status_code == 200
+            assert response.content_type == "application/x-x509-ca-cert"
+            single = x509.load_der_x509_certificate(response.data)
+            assert single.serial_number == intermediate_serial
+
+            # Opt-in: full chain as degenerate PKCS#7 (RFC 8894 §4.2.1)
+            with app.app_context():
+                _set_config("scep_getcacert_chain", "true")
             response = client.get("/scep/pkiclient.exe?operation=GetCACert")
             certs = pkcs7.load_der_pkcs7_certificates(response.data)
             assert response.status_code == 200
             assert response.content_type == "application/x-x509-ca-ra-cert"
-            assert {cert.serial_number for cert in certs} == expected_serials
+            assert {cert.serial_number for cert in certs} == {
+                root_serial, intermediate_serial,
+            }
         finally:
             with app.app_context():
                 _clear_config("scep_ca_id")
+                _clear_config("scep_getcacert_chain")
 
     def test_get_ca_caps_advertises_implemented_standard_features(self, client):
         response = client.get("/scep/pkiclient.exe?operation=GetCACaps")

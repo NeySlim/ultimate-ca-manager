@@ -127,6 +127,8 @@ class SCEPService:
         if not self.ca:
             raise ValueError(f"CA not found: {ca_refid}")
 
+        self._config_cache = {}
+
         self.ca_cert = x509.load_pem_x509_certificate(
             base64.b64decode(self.ca.crt), default_backend()
         )
@@ -244,29 +246,48 @@ class SCEPService:
                     recipient_nonce=sender_nonce,
                 ), 200
 
-            if not isinstance(sender_nonce, (bytes, bytearray)) or len(sender_nonce) != 16:
-                return self._create_error_response(
-                    self.FAIL_BAD_MESSAGE_CHECK,
-                    "senderNonce must be exactly 16 bytes",
-                    transaction_id=transaction_id,
-                    recipient_nonce=sender_nonce,
-                ), 200
-            sender_nonce = bytes(sender_nonce)
+            # RFC 8894 specifies a 16-byte senderNonce, but pre-RFC clients
+            # (old IOS, embedded stacks, some jscep forks) omit it or send 8
+            # bytes. Rejecting them broke enrolled fleets on upgrade — accept
+            # with a warning instead (pre-2.200 behaviour).
+            if isinstance(sender_nonce, (bytes, bytearray)):
+                sender_nonce = bytes(sender_nonce)
+                if len(sender_nonce) != 16:
+                    logger.warning(
+                        "SCEP senderNonce is %d bytes (RFC 8894 specifies 16); "
+                        "accepting for compatibility", len(sender_nonce),
+                    )
+            else:
+                if sender_nonce is not None:
+                    logger.warning("SCEP senderNonce has unexpected type; ignoring")
+                sender_nonce = None
 
-            if not isinstance(signing_time, datetime):
+            # signingTime is optional in CMS and RFC 8894 does not require it.
+            # Devices without NTP (or with a dead RTC) legitimately drift —
+            # enforce the skew only when scep_enforce_signing_time is enabled.
+            enforce_signing_time = self._config_flag('scep_enforce_signing_time')
+            if isinstance(signing_time, datetime):
+                if signing_time.tzinfo is None:
+                    signing_time = signing_time.replace(tzinfo=timezone.utc)
+                skew_minutes = self._config_int('scep_time_skew_minutes', 10, 1, 1440)
+                time_skew = abs(datetime.now(timezone.utc) - signing_time)
+                if time_skew > timedelta(minutes=skew_minutes):
+                    if enforce_signing_time:
+                        return self._create_error_response(
+                            self.FAIL_BAD_TIME,
+                            "signingTime outside the allowed clock skew",
+                            transaction_id=transaction_id,
+                            recipient_nonce=sender_nonce,
+                        ), 200
+                    logger.warning(
+                        "SCEP signingTime is %s outside the %d-minute skew; "
+                        "accepting (enable scep_enforce_signing_time to reject)",
+                        time_skew, skew_minutes,
+                    )
+            elif enforce_signing_time:
                 return self._create_error_response(
                     self.FAIL_BAD_TIME,
                     "Missing or invalid signingTime",
-                    transaction_id=transaction_id,
-                    recipient_nonce=sender_nonce,
-                ), 200
-            if signing_time.tzinfo is None:
-                signing_time = signing_time.replace(tzinfo=timezone.utc)
-            time_skew = abs(datetime.now(timezone.utc) - signing_time)
-            if time_skew > timedelta(minutes=10):
-                return self._create_error_response(
-                    self.FAIL_BAD_TIME,
-                    "signingTime outside the allowed clock skew",
                     transaction_id=transaction_id,
                     recipient_nonce=sender_nonce,
                 ), 200
@@ -929,6 +950,26 @@ class SCEPService:
 
         return self._create_cert_rep_pending(existing.transaction_id, sender_nonce)
 
+    def _config_value(self, key: str):
+        if key not in self._config_cache:
+            try:
+                from models import SystemConfig
+                row = SystemConfig.query.filter_by(key=key).first()
+                self._config_cache[key] = row.value if row else None
+            except Exception:
+                self._config_cache[key] = None
+        return self._config_cache[key]
+
+    def _config_flag(self, key: str) -> bool:
+        return str(self._config_value(key) or '').lower() == 'true'
+
+    def _config_int(self, key: str, default: int, lo: int, hi: int) -> int:
+        try:
+            value = int(self._config_value(key))
+        except (TypeError, ValueError):
+            return default
+        return max(lo, min(hi, value))
+
     def _auto_approve_request(
         self,
         scep_req: SCEPRequest,
@@ -1011,6 +1052,24 @@ class SCEPService:
             x509.ExtendedKeyUsageOID.CODE_SIGNING,
             x509.ExtendedKeyUsageOID.IPSEC_IKE,
         }
+        # Renewal at par: EKUs the authenticated client's current certificate
+        # already carries stay allowed — silently stripping them (e.g. a
+        # delegated OCSP responder or TSA cert renewing over SCEP) breaks the
+        # service downstream with no error anywhere.
+        if renewal_of is not None:
+            try:
+                old_eku = renewal_of.extensions.get_extension_for_oid(
+                    ExtensionOID.EXTENDED_KEY_USAGE
+                )
+                extra = set(old_eku.value) - _ALLOWED_EKU_OIDS
+                if extra:
+                    logger.info(
+                        "SCEP renewal: preserving existing EKUs %s",
+                        [oid.dotted_string for oid in extra],
+                    )
+                    _ALLOWED_EKU_OIDS = _ALLOWED_EKU_OIDS | extra
+            except x509.ExtensionNotFound:
+                pass
         try:
             for ext in csr.extensions:
                 if ext.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:

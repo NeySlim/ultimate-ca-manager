@@ -284,22 +284,58 @@ def decrypt_scep_envelope(
         recipient_cert.public_bytes(serialization.Encoding.DER)
     )
 
+    # CA cert SKI, for subjectKeyIdentifier-style rids
+    ca_ski = None
+    try:
+        ca_ski = recipient_cert.extensions.get_extension_for_class(
+            x509.SubjectKeyIdentifier
+        ).value.digest
+    except Exception:
+        pass
+
     matching_ktri = None
+    ktri_list = []
     for recipient_info in env["recipient_infos"]:
         if recipient_info.name != "ktri":
             continue
         ktri = recipient_info.chosen
+        ktri_list.append(ktri)
         rid = ktri["rid"]
+        if rid.name == "subject_key_identifier":
+            # RFC 5652 allows identifying the recipient by SKI
+            try:
+                if ca_ski is not None and rid.chosen.native == ca_ski:
+                    matching_ktri = ktri
+                    break
+            except Exception:
+                continue
+            continue
         if rid.name != "issuer_and_serial_number":
             continue
         identifier = rid.chosen
-        if (
-            identifier["issuer"].dump() == recipient_asn1.issuer.dump()
-            and identifier["serial_number"].native
-            == recipient_asn1.serial_number
-        ):
+        # Semantic comparison: embedded stacks re-encode the issuer with BER
+        # or different string types — byte-exact DER comparison rejected them
+        serial_matches = identifier["serial_number"].native == recipient_asn1.serial_number
+        try:
+            issuer_matches = (
+                identifier["issuer"].dump() == recipient_asn1.issuer.dump()
+                or identifier["issuer"].native == recipient_asn1.issuer.native
+            )
+        except Exception:
+            issuer_matches = identifier["issuer"].dump() == recipient_asn1.issuer.dump()
+        if serial_matches and issuer_matches:
             matching_ktri = ktri
             break
+
+    if matching_ktri is None and len(ktri_list) == 1:
+        # Legacy clients point the rid at a stale CA cert (e.g. after a CA
+        # renewal that kept the key). With a single recipient there is no
+        # ambiguity — attempt it; decryption fails naturally on a key mismatch.
+        logger.warning(
+            "SCEP RecipientInfo does not identify the configured CA; "
+            "attempting the single recipient present (legacy client)"
+        )
+        matching_ktri = ktri_list[0]
 
     if matching_ktri is None:
         raise ValueError("SCEP RecipientInfo does not identify configured CA")

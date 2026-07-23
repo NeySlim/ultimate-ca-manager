@@ -166,7 +166,20 @@ def handle_get_ca_cert():
         return make_error_response(error, 500)
 
     try:
-        if service.ca.caref:
+        # Apple clients fail on application/x-x509-ca-ra-cert with error
+        # -67731 (they look for dedicated RA certs that don't exist here), so
+        # the single-cert response is the default even for intermediate CAs —
+        # matching pre-2.200 behaviour. Set scep_getcacert_chain=true to
+        # return the full chain as a degenerate PKCS#7 (RFC 8894 §4.2.1).
+        chain_enabled = False
+        try:
+            from models import SystemConfig
+            row = SystemConfig.query.filter_by(key='scep_getcacert_chain').first()
+            chain_enabled = bool(row and str(row.value).lower() == 'true')
+        except Exception:
+            pass
+
+        if service.ca.caref and chain_enabled:
             ca_data = create_degenerate_pkcs7(service.get_ca_chain())
             content_type = 'application/x-x509-ca-ra-cert'
         else:
