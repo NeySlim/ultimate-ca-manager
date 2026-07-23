@@ -81,6 +81,13 @@ class MicrosoftCAInventoryMixin:
             # builds, so match both interpretations against UCM's store.
             variants = MicrosoftCAInventoryMixin._serial_int_variants(serial)
             if variants & known_serials:
+                # Name what was skipped: the reversed-byte-order matching can
+                # (rarely, on short/sequential serials) collide with a
+                # genuinely distinct cert — a silent skip is undiagnosable.
+                logger.info(
+                    "MSCA inventory: skipping RequestId %s (serial %s, CN %r) "
+                    "— serial already known in UCM", req_id, serial, cn,
+                )
                 skipped += 1
                 continue
             known_serials |= variants  # avoid re-importing a dup within this run
