@@ -40,7 +40,8 @@ class CASigningMixin:
         ca: CA,
         csr: x509.CertificateSigningRequest,
         validity_days: int = 365,
-        source: str = 'manual'
+        source: str = 'manual',
+        renewal_of: x509.Certificate = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -86,6 +87,7 @@ class CASigningMixin:
             aia_ca_issuers_urls=aia_ca_issuers_urls,
             cps_uri=cps_uri,
             cps_oid=cps_oid,
+            renewal_of=renewal_of,
         )
 
         # Extract serial number

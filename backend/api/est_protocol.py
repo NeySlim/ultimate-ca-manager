@@ -609,9 +609,10 @@ def simple_reenroll(label=None):
         days = int(validity_days.value) if validity_days else 365
         
         cert_pem, serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=csr, validity_days=days, source='est'
+            ca=ca, csr=csr, validity_days=days, source='est',
+            renewal_of=client_cert_obj,
         )
-        
+
         from models import AuditLog
         log = AuditLog(
             action='certificate.renewed',

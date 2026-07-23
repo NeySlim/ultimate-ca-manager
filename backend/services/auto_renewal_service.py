@@ -127,12 +127,25 @@ class AutoRenewalService:
                 # Can't renew without CSR
                 return False, "Original CSR not available for renewal"
 
+            # Renewal at par: the existing cert's names are graced by
+            # NameConstraints validation (fleets must not strand at expiry)
+            orig_cert_obj = None
+            try:
+                if cert.crt:
+                    import base64 as _b64
+                    orig_cert_obj = x509.load_pem_x509_certificate(
+                        _b64.b64decode(cert.crt), default_backend()
+                    )
+            except Exception:
+                orig_cert_obj = None
+
             # Sign with new validity
             new_cert_pem, serial = CAService.sign_csr_from_crypto(
                 ca=ca,
                 csr=csr,
                 validity_days=original_days,
-                source=f'{cert.source}-renewal'
+                source=f'{cert.source}-renewal',
+                renewal_of=orig_cert_obj,
             )
 
             # Get new certificate ID — scope by caref to disambiguate across CAs (#85)
@@ -160,6 +173,20 @@ class AutoRenewalService:
         except Exception as e:
             db.session.rollback()
             logger.error(f"Auto-renewal failed for cert {cert.id}: {e}")
+            # Surface the failure in the audit trail — a silently-swallowed
+            # renewal failure means the certificate expires without warning
+            try:
+                fail_log = AuditLog(
+                    action='certificate.auto_renewal_failed',
+                    resource_type='certificate',
+                    resource_id=cert.id,
+                    resource_name=cert.common_name,
+                    details=f'Auto-renewal failed: {e}',
+                )
+                db.session.add(fail_log)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             return False, "Renewal failed"
     
     @staticmethod

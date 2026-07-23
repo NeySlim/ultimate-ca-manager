@@ -502,7 +502,12 @@ class SCEPService:
             db.session.add(scep_req)
 
             if self.auto_approve:
-                cert_refid = self._auto_approve_request(scep_req, csr)
+                cert_refid = self._auto_approve_request(
+                    scep_req, csr,
+                    renewal_of=(signer_cert
+                                if message_type == self.MSG_TYPE_RENEWAL_REQ
+                                else None),
+                )
                 scep_req.status = "approved"
                 scep_req.cert_refid = cert_refid
                 scep_req.approved_by = "auto"
@@ -929,6 +934,7 @@ class SCEPService:
         scep_req: SCEPRequest,
         csr: x509.CertificateSigningRequest,
         validity_days: int = 365,
+        renewal_of: Optional[x509.Certificate] = None,
     ) -> str:
         """Issue a certificate for the given SCEP request. Returns the cert refid."""
         # Offline CAs must not sign (consistent with CSR/CRL/TSA signing paths)
@@ -953,7 +959,11 @@ class SCEPService:
         except x509.ExtensionNotFound:
             _scep_sans = None
         from services.trust_store.constraints_mixin import validate_name_constraints
-        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans)
+        # renewal_of (the cert authenticating a RenewalReq) grants renewal at
+        # par: an enrolled fleet must stay renewable even if the CA's
+        # constraints tightened after enrollment.
+        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans,
+                                  renewal_of=renewal_of)
 
         # Clamp validity to the CA's own expiry — issuing a leaf that outlives
         # its issuer is invalid per RFC 5280 §6.1 and breaks every chain

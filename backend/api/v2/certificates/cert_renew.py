@@ -125,7 +125,11 @@ def renew_certificate(cert_id):
             renew_sans = None
         try:
             from services.trust_store.constraints_mixin import validate_name_constraints
-            validate_name_constraints(ca_cert, orig_cert.subject, renew_sans)
+            # renewal_of grants renewal-at-par: names the certificate already
+            # carries stay renewable even if the CA's constraints tightened
+            # (or started being enforced) after it was issued.
+            validate_name_constraints(ca_cert, orig_cert.subject, renew_sans,
+                                      renewal_of=orig_cert)
         except ValueError as exc:
             logger.info(f"Renewal rejected by CA NameConstraints: {exc}")
             return error_response(f"Renewal violates CA name constraints: {exc}", 400)

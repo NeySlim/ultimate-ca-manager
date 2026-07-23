@@ -135,7 +135,8 @@ def bulk_renew_certificates():
                 _bulk_sans = None
             try:
                 from services.trust_store.constraints_mixin import validate_name_constraints
-                validate_name_constraints(ca_cert, orig_cert.subject, _bulk_sans)
+                validate_name_constraints(ca_cert, orig_cert.subject, _bulk_sans,
+                                          renewal_of=orig_cert)
             except ValueError as exc:
                 results['failed'].append({'id': cert_id, 'error': f'Name constraints: {exc}'})
                 continue

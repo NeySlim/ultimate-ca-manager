@@ -128,8 +128,10 @@ class CSROperationsMixin:
         cps_oid: Optional[str] = None,
         ocsp_must_staple: bool = False,
         extra_ekus: Optional[List[str]] = None,
+        renewal_of=None,
     ) -> bytes:
-        """Sign a CSR with a CA."""
+        """Sign a CSR with a CA. ``renewal_of``: existing certificate this
+        signing renews — its names are graced by NameConstraints validation."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -144,7 +146,9 @@ class CSROperationsMixin:
             csr_sans = list(san_ext.value)
         except x509.ExtensionNotFound:
             pass
-        ConstraintsMixin._validate_name_constraints(ca_cert, csr.subject, csr_sans)
+        ConstraintsMixin._validate_name_constraints(
+            ca_cert, csr.subject, csr_sans, renewal_of=renewal_of
+        )
 
         # If CSR has empty subject, populate CN from first SAN DNS name
         subject = csr.subject

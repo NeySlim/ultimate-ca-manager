@@ -2,10 +2,23 @@
 Name constraints mixin for TrustStoreService
 """
 import ipaddress
+import logging
+import re
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 
 from .validation_helpers import _name_value, _name_matches_subtree
+
+logger = logging.getLogger(__name__)
+
+# Hostname-shaped CN: optional wildcard label then dotted DNS labels. A CN
+# like "John Doe" or "Fileserver Backup Key" is a display name, not a DNS
+# identity — mapping it to DNSName made client certs fail DNS-permitted
+# subtrees they were never subject to.
+_DNS_LIKE_CN = re.compile(
+    r'^(\*\.)?[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?'
+    r'(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$'
+)
 
 
 def _validate_against_cert(ca_cert, names_to_check):
@@ -14,6 +27,15 @@ def _validate_against_cert(ca_cert, names_to_check):
         nc_ext = ca_cert.extensions.get_extension_for_oid(ExtensionOID.NAME_CONSTRAINTS)
         nc = nc_ext.value
     except x509.ExtensionNotFound:
+        return
+    except Exception as exc:
+        # A NameConstraints extension cryptography cannot parse (legacy or
+        # malformed CA) must not brick every issuance from that CA — pre-2.200
+        # these paths did not reach the constraint at all.
+        logger.warning(
+            "Unreadable NameConstraints on CA %s; skipping constraint check: %s",
+            getattr(ca_cert, 'subject', '?'), exc,
+        )
         return
 
     permitted = nc.permitted_subtrees or []
@@ -64,6 +86,19 @@ def _chain_certs_above(ca_cert):
     except Exception:
         return chain
 
+    # Load and parse the CA table once, not once per chain level
+    try:
+        candidates = []
+        for ca in CA.query.filter(CA.crt.isnot(None)).all():
+            try:
+                pem = base64.b64decode(ca.crt)
+                cert = x509.load_pem_x509_certificate(pem)
+                candidates.append((cert.subject.public_bytes(), cert))
+            except Exception:
+                continue
+    except Exception:
+        return chain
+
     current = ca_cert
     seen = set()
     for _ in range(16):  # depth guard
@@ -74,19 +109,9 @@ def _chain_certs_above(ca_cert):
         if issuer_bytes in seen:
             break  # cycle guard
         seen.add(issuer_bytes)
-        parent = None
-        try:
-            for ca in CA.query.filter(CA.crt.isnot(None)).all():
-                try:
-                    pem = base64.b64decode(ca.crt)
-                    cert = x509.load_pem_x509_certificate(pem)
-                except Exception:
-                    continue
-                if cert.subject.public_bytes() == issuer_bytes:
-                    parent = cert
-                    break
-        except Exception:
-            break
+        parent = next(
+            (cert for subj, cert in candidates if subj == issuer_bytes), None
+        )
         if parent is None:
             break
         chain.append(parent)
@@ -94,10 +119,38 @@ def _chain_certs_above(ca_cert):
     return chain
 
 
-def validate_name_constraints(ca_cert, subject, san_names=None):
+def _cert_name_values(cert):
+    """(type-name, value) pairs a certificate already carries: SAN entries
+    plus its CN — used to grace renewals at par."""
+    values = set()
+    try:
+        cn_attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        for attr in cn_attrs:
+            values.add(('cn', str(attr.value).lower()))
+    except Exception:
+        pass
+    try:
+        san = cert.extensions.get_extension_for_oid(
+            ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+        )
+        for name in san.value:
+            values.add((type(name).__name__, str(_name_value(name)).lower()))
+    except Exception:
+        pass
+    return values
+
+
+def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None):
     """Validate subject and SANs against the NameConstraints of the whole CA
     chain (RFC 5280 §4.2.1.10) — the direct issuer AND every CA above it, so a
     constraint set on a root is enforced even when an intermediate carries none.
+
+    ``renewal_of``: the certificate being renewed, when this issuance is a
+    renewal. Names already present in that certificate are exempt (renewal at
+    par): certificates legitimately issued before constraint enforcement (or
+    before the CA's constraints were tightened) must stay renewable — blocking
+    them strands entire fleets at expiry. Violations on carried-over names are
+    logged; only names NEW to this request are enforced.
     """
     names_to_check = []
     try:
@@ -106,8 +159,10 @@ def validate_name_constraints(ca_cert, subject, san_names=None):
             cn_value = cn_attrs[0].value
             if '@' in cn_value:
                 names_to_check.append(x509.RFC822Name(cn_value))
-            else:
+            elif _DNS_LIKE_CN.match(cn_value or ''):
                 names_to_check.append(x509.DNSName(cn_value))
+            # Non-hostname CNs ("John Doe") carry no DNS/email identity —
+            # RFC 5280 name constraints do not apply to them.
     except Exception:
         pass
 
@@ -116,6 +171,29 @@ def validate_name_constraints(ca_cert, subject, san_names=None):
 
     if not names_to_check:
         return
+
+    if renewal_of is not None:
+        existing = _cert_name_values(renewal_of)
+        graced, enforced = [], []
+        for name in names_to_check:
+            value = str(_name_value(name)).lower()
+            if (type(name).__name__, value) in existing or ('cn', value) in existing:
+                graced.append(name)
+            else:
+                enforced.append(name)
+        if graced:
+            try:
+                _validate_against_cert(ca_cert, graced)
+                for parent_cert in _chain_certs_above(ca_cert):
+                    _validate_against_cert(parent_cert, graced)
+            except ValueError as exc:
+                logger.warning(
+                    "Renewal at par: carried-over names violate current CA "
+                    "NameConstraints but are graced (%s)", exc,
+                )
+        names_to_check = enforced
+        if not names_to_check:
+            return
 
     _validate_against_cert(ca_cert, names_to_check)
     for parent_cert in _chain_certs_above(ca_cert):
