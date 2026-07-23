@@ -73,6 +73,7 @@ def get_est_config():
         'username': get_config('est_username', ''),
         'password_set': bool(get_config('est_password', '')),
         'validity_days': int(get_config('est_validity_days', '365') or 365),
+        'response_include_chain': get_config('est_response_include_chain', 'false') == 'true',
         'labels': labels,
     })
 
@@ -114,6 +115,9 @@ def update_est_config():
         if vd < 1 or vd > 3650:
             return error_response('validity_days must be between 1 and 3650', 400)
         set_config('est_validity_days', str(vd))
+    if 'response_include_chain' in data:
+        set_config('est_response_include_chain',
+                   'true' if data['response_include_chain'] else 'false')
 
     if 'labels' in data:
         # RFC 7030 §3.2.2 CA labels. Accepts {label: ca_refid} or the enriched

@@ -115,6 +115,12 @@ def get_acme_settings():
     revoke_on_renewal = revoke_on_renewal_cfg.value == 'true' if revoke_on_renewal_cfg else False
     superseded_count = _count_superseded_certificates()
 
+    # CAA checking (RFC 8659/8657)
+    caa_enforce_cfg = SystemConfig.query.filter_by(key='acme_caa_enforce').first()
+    caa_enforce = bool(caa_enforce_cfg and caa_enforce_cfg.value == 'true')
+    caa_ident_cfg = SystemConfig.query.filter_by(key='acme_caa_identifiers').first()
+    caa_identifiers = caa_ident_cfg.value if caa_ident_cfg else ''
+
     # Get CA name if CA ID is set
     ca_name = None
     if ca_id:
@@ -137,6 +143,8 @@ def get_acme_settings():
         'acme_public_base_url': get_acme_public_base(request),
         'revoke_on_renewal': revoke_on_renewal,
         'superseded_count': superseded_count,
+        'caa_enforce': caa_enforce,
+        'caa_identifiers': caa_identifiers,
         'terms_of_service': terms_of_service,
         # ACME Profiles Extension (draft-ietf-acme-profiles). Returned
         # normalised (defaults filled in) so the UI shows what clients get.
@@ -173,6 +181,25 @@ def update_acme_settings():
             revoke_cfg = SystemConfig(key='acme.revoke_on_renewal', description='Revoke old certificate after ACME renewal')
             db.session.add(revoke_cfg)
         revoke_cfg.value = 'true' if data['revoke_on_renewal'] else 'false'
+
+    # CAA checking: enforce = fail-closed on DNS lookup errors (default is
+    # soft-fail for air-gapped deployments); identifiers = comma-separated
+    # issuer domains matched against CAA issue/issuewild records
+    if 'caa_enforce' in data:
+        caa_cfg = SystemConfig.query.filter_by(key='acme_caa_enforce').first()
+        if not caa_cfg:
+            caa_cfg = SystemConfig(key='acme_caa_enforce',
+                                   description='Fail ACME issuance on CAA DNS lookup errors')
+            db.session.add(caa_cfg)
+        caa_cfg.value = 'true' if data['caa_enforce'] else 'false'
+
+    if 'caa_identifiers' in data:
+        ident_cfg = SystemConfig.query.filter_by(key='acme_caa_identifiers').first()
+        if not ident_cfg:
+            ident_cfg = SystemConfig(key='acme_caa_identifiers',
+                                     description='CAA issuer domains (comma-separated)')
+            db.session.add(ident_cfg)
+        ident_cfg.value = str(data['caa_identifiers'] or '').strip()[:1000]
 
     # Update Terms of Service
     if 'terms_of_service' in data:

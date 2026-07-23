@@ -12,9 +12,12 @@ from cryptography.hazmat.primitives import serialization
 
 logger = logging.getLogger(__name__)
 
+# Temporally-sharded logs: entries must land in the shard covering the
+# certificate's notAfter. Keep both current-year shards listed; operators
+# should override via ct_log_urls as shards roll over.
 DEFAULT_CT_LOGS = [
-    "https://ct.googleapis.com/logs/argon2025h1/",
-    "https://ct.googleapis.com/logs/argon2025h2/",
+    "https://ct.googleapis.com/logs/us1/argon2026h1/",
+    "https://ct.googleapis.com/logs/us1/argon2026h2/",
 ]
 
 SCT_LIST_OID = "1.3.6.1.4.1.11129.2.4.2"

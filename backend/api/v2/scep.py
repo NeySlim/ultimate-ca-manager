@@ -44,7 +44,10 @@ def get_scep_config():
         'ca_id': int(get_config('scep_ca_id', '0') or 0) or None,
         'ca_ident': get_config('scep_ca_ident', 'ucm-ca'),
         'auto_approve': get_config('scep_auto_approve', 'false') == 'true',
-        'challenge_validity': int(get_config('scep_challenge_validity', '24'))
+        'challenge_validity': int(get_config('scep_challenge_validity', '24')),
+        'enforce_signing_time': get_config('scep_enforce_signing_time', 'false') == 'true',
+        'time_skew_minutes': int(get_config('scep_time_skew_minutes', '10') or 10),
+        'getcacert_chain': get_config('scep_getcacert_chain', 'false') == 'true',
     })
 
 
@@ -84,6 +87,20 @@ def update_scep_config():
         if cv < 1 or cv > 720:
             return error_response('challenge_validity must be between 1 and 720 hours', 400)
         set_config('scep_challenge_validity', str(cv))
+    if 'enforce_signing_time' in data:
+        set_config('scep_enforce_signing_time',
+                   'true' if data['enforce_signing_time'] else 'false')
+    if 'time_skew_minutes' in data:
+        try:
+            skew = int(data['time_skew_minutes'])
+        except (TypeError, ValueError):
+            return error_response('time_skew_minutes must be an integer', 400)
+        if skew < 1 or skew > 1440:
+            return error_response('time_skew_minutes must be between 1 and 1440', 400)
+        set_config('scep_time_skew_minutes', str(skew))
+    if 'getcacert_chain' in data:
+        set_config('scep_getcacert_chain',
+                   'true' if data['getcacert_chain'] else 'false')
     
     ok, _err = safe_commit(logger, "Failed to update SCEP configuration")
     if not ok:

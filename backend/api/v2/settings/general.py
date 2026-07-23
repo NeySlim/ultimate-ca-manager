@@ -74,6 +74,8 @@ def get_general_settings():
         # forces it, in which case the Settings toggle is read-only.
         'key_recovery_dual_control': _dual_control_enabled(),
         'key_recovery_dual_control_locked': _dual_control_env() is not None,
+        # OCSP responder: signed response validity window (hours, 1..168)
+        'ocsp_response_validity_hours': int(get_config('ocsp_response_validity_hours', '24') or 24),
     })
 
 
@@ -104,7 +106,18 @@ def update_general_settings():
         'key_recovery_dual_control',
         # Prometheus metrics bearer token (empty = disabled)
         'metrics_token',
+        # OCSP responder response validity window
+        'ocsp_response_validity_hours',
     ]
+
+    if 'ocsp_response_validity_hours' in data:
+        try:
+            hours = int(data['ocsp_response_validity_hours'])
+        except (TypeError, ValueError):
+            return error_response('ocsp_response_validity_hours must be an integer', 400)
+        if hours < 1 or hours > 168:
+            return error_response('ocsp_response_validity_hours must be between 1 and 168', 400)
+        data['ocsp_response_validity_hours'] = str(hours)
 
     if 'base_url' in data:
         normalized, err = validate_admin_base_url(data.get('base_url') or '')
@@ -240,6 +253,8 @@ def get_ct_settings():
         'enabled': get_config('ct_enabled', 'false') == 'true',
         'log_urls': json.loads(get_config('ct_log_urls', '[]')),
         'auto_submit': get_config('ct_auto_submit', 'false') == 'true',
+        'embed_sct': get_config('ct_embed_sct', 'false') == 'true',
+        'required': get_config('ct_required', 'false') == 'true',
     })
 
 
@@ -257,6 +272,10 @@ def update_ct_settings():
         set_config('ct_log_urls', json.dumps(data['log_urls']))
     if 'auto_submit' in data:
         set_config('ct_auto_submit', 'true' if data['auto_submit'] else 'false')
+    if 'embed_sct' in data:
+        set_config('ct_embed_sct', 'true' if data['embed_sct'] else 'false')
+    if 'required' in data:
+        set_config('ct_required', 'true' if data['required'] else 'false')
 
     try:
         db.session.commit()
