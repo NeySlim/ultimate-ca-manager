@@ -604,6 +604,19 @@ def create_app(config_name=None):
         except ImportError:
             pass
         
+        # Register delegated OCSP responder renewal task (runs daily)
+        try:
+            from services.ocsp_responder_renewal import run_ocsp_responder_renewal
+            scheduler.register_task(
+                name="ocsp_responder_renewal",
+                func=run_ocsp_responder_renewal,
+                interval=86400,  # 24 hours
+                description="Renew delegated OCSP responder certificates before expiry"
+            )
+            app.logger.info("Registered OCSP responder renewal task (daily)")
+        except ImportError:
+            pass
+
         # Register OCSP cache cleanup task (runs daily)
         try:
             from services.ocsp_service import OCSPService
