@@ -109,7 +109,26 @@ class TestAcmeDirectoryPublicUrls:
             'https://acme.ucm.example.com:8443/acme/new-order'
         )
 
-    def test_proxy_directory_uses_configured_public_origin(self, client, app, set_acme_public_config):
+    def test_proxy_directory_uses_configured_public_origin(
+        self, client, app, set_acme_public_config, monkeypatch
+    ):
+        # Hermetic: the proxy directory normally fetches the upstream ACME
+        # directory — stub it out so the test does not depend on network
+        from services.acme.acme_proxy_service import AcmeProxyService
+
+        def _fake_ensure_directory(self):
+            self.directory = {
+                'newNonce': 'https://upstream.example/acme/new-nonce',
+                'newAccount': 'https://upstream.example/acme/new-acct',
+                'newOrder': 'https://upstream.example/acme/new-order',
+                'revokeCert': 'https://upstream.example/acme/revoke-cert',
+                'keyChange': 'https://upstream.example/acme/key-change',
+                'meta': {},
+            }
+
+        monkeypatch.setattr(
+            AcmeProxyService, '_ensure_directory', _fake_ensure_directory
+        )
         set_acme_public_config('acme.ucm.example.com', '8443')
         r = client.get('/acme/proxy/directory')
         assert r.status_code == 200
