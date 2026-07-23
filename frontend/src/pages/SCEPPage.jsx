@@ -546,6 +546,35 @@ export default function SCEPPage() {
                 helperText={t('scep.challengeValidityHelp')}
                 suffix={t('scep.hours')}
               />
+
+              <ToggleSwitch
+                checked={config.getcacert_chain || false}
+                onChange={(val) => setConfig({ ...config, getcacert_chain: val })}
+                label={t('scep.getCaCertChain')}
+                size="sm"
+                disabled={!config.enabled}
+              />
+              <p className="text-xs text-text-tertiary">{t('scep.getCaCertChainHelp')}</p>
+
+              <ToggleSwitch
+                checked={config.enforce_signing_time || false}
+                onChange={(val) => setConfig({ ...config, enforce_signing_time: val })}
+                label={t('scep.enforceSigningTime')}
+                size="sm"
+                disabled={!config.enabled}
+              />
+              {config.enforce_signing_time && (
+                <Input
+                  label={t('scep.timeSkewMinutes')}
+                  type="number"
+                  value={config.time_skew_minutes || 10}
+                  onChange={(e) => setConfig({ ...config, time_skew_minutes: parseInt(e.target.value) })}
+                  min="1"
+                  max="1440"
+                  disabled={!config.enabled}
+                  helperText={t('scep.timeSkewMinutesHelp')}
+                />
+              )}
             </Card>
 
             {hasPermission('write:scep') && (

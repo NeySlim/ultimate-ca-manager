@@ -1556,7 +1556,16 @@
     "profileDigest": "Хеш",
     "profileNamePlaceholder": "напр. shortlived",
     "profileDescriptionPlaceholder": "Показується клієнтам ACME",
-    "addProfile": "Додати профіль"
+    "addProfile": "Додати профіль",
+    "caaSection": "Перевірка CAA (RFC 8659)",
+    "caaIdentifiers": "Ідентифікатори видавця CAA",
+    "caaIdentifiersHelp": "Домени через кому, що звіряються із записами CAA issue/issuewild. Порожньо = публічне ім'я цього сервера.",
+    "caaEnforce": "Відхиляти випуск у разі помилок DNS",
+    "caaEnforceDesc": "Типово вимкнено: SERVFAIL/тайм-аут вважається відсутністю запису CAA (зручно для ізольованих мереж). Увімкнено: суворий fail-closed.",
+    "caaEnforceWarning": "В ізольованих мережах кожен випуск ACME не вдасться, якщо резолвер не може відповісти на запити CAA.",
+    "tlsAlpn01Desc": "перевірка через TLS на порту 443 (RFC 8737)",
+    "tlsAlpnPort": "Порт TLS-ALPN-01",
+    "tlsAlpnPortHelper": "Локальний порт, який слухає відповідач TLS-ALPN-01 під час перевірки (типово 443)."
   },
   "scep": {
     "title": "Протокол SCEP",
@@ -1613,7 +1622,12 @@
       "management": "Керування",
       "settings": "Налаштування"
     },
-    "enrollmentRequest": "Запит на реєстрацію SCEP"
+    "enrollmentRequest": "Запит на реєстрацію SCEP",
+    "getCaCertChain": "Повертати повний ланцюжок у GetCACert",
+    "getCaCertChainHelp": "Вимкнено (типово): лише сертифікат CA — потрібно для клієнтів Apple/MDM. Увімкнено: вироджений PKCS#7 з повним ланцюжком (RFC 8894).",
+    "enforceSigningTime": "Перевіряти зсув годинника signingTime",
+    "timeSkewMinutes": "Допустимий зсув годинника (хвилини)",
+    "timeSkewMinutesHelp": "Пристрої без NTP дрейфують: поза цим вікном запити відхиляються, коли перевірку ввімкнено."
   },
   "crlOcsp": {
     "subtitle": "{{count}} активних CRL",
@@ -2516,7 +2530,17 @@
       "statusFail": "Failed",
       "statusSkip": "—",
       "statusWarn": "Warning"
-    }
+    },
+    "syslogTlsVerify": "Перевіряти сертифікат TLS",
+    "syslogTlsVerifyWarning": "Перевірку сертифіката вимкнено: потік syslog може бути перехоплено.",
+    "syslogFraming": "Фреймінг TCP",
+    "syslogFramingLine": "Рядок (розділення новим рядком, більшість колекторів)",
+    "syslogFramingOctet": "Підрахунок октетів (RFC 6587)",
+    "ctEmbedSct": "Вбудовувати SCT під час випуску (потік пре-сертифіката)",
+    "ctRequired": "Вимагати SCT (випуск не вдасться, якщо жоден журнал не відповість)",
+    "ctRequiredWarning": "Стосується випуску через web, ACME та EST: якщо журнали CT недоступні, ВЕСЬ випуск не працюватиме.",
+    "ocspResponseValidity": "Термін дії відповідей OCSP (години)",
+    "ocspResponseValidityDesc": "Тривалість дії підписаних відповідей OCSP (nextUpdate). 1-168 годин, типово 24."
   },
   "account": {
     "profile": "Профіль",
@@ -2955,7 +2979,14 @@
     "defaultRoleHelp": "Застосовується лише під час автоматичного створення користувача при першому вході.",
     "accountStatusAttrHelp": "Атрибут LDAP, який вказує, чи обліковий запис вимкнено. Поширені значення: 'description', 'userAccountControl', 'accountStatus'. Залиште порожнім, щоб вимкнути цю перевірку.",
     "enforce2fa": "Примусова 2FA",
-    "enforce2faHelp": "Вимагати від користувачів, які автентифікуються через цей постачальник, налаштувати двофакторну автентифікацію TOTP."
+    "enforce2faHelp": "Вимагати від користувачів, які автентифікуються через цей постачальник, налаштувати двофакторну автентифікацію TOTP.",
+    "oidcIssuer": "Емітент OIDC (issuer)",
+    "oidcIssuerHelp": "Обов'язково, коли ввімкнено перевірку ID-токена. Виявлення використовує <issuer>/.well-known/openid-configuration.",
+    "oidcJwksUri": "JWKS URI (необов'язково)",
+    "oidcJwksUriHelp": "Залиште порожнім, щоб отримати ключі підпису від емітента.",
+    "idTokenVerify": "Перевіряти підпис ID-токена (рекомендовано)",
+    "idTokenVerifyWarning": "Вимкнення перевірки підпису послаблює безпеку входу. Використовуйте лише як тимчасовий захід сумісності.",
+    "idTokenVerifyIssuerMissing": "Перевірку ввімкнено, але емітента не задано: входи OIDC не працюватимуть, доки його не налаштовано."
   },
   "notifications": {
     "certificateIssued": "Сертифікат видано: {{name}}",
@@ -3915,7 +3946,9 @@
     "labels": "Мітки ЦС",
     "labelsDesc": "Обслуговувати додаткові ЦС за адресою /.well-known/est/<мітка>/. Доступні лише перелічені тут ЦС; невідома мітка відхиляється.",
     "labelName": "Мітка",
-    "labelPlaceholder": "напр. filiya"
+    "labelPlaceholder": "напр. filiya",
+    "responseIncludeChain": "Додавати ланцюжок CA у відповіді реєстрації",
+    "responseIncludeChainHelp": "Відповіді RFC 7030 містять лише випущений сертифікат; увімкніть для застарілих клієнтів, які будують пакет із відповіді замість /cacerts."
   },
   "discovery": {
     "aboutDiscovery": "Про виявлення",

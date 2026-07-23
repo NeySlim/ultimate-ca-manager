@@ -49,7 +49,7 @@ export default function RequestCertificateForm({
       return null
     }
 
-    if (formData.challenge_type === 'http-01' && domainList.some(d => d.startsWith('*.'))) {
+    if (formData.challenge_type !== 'dns-01' && domainList.some(d => d.startsWith('*.'))) {
       showWarning(t('acme.wildcardRequiresDns01'))
       return null
     }
@@ -150,7 +150,8 @@ export default function RequestCertificateForm({
         onChange={(val) => setFormData(prev => ({ ...prev, challenge_type: val }))}
         options={[
           { value: 'dns-01', label: 'DNS-01 - ' + t('acme.dns01Desc') },
-          { value: 'http-01', label: 'HTTP-01 - ' + t('acme.http01Desc') }
+          { value: 'http-01', label: 'HTTP-01 - ' + t('acme.http01Desc') },
+          { value: 'tls-alpn-01', label: 'TLS-ALPN-01 - ' + t('acme.tlsAlpn01Desc') }
         ]}
         helperText={t('acme.challengeTypeHelper')}
       />

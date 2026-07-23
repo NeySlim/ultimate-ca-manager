@@ -203,6 +203,15 @@ export default function ESTPage() {
               disabled={!config.enabled}
               helperText={t('est.validityDaysHelp')}
             />
+
+            <ToggleSwitch
+              checked={config.response_include_chain || false}
+              onChange={(val) => setConfig({ ...config, response_include_chain: val })}
+              label={t('est.responseIncludeChain')}
+              size="sm"
+              disabled={!config.enabled}
+            />
+            <p className="text-xs text-text-tertiary">{t('est.responseIncludeChainHelp')}</p>
           </Card>
 
           <Card className="p-4 space-y-4">

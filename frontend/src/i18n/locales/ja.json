@@ -1556,7 +1556,16 @@
     "profileDigest": "ダイジェスト",
     "profileNamePlaceholder": "例: shortlived",
     "profileDescriptionPlaceholder": "ACME クライアントに表示されます",
-    "addProfile": "プロファイルを追加"
+    "addProfile": "プロファイルを追加",
+    "caaSection": "CAA検査（RFC 8659）",
+    "caaIdentifiers": "CAA発行者識別子",
+    "caaIdentifiersHelp": "CAA issue/issuewildレコードと照合するドメイン（カンマ区切り）。空欄の場合はこのサーバーの公開ホスト名。",
+    "caaEnforce": "DNSルックアップエラー時に発行を失敗させる",
+    "caaEnforceDesc": "既定はオフ：SERVFAIL/タイムアウトはCAAレコードなしとして扱われます（エアギャップ環境向け）。オン：厳格なフェイルクローズ。",
+    "caaEnforceWarning": "隔離ネットワークでは、リゾルバーがCAAクエリに応答できない場合、すべてのACME発行が失敗します。",
+    "tlsAlpn01Desc": "ポート443のTLS経由で検証（RFC 8737）",
+    "tlsAlpnPort": "TLS-ALPN-01ポート",
+    "tlsAlpnPortHelper": "検証中にTLS-ALPN-01レスポンダーが待ち受けるローカルポート（既定443）。"
   },
   "scep": {
     "title": "SCEPプロトコル",
@@ -1613,7 +1622,12 @@
       "management": "管理",
       "settings": "設定"
     },
-    "enrollmentRequest": "SCEP登録リクエスト"
+    "enrollmentRequest": "SCEP登録リクエスト",
+    "getCaCertChain": "GetCACertで完全なチェーンを返す",
+    "getCaCertChainHelp": "オフ（既定）：CA証明書単体 — Apple/MDMクライアントに必要。オン：完全なチェーンを含む縮退PKCS#7（RFC 8894）。",
+    "enforceSigningTime": "signingTimeの時刻ずれを強制",
+    "timeSkewMinutes": "許容する時刻ずれ（分）",
+    "timeSkewMinutesHelp": "NTPのないデバイスは時刻がずれます。強制が有効な場合、この範囲外のリクエストは拒否されます。"
   },
   "crlOcsp": {
     "subtitle": "{{count}}個のアクティブなCRL",
@@ -2516,7 +2530,17 @@
       "statusFail": "Failed",
       "statusSkip": "—",
       "statusWarn": "Warning"
-    }
+    },
+    "syslogTlsVerify": "TLS証明書を検証",
+    "syslogTlsVerifyWarning": "証明書検証が無効です。syslogストリームが傍受される可能性があります。",
+    "syslogFraming": "TCPフレーミング",
+    "syslogFramingLine": "行区切り（改行区切り、多くのコレクター）",
+    "syslogFramingOctet": "オクテットカウント（RFC 6587）",
+    "ctEmbedSct": "発行時にSCTを埋め込む（プレ証明書フロー）",
+    "ctRequired": "SCTを必須にする（ログが応答しない場合は発行失敗）",
+    "ctRequiredWarning": "Web・ACME・EST発行に適用されます。CTログに到達できない場合、すべての発行が失敗します。",
+    "ocspResponseValidity": "OCSP応答の有効期間（時間）",
+    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。"
   },
   "account": {
     "profile": "プロフィール",
@@ -2955,7 +2979,14 @@
     "defaultRoleHelp": "初回ログイン時にユーザーが自動作成される場合にのみ適用されます。",
     "accountStatusAttrHelp": "アカウントが無効化されているかどうかを示すLDAP属性。一般的な値： 'description'、 'userAccountControl'、 'accountStatus'。このチェックを無効にするには空白にしてください。",
     "enforce2fa": "2FAを強制する",
-    "enforce2faHelp": "このプロバイダーで認証するユーザーにTOTP二要素認証の登録を必須にします。"
+    "enforce2faHelp": "このプロバイダーで認証するユーザーにTOTP二要素認証の登録を必須にします。",
+    "oidcIssuer": "OIDC発行者 (issuer)",
+    "oidcIssuerHelp": "IDトークン検証が有効な場合に必須。<issuer>/.well-known/openid-configuration でディスカバリーを行います。",
+    "oidcJwksUri": "JWKS URI（任意）",
+    "oidcJwksUriHelp": "空欄の場合は発行者から署名鍵を自動取得します。",
+    "idTokenVerify": "IDトークンの署名を検証（推奨）",
+    "idTokenVerifyWarning": "署名検証を無効にするとログインの安全性が低下します。互換性のための一時的な措置としてのみ使用してください。",
+    "idTokenVerifyIssuerMissing": "検証が有効ですが発行者が未設定です。設定されるまでOIDCログインは失敗します。"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",
@@ -3915,7 +3946,9 @@
     "labels": "CA ラベル",
     "labelsDesc": "/.well-known/est/<label>/ で追加の CA を提供します。ここに登録された CA のみ利用可能で、未知のラベルは拒否されます。",
     "labelName": "ラベル",
-    "labelPlaceholder": "例: branch-office"
+    "labelPlaceholder": "例: branch-office",
+    "responseIncludeChain": "登録応答にCAチェーンを含める",
+    "responseIncludeChainHelp": "RFC 7030の応答には発行された証明書のみが含まれます。/cacertsではなく登録応答からバンドルを構築するレガシークライアント向けに有効化してください。"
   },
   "discovery": {
     "aboutDiscovery": "ディスカバリーについて",

@@ -1556,7 +1556,16 @@
     "profileDigest": "摘要",
     "profileNamePlaceholder": "例如 shortlived",
     "profileDescriptionPlaceholder": "向 ACME 客户端显示",
-    "addProfile": "添加配置文件"
+    "addProfile": "添加配置文件",
+    "caaSection": "CAA 检查（RFC 8659）",
+    "caaIdentifiers": "CAA 颁发者标识",
+    "caaIdentifiersHelp": "与 CAA issue/issuewild 记录匹配的域名（逗号分隔）。留空 = 本服务器的公开主机名。",
+    "caaEnforce": "DNS 查询错误时签发失败",
+    "caaEnforceDesc": "默认关闭：SERVFAIL/超时视为无 CAA 记录（适合隔离网络）。开启：严格失败关闭。",
+    "caaEnforceWarning": "在隔离网络中，如果解析器无法应答 CAA 查询，所有 ACME 签发都会失败。",
+    "tlsAlpn01Desc": "通过 443 端口的 TLS 验证（RFC 8737）",
+    "tlsAlpnPort": "TLS-ALPN-01 端口",
+    "tlsAlpnPortHelper": "验证期间 TLS-ALPN-01 响应器监听的本地端口（默认 443）。"
   },
   "scep": {
     "title": "SCEP协议",
@@ -1613,7 +1622,12 @@
       "management": "管理",
       "settings": "设置"
     },
-    "enrollmentRequest": "SCEP注册请求"
+    "enrollmentRequest": "SCEP注册请求",
+    "getCaCertChain": "在 GetCACert 中返回完整链",
+    "getCaCertChainHelp": "关闭（默认）：仅返回 CA 证书 — Apple/MDM 客户端需要。开启：包含完整链的退化 PKCS#7（RFC 8894）。",
+    "enforceSigningTime": "强制校验 signingTime 时钟偏移",
+    "timeSkewMinutes": "允许的时钟偏移（分钟）",
+    "timeSkewMinutesHelp": "无 NTP 的设备会漂移：启用强制校验时，超出此窗口的请求将被拒绝。"
   },
   "crlOcsp": {
     "subtitle": "{{count}}个活跃CRL",
@@ -2516,7 +2530,17 @@
       "statusFail": "Failed",
       "statusSkip": "—",
       "statusWarn": "Warning"
-    }
+    },
+    "syslogTlsVerify": "验证 TLS 证书",
+    "syslogTlsVerifyWarning": "已禁用证书验证：syslog 流可能被拦截。",
+    "syslogFraming": "TCP 帧格式",
+    "syslogFramingLine": "行分隔（换行分隔，多数采集器）",
+    "syslogFramingOctet": "八位组计数（RFC 6587）",
+    "ctEmbedSct": "签发时嵌入 SCT（预证书流程）",
+    "ctRequired": "强制要求 SCT（无日志响应时签发失败）",
+    "ctRequiredWarning": "适用于 Web、ACME 和 EST 签发：如果 CT 日志不可达，所有签发都会失败。",
+    "ocspResponseValidity": "OCSP 响应有效期（小时）",
+    "ocspResponseValidityDesc": "已签名 OCSP 响应的有效时长（nextUpdate）。1-168 小时，默认 24。"
   },
   "account": {
     "profile": "个人资料",
@@ -2955,7 +2979,14 @@
     "defaultRoleHelp": "仅在首次登录时自动创建用户时应用。",
     "accountStatusAttrHelp": "指示帐户是否被禁用的 LDAP 属性。常见值：'description'、'userAccountControl'、'accountStatus'。留空以禁用此检查。",
     "enforce2fa": "强制双重验证",
-    "enforce2faHelp": "要求通过此提供程序进行身份验证的用户注册 TOTP 双重身份验证。"
+    "enforce2faHelp": "要求通过此提供程序进行身份验证的用户注册 TOTP 双重身份验证。",
+    "oidcIssuer": "OIDC 颁发者 (issuer)",
+    "oidcIssuerHelp": "启用 ID 令牌验证时必填。发现机制使用 <issuer>/.well-known/openid-configuration。",
+    "oidcJwksUri": "JWKS URI（可选）",
+    "oidcJwksUriHelp": "留空则通过颁发者自动发现签名密钥。",
+    "idTokenVerify": "验证 ID 令牌签名（推荐）",
+    "idTokenVerifyWarning": "禁用签名验证会削弱登录安全性。仅作为临时兼容性措施使用。",
+    "idTokenVerifyIssuerMissing": "已启用验证但未设置颁发者：在配置颁发者之前 OIDC 登录将失败。"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",
@@ -3915,7 +3946,9 @@
     "labels": "CA 标签",
     "labelsDesc": "在 /.well-known/est/<label>/ 下提供其他 CA。仅此处列出的 CA 可访问；未知标签将被拒绝。",
     "labelName": "标签",
-    "labelPlaceholder": "例如 branch-office"
+    "labelPlaceholder": "例如 branch-office",
+    "responseIncludeChain": "在注册响应中包含 CA 链",
+    "responseIncludeChainHelp": "RFC 7030 响应仅包含签发的证书；为从注册响应（而非 /cacerts）构建证书包的旧客户端启用。"
   },
   "discovery": {
     "aboutDiscovery": "关于发现",

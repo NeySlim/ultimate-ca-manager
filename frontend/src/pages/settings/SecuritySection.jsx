@@ -126,6 +126,16 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <span>{t('settings.hstsNote')}</span>
             </div>
           )}
+
+          <Input
+            label={t('settings.ocspResponseValidity')}
+            type="number"
+            value={settings.ocsp_response_validity_hours ?? 24}
+            onChange={(e) => updateSetting('ocsp_response_validity_hours', parseInt(e.target.value))}
+            min="1"
+            max="168"
+            helperText={t('settings.ocspResponseValidityDesc')}
+          />
           {hasPermission('admin:system') && (
             <Button type="button" onClick={() => handleSave('security')} disabled={saving}>
               <FloppyDisk size={16} />

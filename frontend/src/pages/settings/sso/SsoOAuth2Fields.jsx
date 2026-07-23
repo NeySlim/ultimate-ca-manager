@@ -63,6 +63,32 @@ export default function SsoOAuth2Fields({
           <Input label={t('sso.tokenUrl')} value={formData.oauth2_token_url} onChange={e => handleChange('oauth2_token_url', e.target.value)} placeholder={t('sso.tokenUrlPlaceholder')} />
           <Input label={t('sso.userinfoUrl')} value={formData.oauth2_userinfo_url} onChange={e => handleChange('oauth2_userinfo_url', e.target.value)} placeholder={t('sso.userinfoUrlPlaceholder')} />
           <Input label={t('sso.scopes')} value={formData.oauth2_scopes} onChange={e => handleChange('oauth2_scopes', e.target.value)} placeholder={t('sso.scopesPlaceholder')} />
+          <Input
+            label={t('sso.oidcIssuer')}
+            value={formData.oauth2_issuer}
+            onChange={e => handleChange('oauth2_issuer', e.target.value)}
+            placeholder="https://idp.example.com/realms/main"
+            helperText={t('sso.oidcIssuerHelp')}
+          />
+          <Input
+            label={t('sso.oidcJwksUri')}
+            value={formData.oauth2_jwks_uri}
+            onChange={e => handleChange('oauth2_jwks_uri', e.target.value)}
+            placeholder="https://idp.example.com/.well-known/jwks.json"
+            helperText={t('sso.oidcJwksUriHelp')}
+          />
+          <ToggleSwitch
+            checked={formData.id_token_verify}
+            onChange={(val) => handleChange('id_token_verify', val)}
+            label={t('sso.idTokenVerify')}
+            size="sm"
+          />
+          {formData.id_token_verify && !formData.oauth2_issuer && (
+            <p className="text-xs text-amber-500">{t('sso.idTokenVerifyIssuerMissing')}</p>
+          )}
+          {!formData.id_token_verify && (
+            <p className="text-xs text-amber-500">{t('sso.idTokenVerifyWarning')}</p>
+          )}
           <CopyableUrl label={t('sso.redirectUri')} value={oauthCallbackUrl} />
           <ToggleSwitch checked={formData.oauth2_verify_ssl} onChange={(val) => handleChange('oauth2_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
           {!formData.oauth2_verify_ssl && <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>}

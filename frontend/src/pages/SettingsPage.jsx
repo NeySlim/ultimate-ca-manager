@@ -197,7 +197,7 @@ export default function SettingsPage() {
   const [anomaliesLoading, setAnomaliesLoading] = useState(false)
 
   // Syslog state
-  const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', tls: false, categories: ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system'] })
+  const [syslogConfig, setSyslogConfig] = useState({ enabled: false, host: '', port: 514, protocol: 'udp', tls: false, tls_verify: true, framing: 'line', categories: ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system'] })
   const [syslogTesting, setSyslogTesting] = useState(false)
   const [syslogSaving, setSyslogSaving] = useState(false)
 

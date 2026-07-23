@@ -128,12 +128,34 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             </div>
           </div>
           {syslogConfig.protocol === 'tcp' && (
-            <ToggleSwitch
-              checked={syslogConfig.tls}
-              onChange={(val) => updateSyslogConfig('tls', val)}
-              label={t('settings.syslogTls')}
-              size="sm"
-            />
+            <div className="space-y-3">
+              <ToggleSwitch
+                checked={syslogConfig.tls}
+                onChange={(val) => updateSyslogConfig('tls', val)}
+                label={t('settings.syslogTls')}
+                size="sm"
+              />
+              {syslogConfig.tls && (
+                <ToggleSwitch
+                  checked={syslogConfig.tls_verify ?? true}
+                  onChange={(val) => updateSyslogConfig('tls_verify', val)}
+                  label={t('settings.syslogTlsVerify')}
+                  size="sm"
+                />
+              )}
+              {syslogConfig.tls && syslogConfig.tls_verify === false && (
+                <p className="text-xs text-amber-500">{t('settings.syslogTlsVerifyWarning')}</p>
+              )}
+              <Select
+                label={t('settings.syslogFraming')}
+                value={syslogConfig.framing || 'line'}
+                onChange={(e) => updateSyslogConfig('framing', e.target.value)}
+                options={[
+                  { value: 'line', label: t('settings.syslogFramingLine') },
+                  { value: 'octet', label: t('settings.syslogFramingOctet') },
+                ]}
+              />
+            </div>
           )}
           {hasPermission('admin:system') && (
             <div className="flex gap-2">

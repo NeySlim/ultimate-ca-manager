@@ -313,6 +313,17 @@ export default function LetsEncryptTab({
             description={t('acme.allowLoopbackUpstreamDesc')}
           />
 
+          <Input
+            label={t('acme.tlsAlpnPort')}
+            type="number"
+            value={clientSettings.tls_alpn_port ?? 443}
+            onChange={(e) => onUpdateClientSetting('tls_alpn_port', parseInt(e.target.value) || 443)}
+            min="1"
+            max="65535"
+            disabled={!canWrite}
+            helperText={t('acme.tlsAlpnPortHelper')}
+          />
+
           <Select
             label={t('acme.keyType')}
             value={clientSettings.key_type || 'RSA-2048'}

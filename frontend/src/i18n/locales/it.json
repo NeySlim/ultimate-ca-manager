@@ -1556,7 +1556,16 @@
     "profileDigest": "Digest",
     "profileNamePlaceholder": "es. breve-durata",
     "profileDescriptionPlaceholder": "Mostrato ai client ACME",
-    "addProfile": "Aggiungi profilo"
+    "addProfile": "Aggiungi profilo",
+    "caaSection": "Verifica CAA (RFC 8659)",
+    "caaIdentifiers": "Identificatori emittente CAA",
+    "caaIdentifiersHelp": "Domini separati da virgole confrontati con i record CAA issue/issuewild. Vuoto = hostname pubblico di questo server.",
+    "caaEnforce": "Blocca l'emissione su errori DNS",
+    "caaEnforceDesc": "Disattivato per impostazione predefinita: SERVFAIL/timeout è trattato come assenza di CAA (adatto ad air-gapped). Attivato: fail-closed rigoroso.",
+    "caaEnforceWarning": "Nelle reti isolate ogni emissione ACME fallirà se il resolver non può rispondere alle query CAA.",
+    "tlsAlpn01Desc": "validazione via TLS sulla porta 443 (RFC 8737)",
+    "tlsAlpnPort": "Porta TLS-ALPN-01",
+    "tlsAlpnPortHelper": "Porta locale su cui il responder TLS-ALPN-01 ascolta durante la validazione (predefinita 443)."
   },
   "scep": {
     "title": "Protocollo SCEP",
@@ -1613,7 +1622,12 @@
       "management": "Gestione",
       "settings": "Impostazioni"
     },
-    "enrollmentRequest": "Richiesta di registrazione SCEP"
+    "enrollmentRequest": "Richiesta di registrazione SCEP",
+    "getCaCertChain": "Restituisci la catena completa in GetCACert",
+    "getCaCertChainHelp": "Disattivato (predefinito): solo certificato CA — richiesto per client Apple/MDM. Attivato: PKCS#7 degenere con catena completa (RFC 8894).",
+    "enforceSigningTime": "Applica la tolleranza oraria signingTime",
+    "timeSkewMinutes": "Tolleranza oraria (minuti)",
+    "timeSkewMinutesHelp": "I dispositivi senza NTP derivano: fuori da questa finestra le richieste vengono rifiutate quando l'applicazione è attiva."
   },
   "crlOcsp": {
     "subtitle": "{{count}} CRL attive",
@@ -2516,7 +2530,17 @@
       "statusFail": "Failed",
       "statusSkip": "—",
       "statusWarn": "Warning"
-    }
+    },
+    "syslogTlsVerify": "Verifica certificato TLS",
+    "syslogTlsVerifyWarning": "Verifica del certificato disattivata: il flusso syslog può essere intercettato.",
+    "syslogFraming": "Framing TCP",
+    "syslogFramingLine": "Riga (delimitato da a capo, maggior parte dei collector)",
+    "syslogFramingOctet": "Conteggio ottetti (RFC 6587)",
+    "ctEmbedSct": "Incorpora SCT all'emissione (flusso pre-certificato)",
+    "ctRequired": "Richiedi SCT (l'emissione fallisce se nessun log risponde)",
+    "ctRequiredWarning": "Si applica alle emissioni web, ACME ed EST: se i log CT sono irraggiungibili, OGNI emissione fallisce.",
+    "ocspResponseValidity": "Validità delle risposte OCSP (ore)",
+    "ocspResponseValidityDesc": "Durata di validità delle risposte OCSP firmate (nextUpdate). 1-168 ore, predefinito 24."
   },
   "account": {
     "profile": "Profilo",
@@ -2955,7 +2979,14 @@
     "defaultRoleHelp": "Applicato solo quando un utente viene creato automaticamente al primo accesso.",
     "accountStatusAttrHelp": "Attributo LDAP che indica se un account è disabilitato. Valori comuni: 'description', 'userAccountControl', 'accountStatus'. Lasciare vuoto per disabilitare questo controllo.",
     "enforce2fa": "Imponi 2FA",
-    "enforce2faHelp": "Richiedi agli utenti che si autenticano tramite questo provider di configurare l'autenticazione a due fattori TOTP."
+    "enforce2faHelp": "Richiedi agli utenti che si autenticano tramite questo provider di configurare l'autenticazione a due fattori TOTP.",
+    "oidcIssuer": "Issuer OIDC",
+    "oidcIssuerHelp": "Obbligatorio quando la verifica dell'ID token è attiva. La discovery usa <issuer>/.well-known/openid-configuration.",
+    "oidcJwksUri": "URI JWKS (opzionale)",
+    "oidcJwksUriHelp": "Lasciare vuoto per scoprire le chiavi di firma tramite l'issuer.",
+    "idTokenVerify": "Verifica la firma dell'ID token (consigliato)",
+    "idTokenVerifyWarning": "Disattivare la verifica della firma indebolisce la sicurezza dell'accesso. Usare solo come misura temporanea di compatibilità.",
+    "idTokenVerifyIssuerMissing": "La verifica è attiva ma nessun issuer è impostato: gli accessi OIDC falliranno finché non viene configurato."
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",
@@ -3915,7 +3946,9 @@
     "labels": "Etichette CA",
     "labelsDesc": "Servire CA aggiuntive su /.well-known/est/<etichetta>/. Solo le CA elencate qui sono raggiungibili; un’etichetta sconosciuta viene rifiutata.",
     "labelName": "Etichetta",
-    "labelPlaceholder": "es. filiale"
+    "labelPlaceholder": "es. filiale",
+    "responseIncludeChain": "Includi la catena CA nelle risposte di enrollment",
+    "responseIncludeChainHelp": "Le risposte RFC 7030 contengono solo il certificato emesso; attivare per client legacy che costruiscono il bundle dalla risposta invece che da /cacerts."
   },
   "discovery": {
     "aboutDiscovery": "Informazioni sulla scoperta",

@@ -64,6 +64,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     oauth2_scopes: provider?.oauth2_scopes?.join(' ') || 'openid profile email',
     oauth2_verify_ssl: provider?.oauth2_verify_ssl ?? true,
     oauth2_ca_bundle: '',
+    oauth2_issuer: provider?.oauth2_issuer || '',
+    oauth2_jwks_uri: provider?.oauth2_jwks_uri || '',
+    id_token_verify: provider?.id_token_verify ?? true,
     // SAML
     saml_metadata_url: provider?.saml_metadata_url || '',
     saml_entity_id: provider?.saml_entity_id || '',

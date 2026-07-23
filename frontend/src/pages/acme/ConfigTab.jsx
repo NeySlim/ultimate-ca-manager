@@ -116,6 +116,29 @@ export default function ConfigTab({ acmeSettings, cas, updateSetting, onSaveConf
         </div>
       </CompactSection>
 
+      <CompactSection title={t('acme.caaSection')} icon={ArrowsClockwise}>
+        <div className="space-y-2">
+          <Input
+            label={t('acme.caaIdentifiers')}
+            value={acmeSettings.caa_identifiers || ''}
+            onChange={(e) => updateSetting('caa_identifiers', e.target.value)}
+            placeholder="ca.example.com, pki.example.com"
+            helperText={t('acme.caaIdentifiersHelp')}
+            disabled={!canWrite}
+          />
+          <ToggleSwitch
+            checked={acmeSettings.caa_enforce || false}
+            onChange={(val) => updateSetting('caa_enforce', val)}
+            disabled={!canWrite}
+            label={t('acme.caaEnforce')}
+            description={t('acme.caaEnforceDesc')}
+          />
+          {acmeSettings.caa_enforce && (
+            <p className="text-xs text-amber-500">{t('acme.caaEnforceWarning')}</p>
+          )}
+        </div>
+      </CompactSection>
+
       <CompactSection title={t('acme.termsOfService')} icon={FileText}>
         <div className="space-y-2">
           {tosExists && savedPreview ? (

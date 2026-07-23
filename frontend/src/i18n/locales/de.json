@@ -1556,7 +1556,16 @@
     "profileDigest": "Hash",
     "profileNamePlaceholder": "z. B. kurzlebig",
     "profileDescriptionPlaceholder": "Für ACME-Clients sichtbar",
-    "addProfile": "Profil hinzufügen"
+    "addProfile": "Profil hinzufügen",
+    "caaSection": "CAA-Prüfung (RFC 8659)",
+    "caaIdentifiers": "CAA-Aussteller-Kennungen",
+    "caaIdentifiersHelp": "Kommagetrennte Domains, die mit CAA-issue/issuewild-Einträgen abgeglichen werden. Leer = öffentlicher Hostname dieses Servers.",
+    "caaEnforce": "Ausstellung bei DNS-Fehlern ablehnen",
+    "caaEnforceDesc": "Standardmäßig aus: SERVFAIL/Timeout gilt als kein CAA-Eintrag (air-gapped-freundlich). Ein: strikt fail-closed.",
+    "caaEnforceWarning": "In isolierten Netzwerken schlägt jede ACME-Ausstellung fehl, wenn der Resolver CAA-Anfragen nicht beantworten kann.",
+    "tlsAlpn01Desc": "Validierung über TLS auf Port 443 (RFC 8737)",
+    "tlsAlpnPort": "TLS-ALPN-01-Port",
+    "tlsAlpnPortHelper": "Lokaler Port, auf dem der TLS-ALPN-01-Responder während der Validierung lauscht (Standard 443)."
   },
   "scep": {
     "title": "SCEP-Protokoll",
@@ -1613,7 +1622,12 @@
       "management": "Verwaltung",
       "settings": "Einstellungen"
     },
-    "enrollmentRequest": "SCEP-Registrierungsanfrage"
+    "enrollmentRequest": "SCEP-Registrierungsanfrage",
+    "getCaCertChain": "Vollständige Kette in GetCACert zurückgeben",
+    "getCaCertChainHelp": "Aus (Standard): einzelnes CA-Zertifikat — für Apple/MDM-Clients erforderlich. Ein: degeneriertes PKCS#7 mit vollständiger Kette (RFC 8894).",
+    "enforceSigningTime": "signingTime-Zeitabweichung erzwingen",
+    "timeSkewMinutes": "Erlaubte Zeitabweichung (Minuten)",
+    "timeSkewMinutesHelp": "Geräte ohne NTP driften: Anfragen außerhalb dieses Fensters werden bei aktiver Durchsetzung abgelehnt."
   },
   "crlOcsp": {
     "subtitle": "{{count}} aktive CRLs",
@@ -2516,7 +2530,17 @@
       "statusFail": "Failed",
       "statusSkip": "—",
       "statusWarn": "Warning"
-    }
+    },
+    "syslogTlsVerify": "TLS-Zertifikat prüfen",
+    "syslogTlsVerifyWarning": "Zertifikatsprüfung deaktiviert: Der Syslog-Stream kann abgefangen werden.",
+    "syslogFraming": "TCP-Framing",
+    "syslogFramingLine": "Zeile (durch Zeilenumbruch getrennt, die meisten Kollektoren)",
+    "syslogFramingOctet": "Oktettzählung (RFC 6587)",
+    "ctEmbedSct": "SCTs bei Ausstellung einbetten (Vorzertifikat-Ablauf)",
+    "ctRequired": "SCTs verlangen (Ausstellung schlägt fehl, wenn kein Log antwortet)",
+    "ctRequiredWarning": "Gilt für Web-, ACME- und EST-Ausstellung: Sind die CT-Logs nicht erreichbar, schlägt JEDE Ausstellung fehl.",
+    "ocspResponseValidity": "Gültigkeit der OCSP-Antworten (Stunden)",
+    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24."
   },
   "account": {
     "profile": "Profil",
@@ -2955,7 +2979,14 @@
     "defaultRoleHelp": "Wird nur angewendet, wenn ein Benutzer bei der ersten Anmeldung automatisch angelegt wird.",
     "accountStatusAttrHelp": "LDAP-Attribut, das angibt, ob ein Konto deaktiviert ist. Häufige Werte: 'description', 'userAccountControl', 'accountStatus'. Leer lassen, um diese Prüfung zu deaktivieren.",
     "enforce2fa": "2FA erzwingen",
-    "enforce2faHelp": "Benutzer, die sich über diesen Anbieter anmelden, zur Einrichtung der TOTP-Zwei-Faktor-Authentifizierung verpflichten."
+    "enforce2faHelp": "Benutzer, die sich über diesen Anbieter anmelden, zur Einrichtung der TOTP-Zwei-Faktor-Authentifizierung verpflichten.",
+    "oidcIssuer": "OIDC-Issuer",
+    "oidcIssuerHelp": "Erforderlich, wenn die ID-Token-Prüfung aktiv ist. Discovery nutzt <issuer>/.well-known/openid-configuration.",
+    "oidcJwksUri": "JWKS-URI (optional)",
+    "oidcJwksUriHelp": "Leer lassen, um die Signaturschlüssel über den Issuer zu ermitteln.",
+    "idTokenVerify": "ID-Token-Signatur prüfen (empfohlen)",
+    "idTokenVerifyWarning": "Das Deaktivieren der Signaturprüfung schwächt die Anmeldesicherheit. Nur als vorübergehende Kompatibilitätsmaßnahme verwenden.",
+    "idTokenVerifyIssuerMissing": "Die Prüfung ist aktiv, aber kein Issuer gesetzt: OIDC-Anmeldungen schlagen fehl, bis der Issuer konfiguriert ist."
   },
   "notifications": {
     "certificateIssued": "Zertifikat ausgestellt: {{name}}",
@@ -3915,7 +3946,9 @@
     "labels": "CA-Labels",
     "labelsDesc": "Weitere CAs unter /.well-known/est/<label>/ bereitstellen. Nur die hier aufgeführten CAs sind erreichbar; ein unbekanntes Label wird abgelehnt.",
     "labelName": "Label",
-    "labelPlaceholder": "z. B. filiale"
+    "labelPlaceholder": "z. B. filiale",
+    "responseIncludeChain": "CA-Kette in Enroll-Antworten aufnehmen",
+    "responseIncludeChainHelp": "RFC-7030-Antworten enthalten nur das ausgestellte Zertifikat; für Legacy-Clients aktivieren, die ihr Bundle aus der Enroll-Antwort statt aus /cacerts erstellen."
   },
   "discovery": {
     "aboutDiscovery": "Über Entdeckung",

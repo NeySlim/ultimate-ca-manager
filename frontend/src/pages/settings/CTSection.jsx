@@ -61,6 +61,25 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctSavi
               onChange={(val) => setCtSettings(prev => ({ ...prev, enabled: val }))}
             />
 
+            <ToggleSwitch
+              label={t('settings.ctEmbedSct')}
+              checked={ctSettings.embed_sct ?? false}
+              onChange={(val) => setCtSettings(prev => ({ ...prev, embed_sct: val }))}
+            />
+
+            {ctSettings.embed_sct && (
+              <>
+                <ToggleSwitch
+                  label={t('settings.ctRequired')}
+                  checked={ctSettings.required ?? false}
+                  onChange={(val) => setCtSettings(prev => ({ ...prev, required: val }))}
+                />
+                {ctSettings.required && (
+                  <p className="text-xs text-amber-500">{t('settings.ctRequiredWarning')}</p>
+                )}
+              </>
+            )}
+
             <div className="flex justify-end pt-4 border-t border-border">
               <Button type="button" onClick={handleCtSave} disabled={ctSaving}>
                 {ctSaving ? <ArrowsClockwise size={14} className="animate-spin mr-1" /> : <FloppyDisk size={14} className="mr-1" />}

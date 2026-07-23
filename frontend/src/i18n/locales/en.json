@@ -1556,7 +1556,16 @@
     "profileDigest": "Digest",
     "profileNamePlaceholder": "e.g. shortlived",
     "profileDescriptionPlaceholder": "Shown to ACME clients",
-    "addProfile": "Add profile"
+    "addProfile": "Add profile",
+    "caaSection": "CAA Checking (RFC 8659)",
+    "caaIdentifiers": "CAA issuer identifiers",
+    "caaIdentifiersHelp": "Comma-separated domains matched against CAA issue/issuewild records. Empty = this server's public hostname.",
+    "caaEnforce": "Fail issuance on DNS lookup errors",
+    "caaEnforceDesc": "Default off: a SERVFAIL/timeout is treated as no CAA record (air-gapped friendly). On: strict fail-closed.",
+    "caaEnforceWarning": "In isolated networks every ACME issuance will fail if the resolver cannot answer CAA queries.",
+    "tlsAlpn01Desc": "validation via TLS on port 443 (RFC 8737)",
+    "tlsAlpnPort": "TLS-ALPN-01 port",
+    "tlsAlpnPortHelper": "Local port the TLS-ALPN-01 responder listens on during validation (default 443)."
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -1613,7 +1622,12 @@
       "management": "Management",
       "settings": "Settings"
     },
-    "enrollmentRequest": "SCEP Enrollment Request"
+    "enrollmentRequest": "SCEP Enrollment Request",
+    "getCaCertChain": "Return full chain in GetCACert",
+    "getCaCertChainHelp": "Off (default): single CA certificate — required for Apple/MDM clients. On: degenerate PKCS#7 with the full chain (RFC 8894).",
+    "enforceSigningTime": "Enforce signingTime clock skew",
+    "timeSkewMinutes": "Allowed clock skew (minutes)",
+    "timeSkewMinutesHelp": "Devices without NTP drift: requests outside this window are rejected when enforcement is on."
   },
   "crlOcsp": {
     "subtitle": "{{count}} active CRLs",
@@ -2517,7 +2531,17 @@
       "statusFail": "Failed",
       "statusWarn": "Warning",
       "statusSkip": "—"
-    }
+    },
+    "syslogTlsVerify": "Verify TLS certificate",
+    "syslogTlsVerifyWarning": "Certificate verification disabled: the syslog stream can be intercepted.",
+    "syslogFraming": "TCP framing",
+    "syslogFramingLine": "Line (newline-delimited, most collectors)",
+    "syslogFramingOctet": "Octet counting (RFC 6587)",
+    "ctEmbedSct": "Embed SCTs at issuance (pre-certificate flow)",
+    "ctRequired": "Require SCTs (fail issuance if no log responds)",
+    "ctRequiredWarning": "Applies to web, ACME and EST issuance: if the CT logs are unreachable, ALL issuance fails.",
+    "ocspResponseValidity": "OCSP response validity (hours)",
+    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24."
   },
   "account": {
     "profile": "Profile",
@@ -2958,7 +2982,14 @@
     "defaultRoleHelp": "Applied only when a user is auto-created on first login.",
     "accountStatusAttrHelp": "LDAP attribute that indicates if an account is disabled. Common values: 'description', 'userAccountControl', 'accountStatus'. Leave empty to disable this check.",
     "enforce2fa": "Enforce 2FA",
-    "enforce2faHelp": "Require users authenticating through this provider to enrol TOTP two-factor authentication."
+    "enforce2faHelp": "Require users authenticating through this provider to enrol TOTP two-factor authentication.",
+    "oidcIssuer": "OIDC Issuer",
+    "oidcIssuerHelp": "Required when ID token verification is enabled. Discovery uses <issuer>/.well-known/openid-configuration.",
+    "oidcJwksUri": "JWKS URI (optional)",
+    "oidcJwksUriHelp": "Leave empty to discover the signing keys from the issuer.",
+    "idTokenVerify": "Verify ID token signature (recommended)",
+    "idTokenVerifyWarning": "Disabling signature verification weakens login security. Only use as a temporary compatibility measure.",
+    "idTokenVerifyIssuerMissing": "Verification is enabled but no issuer is set: OIDC logins will fail until the issuer is configured."
   },
   "notifications": {
     "certificateIssued": "Certificate issued: {{name}}",
@@ -3918,7 +3949,9 @@
     "labels": "CA labels",
     "labelsDesc": "Serve additional CAs under /.well-known/est/<label>/. Only the CAs listed here are reachable; an unknown label is rejected.",
     "labelName": "Label",
-    "labelPlaceholder": "e.g. branch-office"
+    "labelPlaceholder": "e.g. branch-office",
+    "responseIncludeChain": "Include CA chain in enroll responses",
+    "responseIncludeChainHelp": "RFC 7030 responses contain only the issued certificate; enable for legacy clients that build their bundle from the enroll response instead of /cacerts."
   },
   "discovery": {
     "aboutDiscovery": "About Discovery",
