@@ -85,10 +85,13 @@ class TestTsaConfigGuard:
                 _clear_config('tsa_enabled')
                 _clear_config('tsa_ca_refid')
 
-    def test_tsa_certificate_without_timestamping_eku_returns_503(
+    def test_tsa_signing_with_ca_certificate_is_accepted(
         self, app, client, create_ca
     ):
-        ca = create_ca(cn='TSA Invalid EKU CA')
+        # Pre-2.200 installs sign with the CA's own cert (no EKU) — a 503
+        # here broke every existing deployment on upgrade. The garbage body
+        # yields an RFC 3161 rejection response, HTTP 200.
+        ca = create_ca(cn='TSA CA Signer')
         with app.app_context():
             ca_obj = db.session.get(CA, ca['id'])
             _set_config('tsa_enabled', 'true')
@@ -96,11 +99,28 @@ class TestTsaConfigGuard:
         try:
             r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
                             content_type='application/timestamp-query')
-            assert r.status_code == 503
-            assert b'invalid' in r.data.lower()
+            assert r.status_code == 200
         finally:
             with app.app_context():
                 _clear_config('tsa_enabled')
+                _clear_config('tsa_ca_refid')
+
+    def test_tsa_enabled_absent_is_grandfathered_when_ca_configured(
+        self, app, client, create_ca
+    ):
+        # tsa_enabled didn't exist before 2.200: missing row + configured CA
+        # must keep serving (grandfathered), not 503.
+        ca = create_ca(cn='TSA Grandfather CA')
+        with app.app_context():
+            ca_obj = db.session.get(CA, ca['id'])
+            _clear_config('tsa_enabled')
+            _set_config('tsa_ca_refid', ca_obj.refid)
+        try:
+            r = client.post('/tsa', data=b'\x30\x03\x02\x01\x01',
+                            content_type='application/timestamp-query')
+            assert r.status_code == 200
+        finally:
+            with app.app_context():
                 _clear_config('tsa_ca_refid')
 
 

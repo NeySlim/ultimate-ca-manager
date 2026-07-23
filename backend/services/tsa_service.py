@@ -60,20 +60,46 @@ class TSAService:
 
     @staticmethod
     def validate_certificate(tsa_cert: x509.Certificate) -> None:
-        """Validate the dedicated TSA certificate requirements from RFC 3161 §2.3."""
+        """Validate the TSA signer. A dedicated end-entity TSA certificate
+        (RFC 3161 §2.3: critical, exclusive timeStamping EKU) is the
+        recommended setup, but UCM historically signs with the configured
+        CA's own certificate — which carries no EKU at all. Refusing that
+        broke every pre-2.200 deployment, so a CA certificate stays
+        accepted (with a warning), and only an end-entity certificate
+        lacking the timeStamping EKU is refused."""
+        try:
+            bc = tsa_cert.extensions.get_extension_for_oid(
+                ExtensionOID.BASIC_CONSTRAINTS
+            )
+            is_ca = bool(bc.value.ca)
+        except x509.ExtensionNotFound:
+            is_ca = False
+
         try:
             eku_extension = tsa_cert.extensions.get_extension_for_oid(
                 ExtensionOID.EXTENDED_KEY_USAGE
             )
-        except x509.ExtensionNotFound as exc:
+        except x509.ExtensionNotFound:
+            if is_ca:
+                logger.warning(
+                    'TSA is signing with a CA certificate (no timeStamping EKU). '
+                    'Consider issuing a dedicated TSA certificate with a critical, '
+                    'exclusive timeStamping EKU (RFC 3161 §2.3).'
+                )
+                return
             raise TSAConfigurationError(
-                'TSA certificate is missing the critical timeStamping EKU'
-            ) from exc
+                'TSA certificate is missing the timeStamping EKU'
+            )
 
         eku_oids = set(eku_extension.value)
-        if not eku_extension.critical or eku_oids != {ExtendedKeyUsageOID.TIME_STAMPING}:
+        if ExtendedKeyUsageOID.TIME_STAMPING not in eku_oids:
             raise TSAConfigurationError(
-                'TSA certificate timeStamping EKU must be critical and exclusive'
+                'TSA certificate does not include the timeStamping EKU'
+            )
+        if not eku_extension.critical or eku_oids != {ExtendedKeyUsageOID.TIME_STAMPING}:
+            logger.warning(
+                'TSA certificate timeStamping EKU should be critical and exclusive '
+                '(RFC 3161 §2.3); accepting for compatibility.'
             )
 
     def process_request(self, tsp_request_der: bytes) -> Tuple[bytes, int]:
@@ -94,11 +120,12 @@ class TSAService:
                 return self._error_resp('rejection', 'bad_alg',
                                         f'Unsupported hash: {hash_oid}'), 200
 
+            # RFC 3161 §2.4.1: when reqPolicy is set the TSA must issue the
+            # token under that policy or reject. Issuing under the requested
+            # policy keeps clients with pinned policies (openssl ts -tspolicy,
+            # code-signing configs) working, as pre-2.200 releases did.
             requested_policy = req['req_policy'].native
-            if requested_policy is not None and requested_policy != self.policy_oid:
-                return self._error_resp(
-                    'rejection', 'unaccepted_policy', 'Requested policy is not supported'
-                ), 200
+            token_policy = requested_policy if requested_policy is not None else self.policy_oid
 
             extensions = req['extensions']
             if extensions.native is not None:
@@ -120,7 +147,8 @@ class TSAService:
             nonce = req['nonce'].native if req['nonce'].native is not None else None
             cert_req = req['cert_req'].native
 
-            tst_info = self._build_tst_info(hash_oid, digest, nonce)
+            tst_info = self._build_tst_info(hash_oid, digest, nonce,
+                                            policy_oid=token_policy)
             tst_info_der = tst_info.dump()
 
             response_der = self._build_signed_response(
@@ -134,14 +162,15 @@ class TSAService:
                                     'Internal error'), 200
 
     def _build_tst_info(self, hash_oid: str, digest: bytes,
-                        nonce: Optional[int] = None) -> tsp.TSTInfo:
+                        nonce: Optional[int] = None,
+                        policy_oid: Optional[str] = None) -> tsp.TSTInfo:
         """Build TSTInfo (RFC 3161 §2.4.2)"""
         serial = uuid.uuid4().int >> 64  # Unique serial, no collision across workers
         now = datetime.now(timezone.utc)
 
         info = tsp.TSTInfo({
             'version': 'v1',
-            'policy': self.policy_oid,
+            'policy': policy_oid or self.policy_oid,
             'message_imprint': {
                 'hash_algorithm': {'algorithm': hash_oid},
                 'hashed_message': digest,

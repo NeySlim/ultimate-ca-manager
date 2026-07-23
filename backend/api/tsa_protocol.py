@@ -54,8 +54,11 @@ def timestamp_request():
         from services.tsa_service import TSAConfigurationError, TSAService
         from models import SystemConfig
 
+        # tsa_enabled did not exist before 2.200: an install that configured a
+        # TSA CA but never saved the TSA page again has no row — treat that as
+        # enabled (grandfathered) instead of breaking timestamping on upgrade.
         enabled_config = SystemConfig.query.filter_by(key='tsa_enabled').first()
-        if not enabled_config or str(enabled_config.value).lower() != 'true':
+        if enabled_config is not None and str(enabled_config.value).lower() != 'true':
             logger.warning("TSA request refused: TSA is disabled")
             response = make_response('TSA temporarily unavailable', 503)
             response.headers['Content-Type'] = 'text/plain'

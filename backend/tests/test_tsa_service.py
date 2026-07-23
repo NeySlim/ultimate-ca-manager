@@ -25,7 +25,7 @@ def _failure_info_native(resp_der):
     return _status_info(resp_der)['fail_info'].native
 
 
-def _self_signed_tsa(include_eku=True, eku_critical=True):
+def _self_signed_tsa(include_eku=True, eku_critical=True, basic_constraints_ca=False):
     """Build a self-signed cert + key, optionally with a valid TSA EKU."""
     from cryptography import x509
     from cryptography.x509.oid import NameOID
@@ -45,6 +45,10 @@ def _self_signed_tsa(include_eku=True, eku_critical=True):
         builder = builder.add_extension(
             x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.TIME_STAMPING]),
             critical=eku_critical,
+        )
+    if basic_constraints_ca:
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=True, path_length=None), critical=True,
         )
     return builder.sign(key, hashes.SHA256()), key
 
@@ -121,7 +125,9 @@ class TestProcessRequest:
         assert _status_native(resp_der) == 'granted'
         assert _tst_info(resp_der)['policy'].dotted == policy
 
-    def test_different_requested_policy_is_rejected(self):
+    def test_different_requested_policy_is_issued_under_that_policy(self):
+        # RFC 3161 §2.4.1: reqPolicy set → issue under it (or reject). Issuing
+        # keeps clients with pinned policies working (pre-2.200 behaviour).
         from services.tsa_service import TSAService
         cert, key = _self_signed_tsa()
         svc = TSAService(cert, key, policy_oid='1.2.3.4.1')
@@ -131,9 +137,10 @@ class TestProcessRequest:
             _build_tsq(digest, req_policy='1.2.3.4.999')
         )
 
-        assert _status_native(resp_der) == 'rejection'
-        assert _failure_info_native(resp_der) == {'unaccepted_policy'}
-        assert svc.issued_token_metadata(resp_der) is None
+        assert _status_native(resp_der) == 'granted'
+        assert _tst_info(resp_der)['policy'].dotted == '1.2.3.4.999'
+        meta = svc.issued_token_metadata(resp_der)
+        assert meta is not None and meta['policy_oid'] == '1.2.3.4.999'
 
     def test_unknown_critical_extension_is_rejected(self):
         from services.tsa_service import TSAService
@@ -207,16 +214,27 @@ class TestProcessRequest:
 
 
 class TestTsaCertificateValidation:
-    @pytest.mark.parametrize(
-        ('include_eku', 'eku_critical'),
-        [(False, False), (True, False)],
-    )
-    def test_invalid_timestamping_eku_is_rejected(self, include_eku, eku_critical):
+    def test_end_entity_without_eku_is_rejected(self):
         from services.tsa_service import TSAConfigurationError, TSAService
 
-        cert, key = _self_signed_tsa(include_eku, eku_critical)
+        cert, key = _self_signed_tsa(include_eku=False)
         with pytest.raises(TSAConfigurationError, match='timeStamping'):
             TSAService(cert, key)
+
+    def test_non_critical_timestamping_eku_is_accepted(self):
+        # Compat: non-critical/non-exclusive EKU logs a warning but signs
+        from services.tsa_service import TSAService
+
+        cert, key = _self_signed_tsa(include_eku=True, eku_critical=False)
+        assert TSAService(cert, key).tsa_cert is cert
+
+    def test_ca_certificate_without_eku_is_accepted(self):
+        # Pre-2.200 deployments sign with the configured CA's own cert
+        from cryptography import x509
+        from services.tsa_service import TSAService
+
+        cert, key = _self_signed_tsa(include_eku=False, basic_constraints_ca=True)
+        assert TSAService(cert, key).tsa_cert is cert
 
 
 class TestTsaManagementApi:
