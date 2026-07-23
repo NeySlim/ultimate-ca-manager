@@ -152,7 +152,13 @@ def require_jose_content_type():
 
 
 def _is_caa_failure(error: Any) -> bool:
-    return bool(re.search(r'\bcaa\b', str(error or ''), re.IGNORECASE))
+    """True only for a definitive CAA policy denial. A DNS lookup error is
+    transient: it must NOT terminally invalidate the order (the client may
+    retry once the resolver recovers)."""
+    text = str(error or '')
+    if 'dns error' in text.lower():
+        return False
+    return bool(re.search(r'\bcaa\b', text, re.IGNORECASE))
 
 
 def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:

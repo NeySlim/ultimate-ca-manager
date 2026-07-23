@@ -45,15 +45,25 @@ def _parameters_allow(
     method_parameters = parameters.get('validationmethods', [])
     if method_parameters:
         normalized_method = validation_method.lower() if validation_method else None
-        allowed_method_sets = [
-            {method.strip().lower() for method in value.split(',') if method.strip()}
-            for value in method_parameters
-        ]
-        if normalized_method is None or any(
-            normalized_method not in allowed_methods
-            for allowed_methods in allowed_method_sets
-        ):
-            return False, 'validationmethods does not allow the validation method used'
+        if normalized_method is None:
+            # Reused or auto-approved authorizations have no single
+            # determinable challenge type; denying here would fail orders
+            # whose original validation was compliant.
+            logger.warning(
+                'CAA validationmethods present but the validation method is '
+                'indeterminable (reused/auto-approved authorization); '
+                'not enforcing this parameter'
+            )
+        else:
+            allowed_method_sets = [
+                {method.strip().lower() for method in value.split(',') if method.strip()}
+                for value in method_parameters
+            ]
+            if any(
+                normalized_method not in allowed_methods
+                for allowed_methods in allowed_method_sets
+            ):
+                return False, 'validationmethods does not allow the validation method used'
 
     return True, None
 
@@ -63,6 +73,7 @@ def check_caa(
     issuer_domains: Optional[List[str]] = None,
     account_url: Optional[str] = None,
     validation_method: Optional[str] = None,
+    fail_hard: bool = False,
 ) -> Tuple[bool, str]:
     """Check whether CAA authorizes issuance for one DNS identifier.
 
@@ -89,8 +100,19 @@ def check_caa(
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             continue
         except dns.exception.DNSException as exc:
-            logger.warning("CAA DNS lookup failed for %s: %s", lookup_domain, exc)
-            return False, f"CAA DNS lookup failed for {lookup_domain}"
+            # SERVFAIL/timeout/unreachable resolver. Air-gapped and
+            # split-horizon deployments (UCM's primary use case) routinely
+            # cannot resolve here — treating that as a denial broke every
+            # ACME renewal after upgrade. Soft-fail by default; the
+            # acme_caa_enforce setting restores fail-closed semantics.
+            if fail_hard:
+                logger.warning("CAA DNS lookup failed for %s: %s", lookup_domain, exc)
+                return False, f"CAA DNS lookup failed (DNS error) for {lookup_domain}"
+            logger.warning(
+                "CAA DNS lookup failed for %s (%s); treating as no CAA at "
+                "this label (soft-fail)", lookup_domain, exc,
+            )
+            continue
 
         issue_records = []
         issuewild_records = []
@@ -168,6 +190,7 @@ def check_caa_for_domains(
     issuer_domains: Optional[List[str]] = None,
     account_url: Optional[str] = None,
     validation_methods: Optional[Mapping[str, Optional[str]]] = None,
+    fail_hard: bool = False,
 ) -> Tuple[bool, str]:
     """Check CAA for multiple domains; every domain must be authorized."""
     methods = validation_methods or {}
@@ -177,6 +200,7 @@ def check_caa_for_domains(
             issuer_domains,
             account_url=account_url,
             validation_method=methods.get(domain),
+            fail_hard=fail_hard,
         )
         if not allowed:
             return False, f"CAA check failed for {domain}: {reason}"

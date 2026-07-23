@@ -95,6 +95,7 @@ class IssuanceMixin:
         
         # CAA record check (RFC 6844 + RFC 8555 §8.1) - only for DNS identifiers
         if order_domains:
+            caa_enforce = False
             try:
                 from utils.caa_checker import check_caa_for_domains
                 from models import SystemConfig
@@ -117,26 +118,41 @@ class IssuanceMixin:
                     except Exception:
                         pass
                 
+                # DNS lookup errors are soft-fail by default (pre-2.200
+                # behaviour): air-gapped/split-horizon deployments cannot
+                # resolve CAA and were fully broken by fail-closed. Setting
+                # acme_caa_enforce=true restores strict semantics.
+                try:
+                    enforce_cfg = SystemConfig.query.filter_by(key='acme_caa_enforce').first()
+                    caa_enforce = bool(enforce_cfg and str(enforce_cfg.value).lower() == 'true')
+                except Exception:
+                    pass
+
                 account_url, validation_methods = self._caa_request_context(order)
                 caa_allowed, caa_reason = check_caa_for_domains(
                     order_domains,
                     caa_identifiers,
                     account_url=account_url,
                     validation_methods=validation_methods,
+                    fail_hard=caa_enforce,
                 )
                 if not caa_allowed:
                     logger.warning(f"CAA check failed for order {order_id}: {caa_reason}")
                     return False, f"CAA check failed: {caa_reason}"
                 logger.debug(f"CAA check passed for {order_domains}: {caa_reason}")
             except ImportError:
-                # dnspython is a hard dependency; if it's genuinely missing we
-                # cannot check CAA, and silently skipping would let issuance
-                # proceed against a CAA record that forbids it. Fail closed.
-                logger.error("CAA check unavailable: dns.resolver import failed")
-                return False, "CAA check failed: DNS resolver unavailable"
+                if caa_enforce:
+                    logger.error("CAA check unavailable: dns.resolver import failed")
+                    return False, "CAA check failed (DNS error): resolver unavailable"
+                logger.error(
+                    "CAA check unavailable (dns.resolver import failed); "
+                    "proceeding without CAA check (soft-fail)"
+                )
             except Exception as e:
-                logger.warning(f"CAA check error: {e}")
-                return False, "CAA check failed: DNS lookup error"
+                if caa_enforce:
+                    logger.warning(f"CAA check error: {e}")
+                    return False, "CAA check failed (DNS error): lookup error"
+                logger.warning(f"CAA check error (non-blocking): {e}")
         
         # Resolve CA: domain-specific → global default → first available
         # IP-only orders have no domains: skips the per-domain mappings and

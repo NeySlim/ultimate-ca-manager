@@ -59,11 +59,24 @@ class TestNoRecords:
         dns.exception.Timeout(),
         dns.resolver.NoNameservers(),
     ])
-    def test_dns_error_denies_issuance(self, dns_error):
+    def test_dns_error_soft_fails_by_default(self, dns_error):
+        # Air-gapped/split-horizon deployments SERVFAIL or time out on CAA:
+        # pre-2.200 behaviour (non-blocking) is the default again.
         with patch('dns.resolver.resolve', side_effect=dns_error):
             ok, reason = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is True
+        assert 'No CAA record' in reason
+
+    @pytest.mark.parametrize('dns_error', [
+        dns.exception.Timeout(),
+        dns.resolver.NoNameservers(),
+    ])
+    def test_dns_error_denies_issuance_when_enforced(self, dns_error):
+        with patch('dns.resolver.resolve', side_effect=dns_error):
+            ok, reason = check_caa('www.example.com', ['ucm.example.com'],
+                                   fail_hard=True)
         assert ok is False
-        assert 'DNS lookup failed' in reason
+        assert 'DNS' in reason
 
     def test_nodata_continues_to_parent(self):
         with _patch({'example.com': [_FakeCAA('issue', 'ucm.example.com')]}):
@@ -149,10 +162,19 @@ class TestIssueMatching:
         assert ok is False
         assert 'validationmethods' in reason
 
-    def test_validationmethods_without_used_method_denies(self):
+    def test_validationmethods_with_indeterminable_method_allows(self):
+        # Reused/auto-approved authorizations have no single determinable
+        # challenge type — the parameter is not enforced in that case.
         rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
         with _patch({'example.com': [rec]}):
             ok, _ = check_caa('www.example.com', ['ucm.example.com'])
+        assert ok is True
+
+    def test_validationmethods_with_wrong_method_denies(self):
+        rec = _FakeCAA('issue', 'ucm.example.com; validationmethods=dns-01')
+        with _patch({'example.com': [rec]}):
+            ok, _ = check_caa('www.example.com', ['ucm.example.com'],
+                              validation_method='http-01')
         assert ok is False
 
     def test_alternate_matching_record_can_authorize(self):
