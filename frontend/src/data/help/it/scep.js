@@ -11,6 +11,7 @@ export default {
           { label: 'Configurazione', text: 'Impostazioni del server SCEP: selezione CA, identificativo CA, approvazione automatica' },
           { label: 'Challenge Password', text: 'Gestisci le challenge password per CA per l\'iscrizione dei dispositivi' },
           { label: 'Informazioni', text: 'URL degli endpoint SCEP e istruzioni di integrazione' },
+          { label: 'Profili', text: 'Endpoint di enrollment denominati, ciascuno con URL, CA, modello e challenge propri' },
         ]
       },
       {
@@ -19,6 +20,15 @@ export default {
           { label: 'CA firmataria', text: 'Seleziona quale CA firma i certificati iscritti tramite SCEP' },
           { label: 'Approvazione automatica', text: 'Approva automaticamente le richieste con challenge password valide' },
           { label: 'Challenge Password', text: 'Segreto condiviso che i dispositivi usano per autenticare l\'iscrizione' },
+        ]
+      },
+      {
+        title: 'Profili',
+        items: [
+          { label: 'Segmento URL', text: 'Ogni profilo è servito su /scep/<segment>/pkiclient.exe — punta ogni flotta di dispositivi o profilo MDM al proprio URL' },
+          { label: 'Modello di certificato', text: 'Quando un modello è associato, i suoi KU/EKU e la validità governano ogni certificato emesso tramite il profilo' },
+          { label: 'Challenge per profilo', text: 'Ogni profilo ha la propria password di challenge, memorizzata cifrata, con la stessa finestra di scadenza della challenge globale' },
+          { label: 'Endpoint predefinito', text: 'L\'endpoint /scep/pkiclient.exe senza segmento continua a servire la configurazione globale' },
         ]
       },
     ],

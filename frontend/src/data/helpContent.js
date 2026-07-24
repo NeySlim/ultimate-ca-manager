@@ -353,6 +353,7 @@ export const helpContent = {
         items: [
           { label: 'Requests', text: 'Pending, approved, and rejected SCEP enrollment requests' },
           { label: 'Configuration', text: 'SCEP server settings: CA selection, CA identifier, auto-approve' },
+          { label: 'Profiles', text: 'Named enrollment endpoints, each with its own URL, CA, template and challenge' },
           { label: 'Challenge Passwords', text: 'Manage per-CA challenge passwords for device enrollment' },
           { label: 'Information', text: 'SCEP endpoint URLs and integration instructions' },
         ]
@@ -364,6 +365,16 @@ export const helpContent = {
           { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates' },
           { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
           { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
+        ]
+      },
+      {
+        title: 'Profiles',
+        icon: Gear,
+        items: [
+          { label: 'URL segment', text: 'Each profile is served at /scep/<segment>/pkiclient.exe — point each device fleet or MDM profile at its own URL' },
+          { label: 'Certificate template', text: 'When a template is bound, its key usage, extended key usage and validity govern every certificate issued through the profile' },
+          { label: 'Per-profile challenge', text: 'Each profile has its own challenge password, stored encrypted, with the same expiry window as the global challenge' },
+          { label: 'Default endpoint', text: 'The unlabelled /scep/pkiclient.exe endpoint keeps serving the global configuration' },
         ]
       },
     ],

@@ -11,6 +11,7 @@ export default {
           { label: 'Konfiguration', text: 'SCEP-Servereinstellungen: CA-Auswahl, CA-Kennung, Auto-Genehmigung' },
           { label: 'Challenge-Passwörter', text: 'Pro-CA-Challenge-Passwörter für die Geräteregistrierung verwalten' },
           { label: 'Information', text: 'SCEP-Endpunkt-URLs und Integrationsanweisungen' },
+          { label: 'Profile', text: 'Benannte Enrollment-Endpunkte, jeder mit eigener URL, CA, Vorlage und Challenge' },
         ]
       },
       {
@@ -19,6 +20,15 @@ export default {
           { label: 'Signierende CA', text: 'Auswählen, welche CA SCEP-registrierte Zertifikate signiert' },
           { label: 'Auto-Genehmigung', text: 'Anfragen mit gültigem Challenge-Passwort automatisch genehmigen' },
           { label: 'Challenge-Passwort', text: 'Gemeinsames Geheimnis, das Geräte zur Authentifizierung der Registrierung verwenden' },
+        ]
+      },
+      {
+        title: 'Profile',
+        items: [
+          { label: 'URL-Segment', text: 'Jedes Profil wird unter /scep/<segment>/pkiclient.exe bereitgestellt — jede Geräteflotte oder jedes MDM-Profil auf die eigene URL zeigen lassen' },
+          { label: 'Zertifikatsvorlage', text: 'Ist eine Vorlage gebunden, bestimmen deren KU/EKU und Gültigkeit jedes über das Profil ausgestellte Zertifikat' },
+          { label: 'Challenge pro Profil', text: 'Jedes Profil hat ein eigenes, verschlüsselt gespeichertes Challenge-Passwort mit demselben Ablauffenster wie die globale Challenge' },
+          { label: 'Standard-Endpunkt', text: 'Der Endpunkt /scep/pkiclient.exe ohne Segment bedient weiterhin die globale Konfiguration' },
         ]
       },
     ],

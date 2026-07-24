@@ -11,6 +11,7 @@ export default {
           { label: '配置', text: 'SCEP 服务器设置：CA 选择、CA 标识符、自动批准' },
           { label: '质询密码', text: '管理每个 CA 的设备注册质询密码' },
           { label: '信息', text: 'SCEP 端点 URL 和集成说明' },
+          { label: '配置文件', text: '命名注册端点，每个都有自己的 URL、CA、模板和质询' },
         ]
       },
       {
@@ -19,6 +20,15 @@ export default {
           { label: '签名 CA', text: '选择哪个 CA 签署 SCEP 注册的证书' },
           { label: '自动批准', text: '自动批准带有有效质询密码的请求' },
           { label: '质询密码', text: '设备用于认证注册的共享密钥' },
+        ]
+      },
+      {
+        title: '配置文件',
+        items: [
+          { label: 'URL 片段', text: '每个配置文件通过 /scep/<segment>/pkiclient.exe 提供 — 将每个设备群或 MDM 配置指向其专属 URL' },
+          { label: '证书模板', text: '绑定模板后，其密钥用法（KU/EKU）和有效期将决定通过该配置文件签发的每个证书' },
+          { label: '按配置文件的质询', text: '每个配置文件都有自己的质询密码，加密存储，过期窗口与全局质询相同' },
+          { label: '默认端点', text: '不带片段的 /scep/pkiclient.exe 端点继续使用全局配置' },
         ]
       },
     ],
