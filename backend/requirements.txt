@@ -114,6 +114,16 @@ javaobj-py3>=0.4.3
 pycryptodomex>=3.20
 defusedxml>=0.7.1
 
+# MS-XCEP / MS-WSTEP (Windows autoenrollment, GH #229): SOAP/XML envelope
+# parsing and construction. Mature manylinux + Windows wheels, no native
+# lib beyond libxml2 (already pulled in transitively by other deps).
+lxml>=5.0
+# XML-DSig signing of the WS-Trust RSTR envelope is a Phase 2/3 concern
+# (add only if real Windows-client interop testing shows an unsigned
+# envelope is rejected). No new dependency needed for it either way:
+# xmlsec is already installed transitively via python3-saml (SAML SSO),
+# so it is the tool to reach for rather than adding a second signing lib.
+
 # Certificate conformance linting (RFC 5280 / CA-Browser Forum).
 # Pure-python wheel; its deps (pyasn1, pyasn1-modules, cryptography) are
 # already pulled in above. Optional at runtime — the linting feature

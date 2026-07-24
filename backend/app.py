@@ -1608,7 +1608,16 @@ def register_blueprints(app):
         app.logger.info("✓ EST protocol enabled (/.well-known/est)")
     except ImportError:
         pass
-    
+
+    # MS-XCEP Protocol (Certificate Enrollment Policy) - policy discovery
+    # for Windows autoenrollment clients (MMC, certreq, GPO).
+    try:
+        from api.xcep_protocol import bp as xcep_bp
+        app.register_blueprint(xcep_bp)
+        app.logger.info("✓ MS-XCEP protocol enabled")
+    except ImportError:
+        pass
+
     # TSA Protocol (RFC 3161) - /tsa
     try:
         from api.tsa_protocol import bp as tsa_bp
