@@ -137,8 +137,21 @@ class CRLSchedulerTask:
             
             # Get all CAs with CDP enabled (auto-regen)
             # NOTE: has_private_key is a @property, NOT a DB column — cannot use filter_by
+            # Offline CAs are excluded: in password_protected mode the key is
+            # still present but passphrase-encrypted, so has_private_key is
+            # true while signing is impossible — attempting it raised a
+            # traceback on every cycle instead of a skip.
             cas_with_cdp = CA.query.filter_by(cdp_enabled=True).all()
-            cas_with_keys = [ca for ca in cas_with_cdp if ca.has_private_key]
+            cas_with_keys = [
+                ca for ca in cas_with_cdp if ca.has_private_key and not ca.offline
+            ]
+            offline_skipped = sum(
+                1 for ca in cas_with_cdp if ca.has_private_key and ca.offline
+            )
+            if offline_skipped:
+                logger.debug(
+                    "CRL regeneration: %s offline CA(s) skipped", offline_skipped
+                )
             
             if not cas_with_keys:
                 logger.debug("No CAs with CDP enabled and private key found")
@@ -174,7 +187,7 @@ class CRLSchedulerTask:
             # NOTE: has_private_key is a @property — filter in Python
             delta_cas = [
                 ca for ca in CA.query.filter_by(cdp_enabled=True, delta_crl_enabled=True).all()
-                if ca.has_private_key
+                if ca.has_private_key and not ca.offline
             ]
             
             delta_count = 0

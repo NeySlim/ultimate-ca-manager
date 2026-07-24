@@ -10,6 +10,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+- **CRL scheduler no longer errors on offline CAs** — a CA taken offline in password-protected mode keeps its (passphrase-encrypted) key in the database, so the scheduler still selected it for CRL regeneration and raised "Password was not given but private key is encrypted" on every cycle. Offline CAs are now skipped (with a debug log), for both base and delta CRLs, consistent with every other signing path.
+
 ### Added
 - **SCEP profiles — multiple enrollment endpoints** — named profiles served at `/scep/<profile>/pkiclient.exe`, each bound to its own CA, optional certificate template (whose key usage, extended key usage and validity govern issuance), challenge password (encrypted at rest, with the same expiry window as the global challenge) and approval policy. Device certs, user certs or per-tenant enrollments each get a dedicated URL instead of sharing one global endpoint; the existing `/scep/pkiclient.exe` endpoints keep serving the global configuration unchanged. Managed from a new Profiles tab on the SCEP page (migration 068). Requested in #228, and groundwork for Intune dynamic challenge validation.
 - **Delegated OCSP responder certificates renew automatically** — a daily task re-issues a responder certificate before it expires (same key pair and extensions, renewed at par) and rebinds the CA's responder configuration to the new certificate, so a short-lived OCSP signing certificate (e.g. the 90-day system template) rotates without manual action. Enabled by default; can be disabled and the renewal window tuned via configuration. Requested in #226.
