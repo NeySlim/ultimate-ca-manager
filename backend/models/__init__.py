@@ -9,7 +9,7 @@ from models.system_config import SystemConfig
 from models.ca import CA
 from models.certificate import Certificate
 from models.crl_list import CRL
-from models.scep import SCEPRequest
+from models.scep import SCEPRequest, ScepProfile
 from models.audit_log import AuditLog
 
 # Previously-split sub-models (already existed)

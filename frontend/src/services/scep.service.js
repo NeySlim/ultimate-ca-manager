@@ -49,5 +49,26 @@ export const scepService = {
 
   async regenerateChallenge(caId) {
     return apiClient.post(`/scep/challenge/${caId}/regenerate`)
+  },
+
+  // Profiles (named endpoints, issue #228)
+  async getProfiles() {
+    return apiClient.get('/scep/profiles')
+  },
+
+  async createProfile(data) {
+    return apiClient.post('/scep/profiles', data)
+  },
+
+  async updateProfile(id, data) {
+    return apiClient.patch(`/scep/profiles/${id}`, data)
+  },
+
+  async deleteProfile(id) {
+    return apiClient.delete(`/scep/profiles/${id}`)
+  },
+
+  async regenerateProfileChallenge(id) {
+    return apiClient.post(`/scep/profiles/${id}/challenge/regenerate`)
   }
 }

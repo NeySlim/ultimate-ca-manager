@@ -16,7 +16,8 @@ import {
   Badge, LoadingSpinner, Modal, Textarea, EmptyState, HelpCard,
   CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
 } from '../components'
-import { scepService, casService } from '../services'
+import { scepService, casService, templatesService } from '../services'
+import ScepProfilesTab from './scep/ScepProfilesTab'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -29,6 +30,8 @@ export default function SCEPPage() {
   
   const [loading, setLoading] = useState(true)
   const [config, setConfig] = useState({})
+  const [profiles, setProfiles] = useState([])
+  const [templates, setTemplates] = useState([])
   const [requests, setRequests] = useState([])
   const [cas, setCas] = useState([])
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 })
@@ -53,13 +56,17 @@ export default function SCEPPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [configRes, requestsRes, casRes, statsRes] = await Promise.all([
+      const [configRes, requestsRes, casRes, statsRes, profilesRes, templatesRes] = await Promise.all([
         scepService.getConfig(),
         scepService.getRequests(),
         casService.getAll(),
-        scepService.getStats()
+        scepService.getStats(),
+        scepService.getProfiles().catch(() => ({ data: [] })),
+        templatesService.getAll().catch(() => ({ data: [] }))
       ])
       setConfig(configRes.data || {})
+      setProfiles(profilesRes.data || [])
+      setTemplates((templatesRes.data || []).filter(tpl => tpl.template_type !== 'ca'))
       setRequests(requestsRes.data || [])
       setStats(statsRes.data || { pending: 0, approved: 0, rejected: 0, total: 0 })
       
@@ -163,6 +170,7 @@ export default function SCEPPage() {
   const tabs = useMemo(() => [
     { id: 'requests', label: t('scep.requests'), icon: ListBullets, badge: stats.pending > 0 ? stats.pending : null },
     { id: 'config', label: t('common.config'), icon: Gear },
+    { id: 'profiles', label: t('scep.profiles'), icon: Plugs, badge: null },
     { id: 'challenge', label: t('common.challenges'), icon: Key },
     { id: 'info', label: t('scep.info'), icon: Info }
   ], [stats.pending, t])
@@ -409,7 +417,7 @@ export default function SCEPPage() {
         tabLayout="sidebar"
         sidebarContentClass=""
         tabGroups={[
-          { labelKey: 'scep.groups.management', tabs: ['requests', 'challenge'], color: 'icon-bg-blue' },
+          { labelKey: 'scep.groups.management', tabs: ['requests', 'challenge', 'profiles'], color: 'icon-bg-blue' },
           { labelKey: 'scep.groups.settings', tabs: ['config', 'info'], color: 'icon-bg-emerald' },
         ]}
         stats={activeTab === 'requests' ? headerStats : undefined}
@@ -589,6 +597,16 @@ export default function SCEPPage() {
         )}
 
         {/* Challenge Passwords Tab */}
+        {activeTab === 'profiles' && (
+          <ScepProfilesTab
+            profiles={profiles}
+            cas={cas}
+            templates={templates}
+            canWrite={hasPermission('write:scep')}
+            onChanged={loadData}
+          />
+        )}
+
         {activeTab === 'challenge' && (
           <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
             {!config.enabled && (

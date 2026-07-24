@@ -105,6 +105,7 @@ class SCEPService:
         challenge_password: Optional[str] = None,
         auto_approve: bool = False,
         challenge_expired: bool = False,
+        template=None,
     ):
         """
         Initialize SCEP service for a specific CA.
@@ -117,11 +118,16 @@ class SCEPService:
                 outlived ``scep_challenge_validity``. Kept separate from a
                 blank challenge so expiry is an explicit refusal rather than a
                 fallback to the weaker no-challenge path.
+            template: Optional CertificateTemplate bound to the serving SCEP
+                profile (issue #228). When set, its KU/EKU and validity govern
+                issuance — the operator explicitly authorised this policy for
+                the profile's endpoint — while SANs still come from the CSR.
         """
         self.ca_refid = ca_refid
         self.challenge_password = challenge_password
         self.auto_approve = auto_approve
         self.challenge_expired = challenge_expired
+        self.template = template
 
         self.ca = CA.query.filter_by(refid=ca_refid).first()
         if not self.ca:
@@ -1006,6 +1012,24 @@ class SCEPService:
         validate_name_constraints(self.ca_cert, csr.subject, _scep_sans,
                                   renewal_of=renewal_of)
 
+        # Profile template (issue #228): its validity and KU/EKU govern
+        # issuance for this endpoint — the operator bound this policy to the
+        # profile explicitly. Parsed once here, applied below.
+        tpl_ext = {}
+        if self.template is not None:
+            if self.template.validity_days:
+                validity_days = int(self.template.validity_days)
+            raw_ext = self.template.extensions_template
+            try:
+                for _ in range(2):  # tolerate double-encoded JSON
+                    if isinstance(raw_ext, str):
+                        import json as _json
+                        raw_ext = _json.loads(raw_ext)
+                if isinstance(raw_ext, dict):
+                    tpl_ext = raw_ext
+            except (ValueError, TypeError):
+                tpl_ext = {}
+
         # Clamp validity to the CA's own expiry — issuing a leaf that outlives
         # its issuer is invalid per RFC 5280 §6.1 and breaks every chain
         # validator the moment the CA expires.
@@ -1070,11 +1094,51 @@ class SCEPService:
                     _ALLOWED_EKU_OIDS = _ALLOWED_EKU_OIDS | extra
             except x509.ExtensionNotFound:
                 pass
+        # Template-governed KU/EKU (issue #228): when the serving profile is
+        # bound to a template, the template's extensions replace whatever the
+        # CSR requested — operator policy wins over enrollee wishes, in both
+        # directions (the template may also grant EKUs the generic allowlist
+        # would strip, because the operator explicitly configured them).
+        tpl_ku_names = tpl_ext.get('key_usage') if isinstance(tpl_ext.get('key_usage'), list) else None
+        tpl_eku_names = (tpl_ext.get('extended_key_usage')
+                         if isinstance(tpl_ext.get('extended_key_usage'), list) else None)
+        if tpl_ku_names:
+            _ku_flag_map = {
+                'digitalsignature': 'digital_signature',
+                'keyencipherment': 'key_encipherment',
+                'contentcommitment': 'content_commitment',
+                'nonrepudiation': 'content_commitment',
+                'dataencipherment': 'data_encipherment',
+                'keyagreement': 'key_agreement',
+            }
+            flags = dict(digital_signature=False, content_commitment=False,
+                         key_encipherment=False, data_encipherment=False,
+                         key_agreement=False, key_cert_sign=False,
+                         crl_sign=False, encipher_only=False, decipher_only=False)
+            for name in tpl_ku_names:
+                attr = _ku_flag_map.get(str(name).lower())
+                if attr:
+                    flags[attr] = True
+            if any(flags.values()):
+                builder = builder.add_extension(x509.KeyUsage(**flags), critical=True)
+        if tpl_eku_names:
+            from utils.eku_validation import normalize_extra_ekus, to_object_identifiers
+            tpl_oids, tpl_err = normalize_extra_ekus(tpl_eku_names)
+            if tpl_err:
+                raise ValueError(f"Invalid template EKUs: {tpl_err}")
+            if tpl_oids:
+                builder = builder.add_extension(
+                    x509.ExtendedKeyUsage(to_object_identifiers(tpl_oids)),
+                    critical=False,
+                )
+
         try:
             for ext in csr.extensions:
                 if ext.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
                     builder = builder.add_extension(ext.value, critical=False)
                 elif ext.oid == ExtensionOID.KEY_USAGE:
+                    if tpl_ku_names:
+                        continue  # template governs Key Usage
                     ku = ext.value
                     # Force-clear bits that would let the cert act as a CA or
                     # sign CRLs. Encipher-only / decipher-only are only valid
@@ -1093,6 +1157,8 @@ class SCEPService:
                     )
                     builder = builder.add_extension(safe_ku, critical=True)
                 elif ext.oid == ExtensionOID.EXTENDED_KEY_USAGE:
+                    if tpl_eku_names:
+                        continue  # template governs Extended Key Usage
                     safe_ekus = [oid for oid in ext.value if oid in _ALLOWED_EKU_OIDS]
                     if safe_ekus:
                         builder = builder.add_extension(

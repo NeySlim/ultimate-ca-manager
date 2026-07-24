@@ -45,27 +45,73 @@ def _reject(reason):
     return None, reason
 
 
-def get_scep_service():
-    """Get configured SCEP service instance"""
+def _resolve_profile(profile_slug):
+    """Resolve a SCEP profile by URL slug. Returns (profile, error)."""
+    from models import ScepProfile
+    profile = ScepProfile.query.filter_by(url_slug=profile_slug).first()
+    if not profile:
+        return None, f"Unknown SCEP profile {profile_slug!r}"
+    if not profile.enabled:
+        return None, f"SCEP profile {profile.name!r} is disabled"
+    return profile, None
+
+
+def _profile_challenge_state(profile):
+    """Per-profile challenge + expiry, using the global validity window."""
+    challenge = profile.decrypted_challenge()
+    if not challenge:
+        return '', False
+    try:
+        validity_hours = int(get_config('scep_challenge_validity', '24'))
+    except (TypeError, ValueError):
+        validity_hours = 24
+    generated_at = profile.challenge_generated_at
+    if generated_at is None:
+        return challenge, False
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    age_limit = generated_at + timedelta(hours=validity_hours)
+    return challenge, utc_now() > age_limit
+
+
+def get_scep_service(profile_slug=None):
+    """Get a configured SCEP service instance.
+
+    Without ``profile_slug``: the global SystemConfig-based endpoint
+    (unchanged pre-profiles behaviour). With a slug: the named profile's CA,
+    challenge, approval policy and template (issue #228).
+    """
     # Get SCEP configuration
     enabled = get_config('scep_enabled', 'true') == 'true'
     if not enabled:
         return _reject("SCEP is disabled")
 
-    ca_id = get_config('scep_ca_id')
-    if not ca_id:
-        return _reject("No CA configured for SCEP")
-
-    # Find CA
-    try:
-        ca = db.session.get(CA, int(ca_id))
+    profile = None
+    if profile_slug is not None:
+        profile, error = _resolve_profile(profile_slug)
+        if error:
+            return _reject(error)
+        ca = CA.query.filter_by(refid=profile.ca_refid).first()
         if not ca:
-            ca = CA.query.filter_by(refid=ca_id).first()
-    except (ValueError, TypeError):
-        ca = CA.query.filter_by(refid=ca_id).first()
+            return _reject(
+                f"CA for SCEP profile {profile.name!r} not found "
+                f"(ca_refid={profile.ca_refid!r})"
+            )
+    else:
+        ca_id = get_config('scep_ca_id')
+        if not ca_id:
+            return _reject("No CA configured for SCEP")
 
-    if not ca:
-        return _reject(f"Configured CA not found (scep_ca_id={ca_id!r})")
+        # Find CA
+        try:
+            ca = db.session.get(CA, int(ca_id))
+            if not ca:
+                ca = CA.query.filter_by(refid=ca_id).first()
+        except (ValueError, TypeError):
+            ca = CA.query.filter_by(refid=ca_id).first()
+
+        if not ca:
+            return _reject(f"Configured CA not found (scep_ca_id={ca_id!r})")
 
     if not ca.has_private_key:
         return _reject(f"CA {ca.descr!r} has no private key")
@@ -88,15 +134,33 @@ def get_scep_service():
     # make the request look like a "no challenge configured" enrollment, which
     # is a *weaker* check (it falls through to the manual-approval path) instead
     # of the outright refusal an expired secret must produce.
-    from api.v2.scep import challenge_age_state
-    challenge, challenge_expired, _expires_at = challenge_age_state(ca.id)
-    auto_approve = get_config('scep_auto_approve', 'false') == 'true'
+    template = None
+    if profile is not None:
+        challenge, challenge_expired = _profile_challenge_state(profile)
+        auto_approve = profile.auto_approve
+        if profile.template_id:
+            from models import CertificateTemplate
+            template = db.session.get(CertificateTemplate, profile.template_id)
+            if not template:
+                return _reject(
+                    f"Template for SCEP profile {profile.name!r} not found "
+                    f"(template_id={profile.template_id})"
+                )
+        if challenge_expired:
+            logger.warning(
+                "SCEP: challenge password for profile %r expired; regenerate "
+                "it to allow enrollment", profile.name
+            )
+    else:
+        from api.v2.scep import challenge_age_state
+        challenge, challenge_expired, _expires_at = challenge_age_state(ca.id)
+        auto_approve = get_config('scep_auto_approve', 'false') == 'true'
 
-    if challenge_expired:
-        logger.warning(
-            "SCEP: challenge password for CA %s expired; regenerate it to "
-            "allow enrollment", ca.id
-        )
+        if challenge_expired:
+            logger.warning(
+                "SCEP: challenge password for CA %s expired; regenerate it to "
+                "allow enrollment", ca.id
+            )
 
     try:
         service = SCEPService(
@@ -104,6 +168,7 @@ def get_scep_service():
             challenge_password=challenge,
             auto_approve=auto_approve,
             challenge_expired=challenge_expired,
+            template=template,
         )
         return service, None
     except Exception as e:
@@ -112,7 +177,8 @@ def get_scep_service():
 
 
 @bp.route('/scep/pkiclient.exe', methods=['GET', 'POST'])
-def scep_endpoint():
+@bp.route('/scep/<profile_slug>/pkiclient.exe', methods=['GET', 'POST'])
+def scep_endpoint(profile_slug=None):
     """
     Main SCEP endpoint - handles all SCEP operations
 
@@ -128,9 +194,9 @@ def scep_endpoint():
     # reached us and succeeded". That distinction is the first thing needed when
     # a network appliance reports a generic enrollment failure.
     logger.info(
-        "SCEP request: operation=%s method=%s from=%s ua=%r",
-        operation or '(none)', request.method, client_ip(),
-        request.headers.get('User-Agent', ''),
+        "SCEP request: operation=%s method=%s profile=%s from=%s ua=%r",
+        operation or '(none)', request.method, profile_slug or '(default)',
+        client_ip(), request.headers.get('User-Agent', ''),
     )
 
     if not operation:
@@ -139,11 +205,11 @@ def scep_endpoint():
     elif operation == 'GetCACaps':
         return handle_get_ca_caps()
     elif operation == 'GetCACert':
-        return handle_get_ca_cert()
+        return handle_get_ca_cert(profile_slug)
     elif operation == 'GetNextCACert':
-        return handle_get_next_ca_cert()
+        return handle_get_next_ca_cert(profile_slug)
     elif operation == 'PKIOperation':
-        return handle_pki_operation()
+        return handle_pki_operation(profile_slug)
     else:
         logger.warning("SCEP: unknown operation %r from %s", operation, client_ip())
         return make_error_response(f"Unknown operation: {operation}", 400)
@@ -158,9 +224,9 @@ def handle_get_ca_caps():
     return response
 
 
-def handle_get_ca_cert():
+def handle_get_ca_cert(profile_slug=None):
     """Handle GetCACert operation - return CA certificate (RFC 8894 §3.2)"""
-    service, error = get_scep_service()
+    service, error = get_scep_service(profile_slug)
 
     if error:
         return make_error_response(error, 500)
@@ -195,14 +261,14 @@ def handle_get_ca_cert():
         return make_error_response("SCEP server error", 500)
 
 
-def handle_get_next_ca_cert():
+def handle_get_next_ca_cert(profile_slug=None):
     """Handle GetNextCACert operation (RFC 8894 §4.7)
 
     Returns the next CA certificate for CA rollover scenarios.
     If the CA has a pending renewal certificate, return it in PKCS#7 format.
     Otherwise return 404 (no rollover in progress).
     """
-    service, error = get_scep_service()
+    service, error = get_scep_service(profile_slug)
 
     if error:
         return make_error_response(error, 500)
@@ -265,9 +331,9 @@ def handle_get_next_ca_cert():
         return make_error_response("SCEP server error", 500)
 
 
-def handle_pki_operation():
+def handle_pki_operation(profile_slug=None):
     """Handle PKIOperation - certificate enrollment"""
-    service, error = get_scep_service()
+    service, error = get_scep_service(profile_slug)
 
     if error:
         return make_error_response(error, 500)

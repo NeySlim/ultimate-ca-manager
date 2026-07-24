@@ -340,3 +340,240 @@ def regenerate_challenge_password(ca_id):
         message='Challenge password regenerated'
     )
 
+
+
+# ============ SCEP Profiles (issue #228) ============
+
+import re as _re
+
+_SLUG_REGEX = _re.compile(r'^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$|^[a-z0-9]$')
+
+
+def _slugify(name):
+    slug = _re.sub(r'[^a-z0-9-]+', '-', (name or '').lower()).strip('-')
+    return slug[:64].rstrip('-')
+
+
+def _validate_profile_payload(data, *, partial=False, profile_id=None):
+    """Validate/normalize a profile payload. Returns (ok, err)."""
+    from models import ScepProfile, CertificateTemplate
+
+    if not partial or 'name' in data:
+        name = (data.get('name') or '').strip()
+        if not name:
+            return False, 'Profile name is required'
+        if len(name) > 100:
+            return False, 'Profile name too long (max 100)'
+        clash = ScepProfile.query.filter_by(name=name).first()
+        if clash and clash.id != profile_id:
+            return False, 'Profile name already exists'
+        data['name'] = name
+
+    if 'url_slug' in data or not partial:
+        slug = (data.get('url_slug') or '').strip().lower()
+        if not slug:
+            slug = _slugify(data.get('name', ''))
+        if not slug or not _SLUG_REGEX.match(slug):
+            return False, ('url_slug must be 1-64 lowercase letters, digits '
+                           'or hyphens (no leading/trailing hyphen)')
+        clash = ScepProfile.query.filter_by(url_slug=slug).first()
+        if clash and clash.id != profile_id:
+            return False, 'url_slug already in use'
+        data['url_slug'] = slug
+
+    if not partial or 'ca_id' in data or 'ca_refid' in data:
+        ca = None
+        if data.get('ca_refid'):
+            ca = CA.query.filter_by(refid=data['ca_refid']).first()
+        elif data.get('ca_id'):
+            ca = db.session.get(CA, data['ca_id'])
+        if not ca:
+            return False, 'CA not found'
+        if not ca.has_private_key:
+            return False, 'Selected CA has no private key'
+        if ca.uses_hsm:
+            return False, ('Selected CA is HSM-backed: SCEP requires RSA '
+                           'envelope decryption, unavailable for HSM keys')
+        data['ca_refid'] = ca.refid
+
+    if 'template_id' in data and data['template_id']:
+        tpl = db.session.get(CertificateTemplate, data['template_id'])
+        if not tpl:
+            return False, 'Template not found'
+        if tpl.template_type == 'ca':
+            return False, 'CA templates cannot be used for SCEP profiles'
+
+    return True, None
+
+
+def _apply_challenge(profile, raw_challenge):
+    """Encrypt and store a challenge; blank clears it."""
+    from utils.datetime_utils import utc_now
+    if raw_challenge:
+        try:
+            from security.encryption import encrypt_text
+            profile.challenge_password = encrypt_text(raw_challenge)
+        except Exception:
+            profile.challenge_password = raw_challenge
+        profile.challenge_generated_at = utc_now()
+    else:
+        profile.challenge_password = None
+        profile.challenge_generated_at = None
+
+
+@bp.route('/api/v2/scep/profiles', methods=['GET'])
+@require_auth(['read:scep'])
+def list_scep_profiles():
+    """List SCEP profiles (challenge secrets are never returned)."""
+    from models import ScepProfile, CertificateTemplate
+    profiles = ScepProfile.query.order_by(ScepProfile.name).all()
+    ca_names = {c.refid: (c.descr or c.common_name) for c in CA.query.all()}
+    tpl_names = {t.id: t.name for t in CertificateTemplate.query.all()}
+    data = []
+    for p in profiles:
+        d = p.to_dict()
+        d['ca_name'] = ca_names.get(p.ca_refid)
+        d['template_name'] = tpl_names.get(p.template_id)
+        data.append(d)
+    return success_response(data=data)
+
+
+@bp.route('/api/v2/scep/profiles', methods=['POST'])
+@require_auth(['write:scep'])
+def create_scep_profile():
+    """Create a SCEP profile served at /scep/<url_slug>/pkiclient.exe."""
+    from models import ScepProfile
+    data = request.json or {}
+    ok, err = _validate_profile_payload(data)
+    if not ok:
+        return error_response(err, 400)
+
+    profile = ScepProfile(
+        name=data['name'],
+        url_slug=data['url_slug'],
+        description=(data.get('description') or '')[:255],
+        enabled=bool(data.get('enabled', True)),
+        ca_refid=data['ca_refid'],
+        template_id=data.get('template_id') or None,
+        auto_approve=bool(data.get('auto_approve', False)),
+        created_by=getattr(g.current_user, 'username', None),
+    )
+    _apply_challenge(profile, (data.get('challenge_password') or '').strip())
+    db.session.add(profile)
+    ok, _err = safe_commit(logger, "Failed to create SCEP profile")
+    if not ok:
+        return _err
+
+    AuditService.log_action(
+        action='scep_profile_create',
+        resource_type='scep',
+        resource_id=str(profile.id),
+        resource_name=profile.name,
+        details=f'Created SCEP profile {profile.name} (/scep/{profile.url_slug}/)',
+        success=True,
+    )
+    return success_response(data=profile.to_dict(),
+                            message='SCEP profile created')
+
+
+@bp.route('/api/v2/scep/profiles/<int:profile_id>', methods=['PUT', 'PATCH'])
+@require_auth(['write:scep'])
+def update_scep_profile(profile_id):
+    from models import ScepProfile
+    profile = db.session.get(ScepProfile, profile_id)
+    if not profile:
+        return error_response('Profile not found', 404)
+
+    data = request.json or {}
+    ok, err = _validate_profile_payload(data, partial=True, profile_id=profile_id)
+    if not ok:
+        return error_response(err, 400)
+
+    if 'name' in data:
+        profile.name = data['name']
+    if 'url_slug' in data:
+        profile.url_slug = data['url_slug']
+    if 'description' in data:
+        profile.description = (data.get('description') or '')[:255]
+    if 'enabled' in data:
+        profile.enabled = bool(data['enabled'])
+    if 'ca_refid' in data:
+        profile.ca_refid = data['ca_refid']
+    if 'template_id' in data:
+        profile.template_id = data.get('template_id') or None
+    if 'auto_approve' in data:
+        profile.auto_approve = bool(data['auto_approve'])
+    if 'challenge_password' in data:
+        _apply_challenge(profile, (data.get('challenge_password') or '').strip())
+    profile.updated_by = getattr(g.current_user, 'username', None)
+
+    ok, _err = safe_commit(logger, "Failed to update SCEP profile")
+    if not ok:
+        return _err
+
+    AuditService.log_action(
+        action='scep_profile_update',
+        resource_type='scep',
+        resource_id=str(profile.id),
+        resource_name=profile.name,
+        details=f'Updated SCEP profile {profile.name}',
+        success=True,
+    )
+    return success_response(data=profile.to_dict(),
+                            message='SCEP profile updated')
+
+
+@bp.route('/api/v2/scep/profiles/<int:profile_id>', methods=['DELETE'])
+@require_auth(['write:scep'])
+def delete_scep_profile(profile_id):
+    from models import ScepProfile
+    profile = db.session.get(ScepProfile, profile_id)
+    if not profile:
+        return error_response('Profile not found', 404)
+
+    name = profile.name
+    try:
+        db.session.delete(profile)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to delete SCEP profile: {e}')
+        return error_response('Failed to delete SCEP profile', 500)
+
+    AuditService.log_action(
+        action='scep_profile_delete',
+        resource_type='scep',
+        resource_id=str(profile_id),
+        resource_name=name,
+        details=f'Deleted SCEP profile {name}',
+        success=True,
+    )
+    return success_response(message='SCEP profile deleted')
+
+
+@bp.route('/api/v2/scep/profiles/<int:profile_id>/challenge/regenerate', methods=['POST'])
+@require_auth(['write:scep'])
+def regenerate_scep_profile_challenge(profile_id):
+    """Generate a fresh challenge for the profile; returned once."""
+    from models import ScepProfile
+    profile = db.session.get(ScepProfile, profile_id)
+    if not profile:
+        return error_response('Profile not found', 404)
+
+    new_challenge = secrets.token_urlsafe(24)
+    _apply_challenge(profile, new_challenge)
+    profile.updated_by = getattr(g.current_user, 'username', None)
+    ok, _err = safe_commit(logger, "Failed to regenerate profile challenge")
+    if not ok:
+        return _err
+
+    AuditService.log_action(
+        action='scep_profile_challenge_regenerate',
+        resource_type='scep',
+        resource_id=str(profile.id),
+        resource_name=profile.name,
+        details=f'Regenerated challenge for SCEP profile {profile.name}',
+        success=True,
+    )
+    return success_response(data={'challenge': new_challenge},
+                            message='Challenge password regenerated')
