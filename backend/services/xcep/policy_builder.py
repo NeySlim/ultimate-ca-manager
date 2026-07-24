@@ -123,9 +123,11 @@ def build_get_policies_response(ca, templates):
         extensions = {}
         if template.extensions_template:
             try:
-                extensions = json.loads(template.extensions_template)
+                parsed = json.loads(template.extensions_template)
+                if isinstance(parsed, dict):
+                    extensions = parsed
             except (TypeError, ValueError):
-                extensions = {}
+                pass
 
         algo_oid, algo_name, min_key_length = _key_type_info(template.key_type)
         algo_ref = oids.ref(algo_oid, group='publicKeyAlgorithm', default_name=algo_name)
@@ -156,10 +158,14 @@ def build_get_policies_response(ca, templates):
         etree.SubElement(pk_attrs, '{%s}minimalKeyLength' % XCEP_NS).text = str(min_key_length)
         etree.SubElement(pk_attrs, '{%s}algorithmOIDReference' % XCEP_NS).text = str(algo_ref)
 
-        eku_list = extensions.get('extended_key_usage') or []
+        eku_list = extensions.get('extended_key_usage')
+        if not isinstance(eku_list, list):
+            eku_list = []
         if eku_list:
             eku_refs = etree.SubElement(attributes, '{%s}enrollmentCriteria' % XCEP_NS)
             for eku_name in eku_list:
+                if not isinstance(eku_name, str):
+                    continue
                 eku_oid = _EKU_OIDS.get(eku_name)
                 if not eku_oid:
                     continue
