@@ -33,8 +33,10 @@ AVAILABLE_PERMISSIONS = [
     'read:audit', 'export:audit',
     # ACME 
     'read:acme', 'write:acme', 'delete:acme',
-    # SCEP 
+    # SCEP
     'read:scep', 'write:scep', 'delete:scep',
+    # MS-XCEP (certificate enrollment policy)
+    'read:xcep', 'write:xcep', 'delete:xcep',
     # Trust Store 
     'read:truststore', 'write:truststore', 'delete:truststore',
     # HSM 
