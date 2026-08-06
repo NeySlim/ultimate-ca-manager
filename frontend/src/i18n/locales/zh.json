@@ -1188,7 +1188,7 @@
     "enableAcmeServerDesc": "允许通过ACME自动签发证书",
     "defaultIssuingCA": "默认签发 CA",
     "enableLetsEncryptProxy": "启用 Let's Encrypt 代理",
-   "enableLetsEncryptProxyDesc": "转发请求至 Let's Encrypt 并启用审计日志",
+    "enableLetsEncryptProxyDesc": "转发请求至 Let's Encrypt 并启用审计日志",
     "proxyEndpoint": "Proxy Endpoint",
     "proxyUpstreamUrl": "上游目录 URL",
     "proxyUpstreamUrlHelper": "上游 ACME 服务器的目录 URL。如果为空，默认使用 Let's Encrypt staging。",
