@@ -395,13 +395,13 @@ def _trusted_client_cert():
     if request.environ.get('peercert'):
         return request.environ['peercert']
 
-    from utils.trusted_proxy import is_request_from_trusted_proxy
+    from utils.trusted_proxy import immediate_peer_addr, is_request_from_trusted_proxy
     if not is_request_from_trusted_proxy():
         # Untrusted peer is sending SSL_CLIENT_CERT — likely a spoof.
         if request.environ.get('SSL_CLIENT_CERT') or request.headers.get('X-SSL-Client-Cert'):
             logger.warning(
                 "EST: ignoring SSL_CLIENT_CERT from untrusted peer %s",
-                request.remote_addr,
+                immediate_peer_addr(),
             )
         return None
 

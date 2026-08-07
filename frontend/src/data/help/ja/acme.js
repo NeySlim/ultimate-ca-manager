@@ -93,6 +93,17 @@ export default {
           { label: '発行されるSAN', text: '証明書にはiPAddress SANが含まれます。DNS + IPの混在注文に対応しています' },
           { label: '内部IP', text: 'RFC1918およびループバックアドレスはそのまま検証されます — UCMの主要な導入モデルです' },
         ]
+      },
+      {
+        title: '永続 DNS 検証 (dns-persist-01)',
+        content: 'ローカル ACME サーバーは、ACME アカウントに紐付いた永続 TXT レコードでドメインを検証できます (draft-ietf-acme-dns-persist)。更新時に DNS への書き込みは不要です。オプトインで、デフォルトは無効です。',
+        items: [
+          { label: 'レコード', text: '_validation-persist.<ドメイン> TXT "<発行者ドメイン>; accounturi=<アカウント URL>" を作成します。チャレンジオブジェクトが両方の期待値を通知します' },
+          { label: '有効化', text: 'ACME → 設定 → 永続 DNS 検証 (dns-persist-01)' },
+          { label: 'ワイルドカード / サブドメイン', text: 'policy=wildcard を追加すると、検証済みの名前のワイルドカード証明書とサブドメインも許可されます' },
+          { label: 'persistUntil', text: '任意の persistUntil=<unix タイムスタンプ> で、その時刻以降の新規検証を停止します' },
+          { label: 'セキュリティ', text: 'レコードが存在する限り、アカウント鍵に発行権限が与えられます。取り消すには TXT レコードを削除してください' },
+        ]
       }
     ],
     tips: [
@@ -387,6 +398,24 @@ DNS + IP の混在注文も対応しています。
 署名された証明書には、検証された各IPに対する **iPAddress** SubjectAltName エントリが含まれます。
 
 > 💡 内部アドレス（RFC1918、ループバック）はそのまま検証されます — UCMの主要な導入モデルです。クラウドメタデータIPは引き続きブロックされます。
+
+## 永続 DNS 検証 (dns-persist-01)
+
+ローカル ACME サーバーは **dns-persist-01** (draft-ietf-acme-dns-persist) をサポートします。ACME アカウントに紐付いた**永続** TXT レコードによる検証で、更新時に DNS への書き込みは不要です。
+
+### セットアップ
+1. **ACME → 設定 → 永続 DNS 検証** で有効化します（デフォルトは無効）。
+2. レコードを一度だけ作成します:
+\`\`\`
+_validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
+\`\`\`
+チャレンジオブジェクトが期待値 \`accounturi\` と \`issuer-domain-names\` を通知します。
+
+### オプション
+- \`policy=wildcard\` — 検証済みの名前のワイルドカード証明書とサブドメインも許可します（親ドメインのレコードが子をカバーします）
+- \`persistUntil=<unix タイムスタンプ>\` — その時刻以降の新規検証を停止します
+
+> ⚠️ レコードが存在する限り、ACME アカウント鍵に発行権限が与えられます。取り消すには TXT レコードを削除してください。
 
 ## Renewal Information (ARI, RFC 9773)
 

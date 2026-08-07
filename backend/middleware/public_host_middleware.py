@@ -36,7 +36,7 @@ def _peer_is_loopback(remote_addr: str | None) -> bool:
 def _is_trusted_local_request() -> bool:
     """True only when the TCP peer is loopback AND Host names localhost."""
     host = request.host.split(':')[0].lower()
-    return host in _LOCAL_HOSTNAMES and _peer_is_loopback(request.remote_addr)
+    return host in _LOCAL_HOSTNAMES and _peer_is_loopback(trusted_proxy.immediate_peer_addr())
 
 
 def _remote_is_trusted_proxy() -> bool:

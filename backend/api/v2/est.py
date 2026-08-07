@@ -86,12 +86,11 @@ def update_est_config():
 
     if 'enabled' in data:
         set_config('est_enabled', 'true' if data['enabled'] else 'false')
-    if 'ca_refid' in data:
-        # Validate CA exists if a non-empty refid was provided
-        if data['ca_refid']:
-            if not CA.query.filter_by(refid=data['ca_refid']).first():
-                return error_response('CA not found', 404)
-        set_config('est_ca_refid', data['ca_refid'] or '')
+    # ca_id and ca_refid are two names for the same setting. When both are
+    # sent, ca_id wins: the UI round-trips the GET response, so ca_refid may
+    # hold a stale value (e.g. pointing at a since-deleted CA) while ca_id
+    # carries the user's fresh selection. Validating the stale refid first
+    # would reject a perfectly valid update with "CA not found".
     if 'ca_id' in data:
         # Look up refid from CA id
         if data['ca_id']:
@@ -101,6 +100,12 @@ def update_est_config():
             set_config('est_ca_refid', ca.refid)
         else:
             set_config('est_ca_refid', '')
+    elif 'ca_refid' in data:
+        # Validate CA exists if a non-empty refid was provided
+        if data['ca_refid']:
+            if not CA.query.filter_by(refid=data['ca_refid']).first():
+                return error_response('CA not found', 404)
+        set_config('est_ca_refid', data['ca_refid'] or '')
     if 'username' in data:
         set_config('est_username', data['username'])
     if 'password' in data and data['password']:

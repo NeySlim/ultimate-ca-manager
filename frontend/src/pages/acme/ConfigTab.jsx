@@ -182,6 +182,26 @@ export default function ConfigTab({ acmeSettings, cas, updateSetting, onSaveConf
         </div>
       </CompactSection>
 
+      <CompactSection title={t('acme.dnsPersistSection')} icon={ArrowsClockwise}>
+        <div className="space-y-2">
+          <ToggleSwitch
+            checked={acmeSettings.dns_persist_enabled || false}
+            onChange={(val) => updateSetting('dns_persist_enabled', val)}
+            disabled={!canWrite}
+            label={t('acme.dnsPersistEnabled')}
+            description={t('acme.dnsPersistEnabledDesc')}
+          />
+          {acmeSettings.dns_persist_enabled && (
+            <>
+              <p className="text-xs text-amber-500">{t('acme.dnsPersistWarning')}</p>
+              <p className="text-xs text-text-tertiary">
+                {t('acme.dnsPersistIssuerNote', { domains: (acmeSettings.dns_persist_issuer_domains || []).join(', ') || '—' })}
+              </p>
+            </>
+          )}
+        </div>
+      </CompactSection>
+
       <CompactSection title={t('acme.termsOfService')} icon={FileText}>
         <div className="space-y-2">
           {tosExists && savedPreview ? (

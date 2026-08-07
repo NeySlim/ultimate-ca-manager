@@ -13,6 +13,7 @@ import logging
 
 from .base import BaseDnsProvider
 from .manual import ManualDnsProvider
+from .custom_command import CustomCommandDnsProvider
 from .ovh import OvhDnsProvider
 from .cloudflare import CloudflareDnsProvider
 from .hetzner import HetznerDnsProvider
@@ -70,6 +71,7 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'manual': ManualDnsProvider,
+    'custom_command': CustomCommandDnsProvider,
     # European providers (priority)
     'ovh': OvhDnsProvider,
     'hetzner': HetznerDnsProvider,

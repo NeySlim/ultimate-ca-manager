@@ -797,7 +797,12 @@
       "maxReached": "最大 {{max}} 個のEKUに達しました",
       "helper": "あと {{remaining}} 個のEKUを追加できます (RFC 5280 §4.2.1.12)。",
       "defaultLocked": "この証明書タイプのデフォルト"
-    }
+    },
+    "template": "テンプレート",
+    "allTemplates": "すべてのテンプレート",
+    "modifiedFromTemplate": "テンプレートから変更済み",
+    "issuedFromTemplate": "テンプレートから発行: {{name}}",
+    "templateOverridesHint": "テンプレート '{{name}}' との相違: {{fields}}"
   },
   "cas": {
     "parentCA": "親CA",
@@ -1432,6 +1437,8 @@
     "proxyUpstreamCAAccount": "アップストリームCAアカウント",
     "proxyUpstreamCAAccountHelper": "登録済みの外部ACME CAアカウントを選択します。EABと認証情報は下の外部CAアカウントで管理します。",
     "proxySelectCaAccount": "CAアカウントを選択…",
+    "proxyPruneReplacedCertificates": "置き換えられた証明書を削除",
+    "proxyPruneReplacedCertificatesDesc": "同一ドメインの更新が成功したら、プロキシ経由でインポートされた証明書を自動的に削除します。失効した証明書は常に保持されます。",
     "proxyNoCaAccounts": "外部CAアカウントが未設定です。下の外部CAアカウントで追加してください。",
     "proxyManageCaAccountsHint": "EABとCA別設定は下の外部CAアカウントで管理します。",
     "proxyEnabled": "ACMEプロキシ経由で公開",
@@ -1577,7 +1584,12 @@
     "caaEnforceWarning": "隔離ネットワークでは、リゾルバーがCAAクエリに応答できない場合、すべてのACME発行が失敗します。",
     "tlsAlpn01Desc": "ポート443のTLS経由で検証（RFC 8737）",
     "tlsAlpnPort": "TLS-ALPN-01ポート",
-    "tlsAlpnPortHelper": "検証中にTLS-ALPN-01レスポンダーが待ち受けるローカルポート（既定443）。"
+    "tlsAlpnPortHelper": "検証中にTLS-ALPN-01レスポンダーが待ち受けるローカルポート（既定443）。",
+    "dnsPersistSection": "永続的DNS検証 (dns-persist-01)",
+    "dnsPersistEnabled": "dns-persist-01 チャレンジを提供 (draft-ietf-acme-dns-persist)",
+    "dnsPersistEnabledDesc": "_validation-persist.<ドメイン> の永続 TXT レコードで検証。ACME アカウントに紐付け。更新時の DNS 書き込み不要。",
+    "dnsPersistWarning": "リスク：ACME アカウント鍵の漏洩により、TXT レコードが削除されるまで当該ドメインへの発行が可能になります（draft §7.2）。管理下のアカウント・ゾーンにのみ有効化してください。",
+    "dnsPersistIssuerNote": "TXT レコードの発行者ドメイン名：{{domains}}（CAA 識別子から取得、未設定時は ACME 公開ホスト名）。"
   },
   "scep": {
     "title": "SCEPプロトコル",

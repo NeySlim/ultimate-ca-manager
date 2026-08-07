@@ -19,7 +19,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from models import AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
-from services.acme.acme_proxy_service import AcmeProxyService, ProxyDns01OnlyError
+from services.acme.acme_proxy_service import (
+    AcmeProxyService,
+    ProxyDns01OnlyError,
+    ProxyResourceNotFoundError,
+)
 from services.cert_service import CertificateService
 from services.acme.acme_proxy_account import (
     ProxyEndpointNotConfiguredError,
@@ -156,6 +160,32 @@ def _kid_account_thumbprint(protected):
         return acct.jwk_thumbprint if acct else None
     except Exception:
         return None
+
+
+def _requester_identity(jwk=None):
+    """(account_id, thumbprint) of the verified requester, for ownership checks.
+
+    Only meaningful after verify_proxy_jws() succeeded: the kid (or jwk) has
+    been validated against the account's key, so deriving identity from it is
+    sound. kid-signed requests (the RFC 8555 §6.2 norm for these endpoints)
+    resolve through the account's stored thumbprint; a jwk-signed request
+    hashes the header JWK directly. Returns (None, None) when nothing can be
+    derived — owner-bound resources then fail closed in the service layer.
+    """
+    protected = _request_protected_header()
+    account_id = _kid_account_id(protected)
+    thumbprint = None
+    if jwk:
+        try:
+            jwk_canonical = json.dumps(jwk, separators=(',', ':'), sort_keys=True)
+            thumbprint = base64.urlsafe_b64encode(
+                hashlib.sha256(jwk_canonical.encode()).digest()
+            ).rstrip(b'=').decode()
+        except Exception:
+            pass
+    if not thumbprint:
+        thumbprint = _kid_account_thumbprint(protected)
+    return account_id, thumbprint
 
 
 def _decode_b64url(value):
@@ -495,7 +525,7 @@ def new_order(slug=None):
 @_dual_route('/authz/<authz_id>', methods=['POST'], endpoint='proxy_authz')
 def authz(authz_id, slug=None):
     """Get authorization (RFC 8555 §7.5) — POST-as-GET"""
-    is_valid, payload, _, err = verify_proxy_jws()
+    is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
@@ -503,14 +533,24 @@ def authz(authz_id, slug=None):
     if err_resp:
         return err_resp
 
+    requester_account_id, requester_thumbprint = _requester_identity(jwk)
+
     try:
         svc = get_proxy_service(slug)
-        result = svc.get_authz(authz_id)
+        result = svc.get_authz(
+            authz_id,
+            requester_account_id=requester_account_id,
+            requester_thumbprint=requester_thumbprint,
+        )
         if not result:
             return proxy_error("malformed", "Authorization not found", 404)
 
         data, _ = result
         return proxy_response(data)
+    except PermissionError as e:
+        return proxy_error("unauthorized", str(e), 403)
+    except ProxyResourceNotFoundError as e:
+        return proxy_error("malformed", str(e), 404)
     except ProxyDns01OnlyError as e:
         return proxy_error('malformed', str(e), 400)
     except ValueError as e:
@@ -528,17 +568,27 @@ def authz(authz_id, slug=None):
 @_dual_route('/challenge/<chall_id>', methods=['POST'], endpoint='proxy_challenge')
 def challenge(chall_id, slug=None):
     """Respond to challenge (RFC 8555 §7.5.1)"""
-    is_valid, payload, _, err = verify_proxy_jws()
+    is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
+    requester_account_id, requester_thumbprint = _requester_identity(jwk)
+
     try:
         svc = get_proxy_service(slug)
-        data, link_header = svc.respond_challenge(chall_id)
+        data, link_header = svc.respond_challenge(
+            chall_id,
+            requester_account_id=requester_account_id,
+            requester_thumbprint=requester_thumbprint,
+        )
         resp = proxy_response(data)
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except PermissionError as e:
+        return proxy_error("unauthorized", str(e), 403)
+    except ProxyResourceNotFoundError as e:
+        return proxy_error("malformed", str(e), 404)
     except ProxyDns01OnlyError as e:
         return proxy_error('malformed', str(e), 400)
     except ValueError as e:
@@ -556,7 +606,7 @@ def challenge(chall_id, slug=None):
 @_dual_route('/order/<order_id>', methods=['POST'], endpoint='proxy_get_order')
 def get_order(order_id, slug=None):
     """Get order status (RFC 8555 §7.4) — POST-as-GET"""
-    is_valid, payload, _, err = verify_proxy_jws()
+    is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
@@ -564,13 +614,23 @@ def get_order(order_id, slug=None):
     if err_resp:
         return err_resp
 
+    requester_account_id, requester_thumbprint = _requester_identity(jwk)
+
     try:
         svc = get_proxy_service(slug)
-        data = svc.get_order(order_id)
+        data = svc.get_order(
+            order_id,
+            requester_account_id=requester_account_id,
+            requester_thumbprint=requester_thumbprint,
+        )
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
         return resp
+    except PermissionError as e:
+        return proxy_error("unauthorized", str(e), 403)
+    except ProxyResourceNotFoundError as e:
+        return proxy_error("malformed", str(e), 404)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except ProxyEndpointNotConfiguredError as e:
@@ -587,19 +647,10 @@ def finalize(order_id, slug=None):
     if not is_valid:
         return proxy_error("malformed", err)
 
-    # Ownership binding — mirrors new-order. The helpers never raise (they
-    # return {}/None on undecodable input); finalize_order() fails closed when
-    # the order carries owner info but no requester identity could be derived.
-    protected = _request_protected_header()
-    requester_account_id = _kid_account_id(protected)
-    if jwk:
-        jwk_canonical = json.dumps(jwk, separators=(',', ':'), sort_keys=True)
-        requester_thumbprint = base64.urlsafe_b64encode(
-            hashlib.sha256(jwk_canonical.encode()).digest()
-        ).rstrip(b'=').decode()
-    else:
-        # kid-signed (RFC-compliant path): mirror new-order's binding.
-        requester_thumbprint = _kid_account_thumbprint(protected)
+    # Ownership binding — mirrors new-order. The helper never raises;
+    # finalize_order() fails closed when the order carries owner info but no
+    # requester identity could be derived.
+    requester_account_id, requester_thumbprint = _requester_identity(jwk)
     if not requester_account_id and not requester_thumbprint:
         logger.warning("ACME proxy finalize: no requester identity from verified JWS")
 
@@ -627,6 +678,8 @@ def finalize(order_id, slug=None):
         return resp
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
+    except ProxyResourceNotFoundError as e:
+        return proxy_error("malformed", str(e), 404)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except Exception as e:
@@ -637,7 +690,7 @@ def finalize(order_id, slug=None):
 @_dual_route('/cert/<cert_id>', methods=['POST'], endpoint='proxy_cert')
 def cert(cert_id, slug=None):
     """Download certificate (RFC 8555 §7.4.2) — POST-as-GET"""
-    is_valid, payload, _, err = verify_proxy_jws()
+    is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
@@ -645,9 +698,15 @@ def cert(cert_id, slug=None):
     if err_resp:
         return err_resp
 
+    requester_account_id, requester_thumbprint = _requester_identity(jwk)
+
     try:
         svc = get_proxy_service(slug)
-        content, content_type, link_header = svc.get_certificate(cert_id)
+        content, content_type, link_header = svc.get_certificate(
+            cert_id,
+            requester_account_id=requester_account_id,
+            requester_thumbprint=requester_thumbprint,
+        )
 
         resp = make_response(content, 200)
         resp.headers['Content-Type'] = content_type
@@ -656,6 +715,10 @@ def cert(cert_id, slug=None):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except PermissionError as e:
+        return proxy_error("unauthorized", str(e), 403)
+    except ProxyResourceNotFoundError as e:
+        return proxy_error("malformed", str(e), 404)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except ProxyEndpointNotConfiguredError as e:

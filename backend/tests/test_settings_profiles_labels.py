@@ -20,7 +20,7 @@ def patch_json(client, url, payload):
 def _clean_config(app):
     yield
     with app.app_context():
-        for key in (acme_profiles.CONFIG_KEY, 'est_labels'):
+        for key in (acme_profiles.CONFIG_KEY, 'est_labels', 'est_ca_refid'):
             row = SystemConfig.query.filter_by(key=key).first()
             if row:
                 db.session.delete(row)
@@ -142,3 +142,65 @@ class TestEstLabelsSettings:
 
     def test_requires_write_permission(self, client):
         assert patch_json(client, self.URL, {'labels': {}}).status_code in (401, 403)
+
+
+class TestEstCaSelection:
+    """PATCH /api/v2/est/config accepts both ca_id and ca_refid for the same
+    setting; when a client sends both, ca_id is authoritative."""
+
+    URL = '/api/v2/est/config'
+
+    def test_ca_id_wins_over_stale_ca_refid(self, app, auth_client, create_ca):
+        """UI scenario: the configured CA was deleted, GET keeps returning its
+        stale refid, and the page PATCHes that refid back alongside the fresh
+        ca_id. The stale refid must not veto the update."""
+        ca_data = create_ca(cn='EST Stale Refid CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca_data['id']).refid
+            db.session.add(SystemConfig(key='est_ca_refid', value='deleted-ca-refid'))
+            db.session.commit()
+
+        r = patch_json(auth_client, self.URL,
+                       {'ca_refid': 'deleted-ca-refid', 'ca_id': ca_data['id']})
+        assert r.status_code == 200, r.data
+
+        body = auth_client.get(self.URL).get_json()['data']
+        assert body['ca_refid'] == refid
+        assert body['ca_id'] == ca_data['id']
+
+    def test_stale_ca_refid_alone_is_still_rejected(self, auth_client):
+        r = patch_json(auth_client, self.URL, {'ca_refid': 'deleted-ca-refid'})
+        assert r.status_code == 404
+        assert 'CA not found' in r.get_json()['message']
+
+    def test_ca_refid_alone_still_works(self, app, auth_client, create_ca):
+        ca_data = create_ca(cn='EST Refid Only CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca_data['id']).refid
+
+        r = patch_json(auth_client, self.URL, {'ca_refid': refid})
+        assert r.status_code == 200, r.data
+
+        body = auth_client.get(self.URL).get_json()['data']
+        assert body['ca_refid'] == refid
+        assert body['ca_id'] == ca_data['id']
+
+    def test_unknown_ca_id_is_rejected_despite_valid_refid(self, app, auth_client,
+                                                           create_ca):
+        ca_data = create_ca(cn='EST Unknown Id CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca_data['id']).refid
+
+        r = patch_json(auth_client, self.URL,
+                       {'ca_refid': refid, 'ca_id': 999999999})
+        assert r.status_code == 404
+        assert 'CA not found' in r.get_json()['message']
+
+    def test_ca_id_null_clears_despite_stale_refid(self, auth_client):
+        r = patch_json(auth_client, self.URL,
+                       {'ca_refid': 'deleted-ca-refid', 'ca_id': None})
+        assert r.status_code == 200, r.data
+
+        body = auth_client.get(self.URL).get_json()['data']
+        assert body['ca_refid'] == ''
+        assert body['ca_id'] is None

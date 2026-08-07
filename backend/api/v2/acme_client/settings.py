@@ -64,6 +64,7 @@ def get_settings():
     proxy_account_id_cfg = SystemConfig.query.filter_by(key='acme.proxy.acme_account_id').first()
     client_verify_ssl_cfg = SystemConfig.query.filter_by(key='acme.client.verify_ssl').first()
     proxy_verify_ssl_cfg = SystemConfig.query.filter_by(key='acme.proxy.verify_ssl').first()
+    proxy_prune_cfg = SystemConfig.query.filter_by(key='acme.proxy.prune_replaced_certificates').first()
 
     # Proxy account registration status
     proxy_account_url_cfg = SystemConfig.query.filter_by(key='acme.proxy.account_url').first()
@@ -128,6 +129,7 @@ def get_settings():
         'proxy_upstream_mode': proxy_upstream_mode,
         'proxy_acme_account_id': proxy_acme_account_id,
         'proxy_verify_ssl': _coerce_bool(proxy_verify_ssl_cfg.value if proxy_verify_ssl_cfg else None, True),
+        'proxy_prune_replaced_certificates': _coerce_bool(proxy_prune_cfg.value if proxy_prune_cfg else None, False),
         'proxy_account_url': proxy_account_url,
         'proxy_account_registered': proxy_account_registered,
         'proxy_eab_kid': proxy_eab_kid,
@@ -272,6 +274,18 @@ def update_settings():
             'ACME proxy upstream SSL certificate verification'
         )
         updates.append('proxy_verify_ssl')
+
+    if 'proxy_prune_replaced_certificates' in data:
+        try:
+            prune = _coerce_bool(data.get('proxy_prune_replaced_certificates'), False, strict=True)
+        except ValueError:
+            return error_response('proxy_prune_replaced_certificates must be a boolean', 400)
+        _set_config(
+            'acme.proxy.prune_replaced_certificates',
+            'true' if prune else 'false',
+            'Delete proxy-imported certificates superseded by a renewal (#240)'
+        )
+        updates.append('proxy_prune_replaced_certificates')
 
     if 'directory_url' in data:
         url_val = (data['directory_url'] or '').strip()

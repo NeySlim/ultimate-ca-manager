@@ -67,6 +67,13 @@ class Certificate(db.Model):
     
     # Template reference (optional - null if created without template)
     template_id = db.Column(db.Integer, db.ForeignKey("certificate_templates.id"), nullable=True)
+
+    # Frozen at issuance (issue #258): JSON array of the fields where the
+    # effective value diverged from the linked template's declared default
+    # ('key_type', 'validity_days', 'digest'). NULL/empty = in sync with the
+    # template (or no template used). Not recomputed later — editing the
+    # template afterwards does not change this record.
+    template_overrides = db.Column(db.Text, nullable=True)
     
     # Ownership (Pro feature - group-based access control)
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
@@ -76,6 +83,18 @@ class Certificate(db.Model):
     ca = db.relationship("CA", back_populates="certificates")
     template = db.relationship("CertificateTemplate", foreign_keys=[template_id])
     
+    @property
+    def template_overrides_list(self) -> list:
+        """JSON-decoded template_overrides as a list of field names ([] when unset)."""
+        if not self.template_overrides:
+            return []
+        try:
+            import json
+            parsed = json.loads(self.template_overrides)
+            return parsed if isinstance(parsed, list) else []
+        except (TypeError, ValueError):
+            return []
+
     @property
     def has_private_key(self) -> bool:
         """Check if certificate has a private key"""
@@ -483,6 +502,10 @@ class Certificate(db.Model):
             # Ownership (Pro feature)
             "owner_group_id": self.owner_group_id,
             "owner_group_name": self.owner_group.name if self.owner_group else None,
+            # Template linkage + divergence record (#258)
+            "template_id": self.template_id,
+            "template_name": self.template.name if self.template_id and self.template else None,
+            "template_overrides": self.template_overrides_list,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }

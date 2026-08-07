@@ -157,8 +157,19 @@ class TestProxyOrderMetadata:
             cert_url = 'https://acme-proxy-test.example/cert/1'
             cert_id = base64.urlsafe_b64encode(cert_url.encode()).rstrip(b'=').decode()
 
+            # An unbound tracked order — the download must resolve it (#260)
+            # while the source-label behaviour under test stays unchanged.
+            from models.acme_models import AcmeClientOrder
+            order = AcmeClientOrder(
+                domains='["actalis.example.com"]',
+                status='pending',
+                is_proxy_order=True,
+                certificate_url=cert_url,
+            )
+            db.session.add(order)
+            db.session.commit()
+
             with patch.object(svc, '_post_with_account', return_value=response), \
-                 patch.object(svc, '_find_order_for_certificate', return_value=None), \
                  patch('services.cert_service.CertificateService.import_certificate') as importer:
                 importer.return_value = MagicMock(id=123)
                 svc.get_certificate(cert_id)
@@ -166,6 +177,9 @@ class TestProxyOrderMetadata:
             kwargs = importer.call_args.kwargs
             assert kwargs['source'] == 'acme_client'
             assert kwargs['descr'] == 'actalis.example.com'
+
+            AcmeClientOrder.query.filter_by(certificate_url=cert_url).delete()
+            db.session.commit()
 
 
 class TestProxySettingsApi:

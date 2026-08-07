@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 from models import db
 from models.ssh import SSHCertificateAuthority
 from utils.datetime_utils import utc_now
+from utils.duration import parse_duration_seconds
 
 # Import key encryption (optional — fallback if not available)
 try:
@@ -138,8 +139,9 @@ class SSHCAService:
             ca_type: 'user' or 'host'
             key_type: Key algorithm (ed25519, rsa, ecdsa-p256/p384/p521)
             username: Who created it
-            default_ttl: Default certificate validity in seconds
-            max_ttl: Maximum allowed TTL (0 = unlimited)
+            default_ttl: Default certificate validity — seconds or a
+                duration string ("24h", "7d", "365d")
+            max_ttl: Maximum allowed TTL (0 = unlimited) — same formats
             default_extensions: List of default extensions for user certs
             allowed_principals: List of allowed principal patterns
             comment: Optional notes
@@ -155,6 +157,15 @@ class SSHCAService:
             raise ValueError(f"Invalid key type: {key_type}. "
                              f"Valid: {', '.join(KEY_TYPE_MAP.keys())}")
 
+        # Validate/normalize TTL before burning a keygen on an invalid request
+        if default_ttl is None:
+            default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
+        else:
+            default_ttl = parse_duration_seconds(default_ttl, field='default_ttl')
+
+        if max_ttl is not None:
+            max_ttl = parse_duration_seconds(max_ttl, field='max_ttl')
+
         # Generate key pair
         private_key = SSHCAService._generate_key(key_type)
         public_key = private_key.public_key()
@@ -163,15 +174,6 @@ class SSHCAService:
         pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
         prv_stored = SSHCAService._serialize_private_key(private_key)
         fingerprint = SSHCAService._compute_fingerprint(public_key)
-
-        # Set default TTL based on type
-        if default_ttl is None:
-            default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
-        else:
-            default_ttl = int(default_ttl)
-
-        if max_ttl is not None:
-            max_ttl = int(max_ttl)
 
         # Default extensions for user CAs
         if default_extensions is None and ca_type == 'user':
@@ -216,8 +218,8 @@ class SSHCAService:
             ca_type: 'user' or 'host'
             private_key_pem: Private key in OpenSSH PEM format (bytes or str)
             username: Who imported it
-            default_ttl: Default TTL in seconds
-            max_ttl: Max TTL (0 = unlimited)
+            default_ttl: Default TTL — seconds or duration string ("24h", "7d")
+            max_ttl: Max TTL (0 = unlimited) — same formats
             comment: Optional notes
             owner_group_id: Optional group ownership
 
@@ -252,6 +254,10 @@ class SSHCAService:
 
         if default_ttl is None:
             default_ttl = DEFAULT_USER_TTL if ca_type == 'user' else DEFAULT_HOST_TTL
+        else:
+            default_ttl = parse_duration_seconds(default_ttl, field='default_ttl')
+        if max_ttl is not None:
+            max_ttl = parse_duration_seconds(max_ttl, field='max_ttl')
 
         default_extensions = list(SSHCertificateAuthority.STANDARD_EXTENSIONS) if ca_type == 'user' else None
 
@@ -296,9 +302,10 @@ class SSHCAService:
         allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment', 'owner_group_id'}
         for field, value in kwargs.items():
             if field in allowed_fields:
-                # Cast TTL fields to int to prevent str/int comparison errors
+                # Normalize TTL fields (seconds or duration strings like
+                # "7d") to int seconds to prevent str/int comparison errors
                 if field in ('default_ttl', 'max_ttl') and value is not None:
-                    value = int(value)
+                    value = parse_duration_seconds(value, field=field)
                 setattr(ca, field, value)
 
         if 'default_extensions' in kwargs:

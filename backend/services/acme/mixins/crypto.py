@@ -80,10 +80,11 @@ class CryptoMixin:
         """Optional list of DNS servers to use for DNS-01 challenge validation.
 
         When set (SystemConfig key ``acme.dns01_nameservers``, comma-separated
-        IPs), DNS-01 validation queries those resolvers instead of the system
-        resolver. Useful when the authoritative DNS for the validation zone
-        (e.g. a local BIND9 driven by cert-manager rfc2136) is not reachable
-        via the OS /etc/resolv.conf chain.
+        IPs, optionally ``host:port``), DNS-01 validation queries those
+        resolvers instead of the system resolver. Useful when the
+        authoritative DNS for the validation zone (e.g. a local BIND9 driven
+        by cert-manager rfc2136) is not reachable via the OS
+        /etc/resolv.conf chain.
 
         Returns an empty list when unset.
         """
@@ -95,3 +96,33 @@ class CryptoMixin:
             return [ip.strip() for ip in str(setting.value).split(',') if ip.strip()]
         except Exception:
             return []
+
+    def _acme_dns01_resolver(self):
+        """dns.resolver.Resolver honoring ``acme.dns01_nameservers``, or None.
+
+        Supports 'host:port' entries; the port of the first entry carrying
+        one wins (dnspython resolvers expose a single shared port).
+        """
+        custom_ns = [e for e in self._acme_dns01_nameservers() if e]
+        if not custom_ns:
+            return None
+        import dns.resolver
+        resolver = dns.resolver.Resolver(configure=False)
+        hosts, port = [], None
+        for entry in custom_ns:
+            if ':' in entry and entry.count(':') == 1:  # ipv4:port
+                host, _, p = entry.rpartition(':')
+                hosts.append(host)
+                if port is None:
+                    try:
+                        port = int(p)
+                    except ValueError:
+                        port = 53
+            else:
+                hosts.append(entry)
+        resolver.nameservers = hosts
+        if port:
+            resolver.port = port
+        resolver.timeout = 5
+        resolver.lifetime = 10
+        return resolver

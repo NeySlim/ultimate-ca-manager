@@ -401,6 +401,14 @@ export default function LetsEncryptTab({
                 </div>
               )}
 
+              <ToggleSwitch
+                checked={clientSettings.proxy_prune_replaced_certificates ?? false}
+                onChange={(val) => onUpdateClientSetting('proxy_prune_replaced_certificates', val)}
+                disabled={!canWrite}
+                label={t('acme.proxyPruneReplacedCertificates')}
+                description={t('acme.proxyPruneReplacedCertificatesDesc')}
+              />
+
               {selectedProxyAccount && (
                 <p className="text-xs text-text-tertiary">{t('acme.proxyManageCaAccountsHint')}</p>
               )}

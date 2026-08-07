@@ -395,6 +395,8 @@
     "proxyUpstreamCAAccount": "Compte CA en amont",
     "proxyUpstreamCAAccountHelper": "Sélectionnez un compte ACME externe enregistré. L'EAB et les identifiants se gèrent dans Comptes CA externes ci-dessous.",
     "proxySelectCaAccount": "Sélectionner un compte CA…",
+    "proxyPruneReplacedCertificates": "Purger les certificats remplacés",
+    "proxyPruneReplacedCertificatesDesc": "Supprimer automatiquement les certificats importés par le proxy quand un renouvellement pour les mêmes domaines réussit. Les certificats révoqués sont toujours conservés.",
     "proxyNoCaAccounts": "Aucun compte CA externe configuré. Ajoutez-en un dans Comptes CA externes ci-dessous.",
     "proxyManageCaAccountsHint": "L'EAB et les paramètres par CA se gèrent dans Comptes CA externes ci-dessous.",
     "proxyEnabled": "Exposer via le proxy ACME",
@@ -540,7 +542,12 @@
     "caaEnforceWarning": "En réseau isolé, toute émission ACME échouera si le resolver ne peut pas répondre aux requêtes CAA.",
     "tlsAlpn01Desc": "validation via TLS sur le port 443 (RFC 8737)",
     "tlsAlpnPort": "Port TLS-ALPN-01",
-    "tlsAlpnPortHelper": "Port local d'écoute du répondeur TLS-ALPN-01 pendant la validation (443 par défaut)."
+    "tlsAlpnPortHelper": "Port local d'écoute du répondeur TLS-ALPN-01 pendant la validation (443 par défaut).",
+    "dnsPersistSection": "Validation DNS persistante (dns-persist-01)",
+    "dnsPersistEnabled": "Proposer le challenge dns-persist-01 (draft-ietf-acme-dns-persist)",
+    "dnsPersistEnabledDesc": "Validation via un enregistrement TXT persistant sous _validation-persist.<domaine> lié au compte ACME. Renouvellement sans écriture DNS.",
+    "dnsPersistWarning": "Risque : la compromission de la clé du compte ACME permet d'émettre pour le domaine tant que le TXT existe (draft §7.2). À activer uniquement pour des comptes et zones maîtrisés.",
+    "dnsPersistIssuerNote": "Noms d'émetteur pour l'enregistrement TXT : {{domains}} (issus des identifiants CAA, ou du nom d'hôte ACME public sinon)."
   },
   "audit": {
     "event": "Événement",
@@ -920,7 +927,12 @@
       "maxReached": "Maximum de {{max}} EKU atteint",
       "helper": "{{remaining}} EKU supplémentaires peuvent être ajoutés (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Par défaut pour ce type de certificat"
-    }
+    },
+    "template": "Modèle",
+    "allTemplates": "Tous les modèles",
+    "modifiedFromTemplate": "Modifié par rapport au modèle",
+    "issuedFromTemplate": "Émis depuis le modèle : {{name}}",
+    "templateOverridesHint": "Diverge du modèle « {{name}} » sur : {{fields}}"
   },
   "common": {
     "saved": "Paramètres enregistrés",

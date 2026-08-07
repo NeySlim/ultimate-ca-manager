@@ -387,6 +387,23 @@ class OrderMixin:
             )
             auth.challenges.append(dns_challenge)
 
+            # DNS-PERSIST-01 (draft-ietf-acme-dns-persist) — opt-in challenge
+            # type authorizing via a persistent _validation-persist TXT record
+            # bound to this account. No DNS writes needed at renewal time, so
+            # it suits on-prem DNS zones without write APIs.
+            if status != 'valid':
+                from services.acme import dns_persist
+                if dns_persist.is_enabled():
+                    persist_challenge = AcmeChallenge(
+                        authorization_id=auth.authorization_id,
+                        type="dns-persist-01",
+                        status=status,
+                        token=secrets.token_urlsafe(32),
+                        url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
+                        validated=validated
+                    )
+                    auth.challenges.append(persist_challenge)
+
         if is_wildcard:
             # Per RFC 8555 §8.4 — wildcard MUST be DNS-01 only
             # Note: wildcards are only valid for DNS identifiers, not IPs

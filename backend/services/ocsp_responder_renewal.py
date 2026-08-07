@@ -121,6 +121,7 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         valid_to=not_after,
         source=cert.source,
         template_id=cert.template_id,
+        template_overrides=cert.template_overrides,  # renewal at par keeps the record (#258)
         created_by='system:ocsp-renewal',
     )
     db.session.add(db_cert)

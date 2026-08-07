@@ -85,6 +85,7 @@ export default function CertificatesPage() {
   const [filterStatus, setFilterStatus] = usePersistedState('ucm-filter-certs-status', [])
   const [filterCA, setFilterCA] = usePersistedState('ucm-filter-certs-ca', [])
   const [filterSource, setFilterSource] = usePersistedState('ucm-filter-certs-source', [])
+  const [filterTemplate, setFilterTemplate] = usePersistedState('ucm-filter-certs-template', [])
 
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
@@ -108,7 +109,7 @@ export default function CertificatesPage() {
   useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), sortBy, sortOrder])
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), JSON.stringify(filterTemplate), sortBy, sortOrder])
 
   // Reload when floating window actions change data
   useEffect(() => {
@@ -150,6 +151,9 @@ export default function CertificatesPage() {
       }
       if (filterSource.length > 0) {
         params.source = filterSource
+      }
+      if (filterTemplate.includes('modified')) {
+        params.template_modified = 'true'
       }
       
       const [certsRes, casRes, statsRes] = await Promise.all([
@@ -477,10 +481,21 @@ export default function CertificatesPage() {
         value: src,
         label: SOURCE_LABEL_KEYS[src] ? t(`certificates.${SOURCE_LABEL_KEYS[src]}`) : humanizeSource(src)
       }))
+    },
+    {
+      key: 'template',
+      label: t('certificates.template'),
+      type: 'multiSelect',
+      value: filterTemplate,
+      onChange: (val) => { setPage(1); setFilterTemplate(val) },
+      placeholder: t('certificates.allTemplates'),
+      options: [
+        { value: 'modified', label: t('certificates.modifiedFromTemplate') }
+      ]
     }
-  ], [filterStatus, filterCA, filterSource, certStats.sources, cas, t])
+  ], [filterStatus, filterCA, filterSource, filterTemplate, certStats.sources, cas, t])
 
-  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0) + (filterSource.length > 0 ? 1 : 0)
+  const activeFilters = (filterStatus.length > 0 ? 1 : 0) + (filterCA.length > 0 ? 1 : 0) + (filterSource.length > 0 ? 1 : 0) + (filterTemplate.length > 0 ? 1 : 0)
 
   // Help content
   const helpContent = (

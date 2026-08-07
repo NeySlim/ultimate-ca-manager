@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from flask import request
 from sqlalchemy import or_, and_, case, func
+from sqlalchemy.orm import selectinload
 from auth.unified import require_auth
 from utils.response import success_response
 from models import Certificate, CA, db
@@ -24,6 +25,7 @@ def list_certificates():
     ca_id_list = request.args.getlist('ca_id', type=int)  # supports multi-select: ?ca_id=1&ca_id=2
     source_list = request.args.getlist('source')  # supports multi-select: ?source=msca&source=acme
     search = request.args.get('search', '').strip()
+    template_modified = request.args.get('template_modified', '').lower() in ('1', 'true', 'yes')
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
 
@@ -46,6 +48,10 @@ def list_certificates():
     }
 
     query = Certificate.query.filter(Certificate.crt.isnot(None))
+
+    # Eager-load the linked template: to_dict() resolves template_name, and
+    # without this the list page would run one extra query per templated cert.
+    query = query.options(selectinload(Certificate.template))
 
     # Apply CA filter (Certificate stores caref=CA.refid, not ca_id)
     if ca_id_list:
@@ -82,6 +88,10 @@ def list_certificates():
                 )
         if status_conditions:
             query = query.filter(or_(*status_conditions))
+
+    # Certificates issued from a template but diverging from its defaults (#258)
+    if template_modified:
+        query = query.filter(Certificate.template_overrides.isnot(None))
 
     # Apply source filter (supports multi-select). Legacy rows may have NULL
     # source; treat those as 'manual' so the manual filter still finds them.

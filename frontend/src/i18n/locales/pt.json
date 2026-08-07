@@ -797,7 +797,12 @@
       "maxReached": "Máximo de {{max}} EKUs atingido",
       "helper": "Mais {{remaining}} EKUs podem ser adicionados (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Padrão para este tipo de certificado"
-    }
+    },
+    "template": "Modelo",
+    "allTemplates": "Todos os modelos",
+    "modifiedFromTemplate": "Modificado em relação ao modelo",
+    "issuedFromTemplate": "Emitido a partir do modelo: {{name}}",
+    "templateOverridesHint": "Diverge do modelo '{{name}}' em: {{fields}}"
   },
   "cas": {
     "parentCA": "CA pai",
@@ -1432,6 +1437,8 @@
     "proxyUpstreamCAAccount": "Conta CA upstream",
     "proxyUpstreamCAAccountHelper": "Selecione uma conta ACME externa registrada. EAB e credenciais são geridos em Contas CA externas abaixo.",
     "proxySelectCaAccount": "Selecionar conta CA…",
+    "proxyPruneReplacedCertificates": "Eliminar certificados substituídos",
+    "proxyPruneReplacedCertificatesDesc": "Eliminar automaticamente os certificados importados pelo proxy após uma renovação bem-sucedida para os mesmos domínios. Certificados revogados são sempre mantidos.",
     "proxyNoCaAccounts": "Nenhuma conta CA externa configurada. Adicione uma em Contas CA externas abaixo.",
     "proxyManageCaAccountsHint": "EAB e definições por CA são geridos em Contas CA externas abaixo.",
     "proxyEnabled": "Expor via proxy ACME",
@@ -1577,7 +1584,12 @@
     "caaEnforceWarning": "Em redes isoladas toda emissão ACME falhará se o resolvedor não puder responder a consultas CAA.",
     "tlsAlpn01Desc": "validação via TLS na porta 443 (RFC 8737)",
     "tlsAlpnPort": "Porta TLS-ALPN-01",
-    "tlsAlpnPortHelper": "Porta local em que o respondedor TLS-ALPN-01 escuta durante a validação (padrão 443)."
+    "tlsAlpnPortHelper": "Porta local em que o respondedor TLS-ALPN-01 escuta durante a validação (padrão 443).",
+    "dnsPersistSection": "Validação DNS persistente (dns-persist-01)",
+    "dnsPersistEnabled": "Oferecer desafio dns-persist-01 (draft-ietf-acme-dns-persist)",
+    "dnsPersistEnabledDesc": "Validação via registro TXT persistente em _validation-persist.<domínio> vinculado à conta ACME. Renovações sem escrita em DNS.",
+    "dnsPersistWarning": "Risco: uma chave de conta ACME comprometida permite emissão para o domínio enquanto o TXT existir (draft §7.2). Ative apenas para contas e zonas controladas.",
+    "dnsPersistIssuerNote": "Domínios de emissor para o registro TXT: {{domains}} (dos identificadores CAA, ou o hostname público ACME se vazio)."
   },
   "scep": {
     "title": "Protocolo SCEP",

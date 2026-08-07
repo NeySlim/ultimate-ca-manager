@@ -566,3 +566,86 @@ class TemplateService:
             logger.error(f"Commit failed in services/template_service.py:382: {_commit_err}", exc_info=True)
             raise
         return count
+
+
+# ---------------------------------------------------------------------------
+# Template divergence tracking (issue #258)
+# ---------------------------------------------------------------------------
+
+# Fields a request is allowed to override while keeping the template link;
+# the link is kept and the divergences are recorded instead (option 2 of
+# #258: "keep the link, flag it"). KU/EKU never appear here by design — a
+# template's extensions are imposed, not overridable (issue #226).
+_TEMPLATE_OVERRIDABLE_FIELDS = ('key_type', 'validity_days', 'digest')
+
+_EC_CURVE_LABELS = {
+    'prime256v1': 'P256',
+    'secp256r1': 'P256',
+    'secp384r1': 'P384',
+    'secp521r1': 'P521',
+}
+
+
+def _normalize_key_type_label(value):
+    """Normalize a key-type value to the template format ('RSA-2048',
+    'EC-P256', ...).
+
+    The various issuance entry points pass this differently: the template
+    itself uses 'RSA-2048'/'EC-P256', the direct-creation API resolves to
+    '2048' (RSA size) or an OpenSSL curve name, the legacy service path
+    receives bare sizes. Returns None when the value can't be mapped to a
+    comparable label (unknown algorithm — the caller then skips the check
+    rather than false-flagging a divergence).
+    """
+    if value is None:
+        return None
+    v = str(value).strip()
+    if not v:
+        return None
+    if v.isdigit():
+        return f'RSA-{v}'
+    lowered = v.lower()
+    if lowered in _EC_CURVE_LABELS:
+        return f'EC-{_EC_CURVE_LABELS[lowered]}'
+    uppered = v.upper()
+    if uppered.startswith(('RSA-', 'EC-')):
+        return uppered
+    return None
+
+
+def compute_template_overrides(template, key_type=None, validity_days=None,
+                               digest=None):
+    """Compare effective issuance values against a template's declared defaults.
+
+    Only the parameters actually provided are compared — pass None for any
+    value the issuance path does not let the requester influence (e.g. the
+    digest in the direct-creation path, which is always the template's).
+
+    Returns a JSON-encoded list of divergent field names (subset of
+    _TEMPLATE_OVERRIDABLE_FIELDS), or None when nothing diverges. Store the
+    result verbatim in Certificate.template_overrides: NULL means "in sync
+    with the template at issuance time" and is never recomputed, so editing
+    the template later cannot retroactively rewrite history.
+    """
+    if template is None:
+        return None
+
+    divergent = []
+
+    tpl_key = _normalize_key_type_label(template.key_type)
+    eff_key = _normalize_key_type_label(key_type) if key_type is not None else None
+    if eff_key and tpl_key and eff_key != tpl_key:
+        divergent.append('key_type')
+
+    if validity_days is not None and template.validity_days is not None:
+        try:
+            if int(validity_days) != int(template.validity_days):
+                divergent.append('validity_days')
+        except (TypeError, ValueError):
+            pass
+
+    if digest is not None and template.digest:
+        if str(digest).lower() != str(template.digest).lower():
+            divergent.append('digest')
+
+    return json.dumps(divergent) if divergent else None

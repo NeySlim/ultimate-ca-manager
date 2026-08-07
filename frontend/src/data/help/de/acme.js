@@ -93,6 +93,17 @@ export default {
           { label: 'Ausgestellter SAN', text: 'Das Zertifikat enthält einen iPAddress-SAN; gemischte DNS- + IP-Bestellungen werden unterstützt' },
           { label: 'Interne IPs', text: 'RFC1918- und Loopback-Adressen werden sofort validiert — UCMs primäres Bereitstellungsmodell' },
         ]
+      },
+      {
+        title: 'Persistente DNS-Validierung (dns-persist-01)',
+        content: 'Der lokale ACME-Server kann Domains über einen persistenten TXT-Eintrag validieren, der an das ACME-Konto gebunden ist (draft-ietf-acme-dns-persist) — Erneuerung ohne DNS-Schreibzugriffe. Opt-in, standardmäßig deaktiviert.',
+        items: [
+          { label: 'Eintrag', text: 'Erstellen Sie _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<Konto-URL>" — das Challenge-Objekt nennt beide erwarteten Werte' },
+          { label: 'Aktivierung', text: 'ACME → Konfiguration → Persistente DNS-Validierung (dns-persist-01)' },
+          { label: 'Wildcard / Subdomains', text: 'Mit policy=wildcard werden auch Wildcard-Zertifikate und Subdomains des validierten Namens autorisiert' },
+          { label: 'persistUntil', text: 'Optionales persistUntil=<Unix-Timestamp> stoppt neue Validierungen nach diesem Zeitpunkt' },
+          { label: 'Sicherheit', text: 'Der Eintrag verleiht dem Kontoschlüssel Ausstellungsrechte, solange er existiert — TXT-Eintrag löschen, um sie zu entziehen' },
+        ]
       }
     ],
     tips: [
@@ -387,6 +398,24 @@ Gemischte DNS- + IP-Bestellungen werden ebenfalls unterstützt.
 Das signierte Zertifikat enthält für jede validierte IP einen **iPAddress**-SubjectAltName-Eintrag.
 
 > 💡 Interne Adressen (RFC1918, Loopback) werden sofort validiert — UCMs primäres Bereitstellungsmodell. Cloud-Metadaten-IPs bleiben blockiert.
+
+## Persistente DNS-Validierung (dns-persist-01)
+
+Der lokale ACME-Server unterstützt **dns-persist-01** (draft-ietf-acme-dns-persist): Validierung über einen **persistenten** TXT-Eintrag, der an das ACME-Konto gebunden ist — Erneuerungen erfordern keine DNS-Schreibzugriffe.
+
+### Einrichtung
+1. Aktivieren Sie es unter **ACME → Konfiguration → Persistente DNS-Validierung** (standardmäßig deaktiviert).
+2. Erstellen Sie den Eintrag einmalig:
+\`\`\`
+_validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
+\`\`\`
+Das Challenge-Objekt nennt die erwarteten Werte \`accounturi\` und \`issuer-domain-names\`.
+
+### Optionen
+- \`policy=wildcard\` — autorisiert auch Wildcard-Zertifikate und Subdomains des validierten Namens (ein Eintrag auf einer übergeordneten Domain deckt deren Kinder ab)
+- \`persistUntil=<Unix-Timestamp>\` — stoppt neue Validierungen nach diesem Zeitpunkt
+
+> ⚠️ Der Eintrag verleiht dem ACME-Kontoschlüssel Ausstellungsrechte, solange er existiert — löschen Sie den TXT-Eintrag, um sie zu entziehen.
 
 ## Renewal Information (ARI, RFC 9773)
 

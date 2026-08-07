@@ -13,7 +13,7 @@ import {
   Gavel, Stamp, ChartBar, Broadcast
 } from '@phosphor-icons/react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Sidebar, navGroups } from './Sidebar'
+import { Sidebar, navGroups, resolveActivePageId } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
@@ -66,11 +66,8 @@ export function AppShell() {
   const [isDesktopFrame, setIsDesktopFrame] = useState(false)
   const { showWarning } = useNotification()
   
-  // Extract current page from pathname (empty string for dashboard)
-  const rawPage = location.pathname.split('/')[1] || ''
-  // Map URL segments to nav item IDs when they differ
-  const pageIdMap = { 'scep-config': 'scep', 'est-config': 'est', 'tsa-config': 'tsa' }
-  const activePage = pageIdMap[rawPage] || rawPage
+  // Derive the active nav item from the URL (see resolveActivePageId)
+  const activePage = resolveActivePageId(location.pathname)
   
   // Map URL paths to helpContent keys
   // Use full path for nested routes (e.g. /ssh/cas → sshCas)
@@ -95,7 +92,9 @@ export function AppShell() {
     // Pro pages
     'rbac', 'hsm',
     // SSH pages
-    'ssh'
+    'ssh-cas', 'ssh-certificates',
+    // Governance pages
+    'keyRecovery'
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
 

@@ -93,6 +93,17 @@ export default {
           { label: '签发的 SAN', text: '证书包含 iPAddress SAN；支持 DNS + IP 混合订单' },
           { label: '内部 IP', text: 'RFC1918 和环回地址开箱即可验证 — UCM 的主要部署模式' },
         ]
+      },
+      {
+        title: '持久 DNS 验证 (dns-persist-01)',
+        content: '本地 ACME 服务器可通过绑定到 ACME 账户的持久 TXT 记录验证域名 (draft-ietf-acme-dns-persist)——续期时无需写入 DNS。可选启用，默认关闭。',
+        items: [
+          { label: '记录', text: '创建 _validation-persist.<域名> TXT "<签发者域名>; accounturi=<账户 URL>"——challenge 对象会公布这两个期望值' },
+          { label: '启用', text: 'ACME → 配置 → 持久 DNS 验证 (dns-persist-01)' },
+          { label: '通配符 / 子域名', text: '追加 policy=wildcard 可同时授权通配符证书及已验证名称的子域名' },
+          { label: 'persistUntil', text: '可选的 persistUntil=<unix 时间戳> 会在该时间之后阻止新的验证' },
+          { label: '安全', text: '只要记录存在，账户密钥即拥有签发能力——删除 TXT 记录即可撤销' },
+        ]
       }
     ],
     tips: [
@@ -387,6 +398,24 @@ acme.sh --issue \\
 签名后的证书为每个已验证的 IP 包含一个 **iPAddress** SubjectAltName 条目。
 
 > 💡 内部地址（RFC1918、环回）开箱即可验证 — UCM 的主要部署模式。云元数据 IP 仍被阻止。
+
+## 持久 DNS 验证 (dns-persist-01)
+
+本地 ACME 服务器支持 **dns-persist-01** (draft-ietf-acme-dns-persist)：通过绑定到 ACME 账户的**持久** TXT 记录进行验证——续期时无需写入 DNS。
+
+### 设置
+1. 在 **ACME → 配置 → 持久 DNS 验证** 中启用（默认关闭）。
+2. 只需创建一次记录：
+\`\`\`
+_validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
+\`\`\`
+challenge 对象会公布期望的 \`accounturi\` 和 \`issuer-domain-names\`。
+
+### 选项
+- \`policy=wildcard\` — 同时授权通配符证书及已验证名称的子域名（父域名上的记录覆盖其子域名）
+- \`persistUntil=<unix 时间戳>\` — 在该时间之后阻止新的验证
+
+> ⚠️ 只要记录存在，ACME 账户密钥即拥有签发能力——删除 TXT 记录即可撤销。
 
 ## Renewal Information (ARI, RFC 9773)
 

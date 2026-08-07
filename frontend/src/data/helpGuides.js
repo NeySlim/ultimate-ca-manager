@@ -986,6 +986,24 @@ The signed certificate contains an **iPAddress** SubjectAltName entry for each v
 
 > 💡 Internal addresses (RFC1918, loopback) validate out of the box — UCM's primary deployment model. Cloud-metadata IPs remain blocked.
 
+## Persistent DNS Validation (dns-persist-01)
+
+The local ACME server supports **dns-persist-01** (draft-ietf-acme-dns-persist): validation through a **persistent** TXT record bound to the ACME account — renewals need no DNS writes.
+
+### Setup
+1. Enable it under **ACME → Configuration → Persistent DNS Validation** (off by default).
+2. Create the record once:
+\`\`\`
+_validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
+\`\`\`
+The challenge object advertises the expected \`accounturi\` and \`issuer-domain-names\`.
+
+### Options
+- \`policy=wildcard\` — also authorizes wildcard certificates and subdomains of the validated name (a record on a parent domain covers its children)
+- \`persistUntil=<unix-timestamp>\` — stops new validation attempts after that time
+
+> ⚠️ The record grants issuance capability to the ACME account key for as long as it exists — delete the TXT record to revoke it.
+
 ## Using certbot
 
 \`\`\`

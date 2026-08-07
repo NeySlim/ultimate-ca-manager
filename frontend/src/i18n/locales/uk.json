@@ -797,7 +797,12 @@
       "maxReached": "Досягнуто максимум {{max}} EKU",
       "helper": "Можна додати ще {{remaining}} EKU (RFC 5280 §4.2.1.12).",
       "defaultLocked": "За замовчуванням для цього типу сертифіката"
-    }
+    },
+    "template": "Шаблон",
+    "allTemplates": "Усі шаблони",
+    "modifiedFromTemplate": "Змінено відносно шаблону",
+    "issuedFromTemplate": "Видано з шаблону: {{name}}",
+    "templateOverridesHint": "Відрізняється від шаблону '{{name}}' у: {{fields}}"
   },
   "cas": {
     "parentCA": "Батьківський ЦС",
@@ -1432,6 +1437,8 @@
     "proxyUpstreamCAAccount": "Обліковий запис CA вгорі по течії",
     "proxyUpstreamCAAccountHelper": "Виберіть зареєстрований зовнішній ACME CA. EAB і облікові дані керуються в Зовнішніх CA нижче.",
     "proxySelectCaAccount": "Вибрати обліковий запис CA…",
+    "proxyPruneReplacedCertificates": "Видаляти замінені сертифікати",
+    "proxyPruneReplacedCertificatesDesc": "Автоматично видаляти імпортовані проксі сертифікати після успішного оновлення для тих самих доменів. Відкликані сертифікати завжди зберігаються.",
     "proxyNoCaAccounts": "Зовнішні CA не налаштовані. Додайте обліковий запис у Зовнішніх CA нижче.",
     "proxyManageCaAccountsHint": "EAB і налаштування для кожного CA керуються в Зовнішніх CA нижче.",
     "proxyEnabled": "Надати через ACME-проксі",
@@ -1577,7 +1584,12 @@
     "caaEnforceWarning": "В ізольованих мережах кожен випуск ACME не вдасться, якщо резолвер не може відповісти на запити CAA.",
     "tlsAlpn01Desc": "перевірка через TLS на порту 443 (RFC 8737)",
     "tlsAlpnPort": "Порт TLS-ALPN-01",
-    "tlsAlpnPortHelper": "Локальний порт, який слухає відповідач TLS-ALPN-01 під час перевірки (типово 443)."
+    "tlsAlpnPortHelper": "Локальний порт, який слухає відповідач TLS-ALPN-01 під час перевірки (типово 443).",
+    "dnsPersistSection": "Постійна DNS-валідація (dns-persist-01)",
+    "dnsPersistEnabled": "Пропонувати dns-persist-01 (draft-ietf-acme-dns-persist)",
+    "dnsPersistEnabledDesc": "Валідація через постійний TXT-запис у _validation-persist.<домен>, прив'язаний до ACME-акаунта. Подовження без запису в DNS.",
+    "dnsPersistWarning": "Ризик: компрометація ключа ACME-акаунта дозволяє видачу для домену, поки існує TXT-запис (draft §7.2). Вмикайте лише для контрольованих акаунтів і зон.",
+    "dnsPersistIssuerNote": "Домени емітента для TXT-запису: {{domains}} (з ідентифікаторів CAA, або публічне ім'я хоста ACME)."
   },
   "scep": {
     "title": "Протокол SCEP",

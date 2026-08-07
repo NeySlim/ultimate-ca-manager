@@ -586,6 +586,18 @@ export const helpContent = {
           { label: 'Internal IPs', text: 'RFC1918 and loopback addresses validate out of the box — UCM\'s primary deployment model' },
         ]
       },
+      {
+        title: 'Persistent DNS Validation (dns-persist-01)',
+        icon: ArrowClockwise,
+        content: 'The local ACME server can validate domains through a persistent TXT record bound to the ACME account (draft-ietf-acme-dns-persist) — clients renew without writing DNS records. Opt-in, off by default.',
+        items: [
+          { label: 'Record', text: 'Create _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<account URL>" — the challenge object advertises both expected values' },
+          { label: 'Enable', text: 'ACME → Configuration → Persistent DNS Validation (dns-persist-01)' },
+          { label: 'Wildcard / subdomains', text: 'Append policy=wildcard to also authorize wildcard certificates and subdomains of the validated name' },
+          { label: 'persistUntil', text: 'Optional persistUntil=<unix timestamp> stops new validations after that time' },
+          { label: 'Security', text: 'The record grants the account key issuance capability for as long as it exists — delete the TXT record to revoke' },
+        ]
+      },
     ],
     tips: [
       'ACME directory URL: https://your-server:port/acme/directory',

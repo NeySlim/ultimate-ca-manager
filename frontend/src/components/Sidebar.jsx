@@ -487,3 +487,22 @@ export function Sidebar({ activePage }) {
 
 // Export navGroups for use by AppShell mobile nav
 export { navGroups }
+
+// Derive the active nav item id from the current pathname. The URL is the
+// single source of truth: match on each item's `path` (exact first, then
+// longest prefix so detail pages like /cas/123 highlight their section)
+// instead of relying on a "first URL segment === item id" naming convention
+// that scep-config/est-config/tsa-config/key-recovery/ssh all break.
+// Falls back to the first URL segment for pages without a nav entry
+// (settings, account), so activePage keeps its previous meaning there.
+export function resolveActivePageId(pathname) {
+  if (pathname === '/') return ''
+  const items = navGroups.flatMap(g => g.children)
+  const exact = items.find(item => item.path === pathname)
+  if (exact) return exact.id
+  const prefix = items
+    .filter(item => pathname.startsWith(item.path + '/'))
+    .sort((a, b) => b.path.length - a.path.length)[0]
+  if (prefix) return prefix.id
+  return pathname.split('/')[1] || ''
+}

@@ -455,7 +455,8 @@ def enroll_presented_certificate():
     # Also try proxy headers — only when the immediate peer is trusted
     # (same gate as login_mtls in auth_methods.py).
     if not cert_info:
-        headers = dict(request.headers)
+        # Case-insensitive mapping — do NOT dict() it (see login_mtls).
+        headers = request.headers
         spoof_attempt = (
             'X-SSL-Client-Verify' in headers
             or 'X-SSL-Client-S-DN' in headers
@@ -464,7 +465,7 @@ def enroll_presented_certificate():
         if spoof_attempt and not trusted_proxy.is_request_from_trusted_proxy():
             logger.warning(
                 "mTLS enroll: ignoring proxy cert headers from untrusted peer %s",
-                request.remote_addr,
+                trusted_proxy.immediate_peer_addr(),
             )
         elif 'X-SSL-Client-Verify' in headers:
             cert_info = CertificateParser.extract_from_nginx_headers(headers)

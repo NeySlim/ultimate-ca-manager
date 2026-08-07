@@ -13,6 +13,7 @@ from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, me
 from models import Certificate, CertificateTemplate, CA, db
 from services.trust_store.constants import HASH_ALGORITHMS
 from services.trust_store.constraints_mixin import validate_name_constraints
+from services.template_service import compute_template_overrides
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
@@ -196,6 +197,16 @@ def create_certificate():
         if validity_days < 1 or validity_days > MAX_VALIDITY_DAYS:
             return error_response(
                 f"validity_days must be between 1 and {MAX_VALIDITY_DAYS}", 400)
+
+        # Record which inherited values the request explicitly diverged from
+        # (#258): the template link is kept and the divergence flagged. The
+        # digest is not compared here — this path always signs with the
+        # template's digest (or SHA-256 by default), it cannot be overridden.
+        template_overrides = compute_template_overrides(
+            template,
+            key_type=normalized_key,
+            validity_days=validity_days,
+        )
         now = utc_now()
         not_before = cert_not_before()
         not_after = now + timedelta(days=validity_days)
@@ -523,6 +534,7 @@ def create_certificate():
             san_upn=json.dumps(final_san_upn) if final_san_upn else None,
             ocsp_must_staple=bool(data.get('ocsp_must_staple')),
             template_id=template.id if template else None,
+            template_overrides=template_overrides,
             created_by=g.current_user.username if hasattr(g, 'current_user') else None
         )
 

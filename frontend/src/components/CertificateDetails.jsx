@@ -41,7 +41,8 @@ import {
   ArrowsClockwise,
   UploadSimple,
   LinkSimple,
-  SealCheck
+  SealCheck,
+  Stack
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
@@ -50,6 +51,13 @@ import { CertificateLintModal } from './CertificateLintModal'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
 import { cn } from '../lib/utils'
+
+// Maps a template_override field name to the i18n key of its label (#258).
+const OVERRIDE_FIELD_LABEL_KEYS = {
+  key_type: 'common.keyType',
+  validity_days: 'common.validityPeriod',
+  digest: 'common.digest',
+}
 
 // Format date helper — delegates to shared util
 function formatDate(dateStr) {
@@ -175,6 +183,22 @@ export function CertificateDetails({
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
             {!cert.has_private_key && <Badge variant="warning" size="sm">{t('details.noKey')}</Badge>}
+            {cert.template_name && (
+              <Badge
+                variant={cert.template_overrides?.length ? 'warning' : 'info'}
+                size="sm"
+                title={cert.template_overrides?.length
+                  ? t('certificates.templateOverridesHint', {
+                      name: cert.template_name,
+                      fields: cert.template_overrides
+                        .map(f => OVERRIDE_FIELD_LABEL_KEYS[f] ? t(OVERRIDE_FIELD_LABEL_KEYS[f]) : f)
+                        .join(', ')
+                    })
+                  : t('certificates.issuedFromTemplate', { name: cert.template_name })}
+              >
+                {cert.template_name}
+              </Badge>
+            )}
           </div>
           <p className="text-2xs sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
         </div>
@@ -298,6 +322,15 @@ export function CertificateDetails({
             value={cert.signature_algorithm}
           />
           <CompactField autoIcon="certType" label={t('details.certType')} value={formatCertType(cert.cert_type, t)} />
+          {cert.template_name && (
+            <CompactField
+              icon={Stack}
+              label={t('certificates.template')}
+              value={cert.template_overrides?.length
+                ? `${cert.template_name} — ${t('certificates.modifiedFromTemplate')}: ${cert.template_overrides.map(f => OVERRIDE_FIELD_LABEL_KEYS[f] ? t(OVERRIDE_FIELD_LABEL_KEYS[f]) : f).join(', ')}`
+                : cert.template_name}
+            />
+          )}
         </CompactGrid>
       </CompactSection>
       

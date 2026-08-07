@@ -208,6 +208,7 @@ class TestGetCertificateResponsePath:
     def test_link_not_forwarded_on_upstream_error(self, app, monkeypatch):
         with app.app_context():
             svc = _make_service(app)
+            _seed_proxy_order(certificate_url=f'{UPSTREAM}/cert/err')
             err_resp = SimpleNamespace(
                 status_code=404,
                 content=b'not found',

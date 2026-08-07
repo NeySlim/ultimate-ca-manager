@@ -955,15 +955,7 @@ def new_authz():
         # Build challenges
         challenges = []
         for challenge in auth.challenges:
-            challenge_data = {
-                "type": challenge.type,
-                "status": challenge.status,
-                "url": challenge.url,
-                "token": challenge.token
-            }
-            if challenge.validated:
-                challenge_data["validated"] = challenge.validated.isoformat() + 'Z'
-            challenges.append(challenge_data)
+            challenges.append(_challenge_wire_dict(challenge, service, account_id))
         
         response_data = {
             "status": auth.status,
@@ -1442,20 +1434,7 @@ def authorization_info(authorization_id: str):
     # Build challenges list
     challenges = []
     for challenge in auth.challenges:
-        challenge_data = {
-            "type": challenge.type,
-            "status": challenge.status,
-            "url": challenge.url,
-            "token": challenge.token
-        }
-        
-        if challenge.validated:
-            challenge_data["validated"] = challenge.validated.isoformat() + 'Z'
-        
-        if challenge.error:
-            challenge_data["error"] = json.loads(challenge.error)
-        
-        challenges.append(challenge_data)
+        challenges.append(_challenge_wire_dict(challenge, service, auth_account))
     
     response_data = {
         "status": auth.status,
@@ -1474,6 +1453,33 @@ def authorization_info(authorization_id: str):
         response.headers.add('Link', f'<{order_url}>;rel="up"')
     
     return response
+
+
+# dns-persist-01 (draft-ietf-acme-dns-persist-01) wire helper
+def _challenge_wire_dict(challenge, service, account_id):
+    """Serialize an AcmeChallenge for the wire.
+
+    dns-persist-01 adds the account binding (``accounturi`` = this account's
+    URL) and the issuer identities the DNS record may claim
+    (``issuer-domain-names``).
+    """
+    data = {
+        "type": challenge.type,
+        "status": challenge.status,
+        "url": challenge.url,
+        "token": challenge.token,
+    }
+    if challenge.type == 'dns-persist-01':
+        from services.acme import dns_persist
+        from urllib.parse import urlparse
+        data['accounturi'] = f"{service.base_url}/acme/acct/{account_id}"
+        data['issuer-domain-names'] = dns_persist.get_issuer_domain_names(
+            fallback_host=urlparse(service.base_url).hostname)
+    if challenge.validated:
+        data["validated"] = challenge.validated.isoformat() + 'Z'
+    if challenge.error:
+        data["error"] = json.loads(challenge.error)
+    return data
 
 
 @acme_bp.route('/challenge/<challenge_id>', methods=['POST'])
@@ -1548,6 +1554,8 @@ def respond_to_challenge(challenge_id: str):
             success = service.validate_http01_challenge(challenge, account)
         elif challenge.type == "dns-01":
             success = service.validate_dns01_challenge(challenge, account)
+        elif challenge.type == "dns-persist-01":
+            success = service.validate_dns_persist01_challenge(challenge, account)
         elif challenge.type == "tls-alpn-01":
             success = service.validate_tls_alpn01_challenge(challenge, account)
         else:
@@ -1565,18 +1573,7 @@ def respond_to_challenge(challenge_id: str):
             )
         
         # Build response
-        response_data = {
-            "type": challenge.type,
-            "status": challenge.status,
-            "url": challenge.url,
-            "token": challenge.token
-        }
-        
-        if challenge.validated:
-            response_data["validated"] = challenge.validated.isoformat() + 'Z'
-        
-        if challenge.error:
-            response_data["error"] = json.loads(challenge.error)
+        response_data = _challenge_wire_dict(challenge, service, account.account_id)
         
         response = acme_response(response_data)
         

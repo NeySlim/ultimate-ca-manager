@@ -797,7 +797,12 @@
       "maxReached": "Maximum {{max}} EKUs reached",
       "helper": "{{remaining}} more EKUs can be added (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Default for this certificate type"
-    }
+    },
+    "template": "Template",
+    "allTemplates": "All templates",
+    "modifiedFromTemplate": "Modified from template",
+    "issuedFromTemplate": "Issued from template: {{name}}",
+    "templateOverridesHint": "Diverges from template '{{name}}' on: {{fields}}"
   },
   "cas": {
     "parentCA": "Parent CA",
@@ -1432,6 +1437,8 @@
     "proxyUpstreamCAAccount": "Upstream CA account",
     "proxyUpstreamCAAccountHelper": "Select a registered external ACME CA account. EAB and credentials are managed in External CA Accounts below.",
     "proxySelectCaAccount": "Select a CA account…",
+    "proxyPruneReplacedCertificates": "Purge replaced certificates",
+    "proxyPruneReplacedCertificatesDesc": "Automatically delete proxy-imported certificates once a renewal for the same domains succeeds. Revoked certificates are always kept.",
     "proxyNoCaAccounts": "No external CA accounts configured. Add one in External CA Accounts below.",
     "proxyManageCaAccountsHint": "EAB credentials and per-CA settings are managed in External CA Accounts below.",
     "proxyEnabled": "Expose via ACME proxy",
@@ -1577,7 +1584,12 @@
     "caaEnforceWarning": "In isolated networks every ACME issuance will fail if the resolver cannot answer CAA queries.",
     "tlsAlpn01Desc": "validation via TLS on port 443 (RFC 8737)",
     "tlsAlpnPort": "TLS-ALPN-01 port",
-    "tlsAlpnPortHelper": "Local port the TLS-ALPN-01 responder listens on during validation (default 443)."
+    "tlsAlpnPortHelper": "Local port the TLS-ALPN-01 responder listens on during validation (default 443).",
+    "dnsPersistSection": "Persistent DNS Validation (dns-persist-01)",
+    "dnsPersistEnabled": "Offer dns-persist-01 challenge (draft-ietf-acme-dns-persist)",
+    "dnsPersistEnabledDesc": "Validation via a persistent TXT record at _validation-persist.<domain> bound to the ACME account. Clients renew without writing DNS records.",
+    "dnsPersistWarning": "Risk: a compromise of the ACME account key grants issuance capability for the domain until the TXT record is removed (draft §7.2). Enable only for accounts and zones you control.",
+    "dnsPersistIssuerNote": "Issuer domain names for the TXT record: {{domains}} (from CAA identifiers, or the ACME public hostname when unset)."
   },
   "scep": {
     "title": "SCEP Protocol",

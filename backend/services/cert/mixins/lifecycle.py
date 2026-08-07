@@ -78,6 +78,7 @@ class LifecycleMixin:
             Certificate model instance
         """
         # Apply template if provided
+        template = None
         if template_id:
             template = db.session.get(CertificateTemplate, template_id)
             if template:
@@ -85,6 +86,13 @@ class LifecycleMixin:
                 key_type = key_type if key_type != '2048' else template.key_type or key_type
                 validity_days = validity_days if validity_days != 397 else template.validity_days or validity_days
                 digest = digest if digest != 'sha256' else template.digest or digest
+
+        # Record divergences from the template on the final effective values
+        # (#258) — inherited-as-default values compare equal and are not
+        # flagged; an explicit override is.
+        from services.template_service import compute_template_overrides
+        template_overrides = compute_template_overrides(
+            template, key_type=key_type, validity_days=validity_days, digest=digest)
 
         # Validate SAN emails if provided
         if san_email:
@@ -215,6 +223,7 @@ class LifecycleMixin:
             private_key_location=private_key_location,
             # Template reference
             template_id=template_id,
+            template_overrides=template_overrides,
             # Other fields
             revoked=False,
             imported_from='generated',

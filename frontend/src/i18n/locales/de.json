@@ -797,7 +797,12 @@
       "maxReached": "Maximum von {{max}} EKUs erreicht",
       "helper": "Es können {{remaining}} weitere EKUs hinzugefügt werden (RFC 5280 §4.2.1.12).",
       "defaultLocked": "Standard für diesen Zertifikatstyp"
-    }
+    },
+    "template": "Vorlage",
+    "allTemplates": "Alle Vorlagen",
+    "modifiedFromTemplate": "Von Vorlage abweichend",
+    "issuedFromTemplate": "Ausgestellt aus Vorlage: {{name}}",
+    "templateOverridesHint": "Weicht von Vorlage '{{name}}' ab in: {{fields}}"
   },
   "cas": {
     "parentCA": "Übergeordnete CA",
@@ -1432,6 +1437,8 @@
     "proxyUpstreamCAAccount": "Upstream-CA-Konto",
     "proxyUpstreamCAAccountHelper": "Wählen Sie ein registriertes externes ACME-CA-Konto. EAB und Zugangsdaten werden unten unter Externe CA-Konten verwaltet.",
     "proxySelectCaAccount": "CA-Konto auswählen…",
+    "proxyPruneReplacedCertificates": "Ersetzte Zertifikate bereinigen",
+    "proxyPruneReplacedCertificatesDesc": "Vom Proxy importierte Zertifikate automatisch löschen, sobald eine Erneuerung für dieselben Domains erfolgreich war. Widerrufene Zertifikate werden immer behalten.",
     "proxyNoCaAccounts": "Keine externen CA-Konten konfiguriert. Fügen Sie unten unter Externe CA-Konten eines hinzu.",
     "proxyManageCaAccountsHint": "EAB und CA-spezifische Einstellungen werden unten unter Externe CA-Konten verwaltet.",
     "proxyEnabled": "Über ACME-Proxy bereitstellen",
@@ -1577,7 +1584,12 @@
     "caaEnforceWarning": "In isolierten Netzwerken schlägt jede ACME-Ausstellung fehl, wenn der Resolver CAA-Anfragen nicht beantworten kann.",
     "tlsAlpn01Desc": "Validierung über TLS auf Port 443 (RFC 8737)",
     "tlsAlpnPort": "TLS-ALPN-01-Port",
-    "tlsAlpnPortHelper": "Lokaler Port, auf dem der TLS-ALPN-01-Responder während der Validierung lauscht (Standard 443)."
+    "tlsAlpnPortHelper": "Lokaler Port, auf dem der TLS-ALPN-01-Responder während der Validierung lauscht (Standard 443).",
+    "dnsPersistSection": "Persistente DNS-Validierung (dns-persist-01)",
+    "dnsPersistEnabled": "dns-persist-01-Challenge anbieten (draft-ietf-acme-dns-persist)",
+    "dnsPersistEnabledDesc": "Validierung über einen persistenten TXT-Eintrag unter _validation-persist.<Domain>, an das ACME-Konto gebunden. Erneuerungen ohne DNS-Schreibzugriff.",
+    "dnsPersistWarning": "Risiko: Kompromittierter ACME-Kontoschlüssel erlaubt Ausstellung für die Domain, bis der TXT-Eintrag entfernt wird (draft §7.2). Nur für kontrollierte Konten/Zonen aktivieren.",
+    "dnsPersistIssuerNote": "Issuer-Domains für den TXT-Eintrag: {{domains}} (aus den CAA-Identifiern, sonst ACME-Hostname)."
   },
   "scep": {
     "title": "SCEP-Protokoll",

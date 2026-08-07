@@ -36,6 +36,32 @@ def _trusted_proxy_set():
     return {p.strip() for p in proxies_str.split(',') if p.strip()}
 
 
+def immediate_peer_addr() -> str:
+    """
+    Return the request's real TCP peer, undoing any ProxyFix rewrite.
+
+    When ProxyFix is active (UCM_BEHIND_PROXY=1 / UCM_TRUSTED_PROXY_HOPS>0)
+    it overwrites REMOTE_ADDR with a value taken from X-Forwarded-For, so
+    request.remote_addr is the *client* IP — client-controlled input — not
+    the peer that opened the TCP connection. Werkzeug preserves the original
+    peer in environ['werkzeug.proxy_fix.orig']['REMOTE_ADDR'].
+
+    Every trust decision keyed on the peer (trusted-proxy gating, loopback
+    checks) MUST use this value. Using request.remote_addr instead is wrong
+    in both directions:
+      - trusted proxies fail the check (their REMOTE_ADDR was rewritten to
+        the client IP, which is not in UCM_TRUSTED_PROXIES), and
+      - a direct attacker can PASS the check by sending
+        `X-Forwarded-For: 127.0.0.1`, impersonating a trusted peer.
+    """
+    orig = request.environ.get('werkzeug.proxy_fix.orig')
+    if orig is not None:
+        # ProxyFix ran: the original entry is the only trustworthy source,
+        # even when empty (a WSGI server that sets no REMOTE_ADDR at all).
+        return orig.get('REMOTE_ADDR') or ''
+    return request.remote_addr or ''
+
+
 def is_request_from_trusted_proxy() -> bool:
     """
     Return True iff the current request's immediate peer is in the
@@ -46,8 +72,7 @@ def is_request_from_trusted_proxy() -> bool:
     trusted = _trusted_proxy_set()
     if trusted is None:
         return True  # explicit '*' opt-in
-    remote = request.remote_addr or ''
-    return remote in trusted
+    return immediate_peer_addr() in trusted
 
 
 def reject_untrusted_proxy_headers(*header_names) -> bool:
@@ -63,7 +88,7 @@ def reject_untrusted_proxy_headers(*header_names) -> bool:
     if present:
         logger.warning(
             "Ignoring proxy headers %s from untrusted peer %s",
-            present, request.remote_addr,
+            present, immediate_peer_addr(),
         )
     return True
 
@@ -72,9 +97,15 @@ def client_ip() -> str:
     """
     Return the best-effort real client IP for audit logging.
 
-    Behind a trusted reverse proxy (UCM_TRUSTED_PROXIES contains the
-    immediate peer) the left-most entry of X-Forwarded-For is taken
-    as the original client IP. Otherwise — including when the request
+    When ProxyFix has rewritten REMOTE_ADDR it has already resolved the
+    real client IP using the configured TRUSTED_PROXY_HOPS, so that value
+    is returned as-is — re-parsing X-Forwarded-For here would both ignore
+    the hop count and trust client-supplied leading entries.
+
+    Otherwise (no ProxyFix, or ProxyFix found no X-Forwarded-For to apply),
+    behind a trusted reverse proxy (UCM_TRUSTED_PROXIES contains the
+    immediate peer) the left-most entry of X-Forwarded-For is taken as the
+    original client IP, falling back to X-Real-IP. When the request
     comes directly from gunicorn or from a peer NOT in the trusted
     set — request.remote_addr is returned and any X-Forwarded-* on
     the request is ignored. This is the same gating that protects
@@ -83,6 +114,9 @@ def client_ip() -> str:
 
     Always returns a non-empty string ('unknown' as last resort).
     """
+    orig = request.environ.get('werkzeug.proxy_fix.orig')
+    if orig is not None and orig.get('REMOTE_ADDR') != request.remote_addr:
+        return request.remote_addr or 'unknown'
     if is_request_from_trusted_proxy():
         xff = request.headers.get('X-Forwarded-For') or ''
         if xff:

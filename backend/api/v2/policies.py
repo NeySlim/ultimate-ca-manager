@@ -8,6 +8,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, CA, Certificate
 from models.policy import CertificatePolicy, ApprovalRequest
+from models.certificate_template import CertificateTemplate
 from datetime import datetime, timedelta
 import json
 import logging
@@ -15,6 +16,8 @@ import base64
 import uuid
 from utils.datetime_utils import utc_now
 from services.audit_service import AuditService
+from security.encryption import encrypt_private_key
+from services.template_service import compute_template_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +89,22 @@ def _issue_approved_certificate(approval):
     if not data:
         raise ValueError("No request data stored in approval")
 
+    # Resolve the template the request was made against (issue #226 semantics:
+    # templates govern issuance — KU/EKU, digest, and the defaults for key
+    # type / validity). Without this, approved requests silently degraded to
+    # the legacy hardcoded profile and produced certs that were NOT what the
+    # template promised.
+    template = None
+    if data.get('template_id'):
+        template = db.session.get(CertificateTemplate, data['template_id'])
+        if not template:
+            raise ValueError(f"Template {data['template_id']} not found")
+
     # Re-clamp validity at issuance time:
-    #   1) hard cap (defence against a tampered/old request_data)
-    #   2) re-check live policy.max_validity_days in case the policy was
-    #      tightened between request and approval
-    requested_validity = int(data.get('validity_days') or 365)
+    #   0) template default when the request didn't pick one (digest behaves
+    #      the same way — the template's digest is imposed at signing)
+    requested_validity = int(data.get('validity_days')
+                             or (template.validity_days if template and template.validity_days else 365))
     if requested_validity <= 0:
         requested_validity = 365
     effective_max = _MAX_VALIDITY_DAYS
@@ -119,9 +133,17 @@ def _issue_approved_certificate(approval):
     from services.hsm.ca_key_loader import get_ca_signing_key
     ca_key = get_ca_signing_key(ca)
     
-    # Generate key pair
-    key_type = data.get('key_type', 'RSA')
-    key_size = data.get('key_size', '2048')
+    # Generate key pair — the template's key_type is the default when the
+    # request didn't pick one (API parity with the UI prefill, #226).
+    key_type = data.get('key_type') or data.get('keyType')
+    key_size = data.get('key_size') or data.get('keySize')
+    if not key_type and template and template.key_type:
+        tpl_algo, _, tpl_size = template.key_type.partition('-')
+        key_type = tpl_algo
+        if not key_size:
+            key_size = tpl_size
+    key_type = key_type or 'RSA'
+    key_size = key_size or '2048'
     
     if key_type.upper() in ('EC', 'ECDSA'):
         curve_map = {
@@ -129,7 +151,7 @@ def _issue_approved_certificate(approval):
             '384': ec.SECP384R1(), 'secp384r1': ec.SECP384R1(),
             '521': ec.SECP521R1(), 'secp521r1': ec.SECP521R1(),
         }
-        curve = curve_map.get(str(key_size), ec.SECP256R1())
+        curve = curve_map.get(str(key_size), curve_map.get(str(key_size).lstrip('Pp'), ec.SECP256R1()))
         new_key = ec.generate_private_key(curve, default_backend())
     else:
         new_key = rsa.generate_private_key(65537, int(key_size), default_backend())
@@ -146,6 +168,12 @@ def _issue_approved_certificate(approval):
     # validity_days already clamped + propagated above
     validity_days = data['validity_days']
     now = utc_now()
+
+    # CA-chain sanity: validity must not extend past the CA's own certificate
+    ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
+    if now + timedelta(days=validity_days) > ca_not_after:
+        raise ValueError(
+            f"validity_days exceeds CA expiration ({ca_not_after.isoformat()})")
     
     builder = x509.CertificateBuilder()
     builder = builder.subject_name(subject)
@@ -157,19 +185,66 @@ def _issue_approved_certificate(approval):
     
     builder = builder.add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
     
-    # Key Usage
+    # Key Usage / Extended Key Usage.
+    # A template's extensions_template is the source of truth for KU/EKU
+    # (issue #226); without a template the legacy cert_type profile applies.
     cert_type = data.get('cert_type', 'server')
+    tpl_ext = {}
+    if template and template.extensions_template:
+        try:
+            tpl_ext = template.extensions_template
+            # tolerate double-encoded JSON from older/import payloads
+            for _ in range(2):
+                if isinstance(tpl_ext, str):
+                    tpl_ext = json.loads(tpl_ext)
+            if not isinstance(tpl_ext, dict):
+                tpl_ext = {}
+        except (ValueError, TypeError):
+            tpl_ext = {}
+
+    ku_name_to_flag = {
+        'digitalsignature': 'digital_signature',
+        'keyencipherment': 'key_encipherment',
+        'contentcommitment': 'content_commitment',
+        'nonrepudiation': 'content_commitment',
+        'dataencipherment': 'data_encipherment',
+        'keyagreement': 'key_agreement',
+        'keycertsign': 'key_cert_sign',
+        'crlsign': 'crl_sign',
+    }
+
     if cert_type == 'client':
-        builder = builder.add_extension(x509.KeyUsage(digital_signature=True, key_encipherment=False, content_commitment=False,
-            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False, encipher_only=False, decipher_only=False), critical=True)
-        builder = builder.add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
+        ku_flags = dict(digital_signature=True, key_encipherment=False, content_commitment=False,
+            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False, encipher_only=False, decipher_only=False)
+        base_ekus = [ExtendedKeyUsageOID.CLIENT_AUTH]
     else:
-        builder = builder.add_extension(x509.KeyUsage(digital_signature=True, key_encipherment=True, content_commitment=False,
-            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False, encipher_only=False, decipher_only=False), critical=True)
-        ekus = [ExtendedKeyUsageOID.SERVER_AUTH]
+        ku_flags = dict(digital_signature=True, key_encipherment=True, content_commitment=False,
+            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False, encipher_only=False, decipher_only=False)
+        base_ekus = [ExtendedKeyUsageOID.SERVER_AUTH]
         if cert_type == 'combined':
-            ekus.append(ExtendedKeyUsageOID.CLIENT_AUTH)
-        builder = builder.add_extension(x509.ExtendedKeyUsage(ekus), critical=False)
+            base_ekus.append(ExtendedKeyUsageOID.CLIENT_AUTH)
+
+    tpl_ku = tpl_ext.get('key_usage')
+    if isinstance(tpl_ku, list) and tpl_ku:
+        mapped = dict.fromkeys(ku_flags, False)
+        for name in tpl_ku:
+            flag = ku_name_to_flag.get(str(name).lower())
+            if flag:
+                mapped[flag] = True
+        if any(mapped.values()):
+            ku_flags = mapped
+
+    tpl_eku = tpl_ext.get('extended_key_usage')
+    if isinstance(tpl_eku, list) and tpl_eku:
+        from utils.eku_validation import normalize_extra_ekus, to_object_identifiers
+        tpl_oid_strs, tpl_err = normalize_extra_ekus(tpl_eku)
+        if tpl_err:
+            raise ValueError(f'Invalid template EKUs: {tpl_err}')
+        base_ekus = to_object_identifiers(tpl_oid_strs)
+
+    builder = builder.add_extension(x509.KeyUsage(**ku_flags), critical=True)
+    if base_ekus:
+        builder = builder.add_extension(x509.ExtendedKeyUsage(base_ekus), critical=False)
     
     # SANs
     from ipaddress import ip_address
@@ -229,8 +304,12 @@ def _issue_approved_certificate(approval):
             x509.PolicyInformation(policy_identifier=x509.ObjectIdentifier(ca.cps_oid or '2.5.29.32.0'), policy_qualifiers=[ca.cps_uri])
         ]), critical=False)
     
-    # Sign
-    new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
+    # Sign — honor the template digest when one is used
+    from services.trust_store.constants import HASH_ALGORITHMS
+    sign_hash = hashes.SHA256()
+    if template and template.digest:
+        sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
+    new_cert = builder.sign(ca_key, sign_hash, default_backend())
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = new_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()).decode('utf-8')
     
@@ -248,13 +327,31 @@ def _issue_approved_certificate(approval):
     except Exception:
         pass
     
-    # Save to DB
+    # Save to DB — encrypt private key at rest (matches CertificateService.sign_csr), keep the
+    # template link and record the issued divergences from its defaults (#258).
+    prv_encoded = encrypt_private_key(base64.b64encode(key_pem.encode()).decode())
+
+    _curve_to_pnum = {
+        'prime256v1': '256', 'secp256r1': '256',
+        'secp384r1': '384', 'secp521r1': '521',
+    }
+    _size_digits = str(
+        _curve_to_pnum.get(str(key_size).lower(), key_size)
+    ).lstrip('Pp')
+    effective_key_label = (
+        f"EC-P{_size_digits}" if key_type.upper() in ('EC', 'ECDSA')
+        else f"{key_type.upper()}-{_size_digits}"
+    )
+    template_overrides = compute_template_overrides(
+        template, key_type=effective_key_label, validity_days=validity_days,
+        digest=template.digest if template else None,
+    ) if template else None
     db_cert = Certificate(
         refid=str(uuid.uuid4())[:8],
         descr=data.get('description', data['cn']),
         caref=ca.refid,
         crt=base64.b64encode(cert_pem.encode()).decode(),
-        prv=base64.b64encode(key_pem.encode()).decode(),
+        prv=prv_encoded,
         cert_type=cert_type,
         subject=new_cert.subject.rfc4514_string(),
         issuer=new_cert.issuer.rfc4514_string(),
@@ -267,6 +364,8 @@ def _issue_approved_certificate(approval):
         san_ip=json.dumps(data.get('san_ip', [])),
         san_email=json.dumps(data.get('san_email', [])),
         source='approval',
+        template_id=template.id if template else None,
+        template_overrides=template_overrides,
         created_by=approval.requester.username if approval.requester else 'system'
     )
     db.session.add(db_cert)

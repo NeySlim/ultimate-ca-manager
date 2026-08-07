@@ -7,10 +7,11 @@ from services.cert_service import CertificateService
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from utils.acme_public_url import get_acme_public_base
+from utils.acme_public_url import get_acme_public_base, get_acme_public_host
 from services.acme import profiles as acme_profiles
 
 from . import bp, logger
+from services.acme import dns_persist as acme_dns_persist
 
 
 def _count_superseded_certificates():
@@ -149,6 +150,12 @@ def get_acme_settings():
         # ACME Profiles Extension (draft-ietf-acme-profiles). Returned
         # normalised (defaults filled in) so the UI shows what clients get.
         'profiles': acme_profiles.get_profiles(),
+        # dns-persist-01 (draft-ietf-acme-dns-persist) — opt-in persistent
+        # TXT validation, issuer domains derive from the CAA identifiers
+        # (or the public ACME hostname when unset)
+        'dns_persist_enabled': acme_dns_persist.is_enabled(),
+        'dns_persist_issuer_domains': acme_dns_persist.get_issuer_domain_names(
+            fallback_host=get_acme_public_host(request)),
     })
 
 
@@ -200,6 +207,18 @@ def update_acme_settings():
                                      description='CAA issuer domains (comma-separated)')
             db.session.add(ident_cfg)
         ident_cfg.value = str(data['caa_identifiers'] or '').strip()[:1000]
+
+    # dns-persist-01 (draft-ietf-acme-dns-persist) — opt-in persistent
+    # validation: long-lived issuance capability bound to account key (draft
+    # §7.2), hence the explicit toggle with UI warning rather than a default.
+    if 'dns_persist_enabled' in data:
+        persist_cfg = SystemConfig.query.filter_by(key=acme_dns_persist.CONFIG_ENABLED_KEY).first()
+        if not persist_cfg:
+            persist_cfg = SystemConfig(
+                key=acme_dns_persist.CONFIG_ENABLED_KEY,
+                description='Offer dns-persist-01 challenge (persistent TXT validation)')
+            db.session.add(persist_cfg)
+        persist_cfg.value = 'true' if data['dns_persist_enabled'] else 'false'
 
     # Update Terms of Service
     if 'terms_of_service' in data:

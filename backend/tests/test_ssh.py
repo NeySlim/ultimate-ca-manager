@@ -297,6 +297,120 @@ class TestUpdateSSHCA:
 
 
 # ============================================================
+# TTL duration strings — UI placeholder promises "24h, 7d, 365d"
+# ============================================================
+
+class TestSSHCaTtlDuration:
+    """TTL fields accept duration strings, normalized to int seconds."""
+
+    def test_create_accepts_day_suffix(self, auth_client):
+        payload = {**VALID_USER_CA, 'descr': 'Duration Days CA', 'default_ttl': '365d'}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        data = assert_success(r, status=201)
+        assert data['default_ttl'] == 365 * 86400
+
+    def test_create_accepts_hour_suffix_and_max_ttl(self, auth_client):
+        payload = {**VALID_USER_CA, 'descr': 'Duration Hours CA',
+                   'default_ttl': '24h', 'max_ttl': '7d'}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        data = assert_success(r, status=201)
+        assert data['default_ttl'] == 86400
+        assert data['max_ttl'] == 7 * 86400
+
+    def test_create_accepts_numeric_string(self, auth_client):
+        payload = {**VALID_USER_CA, 'descr': 'Numeric String TTL CA', 'default_ttl': '3600'}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        data = assert_success(r, status=201)
+        assert data['default_ttl'] == 3600
+
+    def test_create_rejects_unknown_unit(self, auth_client):
+        payload = {**VALID_USER_CA, 'descr': 'Bad Unit CA', 'default_ttl': '365x'}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        assert_error(r, 400)
+
+    def test_create_rejects_garbage(self, auth_client):
+        payload = {**VALID_USER_CA, 'descr': 'Garbage TTL CA', 'default_ttl': 'abc'}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        assert_error(r, 400)
+
+    def test_create_rejects_boolean(self, auth_client):
+        payload = {**VALID_USER_CA, 'descr': 'Boolean TTL CA', 'default_ttl': True}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        assert_error(r, 400)
+
+    def test_update_accepts_duration(self, auth_client):
+        ca = _create_ssh_ca(auth_client, descr='Duration Update CA')
+        r = put_json(auth_client, f'/api/v2/ssh/cas/{ca["id"]}', {'default_ttl': '30d'})
+        data = assert_success(r)
+        assert data['default_ttl'] == 30 * 86400
+
+    def test_update_rejects_invalid_duration(self, auth_client):
+        ca = _create_ssh_ca(auth_client, descr='Duration Reject CA')
+        r = put_json(auth_client, f'/api/v2/ssh/cas/{ca["id"]}', {'max_ttl': 'forever'})
+        assert_error(r, 400)
+
+    def test_import_accepts_duration(self, auth_client):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding, NoEncryption, PrivateFormat,
+        )
+        key = ed25519.Ed25519PrivateKey.generate()
+        pem = key.private_bytes(Encoding.PEM, PrivateFormat.OpenSSH, NoEncryption()).decode()
+        r = post_json(auth_client, '/api/v2/ssh/cas/import', {
+            'private_key': pem,
+            'descr': 'Duration Import CA',
+            'ca_type': 'user',
+            'default_ttl': '90d',
+            'max_ttl': '1y',
+        })
+        data = assert_success(r, status=201)
+        assert data['default_ttl'] == 90 * 86400
+        assert data['max_ttl'] == 365 * 86400
+
+    def test_duration_ca_signs_certificate(self, auth_client):
+        """The import path used to store raw strings — issuance then crashed
+        on int(ca.default_ttl). Duration-created CAs must sign fine."""
+        payload = {**VALID_USER_CA, 'descr': 'Duration Sign CA', 'default_ttl': '365d'}
+        r = post_json(auth_client, '/api/v2/ssh/cas', payload)
+        ca = assert_success(r, status=201)
+        r = post_json(auth_client, '/api/v2/ssh/certificates', {
+            'ca_id': ca['id'],
+            'public_key': _generate_test_ssh_key(),
+            'cert_type': 'user',
+            'principals': ['testuser'],
+        })
+        assert_success(r, status=201)
+
+
+class TestParseDurationSeconds:
+    """Unit coverage for utils.duration.parse_duration_seconds."""
+
+    def test_units(self):
+        from utils.duration import parse_duration_seconds as parse
+        assert parse('30s') == 30
+        assert parse('30m') == 1800
+        assert parse('24h') == 86400
+        assert parse('7d') == 604800
+        assert parse('2w') == 1209600
+        assert parse('1y') == 31536000
+        assert parse('7D') == 604800  # case-insensitive
+        assert parse(' 24h ') == 86400  # surrounding whitespace
+
+    def test_passthrough_scalars(self):
+        from utils.duration import parse_duration_seconds as parse
+        assert parse(3600) == 3600
+        assert parse('3600') == 3600
+        assert parse(0) == 0  # max_ttl=0 means unlimited
+
+    def test_rejects_invalid(self):
+        from utils.duration import parse_duration_seconds as parse
+        for bad in ('', 'd', '1.5h', '-7d', '365x', 'abc', True, None, [86400],
+                    1.5, float('inf'), float('nan'), 2**63, '99999999999999999999y'):
+            with pytest.raises(ValueError):
+                parse(bad)
+
+
+# ============================================================
 # Delete SSH CA
 # ============================================================
 
