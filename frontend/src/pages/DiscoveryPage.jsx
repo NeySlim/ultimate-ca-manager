@@ -70,9 +70,16 @@ export default function DiscoveryPage() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
 
-  // Filters
+  // Search & Filters
+  const [discoveredSearch, setDiscoveredSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState([])   // [] = all, ['managed', 'unmanaged', 'error']
   const [profileFilter, setProfileFilter] = useState(null)  // null = all, profile id
+
+  // Reset to first page and update search term (discovered tab)
+  const handleDiscoveredSearchChange = useCallback((val) => {
+    setPage(1)
+    setDiscoveredSearch(val)
+  }, [])
 
   // ── Data loaders ──────────────────────────────────────
   const loadStats = useCallback(async () => {
@@ -91,7 +98,7 @@ export default function DiscoveryPage() {
 
   const loadDiscovered = useCallback(async () => {
     try {
-      const params = { limit: perPage, offset: (page - 1) * perPage }
+      const params = { limit: perPage, offset: (page - 1) * perPage, search: discoveredSearch || undefined }
       if (statusFilter.length > 0) params.status = statusFilter
       if (profileFilter) params.profile_id = profileFilter
       const res = await discoveryService.getAll(params)
@@ -104,7 +111,7 @@ export default function DiscoveryPage() {
         setDiscoveredTotal(data.total ?? data.items?.length ?? 0)
       }
     } catch { /* silent */ }
-  }, [page, perPage, JSON.stringify(statusFilter), profileFilter])
+  }, [page, perPage, discoveredSearch, JSON.stringify(statusFilter), profileFilter])
 
   const loadRuns = useCallback(async () => {
     try {
@@ -621,7 +628,8 @@ export default function DiscoveryPage() {
             onRowClick={(item) => item ? setSelectedItem(item) : setSelectedItem(null)}
             searchable
             searchPlaceholder={t('discovery.searchDiscovered')}
-            searchKeys={['subject', 'target', 'issuer', 'serial_number']}
+            externalSearch={discoveredSearch}
+            onSearchChange={handleDiscoveredSearchChange}
             columnStorageKey="ucm-discovery-columns"
             densityStorageKey="ucm-discovery-density"
             sortable

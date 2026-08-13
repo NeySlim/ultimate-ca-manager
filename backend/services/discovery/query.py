@@ -40,7 +40,7 @@ class QueryMixin:
         return {'total': len(certs), 'updated': updated}
 
     def get_all(self, limit: int = 200, offset: int = 0,
-                profile_id: int = None, status=None) -> Tuple[List[Dict], int]:
+                profile_id: int = None, status=None, search: str = None) -> Tuple[List[Dict], int]:
         """Return discovered certificates with pagination. Returns (items, total).
         status can be str or list[str] for multi-select.
         """
@@ -52,6 +52,15 @@ class QueryMixin:
                 query = query.filter(DiscoveredCertificate.status.in_(status))
             else:
                 query = query.filter_by(status=status)
+        if search:
+            safe_search = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            pattern = f'%{safe_search}%'
+            query = query.filter(db.or_(
+                DiscoveredCertificate.subject.ilike(pattern, escape='\\'),
+                DiscoveredCertificate.issuer.ilike(pattern, escape='\\'),
+                DiscoveredCertificate.target.ilike(pattern, escape='\\'),
+                DiscoveredCertificate.serial_number.ilike(pattern, escape='\\'),
+            ))
         total = query.count()
         rows = query.order_by(DiscoveredCertificate.last_seen.desc()
                               ).offset(offset).limit(limit).all()

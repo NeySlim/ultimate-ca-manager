@@ -301,10 +301,12 @@ def list_discovered():
     offset = _safe_int(request.args.get('offset', 0), 0, lo=0)
     profile_id = request.args.get('profile_id', type=int)
     status_list = request.args.getlist('status')
+    search = request.args.get('search', '').strip()
     svc = _get_service()
     items, total = svc.get_all(limit=limit, offset=offset,
                                profile_id=profile_id,
-                               status=status_list if status_list else None)
+                               status=status_list if status_list else None,
+                               search=search or None)
     return success_response(data={'items': items, 'total': total})
 
 
