@@ -29,6 +29,7 @@ export default {
           { label: 'Zertifikatsvorlage', text: 'Ist eine Vorlage gebunden, bestimmen deren KU/EKU und Gültigkeit jedes über das Profil ausgestellte Zertifikat' },
           { label: 'Challenge pro Profil', text: 'Jedes Profil hat ein eigenes, verschlüsselt gespeichertes Challenge-Passwort mit demselben Ablauffenster wie die globale Challenge' },
           { label: 'Standard-Endpunkt', text: 'Der Endpunkt /scep/pkiclient.exe ohne Segment bedient weiterhin die globale Konfiguration' },
+          { label: 'Microsoft Intune-Validierung', text: 'Ein Profil kann anstelle eines statischen Passworts gegen Intunes eigene gerätespezifische SCEP-Challenge validieren — erfordert eine Entra-App-Registrierung (Berechtigungen SCEP challenge validation + Application.Read.All) und aktivierte Auto-Genehmigung' },
         ]
       },
     ],
@@ -36,6 +37,7 @@ export default {
       'Verwenden Sie eindeutige Challenge-Passwörter pro CA für bessere Sicherheitsüberwachung',
       'Auto-Genehmigung ist praktisch, aber überprüfen Sie Anfragen in Hochsicherheitsumgebungen manuell',
       'SCEP-URL-Format: https://ihr-server:port/scep',
+      'Intune-Profile benötigen aktivierte Auto-Genehmigung — die Registrierung bei Intune ist ein synchroner Validierungs- und Ausstellungsvorgang ohne Genehmigungswarteschlange auf Intune-Seite',
     ],
     warnings: [
       'Challenge-Passwörter werden in der SCEP-Anfrage übertragen — verwenden Sie HTTPS für Transportsicherheit',
@@ -123,10 +125,19 @@ crypto pki trustpoint UCM
   password <challenge-passwort>
 \`\`\`
 
-### Microsoft Intune / JAMF
+### JAMF
 Konfigurieren Sie das SCEP-Profil mit:
 - Server-URL: \`https://ihr-server:8443/scep\`
 - Challenge: das Passwort von UCM
+
+### Microsoft Intune
+Intune unterstützt kein statisches Challenge-Passwort — es stellt eine eigene verschlüsselte, gerätespezifische Challenge aus, die nur die Intune-API validieren kann. Aktivieren Sie auf einem SCEP-**Profil** (nicht dem globalen Endpunkt) **Microsoft Intune SCEP-Challenge-Validierung** und geben Sie Mandanten-ID, Client-ID und Client-Secret einer Entra-App-Registrierung an:
+
+1. Registrieren Sie in Microsoft Entra ID eine App und erteilen Sie ihr die Anwendungsberechtigungen **Intune API → SCEP challenge validation** (\`scep_challenge_provider\`) und **Microsoft Graph → Application.Read.All**, beide mit Administratorzustimmung
+2. Geben Sie Mandanten-ID, Client-ID und Client-Secret im Profil ein und klicken Sie auf **Verbindung testen**, um vor dem Speichern zu bestätigen, dass UCM Intune erreichen kann
+3. Zeigen Sie in Intune die Server-URL des Geräte-SCEP-Profils auf den Endpunkt \`/scep/<segment>/pkiclient.exe\` dieses Profils
+
+Intune-Profile müssen **Auto-Genehmigung** aktiviert haben — die Registrierung bei Intune ist ein synchroner Validierungs- und Ausstellungsvorgang, ohne Warteschlange auf Intune-Seite für eine manuelle Prüfung.
 `
   }
 }

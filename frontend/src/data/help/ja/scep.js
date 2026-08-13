@@ -29,6 +29,7 @@ export default {
           { label: '証明書テンプレート', text: 'テンプレートを紐付けると、そのKU/EKUと有効期間がプロファイル経由で発行されるすべての証明書を決定します' },
           { label: 'プロファイルごとのチャレンジ', text: '各プロファイルは独自のチャレンジパスワードを持ち、暗号化して保存され、グローバルチャレンジと同じ有効期限が適用されます' },
           { label: '既定のエンドポイント', text: 'セグメントなしの /scep/pkiclient.exe はこれまで通りグローバル設定で動作します' },
+          { label: 'Microsoft Intune 検証', text: 'プロファイルは静的パスワードの代わりに、Intune 独自のデバイスごとの SCEP チャレンジに対して検証できます。Entra アプリ登録（SCEP challenge validation と Application.Read.All の権限）と自動承認の有効化が必要です' },
         ]
       },
     ],
@@ -36,6 +37,7 @@ export default {
       'セキュリティ監査向上のため、CA別にユニークなチャレンジパスワードを使用してください',
       '自動承認は便利ですが、高セキュリティ環境ではリクエストを手動でレビューしてください',
       'SCEP URLフォーマット: https://your-server:port/scep',
+      'Intune プロファイルは自動承認を有効にする必要があります — Intune の登録は同期的な検証・発行の往復処理であり、Intune 側に承認待ちキューはありません',
     ],
     warnings: [
       'チャレンジパスワードはSCEPリクエスト内で送信されます — トランスポートセキュリティにHTTPSを使用してください',
@@ -123,10 +125,19 @@ crypto pki trustpoint UCM
   password <challenge-password>
 \`\`\`
 
-### Microsoft Intune / JAMF
+### JAMF
 以下でSCEPプロファイルを設定：
 - サーバーURL: \`https://your-server:8443/scep\`
 - チャレンジ: UCMからのパスワード
+
+### Microsoft Intune
+Intune は静的なチャレンジパスワードをサポートしていません。Intune の API だけが検証できる、デバイスごとの暗号化されたチャレンジを独自に発行します。（グローバルエンドポイントではなく）SCEP **プロファイル**で **Microsoft Intune SCEP チャレンジ検証** を有効にし、Entra アプリ登録のテナント ID、クライアント ID、クライアントシークレットを指定してください。
+
+1. Microsoft Entra ID でアプリを登録し、**Intune API → SCEP challenge validation**（\`scep_challenge_provider\`）と **Microsoft Graph → Application.Read.All** のアプリケーション権限を、いずれも管理者の同意を得て付与します
+2. プロファイルにテナント ID、クライアント ID、クライアントシークレットを入力し、保存前に **接続をテスト** をクリックして UCM が Intune に到達できることを確認します
+3. Intune で、デバイスの SCEP プロファイルのサーバー URL をこのプロファイルの \`/scep/<segment>/pkiclient.exe\` エンドポイントに向けます
+
+Intune を有効にしたプロファイルは **自動承認** を有効にする必要があります — Intune の登録は同期的な検証・発行の往復処理であり、Intune 側に手動レビュー用のキューはありません。
 `
   }
 }

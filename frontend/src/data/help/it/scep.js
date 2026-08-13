@@ -29,6 +29,7 @@ export default {
           { label: 'Modello di certificato', text: 'Quando un modello è associato, i suoi KU/EKU e la validità governano ogni certificato emesso tramite il profilo' },
           { label: 'Challenge per profilo', text: 'Ogni profilo ha la propria password di challenge, memorizzata cifrata, con la stessa finestra di scadenza della challenge globale' },
           { label: 'Endpoint predefinito', text: 'L\'endpoint /scep/pkiclient.exe senza segmento continua a servire la configurazione globale' },
+          { label: 'Validazione Microsoft Intune', text: 'Un profilo può validarsi contro la challenge SCEP propria di Intune per dispositivo invece di una password statica — richiede una registrazione app Entra (permessi SCEP challenge validation + Application.Read.All) e l\'approvazione automatica attiva' },
         ]
       },
     ],
@@ -36,6 +37,7 @@ export default {
       'Usa challenge password uniche per CA per un miglior auditing di sicurezza',
       'L\'approvazione automatica è comoda ma rivedi le richieste manualmente in ambienti ad alta sicurezza',
       'Formato URL SCEP: https://your-server:port/scep',
+      'I profili Intune richiedono l\'approvazione automatica attiva — l\'iscrizione Intune è un round trip sincrono di convalida e poi emissione, senza coda di approvazione lato Intune',
     ],
     warnings: [
       'Le challenge password vengono trasmesse nella richiesta SCEP — usa HTTPS per la sicurezza del trasporto',
@@ -123,10 +125,19 @@ crypto pki trustpoint UCM
   password <challenge-password>
 \`\`\`
 
-### Microsoft Intune / JAMF
+### JAMF
 Configura il profilo SCEP con:
 - URL server: \`https://your-server:8443/scep\`
 - Challenge: la password da UCM
+
+### Microsoft Intune
+Intune non supporta una challenge password statica — emette una propria challenge cifrata per dispositivo che solo l'API di Intune può validare. Su un **profilo** SCEP (non l'endpoint globale), abilita **Convalida challenge SCEP di Microsoft Intune** e fornisci tenant ID, client ID e client secret di una registrazione app Entra:
+
+1. In Microsoft Entra ID, registra un'app e concedile i permessi applicazione **Intune API → SCEP challenge validation** (\`scep_challenge_provider\`) e **Microsoft Graph → Application.Read.All**, entrambi con consenso amministratore
+2. Inserisci tenant ID, client ID e client secret nel profilo, poi clicca **Verifica connessione** per confermare che UCM possa raggiungere Intune prima di salvare
+3. In Intune, punta l'URL server del profilo SCEP del dispositivo all'endpoint \`/scep/<segment>/pkiclient.exe\` di questo profilo
+
+I profili con Intune abilitato devono avere l'**approvazione automatica** attiva — l'iscrizione Intune è un round trip sincrono di convalida e poi emissione, senza coda lato Intune per una revisione manuale.
 `
   }
 }

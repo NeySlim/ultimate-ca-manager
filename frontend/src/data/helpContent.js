@@ -389,6 +389,7 @@ export const helpContent = {
           { label: 'Certificate template', text: 'When a template is bound, its key usage, extended key usage and validity govern every certificate issued through the profile' },
           { label: 'Per-profile challenge', text: 'Each profile has its own challenge password, stored encrypted, with the same expiry window as the global challenge' },
           { label: 'Default endpoint', text: 'The unlabelled /scep/pkiclient.exe endpoint keeps serving the global configuration' },
+          { label: 'Microsoft Intune validation', text: 'A profile can validate against Intune\'s own per-device SCEP challenge instead of a static password — requires an Entra app registration (SCEP challenge validation + Application.Read.All permissions) and Auto-Approve enabled' },
         ]
       },
     ],
@@ -396,6 +397,7 @@ export const helpContent = {
       'Use unique challenge passwords per CA for better security auditing',
       'Auto-approve is convenient but review requests manually in high-security environments',
       'SCEP URL format: https://your-server:port/scep',
+      'Intune profiles need Auto-Approve on — Intune\'s enrollment is a synchronous validate-then-issue round trip with no approval queue on its side',
     ],
     warnings: [
       'Challenge passwords are transmitted in the SCEP request — use HTTPS for transport security',

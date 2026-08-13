@@ -743,7 +743,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 Each profile is bound to:
 - **Its own CA** — different device fleets can enroll against different CAs
 - **An optional certificate template** — when bound, the template's key usage, extended key usage and validity govern every certificate issued through the profile
-- **A per-profile challenge password** — stored encrypted, with the same expiry window as the global challenge
+- **A per-profile challenge password** — stored encrypted, with the same expiry window as the global challenge (or Microsoft Intune validation, see below)
 - **An approval policy** — auto-approve or manual review per profile
 
 Point each device fleet, MDM profile, or tenant at its own profile URL. The unlabelled \`/scep/pkiclient.exe\` endpoint keeps serving the global configuration unchanged.
@@ -793,10 +793,19 @@ crypto pki trustpoint UCM
   password <challenge-password>
 \`\`\`
 
-### Microsoft Intune / JAMF
+### JAMF
 Configure the SCEP profile with:
 - Server URL: \`https://your-server:8443/scep\`
 - Challenge: the password from UCM
+
+### Microsoft Intune
+Intune doesn't support a static challenge password — it issues its own encrypted, per-device challenge that only Intune's API can validate. On a SCEP **profile** (not the global endpoint), enable **Microsoft Intune SCEP challenge validation** and provide an Entra app registration's tenant ID, client ID and client secret:
+
+1. In Microsoft Entra ID, register an app and grant it **Intune API → SCEP challenge validation** (\`scep_challenge_provider\`) and **Microsoft Graph → Application.Read.All**, both application permissions, admin-consented
+2. Enter the tenant ID, client ID and client secret on the profile, then **Test Connection** to confirm UCM can reach Intune before saving
+3. In Intune, point the device SCEP profile's server URL at this profile's \`/scep/<segment>/pkiclient.exe\` endpoint
+
+Intune-enabled profiles must have **Auto-Approve** on — Intune's enrollment flow is a synchronous validate-then-issue round trip, with no queue on Intune's side for a human to review.
 `
   },
 

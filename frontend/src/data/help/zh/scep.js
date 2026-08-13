@@ -29,6 +29,7 @@ export default {
           { label: '证书模板', text: '绑定模板后，其密钥用法（KU/EKU）和有效期将决定通过该配置文件签发的每个证书' },
           { label: '按配置文件的质询', text: '每个配置文件都有自己的质询密码，加密存储，过期窗口与全局质询相同' },
           { label: '默认端点', text: '不带片段的 /scep/pkiclient.exe 端点继续使用全局配置' },
+          { label: 'Microsoft Intune 验证', text: '配置文件可以针对 Intune 自己的按设备 SCEP 质询进行验证，而不使用静态密码 —— 需要 Entra 应用注册（SCEP challenge validation 和 Application.Read.All 权限）并启用自动批准' },
         ]
       },
     ],
@@ -36,6 +37,7 @@ export default {
       '为每个 CA 使用唯一的质询密码以提高安全审计能力',
       '自动批准很方便，但在高安全环境中建议手动审核请求',
       'SCEP URL 格式：https://your-server:port/scep',
+      'Intune 配置文件需要启用自动批准 —— Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有批准队列',
     ],
     warnings: [
       '质询密码在 SCEP 请求中传输——请使用 HTTPS 保证传输安全',
@@ -123,8 +125,17 @@ crypto pki trustpoint UCM-CA
 crypto pki enroll UCM-CA
 \`\`\`
 
-### Microsoft Intune / JAMF
+### JAMF
 在 MDM 配置文件中配置 SCEP URL、质询密码和证书主题。MDM 平台会自动处理注册。
+
+### Microsoft Intune
+Intune 不支持静态质询密码 —— 它会为每台设备签发自己的加密质询，只有 Intune 的 API 才能验证。在 SCEP **配置文件**（而非全局端点）上启用 **Microsoft Intune SCEP 质询验证**，并提供 Entra 应用注册的租户 ID、客户端 ID 和客户端密钥：
+
+1. 在 Microsoft Entra ID 中注册一个应用，并授予其 **Intune API → SCEP challenge validation**（\`scep_challenge_provider\`）和 **Microsoft Graph → Application.Read.All** 应用程序权限，两者均需管理员同意
+2. 在配置文件中输入租户 ID、客户端 ID 和客户端密钥，然后点击**测试连接**，在保存前确认 UCM 能够连接到 Intune
+3. 在 Intune 中，将设备 SCEP 配置文件的服务器 URL 指向此配置文件的 \`/scep/<segment>/pkiclient.exe\` 端点
+
+启用了 Intune 的配置文件必须启用**自动批准** —— Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有供人工审核的队列。
 
 > 💡 SCEP 是传统协议。对于新部署，如果设备支持，建议优先使用 EST。
 `
