@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, PencilSimple, Trash, Copy, ArrowsClockwise, LinkSimple } from '@phosphor-icons/react'
-import { Button, Input, Select, Card, Badge, Modal, EmptyState } from '../../components'
+import { Plus, PencilSimple, Trash, Copy, ArrowsClockwise, LinkSimple, TestTube } from '@phosphor-icons/react'
+import { Button, Input, Select, Card, Badge, Modal, EmptyState, HelpCard } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { scepService } from '../../services'
 import { useNotification } from '../../contexts'
@@ -9,6 +9,7 @@ import { useNotification } from '../../contexts'
 const EMPTY_FORM = {
   name: '', url_slug: '', description: '', ca_id: '',
   template_id: '', challenge_password: '', auto_approve: false, enabled: true,
+  intune_enabled: false, intune_tenant_id: '', intune_client_id: '', intune_client_secret: '',
 }
 
 // SCEP profiles: named endpoints at /scep/<slug>/pkiclient.exe, each bound to
@@ -21,6 +22,7 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [slugTouched, setSlugTouched] = useState(false)
+  const [testingIntune, setTestingIntune] = useState(false)
 
   const baseUrl = useMemo(() => window.location.origin, [])
 
@@ -45,6 +47,10 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
       challenge_password: '',
       auto_approve: profile.auto_approve,
       enabled: profile.enabled,
+      intune_enabled: profile.intune_enabled || false,
+      intune_tenant_id: profile.intune_tenant_id || '',
+      intune_client_id: profile.intune_client_id || '',
+      intune_client_secret: '',
     })
     setSlugTouched(true)
     setShowModal(true)
@@ -54,6 +60,10 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
     const next = { ...prev, [field]: val }
     if (field === 'name' && !slugTouched && !editing) next.url_slug = slugify(val)
     if (field === 'url_slug') setSlugTouched(true)
+    // Intune's flow is a synchronous validate-then-issue round trip -- there's
+    // no human queue on Intune's side to poll, so auto-approve is mandatory
+    // whenever Intune validation is on (enforced again server-side).
+    if (field === 'intune_enabled' && val) next.auto_approve = true
     return next
   })
 
@@ -69,8 +79,12 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
         template_id: formData.template_id ? parseInt(formData.template_id) : null,
         auto_approve: formData.auto_approve,
         enabled: formData.enabled,
+        intune_enabled: formData.intune_enabled,
+        intune_tenant_id: formData.intune_tenant_id,
+        intune_client_id: formData.intune_client_id,
       }
       if (formData.challenge_password) payload.challenge_password = formData.challenge_password
+      if (formData.intune_client_secret) payload.intune_client_secret = formData.intune_client_secret
       if (editing) {
         await scepService.updateProfile(editing.id, payload)
         showSuccess(t('scep.profileUpdated'))
@@ -112,6 +126,24 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
     }
   }
 
+  const handleTestIntuneConnection = async () => {
+    if (!formData.intune_tenant_id || !formData.intune_client_id) return
+    setTestingIntune(true)
+    try {
+      const response = await scepService.testIntuneConnection({
+        intune_tenant_id: formData.intune_tenant_id,
+        intune_client_id: formData.intune_client_id,
+        intune_client_secret: formData.intune_client_secret,
+        profile_id: editing?.id,
+      })
+      showSuccess(response.data?.message || t('scep.intuneTestSuccess'))
+    } catch (error) {
+      showError(error.message || t('scep.intuneTestFailed'))
+    } finally {
+      setTestingIntune(false)
+    }
+  }
+
   const copyUrl = async (profile) => {
     try {
       await navigator.clipboard.writeText(`${baseUrl}/scep/${profile.url_slug}/pkiclient.exe`)
@@ -146,7 +178,9 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
                   <h3 className="text-sm font-semibold text-text-primary truncate">{profile.name}</h3>
                   {!profile.enabled && <Badge variant="warning">{t('common.disabled')}</Badge>}
                   {profile.auto_approve && <Badge variant="success">{t('scep.autoApprove')}</Badge>}
-                  {profile.challenge_set && <Badge>{t('scep.challengeSetBadge')}</Badge>}
+                  {profile.intune_enabled
+                    ? <Badge variant="info">{t('scep.intuneEnabledBadge')}</Badge>
+                    : profile.challenge_set && <Badge>{t('scep.challengeSetBadge')}</Badge>}
                 </div>
                 <div className="flex items-center gap-1 mb-1">
                   <code className="text-xs font-mono text-text-secondary truncate">
@@ -223,21 +257,76 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
             ]}
           />
           <p className="text-xs text-text-tertiary -mt-2">{t('scep.profileTemplateHelp')}</p>
-          <Input
-            label={t('scep.challenge')}
-            type="password"
-            noAutofill
-            value={formData.challenge_password}
-            onChange={(e) => update('challenge_password', e.target.value)}
-            placeholder={editing && editing.challenge_set ? '••••••••' : ''}
-            helperText={t('scep.profileChallengeHelp')}
-          />
+          {!formData.intune_enabled && (
+            <Input
+              label={t('scep.challenge')}
+              type="password"
+              noAutofill
+              value={formData.challenge_password}
+              onChange={(e) => update('challenge_password', e.target.value)}
+              placeholder={editing && editing.challenge_set ? '••••••••' : ''}
+              helperText={t('scep.profileChallengeHelp')}
+            />
+          )}
           <ToggleSwitch
             checked={formData.auto_approve}
             onChange={(val) => update('auto_approve', val)}
             label={t('scep.autoApprove')}
+            disabled={formData.intune_enabled}
             size="sm"
           />
+          {formData.intune_enabled && (
+            <p className="text-xs text-text-tertiary -mt-2">{t('scep.intuneForcesAutoApprove')}</p>
+          )}
+
+          <div className="pt-2 border-t border-border space-y-3">
+            <ToggleSwitch
+              checked={formData.intune_enabled}
+              onChange={(val) => update('intune_enabled', val)}
+              label={t('scep.intuneEnabled')}
+              size="sm"
+            />
+            {formData.intune_enabled && (
+              <>
+                <HelpCard variant="info" title={t('scep.intuneHelpTitle')}>
+                  {t('scep.intuneHelpDesc')}
+                </HelpCard>
+                <Input
+                  label={t('scep.intuneTenantId')}
+                  value={formData.intune_tenant_id}
+                  onChange={(e) => update('intune_tenant_id', e.target.value)}
+                  placeholder="contoso.onmicrosoft.com"
+                  required
+                />
+                <Input
+                  label={t('scep.intuneClientId')}
+                  value={formData.intune_client_id}
+                  onChange={(e) => update('intune_client_id', e.target.value)}
+                  required
+                />
+                <Input
+                  label={t('scep.intuneClientSecret')}
+                  type="password"
+                  noAutofill
+                  value={formData.intune_client_secret}
+                  onChange={(e) => update('intune_client_secret', e.target.value)}
+                  placeholder={editing && editing.intune_client_secret_set ? '••••••••' : ''}
+                  required={!(editing && editing.intune_client_secret_set)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTestIntuneConnection}
+                  disabled={!formData.intune_tenant_id || !formData.intune_client_id || testingIntune}
+                >
+                  <TestTube size={14} />
+                  {testingIntune ? t('common.testing') : t('scep.intuneTestConnection')}
+                </Button>
+              </>
+            )}
+          </div>
+
           <ToggleSwitch
             checked={formData.enabled}
             onChange={(val) => update('enabled', val)}

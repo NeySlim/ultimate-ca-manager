@@ -107,6 +107,7 @@ class SCEPService:
         auto_approve: bool = False,
         challenge_expired: bool = False,
         template=None,
+        intune_client=None,
     ):
         """
         Initialize SCEP service for a specific CA.
@@ -123,12 +124,22 @@ class SCEPService:
                 profile (issue #228). When set, its KU/EKU and validity govern
                 issuance — the operator explicitly authorised this policy for
                 the profile's endpoint — while SANs still come from the CSR.
+            intune_client: Optional IntuneScepClient (issue #228 part 2).
+                When set, this profile validates its SCEP challenge live
+                against Microsoft Intune's API instead of comparing
+                ``challenge_password`` locally — Intune issues a per-device
+                encrypted+signed blob, not a static secret. The caller
+                (get_scep_service) only sets this when the profile's own
+                intune_enabled flag is on, and only for auto-approve profiles
+                (Intune's flow is a synchronous validate-then-issue round
+                trip; there's no human queue on Intune's side to poll).
         """
         self.ca_refid = ca_refid
         self.challenge_password = challenge_password
         self.auto_approve = auto_approve
         self.challenge_expired = challenge_expired
         self.template = template
+        self.intune_client = intune_client
 
         self.ca = CA.query.filter_by(refid=ca_refid).first()
         if not self.ca:
@@ -443,19 +454,37 @@ class SCEPService:
                     recipient_nonce=sender_nonce,
                 ), 200
 
-            # ---- 7. Validate challenge password (constant-time) ----
+            # ---- 7. Validate challenge password (constant-time), or Intune ----
             # An expired challenge is refused outright: renewals stay allowed
             # because they authenticate with the existing certificate
             # (_validate_renewal), so an expired secret does not strand a fleet
             # that is already enrolled.
-            if self.challenge_expired and message_type != self.MSG_TYPE_RENEWAL_REQ:
+            if self.intune_client is not None:
+                # Intune-bound profiles don't have a static secret to compare —
+                # the "challenge" is a per-device blob only Intune's own API
+                # can validate (issue #228 part 2). Renewals still go through
+                # this too: Intune's SCEP profiles reissue via a fresh
+                # challenge on renewal, same as an initial enrollment.
+                try:
+                    self.intune_client.validate_request(transaction_id, csr_data)
+                except Exception as e:
+                    logger.warning(
+                        "SCEP: Intune challenge validation failed "
+                        "(txn_id=%s client_ip=%s): %s",
+                        transaction_id, client_ip, e,
+                    )
+                    return self._create_error_response(
+                        self.FAIL_BAD_MESSAGE_CHECK, "Challenge validation failed",
+                        transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                    ), 200
+            elif self.challenge_expired and message_type != self.MSG_TYPE_RENEWAL_REQ:
                 return self._create_error_response(
                     self.FAIL_BAD_MESSAGE_CHECK,
                     "Challenge password has expired",
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
-            if self.challenge_password:
+            if self.intune_client is None and self.challenge_password:
                 if not self._has_usable_challenge_password(
                     challenge_pwd
                 ) or not hmac.compare_digest(
@@ -480,10 +509,15 @@ class SCEPService:
             # Refuse auto-issuance in that case (manual queue stays allowed, and
             # renewals are authenticated by the existing cert via _validate_renewal).
             # UCM_SCEP_ALLOW_NO_CHALLENGE=1 opts back in for a cloistered network.
+            # Intune-bound profiles are exempt: self.intune_client being set
+            # means this request already passed Intune's own ValidateRequest
+            # above, a real per-device authenticated challenge — it's simply
+            # not the local static challenge_password this guard checks for.
             if (
                 message_type != self.MSG_TYPE_RENEWAL_REQ
                 and self.auto_approve
                 and not self.challenge_password
+                and self.intune_client is None
                 and not _scep_allow_no_challenge()
             ):
                 logger.warning(
@@ -530,16 +564,81 @@ class SCEPService:
             db.session.add(scep_req)
 
             if self.auto_approve:
-                cert_refid = self._auto_approve_request(
-                    scep_req, csr,
-                    renewal_of=(signer_cert
-                                if message_type == self.MSG_TYPE_RENEWAL_REQ
-                                else None),
-                )
+                try:
+                    cert_refid = self._auto_approve_request(
+                        scep_req, csr,
+                        renewal_of=(signer_cert
+                                    if message_type == self.MSG_TYPE_RENEWAL_REQ
+                                    else None),
+                    )
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"SCEP: auto-approve issuance failed: {e}")
+                    # This request already passed Intune's ValidateRequest —
+                    # Intune expects to hear about a subsequent failure too,
+                    # not just silence. Best-effort: a failed notify here
+                    # must not mask the real error back to the device.
+                    if self.intune_client is not None:
+                        try:
+                            self.intune_client.send_failure_notification(
+                                transaction_id, csr_data,
+                                hresult=0x80004005,  # E_FAIL — no finer-grained mapping available
+                                description=str(e)[:255],
+                            )
+                        except Exception as notify_err:
+                            logger.error(
+                                "SCEP: Intune failure notification also failed: %s",
+                                notify_err,
+                            )
+                    return self._create_error_response(
+                        self.FAIL_BAD_REQUEST, "Server error issuing certificate",
+                        transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                    ), 200
+
                 scep_req.status = "approved"
                 scep_req.cert_refid = cert_refid
                 scep_req.approved_by = "auto"
                 scep_req.approved_at = utc_now()
+
+                # Flush (not commit) so the cert row is queryable within this
+                # transaction without being durable yet — Intune profiles
+                # need the signed cert's real details to notify Intune
+                # *before* anything is committed or returned to the device
+                # (see scep_service.py's Intune ordering note above step 7,
+                # and the plan for issue #228 part 2: Microsoft's own docs
+                # only make sense if "issuance" means handing the cert to the
+                # device, not the act of signing it).
+                try:
+                    db.session.flush()
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"SCEP: DB flush failed during auto-approve: {e}")
+                    return self._create_error_response(
+                        self.FAIL_BAD_REQUEST, "Server error persisting request",
+                        transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                    ), 200
+
+                cert = Certificate.query.filter_by(refid=cert_refid).first()
+                cert_obj = x509.load_pem_x509_certificate(
+                    base64.b64decode(cert.crt), default_backend()
+                )
+
+                if self.intune_client is not None:
+                    try:
+                        self.intune_client.send_success_notification(
+                            transaction_id, csr_data, cert_obj
+                        )
+                    except Exception as e:
+                        db.session.rollback()
+                        logger.error(
+                            "SCEP: Intune success notification failed, not "
+                            "issuing (txn_id=%s): %s", transaction_id, e,
+                        )
+                        return self._create_error_response(
+                            self.FAIL_BAD_REQUEST, "Server error persisting request",
+                            transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                        ), 200
+
                 try:
                     db.session.commit()
                 except Exception as e:
@@ -550,10 +649,6 @@ class SCEPService:
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
 
-                cert = Certificate.query.filter_by(refid=cert_refid).first()
-                cert_obj = x509.load_pem_x509_certificate(
-                    base64.b64decode(cert.crt), default_backend()
-                )
                 try:
                     from services.webhook_service import emit_cert_issued
                     if cert:

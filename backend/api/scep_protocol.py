@@ -135,6 +135,7 @@ def get_scep_service(profile_slug=None):
     # is a *weaker* check (it falls through to the manual-approval path) instead
     # of the outright refusal an expired secret must produce.
     template = None
+    intune_client = None
     if profile is not None:
         challenge, challenge_expired = _profile_challenge_state(profile)
         auto_approve = profile.auto_approve
@@ -151,6 +152,20 @@ def get_scep_service(profile_slug=None):
                 "SCEP: challenge password for profile %r expired; regenerate "
                 "it to allow enrollment", profile.name
             )
+
+        if profile.intune_enabled:
+            try:
+                from services.scep.intune_client import IntuneScepClient
+                intune_client = IntuneScepClient(
+                    tenant_id=profile.intune_tenant_id,
+                    client_id=profile.intune_client_id,
+                    client_secret=profile.decrypted_intune_secret(),
+                )
+            except Exception as e:
+                return _reject(
+                    f"SCEP profile {profile.name!r} has Intune validation "
+                    f"enabled but its Entra app config is invalid: {e}"
+                )
     else:
         from api.v2.scep import challenge_age_state
         challenge, challenge_expired, _expires_at = challenge_age_state(ca.id)
@@ -169,6 +184,7 @@ def get_scep_service(profile_slug=None):
             auto_approve=auto_approve,
             challenge_expired=challenge_expired,
             template=template,
+            intune_client=intune_client,
         )
         return service, None
     except Exception as e:

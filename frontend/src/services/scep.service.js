@@ -70,5 +70,9 @@ export const scepService = {
 
   async regenerateProfileChallenge(id) {
     return apiClient.post(`/scep/profiles/${id}/challenge/regenerate`)
+  },
+
+  async testIntuneConnection(data) {
+    return apiClient.post('/scep/profiles/test-intune-connection', data)
   }
 }

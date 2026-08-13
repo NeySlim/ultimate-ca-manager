@@ -40,6 +40,22 @@ class ScepProfile(db.Model):
     challenge_generated_at = db.Column(db.DateTime)
     auto_approve = db.Column(db.Boolean, default=False, nullable=False)
 
+    # Microsoft Intune SCEP challenge validation (issue #228 part 2). Mutually
+    # exclusive with challenge_password in practice: Intune issues its own
+    # per-device encrypted+signed challenge blob instead of a static secret,
+    # validated live against Intune's API rather than compared locally.
+    intune_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    intune_tenant_id = db.Column(db.String(255))
+    intune_client_id = db.Column(db.String(255))
+    # Encrypted at rest via utils.encryption (always encrypts — real key or
+    # machine-id-derived, never silently plaintext — unlike challenge_password
+    # above via security.encryption). A real Entra app secret warrants the
+    # stronger of this codebase's two encryption helpers; see AD Connector's
+    # bind_password for the same precedent.
+    intune_client_secret = db.Column(db.Text)
+    intune_last_test_at = db.Column(db.DateTime)
+    intune_last_test_result = db.Column(db.String(255))
+
     created_at = db.Column(db.DateTime, default=utc_now)
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=utc_now)
@@ -57,6 +73,12 @@ class ScepProfile(db.Model):
             "auto_approve": self.auto_approve,
             "challenge_set": bool(self.challenge_password),
             "challenge_generated_at": utc_isoformat(self.challenge_generated_at),
+            "intune_enabled": self.intune_enabled,
+            "intune_tenant_id": self.intune_tenant_id,
+            "intune_client_id": self.intune_client_id,
+            "intune_client_secret_set": bool(self.intune_client_secret),
+            "intune_last_test_at": utc_isoformat(self.intune_last_test_at),
+            "intune_last_test_result": self.intune_last_test_result,
             "created_at": utc_isoformat(self.created_at),
             "created_by": self.created_by,
             "updated_at": utc_isoformat(self.updated_at),
@@ -75,6 +97,12 @@ class ScepProfile(db.Model):
         except Exception:
             # Legacy/plaintext value (e.g. encryption disabled at write time)
             return self.challenge_password
+
+    def decrypted_intune_secret(self):
+        if not self.intune_client_secret:
+            return ''
+        from utils.encryption import decrypt_value
+        return decrypt_value(self.intune_client_secret) or ''
 
 
 class SCEPRequest(db.Model):
