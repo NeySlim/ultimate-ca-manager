@@ -123,8 +123,13 @@ export const Input = forwardRef(function Input({
           {...props}
         />
         
-        {/* Password toggle */}
-        {isPassword && (
+        {/* Password toggle -- hidden when there's nothing typed to reveal.
+            An "already set" field shows a literal '••••••••' placeholder
+            (never a real loaded secret, which is never sent to the browser),
+            and placeholders are never masked/unmasked by type or CSS in any
+            browser -- showing the toggle there just invites a user to click
+            "reveal" on text that was never masked in the first place. */}
+        {isPassword && (props.value || internalValue) && (
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
