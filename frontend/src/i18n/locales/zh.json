@@ -4363,6 +4363,7 @@
     "kerberosDescription": "绑定用于静默 GPO 自动注册的、经 Kerberos 身份验证的 XCEP/WSTEP 端点，使计算机和用户通过其 Kerberos 票证进行身份验证，而不是弹出凭据提示。",
     "kerberosLibraryWarningTitle": "Kerberos 库不可用",
     "kerberosLibraryWarningDesc": "服务器端 SPNEGO 库未安装或加载失败。即使在此处启用，Kerberos 身份验证在问题解决前也无法正常工作。",
+    "kerberosLibraryWarningFix": "安装系统 Kerberos 头文件和可选的 Python 扩展，然后重启服务：",
     "kerberosAdConnectorWarningTitle": "尚未配置 Active Directory 连接器",
     "kerberosAdConnectorWarningDesc": "静默 GPO 自动注册会提交一个没有主题的证书请求，并依赖 Active Directory 连接器从 Active Directory 中派生计算机或用户身份。Kerberos 身份验证本身在没有该连接器的情况下仍可正常工作，但在配置 Active Directory 连接器之前，无主题 CSR 的自动注册将会失败。",
     "spn": "服务主体名称 (SPN)",

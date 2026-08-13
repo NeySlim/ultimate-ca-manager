@@ -20,6 +20,22 @@ This guide covers all installation methods for Ultimate Certificate Manager.
 - **Python:** 3.11+ (for source installation)
 - **Database:** SQLite (included) or PostgreSQL 13+ (optional, set via `DATABASE_URL`)
 
+### Optional: Kerberos/SPNEGO support
+
+Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) needs an extra dependency that none of the methods above install by default, since it requires a C compiler and the system's Kerberos headers to build:
+
+```bash
+# Debian/Ubuntu
+apt-get install -y libkrb5-dev build-essential python3-dev
+# RHEL/Rocky/Alma
+dnf install -y krb5-devel gcc python3-devel
+
+pip install pyspnego[kerberos]   # run inside the venv UCM uses, e.g. /opt/ucm/venv
+systemctl restart ucm
+```
+
+Skip this if you don't need Kerberos/SPNEGO — every other autoenrollment binding (username/password, certificate) works without it. See the "Windows Autoenrollment" section in [ADMIN_GUIDE.md](../ADMIN_GUIDE.md) for details.
+
 ---
 
 ## Installation Methods

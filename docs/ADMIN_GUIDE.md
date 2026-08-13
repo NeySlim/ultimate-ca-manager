@@ -515,6 +515,30 @@ Configure certificate discovery under **Operations → Discovery**:
 4. **Quick Scan** — One-off scans without creating a profile
 5. **SNI support** — Enable SNI for virtual host scanning
 
+### Windows Autoenrollment (XCEP/WSTEP) — Kerberos/SPNEGO
+
+Configure under **Settings → Windows Autoenrollment**. Policy discovery (XCEP) and issuance (WSTEP) work out of the box for username/password and certificate-based binding. The **Kerberos** binding, used for silent GPO autoenrollment, needs one extra server-side dependency that is deliberately **not** installed by default: `pyspnego`'s `kerberos` extra pulls in `gssapi`, a C extension that requires the system's Kerberos development headers to build. Installing it by default would break `pip install -r requirements.txt` on hosts without a compiler or `libkrb5-dev`, so it's opt-in.
+
+If the Kerberos section shows "Kerberos library not available", install the extra in the same Python environment UCM runs in, then restart the service:
+
+```bash
+# Debian/Ubuntu
+apt-get install -y libkrb5-dev build-essential python3-dev
+pip install pyspnego[kerberos]
+
+# RHEL/Rocky/Alma
+dnf install -y krb5-devel gcc python3-devel
+pip install pyspnego[kerberos]
+```
+
+For a DEB/RPM install, run `pip install` inside `/opt/ucm/venv` (e.g. `/opt/ucm/venv/bin/pip install pyspnego[kerberos]`) as the `ucm` user. For Docker, add the same `apt-get`/`pip install` lines to a custom image built from `neyslim/ultimate-ca-manager` — the extra isn't baked into the published image either.
+
+```bash
+systemctl restart ucm
+```
+
+Once installed, `gssapi`/`spnego` are importable and the warning clears without any further configuration. This mirrors how `requests-kerberos` is handled for the MS CA WinRM/Kerberos admin channel (also excluded from the default install for the same reason).
+
 ---
 
 ## User Administration

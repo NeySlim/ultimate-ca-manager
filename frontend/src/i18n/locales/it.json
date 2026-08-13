@@ -4363,6 +4363,7 @@
     "kerberosDescription": "Associa gli endpoint XCEP/WSTEP autenticati tramite Kerberos utilizzati per l'iscrizione automatica GPO silenziosa, in modo che macchine e utenti vengano autenticati tramite il proprio ticket Kerberos anziché con una richiesta di credenziali.",
     "kerberosLibraryWarningTitle": "Libreria Kerberos non disponibile",
     "kerberosLibraryWarningDesc": "La libreria SPNEGO lato server non è installata o non è stato possibile caricarla. L'autenticazione Kerberos non funzionerà finché il problema non sarà risolto, anche se abilitata qui.",
+    "kerberosLibraryWarningFix": "Installa gli header Kerberos di sistema e l'estensione Python opzionale, quindi riavvia il servizio:",
     "kerberosAdConnectorWarningTitle": "Connettore Active Directory non configurato",
     "kerberosAdConnectorWarningDesc": "L'iscrizione automatica silenziosa tramite GPO invia una richiesta di certificato senza soggetto e si basa sul Connettore Active Directory per derivare l'identità del computer o dell'utente da Active Directory. L'autenticazione Kerberos continuerà comunque a funzionare senza di esso, ma l'iscrizione automatica con CSR senza soggetto fallirà finché il Connettore Active Directory non sarà configurato.",
     "spn": "Nome principale del servizio (SPN)",

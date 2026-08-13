@@ -4366,6 +4366,7 @@
     "kerberosDescription": "Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt.",
     "kerberosLibraryWarningTitle": "Kerberos library not available",
     "kerberosLibraryWarningDesc": "The server-side SPNEGO library isn't installed or couldn't be loaded. Kerberos authentication won't work until that's fixed, even if enabled here.",
+    "kerberosLibraryWarningFix": "Install the system Kerberos headers and the optional Python extra, then restart the service:",
     "kerberosAdConnectorWarningTitle": "Active Directory Connector not configured",
     "kerberosAdConnectorWarningDesc": "Silent GPO autoenrollment submits a subject-less certificate request and relies on the AD Connector to derive the machine or user identity from Active Directory. Kerberos authentication itself will still work without it, but naked-CSR autoenrollment will fail until the AD Connector is configured.",
     "spn": "Service Principal Name (SPN)",

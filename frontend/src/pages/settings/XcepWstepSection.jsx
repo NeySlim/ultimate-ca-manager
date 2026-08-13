@@ -302,7 +302,11 @@ export default function XcepWstepSection() {
 
           {!kerberos.library_available && (
             <HelpCard variant="warning" title={t('xcepWstep.kerberosLibraryWarningTitle')}>
-              {t('xcepWstep.kerberosLibraryWarningDesc')}
+              <p>{t('xcepWstep.kerberosLibraryWarningDesc')}</p>
+              <p className="mt-2">{t('xcepWstep.kerberosLibraryWarningFix')}</p>
+              <code className="block mt-1 text-[11px] font-mono text-text-primary bg-bg-tertiary px-2 py-1.5 rounded break-all">
+                apt-get install libkrb5-dev build-essential python3-dev && pip install pyspnego[kerberos]
+              </code>
             </HelpCard>
           )}
           {!adConnectorConfigured && (

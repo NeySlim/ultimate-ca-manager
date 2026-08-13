@@ -4363,6 +4363,7 @@
     "kerberosDescription": "Bindet die Kerberos-authentifizierten XCEP/WSTEP-Endpunkte für die stille GPO-Autoregistrierung, sodass Maschinen und Benutzer über ihr Kerberos-Ticket statt per Anmeldeaufforderung authentifiziert werden.",
     "kerberosLibraryWarningTitle": "Kerberos-Bibliothek nicht verfügbar",
     "kerberosLibraryWarningDesc": "Die serverseitige SPNEGO-Bibliothek ist nicht installiert oder konnte nicht geladen werden. Die Kerberos-Authentifizierung funktioniert erst, wenn dies behoben ist, selbst wenn sie hier aktiviert ist.",
+    "kerberosLibraryWarningFix": "Installieren Sie die System-Kerberos-Header und die optionale Python-Erweiterung, und starten Sie den Dienst anschließend neu:",
     "kerberosAdConnectorWarningTitle": "Active-Directory-Connector nicht konfiguriert",
     "kerberosAdConnectorWarningDesc": "Die automatische GPO-Registrierung im Hintergrund sendet eine Zertifikatsanforderung ohne Betreff und ist auf den Active-Directory-Connector angewiesen, um die Computer- oder Benutzeridentität aus Active Directory abzuleiten. Die Kerberos-Authentifizierung selbst funktioniert auch ohne ihn, aber die automatische Registrierung mit Zertifikatsanforderung ohne Betreff schlägt fehl, bis der Active-Directory-Connector konfiguriert ist.",
     "spn": "Dienstprinzipalname (SPN)",

@@ -4363,6 +4363,7 @@
     "kerberosDescription": "サイレントな GPO 自動登録に使用される Kerberos 認証済み XCEP/WSTEP エンドポイントをバインドし、マシンとユーザーが資格情報プロンプトの代わりに Kerberos チケットで認証されるようにします。",
     "kerberosLibraryWarningTitle": "Kerberos ライブラリが利用できません",
     "kerberosLibraryWarningDesc": "サーバー側の SPNEGO ライブラリがインストールされていないか、読み込めませんでした。ここで有効にしていても、この問題が解決されるまで Kerberos 認証は機能しません。",
+    "kerberosLibraryWarningFix": "システムの Kerberos ヘッダーとオプションの Python エクストラをインストールし、サービスを再起動してください:",
     "kerberosAdConnectorWarningTitle": "Active Directory コネクタが構成されていません",
     "kerberosAdConnectorWarningDesc": "サイレント GPO 自動登録では、サブジェクトのない証明書要求を送信し、コンピューターまたはユーザーの ID を Active Directory から取得するために Active Directory コネクタに依存します。Kerberos 認証自体はコネクタがなくても機能しますが、Active Directory コネクタが構成されるまで、サブジェクトなしの CSR による自動登録は失敗します。",
     "spn": "サービスプリンシパル名 (SPN)",
