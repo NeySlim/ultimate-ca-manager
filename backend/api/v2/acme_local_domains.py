@@ -2,8 +2,6 @@
 ACME Local Domains API Routes
 Manages domain-to-CA mappings for the Local ACME server.
 
-Patched: allow bare TLD registration (e.g. "local", "internal") so that
-parent-walking in find_local_domain_ca covers all subdomains of that TLD.
 """
 import re
 import logging
@@ -184,11 +182,6 @@ def find_local_domain_ca(domain: str) -> int | None:
 
 def _is_valid_domain(domain: str) -> bool:
     """Validate domain format.
-
-    Patched: the label+dot group is now optional so bare TLDs
-    (e.g. "local", "internal", "lab") are accepted. This lets
-    admins register a bare TLD and have find_local_domain_ca's
-    parent-walking cover every subdomain automatically.
 
     Accepted examples:
       local               ← bare TLD (NEW)

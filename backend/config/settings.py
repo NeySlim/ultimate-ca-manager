@@ -92,11 +92,8 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate Certificate Manager")
 
-    # Patched: expose DATA_DIR as a class attribute so code that references
-    # Config.DATA_DIR (or app.config['DATA_DIR']) works correctly. Previously
-    # only the module-level DATA_DIR existed; the class derived paths from it
-    # but never exposed DATA_DIR itself, causing AttributeError or missing
-    # config keys for any consumer that accessed Config.DATA_DIR directly.
+    # Expose DATA_DIR as a class attribute so code that references
+    # Config.DATA_DIR (or app.config['DATA_DIR']) works correctly.
     DATA_DIR = DATA_DIR
 
     # Version - single source of truth: VERSION file at repo/install root
