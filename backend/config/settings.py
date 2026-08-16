@@ -10,6 +10,7 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
+# Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
 load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
