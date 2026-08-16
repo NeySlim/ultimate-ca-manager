@@ -10,7 +10,6 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
 load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
@@ -61,7 +60,7 @@ def get_system_fqdn():
     # Docker: MUST use environment variable
     if is_docker():
         return os.getenv('UCM_FQDN')
-    
+
     # Native installation: Try hostname -f first
     try:
         result = subprocess.run(
@@ -77,22 +76,29 @@ def get_system_fqdn():
                 return fqdn
     except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
         pass
-    
+
     # Fallback: Check environment variable
     env_fqdn = os.getenv('FQDN')
     if env_fqdn and env_fqdn not in ['localhost', 'ucm.local', 'ucm.example.com']:
         return env_fqdn
-    
+
     # Last resort: Will be loaded from database later via Config.get_db_setting()
     return None
 
 
 class Config:
     """Base configuration - values can be overridden by database settings"""
-    
+
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate Certificate Manager")
-    
+
+    # Patched: expose DATA_DIR as a class attribute so code that references
+    # Config.DATA_DIR (or app.config['DATA_DIR']) works correctly. Previously
+    # only the module-level DATA_DIR existed; the class derived paths from it
+    # but never exposed DATA_DIR itself, causing AttributeError or missing
+    # config keys for any consumer that accessed Config.DATA_DIR directly.
+    DATA_DIR = DATA_DIR
+
     # Version - single source of truth: VERSION file at repo/install root
     @staticmethod
     def _get_version():
@@ -104,42 +110,42 @@ class Config:
         except Exception:
             pass
         return os.getenv("APP_VERSION", "unknown")
-    
+
     APP_VERSION = _get_version.__func__()
-    
+
     # SECRET_KEY validation - deferred to runtime
     _secret_key = os.getenv("SECRET_KEY")
-    
+
     # For packaging: allow missing secrets during install, but validate at runtime
     SECRET_KEY = _secret_key if _secret_key else "INSTALL_TIME_PLACEHOLDER"
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-    
+
     # Server - HTTPS mandatory
     HOST = os.getenv("HOST", "0.0.0.0")
     HTTPS_PORT = int(os.getenv("HTTPS_PORT", "8443"))
     HTTP_REDIRECT = os.getenv("HTTP_REDIRECT", "true").lower() == "true"
     HTTP_PROTOCOL_PORT = int(os.getenv("HTTP_PROTOCOL_PORT", "8080"))  # 8080 = default
-    
+
     # HTTPS Certificate
     # Respect package installation paths: /var/lib/ucm (Debian) or /etc/ucm (RPM)
     # Fallback to DATA_DIR for Docker or manual installations
     _https_cert_default = str(DATA_DIR / "https_cert.pem")
     _https_key_default = str(DATA_DIR / "https_key.pem")
-    
+
     HTTPS_CERT_PATH = Path(os.getenv("HTTPS_CERT_PATH", _https_cert_default))
     HTTPS_KEY_PATH = Path(os.getenv("HTTPS_KEY_PATH", _https_key_default))
     HTTPS_AUTO_GENERATE = os.getenv("HTTPS_AUTO_GENERATE", "true").lower() == "true"
-    
+
     # File Upload Limits (security)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
-    
+
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability
     # DATABASE_URL takes precedence (PostgreSQL), else fallback to SQLite
     _db_url = os.getenv("DATABASE_URL")
     _db_default = str(DATA_DIR / "ucm.db")
     DATABASE_PATH = Path(os.getenv("DATABASE_PATH", _db_default))
-    
+
     if _db_url:
         # PostgreSQL or external database (HA mode)
         # Format: postgresql://user:password@host:port/dbname
@@ -149,9 +155,9 @@ class Config:
         # SQLite (standalone mode)
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
         DATABASE_TYPE = "sqlite"
-    
+
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
+
     # PostgreSQL-specific settings
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
@@ -159,8 +165,8 @@ class Config:
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
-    
-    
+
+
     @classmethod
     def validate_secrets(cls):
         """Validate that secrets are properly set - called at app startup"""
@@ -169,13 +175,13 @@ class Config:
                 "SECRET_KEY must be set in environment. "
                 "Check /etc/ucm/ucm.env or load environment variables."
             )
-    
+
     # Session settings
-    
+
     # Session Configuration - Flask server-side sessions
     # Supports filesystem (default) or Redis (HA mode)
     _redis_url = os.getenv("REDIS_URL")
-    
+
     if _redis_url:
         # Redis session store for HA deployments
         SESSION_TYPE = 'redis'
@@ -185,18 +191,18 @@ class Config:
         # Filesystem sessions for standalone deployment
         SESSION_TYPE = 'filesystem'
         SESSION_FILE_DIR = DATA_DIR / 'sessions'
-    
+
     SESSION_COOKIE_SECURE = True  # HTTPS only
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)  # 24 hours session
     SESSION_REFRESH_EACH_REQUEST = True  # Reset timeout on each request
-    
+
     # Initial Admin User (only used on first run)
     INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME", "admin")
     INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD", "changeme123")
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL", "admin@localhost")
-    
+
     # SCEP Configuration
     SCEP_ENABLED = os.getenv("SCEP_ENABLED", "true").lower() == "true"
     SCEP_CA_ID = os.getenv("SCEP_CA_ID")
@@ -206,17 +212,17 @@ class Config:
     SCEP_CERT_LIFETIME = int(os.getenv("SCEP_CERT_LIFETIME", "365"))
     SCEP_KEY_SIZE = int(os.getenv("SCEP_KEY_SIZE", "2048"))
     SCEP_RENEWAL_DAYS = int(os.getenv("SCEP_RENEWAL_DAYS", "30"))
-    
+
     # Rate Limiting
     RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
     RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
     RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
-    
+
     # Logging
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE = DATA_DIR / "ucm.log"
     AUDIT_LOG_FILE = DATA_DIR / "audit.log"
-    
+
     # CORS - auto-include FQDN and hostname
     _https_port = int(os.getenv("HTTPS_PORT", "8443"))
     _port_suffix = "" if _https_port == 443 else f":{_https_port}"
@@ -233,13 +239,13 @@ class Config:
     if _extra:
         _cors_origins.extend([o.strip() for o in _extra.split(",") if o.strip()])
     CORS_ORIGINS = _cors_origins
-    
+
     # FQDN for redirect - auto-detected based on environment
     # Docker: Uses UCM_FQDN env var
     # Native: Uses hostname -f or FQDN env var
     FQDN = get_system_fqdn()
     HTTP_PORT = int(os.getenv("HTTP_PORT", "80"))  # For redirect URL construction
-    
+
     # File paths
     CA_DIR = DATA_DIR / "ca"
     CERT_DIR = DATA_DIR / "certs"
@@ -247,13 +253,13 @@ class Config:
     CRL_DIR = DATA_DIR / "crl"
     SCEP_DIR = DATA_DIR / "scep"
     BACKUP_DIR = DATA_DIR / "backups"
-    
+
     @classmethod
     def get_db_setting(cls, key: str, default=None):
         """Retrieve setting from database (overrides env vars)"""
         # Will be implemented after DB models are created
         return default
-    
+
     @classmethod
     def set_db_setting(cls, key: str, value):
         """Store setting in database"""
@@ -282,7 +288,6 @@ class TestingConfig(Config):
     # Inherit Config.SQLALCHEMY_ENGINE_OPTIONS when DATABASE_URL is set in the
     # environment (PG CI job) but force in-memory SQLite — pool_* args are invalid.
     SQLALCHEMY_ENGINE_OPTIONS = {}
-
 
 # Configuration dictionary
 config = {
