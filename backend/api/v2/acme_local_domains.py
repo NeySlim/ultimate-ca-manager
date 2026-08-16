@@ -1,7 +1,6 @@
 """
 ACME Local Domains API Routes
 Manages domain-to-CA mappings for the Local ACME server.
-
 """
 import re
 import logging
