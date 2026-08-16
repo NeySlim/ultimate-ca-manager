@@ -2,18 +2,12 @@
 Tests for _is_valid_domain in backend/api/v2/acme_local_domains.py
 
 """
-import re
 import sys
 import os
 
-# Ensure backend is on sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-
-def _is_valid_domain(domain: str) -> bool:
-    """Copy of the patched regex for standalone testing."""
-    pattern = r'^(\*\.)?(([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+)?[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, domain))
+from api.v2.acme_local_domains import _is_valid_domain
 
 
 # ---- Test cases: (domain, expected_result, reason) ----
