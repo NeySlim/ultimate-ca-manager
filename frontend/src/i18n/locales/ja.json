@@ -2632,7 +2632,9 @@
     "ctRequired": "SCTを必須にする（ログが応答しない場合は発行失敗）",
     "ctRequiredWarning": "Web・ACME・EST発行に適用されます。CTログに到達できない場合、すべての発行が失敗します。",
     "ocspResponseValidity": "OCSP応答の有効期間（時間）",
-    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。"
+    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。",
+    "crlAutoDeleteExpiredRevoked": "期限切れの失効証明書を自動削除",
+    "crlAutoDeleteExpiredRevokedDesc": "CRL生成時に失効証明書レコード（期限切れのもののみ）を自動的に削除します。無効にすると、期限切れの失効証明書は履歴レコードとして保持されます。"
   },
   "account": {
     "profile": "プロフィール",

@@ -22,9 +22,9 @@ from cryptography.hazmat.primitives.asymmetric import (
 from cryptography.hazmat.backends import default_backend
 from sqlalchemy import or_
 
-from models import db, CA, Certificate, OCSPResponse, SystemConfig
+from models import db, CA, Certificate, OCSPResponse, SystemConfig, RevokedSerial
 from utils.datetime_utils import utc_now
-from utils.serial_format import serial_to_hex
+from utils.serial_format import serial_to_hex, serial_variants
 
 logger = logging.getLogger(__name__)
 
@@ -444,17 +444,21 @@ class OCSPService:
 
     @staticmethod
     def _status_for_serial(ca: CA, cert_serial: int):
-        serial_dec = str(cert_serial)
-        serial_hex = format(cert_serial, 'x')
-        certificate = (
-            Certificate.query.filter_by(
-                caref=ca.refid, serial_number=serial_dec).first()
-            or Certificate.query.filter_by(
-                caref=ca.refid, serial_number=serial_hex).first()
-            or Certificate.query.filter_by(
-                caref=ca.refid, serial_number=serial_hex.upper()).first()
-        )
+        variants = serial_variants(cert_serial)
+        certificate = Certificate.query.filter(
+            Certificate.caref == ca.refid,
+            Certificate.serial_number.in_(variants),
+        ).first()
         if not certificate:
+            # Fallback: check the persistent revocation table for deleted certs
+            rs = RevokedSerial.query.filter(
+                RevokedSerial.caref == ca.refid,
+                RevokedSerial.serial_number.in_(variants),
+            ).first()
+            if rs:
+                return None, 'revoked', rs.revoked_at or utc_now(), _REASON_MAP.get(
+                    rs.revoke_reason, x509.ReasonFlags.unspecified
+                )
             return None, 'unknown', None, None
         if not certificate.revoked:
             return certificate, 'good', None, None
@@ -660,25 +664,33 @@ class OCSPService:
             # Find certificate in database. RFC 6960 sends the serial as an
             # ASN.1 INTEGER; UCM stores serials as the decimal string form
             # (Certificate.serial_number) while the OCSP cache uses the
-            # lowercase hex form. Convert accordingly.
-            cert_serial_dec = str(cert_serial)
+            # lowercase hex form. Query all known string variants at once.
             cert_serial_hex = format(cert_serial, 'x')
-            # DB has historical mixed format (decimal vs lowercase hex). Try both.
-            certificate = (
-                Certificate.query.filter_by(
-                    caref=ca.refid, serial_number=cert_serial_dec).first()
-                or Certificate.query.filter_by(
-                    caref=ca.refid, serial_number=cert_serial_hex).first()
-                or Certificate.query.filter_by(
-                    caref=ca.refid, serial_number=cert_serial_hex.upper()).first()
-            )
+            variants = serial_variants(cert_serial)
+            certificate = Certificate.query.filter(
+                Certificate.caref == ca.refid,
+                Certificate.serial_number.in_(variants),
+            ).first()
             
             # Determine certificate status
             if not certificate:
-                status = ocsp.OCSPCertStatus.UNKNOWN
-                cert_status = 'unknown'
-                revocation_time = None
-                revocation_reason = None
+                # Fallback: check persistent revocation table for deleted certs
+                rs = RevokedSerial.query.filter(
+                    RevokedSerial.caref == ca.refid,
+                    RevokedSerial.serial_number.in_(variants),
+                ).first()
+                if rs:
+                    status = ocsp.OCSPCertStatus.REVOKED
+                    cert_status = 'revoked'
+                    revocation_time = rs.revoked_at or utc_now()
+                    revocation_reason = _REASON_MAP.get(
+                        rs.revoke_reason, x509.ReasonFlags.unspecified
+                    )
+                else:
+                    status = ocsp.OCSPCertStatus.UNKNOWN
+                    cert_status = 'unknown'
+                    revocation_time = None
+                    revocation_reason = None
             elif certificate.revoked:
                 status = ocsp.OCSPCertStatus.REVOKED
                 cert_status = 'revoked'

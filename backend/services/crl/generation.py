@@ -162,6 +162,19 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca)
 
+        # Purge stale revocation records first (expired certs no longer need CRL entries)
+        try:
+            CRLQueryMixin.purge_stale_revoked_serials(ca_id)
+        except Exception as e:
+            logger.warning(f"Failed to purge stale revoked_serials for CA {ca_id}: {e}")
+
+        # Auto-delete expired+revoked certificate rows if the setting is enabled
+        try:
+            if CRLQueryMixin.is_auto_delete_enabled():
+                CRLQueryMixin.purge_expired_revoked_certificates(ca_id)
+        except Exception as e:
+            logger.warning(f"Failed to auto-delete expired revoked certs for CA {ca_id}: {e}")
+
         revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
 
         last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
@@ -270,18 +283,36 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca)
 
+        from models import RevokedSerial
+
+        now = utc_now()
         revoked_certs = Certificate.query.filter(
             Certificate.caref == ca.refid,
             Certificate.revoked == True,
-            Certificate.revoked_at > base_crl.this_update
+            Certificate.revoked_at > base_crl.this_update,
+            Certificate.valid_to > now
         ).all()
+
+        # Also include orphaned RevokedSerial entries revoked after the base CRL
+        live_serials = {c.serial_number for c in revoked_certs}
+        orphan_serials = RevokedSerial.query.filter(
+            RevokedSerial.caref == ca.refid,
+            RevokedSerial.revoked_at > base_crl.this_update,
+            RevokedSerial.valid_to > now
+        ).all()
+        for rs in orphan_serials:
+            if rs.serial_number not in live_serials:
+                if rs.certificate_id:
+                    existing = db.session.get(Certificate, rs.certificate_id)
+                    if existing and not existing.revoked:
+                        continue
+                revoked_certs.append(rs)
 
         last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
             CRLMetadata.crl_number.desc()
         ).first()
         crl_number = 1 if not last_crl else last_crl.crl_number + 1
 
-        now = utc_now()
         builder = x509.CertificateRevocationListBuilder()
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.last_update(now)

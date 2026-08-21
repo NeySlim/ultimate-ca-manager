@@ -35,6 +35,7 @@ from models.discovered_certificate import ScanProfile, ScanRun, DiscoveredCertif
 from models.ca_template_pin import CATemplatePin
 from models.webhook_delivery import WebhookDelivery
 from models.key_recovery import KeyRecoveryRequest
+from models.revoked_serial import RevokedSerial
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -56,4 +57,5 @@ __all__ = [
     "WebhookDelivery",
     "KeyRecoveryRequest",
     "ADConnectorConfig",
+    "RevokedSerial",
 ]

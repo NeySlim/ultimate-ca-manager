@@ -2632,7 +2632,9 @@
     "ctRequired": "SCTs verlangen (Ausstellung schlägt fehl, wenn kein Log antwortet)",
     "ctRequiredWarning": "Gilt für Web-, ACME- und EST-Ausstellung: Sind die CT-Logs nicht erreichbar, schlägt JEDE Ausstellung fehl.",
     "ocspResponseValidity": "Gültigkeit der OCSP-Antworten (Stunden)",
-    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24."
+    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24.",
+    "crlAutoDeleteExpiredRevoked": "Abgelaufene widerrufene Zertifikate automatisch löschen",
+    "crlAutoDeleteExpiredRevokedDesc": "Widerrufene Zertifikatsdatensätze (nur abgelaufene) bei der CRL-Generierung automatisch bereinigen. Wenn deaktiviert, werden abgelaufene widerrufene Zertifikate als Verlaufsdatensätze aufbewahrt."
   },
   "account": {
     "profile": "Profil",

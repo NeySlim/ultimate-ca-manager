@@ -2633,7 +2633,9 @@
     "ctRequired": "Require SCTs (fail issuance if no log responds)",
     "ctRequiredWarning": "Applies to web, ACME and EST issuance: if the CT logs are unreachable, ALL issuance fails.",
     "ocspResponseValidity": "OCSP response validity (hours)",
-    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24."
+    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24.",
+    "crlAutoDeleteExpiredRevoked": "Auto-delete expired revoked certificates",
+    "crlAutoDeleteExpiredRevokedDesc": "Automatically purge revoked certificate records (expired ones only) during CRL generation. When disabled, expired revoked certs are retained as historical records."
   },
   "account": {
     "profile": "Profile",

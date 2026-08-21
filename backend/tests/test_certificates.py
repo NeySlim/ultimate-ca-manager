@@ -701,7 +701,38 @@ class TestRenewCertificate:
         r = post_json(auth_client, f'{BASE}/999999/renew', {})
         assert r.status_code in (404, 500)
 
+    def test_renew_creates_new_row(self, auth_client, create_cert):
+        """Renewal should create a new certificate row, not overwrite in-place."""
+        cert = create_cert(cn='renew-new-row.example.com')
+        old_id = cert.get('id')
+        r = post_json(auth_client, f'{BASE}/{old_id}/renew', {})
+        assert r.status_code == 200
+        data = get_json(r).get('data', get_json(r))
+        new_id = data.get('id')
+        # New row has a different ID
+        assert new_id != old_id
+        # Old cert row should be gone (revoked + deleted)
+        r_old = auth_client.get(f'{BASE}/{old_id}')
+        assert r_old.status_code == 404
+
+    def test_renew_revokes_old_cert(self, auth_client, create_cert, app):
+        """Renewal should revoke the old certificate and persist it in revoked_serials."""
+        from models import RevokedSerial, db as _db
+        cert = create_cert(cn='renew-revoke-old.example.com')
+        old_id = cert.get('id')
+        old_serial = cert.get('serial_number')
+        r = post_json(auth_client, f'{BASE}/{old_id}/renew', {})
+        assert r.status_code == 200
+        # The old serial should have a RevokedSerial entry
+        with app.app_context():
+            rs = RevokedSerial.query.filter_by(
+                serial_number=old_serial
+            ).first()
+            assert rs is not None
+            assert rs.revoke_reason == 'superseded'
+
     def test_renew_clears_revocation(self, auth_client, create_cert):
+        """Renewing a revoked cert: old cert is revoked+deleted, new cert is not revoked."""
         cert = create_cert(cn='revoke-then-renew.example.com')
         cert_id = cert.get('id')
         post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
@@ -904,3 +935,71 @@ class TestBulkExport:
             'ids': [999990, 999991],
         })
         assert r.status_code == 404
+
+
+# ============================================================================
+# RevokedSerial persistence
+# ============================================================================
+
+class TestRevokedSerialPersistence:
+    """Tests for the revoked_serials table — revocation info survives cert deletion."""
+
+    def test_revoke_creates_revoked_serial(self, auth_client, create_cert, app):
+        """Revoking a cert should insert a RevokedSerial record."""
+        from models import RevokedSerial
+        cert = create_cert(cn='revserial-create.example.com')
+        cert_id = cert.get('id')
+        old_serial = cert.get('serial_number')
+        r = post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'key_compromise'})
+        assert r.status_code == 200
+        with app.app_context():
+            rs = RevokedSerial.query.filter_by(
+                serial_number=old_serial
+            ).first()
+            assert rs is not None
+            assert rs.revoke_reason == 'key_compromise'
+            assert rs.valid_to is not None
+
+    def test_revoked_serial_survives_deletion(self, auth_client, create_cert, app):
+        """After deleting a revoked cert, the RevokedSerial record must persist."""
+        from models import RevokedSerial
+        cert = create_cert(cn='revserial-survive.example.com')
+        cert_id = cert.get('id')
+        old_serial = cert.get('serial_number')
+        post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
+        # Now delete the revoked cert (should be allowed since it's revoked)
+        r = auth_client.delete(f'{BASE}/{cert_id}')
+        assert r.status_code == 204
+        # RevokedSerial must still be there
+        with app.app_context():
+            rs = RevokedSerial.query.filter_by(
+                serial_number=old_serial
+            ).first()
+            assert rs is not None
+
+    def test_stale_revoked_serial_purged(self, auth_client, create_cert, app):
+        """RevokedSerial entries past valid_to should be purged during CRL generation."""
+        from models import RevokedSerial, CA, db as _db
+        from utils.datetime_utils import utc_now
+        from datetime import timedelta
+        cert = create_cert(cn='revserial-stale.example.com')
+        cert_id = cert.get('id')
+        old_serial = cert.get('serial_number')
+        post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
+        # Manually set valid_to in the past to simulate expiry
+        with app.app_context():
+            rs = RevokedSerial.query.filter_by(serial_number=old_serial).first()
+            assert rs is not None
+            rs.valid_to = utc_now() - timedelta(days=1)
+            _db.session.commit()
+            ca = CA.query.filter_by(refid=rs.caref).first()
+            ca_id = ca.id
+        # Trigger CRL generation which should purge the stale entry
+        from services.crl_service import CRLService
+        with app.app_context():
+            try:
+                CRLService.generate_crl(ca_id, username='test')
+            except Exception:
+                pass  # CRL gen may fail if CA key isn't available in test
+            rs_after = RevokedSerial.query.filter_by(serial_number=old_serial).first()
+            assert rs_after is None  # purged because valid_to < now

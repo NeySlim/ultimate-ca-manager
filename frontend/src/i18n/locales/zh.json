@@ -2632,7 +2632,9 @@
     "ctRequired": "强制要求 SCT（无日志响应时签发失败）",
     "ctRequiredWarning": "适用于 Web、ACME 和 EST 签发：如果 CT 日志不可达，所有签发都会失败。",
     "ocspResponseValidity": "OCSP 响应有效期（小时）",
-    "ocspResponseValidityDesc": "已签名 OCSP 响应的有效时长（nextUpdate）。1-168 小时，默认 24。"
+    "ocspResponseValidityDesc": "已签名 OCSP 响应的有效时长（nextUpdate）。1-168 小时，默认 24。",
+    "crlAutoDeleteExpiredRevoked": "自动删除已过期的吊销证书",
+    "crlAutoDeleteExpiredRevokedDesc": "在 CRL 生成期间自动清除吊销证书记录（仅限已过期的）。禁用时，已过期的吊销证书将作为历史记录保留。"
   },
   "account": {
     "profile": "个人资料",

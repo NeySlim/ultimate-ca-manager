@@ -2778,7 +2778,9 @@
     "ctRequired": "Exiger les SCT (échec d'émission si aucun log ne répond)",
     "ctRequiredWarning": "S'applique aux émissions web, ACME et EST : si les logs CT sont injoignables, TOUTE émission échoue.",
     "ocspResponseValidity": "Validité des réponses OCSP (heures)",
-    "ocspResponseValidityDesc": "Durée de validité des réponses OCSP signées (nextUpdate). 1-168 heures, 24 par défaut."
+    "ocspResponseValidityDesc": "Durée de validité des réponses OCSP signées (nextUpdate). 1-168 heures, 24 par défaut.",
+    "crlAutoDeleteExpiredRevoked": "Supprimer automatiquement les certificats révoqués expirés",
+    "crlAutoDeleteExpiredRevokedDesc": "Purge automatiquement les enregistrements de certificats révoqués (uniquement ceux expirés) lors de la génération de la CRL. Lorsque désactivé, les certificats révoqués expirés sont conservés comme enregistrements historiques."
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

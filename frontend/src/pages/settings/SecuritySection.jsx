@@ -152,6 +152,13 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             max="168"
             helperText={t('settings.ocspResponseValidityDesc')}
           />
+          <ToggleSwitch
+            checked={settings.crl_auto_delete_expired_revoked || false}
+            onChange={(val) => updateSetting('crl_auto_delete_expired_revoked', val)}
+            label={t('settings.crlAutoDeleteExpiredRevoked')}
+            description={t('settings.crlAutoDeleteExpiredRevokedDesc')}
+            disabled={!canAdminSettings}
+          />
           {canWriteSettings && (
             <Button type="button" onClick={() => handleSave('securityHsts')} disabled={saving}>
               <FloppyDisk size={16} />

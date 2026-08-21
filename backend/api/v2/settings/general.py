@@ -50,6 +50,7 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'acme_public_port',
     'acme_public_tls_cert_id',
     'backup_password',
+    'crl_auto_delete_expired_revoked',
 })
 
 
@@ -111,6 +112,11 @@ def get_general_settings():
         'key_recovery_dual_control_locked': _dual_control_env() is not None,
         # OCSP responder: signed response validity window (hours, 1..168)
         'ocsp_response_validity_hours': int(get_config('ocsp_response_validity_hours', '24') or 24),
+        # CRL auto-delete: purge expired revoked Certificate rows during CRL
+        # generation so the database doesn't grow unbounded. Defaults to off
+        # — expired revoked certs are kept as historical records unless an
+        # admin explicitly enables this.
+        'crl_auto_delete_expired_revoked': get_config('crl_auto_delete_expired_revoked', 'false') == 'true',
     })
 
 
@@ -169,6 +175,8 @@ def update_general_settings():
         'metrics_token',
         # OCSP responder response validity window
         'ocsp_response_validity_hours',
+        # CRL auto-delete expired revoked certificates
+        'crl_auto_delete_expired_revoked',
     ]
 
     if 'ocsp_response_validity_hours' in data:

@@ -2632,7 +2632,9 @@
     "ctRequired": "Exigir SCTs (falla la emisión si ningún log responde)",
     "ctRequiredWarning": "Se aplica a emisiones web, ACME y EST: si los logs CT no son accesibles, TODA emisión falla.",
     "ocspResponseValidity": "Validez de respuestas OCSP (horas)",
-    "ocspResponseValidityDesc": "Tiempo de validez de las respuestas OCSP firmadas (nextUpdate). 1-168 horas, 24 por defecto."
+    "ocspResponseValidityDesc": "Tiempo de validez de las respuestas OCSP firmadas (nextUpdate). 1-168 horas, 24 por defecto.",
+    "crlAutoDeleteExpiredRevoked": "Eliminar automáticamente certificados revocados expirados",
+    "crlAutoDeleteExpiredRevokedDesc": "Purga automáticamente los registros de certificados revocados (solo los expirados) durante la generación de CRL. Cuando está desactivado, los certificados revocados expirados se conservan como registros históricos."
   },
   "account": {
     "profile": "Perfil",

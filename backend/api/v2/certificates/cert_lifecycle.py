@@ -228,6 +228,28 @@ def unhold_certificate(cert_id):
         cert.invalidity_at = None
         db.session.commit()
 
+        # Remove the persistent RevokedSerial entry so the CRL no longer
+        # carries this serial as revoked. Without this, the CRL would still
+        # show the cert as revoked after unhold.
+        if cert.caref and cert.serial_number:
+            try:
+                from models import RevokedSerial
+                rs = RevokedSerial.query.filter_by(
+                    caref=cert.caref,
+                    serial_number=cert.serial_number,
+                ).first()
+                if rs:
+                    db.session.delete(rs)
+                    db.session.commit()
+                    logger.info(
+                        f"Removed RevokedSerial for cert {cert.id} after unhold"
+                    )
+            except Exception as e:
+                db.session.rollback()
+                logger.warning(
+                    f"Failed to remove RevokedSerial for cert {cert.id} after unhold: {e}"
+                )
+
         # Audit log
         AuditService.log_action(
             action='certificate_unheld',
