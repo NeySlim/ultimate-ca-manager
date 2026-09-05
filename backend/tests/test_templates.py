@@ -241,6 +241,17 @@ class TestCreateTemplate:
                              content_type='application/json')
         assert_error(r, 400)
 
+    def test_create_rejects_ed25519_key_type(self, auth_client):
+        """ED25519 was accepted at save time but rejected by
+        parse_issue_key_type() at issuance, so the template could never
+        issue a certificate. It is now refused up front (#321 follow-up)."""
+        r = auth_client.post('/api/v2/templates',
+                             data=json.dumps({**VALID_TEMPLATE,
+                                              'name': 'Ed25519 Tpl',
+                                              'key_type': 'ED25519'}),
+                             content_type='application/json')
+        assert_error(r, 400)
+
     def test_create_duplicate_name(self, auth_client):
         name = 'Duplicate Name Check'
         _create_template(auth_client, name=name)
@@ -365,6 +376,16 @@ class TestUpdateTemplate:
                             content_type='application/json')
         data = assert_success(r)
         assert data['validity_days'] == 730
+
+    def test_update_rejects_ed25519_key_type(self, auth_client):
+        """A PUT that sets key_type to ED25519 is refused, same as create
+        (#321 follow-up)."""
+        r, created = _create_template(auth_client, name='Ed25519 Update Tpl')
+        tid = created['id']
+        r = auth_client.put(f'/api/v2/templates/{tid}',
+                            data=json.dumps({'key_type': 'ED25519'}),
+                            content_type='application/json')
+        assert_error(r, 400)
 
     def test_update_deactivate(self, auth_client):
         r, created = _create_template(auth_client, name='Deactivate Tpl')

@@ -43,7 +43,8 @@ _MIN_VALIDITY_DAYS = 1
 _VALID_KEY_TYPES = {
     'RSA-2048', 'RSA-3072', 'RSA-4096',
     'EC-P256', 'EC-P384', 'EC-P521',
-    'ED25519',
+    # no ED25519: parse_issue_key_type() cannot generate an Edwards key, so a
+    # template saved with it fails every issuance with a 400
     # legacy lowercase forms used by some import payloads
     'rsa:2048', 'rsa:3072', 'rsa:4096',
     'ec:p256', 'ec:p384', 'ec:p521',
