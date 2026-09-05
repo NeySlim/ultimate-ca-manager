@@ -89,14 +89,6 @@ export const VALIDITY_OPTIONS = [
   { value: '1095', label: '3 years' },
 ]
 
-// Key Type Options
-export const KEY_TYPE_OPTIONS = [
-  { value: 'RSA-2048', label: 'RSA 2048' },
-  { value: 'RSA-4096', label: 'RSA 4096' },
-  { value: 'ECDSA-P256', label: 'ECDSA P-256' },
-  { value: 'ECDSA-P384', label: 'ECDSA P-384' },
-]
-
 // Status Colors (semantic)
 export const STATUS_COLORS = {
   valid: { bg: 'bg-green-500/10', text: 'text-green-500', border: 'border-green-500/30' },
