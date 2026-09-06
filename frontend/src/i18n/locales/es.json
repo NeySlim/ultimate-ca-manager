@@ -3960,6 +3960,7 @@
     "disable": "Deshabilitar",
     "disabled": "Política deshabilitada",
     "dnsPattern": "Restricción de patrón DNS",
+    "rulesEnforcedHelp": "Se aplica al formulario de emisión y a las solicitudes aprobadas: se rechaza una solicitud cuyo tipo de clave no esté permitido o que lleve más nombres DNS que el máximo, y la validez se limita. El patrón DNS delimita a qué solicitudes se aplica la política.",
     "editPolicy": "Editar política",
     "enable": "Habilitar",
     "enabled": "Política habilitada",

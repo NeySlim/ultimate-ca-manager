@@ -3679,6 +3679,7 @@
     "allowedKeyTypes": "Types de clés autorisés",
     "maxSANs": "SANs max",
     "dnsPattern": "Restriction de motif DNS",
+    "rulesEnforcedHelp": "Appliqué au formulaire d'émission et aux demandes approuvées : une demande dont le type de clé n'est pas autorisé ou qui porte plus de noms DNS que le maximum est refusée, et la validité est plafonnée. Le motif DNS délimite les demandes auxquelles la politique s'applique.",
     "approvalWorkflow": "Workflow d'approbation",
     "approval": "Approbation",
     "requireApproval": "Exiger une approbation avant l'émission",

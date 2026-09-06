@@ -3960,6 +3960,7 @@
     "disable": "Disabilita",
     "disabled": "Policy disabilitata",
     "dnsPattern": "Restrizione pattern DNS",
+    "rulesEnforcedHelp": "Applicato al modulo di emissione e alle richieste approvate: una richiesta con tipo di chiave non consentito o con più nomi DNS del massimo viene rifiutata, e la validità viene limitata. Il pattern DNS delimita le richieste a cui si applica il criterio.",
     "editPolicy": "Modifica policy",
     "enable": "Abilita",
     "enabled": "Policy abilitata",

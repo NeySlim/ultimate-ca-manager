@@ -3960,6 +3960,7 @@
     "disable": "Deaktivieren",
     "disabled": "Richtlinie deaktiviert",
     "dnsPattern": "DNS-Musterbeschränkung",
+    "rulesEnforcedHelp": "Gilt für das Ausstellungsformular und genehmigte Anfragen: eine Anfrage mit nicht erlaubtem Schlüsseltyp oder mehr DNS-Namen als dem Maximum wird abgelehnt, die Gültigkeit wird begrenzt. Das DNS-Muster legt fest, für welche Anfragen die Richtlinie gilt.",
     "editPolicy": "Richtlinie bearbeiten",
     "enable": "Aktivieren",
     "enabled": "Richtlinie aktiviert",

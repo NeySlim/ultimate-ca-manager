@@ -3667,6 +3667,7 @@
     "allowedKeyTypes": "Allowed Key Types",
     "maxSANs": "Max SANs",
     "dnsPattern": "DNS Pattern Restriction",
+    "rulesEnforcedHelp": "Enforced on the issue form and on approved requests: a request whose key type is not allowed or which carries more DNS names than the maximum is refused, and the validity is capped. The DNS pattern scopes which requests the policy applies to.",
     "approvalWorkflow": "Approval Workflow",
     "approval": "Approval",
     "requireApproval": "Require approval before issuance",

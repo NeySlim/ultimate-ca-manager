@@ -3960,6 +3960,7 @@
     "disable": "Desativar",
     "disabled": "Política desativada",
     "dnsPattern": "Restrição de Padrão DNS",
+    "rulesEnforcedHelp": "Aplicado ao formulário de emissão e aos pedidos aprovados: um pedido cujo tipo de chave não é permitido ou que traz mais nomes DNS do que o máximo é recusado, e a validade é limitada. O padrão DNS delimita a que pedidos a política se aplica.",
     "editPolicy": "Editar Política",
     "enable": "Ativar",
     "enabled": "Política ativada",

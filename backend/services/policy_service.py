@@ -14,6 +14,10 @@ from utils.datetime_utils import utc_now
 logger = logging.getLogger(__name__)
 
 
+class PolicyViolation(ValueError):
+    """A request breaks a policy Rule (#335); the message names the rule."""
+
+
 class PolicyEvaluationService:
     """Evaluates certificate requests against policies"""
 
@@ -50,6 +54,76 @@ class PolicyEvaluationService:
             return policy
         
         return None
+
+    @staticmethod
+    def applicable_policies(ca_id: int, template_id: int = None,
+                            cn: str = None, san_list: list = None) -> list:
+        """Active issuance policies whose scope covers this request (#335).
+
+        Same CA / template / dns_pattern scoping as ``check_approval_required``
+        but regardless of ``requires_approval``: a policy's Rules bind every
+        request in its scope, not only the ones routed through approval.
+        Ordered by priority (lower number first).
+        """
+        query = CertificatePolicy.query.filter_by(
+            is_active=True, policy_type='issuance'
+        ).order_by(CertificatePolicy.priority.asc())
+        matching = []
+        for policy in query.all():
+            if policy.ca_id is not None and policy.ca_id != ca_id:
+                continue
+            if policy.template_id is not None and policy.template_id != template_id:
+                continue
+            if not PolicyEvaluationService._matches_rules(policy, cn, san_list):
+                continue
+            matching.append(policy)
+        return matching
+
+    @staticmethod
+    def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
+                      validity_days=None):
+        """Apply the Rules of *policies* to a request (#335).
+
+        Returns ``(violations, validity_days)``: the human-readable reasons
+        the request must be refused (``allowed_key_types`` not matched,
+        ``san_restrictions.max_dns_names`` exceeded), and the validity capped
+        by the lowest ``max_validity_days`` among the policies. Parameters
+        left ``None`` are not checked. Key types compare in the template
+        label form (RSA-2048, EC-P256), whatever spelling the request used.
+        """
+        from services.template_service import _normalize_key_type_label
+
+        violations = []
+        effective_validity = validity_days
+        for policy in policies:
+            rules = policy.get_rules() or {}
+
+            allowed = rules.get('allowed_key_types')
+            if key_type is not None and isinstance(allowed, list) and allowed:
+                allowed_labels = {_normalize_key_type_label(a) for a in allowed} - {None}
+                requested = _normalize_key_type_label(key_type)
+                if allowed_labels and requested not in allowed_labels:
+                    violations.append(
+                        f'Key type {requested or key_type} is not allowed by policy '
+                        f'"{policy.name}" (allowed: {", ".join(sorted(allowed_labels))})'
+                    )
+
+            san_rules = rules.get('san_restrictions') or {}
+            max_dns = san_rules.get('max_dns_names') if isinstance(san_rules, dict) else None
+            if (dns_name_count is not None and isinstance(max_dns, int)
+                    and not isinstance(max_dns, bool) and max_dns > 0
+                    and dns_name_count > max_dns):
+                violations.append(
+                    f'{dns_name_count} DNS names exceed the {max_dns} allowed by policy '
+                    f'"{policy.name}"'
+                )
+
+            max_validity = rules.get('max_validity_days')
+            if (effective_validity is not None and isinstance(max_validity, int)
+                    and not isinstance(max_validity, bool) and max_validity > 0
+                    and effective_validity > max_validity):
+                effective_validity = max_validity
+        return violations, effective_validity
 
     @staticmethod
     def _matches_rules(policy: CertificatePolicy, cn: str = None, san_list: list = None) -> bool:

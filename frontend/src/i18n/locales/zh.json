@@ -3960,6 +3960,7 @@
     "disable": "禁用",
     "disabled": "策略已禁用",
     "dnsPattern": "DNS 模式限制",
+    "rulesEnforcedHelp": "适用于签发表单和已批准的请求：密钥类型不被允许或 DNS 名称数超过上限的请求将被拒绝，有效期会被限制。DNS 模式用于界定该策略适用于哪些请求。",
     "editPolicy": "编辑策略",
     "enable": "启用",
     "enabled": "策略已启用",

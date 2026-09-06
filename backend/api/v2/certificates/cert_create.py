@@ -96,6 +96,8 @@ def create_certificate():
             san_list = data.get('san', [])
             if isinstance(san_list, str):
                 san_list = [s.strip() for s in san_list.split(',') if s.strip()]
+            # The issue form sends san_dns; a dns_pattern policy must see it (#335)
+            san_list = list(san_list) + [s for s in (data.get('san_dns') or []) if s not in san_list]
             policy = PolicyEvaluationService.check_approval_required(
                 ca_id=ca.id,
                 template_id=data.get('template_id'),
@@ -200,6 +202,26 @@ def create_certificate():
         if validity_days < 1 or validity_days > MAX_VALIDITY_DAYS:
             return error_response(
                 f"validity_days must be between 1 and {MAX_VALIDITY_DAYS}", 400)
+
+        # Policy Rules (#335): allowed key types, DNS SAN cap and validity cap,
+        # for every role. What administrators bypass above is the approval
+        # workflow, not the issuance rules an operator configured for the CA.
+        from services.policy_service import PolicyEvaluationService
+        from utils.san_parse import auto_san_buckets_from_cn
+        requested_dns = list(data.get('san_dns') or [])
+        implicit_dns = auto_san_buckets_from_cn(
+            data.get('cn') or '', data.get('cert_type', 'server'),
+            subject_email=data.get('email'),
+        ).get('san_dns') or []
+        policies = PolicyEvaluationService.applicable_policies(
+            ca.id, data.get('template_id'), data.get('cn'), requested_dns)
+        violations, validity_days = PolicyEvaluationService.enforce_rules(
+            policies, key_type=normalized_key,
+            dns_name_count=len(set(requested_dns) | set(implicit_dns)),
+            validity_days=validity_days,
+        )
+        if violations:
+            return error_response('Policy violation: ' + '; '.join(violations), 400)
 
         # Record which inherited values the request explicitly diverged from
         # (#258): the template link is kept and the divergence flagged. The

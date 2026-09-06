@@ -604,9 +604,10 @@ export default function PoliciesPage() {
 
           {/* Rules */}
           <div className="border-t border-border pt-4">
-            <h4 className="text-sm font-medium text-text-primary mb-3 flex items-center gap-1.5">
+            <h4 className="text-sm font-medium text-text-primary mb-1 flex items-center gap-1.5">
               <Gavel size={16} /> {t('policies.rules')}
             </h4>
+            <p className="text-xs text-text-tertiary mb-3">{t('policies.rulesEnforcedHelp')}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label={t('policies.maxValidity')}

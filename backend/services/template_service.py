@@ -626,6 +626,13 @@ def _normalize_key_type_label(value):
     uppered = v.upper()
     if uppered.startswith(('RSA-', 'EC-')) or uppered in ('ED25519', 'ED448'):
         return uppered
+    # legacy lowercase forms the template import accepts ('rsa:2048', 'ec:p256')
+    if ':' in uppered:
+        algo, _, param = uppered.partition(':')
+        if algo == 'RSA' and param.isdigit():
+            return f'RSA-{param}'
+        if algo == 'EC' and param.startswith('P') and param[1:].isdigit():
+            return f'EC-{param}'
     return None
 
 

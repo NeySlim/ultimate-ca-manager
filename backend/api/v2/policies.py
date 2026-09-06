@@ -152,6 +152,26 @@ def _issue_approved_certificate(approval):
     key_size = key_size or '2048'
 
     normalized_key = parse_issue_key_type(key_type, key_size, curve=data.get('curve'))
+
+    # Policy Rules (#335), re-checked at issuance time against every policy in
+    # scope (the approving policy included): key type, DNS SAN cap, validity cap.
+    from services.policy_service import PolicyViolation
+    from utils.san_parse import auto_san_buckets_from_cn as _implicit_sans
+    _requested_dns = list(data.get('san_dns') or [])
+    _implicit_dns = _implicit_sans(
+        data.get('cn') or '', data.get('cert_type', 'server'),
+        subject_email=data.get('email'),
+    ).get('san_dns') or []
+    _policies = PolicyEvaluationService.applicable_policies(
+        data['ca_id'], data.get('template_id'), data.get('cn'), _requested_dns)
+    _violations, validity_days = PolicyEvaluationService.enforce_rules(
+        _policies, key_type=normalized_key,
+        dns_name_count=len(set(_requested_dns) | set(_implicit_dns)),
+        validity_days=validity_days,
+    )
+    if _violations:
+        raise PolicyViolation('; '.join(_violations))
+    data['validity_days'] = validity_days
     EC_CURVES = {
         'prime256v1': ec.SECP256R1(),
         'secp384r1': ec.SECP384R1(),
@@ -671,7 +691,9 @@ def approve_request(request_id):
                 logger.info(f"Certificate issued for approval #{approval.id}")
         except Exception as e:
             logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}")
-            issue_error = 'Certificate issuance failed. Check server logs.'
+            from services.policy_service import PolicyViolation
+            issue_error = (f'Policy violation: {e}' if isinstance(e, PolicyViolation)
+                           else 'Certificate issuance failed. Check server logs.')
             db.session.rollback()
             # Re-fetch + re-record the vote without issuance so the
             # approver's action is not lost.
