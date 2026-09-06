@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.223] - 2026-09-06
 
 ### Fixed
 - Automatic updates on the rc channel refused every release candidate with "Release checksum does not cover this package". The checksum file published with a release candidate names the package as built (`ucm_2.223~rc1_all.deb`) while GitHub publishes the asset with a dot (`ucm_2.223.rc1_all.deb`), and the updater compared the two names literally. The updater now matches the names with that transform applied, and the release build writes the published asset name into the checksum file so earlier versions can update to a release candidate too
