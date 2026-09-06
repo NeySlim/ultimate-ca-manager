@@ -302,7 +302,17 @@ def fetch_expected_sha256(checksum_url, package_name):
     response = requests.get(checksum_url, timeout=30, allow_redirects=True,
                             verify=_ca_bundle or True)
     response.raise_for_status()
+    # GitHub publishes ``ucm_2.223~rc1_all.deb`` as ``ucm_2.223.rc1_all.deb``
+    # (tilde is not allowed in asset names) while the checksum line keeps the
+    # package's own name, so a release-candidate package never matched and
+    # the rc channel refused every install. Compare the names with the same
+    # transform applied, the way the watcher already tolerates it for the
+    # installed version.
+    def _asset_name(name):
+        return os.path.basename(name).replace('~', '.')
+
     expected = None
+    wanted = _asset_name(package_name)
     for line in response.text.splitlines():
         parts = line.split()
         if len(parts) < 2:
@@ -310,7 +320,7 @@ def fetch_expected_sha256(checksum_url, package_name):
         digest, fname = parts[0].lower(), parts[-1].lstrip('*')
         if not re.fullmatch(r'[0-9a-f]{64}', digest):
             continue
-        if os.path.basename(fname) == os.path.basename(package_name):
+        if _asset_name(fname) == wanted:
             expected = digest
             break
     return expected
