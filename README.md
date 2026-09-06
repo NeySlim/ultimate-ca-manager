@@ -21,7 +21,7 @@
 
 ### PKI Core
 - **CA Management** -- Root and intermediate CAs, hierarchy view, import/export, **HSM-backed signing keys** (private key never leaves the HSM), **configurable RFC 5280 profile** (signature digest, Key Usage, EKU) with Let's Encrypt-style defaults, **externally-signed CAs** (UCM generates the key pair and a CA-type CSR, an offline/external root signs it — the private key never leaves UCM, with same-key CSR renewal), **RFC 5280 name constraints** set at creation (permitted and excluded DNS, IP-range and e-mail subtrees, enforced on every issuance path)
-- **Certificate Lifecycle** -- Issue, sign, revoke, renew (**in-place**: stable IDs across renewals, superseded serials stay on CRL/OCSP until their original expiry), rename (mutable display name, covers CN-less certificates), export (PEM, DER, PKCS#12 with a 3DES/SHA-1 compatibility mode for Android 15 and earlier, macOS 14 and earlier, older Windows and Java, JKS), bulk operations, filter by status / issuer / source (ACME, SCEP, EST, AD CS, import…)
+- **Certificate Lifecycle** -- Issue, sign, revoke (with the RFC 5280 reason, from every revoke dialog and in bulk), renew (**in-place**: stable IDs across renewals, superseded serials stay on CRL/OCSP until their original expiry), rename (mutable display name, covers CN-less certificates), export (PEM, DER, PKCS#12 with a 3DES/SHA-1 compatibility mode for Android 15 and earlier, macOS 14 and earlier, older Windows and Java, JKS), bulk operations, filter by status / issuer / source (ACME, SCEP, EST, AD CS, import…)
 - **Conformance Linting** -- per-certificate checks against RFC 5280 and CA/Browser Forum Baseline Requirements via pkilint (and zlint when available), informative-only
 - **CSR Management** -- Create, import, sign Certificate Signing Requests with **custom Extra EKU OIDs** (RFC 5280 §4.2.1.12), **typed SAN validation** (DNS / IP / Email / URI / UPN), NIST P-256 / P-384 / P-521 curves
 - **Certificate Templates** -- Predefined profiles for server, client, code signing, email; key types RSA-2048/3072/4096 and EC P-256/P-384/P-521 prefilled into the issue form
@@ -50,7 +50,7 @@
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP 2FA, mTLS, API keys
 - **SSO** -- LDAP, OAuth2 (Azure/Google/GitHub), SAML single sign-on with role mapping; **per-user `auth_source` tracking** and opt-in role sync on login
 - **RBAC** -- 4 built-in roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions; **groups grant additional permissions** on top of a user's role (never administrator)
-- **Policies & Approvals** -- Certificate issuance policies with approval workflows
+- **Policies & Approvals** -- Certificate issuance policies with approval workflows and enforced rules (allowed key types, DNS SAN cap, validity cap, scoped by CA, template or DNS pattern)
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
 - **Private Key Encryption** -- AES-256 at rest under a master key file or `KEY_ENCRYPTION_KEY`; with encryption enabled no plaintext key file is kept on disk (existing mirrors are removed at enable time and at startup, public certificate files stay), and key files are recreated when it is disabled
 - **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own
