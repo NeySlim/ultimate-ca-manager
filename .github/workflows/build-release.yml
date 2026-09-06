@@ -142,7 +142,8 @@ jobs:
       - name: Generate checksums
         run: |
           for f in ucm_*.deb; do
-            sha256sum "$f" > "$f.sha256"
+            # GitHub renames "~" to "." in asset names: write the published name so update clients match the line
+            echo "$(sha256sum "$f" | cut -d' ' -f1)  ${f//\~/.}" > "$f.sha256"
           done
       
       - name: Upload artifact
@@ -229,7 +230,7 @@ jobs:
               
               # Copy outputs
               cp ~/rpmbuild/RPMS/noarch/*.rpm /output/
-              cd /output && for f in *.rpm; do sha256sum "$f" > "$f.sha256"; done
+              cd /output && for f in *.rpm; do echo "$(sha256sum "$f" | cut -d' ' -f1)  ${f//\~/.}" > "$f.sha256"; done
             '
 
       - name: Upload artifact

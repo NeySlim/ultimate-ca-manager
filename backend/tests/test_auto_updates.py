@@ -611,3 +611,39 @@ class TestUpdatePopup:
                             json={'update_popup_seen_version': 'x' * 40})
         assert r.status_code == 200
         assert 'update_popup_seen_version' not in r.get_json()['data']
+
+
+
+class TestChecksumAssetNameTransform:
+    """GitHub publishes ``ucm_2.223~rc1_all.deb`` as ``ucm_2.223.rc1_all.deb``;
+    the checksum line keeps the tilde. A release-candidate package must still
+    match its digest, whichever spelling either side uses."""
+
+    @pytest.mark.parametrize('line_name,package', [
+        ('ucm_2.223~rc1_all.deb', '/opt/ucm/data/updates/ucm_2.223.rc1_all.deb'),
+        ('ucm_2.223.rc1_all.deb', '/opt/ucm/data/updates/ucm_2.223~rc1_all.deb'),
+        ('ucm-2.223~rc1-1.fc43.noarch.rpm', 'ucm-2.223.rc1-1.fc43.noarch.rpm'),
+        ('ucm_2.222_all.deb', 'ucm_2.222_all.deb'),
+    ])
+    def test_rc_package_matches_its_checksum_line(self, monkeypatch, line_name, package):
+        from services import updates
+        digest = 'a' * 64
+
+        class _Resp:
+            text = f'{digest}  {line_name}\n'
+            def raise_for_status(self):
+                pass
+
+        monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _Resp())
+        assert updates.fetch_expected_sha256('https://x/pkg.sha256', package) == digest
+
+    def test_other_package_still_does_not_match(self, monkeypatch):
+        from services import updates
+
+        class _Resp:
+            text = 'b' * 64 + '  ucm_2.223~rc1_all.deb\n'
+            def raise_for_status(self):
+                pass
+
+        monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _Resp())
+        assert updates.fetch_expected_sha256('https://x/pkg.sha256', 'ucm_2.224.rc1_all.deb') is None
