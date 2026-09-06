@@ -3298,6 +3298,35 @@
     "maxLength": "Maximal {{count}} Zeichen",
     "invalidFormat": "Ungültiges Format"
   },
+  "revocation": {
+    "title": "Zertifikat widerrufen",
+    "reasonLabel": "Widerrufsgrund",
+    "reasonHelp": "Wird am Zertifikat gespeichert und in der CRL veröffentlicht (RFC-5280-Grundcode). Ein Widerruf ist unumkehrbar, außer bei einer Sperre.",
+    "bulkReasonHelp": "Gilt für jedes ausgewählte Zertifikat.",
+    "confirm": "Widerrufen",
+    "reasons": {
+      "unspecified": "Nicht angegeben",
+      "keyCompromise": "Schlüsselkompromittierung",
+      "cACompromise": "CA-Kompromittierung",
+      "affiliationChanged": "Zugehörigkeit geändert",
+      "superseded": "Ersetzt",
+      "cessationOfOperation": "Betriebseinstellung",
+      "certificateHold": "Zertifikatssperre (vorübergehend)",
+      "privilegeWithdrawn": "Berechtigung entzogen",
+      "aACompromise": "Kompromittierung einer Attributautorität"
+    },
+    "hints": {
+      "unspecified": "Kein besonderer Grund erfasst.",
+      "keyCompromise": "Der private Schlüssel wurde oder könnte offengelegt worden sein. Vertrauende Parteien sollten jeder damit erstellten Signatur misstrauen.",
+      "cACompromise": "Der Schlüssel der ausstellenden CA wurde kompromittiert.",
+      "affiliationChanged": "Name oder Zugehörigkeit des Inhabers haben sich geändert; der Schlüssel steht nicht unter Verdacht.",
+      "superseded": "Durch ein neues Zertifikat ersetzt; der Schlüssel steht nicht unter Verdacht.",
+      "cessationOfOperation": "Nicht mehr benötigt; der Schlüssel steht nicht unter Verdacht.",
+      "certificateHold": "Vorübergehende Sperre, die später mit „Sperre aufheben“ aufgehoben werden kann.",
+      "privilegeWithdrawn": "Eine durch das Zertifikat gewährte Berechtigung wurde entzogen.",
+      "aACompromise": "Der Schlüssel einer Attributautorität wurde kompromittiert."
+    }
+  },
   "details": {
     "pemCertificate": "PEM-Zertifikat",
     "metadata": "Metadaten",

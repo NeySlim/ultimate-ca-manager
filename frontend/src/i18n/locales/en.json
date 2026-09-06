@@ -3301,6 +3301,35 @@
     "maxLength": "Maximum {{count}} characters",
     "invalidFormat": "Invalid format"
   },
+  "revocation": {
+    "title": "Revoke certificate",
+    "reasonLabel": "Revocation reason",
+    "reasonHelp": "Recorded on the certificate and published on the CRL (RFC 5280 reason code). Revocation cannot be undone, except a certificate hold.",
+    "bulkReasonHelp": "Applied to every selected certificate.",
+    "confirm": "Revoke",
+    "reasons": {
+      "unspecified": "Unspecified",
+      "keyCompromise": "Key compromise",
+      "cACompromise": "CA compromise",
+      "affiliationChanged": "Affiliation changed",
+      "superseded": "Superseded",
+      "cessationOfOperation": "Cessation of operation",
+      "certificateHold": "Certificate hold (temporary)",
+      "privilegeWithdrawn": "Privilege withdrawn",
+      "aACompromise": "Attribute authority compromise"
+    },
+    "hints": {
+      "unspecified": "No particular reason recorded.",
+      "keyCompromise": "The private key was or may have been disclosed. Relying parties should distrust every signature made with it.",
+      "cACompromise": "The issuing CA's key was compromised.",
+      "affiliationChanged": "The subject's name or affiliation changed; the key is not suspected.",
+      "superseded": "Replaced by a new certificate; the key is not suspected.",
+      "cessationOfOperation": "No longer needed; the key is not suspected.",
+      "certificateHold": "Temporary suspension that can be lifted later with Remove hold.",
+      "privilegeWithdrawn": "A privilege granted by the certificate was withdrawn.",
+      "aACompromise": "An attribute authority's key was compromised."
+    }
+  },
   "details": {
     "pemCertificate": "PEM Certificate",
     "metadata": "Metadata",

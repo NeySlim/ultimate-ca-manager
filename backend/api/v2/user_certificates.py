@@ -23,6 +23,7 @@ from utils.response import error_response, no_content_response, success_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
 
 logger = logging.getLogger(__name__)
 
@@ -488,7 +489,9 @@ def revoke_user_certificate(cert_id):
         return error_response('Certificate already revoked', 400)
 
     data = request.json or {}
-    reason = data.get('reason', 'unspecified')
+    reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
+    if reason is None:
+        return error_response(invalid_reason_message(data.get('reason')), 400)
 
     try:
         cert = CertificateService.revoke_certificate(

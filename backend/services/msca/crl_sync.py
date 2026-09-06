@@ -20,7 +20,13 @@ logger = logging.getLogger(__name__)
 # Invert the UCM-string → ReasonFlags map used by CRL generation so both
 # directions speak the same reason vocabulary.
 from services.crl._constants import REASON_MAP
-_REASON_FLAG_TO_UCM = {flag: name for name, flag in REASON_MAP.items()}
+from utils.revocation_reasons import REVOCATION_REASONS
+# Reverse map over the canonical names only: REASON_MAP also carries alias
+# spellings (snake_case, legacy CACompromise) that must never be written back
+# to a certificate (#334)
+_REASON_FLAG_TO_UCM = {
+    REASON_MAP[name]: name for name in (*REVOCATION_REASONS, 'removeFromCRL')
+}
 
 
 class MicrosoftCACRLSyncMixin:

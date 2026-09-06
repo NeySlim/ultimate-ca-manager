@@ -3298,6 +3298,35 @@
     "maxLength": "Máximo {{count}} caracteres",
     "invalidFormat": "Formato inválido"
   },
+  "revocation": {
+    "title": "Revocar certificado",
+    "reasonLabel": "Motivo de revocación",
+    "reasonHelp": "Se registra en el certificado y se publica en la CRL (código de motivo RFC 5280). La revocación es irreversible, salvo la suspensión.",
+    "bulkReasonHelp": "Se aplica a cada certificado seleccionado.",
+    "confirm": "Revocar",
+    "reasons": {
+      "unspecified": "Sin especificar",
+      "keyCompromise": "Clave comprometida",
+      "cACompromise": "CA comprometida",
+      "affiliationChanged": "Cambio de afiliación",
+      "superseded": "Sustituido",
+      "cessationOfOperation": "Cese de operaciones",
+      "certificateHold": "Suspensión (temporal)",
+      "privilegeWithdrawn": "Privilegio retirado",
+      "aACompromise": "Autoridad de atributos comprometida"
+    },
+    "hints": {
+      "unspecified": "No se registra ningún motivo concreto.",
+      "keyCompromise": "La clave privada se divulgó o pudo divulgarse. Las partes confiantes deben desconfiar de toda firma hecha con ella.",
+      "cACompromise": "La clave de la CA emisora fue comprometida.",
+      "affiliationChanged": "El nombre o la afiliación del sujeto cambió; la clave no es sospechosa.",
+      "superseded": "Sustituido por un certificado nuevo; la clave no es sospechosa.",
+      "cessationOfOperation": "Ya no es necesario; la clave no es sospechosa.",
+      "certificateHold": "Suspensión temporal que puede levantarse después con Quitar suspensión.",
+      "privilegeWithdrawn": "Se retiró un privilegio otorgado por el certificado.",
+      "aACompromise": "La clave de una autoridad de atributos fue comprometida."
+    }
+  },
   "details": {
     "pemCertificate": "PEM Certificado",
     "metadata": "Metadatos",

@@ -990,7 +990,8 @@ class TestRevokedSerialPersistence:
                 serial_number=old_serial
             ).first()
             assert rs is not None
-            assert rs.revoke_reason == 'key_compromise'
+            # stored in the canonical RFC 5280 spelling since #334
+            assert rs.revoke_reason == 'keyCompromise'
             assert rs.valid_to is not None
 
     def test_revoked_serial_survives_deletion(self, auth_client, create_cert, app):

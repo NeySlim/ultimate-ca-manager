@@ -20,6 +20,7 @@ import {
   opnsenseService, casService, certificatesService, 
   csrsService, templatesService, usersService 
 } from '../services'
+import { REVOCATION_REASONS } from '../components/RevokeCertificateModal'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
@@ -292,6 +293,7 @@ export default function OperationsPage() {
   const [bulkLoading, setBulkLoading] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
+  const [bulkRevokeReason, setBulkRevokeReason] = useState('unspecified')  // RFC 5280 reason (#334)
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [bulkSignCaId, setBulkSignCaId] = useState('')
   const [bulkSignDays, setBulkSignDays] = useState('365')
@@ -513,7 +515,7 @@ export default function OperationsPage() {
       let result
       switch (`${bulkResourceType}:${bulkAction}`) {
         case 'certificates:revoke':
-          result = await certificatesService.bulkRevoke(ids)
+          result = await certificatesService.bulkRevoke(ids, bulkRevokeReason)
           break
         case 'certificates:renew':
           result = await certificatesService.bulkRenew(ids)
@@ -1113,10 +1115,29 @@ export default function OperationsPage() {
       {/* Confirm modal for bulk actions (not export/sign — they have their own) */}
       <ConfirmModal
         open={!!bulkAction && bulkAction !== 'export' && bulkAction !== 'sign'}
-        onClose={() => setBulkAction(null)}
+        onClose={() => { setBulkAction(null); setBulkRevokeReason('unspecified') }}
         onConfirm={executeBulkAction}
         title={t('operations.confirmBulk', 'Confirm Bulk Operation')}
-        message={getConfirmMessage()}
+        message={bulkAction === 'revoke' && bulkResourceType === 'certificates' ? (
+          <div className="space-y-3">
+            <p>{getConfirmMessage()}</p>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-text-secondary uppercase tracking-wide">
+                {t('revocation.reasonLabel')}
+              </label>
+              <select
+                value={bulkRevokeReason}
+                onChange={(e) => setBulkRevokeReason(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary"
+              >
+                {REVOCATION_REASONS.map(r => (
+                  <option key={r} value={r}>{t(`revocation.reasons.${r}`)}</option>
+                ))}
+              </select>
+              <p className="text-xs text-text-tertiary">{t(`revocation.hints.${bulkRevokeReason}`)} {t('revocation.bulkReasonHelp')}</p>
+            </div>
+          </div>
+        ) : getConfirmMessage()}
         confirmLabel={bulkAction === 'delete' ? t('common.delete') : t('common.confirm', 'Confirm')}
         variant={bulkAction === 'delete' || bulkAction === 'revoke' ? 'danger' : 'primary'}
         loading={bulkProcessing}

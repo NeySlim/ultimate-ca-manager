@@ -6,6 +6,7 @@ from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
 from services.cert_service import CertificateService
 from services.ocsp_service import OCSPService
 from services.audit_service import AuditService
@@ -59,6 +60,11 @@ def revoke_certificate(cert_id):
 
     data = request.json
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
+    # RFC 5280 reason names only, stored in canonical spelling (#334)
+    canonical = normalize_revocation_reason(reason)
+    if canonical is None:
+        return error_response(invalid_reason_message(reason), 400)
+    reason = canonical
     invalidity_raw = None
     if data:
         invalidity_raw = data.get('invalidity_date') or data.get('invalidity_at')

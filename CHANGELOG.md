@@ -7,6 +7,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- Revoking a certificate from the web UI now asks for the revocation reason. The confirm dialog had no reason field, so every manual revocation was recorded and published on the CRL as `unspecified`, with no way to correct it afterwards since revocation is one-way; only automated paths such as ACME renewal recorded a reason. The revoke dialog (certificates page, detail windows, user portal and bulk operations) now offers the RFC 5280 reason codes with a short explanation of each, defaulting to unspecified, and the certificate details show the chosen reason by name. The API rejects an unknown `reason` with 400 instead of storing it, accepts the snake_case spellings older clients used, and the CRL builder now maps the RFC spelling `cACompromise` that ACME revocations store (#334, reported by @JoseGoncalves)
+
 ## [2.222] - 2026-09-06
 
 ### Added

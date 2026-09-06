@@ -1778,6 +1778,35 @@
     },
     "expiresInDays": "Expire dans {{count}} jours"
   },
+  "revocation": {
+    "title": "Révoquer le certificat",
+    "reasonLabel": "Motif de révocation",
+    "reasonHelp": "Enregistré sur le certificat et publié dans la CRL (code de motif RFC 5280). Une révocation est irréversible, sauf la suspension.",
+    "bulkReasonHelp": "Appliqué à chaque certificat sélectionné.",
+    "confirm": "Révoquer",
+    "reasons": {
+      "unspecified": "Non précisé",
+      "keyCompromise": "Compromission de la clé",
+      "cACompromise": "Compromission de la CA",
+      "affiliationChanged": "Changement d'affiliation",
+      "superseded": "Remplacé",
+      "cessationOfOperation": "Cessation d'activité",
+      "certificateHold": "Suspension (temporaire)",
+      "privilegeWithdrawn": "Privilège retiré",
+      "aACompromise": "Compromission d'une autorité d'attributs"
+    },
+    "hints": {
+      "unspecified": "Aucun motif particulier enregistré.",
+      "keyCompromise": "La clé privée a été ou a pu être divulguée. Les parties utilisatrices doivent rejeter toute signature faite avec elle.",
+      "cACompromise": "La clé de la CA émettrice a été compromise.",
+      "affiliationChanged": "Le nom ou l'affiliation du sujet a changé ; la clé n'est pas suspectée.",
+      "superseded": "Remplacé par un nouveau certificat ; la clé n'est pas suspectée.",
+      "cessationOfOperation": "Plus nécessaire ; la clé n'est pas suspectée.",
+      "certificateHold": "Suspension temporaire, levable ensuite avec « Lever la suspension ».",
+      "privilegeWithdrawn": "Un privilège accordé par le certificat a été retiré.",
+      "aACompromise": "La clé d'une autorité d'attributs a été compromise."
+    }
+  },
   "details": {
     "pemCertificate": "Certificat PEM",
     "metadata": "Métadonnées",

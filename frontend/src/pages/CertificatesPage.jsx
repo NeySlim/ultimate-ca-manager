@@ -17,6 +17,7 @@ import {
   CertificateDetails, CertificateCompareModal
 } from '../components'
 import { ExportModal } from '../components/ExportModal'
+import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
@@ -247,29 +248,27 @@ export default function CertificatesPage() {
   }
 
   // Revoke certificate
-  const handleRevoke = async (id) => {
+  // Revocation asks for the RFC 5280 reason (#334); the dialog is rendered below
+  const [revokingCert, setRevokingCert] = useState(null)
+  const [revoking, setRevoking] = useState(false)
+  const handleRevoke = (id) => {
     const cert = certificates.find(c => c.id === id) || (selectedCert?.id === id ? selectedCert : null)
-    let warning = t('certificates.revokeWarning', 'Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.')
-    if (cert?.source === 'msca') {
-      warning += '\n\n' + t('certificates.revokeMscaWarning', 'This certificate was issued by a Microsoft CA. UCM cannot propagate the revocation to AD CS — it will only be marked revoked in UCM. Remember to revoke it on the Windows CA as well.')
-    }
-    const confirmed = await showConfirm(
-      warning,
-      {
-        title: t('certificates.revokeCertificate'),
-        confirmText: t('certificates.revokeCertificate').split(' ')[0],
-        variant: 'danger'
-      }
-    )
-    if (!confirmed) return
+    setRevokingCert(cert || { id })
+  }
+  const handleRevokeConfirm = async (reason) => {
+    if (!revokingCert) return
+    setRevoking(true)
     try {
       muteToasts()
-      await certificatesService.revoke(id)
+      await certificatesService.revoke(revokingCert.id, reason)
       showSuccess(t('messages.success.other.revoked'))
+      setRevokingCert(null)
       loadData()
       setSelectedCert(null)
     } catch {
       showError(t('messages.errors.revokeFailed.certificate'))
+    } finally {
+      setRevoking(false)
     }
   }
 
@@ -765,6 +764,13 @@ export default function CertificatesPage() {
       />
 
       {/* Row Export Modal */}
+      <RevokeCertificateModal
+        open={!!revokingCert}
+        onClose={() => setRevokingCert(null)}
+        onConfirm={handleRevokeConfirm}
+        certificate={revokingCert}
+        loading={revoking}
+      />
       <ExportModal
         open={!!exportRowCert}
         onClose={() => setExportRowCert(null)}

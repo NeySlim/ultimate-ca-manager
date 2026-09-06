@@ -14,6 +14,7 @@ import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input
 } from '../components'
 import { userCertificatesService } from '../services'
+import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { useNotification, useMobile } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, usePersistedState } from '../hooks'
@@ -169,23 +170,28 @@ export default function UserCertificatesPage() {
   }
 
   // Revoke handler
-  const handleRevoke = useCallback(async (id) => {
+  // Revocation asks for the RFC 5280 reason (#334)
+  const [revokingCert, setRevokingCert] = useState(null)
+  const [revoking, setRevoking] = useState(false)
+  const handleRevoke = useCallback((id) => {
     const cert = certificates.find(c => c.id === id)
-    const name = cert?.name || cert?.cert_subject || id
-    const confirmed = await showConfirm(
-      t('userCertificates.revokeDescription', { name }),
-      { title: t('userCertificates.revokeTitle'), variant: 'danger', confirmText: t('userCertificates.actions.revoke') }
-    )
-    if (!confirmed) return
+    setRevokingCert(cert ? { ...cert, name: cert.name || cert.cert_subject } : { id })
+  }, [certificates])
+  const handleRevokeConfirm = async (reason) => {
+    if (!revokingCert) return
+    setRevoking(true)
     try {
-      await userCertificatesService.revoke(id)
+      await userCertificatesService.revoke(revokingCert.id, reason)
       showSuccess(t('userCertificates.revokeSuccess'))
+      setRevokingCert(null)
       setSelectedCert(null)
       loadData()
     } catch (error) {
       showError(error.message || t('userCertificates.revokeFailed'))
+    } finally {
+      setRevoking(false)
     }
-  }, [certificates, showConfirm, showSuccess, showError, loadData, t])
+  }
 
   // Delete handler
   const handleDelete = useCallback(async (id) => {
@@ -466,6 +472,13 @@ export default function UserCertificatesPage() {
           </div>
         </div>
       </Modal>
+      <RevokeCertificateModal
+        open={!!revokingCert}
+        onClose={() => setRevokingCert(null)}
+        onConfirm={handleRevokeConfirm}
+        certificate={revokingCert}
+        loading={revoking}
+      />
     </ResponsiveLayout>
   )
 }

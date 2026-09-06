@@ -658,14 +658,16 @@ Content-Type: application/json
 
 Optional **`invalidity_date`** / **`invalidity_at`** (ISO 8601): RFC 5280 §5.3.2 date on which the certificate became invalid (may precede revocation). Emitted as CRL entry `invalidityDate` when set.
 
-**Revocation Reasons:**
-- `unspecified`
+**Revocation Reasons** (RFC 5280 §5.3.1; an unknown value is rejected with `400`, snake_case spellings such as `key_compromise` are accepted and stored in the canonical form):
+- `unspecified` (default when omitted)
 - `keyCompromise`
-- `caCompromise`
+- `cACompromise`
 - `affiliationChanged`
 - `superseded`
 - `cessationOfOperation`
 - `certificateHold` (temporary; can be lifted via unhold)
+- `privilegeWithdrawn`
+- `aACompromise`
 
 ### Unhold Certificate (lift certificateHold)
 ```http

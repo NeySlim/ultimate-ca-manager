@@ -18,6 +18,7 @@ from services.cert.renewal import RenewalError, renew_certificate_in_place
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_now
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,9 @@ def bulk_revoke_certificates():
         return error_response('ids array required', 400)
 
     ids = data['ids']
-    reason = data.get('reason', 'unspecified')
+    reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
+    if reason is None:
+        return error_response(invalid_reason_message(data.get('reason')), 400)
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
     results = {'success': [], 'failed': []}

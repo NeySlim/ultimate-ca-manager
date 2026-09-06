@@ -3298,6 +3298,35 @@
     "maxLength": "{{count}}文字以下にしてください",
     "invalidFormat": "形式が無効です"
   },
+  "revocation": {
+    "title": "証明書を失効",
+    "reasonLabel": "失効理由",
+    "reasonHelp": "証明書に記録され、CRL に公開されます（RFC 5280 の理由コード）。失効は一時停止を除いて取り消せません。",
+    "bulkReasonHelp": "選択したすべての証明書に適用されます。",
+    "confirm": "失効",
+    "reasons": {
+      "unspecified": "未指定",
+      "keyCompromise": "鍵の危殆化",
+      "cACompromise": "CA の危殆化",
+      "affiliationChanged": "所属の変更",
+      "superseded": "置き換え",
+      "cessationOfOperation": "運用停止",
+      "certificateHold": "一時停止（一時的）",
+      "privilegeWithdrawn": "権限の取り消し",
+      "aACompromise": "属性認証局の危殆化"
+    },
+    "hints": {
+      "unspecified": "特定の理由を記録しません。",
+      "keyCompromise": "秘密鍵が漏えいした、またはその可能性があります。依拠当事者はこの鍵による署名をすべて信頼すべきではありません。",
+      "cACompromise": "発行 CA の鍵が危殆化しました。",
+      "affiliationChanged": "サブジェクトの名前や所属が変わりました。鍵は疑われていません。",
+      "superseded": "新しい証明書に置き換えられました。鍵は疑われていません。",
+      "cessationOfOperation": "不要になりました。鍵は疑われていません。",
+      "certificateHold": "一時的な停止で、後で「停止解除」により解除できます。",
+      "privilegeWithdrawn": "証明書で付与された権限が取り消されました。",
+      "aACompromise": "属性認証局の鍵が危殆化しました。"
+    }
+  },
   "details": {
     "pemCertificate": "PEM証明書",
     "metadata": "メタデータ",

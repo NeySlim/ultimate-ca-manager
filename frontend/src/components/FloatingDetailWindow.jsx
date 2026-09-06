@@ -21,6 +21,7 @@ import { usePermission } from '../hooks'
 import { extractData } from '../lib/utils'
 import { LoadingSpinner } from './LoadingSpinner'
 import { ExportModal } from './ExportModal'
+import { RevokeCertificateModal } from './RevokeCertificateModal'
 import { TakeOfflineModal } from './cas/TakeOfflineModal'
 import { RestoreModal } from './cas/RestoreModal'
 import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
@@ -74,6 +75,7 @@ export function FloatingDetailWindow({ windowInfo }) {
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
   const [lintOpen, setLintOpen] = useState(false)
   const [keyRecoveryOpen, setKeyRecoveryOpen] = useState(false)
+  const [revokeOpen, setRevokeOpen] = useState(false)  // reason dialog (#334)
 
   const config = ENTITY_CONFIG[windowInfo.type]
 
@@ -122,18 +124,11 @@ export function FloatingDetailWindow({ windowInfo }) {
     }
   }
 
-  const handleRevoke = async () => {
-    const confirmed = await showConfirm(
-      t('certificates.revokeWarning', 'Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.'),
-      {
-        title: t('certificates.revokeCertificate', 'Revoke Certificate'),
-        confirmText: t('certificates.revokeCertificate', 'Revoke'),
-        variant: 'danger'
-      }
-    )
-    if (!confirmed) return
+  const handleRevoke = () => setRevokeOpen(true)
+  const handleRevokeConfirm = async (reason) => {
+    setRevokeOpen(false)
     try {
-      await certificatesService.revoke(windowInfo.entityId)
+      await certificatesService.revoke(windowInfo.entityId, reason)
       showSuccess(t('certificates.revoked', 'Certificate revoked'))
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
@@ -326,6 +321,14 @@ export function FloatingDetailWindow({ windowInfo }) {
       />
     )}
 
+    {(isCert || isUserCert) && (
+      <RevokeCertificateModal
+        open={revokeOpen}
+        onClose={() => setRevokeOpen(false)}
+        onConfirm={handleRevokeConfirm}
+        certificate={data}
+      />
+    )}
     {(isCert || isUserCert) && data && (
       <KeyRecoveryRequestModal
         certId={windowInfo.entityId}

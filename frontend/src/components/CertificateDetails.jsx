@@ -550,7 +550,7 @@ export function CertificateDetails({
             </div>
             <CompactGrid>
               <CompactField autoIcon="revokedAt" label={t('details.revokedAt')} value={formatDate(cert.revoked_at)} />
-              <CompactField autoIcon="reason" label={t('details.reason')} value={cert.revoke_reason || t('details.unspecified')} />
+              <CompactField autoIcon="reason" label={t('details.reason')} value={cert.revoke_reason ? t(`revocation.reasons.${cert.revoke_reason}`, cert.revoke_reason) : t('details.unspecified')} />
             </CompactGrid>
           </div>
         </CompactSection>

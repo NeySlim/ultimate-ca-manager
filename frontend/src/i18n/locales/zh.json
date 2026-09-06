@@ -3298,6 +3298,35 @@
     "maxLength": "最多{{count}}个字符",
     "invalidFormat": "格式无效"
   },
+  "revocation": {
+    "title": "吊销证书",
+    "reasonLabel": "吊销原因",
+    "reasonHelp": "记录在证书上并发布到 CRL（RFC 5280 原因代码）。除证书挂起外，吊销无法撤销。",
+    "bulkReasonHelp": "应用于每个选中的证书。",
+    "confirm": "吊销",
+    "reasons": {
+      "unspecified": "未指定",
+      "keyCompromise": "密钥泄露",
+      "cACompromise": "CA 泄露",
+      "affiliationChanged": "隶属关系变更",
+      "superseded": "已被替代",
+      "cessationOfOperation": "停止运营",
+      "certificateHold": "证书挂起（临时）",
+      "privilegeWithdrawn": "权限撤回",
+      "aACompromise": "属性机构泄露"
+    },
+    "hints": {
+      "unspecified": "不记录具体原因。",
+      "keyCompromise": "私钥已经或可能已经泄露。依赖方应不信任用它做出的任何签名。",
+      "cACompromise": "签发 CA 的密钥已泄露。",
+      "affiliationChanged": "主体的名称或隶属关系已变更；密钥未受怀疑。",
+      "superseded": "已被新证书替代；密钥未受怀疑。",
+      "cessationOfOperation": "不再需要；密钥未受怀疑。",
+      "certificateHold": "临时挂起，之后可通过“解除挂起”恢复。",
+      "privilegeWithdrawn": "证书授予的某项权限已被撤回。",
+      "aACompromise": "某个属性机构的密钥已泄露。"
+    }
+  },
   "details": {
     "pemCertificate": "PEM 证书",
     "metadata": "元数据",
