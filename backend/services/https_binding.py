@@ -108,7 +108,11 @@ def backfill_legacy_https_binding():
     the unique match. Existing explicit bindings always win; ambiguous matches
     are left untouched rather than guessing which row should follow renewals.
     """
-    existing = get_bound_refid()
+    try:
+        existing = get_bound_refid()
+    except Exception as exc:
+        logger.warning("Could not read HTTPS certificate binding: %s", exc)
+        return ''
     if existing:
         return existing
 
@@ -198,10 +202,11 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
         logger.error(f"HTTPS re-materialization after renewal failed: {exc}")
 
 
-def register_https_binding_subscriber():
+def register_https_binding_subscriber(app):
     from services.events import event_bus
     if getattr(register_https_binding_subscriber, '_done', False):
         return
     event_bus.subscribe('certificate.renewed', on_certificate_renewed)
-    backfill_legacy_https_binding()
+    with app.app_context():
+        backfill_legacy_https_binding()
     register_https_binding_subscriber._done = True

@@ -772,7 +772,7 @@ def create_app(config_name=None):
             from services.events.subscribers import register_notification_subscribers
             register_notification_subscribers()
             from services.https_binding import register_https_binding_subscriber
-            register_https_binding_subscriber()
+            register_https_binding_subscriber(app)
         except ImportError:
             pass
 

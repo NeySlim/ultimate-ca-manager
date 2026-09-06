@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from flask import has_app_context
 
 import services.https_binding as https_binding
 from services.https_binding import (
@@ -62,6 +63,40 @@ class TestLegacyBindingBackfill:
             set_bound_refid('already-bound')
             assert backfill_legacy_https_binding() == 'already-bound'
             assert get_bound_refid() == 'already-bound'
+
+
+class TestBackfillResilience:
+    def test_unreadable_binding_does_not_break_startup(self, app, monkeypatch):
+        """A database error while reading the binding (first boot after an
+        update, base not ready yet) must not propagate into create_app."""
+        def _boom():
+            raise RuntimeError('database unavailable')
+        monkeypatch.setattr(https_binding, 'get_bound_refid', _boom)
+        with app.app_context():
+            assert https_binding.backfill_legacy_https_binding() == ''
+
+
+class TestSubscriberRegistration:
+    def test_backfill_runs_with_app_context(self, app, monkeypatch):
+        import services.events as events
+
+        observed_contexts = []
+        monkeypatch.setattr(events.event_bus, 'subscribe', MagicMock())
+        monkeypatch.setattr(
+            https_binding,
+            'backfill_legacy_https_binding',
+            lambda: observed_contexts.append(has_app_context()),
+        )
+        monkeypatch.setattr(
+            https_binding.register_https_binding_subscriber,
+            '_done',
+            False,
+            raising=False,
+        )
+
+        https_binding.register_https_binding_subscriber(app)
+
+        assert observed_contexts == [True]
 
 
 class TestMaterialization:

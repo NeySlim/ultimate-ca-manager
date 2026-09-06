@@ -105,13 +105,22 @@ def test_migration_029_uses_text_encryption():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def encryption_enabled():
+def encryption_enabled(tmp_path_factory):
     from cryptography.fernet import Fernet
-    os.environ["KEY_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
     from security import encryption as enc_mod
+
+    patch = pytest.MonkeyPatch()
+    patch.setattr(
+        enc_mod,
+        "MASTER_KEY_PATH",
+        tmp_path_factory.mktemp("pem-encryption") / "master.key",
+    )
+    patch.setenv("KEY_ENCRYPTION_KEY", Fernet.generate_key().decode())
     enc_mod.KeyEncryption().reload()
     assert enc_mod.KeyEncryption().is_enabled
     yield
+    patch.undo()
+    enc_mod.KeyEncryption().reload()
 
 
 def test_encrypt_text_round_trips_pem(encryption_enabled):
