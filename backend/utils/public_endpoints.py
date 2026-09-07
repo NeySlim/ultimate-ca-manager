@@ -59,6 +59,23 @@ class ParsedPublicUrl:
     host: str
     port: int
     normalized: str
+    explicit_port: bool = False
+
+    @property
+    def stored(self) -> str:
+        """Form persisted in SystemConfig.
+
+        ``normalized`` omits a default port (80/443). Persisting that form
+        loses the information that the operator pinned it, and the runtime
+        then substitutes the deployment listen port (8080/8443) for a URL
+        without a port, so ``http://pki.example.com:80`` used to be
+        advertised as ``http://pki.example.com:8080``. An explicitly typed
+        port is therefore kept in the stored string, default or not, and
+        ``_effective_port_for_stored_url`` honours it (discussion #337).
+        """
+        if self.explicit_port:
+            return f'{self.scheme}://{self.host}:{self.port}'
+        return self.normalized
 
 
 def _config_value(key: str, default: str = '') -> str:
@@ -105,7 +122,12 @@ def _format_public_origin(scheme: str, host: str, port: int) -> str:
 
 
 def _effective_port_for_stored_url(stored_raw: str, scheme: str, deployment_port: int) -> int:
-    """Port for runtime URLs: explicit in DB string, else deployment listen port."""
+    """Port for runtime URLs: explicit in DB string, else deployment listen port.
+
+    The validators persist an explicitly typed port even when it is the
+    scheme default, so ``http://pki.example.com:80`` advertises port 80 while
+    UCM itself listens on 8080 behind a reverse proxy (discussion #337).
+    """
     if _explicit_port_in_raw(stored_raw):
         parsed = parse_public_url(stored_raw, default_scheme=scheme)
         return parsed.port if parsed else deployment_port
@@ -153,6 +175,7 @@ def parse_public_url(raw: str, *, default_scheme: str = 'https') -> Optional[Par
     if scheme not in ('http', 'https'):
         return None
     port = parts.port
+    explicit_port = port is not None
     if port is None:
         port = 443 if scheme == 'https' else 80
     if port < 1 or port > 65535:
@@ -161,7 +184,10 @@ def parse_public_url(raw: str, *, default_scheme: str = 'https') -> Optional[Par
         (scheme == 'https' and port == 443) or (scheme == 'http' and port == 80)
     ) else f'{host}:{port}'
     normalized = urlunsplit((scheme, host_part, '', '', ''))
-    return ParsedPublicUrl(scheme=scheme, host=host, port=port, normalized=normalized)
+    return ParsedPublicUrl(
+        scheme=scheme, host=host, port=port, normalized=normalized,
+        explicit_port=explicit_port,
+    )
 
 
 def validate_public_host_ssrf(hostname: str) -> Optional[str]:
@@ -385,7 +411,7 @@ def validate_admin_base_url(raw: str) -> tuple[Optional[str], Optional[str]]:
     ssrf_err = validate_public_host_ssrf(parsed.host)
     if ssrf_err:
         return None, ssrf_err
-    return parsed.normalized, None
+    return parsed.stored, None
 
 
 def probe_admin_base_url(normalized: str) -> Optional[str]:
@@ -454,7 +480,7 @@ def validate_protocol_base_url(raw: str) -> tuple[Optional[str], Optional[str]]:
     ssrf_err = validate_public_host_ssrf(parsed.host)
     if ssrf_err:
         return None, ssrf_err
-    return parsed.normalized, None
+    return parsed.stored, None
 
 
 def validate_acme_public_vhost_host(host: str) -> Optional[str]:

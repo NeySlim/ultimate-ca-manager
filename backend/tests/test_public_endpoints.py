@@ -91,6 +91,24 @@ class TestUrlValidation:
         assert err is None
         assert url == ''
 
+    def test_explicit_default_port_is_kept_in_stored_value(self):
+        # Discussion #337: a typed :80 / :443 pins the advertised port and
+        # must survive validation, unlike a URL that omits the port.
+        url, err = validate_protocol_base_url('http://pki.ucm.example.com:80')
+        assert err is None
+        assert url == 'http://pki.ucm.example.com:80'
+        url, err = validate_admin_base_url('https://admin.ucm.example.com:443')
+        assert err is None
+        assert url == 'https://admin.ucm.example.com:443'
+
+    def test_url_without_port_stays_normalized(self):
+        url, err = validate_protocol_base_url('HTTP://PKI.ucm.example.com/')
+        assert err is None
+        assert url == 'http://pki.ucm.example.com'
+        url, err = validate_admin_base_url('https://admin.ucm.example.com/')
+        assert err is None
+        assert url == 'https://admin.ucm.example.com'
+
     def test_rejects_cloud_metadata_host(self):
         url, err = validate_admin_base_url('https://metadata.google.internal')
         assert url is None
@@ -363,6 +381,30 @@ class TestDeploymentPorts:
         _set_config(app, 'base_url', 'https://admin.ucm.example.com:9443')
         with app.app_context():
             assert get_admin_canonical_origin() == 'https://admin.ucm.example.com:9443'
+
+    def test_explicit_port_80_wins_over_listen_port(self, app, monkeypatch):
+        # Listen on 8080, advertise port 80 (reverse proxy in front, #337).
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '8080')
+        _set_config(app, 'protocol_base_url', 'http://pki.ucm.example.com:80')
+        with app.app_context():
+            assert get_protocol_effective_url() == 'http://pki.ucm.example.com'
+
+    def test_explicit_port_443_wins_over_listen_port(self, app, monkeypatch):
+        monkeypatch.setenv('HTTPS_PORT', '8443')
+        _set_config(app, 'base_url', 'https://admin.ucm.example.com:443')
+        with app.app_context():
+            assert get_admin_canonical_origin() == 'https://admin.ucm.example.com'
+
+    def test_settings_api_round_trip_keeps_port_80(self, app, auth_client, monkeypatch):
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '8080')
+        resp = auth_client.patch('/api/v2/settings/general', json={
+            'protocol_base_url': 'http://pki.ucm.example.com:80',
+        })
+        assert resp.status_code == 200, resp.get_json()
+        body = auth_client.get('/api/v2/settings/public-endpoints').get_json()['data']
+        assert body['protocol']['base_url'] == 'http://pki.ucm.example.com:80'
+        assert body['protocol']['effective_url'] == 'http://pki.ucm.example.com'
+        _set_config(app, 'protocol_base_url', '')
 
 
 class TestAdminHostResolution:
