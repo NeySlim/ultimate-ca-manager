@@ -24,7 +24,7 @@
 - **Certificate Lifecycle** -- Issue, sign, revoke (with the RFC 5280 reason, from every revoke dialog and in bulk), renew (**in-place**: stable IDs across renewals, superseded serials stay on CRL/OCSP until their original expiry), rename (mutable display name, covers CN-less certificates), export (PEM, DER, PKCS#12 with a 3DES/SHA-1 compatibility mode for Android 15 and earlier, macOS 14 and earlier, older Windows and Java, JKS), bulk operations, filter by status / issuer / source (ACME, SCEP, EST, AD CS, import…)
 - **Conformance Linting** -- per-certificate checks against RFC 5280 and CA/Browser Forum Baseline Requirements via pkilint (and zlint when available), informative-only
 - **CSR Management** -- Create, import, sign Certificate Signing Requests with **custom Extra EKU OIDs** (RFC 5280 §4.2.1.12), **typed SAN validation** (DNS / IP / Email / URI / UPN), NIST P-256 / P-384 / P-521 curves
-- **Certificate Templates** -- Predefined profiles for server, client, code signing, email; key types RSA-2048/3072/4096 and EC P-256/P-384/P-521 prefilled into the issue form
+- **Certificate Templates** -- Predefined profiles for server, client, code signing, email, Windows smartcard logon; key types RSA-2048/3072/4096 and EC P-256/P-384/P-521 prefilled into the issue form
 - **Certificate Discovery** -- Network scanning, scan profiles, scheduled scans, certificate import
 - **Trust Store** -- Manage trusted root CA certificates with expiry alerts
 - **Chain Repair** -- AKI/SKI-based chain validation with automatic repair scheduler
@@ -53,7 +53,7 @@
 - **Policies & Approvals** -- Certificate issuance policies with approval workflows and enforced rules (allowed key types, DNS SAN cap, validity cap, scoped by CA, template or DNS pattern)
 - **Audit Logs** -- Action logging with integrity verification and remote syslog forwarding
 - **Private Key Encryption** -- AES-256 at rest under a master key file or `KEY_ENCRYPTION_KEY`; with encryption enabled no plaintext key file is kept on disk (existing mirrors are removed at enable time and at startup, public certificate files stay), and key files are recreated when it is disabled
-- **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own
+- **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own Trusted proxies can be given as CIDR networks and, once proxy support is on, `X-Forwarded-*` headers are honoured only from them, so a client reaching the backend directly cannot spoof its address
 
 ### Operations & Monitoring
 - **Dashboard** -- Customizable drag-and-drop widgets, real-time stats, certificate trends
@@ -78,6 +78,7 @@
 - **Responsive UI** -- React 18 + Radix UI, mobile-friendly
 - **Real-time** -- WebSocket live updates
 - **Multi-platform** -- Docker, Debian/Ubuntu (.deb), RHEL/Rocky/Fedora (.rpm)
+- **Reverse proxy ready** -- Public ports independent of the listen ports (an explicit `:80` or `:443` in the base URLs is advertised as typed), trusted proxies by IP or CIDR network, and Helm chart `proxy.*` values for an Ingress in front of UCM
 
 ---
 
@@ -169,6 +170,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [ ] **High Availability / Clustering** — Active-passive or active-active HA deployment
 - [ ] **Post-Quantum Cryptography** — ML-DSA, ML-KEM, SLH-DSA key types (NIST FIPS 203/204/205)
 - [ ] **CMP Protocol (RFC 4210)** — Certificate Management Protocol support
+- [x] **Reverse proxy fit and smartcard logon templates**: trusted proxies accept CIDR networks and gate every `X-Forwarded-*` header, the advertised admin and protocol ports can differ from the listen ports, the Helm chart wires the proxy settings and follows the release it ships with, the template editor builds Windows smartcard logon templates with a built-in one, and a reused ACME authorization records the challenge that was actually performed *(v2.224)*
 - [x] **ACME profile templates and key-algorithm-aware key usage** — an ACME certificate profile can bind a certificate template whose key usage and EKU govern the issued certificate, and every issuance path (issue form, approvals, ACME, EST, SCEP, WSTEP) now derives key usage from the key algorithm, so ECDSA and Ed25519 leaves no longer assert `keyEncipherment` *(v2.221)*
 - [x] **Security hardening, multi-endpoint SCEP, and access-control refinements** — an audit-driven hardening pass tightens issuance (per-path key-strength floor, CSR EKU capping, gated sub-CA minting), ACME (SAN types and subject bound to validated identifiers, SSRF guard on IP orders and cloud-metadata targets), and authorization (mTLS, API-key scoping, TSA, CSRF, SSH, OCSP, and direct private-key export gated behind an admin-only scope so Key Recovery's approval trail can't be bypassed); named SCEP profiles serve multiple enrollment endpoints, each with its own CA, template, challenge and approval policy; delegated OCSP responder certificates renew automatically; EAB credentials can be restricted to specific domains; and user groups can grant permissions from the UI *(v2.204)*
 - [x] **Compatibility restore & configurable strictness** — the 2.200 hardening no longer breaks existing deployments: TSA, SCEP, EST, CAA and name-constraints checks default to pre-2.200-compatible behaviour with renewals graced at par, and every strictness switch (CAA enforcement, SCEP signingTime/clock skew, CT SCT embedding/require, OCSP response validity, syslog framing, OIDC ID-token verification incl. issuer/JWKS) is now configurable from the UI; certificate templates now govern the issued KU/EKU, with a `custom` type, an OCSP Signing system template and `OCSPSigning` selectable in the editor *(v2.203)*
