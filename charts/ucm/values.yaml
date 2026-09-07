@@ -65,9 +65,9 @@ persistence:
 ## never loopback (the default trust), so without trustedProxies the
 ## forwarded headers are ignored and requests can 403.
 proxy:
-  # Sets UCM_BEHIND_PROXY=1 — enables ProxyFix for one proxy hop.
+  # Sets UCM_BEHIND_PROXY=1, which enables ProxyFix for one proxy hop.
   behindProxy: false
-  # UCM_TRUSTED_PROXIES — list of proxy IP addresses or CIDR networks allowed
+  # UCM_TRUSTED_PROXIES: list of proxy IP addresses or CIDR networks allowed
   # to set forwarded / client-cert headers. Use the ingress controller's pod
   # network (its pod IP rotates), e.g. the CNI pod CIDR:
   #   trustedProxies:

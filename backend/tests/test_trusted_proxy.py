@@ -152,6 +152,15 @@ class TestTrustedProxyCidr:
         with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': '127.0.0.1'}):
             assert is_request_from_trusted_proxy() is False
 
+    def test_mapped_form_entry_matches_bare_ipv4_peer(self, app, monkeypatch):
+        """The operator wrote the IPv4-mapped form; after PeerAddressNormalizer
+        the peer arrives as bare IPv4 and must still be trusted."""
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', f'::ffff:{NGINX_IP}')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': NGINX_IP}):
+            assert is_request_from_trusted_proxy() is True
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': ATTACKER_IP}):
+            assert is_request_from_trusted_proxy() is False
+
     def test_compile_parses_networks_and_exacts(self):
         import ipaddress
         exact, networks, trust_all = _compile_trusted_proxies('192.0.2.1, 10.0.0.0/8')

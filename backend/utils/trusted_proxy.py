@@ -61,7 +61,13 @@ def _compile_trusted_proxies(proxies_str):
             if '/' in entry:
                 networks.append(ipaddress.ip_network(entry, strict=False))
             else:
-                exact.add(ipaddress.ip_address(entry))
+                ip = ipaddress.ip_address(entry)
+                exact.add(ip)
+                # An entry written in the mapped form (::ffff:10.0.0.5) must
+                # also match the bare IPv4 peer PeerAddressNormalizer reports.
+                mapped = getattr(ip, 'ipv4_mapped', None)
+                if mapped is not None:
+                    exact.add(mapped)
         except ValueError:
             logger.warning(
                 "Ignoring UCM_TRUSTED_PROXIES entry %r: not an IP address or "

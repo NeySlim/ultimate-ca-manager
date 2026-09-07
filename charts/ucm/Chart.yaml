@@ -5,7 +5,7 @@ type: application
 # Chart version — bump on chart changes, independent of the app version.
 version: 0.2.0
 # Application version this chart deploys (matches the UCM release / image tag).
-appVersion: "2.170"
+appVersion: "2.223"
 home: https://ucm.tools
 sources:
   - https://github.com/NeySlim/ultimate-ca-manager
