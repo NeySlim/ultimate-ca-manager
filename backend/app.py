@@ -148,15 +148,20 @@ def create_app(config_name=None):
     app.config['TRUSTED_PROXY_HOPS'] = _trusted_hops
 
     if _trusted_hops > 0:
-        app.wsgi_app = ProxyFix(
+        from utils.trusted_proxy import ForwardedHeadersGate
+        # The gate runs first and strips X-Forwarded-* from any peer outside
+        # UCM_TRUSTED_PROXIES, so ProxyFix never rewrites REMOTE_ADDR, scheme
+        # or host on a direct client's say-so (#339).
+        app.wsgi_app = ForwardedHeadersGate(ProxyFix(
             app.wsgi_app,
             x_for=_trusted_hops,
             x_proto=_trusted_hops,
             x_host=_trusted_hops,
             x_prefix=_trusted_hops,
-        )
+        ))
         app.logger.info(
-            f"ProxyFix enabled (trusting {_trusted_hops} X-Forwarded-* hop(s))"
+            f"ProxyFix enabled (trusting {_trusted_hops} X-Forwarded-* hop(s) "
+            "from peers in UCM_TRUSTED_PROXIES)"
         )
     else:
         app.logger.info(

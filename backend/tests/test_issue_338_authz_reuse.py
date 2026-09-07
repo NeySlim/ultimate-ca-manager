@@ -215,6 +215,22 @@ class TestOrderValidationMethod:
             _challenge(authz, 'tls-alpn-01')
             assert order_validation_method(order) == 'HTTP-01'
 
+    def test_method_merges_validated_and_failed_identifiers(self, app, account):
+        # dns-01 proved a.example, http-01 failed on b.example: both are named.
+        with app.app_context():
+            acct = account['account_id']
+            order = _order(acct, 'a.mixed.example.test', 'b.mixed.example.test')
+            order.status = 'invalid'
+            a = _authz(acct, 'a.mixed.example.test', order_id=order.order_id, status='valid')
+            _challenge(a, 'dns-01', status='valid', validated=utc_now())
+            b = _authz(acct, 'b.mixed.example.test', order_id=order.order_id, status='invalid')
+            _challenge(b, 'dns-01')
+            _challenge(b, 'http-01', status='invalid', error={
+                'type': 'urn:ietf:params:acme:error:connection',
+                'detail': 'Connection refused',
+            })
+            assert order_validation_method(order) == 'DNS-01, HTTP-01'
+
     def test_method_is_na_when_no_challenge_was_answered(self, app, account):
         with app.app_context():
             acct = account['account_id']

@@ -72,6 +72,9 @@ proxy:
   # network (its pod IP rotates), e.g. the CNI pod CIDR:
   #   trustedProxies:
   #     - 10.42.0.0/16
+  # CIDR entries need UCM 2.224 or later (the chart's appVersion). With an
+  # older image.tag, list exact IP addresses only: an older UCM keeps a CIDR
+  # entry as a literal string that never matches, and trusts no proxy.
   trustedProxies: []
 
 ## Extra environment variables (UCM_* etc.), passed verbatim.

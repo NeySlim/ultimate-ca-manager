@@ -37,18 +37,23 @@ def order_validation_method(order) -> str:
     Reads the validated challenge(s) of each authorization rather than the
     first challenge row, which is always the first type offered (dns-01) and
     says nothing about what the client did (#338). When nothing was
-    validated, the challenge(s) the client attempted and failed are named so
-    an Invalid order still shows the method that was tried. An order whose
-    challenges were never answered reads N/A.
+    validated for an identifier, the challenge(s) the client attempted and
+    failed on it are named so an Invalid order still shows the method that
+    was tried. The choice is made per authorization and the results merged,
+    so a multi-identifier order validated by dns-01 on one name and failed
+    on http-01 for another lists both. An order whose challenges were never
+    answered reads N/A.
     """
-    performed, attempted = [], []
+    types = []
     for authz in order.authorizations:
+        performed, attempted = [], []
         for challenge in authz.challenges:
             if challenge.status == 'valid':
                 performed.append(challenge.type)
             elif _challenge_was_attempted(challenge):
                 attempted.append(challenge.type)
-    types = list(dict.fromkeys(performed or attempted))
+        types.extend(performed or attempted)
+    types = list(dict.fromkeys(types))
     return ', '.join(t.upper() for t in types) if types else 'N/A'
 
 

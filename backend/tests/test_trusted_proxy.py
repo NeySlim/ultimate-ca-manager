@@ -169,6 +169,80 @@ class TestTrustedProxyCidr:
         assert networks == (ipaddress.ip_network('10.0.0.0/8'),)
 
 
+class TestForwardedHeadersGate:
+    """With UCM_BEHIND_PROXY set, ProxyFix must only act on X-Forwarded-*
+    sent by a peer in UCM_TRUSTED_PROXIES; a direct client's headers are
+    dropped before ProxyFix sees them."""
+
+    def _stack(self):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        from utils.trusted_proxy import ForwardedHeadersGate
+        seen = {}
+
+        def inner(environ, start_response):
+            seen.update({
+                'remote_addr': environ.get('REMOTE_ADDR'),
+                'scheme': environ.get('wsgi.url_scheme'),
+                'host': environ.get('HTTP_HOST'),
+                'xff_left': environ.get('HTTP_X_FORWARDED_FOR'),
+                'real_ip': environ.get('HTTP_X_REAL_IP'),
+            })
+            start_response('200 OK', [])
+            return [b'']
+
+        app = ForwardedHeadersGate(ProxyFix(inner, x_for=1, x_proto=1, x_host=1))
+        return app, seen
+
+    def _call(self, app, peer, **headers):
+        from werkzeug.test import EnvironBuilder
+        environ = EnvironBuilder(path='/', headers=headers, environ_overrides={'REMOTE_ADDR': peer}).get_environ()
+        list(app(environ, lambda *a: None))
+
+    def test_untrusted_peer_headers_are_dropped(self, monkeypatch, caplog):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', NGINX_IP)
+        app, seen = self._stack()
+        with caplog.at_level('WARNING', logger='utils.trusted_proxy'):
+            self._call(app, ATTACKER_IP, **{'X-Forwarded-For': '127.0.0.1', 'X-Forwarded-Proto': 'https',
+                                          'X-Forwarded-Host': 'admin.example', 'X-Real-IP': '127.0.0.1'})
+        assert seen['remote_addr'] == ATTACKER_IP
+        assert seen['scheme'] == 'http'
+        assert seen['host'] != 'admin.example'
+        assert seen['xff_left'] is None and seen['real_ip'] is None
+        assert any(ATTACKER_IP in r.message for r in caplog.records)
+
+    def test_trusted_peer_headers_reach_proxyfix(self, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', NGINX_IP)
+        app, seen = self._stack()
+        self._call(app, NGINX_IP, **{'X-Forwarded-For': CLIENT_IP, 'X-Forwarded-Proto': 'https'})
+        assert seen['remote_addr'] == CLIENT_IP
+        assert seen['scheme'] == 'https'
+
+    def test_cidr_trusted_peer_and_wildcard(self, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '10.42.0.0/16')
+        app, seen = self._stack()
+        self._call(app, '10.42.3.4', **{'X-Forwarded-For': CLIENT_IP})
+        assert seen['remote_addr'] == CLIENT_IP
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '*')
+        app, seen = self._stack()
+        self._call(app, ATTACKER_IP, **{'X-Forwarded-For': CLIENT_IP})
+        assert seen['remote_addr'] == CLIENT_IP
+
+    def test_default_trusts_loopback_only(self, monkeypatch):
+        monkeypatch.delenv('UCM_TRUSTED_PROXIES', raising=False)
+        app, seen = self._stack()
+        self._call(app, '127.0.0.1', **{'X-Forwarded-For': CLIENT_IP})
+        assert seen['remote_addr'] == CLIENT_IP
+        app, seen = self._stack()
+        self._call(app, '10.0.0.9', **{'X-Forwarded-For': CLIENT_IP})
+        assert seen['remote_addr'] == '10.0.0.9'
+
+    def test_request_without_forwarded_headers_is_untouched(self, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', NGINX_IP)
+        app, seen = self._stack()
+        self._call(app, ATTACKER_IP)
+        assert seen['remote_addr'] == ATTACKER_IP
+
+
 class TestClientIp:
     def test_proxyfix_result_is_used_as_is(self, app, monkeypatch):
         """ProxyFix already resolved REMOTE_ADDR hop-aware; client_ip must not

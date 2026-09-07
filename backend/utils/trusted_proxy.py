@@ -103,6 +103,60 @@ def _is_trusted_peer(peer):
     return False
 
 
+# X-Forwarded-* (and X-Real-IP) as WSGI environ keys. ProxyFix reads the
+# first five; client_ip() reads X-Real-IP as a fallback.
+_FORWARDED_ENVIRON_KEYS = (
+    'HTTP_X_FORWARDED_FOR',
+    'HTTP_X_FORWARDED_PROTO',
+    'HTTP_X_FORWARDED_HOST',
+    'HTTP_X_FORWARDED_PORT',
+    'HTTP_X_FORWARDED_PREFIX',
+    'HTTP_X_REAL_IP',
+)
+
+
+class ForwardedHeadersGate:
+    """WSGI middleware dropping forwarded headers from untrusted peers.
+
+    ProxyFix rewrites REMOTE_ADDR, the scheme and the host from
+    X-Forwarded-* on every request once UCM_BEHIND_PROXY is set, whoever
+    sent them. A client that can reach the backend directly (a pod in the
+    same cluster, a host on the same network) could then spoof its IP,
+    rotate past the per-IP rate limits and pollute the audit trail. This
+    gate runs before ProxyFix and removes X-Forwarded-* / X-Real-IP unless
+    the immediate peer is in UCM_TRUSTED_PROXIES, so ProxyFix only ever
+    acts on a trusted proxy's word. Unset, UCM_TRUSTED_PROXIES trusts
+    loopback only; a proxy on another host must be listed (#339).
+    """
+
+    _MAX_WARNED_PEERS = 1024
+
+    def __init__(self, app):
+        self.app = app
+        self._warned = set()
+
+    def __call__(self, environ, start_response):
+        peer = environ.get('REMOTE_ADDR') or ''
+        if not _is_trusted_peer(peer):
+            present = [k for k in _FORWARDED_ENVIRON_KEYS if k in environ]
+            if present:
+                for key in present:
+                    del environ[key]
+                self._warn_once(peer, present)
+        return self.app(environ, start_response)
+
+    def _warn_once(self, peer, keys):
+        if peer in self._warned:
+            return
+        if len(self._warned) < self._MAX_WARNED_PEERS:
+            self._warned.add(peer)
+        logger.warning(
+            "Dropped %s from peer %s: not in UCM_TRUSTED_PROXIES (list the "
+            "proxy's IP or network there if it is your reverse proxy)",
+            ', '.join(k[5:].replace('_', '-').title() for k in keys), peer or 'unknown',
+        )
+
+
 def immediate_peer_addr() -> str:
     """
     Return the request's real TCP peer, undoing any ProxyFix rewrite.

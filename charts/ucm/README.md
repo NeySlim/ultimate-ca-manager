@@ -54,7 +54,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `ingress.enabled` | `false` | Expose the HTTPS UI via Ingress |
 | `ingress.protocolHttp.enabled` | `false` | Second Ingress for cleartext CDP/OCSP/ACME-HTTP-01 (port 8080) |
 | `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
-| `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers |
+| `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES`: proxy IPs / CIDRs allowed to set forwarded / client-cert headers (CIDR entries need UCM 2.224 or later) |
 | `extraEnv` | `[]` | Extra `UCM_*` env vars |
 | `resources` | requests 100m/256Mi, limit 1Gi | Pod resources |
 
