@@ -1369,6 +1369,22 @@ def init_database(app):
                         "san_types": []
                     }),
                     "is_system": True
+                },
+                {
+                    "name": "Smartcard Logon",
+                    "description": "Windows smartcard / PKINIT logon certificate for Active Directory (clientAuth + msSmartcardLogin EKU, UPN otherName SAN)",
+                    "template_type": "smartcard_logon",
+                    "key_type": "RSA-2048",
+                    "validity_days": 397,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{username}", "OU": "Users"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["digitalSignature", "keyEncipherment"],
+                        "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["upn"]
+                    }),
+                    "is_system": True
                 }
             ]
             
@@ -1381,15 +1397,17 @@ def init_database(app):
 
         # System templates added after initial install (upgraded instances
         # skip the count()==0 block above) — ensure they exist by name
-        if not CertificateTemplate.query.filter_by(name="OCSP Signing").first():
-            from services.template_service import TemplateService
-            ocsp_def = next(t for t in TemplateService.SYSTEM_TEMPLATES
-                            if t['name'] == 'OCSP Signing')
-            tmpl = CertificateTemplate(**ocsp_def)
+        from services.template_service import TemplateService
+        for _tmpl_name in ("OCSP Signing", "Smartcard Logon"):
+            if CertificateTemplate.query.filter_by(name=_tmpl_name).first():
+                continue
+            _tmpl_def = next(t for t in TemplateService.SYSTEM_TEMPLATES
+                             if t['name'] == _tmpl_name)
+            tmpl = CertificateTemplate(**_tmpl_def)
             tmpl.created_by = 'system'
             db.session.add(tmpl)
             db.session.commit()
-            app.logger.info("✓ Created OCSP Signing system template")
+            app.logger.info("✓ Created %s system template", _tmpl_name)
     except IntegrityError:
         db.session.rollback()
         app.logger.info("✓ System templates already exist")

@@ -52,7 +52,8 @@ _VALID_KEY_TYPES = {
 _VALID_DIGESTS = {'sha256', 'sha384', 'sha512'}
 _VALID_TEMPLATE_TYPES = {
     'web_server', 'email', 'vpn_server', 'vpn_client',
-    'code_signing', 'client_auth', 'ocsp_signing', 'piv', 'custom',
+    'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon',
+    'piv', 'custom',
 }
 
 

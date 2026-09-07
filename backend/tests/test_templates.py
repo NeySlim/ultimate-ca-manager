@@ -176,6 +176,35 @@ class TestListTemplates:
         system = [t for t in templates if t.get('is_system')]
         assert len(system) >= 1, 'Expected at least one system template'
 
+    def test_smartcard_logon_system_template_seeded(self, auth_client):
+        """The built-in Smartcard Logon template ships with clientAuth +
+        msSmartcardLogin and a UPN SAN (discussion #336)."""
+        data = assert_success(auth_client.get('/api/v2/templates'))
+        sc = next((t for t in data if t['name'] == 'Smartcard Logon'), None)
+        assert sc is not None, 'Smartcard Logon system template not seeded'
+        assert sc['is_system'] is True
+        assert sc['template_type'] == 'smartcard_logon'
+        ext = sc['extensions_template']
+        if isinstance(ext, str):
+            ext = json.loads(ext)
+        assert ext['extended_key_usage'] == ['clientAuth', 'msSmartcardLogin']
+        assert ext['san_types'] == ['upn']
+
+    def test_create_smartcard_logon_template(self, auth_client):
+        """smartcard_logon is an accepted template_type over the API."""
+        r, created = _create_template(
+            auth_client, name='Custom Smartcard Tpl',
+            template_type='smartcard_logon',
+            extensions_template={
+                'key_usage': ['digitalSignature', 'keyEncipherment'],
+                'extended_key_usage': ['clientAuth', 'msSmartcardLogin'],
+                'basic_constraints': {'ca': False},
+                'san_types': ['upn'],
+            },
+        )
+        assert r.status_code in (200, 201), r.data
+        assert created['template_type'] == 'smartcard_logon'
+
     def test_filter_by_type(self, auth_client):
         r = auth_client.get('/api/v2/templates?type=web_server')
         data = assert_success(r)
