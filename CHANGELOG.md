@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.224] - 2026-09-08
 
 ### Added
 - `UCM_TRUSTED_PROXIES` accepts CIDR networks, not only exact IP addresses. Behind an ingress controller or another proxy whose source address is not fixed, every allowed peer had to be listed individually; an entry such as `10.42.0.0/16` now trusts any peer inside that range, and a peer that arrives as an IPv4-mapped IPv6 address (`::ffff:10.42.0.5`, as a dual-stack listener reports IPv4 clients) is matched against IPv4 entries and networks as well. An entry that is neither a valid address nor a valid network is ignored with a warning in the log instead of being kept as a literal string that can never match, so a typo cannot silently narrow the trusted set. The Helm chart gained `proxy.behindProxy` (sets `UCM_BEHIND_PROXY`) and `proxy.trustedProxies` (sets `UCM_TRUSTED_PROXIES`), neither of which it templated before, so a chart deployment behind an Ingress can honour `X-Forwarded-*` and proxy-injected client-certificate headers without a hand-written `extraEnv` entry (discussion #337, requested by @szechyjs, contributed by @Hemsby)
