@@ -83,6 +83,14 @@ spec:
                   name: {{ include "ucm.secretName" . }}
                   key: DATABASE_URL
             {{- end }}
+            {{- if .Values.proxy.behindProxy }}
+            - name: UCM_BEHIND_PROXY
+              value: "1"
+            {{- end }}
+            {{- with .Values.proxy.trustedProxies }}
+            - name: UCM_TRUSTED_PROXIES
+              value: {{ join "," . | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

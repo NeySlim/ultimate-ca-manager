@@ -53,6 +53,8 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `service.httpsPort` / `service.httpPort` | `8443` / `8080` | UI/API (HTTPS) and protocol (HTTP) ports |
 | `ingress.enabled` | `false` | Expose the HTTPS UI via Ingress |
 | `ingress.protocolHttp.enabled` | `false` | Second Ingress for cleartext CDP/OCSP/ACME-HTTP-01 (port 8080) |
+| `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
+| `proxy.trustedProxies` | `[]` | `UCM_TRUSTED_PROXIES` — proxy IPs / CIDRs allowed to set forwarded / client-cert headers |
 | `extraEnv` | `[]` | Extra `UCM_*` env vars |
 | `resources` | requests 100m/256Mi, limit 1Gi | Pod resources |
 
@@ -85,6 +87,19 @@ ingress:
 ```
 
 Protocol endpoints that need cleartext HTTP (ACME HTTP-01, CRL, OCSP) can be exposed via `ingress.protocolHttp.enabled=true` on a separate host.
+
+### Behind a reverse proxy
+
+UCM only honors `X-Forwarded-*` (and proxy-injected client-cert headers) when the request's immediate peer is a **trusted proxy**. Behind an Ingress the peer is the controller's pod IP, which is not loopback, so you must opt in:
+
+```yaml
+proxy:
+  behindProxy: true
+  trustedProxies:
+    - 10.42.0.0/16   # the ingress controller's pod network (CIDR ok)
+```
+
+Leaving `trustedProxies` empty while `behindProxy` is true trusts loopback only, so the forwarded headers are dropped and proxied requests can return `403`. A `trustedProxies` entry that is not a valid IP or CIDR is ignored with a warning in the pod log.
 
 ## Uninstall
 

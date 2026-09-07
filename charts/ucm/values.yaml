@@ -57,6 +57,23 @@ persistence:
     accessMode: ReadWriteOnce
     existingClaim: ""
 
+## Reverse proxy / ingress in front of UCM.
+## When something proxies to UCM (an ingress controller, or a standalone
+## nginx/HAProxy), enable this so UCM honors X-Forwarded-* and any
+## proxy-injected client-certificate headers, but ONLY from the peers listed
+## in trustedProxies. The immediate peer is the proxy's own pod IP, which is
+## never loopback (the default trust), so without trustedProxies the
+## forwarded headers are ignored and requests can 403.
+proxy:
+  # Sets UCM_BEHIND_PROXY=1 — enables ProxyFix for one proxy hop.
+  behindProxy: false
+  # UCM_TRUSTED_PROXIES — list of proxy IP addresses or CIDR networks allowed
+  # to set forwarded / client-cert headers. Use the ingress controller's pod
+  # network (its pod IP rotates), e.g. the CNI pod CIDR:
+  #   trustedProxies:
+  #     - 10.42.0.0/16
+  trustedProxies: []
+
 ## Extra environment variables (UCM_* etc.), passed verbatim.
 extraEnv: []
   # - name: UCM_LOG_LEVEL
