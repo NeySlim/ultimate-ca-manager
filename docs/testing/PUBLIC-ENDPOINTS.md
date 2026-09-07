@@ -59,7 +59,7 @@ wildcard rejected for `acme_public_vhost` (TLS SAN only).
 | `CORS_EXTRA_ORIGINS` | Comma-separated extra CORS origins |
 | `UCM_CORPORATE_DNS_SERVERS` | Internal resolvers for preflight **DNS (interne)** (comma-separated IPs) |
 | `UCM_BEHIND_PROXY` / `UCM_TRUSTED_PROXY_HOPS` | Enable ProxyFix for `X-Forwarded-*` |
-| `UCM_TRUSTED_PROXIES` | Immediate peers allowed to set forwarded headers (default: `127.0.0.1`, `::1`) |
+| `UCM_TRUSTED_PROXIES` | Immediate peers allowed to set forwarded headers — IPs or CIDR networks, comma-separated (default: `127.0.0.1`, `::1`) |
 
 Fallback for corporate DNS preflight: SystemConfig `acme.dns01_nameservers` (same format).
 
@@ -76,7 +76,9 @@ Behind nginx/traefik:
 
 ```bash
 UCM_BEHIND_PROXY=1
-UCM_TRUSTED_PROXIES=10.0.0.5    # reverse-proxy IP only — not entire RFC1918
+UCM_TRUSTED_PROXIES=10.0.0.5         # the reverse-proxy IP, not entire RFC1918
+# or a network when the proxy address is not fixed (ingress pod range):
+# UCM_TRUSTED_PROXIES=10.42.0.0/16
 ```
 
 ## GUI — Settings → General → Public endpoints

@@ -16,6 +16,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from models import SystemConfig
 from utils.trusted_proxy import (
+    _compile_trusted_proxies,
     client_ip,
     immediate_peer_addr,
     is_request_from_trusted_proxy,
@@ -25,6 +26,15 @@ from utils.trusted_proxy import (
 NGINX_IP = '192.0.2.1'
 CLIENT_IP = '10.0.0.1'
 ATTACKER_IP = '203.0.113.9'
+
+
+@pytest.fixture(autouse=True)
+def _clear_trusted_proxy_cache():
+    """_compile_trusted_proxies is lru_cache'd on the raw env string; drop it
+    around every test so a per-value warning log fires when expected."""
+    _compile_trusted_proxies.cache_clear()
+    yield
+    _compile_trusted_proxies.cache_clear()
 
 
 def _proxyfix_orig(peer):
@@ -86,6 +96,68 @@ class TestIsRequestFromTrustedProxy:
         monkeypatch.setenv('UCM_TRUSTED_PROXIES', '*')
         with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': ATTACKER_IP}):
             assert is_request_from_trusted_proxy() is True
+
+
+class TestTrustedProxyCidr:
+    """UCM_TRUSTED_PROXIES accepts CIDR networks, not only exact IPs — so a
+    proxy/ingress whose pod IP rotates inside a known range stays trusted."""
+
+    def test_peer_inside_cidr_is_trusted(self, app, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '10.42.0.0/16')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': '10.42.7.9'}):
+            assert is_request_from_trusted_proxy() is True
+
+    def test_peer_outside_cidr_is_rejected(self, app, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '10.42.0.0/16')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': '10.43.0.1'}):
+            assert is_request_from_trusted_proxy() is False
+
+    def test_mixed_exact_and_cidr_entries(self, app, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', f'{NGINX_IP}, 10.42.0.0/16')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': NGINX_IP}):
+            assert is_request_from_trusted_proxy() is True
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': '10.42.1.1'}):
+            assert is_request_from_trusted_proxy() is True
+
+    def test_ipv6_cidr(self, app, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', 'fd00::/8')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': 'fd00::1234'}):
+            assert is_request_from_trusted_proxy() is True
+
+    def test_ipv4_mapped_ipv6_peer_matches_ipv4_cidr(self, app, monkeypatch):
+        """A dual-stack listener can hand us ::ffff:10.42.0.5 as the peer even
+        after normalization is bypassed — it must still match an IPv4 CIDR."""
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '10.42.0.0/16')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': '::ffff:10.42.0.5'}):
+            assert is_request_from_trusted_proxy() is True
+
+    def test_ipv4_mapped_ipv6_peer_matches_exact_ipv4(self, app, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', NGINX_IP)
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': f'::ffff:{NGINX_IP}'}):
+            assert is_request_from_trusted_proxy() is True
+
+    def test_unparseable_entry_is_ignored_not_trusted(self, app, monkeypatch, caplog):
+        """A garbage entry must be dropped with a warning and must not widen
+        trust — the valid entry alongside it still works."""
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', f'not-an-ip, {NGINX_IP}')
+        with caplog.at_level('WARNING', logger='utils.trusted_proxy'):
+            with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': NGINX_IP}):
+                assert is_request_from_trusted_proxy() is True
+            with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': ATTACKER_IP}):
+                assert is_request_from_trusted_proxy() is False
+        assert any('not-an-ip' in r.message for r in caplog.records)
+
+    def test_all_entries_unparseable_trusts_nothing(self, app, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', 'garbage, also-garbage')
+        with app.test_request_context('/', environ_overrides={'REMOTE_ADDR': '127.0.0.1'}):
+            assert is_request_from_trusted_proxy() is False
+
+    def test_compile_parses_networks_and_exacts(self):
+        import ipaddress
+        exact, networks, trust_all = _compile_trusted_proxies('192.0.2.1, 10.0.0.0/8')
+        assert trust_all is False
+        assert ipaddress.ip_address('192.0.2.1') in exact
+        assert networks == (ipaddress.ip_network('10.0.0.0/8'),)
 
 
 class TestClientIp:

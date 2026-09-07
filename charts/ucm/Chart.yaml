@@ -3,7 +3,7 @@ name: ucm
 description: Ultimate Certificate Manager — web-based Certificate Authority and PKI platform (ACME, SCEP, EST, OCSP, CRL/CDP) for in-cluster deployment.
 type: application
 # Chart version — bump on chart changes, independent of the app version.
-version: 0.1.0
+version: 0.2.0
 # Application version this chart deploys (matches the UCM release / image tag).
 appVersion: "2.170"
 home: https://ucm.tools

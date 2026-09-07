@@ -9,16 +9,23 @@ poison a header through a misconfigured proxy) can spoof client
 certificate authentication and obtain arbitrary certificates.
 
 Configuration:
-    UCM_TRUSTED_PROXIES   Comma-separated list of proxy IPs that are
-                          allowed to set client-cert / forwarded-for
-                          headers. Examples:
+    UCM_TRUSTED_PROXIES   Comma-separated list of proxy IP addresses or
+                          CIDR networks that are allowed to set client-cert
+                          / forwarded-for headers. Examples:
                               UCM_TRUSTED_PROXIES=127.0.0.1,::1
                               UCM_TRUSTED_PROXIES=10.0.0.5
-                              UCM_TRUSTED_PROXIES=*           (trust all — dangerous)
+                              UCM_TRUSTED_PROXIES=10.42.0.0/16,fd00::/8
+                              UCM_TRUSTED_PROXIES=*           (trust all, dangerous)
 
-    Default (unset) trusts loopback only (127.0.0.1, ::1) — safe for
-    nginx/apache running on the same host and the most common deploy.
+    A CIDR entry matches any peer inside that network, which is useful
+    behind an ingress controller whose pod IP rotates. An entry that is
+    neither a valid IP nor a valid network is ignored with a warning (it
+    never widens the trust). Default (unset) trusts loopback only
+    (127.0.0.1, ::1), safe for nginx/apache running on the same host and
+    the most common deploy.
 """
+import functools
+import ipaddress
 import logging
 import os
 
@@ -26,14 +33,68 @@ from flask import request
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_TRUSTED = frozenset({
+    ipaddress.ip_address('127.0.0.1'),
+    ipaddress.ip_address('::1'),
+})
 
-def _trusted_proxy_set():
-    proxies_str = os.environ.get('UCM_TRUSTED_PROXIES', '').strip()
+
+@functools.lru_cache(maxsize=16)
+def _compile_trusted_proxies(proxies_str):
+    """Parse UCM_TRUSTED_PROXIES into ``(exact_ips, networks, trust_all)``.
+
+    Cached on the raw string so the parse (and any warning log) happens
+    once per distinct value rather than on every request.
+    """
+    proxies_str = (proxies_str or '').strip()
     if not proxies_str:
-        return {'127.0.0.1', '::1'}
+        return _DEFAULT_TRUSTED, (), False
     if proxies_str == '*':
-        return None  # explicit opt-in to trust everyone
-    return {p.strip() for p in proxies_str.split(',') if p.strip()}
+        return frozenset(), (), True  # explicit opt-in to trust everyone
+    exact = set()
+    networks = []
+    for raw in proxies_str.split(','):
+        entry = raw.strip()
+        if not entry:
+            continue
+        try:
+            if '/' in entry:
+                networks.append(ipaddress.ip_network(entry, strict=False))
+            else:
+                exact.add(ipaddress.ip_address(entry))
+        except ValueError:
+            logger.warning(
+                "Ignoring UCM_TRUSTED_PROXIES entry %r: not an IP address or "
+                "CIDR network", entry,
+            )
+    return frozenset(exact), tuple(networks), False
+
+
+def _is_trusted_peer(peer):
+    """True iff *peer* (a string address) is covered by UCM_TRUSTED_PROXIES."""
+    exact, networks, trust_all = _compile_trusted_proxies(
+        os.environ.get('UCM_TRUSTED_PROXIES', '')
+    )
+    if trust_all:
+        return True
+    if not peer:
+        return False
+    try:
+        ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    # A dual-stack listener (HOST=::) reports IPv4 peers as ::ffff:a.b.c.d.
+    # PeerAddressNormalizer already rewrites REMOTE_ADDR, but match the
+    # mapped IPv4 form here too so a bare ::ffff:… slipping through still
+    # compares against IPv4 entries and networks.
+    mapped = getattr(ip, 'ipv4_mapped', None)
+    candidates = (ip, mapped) if mapped is not None else (ip,)
+    for cand in candidates:
+        if cand in exact:
+            return True
+        if any(cand in net for net in networks):
+            return True
+    return False
 
 
 def immediate_peer_addr() -> str:
@@ -69,10 +130,7 @@ def is_request_from_trusted_proxy() -> bool:
 
     MUST be called inside a Flask request context.
     """
-    trusted = _trusted_proxy_set()
-    if trusted is None:
-        return True  # explicit '*' opt-in
-    return immediate_peer_addr() in trusted
+    return _is_trusted_peer(immediate_peer_addr())
 
 
 def reject_untrusted_proxy_headers(*header_names) -> bool:
