@@ -658,7 +658,7 @@ export default function TemplatesPage() {
 
 const TEMPLATE_TYPE_OPTIONS = [
   'web_server', 'email', 'vpn_server', 'vpn_client',
-  'code_signing', 'client_auth', 'ocsp_signing', 'custom'
+  'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon', 'custom'
 ]
 const KEY_TYPE_OPTIONS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
@@ -668,9 +668,18 @@ const KEY_USAGE_OPTIONS = [
 ]
 const EXT_KEY_USAGE_OPTIONS = [
   'serverAuth', 'clientAuth', 'codeSigning',
-  'emailProtection', 'ipsecEndSystem', 'ipsecUser', 'OCSPSigning'
+  'emailProtection', 'ipsecEndSystem', 'ipsecUser', 'OCSPSigning',
+  'msSmartcardLogin'
 ]
-const SAN_TYPE_OPTIONS = ['dns', 'ip', 'email', 'uri']
+const SAN_TYPE_OPTIONS = ['dns', 'ip', 'email', 'uri', 'upn']
+// Reuse the Issue Certificate form's SAN type labels (already in every locale)
+const SAN_TYPE_LABEL_KEYS = {
+  dns: 'certificates.sanDns',
+  ip: 'certificates.sanIp',
+  email: 'certificates.sanEmail',
+  uri: 'certificates.sanUri',
+  upn: 'certificates.sanUpn',
+}
 
 // KU/EKU/SAN presets applied when the template type changes (mirrors system templates)
 const TYPE_EXTENSION_DEFAULTS = {
@@ -681,6 +690,7 @@ const TYPE_EXTENSION_DEFAULTS = {
   code_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['codeSigning'], san_types: [] },
   client_auth:  { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth'], san_types: ['email'] },
   ocsp_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['OCSPSigning'], san_types: [] },
+  smartcard_logon: { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'msSmartcardLogin'], san_types: ['upn'] },
 }
 
 function buildInitialState(template) {
@@ -939,12 +949,12 @@ function TemplateForm({ template, onSubmit, onCancel }) {
 
         {/* SAN Types */}
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">SAN Types</label>
+          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.subjectAltNames')}</label>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
             {SAN_TYPE_OPTIONS.map(st => (
               <label key={st} className={checkboxCls}>
                 <input type="checkbox" checked={formData.san_types.includes(st)} onChange={() => toggleCheckbox('san_types', st)} className="accent-accent-primary" />
-                {st.toUpperCase()}
+                {t(SAN_TYPE_LABEL_KEYS[st], st.toUpperCase())}
               </label>
             ))}
           </div>

@@ -186,6 +186,30 @@ class TemplateService:
             }),
             "is_system": True,
             "is_active": True
+        },
+        {
+            "name": "Smartcard Logon",
+            "description": "Windows smartcard / PKINIT logon certificate for Active Directory. Pairs clientAuth with the Microsoft Smartcard Logon EKU and carries the user's UPN as an otherName SAN.",
+            "template_type": "smartcard_logon",
+            "key_type": "RSA-2048",
+            "validity_days": 397,
+            "digest": "sha256",
+            "dn_template": json.dumps({
+                "CN": "{username}",
+                "O": "",
+                "OU": "Users",
+                "C": "",
+                "ST": "",
+                "L": ""
+            }),
+            "extensions_template": json.dumps({
+                "key_usage": ["digitalSignature", "keyEncipherment"],
+                "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
+                "basic_constraints": {"ca": False},
+                "san_types": ["upn"]
+            }),
+            "is_system": True,
+            "is_active": True
         }
     ]
     
