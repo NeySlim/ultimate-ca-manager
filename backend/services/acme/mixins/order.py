@@ -13,6 +13,11 @@ from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
+# Problem detail written on every pending challenge of an authorization that
+# expired unanswered. Distinguishes those rows from a challenge the client
+# actually attempted and failed (see api/v2/acme/orders.py, #338).
+EXPIRED_AUTHORIZATION_DETAIL = 'Authorization has expired'
+
 
 class OrderMixin:
     def create_order(
@@ -131,7 +136,11 @@ class OrderMixin:
                 ).order_by(AcmeAuthorization.expires.desc()).first()
                 
                 if valid_auth:
-                    # Reuse found! Create a new pre-validated authorization
+                    # Reuse found. One authorization row belongs to one order,
+                    # so the reuse is a new object, but the proof of control it
+                    # records is the source's: same expiry (reuse never extends
+                    # a validation) and the challenge(s) the client actually
+                    # completed, dated when they were validated (#338).
                     auth = AcmeAuthorization(
                         order_id=order_id,
                         account_id=account_id,
@@ -144,8 +153,17 @@ class OrderMixin:
                     db.session.add(auth)
                     db.session.flush()
                     
-                    # Create pre-validated challenges (clients may check them)
-                    self._create_challenges(auth, status="valid", validated=utc_now())
+                    copied = self._copy_validated_challenges(auth, valid_auth)
+                    logger.info(
+                        "ACME authorization reuse: %s for order %s carries "
+                        "%s from authorization %s",
+                        authorization_identifier.get('value'), order_id,
+                        ', '.join(
+                            f"{c.type} validated {c.validated.isoformat()}Z"
+                            if c.validated else c.type for c in copied
+                        ) or 'no validated challenge',
+                        valid_auth.authorization_id,
+                    )
                     
                     return auth
             except Exception as e:
@@ -355,6 +373,33 @@ class OrderMixin:
 
         return False
 
+    def _copy_validated_challenges(
+        self, auth: AcmeAuthorization, source: AcmeAuthorization
+    ) -> List[AcmeChallenge]:
+        """Carry the validated challenge(s) of a reused authorization over.
+
+        RFC 8555 §7.1.4: on a valid authorization the challenges array lists
+        the challenge(s) that were used. A reused authorization therefore
+        repeats the source's validated rows, type and ``validated`` timestamp
+        included, under fresh challenge URLs. Types the client never performed
+        are not listed, and nothing is dated to the reuse (#338).
+        """
+        copied = []
+        for challenge in source.challenges:
+            if challenge.status != 'valid':
+                continue
+            copy = AcmeChallenge(
+                authorization_id=auth.authorization_id,
+                type=challenge.type,
+                status='valid',
+                token=challenge.token,
+                url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
+                validated=challenge.validated,
+            )
+            auth.challenges.append(copy)
+            copied.append(copy)
+        return copied
+
     def _create_challenges(self, auth: AcmeAuthorization, status: str, validated: datetime = None):
         """Helper to create standard challenges for an authorization.
 
@@ -532,7 +577,7 @@ class OrderMixin:
         *,
         update_order: bool,
     ) -> None:
-        problem = self._problem_data('malformed', 'Authorization has expired')
+        problem = self._problem_data('malformed', EXPIRED_AUTHORIZATION_DETAIL)
         authorization.status = 'invalid'
         for challenge in authorization.challenges:
             if challenge.status in ('pending', 'processing'):

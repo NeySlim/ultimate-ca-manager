@@ -7,6 +7,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- ACME: a reused authorization now records the challenge that was performed, at the time it was performed. When an order reused a valid authorization of the same account, the built-in server created the new authorization with all three challenge types (`dns-01`, `http-01`, `tls-alpn-01`) marked valid and dated to the reuse, so a renewal appeared validated by methods that were never attempted, on an instance with no DNS provider. The reused authorization now carries only the challenge(s) the client completed, with their original `validated` timestamp; its expiry stays that of the original validation, since reuse does not extend a proof of control. The Orders tab of an ACME account derived an order's method from the first challenge row, which is always `dns-01`, and so reported DNS-01 for the renewal and for a rejected order alike; it now names the validated challenge(s), the challenge the client attempted when validation failed, and N/A for an order whose challenges were never answered (#338, reported by @JoseGoncalves)
+
 ## [2.223] - 2026-09-06
 
 ### Fixed

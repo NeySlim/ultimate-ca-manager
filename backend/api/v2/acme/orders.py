@@ -11,6 +11,45 @@ from utils.datetime_utils import utc_isoformat
 
 from . import bp, logger, resolve_acme_account
 from services.audit_service import AuditService
+from services.acme.mixins.order import EXPIRED_AUTHORIZATION_DETAIL
+
+
+def _challenge_was_attempted(challenge) -> bool:
+    """True when the client answered this challenge and validation failed.
+
+    A failed attempt is the only path that marks a single challenge invalid
+    with a validation problem. Lazy expiry marks every pending challenge of
+    the authorization invalid with the same expiry problem, so those rows do
+    not count as attempts.
+    """
+    if challenge.status != 'invalid' or not challenge.error:
+        return False
+    try:
+        problem = json.loads(challenge.error) if isinstance(challenge.error, str) else challenge.error
+    except (TypeError, ValueError):
+        return False
+    return (problem or {}).get('detail') != EXPIRED_AUTHORIZATION_DETAIL
+
+
+def order_validation_method(order) -> str:
+    """Challenge type(s) that proved control of the order's identifiers.
+
+    Reads the validated challenge(s) of each authorization rather than the
+    first challenge row, which is always the first type offered (dns-01) and
+    says nothing about what the client did (#338). When nothing was
+    validated, the challenge(s) the client attempted and failed are named so
+    an Invalid order still shows the method that was tried. An order whose
+    challenges were never answered reads N/A.
+    """
+    performed, attempted = [], []
+    for authz in order.authorizations:
+        for challenge in authz.challenges:
+            if challenge.status == 'valid':
+                performed.append(challenge.type)
+            elif _challenge_was_attempted(challenge):
+                attempted.append(challenge.type)
+    types = list(dict.fromkeys(performed or attempted))
+    return ', '.join(t.upper() for t in types) if types else 'N/A'
 
 
 @bp.route('/api/v2/acme/orders', methods=['GET'])
@@ -43,13 +82,6 @@ def list_acme_orders():
         account = order.account
         account_name = account.account_id if account else "Unknown"
 
-        # Get challenge type (from first authz)
-        method = "N/A"
-        if order.authorizations.count() > 0:
-            first_authz = order.authorizations.first()
-            if first_authz.challenges.count() > 0:
-                method = first_authz.challenges.first().type.upper()
-
         data.append({
             'id': order.id,
             'order_id': order.order_id,
@@ -57,7 +89,7 @@ def list_acme_orders():
             'account': account_name,
             'status': order.status.capitalize(),
             'expires': order.expires.strftime('%Y-%m-%d'),
-            'method': method,
+            'method': order_validation_method(order),
             'certificate_id': order.certificate_id,
             'created_at': utc_isoformat(order.created_at)
         })
@@ -144,19 +176,13 @@ def list_account_orders(account_id):
     for order in orders:
         identifiers_str = ", ".join([i.get('value', '') for i in order.identifiers_list])
 
-        method = "N/A"
-        if order.authorizations.count() > 0:
-            first_authz = order.authorizations.first()
-            if first_authz.challenges.count() > 0:
-                method = first_authz.challenges.first().type.upper()
-
         data.append({
             'id': order.id,
             'order_id': order.order_id,
             'domain': identifiers_str,
             'status': order.status.capitalize(),
             'expires': order.expires.strftime('%Y-%m-%d') if order.expires else None,
-            'method': method,
+            'method': order_validation_method(order),
             'created_at': utc_isoformat(order.created_at),
             'source': 'local',
         })
