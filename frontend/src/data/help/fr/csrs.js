@@ -12,6 +12,7 @@ export default {
           { label: 'Examiner', text: 'Inspecter le sujet, les SAN, le type de clé et la signature avant de signer' },
           { label: 'Signer', text: 'Sélectionner une CA, le type de certificat, définir la période de validité et émettre le certificat' },
           { label: 'Télécharger', text: 'Télécharger la CSR originale au format PEM' },
+          { label: 'Télécharger la clé', text: 'Télécharger la clé privée d\'une CSR générée dans UCM, pour la déployer à côté d\'un certificat émis par une CA externe (nécessite la permission read:private_keys)' },
         ]
       },
       {
@@ -25,6 +26,7 @@ export default {
     tips: [
       'Les CSR préservent la clé privée du demandeur — elle ne quitte jamais son système',
       'Vous pouvez ajouter une clé privée à une CSR après la signature si nécessaire pour l\'exportation PKCS#12',
+      'Un certificat importé pour une CSR générée dans UCM complète cette CSR : l\'enregistrement conserve sa clé privée, le certificat s\'exporte donc avec elle',
       'Utilisez le mode Microsoft CA pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
       'À la signature, utilisez « EKU supplémentaires » pour ajouter Microsoft RDP, smartcard logon, IPsec ou tout OID — l\'EKU existante du CSR est reconstruite avec le jeu fusionné',
     ],
@@ -109,6 +111,18 @@ Lors de la signature via Microsoft CA, vous pouvez inscrire pour le compte d'un 
 4. Ajustez les valeurs si nécessaire et cliquez sur **Signer**
 
 > ⚠️ EOBO nécessite un certificat d'agent d'inscription configuré sur le serveur AD CS, et le modèle doit autoriser l'inscription pour le compte d'autres utilisateurs.
+
+### Signature par CA externe
+
+Pour un certificat délivré par une CA publique ou tierce, conservez la clé dans UCM et n'envoyez que la demande :
+
+1. **Générer une CSR** dans UCM, puis **Télécharger la CSR** et soumettez-la à la CA externe
+2. Au retour du certificat, importez-le depuis la page Certificats (**Importer**, fichier ou PEM collé) ou via **Opérations → Import intelligent**
+3. UCM reconnaît le certificat par sa clé publique, complète la CSR en attente et conserve sa clé privée : le certificat s'exporte alors avec la clé (PEM, PKCS#12, JKS) comme n'importe quel autre
+
+La CSR passe de **En attente** à **Historique**. Si le certificat doit être installé ailleurs, **Télécharger la clé privée** sur la CSR en attente fournit la clé (nécessite la permission read:private_keys, comme toute exportation directe de clé).
+
+> 💡 La correspondance se fait sur la paire de clés, elle fonctionne donc même lorsque la CA réécrit le sujet (beaucoup de CA publiques ne conservent que le CN).
 
 ## Ajouter une clé privée
 

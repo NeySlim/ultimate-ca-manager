@@ -520,6 +520,18 @@ When signing via Microsoft CA, you can enroll on behalf of another user:
 
 > ⚠️ EOBO requires an enrollment agent certificate configured on the AD CS server, and the template must allow enrollment on behalf of other users.
 
+### External CA Signing
+
+For a certificate from a public or third-party CA, keep the key in UCM and send only the request:
+
+1. **Generate CSR** in UCM, then **Download CSR** and submit it to the external CA
+2. When the certificate comes back, import it on the Certificates page (**Import**, file or pasted PEM) or through **Operations → Smart Import**
+3. UCM recognises the certificate by its public key, completes the pending CSR and keeps its private key: the certificate then exports with the key (PEM, PKCS#12, JKS) like any other
+
+The CSR moves from **Pending** to **History**. If the certificate must be installed elsewhere, **Download Private Key** on the pending CSR provides the key (requires the read:private_keys permission, like every direct key export).
+
+> 💡 The match is made on the key pair, so it still works when the CA rewrites the subject (many public CAs keep only the CN).
+
 ## Adding a Private Key
 
 After signing, you can attach a private key to the certificate for PKCS#12 export. Click **Add Key** on the signed certificate.

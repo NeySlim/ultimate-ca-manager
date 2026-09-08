@@ -291,6 +291,7 @@ export const helpContent = {
           { label: 'Review', text: 'Inspect subject, SANs, key type, and signature before signing' },
           { label: 'Sign', text: 'Select a CA, certificate type, set validity period, and issue the certificate' },
           { label: 'Download', text: 'Download the original CSR in PEM format' },
+          { label: 'Download key', text: 'Download the private key of a CSR generated in UCM, to deploy it next to a certificate issued by an external CA (requires the read:private_keys permission)' },
         ]
       },
       {
@@ -305,6 +306,7 @@ export const helpContent = {
     tips: [
       'CSRs preserve the requester\'s private key — it never leaves their system',
       'You can add a private key to a CSR after signing if needed for PKCS#12 export',
+      'A certificate imported for a CSR generated in UCM completes that CSR: the record keeps its private key, so the certificate exports with it',
       'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
       'When signing, use "Extra EKUs" to add Microsoft RDP, smartcard logon, IPsec or any other dotted OID — the CSR\'s existing EKU is rebuilt with the merged set',
     ],

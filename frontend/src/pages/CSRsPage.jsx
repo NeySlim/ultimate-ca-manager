@@ -29,7 +29,10 @@ export default function CSRsPage() {
   const { isMobile } = useMobile()
   const navigate = useNavigate()
   const { showSuccess, showError, showConfirm } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
+  // Direct private-key export is the admin-only read:private_keys scope,
+  // as on the certificates page
+  const canExportKey = hasPermission('read:private_keys')
   const [searchParams, setSearchParams] = useSearchParams()
   const { modals, open: openModal, close: closeModal } = useModals(['upload', 'sign', 'generate'])
   
@@ -353,6 +356,18 @@ export default function CSRsPage() {
     }
   }
 
+  // The key of a CSR awaiting an external CA: needed next to the certificate
+  // that CA returns (#341)
+  const handleDownloadKey = async (row) => {
+    try {
+      const blob = await csrsService.downloadKey(row.id)
+      downloadBlob(blob, `${row.cn || 'csr'}.key`)
+      showSuccess(t('common.downloadSuccess'))
+    } catch (error) {
+      showError(error.message || t('csrs.downloadFailed'))
+    }
+  }
+
   // Re-key: extract CSR fields to pre-fill form
   const parseSansFromCSR = (csr) => {
     const sans = []
@@ -568,6 +583,9 @@ export default function CSRsPage() {
   // Row actions for pending
   const pendingRowActions = useCallback((row) => [
     { label: t('csrs.downloadCSR'), icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'csr'}.pem`) },
+    ...(canExportKey && row.has_private_key ? [
+      { label: t('csrs.downloadKey'), icon: Key, onClick: () => handleDownloadKey(row) }
+    ] : []),
     ...(canWrite('csrs') ? [
       { label: t('csrs.sign'), icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }},
       { label: t('csrs.rekey'), icon: ArrowsClockwise, onClick: () => handleRekey(row) }
@@ -575,7 +593,7 @@ export default function CSRsPage() {
     ...(canDelete('csrs') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
     ] : [])
-  ], [canWrite, canDelete, t])
+  ], [canWrite, canDelete, canExportKey, t])
 
   // Row actions for history
   const historyRowActions = useCallback((row) => [
@@ -672,6 +690,7 @@ export default function CSRsPage() {
               canDelete={canDelete}
               onSign={() => openModal('sign')}
               onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.pem`)}
+              onDownloadKey={canExportKey && selectedCSR.has_private_key ? () => handleDownloadKey(selectedCSR) : undefined}
               onDelete={() => handleDelete(selectedCSR.id)}
               onUploadKey={() => setShowKeyModal(true)}
               onRekey={canWrite('csrs') ? () => handleRekey(selectedCSR) : undefined}
@@ -1236,7 +1255,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
 // CSR DETAILS PANEL (for pending CSRs)
 // =============================================================================
 
-function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete, onUploadKey, onRekey, t }) {
+function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownloadKey, onDelete, onUploadKey, onRekey, t }) {
   return (
     <div className="p-3 space-y-3">
       {/* Header */}
@@ -1264,6 +1283,11 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         <Button type="button" size="sm" variant="secondary" onClick={onDownload}>
           <Download size={14} /> {t('common.download')}
         </Button>
+        {onDownloadKey && (
+          <Button type="button" size="sm" variant="secondary" onClick={onDownloadKey}>
+            <Key size={14} /> {t('csrs.downloadKey')}
+          </Button>
+        )}
         {canWrite('csrs') && !csr.has_private_key && (
           <Button type="button" size="sm" variant="secondary" onClick={onUploadKey}>
             <UploadSimple size={14} /> {t('csrs.uploadKey')}

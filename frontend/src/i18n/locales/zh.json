@@ -989,6 +989,7 @@
     "passphrase": "密码短语 (如果已加密)",
     "passphraseHint": "如果密钥未加密，请留空",
     "uploadKey": "上传密钥",
+    "downloadKey": "下载私钥",
     "selectCA": "请选择一个CA",
     "validityPeriod": "有效期 (天)",
     "signCSRDescription": "使用证书颁发机构对此 CSR 进行签名以颁发证书",

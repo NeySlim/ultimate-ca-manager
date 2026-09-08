@@ -12,6 +12,7 @@ export default {
           { label: 'Esamina', text: 'Ispeziona soggetto, SAN, tipo di chiave e firma prima della firma' },
           { label: 'Firma', text: 'Seleziona una CA, il tipo di certificato, imposta il periodo di validità ed emetti il certificato' },
           { label: 'Scarica', text: 'Scarica il CSR originale in formato PEM' },
+          { label: 'Scarica chiave', text: 'Scarica la chiave privata di un CSR generato in UCM, per distribuirla accanto a un certificato emesso da una CA esterna (richiede il permesso read:private_keys)' },
         ]
       },
       {
@@ -25,6 +26,7 @@ export default {
     tips: [
       'I CSR preservano la chiave privata del richiedente — non lascia mai il suo sistema',
       'Puoi aggiungere una chiave privata a un CSR dopo la firma se necessario per l\'esportazione PKCS#12',
+      'Un certificato importato per un CSR generato in UCM completa quel CSR: il record conserva la sua chiave privata, quindi il certificato viene esportato insieme a essa',
       'Usa la modalità Microsoft CA per firmare i CSR tramite AD CS quando sei connesso a una PKI Windows',
       'In firma, usa "EKU extra" per aggiungere Microsoft RDP, smartcard logon, IPsec o qualsiasi OID — l\'EKU esistente del CSR viene ricostruito con l\'insieme unito',
     ],
@@ -109,6 +111,18 @@ Quando si firma tramite Microsoft CA, puoi iscrivere per conto di un altro utent
 4. Modifica i valori se necessario e clicca **Firma**
 
 > ⚠️ L'EOBO richiede un certificato di agente di iscrizione configurato sul server AD CS e il template deve consentire l'iscrizione per conto di altri utenti.
+
+### Firma con CA esterna
+
+Per un certificato di una CA pubblica o di terze parti, mantieni la chiave in UCM e invia solo la richiesta:
+
+1. **Genera CSR** in UCM, poi **Scarica CSR** e invialo alla CA esterna
+2. Quando il certificato ritorna, importalo dalla pagina Certificati (**Importa**, file o PEM incollato) oppure tramite **Operazioni → Importazione Intelligente**
+3. UCM riconosce il certificato dalla sua chiave pubblica, completa il CSR in attesa e ne conserva la chiave privata: il certificato viene quindi esportato con la chiave (PEM, PKCS#12, JKS) come qualsiasi altro
+
+Il CSR passa da **In attesa** a **Cronologia**. Se il certificato deve essere installato altrove, **Scarica Chiave Privata** sul CSR in attesa fornisce la chiave (richiede il permesso read:private_keys, come ogni esportazione diretta di chiave).
+
+> 💡 La corrispondenza avviene sulla coppia di chiavi, quindi funziona anche quando la CA riscrive il soggetto (molte CA pubbliche conservano solo il CN).
 
 ## Aggiunta di una chiave privata
 

@@ -989,6 +989,7 @@
     "passphrase": "Passphrase (se cifrata)",
     "passphraseHint": "Lascia vuoto se la chiave non è cifrata",
     "uploadKey": "Carica Chiave",
+    "downloadKey": "Scarica Chiave Privata",
     "selectCA": "Seleziona una CA",
     "validityPeriod": "Periodo di Validità (giorni)",
     "signCSRDescription": "Firma questa CSR con una Certificate Authority per emettere un certificato",

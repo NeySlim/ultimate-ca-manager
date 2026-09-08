@@ -7,6 +7,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Added
+- A CSR generated in UCM can be completed by a certificate issued elsewhere. The workflow for a public or third-party CA (generate the CSR in UCM, download it, have it signed, import the certificate) ended with a certificate record that had no private key: the import matched existing records on subject and issuer, which a CSR record never has, so the certificate was stored as a separate keyless entry and could not be exported with its key. The import (Certificates page and Smart Import) now recognises a certificate whose public key is that of a pending CSR, completes that CSR record and keeps its private key, so the certificate exports with the key like any other; the match is made on the key pair, so it holds when the CA rewrites the subject. A key that arrives alongside the certificate is attached when the CSR was uploaded without one. The CSR page also gained **Download Private Key** on a pending CSR that holds its key (`GET /api/v2/csrs/<id>/export?format=key`, or POST with a `password` for encrypted PKCS#8), gated like every direct key export by the admin-only `read:private_keys` permission and recorded in the audit log (#341, reported by @kiar1404-de)
+
+### Fixed
+- A certificate issued from a CSR generated in UCM no longer appears as "CSR for <name>" in the certificates list. The generator described the request that way and signing kept the description, which the list shows as the certificate's name. A generated CSR is now described by its CN, and signing or completing a CSR created before this release drops the old prefix (#342, reported by @kiar1404-de)
+
 ## [2.224] - 2026-09-08
 
 ### Added

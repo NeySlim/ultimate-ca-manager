@@ -5,6 +5,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 import re
+import base64
 
 
 def parse_certificate_file(file_data, filename, password=None, import_key=True):
@@ -199,6 +200,40 @@ def find_existing_certificate(cert_info):
         subject=cert_info['subject'],
         issuer=cert_info['issuer']
     ).first()
+
+
+def find_pending_csr_for_certificate(cert):
+    """
+    The pending CSR record (request stored, no certificate yet) whose public
+    key is this certificate's, or None (#341).
+
+    A certificate issued by an external CA for a CSR generated here has an
+    issuer the CSR record never had, so subject/issuer matching cannot find
+    it; the key pair is the one thing the two share.
+    """
+    from models import Certificate
+    wanted = cert.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    pending = Certificate.query.filter(
+        Certificate.csr.isnot(None),
+        Certificate.crt.is_(None),
+    ).order_by(Certificate.id.desc()).all()
+    for record in pending:
+        try:
+            stored = record.csr
+            csr_pem = stored.encode('utf-8') if stored.startswith('-----BEGIN') else base64.b64decode(stored)
+            csr = x509.load_pem_x509_csr(csr_pem, default_backend())
+            spki = csr.public_key().public_bytes(
+                encoding=serialization.Encoding.DER,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        except Exception:
+            continue
+        if spki == wanted:
+            return record
+    return None
 
 
 def serialize_cert_to_pem(cert):

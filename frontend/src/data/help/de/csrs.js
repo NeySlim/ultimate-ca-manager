@@ -12,6 +12,7 @@ export default {
           { label: 'Prüfen', text: 'Betreff, SANs, Schlüsseltyp und Signatur vor dem Signieren überprüfen' },
           { label: 'Signieren', text: 'Eine CA auswählen, Zertifikatstyp festlegen, Gültigkeitsdauer einstellen und Zertifikat ausstellen' },
           { label: 'Herunterladen', text: 'Den Original-CSR im PEM-Format herunterladen' },
+          { label: 'Schlüssel herunterladen', text: 'Den privaten Schlüssel eines in UCM generierten CSR herunterladen, um ihn neben einem von einer externen CA ausgestellten Zertifikat bereitzustellen (erfordert die Berechtigung read:private_keys)' },
         ]
       },
       {
@@ -25,6 +26,7 @@ export default {
     tips: [
       'CSRs bewahren den privaten Schlüssel des Antragstellers — er verlässt nie dessen System',
       'Sie können nach dem Signieren einen privaten Schlüssel zu einem CSR hinzufügen, wenn er für den PKCS#12-Export benötigt wird',
+      'Ein für einen in UCM generierten CSR importiertes Zertifikat vervollständigt diesen CSR: Der Eintrag behält seinen privaten Schlüssel, sodass das Zertifikat zusammen mit ihm exportiert wird',
       'Verwenden Sie den Microsoft CA-Modus, um CSRs über AD CS zu signieren, wenn eine Verbindung zu einer Windows-PKI besteht',
       'Beim Signieren über "Extra EKUs" Microsoft RDP, Smartcard-Logon, IPsec oder beliebige OIDs hinzufügen — die vorhandene EKU des CSR wird mit der zusammengeführten Menge neu aufgebaut',
     ],
@@ -109,6 +111,18 @@ Beim Signieren über Microsoft CA können Sie im Namen eines anderen Benutzers r
 4. Passen Sie die Werte bei Bedarf an und klicken Sie auf **Signieren**
 
 > ⚠️ EOBO erfordert ein auf dem AD CS-Server konfiguriertes Enrollment-Agent-Zertifikat, und das Template muss die Registrierung im Namen anderer Benutzer erlauben.
+
+### Signierung durch eine externe CA
+
+Für ein Zertifikat einer öffentlichen oder Drittanbieter-CA belassen Sie den Schlüssel in UCM und senden nur die Anfrage:
+
+1. **CSR generieren** in UCM, dann **CSR herunterladen** und den CSR bei der externen CA einreichen
+2. Wenn das Zertifikat zurückkommt, importieren Sie es auf der Zertifikatsseite (**Importieren**, Datei oder eingefügtes PEM) oder über **Operationen → Smart Import**
+3. UCM erkennt das Zertifikat anhand seines öffentlichen Schlüssels, vervollständigt den ausstehenden CSR und behält dessen privaten Schlüssel: Das Zertifikat wird dann wie jedes andere zusammen mit dem Schlüssel exportiert (PEM, PKCS#12, JKS)
+
+Der CSR wechselt von **Ausstehend** nach **Verlauf**. Muss das Zertifikat an anderer Stelle installiert werden, liefert **Privaten Schlüssel herunterladen** am ausstehenden CSR den Schlüssel (erfordert die Berechtigung read:private_keys, wie jeder direkte Schlüsselexport).
+
+> 💡 Der Abgleich erfolgt über das Schlüsselpaar und funktioniert daher auch, wenn die CA den Betreff umschreibt (viele öffentliche CAs behalten nur den CN).
 
 ## Privaten Schlüssel hinzufügen
 

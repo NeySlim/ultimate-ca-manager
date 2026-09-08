@@ -989,6 +989,7 @@
     "passphrase": "Passphrase (falls verschlüsselt)",
     "passphraseHint": "Leer lassen, wenn Schlüssel nicht verschlüsselt",
     "uploadKey": "Schlüssel hochladen",
+    "downloadKey": "Privaten Schlüssel herunterladen",
     "selectCA": "CA auswählen...",
     "validityPeriod": "Gültigkeitszeitraum (Tage)",
     "signCSRDescription": "Diese CSR mit einer Zertifizierungsstelle signieren",

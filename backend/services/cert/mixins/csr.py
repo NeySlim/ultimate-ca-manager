@@ -32,6 +32,36 @@ def _csr_key_type_label(public_key):
         return 'ed448'
     return None
 
+# CSRs generated before 2.225 were described as "CSR for <CN>"
+_LEGACY_CSR_DESCR_PREFIX = 'CSR for '
+
+
+def settle_csr_descr(descr, cn):
+    """The name a CSR record keeps once it holds a certificate.
+
+    The certificates list shows a record by its description, so a CSR
+    described as "CSR for <CN>" appeared under that wording once signed
+    (#342). Drop the prefix; fall back to the CN when nothing is left."""
+    if descr and descr.startswith(_LEGACY_CSR_DESCR_PREFIX):
+        descr = descr[len(_LEGACY_CSR_DESCR_PREFIX):].strip()
+    return descr or cn or 'Certificate'
+
+
+def _spki_der(public_key) -> bytes:
+    from cryptography.hazmat.primitives import serialization
+    return public_key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+def _csr_pem_bytes(stored: str) -> bytes:
+    """A stored CSR column holds base64 PEM, or raw PEM on old records."""
+    if stored.startswith('-----BEGIN'):
+        return stored.encode('utf-8')
+    return base64.b64decode(stored)
+
+
 try:
     from security.encryption import decrypt_private_key, encrypt_private_key
     from utils.key_codec import load_pem_bytes
@@ -312,6 +342,7 @@ class CSRMixin:
         certificate.caref = caref
         certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
         certificate.cert_type = cert_type
+        certificate.descr = settle_csr_descr(certificate.descr, cn_value)
         certificate.subject = subject_str if subject_str else None
         certificate.subject_cn = cn_value
         certificate.issuer = cert.issuer.rfc4514_string()
@@ -418,3 +449,112 @@ class CSRMixin:
             from services.webhook_service import emit_cert_issued
             emit_cert_issued(certificate.to_dict(), ca_refid=certificate.caref)
             return certificate
+
+    @staticmethod
+    def complete_external_csr(
+        certificate: Certificate,
+        cert: x509.Certificate,
+        cert_pem: bytes,
+        caref: Optional[str] = None,
+        descr: Optional[str] = None,
+        key_pem: Optional[bytes] = None,
+        username: str = 'system',
+        commit: bool = True,
+    ) -> Certificate:
+        """Attach a certificate issued elsewhere to the pending CSR it answers.
+
+        A CSR generated here and signed by an external CA came back as a
+        separate, keyless record when the certificate was imported, since
+        nothing tied the two together (#341). The certificate's public key
+        must be the CSR's; the record then holds the certificate and keeps
+        its private key, so the certificate exports with it. A key that
+        arrives with the certificate is kept only when the record has none.
+
+        Raises ValueError when the record is not a pending CSR or the keys
+        differ. With commit=False the caller owns the transaction (smart
+        import commits once for the whole bundle).
+        """
+        if not certificate.csr or certificate.crt:
+            raise ValueError("Not a pending CSR")
+
+        csr_obj = x509.load_pem_x509_csr(_csr_pem_bytes(certificate.csr), default_backend())
+        if _spki_der(csr_obj.public_key()) != _spki_der(cert.public_key()):
+            raise ValueError("Certificate public key does not match the CSR")
+
+        cn_value = subject_common_name(cert.subject)
+
+        san_dns_list, san_ip_list, san_email_list, san_uri_list = [], [], [], []
+        try:
+            san_ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            for name in san_ext.value:
+                if isinstance(name, x509.DNSName):
+                    san_dns_list.append(name.value)
+                elif isinstance(name, x509.IPAddress):
+                    san_ip_list.append(str(name.value))
+                elif isinstance(name, x509.RFC822Name):
+                    san_email_list.append(name.value)
+                elif isinstance(name, x509.UniformResourceIdentifier):
+                    san_uri_list.append(name.value)
+        except x509.ExtensionNotFound:
+            pass
+        if not cn_value and san_dns_list:
+            cn_value = san_dns_list[0]
+
+        ski_hex = aki_hex = None
+        try:
+            ski_hex = cert.extensions.get_extension_for_class(
+                x509.SubjectKeyIdentifier).value.key_identifier.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+        try:
+            aki = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value
+            if aki.key_identifier:
+                aki_hex = aki.key_identifier.hex(':').upper()
+        except x509.ExtensionNotFound:
+            pass
+
+        certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
+        certificate.caref = caref
+        certificate.descr = descr or settle_csr_descr(certificate.descr, cn_value)
+        certificate.subject = cert.subject.rfc4514_string() or None
+        certificate.subject_cn = cn_value or certificate.descr
+        certificate.issuer = cert.issuer.rfc4514_string()
+        certificate.serial_number = str(cert.serial_number)
+        certificate.aki = aki_hex
+        certificate.ski = ski_hex
+        certificate.valid_from = cert.not_valid_before_utc.replace(tzinfo=None)
+        certificate.valid_to = cert.not_valid_after_utc.replace(tzinfo=None)
+        certificate.san_dns = json.dumps(san_dns_list) if san_dns_list else None
+        certificate.san_ip = json.dumps(san_ip_list) if san_ip_list else None
+        certificate.san_email = json.dumps(san_email_list) if san_email_list else None
+        certificate.san_uri = json.dumps(san_uri_list) if san_uri_list else None
+        certificate.source = 'import'
+        if key_pem and not certificate.prv:
+            certificate.prv = encrypt_private_key(base64.b64encode(key_pem).decode('utf-8'))
+            mirror_private_key(
+                cert_key_path(certificate), key_pem,
+                context=f"CSR certificate {certificate.id}",
+            )
+
+        if commit:
+            try:
+                db.session.commit()
+            except Exception as _commit_err:
+                db.session.rollback()
+                logger.error(
+                    f"Commit failed completing CSR {certificate.id}: {_commit_err}",
+                    exc_info=True,
+                )
+                raise
+
+        with open(cert_cert_path(certificate), 'wb') as f:
+            f.write(cert_pem)
+
+        from services.audit_service import AuditService
+        AuditService.log_certificate(
+            'certificate_imported', certificate,
+            f'Certificate issued externally attached to its pending CSR '
+            f'(private key {"kept" if certificate.prv else "absent"})',
+            username=username,
+        )
+        return certificate

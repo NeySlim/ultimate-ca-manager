@@ -989,6 +989,7 @@
     "passphrase": "パスフレーズ（暗号化されている場合）",
     "passphraseHint": "キーが暗号化されていない場合は空欄のままにしてください",
     "uploadKey": "キーをアップロード",
+    "downloadKey": "秘密鍵をダウンロード",
     "selectCA": "CAを選択してください",
     "validityPeriod": "有効期間（日数）",
     "signCSRDescription": "このCSRに認証局で署名し、証明書を発行します",

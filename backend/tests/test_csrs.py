@@ -755,3 +755,127 @@ class TestCSRLifecycle:
                              content_type='application/json')
         # Uploaded CSRs may lack private key for signing; accept 200 or 500
         assert r.status_code in (200, 400, 500)
+
+
+# ============================================================
+# Record name (#342)
+# ============================================================
+class TestCSRDescr:
+    """A CSR record is named after its CN, not "CSR for <CN>": the
+    certificates list shows a signed record by its description (#342)."""
+
+    def test_generated_csr_descr_is_cn(self, auth_client):
+        r = _create_csr(auth_client, cn='descr-test.example.com')
+        assert r.status_code in (200, 201)
+        assert _json(r)['data']['descr'] == 'descr-test.example.com'
+
+    def test_export_filename_uses_cn(self, auth_client):
+        csr_id = _json(_create_csr(auth_client, cn='descr-file.example.com'))['data']['id']
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export')
+        assert r.status_code == 200
+        assert 'filename="descr-file.example.com.csr"' in r.headers['Content-Disposition']
+
+    def test_legacy_prefix_dropped_on_sign(self, app, auth_client, ca_for_signing):
+        csr_id = _json(_create_csr(auth_client, cn='legacy.example.com'))['data']['id']
+        with app.app_context():
+            from models import db, Certificate
+            record = db.session.get(Certificate, csr_id)
+            record.descr = 'CSR for legacy.example.com'
+            db.session.commit()
+
+        ca_id = ca_for_signing.get('id', ca_for_signing.get('ca_id'))
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign',
+                             data=json.dumps({'ca_id': ca_id, 'validity_days': 30}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert _json(r)['data']['descr'] == 'legacy.example.com'
+
+        r = auth_client.get(f'/api/v2/certificates/{csr_id}')
+        assert r.status_code == 200
+        assert _json(r)['data']['descr'] == 'legacy.example.com'
+
+
+# ============================================================
+# Private key export (#341)
+# ============================================================
+class TestExportCSRKey:
+    """GET/POST /api/v2/csrs/<id>/export?format=key"""
+
+    @staticmethod
+    def _csr_public_key_der(auth_client, csr_id):
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export')
+        csr = x509.load_pem_x509_csr(r.data)
+        return csr.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+
+    def test_key_export_unencrypted(self, auth_client):
+        from cryptography.hazmat.primitives import serialization
+        csr_id = _json(_create_csr(auth_client, cn='key-export.example.com'))['data']['id']
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key')
+        assert r.status_code == 200, r.data
+        assert b'PRIVATE KEY' in r.data
+        assert b'ENCRYPTED' not in r.data
+        assert 'filename="key-export.example.com.key"' in r.headers['Content-Disposition']
+        key = serialization.load_pem_private_key(r.data, password=None)
+        assert key.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        ) == self._csr_public_key_der(auth_client, csr_id)
+
+    def test_key_export_password_protected(self, auth_client):
+        from cryptography.hazmat.primitives import serialization
+        csr_id = _json(_create_csr(auth_client, cn='key-export-pw.example.com'))['data']['id']
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/export',
+                             data=json.dumps({'format': 'key', 'password': 'S3cret!'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert b'ENCRYPTED PRIVATE KEY' in r.data
+        key = serialization.load_pem_private_key(r.data, password=b'S3cret!')
+        assert key.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        ) == self._csr_public_key_der(auth_client, csr_id)
+
+    def test_key_export_rejects_password_in_query_string(self, auth_client):
+        csr_id = _json(_create_csr(auth_client, cn='key-export-qs.example.com'))['data']['id']
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key&password=x')
+        assert r.status_code == 400
+
+    def test_export_rejects_unknown_format(self, auth_client):
+        csr_id = _json(_create_csr(auth_client, cn='key-export-fmt.example.com'))['data']['id']
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=pkcs12')
+        assert r.status_code == 400
+
+    def test_key_export_requires_private_keys_scope(self, auth_client, viewer_client):
+        csr_id = _json(_create_csr(auth_client, cn='key-export-viewer.example.com'))['data']['id']
+        # The viewer reads CSRs but holds no read:private_keys
+        assert viewer_client.get(f'/api/v2/csrs/{csr_id}/export').status_code == 200
+        r = viewer_client.get(f'/api/v2/csrs/{csr_id}/export?format=key')
+        assert r.status_code == 403
+
+    def test_key_export_without_key(self, auth_client, sample_csr_pem):
+        r = auth_client.post('/api/v2/csrs/upload',
+                             data=json.dumps({'pem': sample_csr_pem, 'name': 'nokey-export'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        csr_id = _json(r)['data']['id']
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key')
+        assert r.status_code == 400
+
+    def test_key_export_with_encryption_at_rest(self, auth_client, encryption_enabled):
+        from cryptography.hazmat.primitives import serialization
+        csr_id = _json(_create_csr(auth_client, cn='key-export-enc.example.com'))['data']['id']
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key')
+        assert r.status_code == 200, r.data
+        key = serialization.load_pem_private_key(r.data, password=None)
+        assert key.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        ) == self._csr_public_key_der(auth_client, csr_id)
+
+    def test_key_export_is_audited(self, app, auth_client):
+        csr_id = _json(_create_csr(auth_client, cn='key-export-audit.example.com'))['data']['id']
+        assert auth_client.get(f'/api/v2/csrs/{csr_id}/export?format=key').status_code == 200
+        with app.app_context():
+            from models import AuditLog
+            entry = AuditLog.query.filter_by(action='csr_key_exported', resource_id=str(csr_id)).first()
+            assert entry is not None

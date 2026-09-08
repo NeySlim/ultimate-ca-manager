@@ -57,6 +57,19 @@ export const csrsService = {
     })
   },
 
+  // Private key of a CSR generated in UCM (read:private_keys). A password
+  // travels in the POST body only, never the query string.
+  async downloadKey(id, password = null) {
+    if (password) {
+      return apiClient.post(`/csrs/${id}/export`, { format: 'key', password }, {
+        responseType: 'blob'
+      })
+    }
+    return apiClient.get(`/csrs/${id}/export?format=key`, {
+      responseType: 'blob'
+    })
+  },
+
   // Bulk operations
   async bulkSign(ids, ca_id, validity_days = 365) {
     return apiClient.post('/csrs/bulk/sign', { ids, ca_id, validity_days })

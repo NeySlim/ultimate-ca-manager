@@ -4,7 +4,7 @@ import base64
 import uuid
 import json
 import traceback
-from flask import request
+from flask import request, g
 from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
@@ -13,9 +13,10 @@ from models import Certificate, CA, db
 from services.audit_service import AuditService
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
-    find_existing_ca, find_existing_certificate,
+    find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
     serialize_cert_to_pem, serialize_key_to_pem
 )
+from services.cert_service import CertificateService
 try:
     from security.encryption import encrypt_private_key
     HAS_ENCRYPTION = True
@@ -26,6 +27,22 @@ except ImportError:
 from . import bp
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_caref(ca_id, cert_info):
+    """The issuing CA's refid: the one the caller named, else the CA whose
+    SKI is the certificate's AKI (cryptographically reliable), else the CA
+    whose subject is the issuer DN; None when UCM does not hold the issuer."""
+    if ca_id:
+        ca = db.session.get(CA, ca_id)
+        return ca.refid if ca else None
+    aki = cert_info.get('aki')
+    if aki:
+        ca = CA.query.filter_by(ski=aki).first()
+        if ca:
+            return ca.refid
+    ca = CA.query.filter_by(subject=cert_info['issuer']).first()
+    return ca.refid if ca else None
 
 
 @bp.route('/api/v2/certificates/import', methods=['POST'])
@@ -163,6 +180,30 @@ def import_certificate():
                 message=f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
             )
 
+        # A certificate issued elsewhere for a CSR pending here completes
+        # that record instead of creating a keyless duplicate (#341)
+        pending_csr = find_pending_csr_for_certificate(cert)
+        if pending_csr:
+            username = getattr(getattr(g, 'current_user', None), 'username', None) or 'import'
+            try:
+                CertificateService.complete_external_csr(
+                    pending_csr, cert, cert_pem,
+                    caref=_resolve_caref(ca_id, cert_info),
+                    descr=name or None,
+                    key_pem=key_pem,
+                    username=username,
+                )
+            except ValueError as e:
+                db.session.rollback()
+                return error_response(str(e), 400)
+            return success_response(
+                data=pending_csr.to_dict(),
+                message=(
+                    f'Certificate "{pending_csr.descr}" imported and attached to its '
+                    f'pending CSR' + (' (private key kept)' if pending_csr.prv else '')
+                )
+            )
+
         # Check for existing certificate
         existing_cert = find_existing_certificate(cert_info)
 
@@ -218,22 +259,7 @@ def import_certificate():
             )
 
         # Regular certificate - find parent CA
-        caref = None
-        if ca_id:
-            ca = db.session.get(CA, ca_id)
-            if ca:
-                caref = ca.refid
-        else:
-            # Auto-link: AKI→SKI first (cryptographically reliable), then issuer DN fallback
-            aki = cert_info.get('aki')
-            if aki:
-                ca = CA.query.filter_by(ski=aki).first()
-                if ca:
-                    caref = ca.refid
-            if not caref:
-                ca = CA.query.filter_by(subject=cert_info['issuer']).first()
-                if ca:
-                    caref = ca.refid
+        caref = _resolve_caref(ca_id, cert_info)
 
         # Create certificate record
         refid = str(uuid.uuid4())

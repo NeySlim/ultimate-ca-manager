@@ -989,6 +989,7 @@
     "passphrase": "Passphrase (if encrypted)",
     "passphraseHint": "Leave empty if key is not encrypted",
     "uploadKey": "Upload Key",
+    "downloadKey": "Download Private Key",
     "selectCA": "Select CA...",
     "validityPeriod": "Validity Period (days)",
     "signCSRDescription": "Sign this CSR with a Certificate Authority to issue a certificate",

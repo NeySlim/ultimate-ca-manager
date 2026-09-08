@@ -989,6 +989,7 @@
     "passphrase": "Passphrase sef encrypted)",
     "passphraseHint": "Deixe vazio se a chave não estiver encriptada",
     "uploadKey": "Carregar Chave",
+    "downloadKey": "Descarregar Chave Privada",
     "selectCA": "Por favor selecione uma CA",
     "validityPeriod": "Período de Validade (dias)",
     "signCSRDescription": "Assine este CSR com uma autoridade de certificação para emitir um certificado",

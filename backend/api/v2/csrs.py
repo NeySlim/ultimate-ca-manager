@@ -192,8 +192,11 @@ def create_csr():
         if san_error:
             return error_response(san_error, 400)
 
+        # The record keeps this description once signed and the certificates
+        # list shows it as the certificate's name, so it is the CN, not a
+        # "CSR for <CN>" wording that outlives the request (#342)
         cert = CertificateService.generate_csr(
-            descr=f"CSR for {data['cn']}",
+            descr=data['cn'],
             dn=dn,
             key_type=key_type,
             san_dns=san_buckets['san_dns'] or None,
@@ -464,14 +467,70 @@ def import_csr():
         logger.error(f"CSR Import Error: {e}", exc_info=True)
         return error_response('Import failed', 500)
 
-@bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET'])
+@bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET', 'POST'])
 @require_auth(['read:csrs'])
 def export_csr(csr_id):
-    """Export CSR as PEM file"""
+    """
+    Export the CSR as a PEM file, or its private key with format=key.
+
+    The key of a CSR generated here was reachable only on disk: the
+    certificate export refuses a record with no certificate yet, which is
+    exactly the state of a CSR awaiting an external CA (#341). The key
+    export is gated like the certificate one (read:private_keys); an
+    optional password (POST JSON only, never the query string) returns the
+    key as encrypted PKCS#8.
+    """
     
     cert = db.session.get(Certificate, csr_id)
     if not cert or not cert.csr:
         return error_response('CSR not found', 404)
+
+    if request.method == 'POST' and request.is_json:
+        data = request.get_json(silent=True) or {}
+        export_format = str(data.get('format') or 'csr').lower()
+        password = data.get('password') or None
+    else:
+        export_format = (request.args.get('format') or 'csr').lower()
+        password = None
+        if request.args.get('password'):
+            return error_response('Password must be sent via POST body (JSON), not query string', 400)
+    if export_format not in ('csr', 'key'):
+        return error_response('format must be csr or key', 400)
+
+    if export_format == 'key':
+        from auth.unified import has_permission
+        if not has_permission('read:private_keys', getattr(g, 'permissions', []) or []):
+            return error_response(
+                'Private key export requires the read:private_keys permission', 403
+            )
+        if not cert.prv:
+            return error_response('CSR has no private key', 400)
+        try:
+            from utils.key_codec import load_pem_bytes
+            key_pem = load_pem_bytes(cert.prv, context=f"CSR {cert.id}")
+            if password:
+                private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+                key_pem = private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.BestAvailableEncryption(str(password).encode('utf-8')),
+                )
+        except Exception as e:
+            logger.error(f"CSR key export failed: {e}")
+            return error_response('Export failed', 500)
+        AuditService.log_action(
+            action='csr_key_exported',
+            resource_type='csr',
+            resource_id=str(cert.id),
+            resource_name=cert.descr or f'CSR #{cert.id}',
+            details=f'Private key exported ({"password-protected" if password else "unencrypted"})',
+            success=True
+        )
+        return Response(
+            key_pem,
+            mimetype='application/x-pem-file',
+            headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(cert.descr or cert.refid)}.key"'}
+        )
     
     try:
         csr_pem = base64.b64decode(cert.csr)

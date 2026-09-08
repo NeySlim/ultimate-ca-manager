@@ -1637,6 +1637,7 @@
     "passphrase": "Phrase secrète (si chiffrée)",
     "passphraseHint": "Laisser vide si la clé n'est pas chiffrée",
     "uploadKey": "Téléverser la clé",
+    "downloadKey": "Télécharger la clé privée",
     "selectCA": "Sélectionner l'AC...",
     "validityPeriod": "Période de validité (jours)",
     "signCSRDescription": "Signer cette CSR avec une autorité de certification pour émettre un certificat",

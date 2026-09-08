@@ -369,12 +369,27 @@ class SmartImporter:
             
             # Find matching private key
             prv = None
+            key_pem = None
             for key_idx, cert_idx in matching.get("matched_pairs", []):
                 if objects[cert_idx] == cert_obj:
                     key_obj = objects[key_idx]
-                    prv = base64.b64encode(key_obj.raw_pem.encode()).decode()
+                    key_pem = key_obj.raw_pem.encode()
+                    prv = base64.b64encode(key_pem).decode()
                     result.keys_matched += 1
                     break
+
+            # A certificate issued elsewhere for a CSR pending here completes
+            # that record, which keeps its private key (#341)
+            pending_csr = self._complete_pending_csr(cert_obj, caref, key_pem, username)
+            if pending_csr is not None:
+                if pending_csr.prv and key_pem is None:
+                    result.keys_matched += 1
+                result.certificates_imported += 1
+                result.imported_ids["certificates"].append(pending_csr.id)
+                result.warnings.append(
+                    f"Certificate {self._get_cn(cert_obj.subject)} attached to its pending CSR"
+                )
+                continue
             
             # Extract CN for subject_cn
             cn = self._get_cn(cert_obj.subject)
@@ -470,6 +485,25 @@ class SmartImporter:
             # Audit log
             self._log_audit("import_csr", cert.id, cert.descr, username)
     
+    def _complete_pending_csr(self, cert_obj: ParsedObject, caref, key_pem, username: str):
+        """The pending CSR record this certificate completes, or None."""
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+        from services.import_service import find_pending_csr_for_certificate
+        from services.cert_service import CertificateService
+        try:
+            cert = x509.load_pem_x509_certificate(cert_obj.raw_pem.encode(), default_backend())
+        except Exception:
+            return None
+        pending = find_pending_csr_for_certificate(cert)
+        if pending is None:
+            return None
+        # The caller commits the whole bundle at once
+        return CertificateService.complete_external_csr(
+            pending, cert, cert_obj.raw_pem.encode(),
+            caref=caref, key_pem=key_pem, username=username, commit=False,
+        )
+
     def _get_cn(self, subject: str) -> str:
         """Extract CN from subject"""
         if not subject:

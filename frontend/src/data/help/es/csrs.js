@@ -12,6 +12,7 @@ export default {
           { label: 'Revisar', text: 'Inspeccionar el sujeto, SAN, tipo de clave y firma antes de firmar' },
           { label: 'Firmar', text: 'Seleccionar una CA, tipo de certificado, establecer el período de validez y emitir el certificado' },
           { label: 'Descargar', text: 'Descargar el CSR original en formato PEM' },
+          { label: 'Descargar clave', text: 'Descargar la clave privada de un CSR generado en UCM, para desplegarla junto a un certificado emitido por una CA externa (requiere el permiso read:private_keys)' },
         ]
       },
       {
@@ -25,6 +26,7 @@ export default {
     tips: [
       'Los CSR preservan la clave privada del solicitante — nunca sale de su sistema',
       'Puede añadir una clave privada a un CSR después de firmarlo si es necesario para la exportación PKCS#12',
+      'Un certificado importado para un CSR generado en UCM completa ese CSR: el registro conserva su clave privada, por lo que el certificado se exporta con ella',
       'Utilice el modo Microsoft CA para firmar CSR a través de AD CS cuando esté conectado a una PKI Windows',
       'Al firmar, use "EKU adicionales" para añadir Microsoft RDP, smartcard logon, IPsec o cualquier OID — el EKU existente del CSR se reconstruye con el conjunto fusionado',
     ],
@@ -109,6 +111,18 @@ Al firmar mediante Microsoft CA, puede inscribirse en nombre de otro usuario:
 4. Ajuste los valores si es necesario y haga clic en **Firmar**
 
 > ⚠️ EOBO requiere un certificado de agente de inscripción configurado en el servidor AD CS, y la plantilla debe permitir la inscripción en nombre de otros usuarios.
+
+### Firma con CA externa
+
+Para un certificado de una CA pública o de terceros, conserve la clave en UCM y envíe solo la solicitud:
+
+1. **Generar CSR** en UCM, luego **Descargar CSR** y envíelo a la CA externa
+2. Cuando llegue el certificado, impórtelo en la página de Certificados (**Importar**, archivo o PEM pegado) o mediante **Operaciones → Smart Importar**
+3. UCM reconoce el certificado por su clave pública, completa el CSR pendiente y conserva su clave privada: el certificado se exporta entonces con la clave (PEM, PKCS#12, JKS) como cualquier otro
+
+El CSR pasa de **Pendientes** a **Historial**. Si el certificado debe instalarse en otro lugar, **Descargar Clave Privada** en el CSR pendiente proporciona la clave (requiere el permiso read:private_keys, como toda exportación directa de clave).
+
+> 💡 La correspondencia se realiza sobre el par de claves, por lo que sigue funcionando cuando la CA reescribe el sujeto (muchas CA públicas conservan solo el CN).
 
 ## Añadir una clave privada
 
