@@ -9,6 +9,10 @@ from flask import request
 from auth.unified import require_auth
 from sqlalchemy import or_
 from models import Certificate, CA, db
+from utils.cert_status import (
+    expired_condition, expiring_condition, issued_certificates,
+    orphan_condition, revoked_condition, valid_condition,
+)
 from services.compliance_service import calculate_compliance_score
 from utils.response import success_response
 from utils.datetime_utils import utc_now
@@ -21,40 +25,19 @@ def get_certificate_stats():
     """Get certificate statistics"""
 
     now = utc_now()
-    expiry_threshold = now + timedelta(days=30)
 
-    # Only count actual certificates (not pending CSRs)
-    base_query = Certificate.query.filter(Certificate.crt.isnot(None))
+    # The cards are filters, so they partition: see utils/cert_status
+    base_query = issued_certificates()
 
     total = base_query.count()
-    revoked = base_query.filter(Certificate.revoked == True).count()
-    expired = base_query.filter(
-        Certificate.valid_to <= now,
-        Certificate.revoked == False
-    ).count()
-    expiring = base_query.filter(
-        Certificate.valid_to <= expiry_threshold,
-        Certificate.valid_to > now,
-        Certificate.revoked == False
-    ).count()
-    # Same bucket as the list filter and the row status: not revoked, not
-    # expiring, not expired. A certificate with no validity date counts as
-    # valid, as its row does, instead of falling outside every bucket.
-    valid = base_query.filter(
-        Certificate.revoked == False,
-        or_(
-            Certificate.valid_to.is_(None),
-            Certificate.valid_to > expiry_threshold,
-        ),
-    ).count()
+    revoked = base_query.filter(revoked_condition()).count()
+    expired = base_query.filter(expired_condition(now)).count()
+    expiring = base_query.filter(expiring_condition(now)).count()
+    valid = base_query.filter(valid_condition(now)).count()
 
-    # Certificates whose issuing CA is gone: counted over the whole set, like
-    # every other card, instead of over the page on screen (#345 review)
-    known_refs = db.session.query(CA.refid).filter(CA.refid.isnot(None))
-    orphan = base_query.filter(
-        Certificate.caref.isnot(None),
-        Certificate.caref.notin_(known_refs),
-    ).count()
+    # Counted over the whole set, like every other card, instead of over the
+    # page on screen (#345 review)
+    orphan = base_query.filter(orphan_condition()).count()
 
     # Distinct issuance sources actually present, so the list "source" filter
     # can offer exactly the values that exist (NULL is surfaced as 'manual').

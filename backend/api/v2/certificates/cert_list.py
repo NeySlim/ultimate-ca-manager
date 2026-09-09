@@ -7,6 +7,10 @@ from sqlalchemy.orm import selectinload
 from auth.unified import require_auth
 from utils.response import success_response
 from models import Certificate, CA, db
+from utils.cert_status import (
+    expired_condition, expiring_condition, orphan_condition,
+    revoked_condition, valid_condition,
+)
 from services.compliance_service import calculate_compliance_score
 from utils.datetime_utils import utc_now
 from . import bp
@@ -69,48 +73,21 @@ def list_certificates():
     if status_list:
         status_conditions = []
         for status in status_list:
+            # The buckets partition, so a filter and the card above it
+            # always agree: see utils/cert_status
             if status == 'revoked':
-                status_conditions.append(Certificate.revoked == True)
+                status_conditions.append(revoked_condition())
             elif status == 'valid':
-                # Same buckets as the stats endpoint and the row status:
-                # valid / expiring / expired / revoked never overlap. Counting
-                # the expiring ones as valid here filled pages with rows the
-                # list then had to hide, down to an empty page (#345 review)
-                expiry_threshold = utc_now() + timedelta(days=30)
-                status_conditions.append(
-                    and_(
-                        Certificate.revoked == False,
-                        or_(
-                            Certificate.valid_to.is_(None),
-                            Certificate.valid_to > expiry_threshold,
-                        ),
-                    )
-                )
+                status_conditions.append(valid_condition())
             elif status == 'expired':
-                status_conditions.append(
-                    and_(Certificate.revoked == False, Certificate.valid_to <= utc_now())
-                )
+                status_conditions.append(expired_condition())
             elif status == 'orphan':
-                # Issued by a CA this instance no longer holds. Selected here
-                # rather than on the page just received: filtering the page
-                # showed nothing whenever the orphans sat further down (#345
-                # review)
-                known_refs = db.session.query(CA.refid).filter(CA.refid.isnot(None))
-                status_conditions.append(
-                    and_(
-                        Certificate.caref.isnot(None),
-                        Certificate.caref.notin_(known_refs),
-                    )
-                )
+                # Selected over the whole set rather than on the page just
+                # received, which showed nothing whenever the orphans sat
+                # further down (#345 review)
+                status_conditions.append(orphan_condition())
             elif status == 'expiring':
-                expiry_threshold = utc_now() + timedelta(days=30)
-                status_conditions.append(
-                    and_(
-                        Certificate.valid_to <= expiry_threshold,
-                        Certificate.valid_to > utc_now(),
-                        Certificate.revoked == False
-                    )
-                )
+                status_conditions.append(expiring_condition())
         if status_conditions:
             query = query.filter(or_(*status_conditions))
 

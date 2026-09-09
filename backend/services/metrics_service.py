@@ -38,20 +38,22 @@ class _Doc:
 
 
 def _certificates(doc):
-    from models import Certificate
+    from utils.cert_status import (
+        expired_condition, expiring_condition, issued_certificates,
+        revoked_condition, valid_condition,
+    )
     now = utc_now()
-    total = Certificate.query.filter_by(archived=False).count()
-    revoked = Certificate.query.filter_by(archived=False, revoked=True).count()
-    expired = Certificate.query.filter(
-        Certificate.archived == False, Certificate.revoked == False,  # noqa: E712
-        Certificate.valid_to < now).count()
-    valid = total - revoked - expired
-    exp30 = Certificate.query.filter(
-        Certificate.archived == False, Certificate.revoked == False,  # noqa: E712
-        Certificate.valid_to >= now, Certificate.valid_to < now + timedelta(days=30)).count()
-    exp7 = Certificate.query.filter(
-        Certificate.archived == False, Certificate.revoked == False,  # noqa: E712
-        Certificate.valid_to >= now, Certificate.valid_to < now + timedelta(days=7)).count()
+    # Live certificates only: a superseded copy kept for the record and a row
+    # holding only a signing request are neither of them a served certificate
+    certs = issued_certificates(include_archived=False)
+    total = certs.count()
+    revoked = certs.filter(revoked_condition()).count()
+    expired = certs.filter(expired_condition(now)).count()
+    # Lifecycle state: the expiry windows below overlap the valid ones on
+    # purpose, they answer "what needs renewing", not "what state is it in"
+    valid = certs.filter(valid_condition(now, exclude_expiring=False)).count()
+    exp30 = certs.filter(expiring_condition(now, days=30)).count()
+    exp7 = certs.filter(expiring_condition(now, days=7)).count()
     h = "Certificates by status"
     doc.metric('ucm_certificates', valid, help_text=h, status='valid')
     doc.metric('ucm_certificates', revoked, status='revoked')

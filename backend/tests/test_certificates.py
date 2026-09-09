@@ -1190,3 +1190,62 @@ class TestOrphanFilter:
         cert = json.loads(r.data)['data']
         r = auth_client.get(f'{BASE}?per_page=500&status=orphan')
         assert cert['id'] not in {c['id'] for c in json.loads(r.data)['data']}
+
+
+class TestStatusBucketsAcrossViews:
+    """The certificates page, the dashboard and the Prometheus metrics count
+    the same set. They report it two ways on purpose, and both must add up."""
+
+    @staticmethod
+    def _pending_csr(auth_client):
+        r = auth_client.post('/api/v2/csrs',
+                             data=json.dumps({'cn': 'buckets-pending.example.com',
+                                              'key_type': 'RSA 2048'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        return json.loads(r.data)['data']
+
+    def test_a_pending_request_is_not_a_certificate(self, app, auth_client):
+        """It is reported on its own; counting it as a certificate showed it
+        twice on the dashboard, once as a certificate and once as pending."""
+        before_stats = json.loads(auth_client.get(f'{BASE}/stats').data)['data']
+        before_dash = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']
+        csr = self._pending_csr(auth_client)
+        after_stats = json.loads(auth_client.get(f'{BASE}/stats').data)['data']
+        after_dash = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']
+
+        assert after_stats['total'] == before_stats['total']
+        assert after_dash['total_certificates'] == before_dash['total_certificates']
+        assert after_dash['valid'] == before_dash['valid']
+        assert after_dash['pending_csrs'] == before_dash['pending_csrs'] + 1
+
+        r = auth_client.get(f'{BASE}?per_page=500')
+        assert csr['id'] not in {c['id'] for c in json.loads(r.data)['data']}
+
+    def test_dashboard_slices_add_up_to_the_total(self, auth_client):
+        """They are drawn as one pie and each slice links to its filter."""
+        d = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']
+        assert d['valid'] + d['expiring_soon'] + d['expired'] + d['revoked'] == d['total_certificates']
+
+    def test_page_and_dashboard_report_the_same_figures(self, auth_client):
+        stats = json.loads(auth_client.get(f'{BASE}/stats').data)['data']
+        dash = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']
+        assert stats['total'] == dash['total_certificates']
+        assert stats['valid'] + stats['expiring'] + stats['expired'] + stats['revoked'] == stats['total']
+        for page_key, dash_key in (('valid', 'valid'), ('expiring', 'expiring_soon'),
+                                   ('expired', 'expired'), ('revoked', 'revoked')):
+            assert stats[page_key] == dash[dash_key], (page_key, stats[page_key], dash[dash_key])
+
+    def test_metrics_report_the_lifecycle_state(self, app, auth_client):
+        """Prometheus answers "what state is it in", with the expiry windows
+        overlapping the valid ones on purpose."""
+        with app.app_context():
+            from utils.cert_status import (
+                expired_condition, issued_certificates, revoked_condition, valid_condition,
+            )
+            certs = issued_certificates(include_archived=False)
+            total = certs.count()
+            lifecycle_valid = certs.filter(valid_condition(exclude_expiring=False)).count()
+            expired = certs.filter(expired_condition()).count()
+            revoked = certs.filter(revoked_condition()).count()
+            assert lifecycle_valid + expired + revoked == total

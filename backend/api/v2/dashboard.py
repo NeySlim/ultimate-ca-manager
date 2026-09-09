@@ -11,6 +11,10 @@ from datetime import datetime, timedelta
 from auth.unified import require_auth
 from utils.response import success_response
 from models import db, CA, Certificate
+from utils.cert_status import (
+    expired_condition, expiring_condition, issued_certificates,
+    revoked_condition, valid_condition,
+)
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from sqlalchemy import text
 from utils.datetime_utils import utc_now, utc_isoformat, to_naive_utc
@@ -117,26 +121,18 @@ def get_dashboard_stats():
     # Count CAs
     total_cas = CA.query.count()
     
-    # Count certificates
-    total_certs = Certificate.query.count()
-    
-    # Count expired (past valid_to, not revoked)
+    # Rows holding a certificate. A row holding only a signing request is a
+    # pending request, reported on its own below; counting it here made the
+    # dashboard show it twice, once as a certificate and once as pending.
     now = utc_now()
-    expired = Certificate.query.filter(
-        Certificate.valid_to < now,
-        Certificate.revoked == False
-    ).count()
-    
-    # Count expiring soon (next 30 days, not yet expired)
-    expiry_threshold = now + timedelta(days=30)
-    expiring_soon = Certificate.query.filter(
-        Certificate.valid_to <= expiry_threshold,
-        Certificate.valid_to >= now,
-        Certificate.revoked == False
-    ).count()
-    
-    # Count revoked
-    revoked = Certificate.query.filter_by(revoked=True).count()
+    certs = issued_certificates()
+
+    expired = certs.filter(expired_condition(now)).count()
+    # A window over the valid ones, not a bucket of its own: a certificate
+    # about to expire is still usable (see utils/cert_status)
+    expiring_soon = certs.filter(expiring_condition(now)).count()
+    revoked = certs.filter(revoked_condition()).count()
+    total_certs = certs.count()
     
     # Count pending CSRs (certificates with CSR but no signed cert)
     pending_csrs = 0
@@ -158,7 +154,12 @@ def get_dashboard_stats():
     except Exception:
         logger.debug("Pending CSRs query failed")
     
-    valid = max(0, total_certs - expired - revoked)
+    # A partition, like the certificates page: this figure feeds the status
+    # pie chart next to expiring, expired and revoked, and each slice links
+    # to the matching filter, so the four have to add up to the total and
+    # never overlap. The Prometheus metrics answer the other way round, see
+    # utils/cert_status.
+    valid = certs.filter(valid_condition(now)).count()
 
     # SSH statistics
     ssh_cas = 0
