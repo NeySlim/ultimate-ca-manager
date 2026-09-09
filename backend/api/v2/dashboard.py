@@ -13,7 +13,7 @@ from utils.response import success_response
 from models import db, CA, Certificate
 from utils.cert_status import (
     expired_condition, expiring_condition, issued_certificates,
-    revoked_condition, valid_condition,
+    pending_requests, revoked_condition, valid_condition,
 )
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from sqlalchemy import text
@@ -79,9 +79,10 @@ def get_public_stats():
     """Get public overview statistics (no auth required - for login page)"""
     try:
         
-        # Query counts directly with SQL to avoid import issues
         total_cas = db.session.execute(text("SELECT COUNT(*) FROM certificate_authorities")).scalar() or 0
-        total_certs = db.session.execute(text("SELECT COUNT(*) FROM certificates")).scalar() or 0
+        # Certificates, not signing requests: counting every row announced
+        # the pending requests as certificates here too
+        total_certs = issued_certificates().count()
         
         # Try ACME accounts table
         try:
@@ -134,12 +135,12 @@ def get_dashboard_stats():
     revoked = certs.filter(revoked_condition()).count()
     total_certs = certs.count()
     
-    # Count pending CSRs (certificates with CSR but no signed cert)
+    # Requests still waiting for their certificate, read through the same
+    # definition as the list that shows them (utils/cert_status): a hand
+    # written copy of the rule drifted from it
     pending_csrs = 0
     try:
-        pending_csrs = db.session.execute(
-            text("SELECT COUNT(*) FROM certificates WHERE csr IS NOT NULL AND csr != '' AND (crt IS NULL OR crt = '')")
-        ).scalar() or 0
+        pending_csrs = pending_requests().count()
     except Exception:
         logger.debug("Pending CSRs query failed")
     

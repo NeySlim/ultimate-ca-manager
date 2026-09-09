@@ -216,10 +216,8 @@ def find_pending_csr_for_certificate(cert):
         encoding=serialization.Encoding.DER,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    pending = Certificate.query.filter(
-        Certificate.csr.isnot(None),
-        Certificate.crt.is_(None),
-    ).order_by(Certificate.id.desc()).all()
+    from utils.cert_status import pending_requests
+    pending = pending_requests().order_by(Certificate.id.desc()).all()
     for record in pending:
         try:
             stored = record.csr

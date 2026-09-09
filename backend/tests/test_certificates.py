@@ -1310,3 +1310,64 @@ class TestEmptyCertificateSentinel:
         assert certs & pending == set()
         assert history <= certs   # a signed request is a certificate
         assert rec['id'] in pending and rec['id'] not in certs
+
+
+class TestEmptyRequestSentinel:
+    """A record whose request column holds the empty string carries no
+    request: the list that shows pending requests and the counter that
+    announces them have to agree (mirror of the empty certificate case)."""
+
+    @staticmethod
+    def _empty_request_row(app, auth_client):
+        r = auth_client.post('/api/v2/csrs',
+                             data=json.dumps({'cn': 'empty-request.example.com', 'key_type': 'RSA 2048'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        rec = json.loads(r.data)['data']
+        with app.app_context():
+            from models import db as _db, Certificate as _Cert
+            row = _db.session.get(_Cert, rec['id'])
+            row.csr = ''
+            _db.session.commit()
+        return rec
+
+    def test_it_is_not_listed_as_a_pending_request(self, app, auth_client):
+        before = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']['pending_csrs']
+        rec = self._empty_request_row(app, auth_client)
+        body = json.loads(auth_client.get('/api/v2/csrs?per_page=100').data)
+        assert rec['id'] not in {c['id'] for c in body['data']}
+        after = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']['pending_csrs']
+        assert after == before
+        # The list and the counter announce the same number
+        assert body['meta']['total'] == after
+
+    def test_the_pending_count_follows_the_pending_list(self, app, auth_client):
+        before_list = json.loads(auth_client.get('/api/v2/csrs?per_page=100').data)['meta']['total']
+        before_count = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']['pending_csrs']
+        assert before_list == before_count
+        r = auth_client.post('/api/v2/csrs',
+                             data=json.dumps({'cn': 'counted-request.example.com', 'key_type': 'RSA 2048'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201)
+        after_list = json.loads(auth_client.get('/api/v2/csrs?per_page=100').data)['meta']['total']
+        after_count = json.loads(auth_client.get('/api/v2/dashboard/stats').data)['data']['pending_csrs']
+        assert after_list == before_list + 1
+        assert after_count == after_list
+
+
+class TestOverviewCounts:
+    """The overview shown before login counts certificates, not requests."""
+
+    def test_overview_matches_the_certificate_total(self, auth_client):
+        overview = json.loads(auth_client.get('/api/v2/stats/overview').data)['data']
+        stats = json.loads(auth_client.get(f'{BASE}/stats').data)['data']
+        assert overview['total_certs'] == stats['total']
+
+    def test_a_new_request_does_not_raise_it(self, auth_client):
+        before = json.loads(auth_client.get('/api/v2/stats/overview').data)['data']['total_certs']
+        r = auth_client.post('/api/v2/csrs',
+                             data=json.dumps({'cn': 'overview-request.example.com', 'key_type': 'RSA 2048'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201)
+        after = json.loads(auth_client.get('/api/v2/stats/overview').data)['data']['total_certs']
+        assert after == before

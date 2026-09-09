@@ -44,6 +44,33 @@ def awaits_certificate(model=None):
     return or_(model.crt.is_(None), model.crt == '')
 
 
+def holds_request(model=None):
+    """Condition for "this row holds a signing request".
+
+    Same reading as holds_certificate: absent and empty both mean none. A
+    row with an empty request was listed as a pending request while the
+    dashboard, which already excluded it, counted something else.
+    """
+    model = model or Certificate
+    return and_(model.csr.isnot(None), model.csr != '')
+
+
+def pending_requests(query=None):
+    """Rows holding a request and still waiting for their certificate.
+
+    The exact complement of :func:`issued_certificates` among the rows that
+    carry a request, so the two lists partition the records.
+    """
+    query = query if query is not None else Certificate.query
+    return query.filter(holds_request(), awaits_certificate())
+
+
+def signed_requests(query=None):
+    """Rows whose request has received its certificate."""
+    query = query if query is not None else Certificate.query
+    return query.filter(holds_request(), holds_certificate())
+
+
 def issued_certificates(query=None, include_archived: bool = True):
     """Rows that hold a certificate, excluding CSR-only records."""
     query = query if query is not None else Certificate.query
