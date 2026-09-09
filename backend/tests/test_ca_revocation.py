@@ -385,3 +385,94 @@ class TestRevocationReviewFollowUps:
                     else:
                         db.session.delete(cfg)
                     db.session.commit()
+
+
+class TestIssuerResolution:
+    """Second review: the issuer is the CA whose key verifies the signature,
+    never a same-DN decoy; a CRL failure is reported without its details."""
+
+    def test_same_dn_decoy_root_does_not_mask_revocation(self, app, auth_client, create_ca):
+        with app.app_context():
+            from utils.key_codec import load_pem_bytes
+            # The decoy is created first, so a name lookup would pick it
+            decoy = create_ca(cn='Same DN Root')
+            real = create_ca(cn='Same DN Root')
+            assert db.session.get(CA, decoy['id']).subject == db.session.get(CA, real['id']).subject
+            sub = _intermediate(auth_client, real, 'Same DN Sub CA')
+            serial = _serial_int(sub['id'])
+            record = db.session.get(CA, sub['id'])
+            cert_pem = base64.b64decode(record.crt)
+            key_pem = load_pem_bytes(record.prv, context='test')
+            assert record.issuing_ca().id == real['id']
+
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'keyCompromise'}).status_code == 200
+            assert auth_client.delete(f'{CAS}/{sub["id"]}').status_code in (200, 204)
+            r = auth_client.post(f'{CAS}/import',
+                                 data={'pem_content': (cert_pem + key_pem).decode(), 'name': 'Same DN Sub reimported'},
+                                 content_type='multipart/form-data')
+            assert r.status_code in (200, 201), r.data
+            imported = _json(r)['data']
+            assert imported['revoked'] is True
+            assert imported['status'] == 'Revoked'
+
+            db.session.expire_all()
+            new_ca = db.session.get(CA, imported['id'])
+            assert new_ca.caref is None  # an import carries no parent link
+            assert new_ca.issuing_ca().id == real['id']
+            assert new_ca.revoked_in_chain is True
+
+            status, _ = _ocsp_status(real['id'], serial)
+            assert status == 'revoked'
+            r = _post(auth_client, '/api/v2/certificates', {
+                'cn': 'after-decoy.example.com', 'ca_id': imported['id'],
+                'validity_days': 30, 'key_type': 'RSA 2048', 'cert_type': 'server',
+            })
+            assert r.status_code == 400, r.data
+            assert 'revoked' in _json(r)['message'].lower()
+
+    def test_wrong_caref_is_not_trusted(self, app, auth_client, create_ca):
+        with app.app_context():
+            other = create_ca(cn='Unrelated Root')
+            real = create_ca(cn='Real Root caref')
+            sub = _intermediate(auth_client, real, 'Caref Sub CA')
+            record = db.session.get(CA, sub['id'])
+            record.caref = other['refid']  # a broken link (pre chain repair)
+            db.session.commit()
+            db.session.expire_all()
+            assert db.session.get(CA, sub['id']).issuing_ca().id == real['id']
+
+    def test_no_verifiable_issuer_means_no_parent(self, app, auth_client, create_ca):
+        with app.app_context():
+            real = create_ca(cn='Vanishing Root')
+            decoy = create_ca(cn='Vanishing Root')
+            sub = _intermediate(auth_client, real, 'Vanishing Sub CA')
+            record = db.session.get(CA, sub['id'])
+            record.caref = None
+            db.session.commit()
+            # Only the decoy answers to the name once the real root is gone
+            real_row = db.session.get(CA, real['id'])
+            db.session.delete(real_row)
+            db.session.commit()
+            db.session.expire_all()
+            assert db.session.get(CA, sub['id']).issuing_ca() is None
+            assert db.session.get(CA, decoy['id']).subject == db.session.get(CA, sub['id']).issuer
+
+    def test_crl_failure_warning_is_generic(self, app, auth_client, create_ca, monkeypatch):
+        with app.app_context():
+            root = create_ca(cn='Generic Warning Root')
+            r = auth_client.patch(f'{CAS}/{root["id"]}', data=json.dumps({'cdp_enabled': True}),
+                                  content_type='application/json')
+            assert r.status_code == 200, r.data
+            sub = _intermediate(auth_client, root, 'Generic Warning Sub CA')
+
+            def _fail(*a, **k):
+                raise PermissionError("[Errno 13] Permission denied: '/opt/ucm/data/crl/root.crl'")
+            monkeypatch.setattr(CRLService, 'generate_crl', staticmethod(_fail))
+
+            r = _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'cACompromise'})
+            assert r.status_code == 200, r.data
+            body = _json(r)
+            text = ' '.join(body['data']['warnings']) + ' ' + body['message']
+            assert 'could not be regenerated' in text
+            for leak in ('Errno', '/opt/', 'Permission denied', 'root.crl'):
+                assert leak not in text, text

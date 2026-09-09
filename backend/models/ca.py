@@ -192,16 +192,47 @@ class CA(db.Model):
         return self.subject == self.issuer if self.subject and self.issuer else False
 
     def issuing_ca(self):
-        """The CA held in UCM that issued this one: by caref, else by issuer
-        DN (an imported intermediate has no caref until chain repair)."""
-        if self.is_root:
+        """The CA held in UCM whose key signed this certificate, or None.
+
+        Candidates come from caref, then from the AKI (a CA whose SKI
+        matches), then from the issuer DN (an imported intermediate has no
+        caref until chain repair); a candidate counts only if this
+        certificate's signature verifies with its key. Two CAs can carry
+        the same DN, and a decoy root imported under the parent's name must
+        not stand in for it (#343 review)."""
+        if self.is_root or not self.crt:
             return None
+        import base64
+        from cryptography import x509
+        from utils.cert_issuer import authority_key_identifier_hex, certificate_signed_by
+        try:
+            cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
+        except Exception:
+            return None
+
+        candidates, seen = [], set()
+
+        def _add(rows):
+            for row in rows:
+                if row is not None and row.id != self.id and row.id not in seen and row.crt:
+                    seen.add(row.id)
+                    candidates.append(row)
+
         if self.caref:
-            parent = CA.query.filter_by(refid=self.caref).first()
-            if parent is not None:
-                return parent
+            _add([CA.query.filter_by(refid=self.caref).first()])
+        aki = authority_key_identifier_hex(cert)
+        if aki:
+            _add(CA.query.filter(CA.ski == aki).all())
         if self.issuer:
-            return CA.query.filter(CA.subject == self.issuer, CA.id != self.id).first()
+            _add(CA.query.filter(CA.subject == self.issuer).all())
+
+        for candidate in candidates:
+            try:
+                issuer_cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt))
+            except Exception:
+                continue
+            if certificate_signed_by(cert, issuer_cert):
+                return candidate
         return None
 
     def persisted_revocation(self):

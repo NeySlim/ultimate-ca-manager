@@ -140,10 +140,13 @@ class CAOperationsMixin:
                     f'Failed to auto-generate CRL after revoking CA {ca.descr}: {e}',
                     success=False,
                 )
+                # No exception text here: it reaches the API and the UI
+                # toasts, and an OS error carries server paths
                 warnings.append(
-                    f"The CRL of the parent CA '{parent.descr}' could not be regenerated "
-                    f"({e}): the CRL currently served does not list this CA yet. "
-                    f"Regenerate it once the parent can sign again."
+                    f"The CRL of the parent CA '{parent.descr}' could not be regenerated: "
+                    f"the CRL currently served does not list this CA yet. Check the parent "
+                    f"CA (offline, key unavailable) and regenerate its CRL; details are in "
+                    f"the server log."
                 )
         else:
             warnings.append(
