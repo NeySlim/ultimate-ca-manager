@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 
 from models import db, Certificate, CA
+from utils.cert_status import issued_certificates
 from models.truststore import TrustedCertificate
 from utils.response import success_response, error_response
 from utils.sanitize import sanitize_filename
@@ -173,7 +174,7 @@ def export_all_certificates():
         password = request.args.get('password')
         legacy = False
 
-    certificates = Certificate.query.filter(Certificate.crt.isnot(None)).all()
+    certificates = issued_certificates().all()
     if not certificates:
         return error_response('No certificates to export', 404)
 

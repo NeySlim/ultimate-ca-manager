@@ -8,8 +8,8 @@ from auth.unified import require_auth
 from utils.response import success_response
 from models import Certificate, CA, db
 from utils.cert_status import (
-    expired_condition, expiring_condition, orphan_condition,
-    revoked_condition, valid_condition,
+    expired_condition, expiring_condition, issued_certificates,
+    orphan_condition, revoked_condition, valid_condition,
 )
 from services.compliance_service import calculate_compliance_score
 from utils.datetime_utils import utc_now
@@ -51,7 +51,8 @@ def list_certificates():
         'compliance_grade': 'special_compliance'  # Handled separately
     }
 
-    query = Certificate.query.filter(Certificate.crt.isnot(None))
+    # The same set the counters above the list are computed from
+    query = issued_certificates()
 
     # Eager-load the linked template: to_dict() resolves template_name, and
     # without this the list page would run one extra query per templated cert.

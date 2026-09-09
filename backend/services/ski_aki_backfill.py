@@ -59,7 +59,7 @@ def backfill_ski_aki():
 
     # --- Certificates: populate AKI + SKI ---
     certs = Certificate.query.filter(
-        Certificate.crt.isnot(None),
+        Certificate.crt.isnot(None), Certificate.crt != '',
         Certificate.aki.is_(None)
     ).all()
 
@@ -266,7 +266,7 @@ def backfill_ski_aki():
     stats['orphan_cas'] = CA.query.filter(
         CA.caref.is_(None) | (CA.caref == ''),
         CA.ski.isnot(None),
-        CA.crt.isnot(None),
+        CA.crt.isnot(None), CA.crt != '',
         CA.subject != CA.issuer
     ).count()
     orphan_cert_count = 0

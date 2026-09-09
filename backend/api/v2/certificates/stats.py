@@ -60,7 +60,7 @@ def get_certificate_stats():
 def get_compliance_stats():
     """Get aggregate compliance statistics for all certificates"""
 
-    total_count = Certificate.query.filter(Certificate.crt.isnot(None), Certificate.revoked == False).count()
+    total_count = issued_certificates().filter(Certificate.revoked == False).count()
     if not total_count:
         return success_response(data={
             'average_score': 0,
@@ -76,7 +76,9 @@ def get_compliance_stats():
     BATCH_SIZE = 200
     offset = 0
     while True:
-        batch = Certificate.query.filter(Certificate.crt.isnot(None), Certificate.revoked == False).limit(BATCH_SIZE).offset(offset).all()
+        batch = issued_certificates().filter(
+            Certificate.revoked == False
+        ).limit(BATCH_SIZE).offset(offset).all()
         if not batch:
             break
         for cert in batch:

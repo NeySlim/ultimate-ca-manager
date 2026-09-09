@@ -2,6 +2,7 @@
 Name constraints mixin for TrustStoreService
 """
 import ipaddress
+from utils.cert_status import holds_certificate
 import logging
 import re
 from cryptography import x509
@@ -89,7 +90,7 @@ def _chain_certs_above(ca_cert):
     # Load and parse the CA table once, not once per chain level
     try:
         candidates = []
-        for ca in CA.query.filter(CA.crt.isnot(None)).all():
+        for ca in CA.query.filter(holds_certificate(CA)).all():
             try:
                 pem = base64.b64decode(ca.crt)
                 cert = x509.load_pem_x509_certificate(pem)

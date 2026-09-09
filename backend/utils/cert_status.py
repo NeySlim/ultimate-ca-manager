@@ -25,10 +25,29 @@ from utils.datetime_utils import utc_now
 EXPIRY_WINDOW_DAYS = 30
 
 
+def holds_certificate(model=None):
+    """Condition for "this row holds a certificate".
+
+    Absent and empty both mean "none": a pending request is stored with no
+    certificate, and some paths write the empty string for the same state
+    (the CA table uses it as its sentinel). Testing only for absent left the
+    empty ones counted as certificates in one view and as pending requests
+    in the next.
+    """
+    model = model or Certificate
+    return and_(model.crt.isnot(None), model.crt != '')
+
+
+def awaits_certificate(model=None):
+    """Complement of holds_certificate: no certificate yet."""
+    model = model or Certificate
+    return or_(model.crt.is_(None), model.crt == '')
+
+
 def issued_certificates(query=None, include_archived: bool = True):
     """Rows that hold a certificate, excluding CSR-only records."""
     query = query if query is not None else Certificate.query
-    query = query.filter(Certificate.crt.isnot(None), Certificate.crt != '')
+    query = query.filter(holds_certificate())
     if not include_archived:
         query = query.filter(Certificate.archived == False)  # noqa: E712
     return query

@@ -13,6 +13,7 @@ from auth.unified import require_auth, has_permission
 from sqlalchemy import or_
 
 from models import Certificate, CA, db
+from utils.cert_status import issued_certificates
 from services.cert_service import CertificateService
 from services.cert.renewal import RenewalError, renew_certificate_in_place
 from services.audit_service import AuditService
@@ -202,7 +203,9 @@ def bulk_export_certificates():
         return error_response('ids array required', 400)
 
     export_format = data.get('format', 'pem').lower()
-    certs = Certificate.query.filter(Certificate.id.in_(data['ids']), Certificate.crt.isnot(None)).all()
+    certs = issued_certificates(
+        Certificate.query.filter(Certificate.id.in_(data['ids']))
+    ).all()
 
     if not certs:
         return error_response('No certificates found', 404)

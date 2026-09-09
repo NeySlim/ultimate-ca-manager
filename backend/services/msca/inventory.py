@@ -11,6 +11,7 @@ import logging
 import re
 
 from models import db, Certificate
+from utils.cert_status import issued_certificates
 from models.msca import MicrosoftCA, MSCARequest
 from utils.datetime_utils import utc_now
 from utils.serial_format import serial_to_int
@@ -327,7 +328,7 @@ class MicrosoftCAInventoryMixin:
             .filter(MSCARequest.msca_id == msca.id, MSCARequest.cert_id.isnot(None))
             .all()
         }
-        query = Certificate.query.filter(Certificate.crt.isnot(None))
+        query = issued_certificates()
         if ids:
             return query.filter(
                 db.or_(Certificate.id.in_(ids),

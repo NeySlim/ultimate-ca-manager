@@ -25,6 +25,7 @@ from cryptography.hazmat.primitives import serialization
 from security.encryption import encrypt_private_key
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
+from utils.cert_status import awaits_certificate, holds_certificate
 
 bp = Blueprint('csrs_v2', __name__)
 logger = logging.getLogger(__name__)
@@ -41,10 +42,12 @@ def list_csrs():
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     search = request.args.get('search', '').strip()
 
-    # Filter for certificates that have a CSR but no signed certificate yet
+    # Requests still awaiting their certificate. The exact complement of the
+    # certificates list, so a record shows up in one or the other, never in
+    # both and never in neither
     query = Certificate.query.filter(
         Certificate.csr.isnot(None),
-        Certificate.crt.is_(None)
+        awaits_certificate(),
     )
 
     # Apply search filter (escape LIKE wildcards) — same contract as the
@@ -94,10 +97,10 @@ def list_csrs_history():
     page = max(1, request.args.get('page', 1, type=int))
     per_page = min(max(1, request.args.get('per_page', 20, type=int)), 100)
     
-    # Filter for certificates that have both CSR and signed certificate
+    # Requests that have received their certificate
     query = Certificate.query.filter(
         Certificate.csr.isnot(None),
-        Certificate.crt.isnot(None)
+        holds_certificate(),
     ).order_by(Certificate.created_at.desc())
     
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)

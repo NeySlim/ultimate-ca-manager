@@ -15,6 +15,7 @@ from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from services.audit_service import AuditService
 from models import CA, Certificate, db
+from utils.cert_status import holds_certificate
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,9 @@ def bulk_export_cas():
         return error_response(f'Too many ids (max {_MAX_BULK_IDS} per request)', 400)
 
     export_format = data.get('format', 'pem').lower()
-    cas = CA.query.filter(CA.id.in_(ids), CA.crt.isnot(None)).all()
+    # A CA awaiting its external certificate holds the empty sentinel,
+    # which is not a certificate to export (#298)
+    cas = CA.query.filter(CA.id.in_(ids), holds_certificate(CA)).all()
 
     if not cas:
         return error_response('No CAs found', 404)

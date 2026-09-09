@@ -1249,3 +1249,64 @@ class TestStatusBucketsAcrossViews:
             expired = certs.filter(expired_condition()).count()
             revoked = certs.filter(revoked_condition()).count()
             assert lifecycle_valid + expired + revoked == total
+
+
+class TestEmptyCertificateSentinel:
+    """A record whose certificate column holds the empty string is a pending
+    request, not a certificate: every view has to read it the same way, or a
+    record shows up as a certificate in one place and as pending in another."""
+
+    @staticmethod
+    def _sentinel_row(app, auth_client):
+        r = auth_client.post('/api/v2/csrs',
+                             data=json.dumps({'cn': 'sentinel.example.com', 'key_type': 'RSA 2048'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        rec = json.loads(r.data)['data']
+        with app.app_context():
+            from models import db as _db, Certificate as _Cert
+            row = _db.session.get(_Cert, rec['id'])
+            row.crt = ''      # the empty sentinel, not a certificate
+            _db.session.commit()
+        return rec
+
+    def test_it_is_not_listed_as_a_certificate(self, app, auth_client):
+        rec = self._sentinel_row(app, auth_client)
+        before = json.loads(auth_client.get(f'{BASE}/stats').data)['data']['total']
+        r = auth_client.get(f'{BASE}?per_page=500')
+        body = json.loads(r.data)
+        assert rec['id'] not in {c['id'] for c in body['data']}
+        # The list total and the counter agree, which was the visible symptom
+        assert body['meta']['total'] == before
+
+    def test_it_is_listed_as_a_pending_request(self, app, auth_client):
+        rec = self._sentinel_row(app, auth_client)
+        r = auth_client.get('/api/v2/csrs?per_page=500')
+        assert rec['id'] in {c['id'] for c in json.loads(r.data)['data']}
+        r = auth_client.get('/api/v2/csrs/history?per_page=500')
+        assert rec['id'] not in {c['id'] for c in json.loads(r.data)['data']}
+
+    @staticmethod
+    def _all_ids(auth_client, path):
+        """Every id, following the pages: both lists cap per_page at 100, so
+        a single call compares truncated sets and proves nothing."""
+        ids, page = set(), 1
+        while True:
+            sep = '&' if '?' in path else '?'
+            body = json.loads(auth_client.get(f'{path}{sep}per_page=100&page={page}').data)
+            rows = body.get('data') or []
+            ids |= {c['id'] for c in rows}
+            total = (body.get('meta') or {}).get('total', len(ids))
+            if len(ids) >= total or not rows:
+                return ids
+            page += 1
+
+    def test_the_two_lists_partition_the_records(self, app, auth_client):
+        """No record falls in both lists, and none falls in neither."""
+        rec = self._sentinel_row(app, auth_client)
+        certs = self._all_ids(auth_client, BASE)
+        pending = self._all_ids(auth_client, '/api/v2/csrs')
+        history = self._all_ids(auth_client, '/api/v2/csrs/history')
+        assert certs & pending == set()
+        assert history <= certs   # a signed request is a certificate
+        assert rec['id'] in pending and rec['id'] not in certs
