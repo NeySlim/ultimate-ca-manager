@@ -355,6 +355,13 @@ class OCSPService:
             if not responder_record or not responder_record.crt or not responder_record.prv:
                 logger.warning(f"Delegated OCSP responder cert {responder_cert_id} not found or incomplete")
                 return None, None
+            # A revoked responder must not sign: its answers would be signed
+            # by a key relying parties are told to distrust (#347 review)
+            if responder_record.revoked:
+                logger.warning(
+                    f"Delegated OCSP responder cert {responder_cert_id} is revoked; refusing to use it"
+                )
+                return None, None
             
             # Verify the responder is currently valid and was directly issued
             # by the CA it is configured to answer for (RFC 6960 §4.2.2.2).
@@ -908,6 +915,42 @@ class OCSPService:
             )
             return error_response.public_bytes(serialization.Encoding.DER), 'error'
     
+    @staticmethod
+    def invalidate_ca_cache(ca_id: int) -> int:
+        """Delete every cached response of a CA.
+
+        Called when the identity that signs its responses changes, a
+        delegated responder assigned, removed or revoked: a cached response
+        keeps the previous signer, and would be served with it until it
+        expires (#347 review).
+        """
+        try:
+            deleted = OCSPResponse.query.filter(
+                OCSPResponse.ca_id == ca_id
+            ).delete(synchronize_session=False)
+            db.session.commit()
+            logger.info(f"Invalidated {deleted} OCSP cache entries for CA {ca_id}")
+            return deleted
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to invalidate OCSP cache for CA {ca_id}: {e}")
+            return 0
+
+    @staticmethod
+    def responder_cas_for_certificate(cert_id: int) -> list:
+        """Ids of the CAs whose delegated responder is this certificate."""
+        rows = SystemConfig.query.filter(
+            SystemConfig.key.like('ocsp_responder_cert_%'),
+            SystemConfig.value == str(cert_id),
+        ).all()
+        cas = []
+        for row in rows:
+            try:
+                cas.append(int(row.key.rsplit('_', 1)[1]))
+            except (ValueError, IndexError):
+                continue
+        return cas
+
     @staticmethod
     def invalidate_cached_responses(serial, ca_id: Optional[int] = None) -> int:
         """Delete every cached response for a serial, across hash algorithms."""

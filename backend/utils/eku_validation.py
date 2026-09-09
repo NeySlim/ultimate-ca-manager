@@ -128,4 +128,12 @@ def add_ocsp_nocheck_if_responder(builder, ekus):
     from cryptography import x509 as _x509
     if _x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in (ekus or []):
         return builder
+    # A request that already carries it (a properly built responder CSR)
+    # must not get it twice, which the builder refuses
+    already = any(
+        ext.oid == _x509.oid.ExtensionOID.OCSP_NO_CHECK
+        for ext in getattr(builder, '_extensions', [])
+    )
+    if already:
+        return builder
     return builder.add_extension(_x509.OCSPNoCheck(), critical=False)

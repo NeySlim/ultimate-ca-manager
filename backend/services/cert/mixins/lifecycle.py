@@ -468,6 +468,10 @@ class LifecycleMixin:
             if ca:
                 OCSPService.invalidate_cached_responses(
                     certificate.serial_number, ca_id=ca.id)
+            # A revoked delegated responder stops signing at once, and the
+            # answers it signed so far stop being served (#347 review)
+            for responder_ca_id in OCSPService.responder_cas_for_certificate(cert_id):
+                OCSPService.invalidate_ca_cache(responder_ca_id)
 
             from services.webhook_service import emit_cert_revoked
             emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref, actor=username)

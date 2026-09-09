@@ -748,6 +748,12 @@ class CSROperationsMixin:
                     )
                     builder = add_ocsp_nocheck_if_responder(builder, safe_ekus)
                 continue
+            if extension.oid == ExtensionOID.OCSP_NO_CHECK and any(
+                e.oid == ExtensionOID.OCSP_NO_CHECK for e in builder._extensions
+            ):
+                # Already added next to the OCSPSigning EKU above: a request
+                # built the right way carries it too (#347 review)
+                continue
             builder = builder.add_extension(extension.value, extension.critical)
 
         # Auto-add SAN from CN if the CSR had no SAN extension -- reuses
@@ -905,8 +911,7 @@ class CSROperationsMixin:
             new_builder = new_builder.add_extension(
                 x509.ExtendedKeyUsage(merged), critical=existing_eku.critical
             )
-            if not any(e.oid == ExtensionOID.OCSP_NO_CHECK for e in new_builder._extensions):
-                new_builder = add_ocsp_nocheck_if_responder(new_builder, merged)
+            new_builder = add_ocsp_nocheck_if_responder(new_builder, merged)
             builder = new_builder
 
         if not issuing_ca:

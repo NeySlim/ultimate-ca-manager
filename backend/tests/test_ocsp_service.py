@@ -921,3 +921,137 @@ class TestDelegatedResponderIssuance:
             # and the response carries the responder certificate, as RFC 6960 asks
             assert any(c.serial_number == responder_cert.serial_number
                        for c in resp.certificates)
+
+
+class TestDelegatedResponderLifecycle:
+    """Second review of #347: a revoked responder stops signing, the cache
+    follows the signing identity, a request already carrying ocsp-nocheck
+    signs once, and a responder with no certificate is refused."""
+
+    @staticmethod
+    def _responder(auth_client, ca_id, cn):
+        r = auth_client.post('/api/v2/certificates', data=json.dumps({
+            'cn': cn, 'ca_id': ca_id, 'validity_days': 60, 'key_type': 'RSA 2048',
+            'cert_type': 'server', 'extra_ekus': ['1.3.6.1.5.5.7.3.9']}),
+            content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        return json.loads(r.data)['data']
+
+    @staticmethod
+    def _assign(auth_client, ca_id, cert_id):
+        return auth_client.post(f'/api/v2/cas/{ca_id}/ocsp-responder',
+                                data=json.dumps({'certificate_id': cert_id}),
+                                content_type='application/json')
+
+    @staticmethod
+    def _responder_id(der):
+        return ocsp.load_der_ocsp_response(der).responder_key_hash
+
+    def test_revoked_responder_stops_signing_and_its_answers_are_dropped(self, app, auth_client, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='Revoked Responder CA')
+            leaf = create_cert(cn='leaf-rr.example.com', ca_id=ca['id'])
+            responder = self._responder(auth_client, ca['id'], 'rr.example.com')
+            assert self._assign(auth_client, ca['id'], responder['id']).status_code == 200
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            serial = int(_cert_model(leaf).serial_number, 16)
+            responder_cert = x509.load_pem_x509_certificate(responder['pem'].encode())
+
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            assert self._responder_id(der) == TestResponderIdRfc6960._key_hash(responder_cert)
+            assert _cache_entries(ca['id'], serial), 'the answer is cached'
+
+            r = auth_client.post(f"/api/v2/certificates/{responder['id']}/revoke",
+                                 data=json.dumps({'reason': 'keyCompromise'}),
+                                 content_type='application/json')
+            assert r.status_code == 200, r.data
+            db.session.expire_all()
+            # Everything it signed is gone from the cache
+            assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 0
+            # And the CA signs again, with its own identity
+            der, status = OCSPService().generate_response(ca_obj, serial)
+            assert status == 'good'
+            assert self._responder_id(der) == TestResponderIdRfc6960._key_hash(ca_cert)
+
+    def test_assigning_or_removing_a_responder_drops_the_cache(self, app, auth_client, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='Cache Responder CA')
+            leaf = create_cert(cn='leaf-cache.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            serial = int(_cert_model(leaf).serial_number, 16)
+
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            assert self._responder_id(der) == TestResponderIdRfc6960._key_hash(ca_cert)
+            assert _cache_entries(ca['id'], serial)
+
+            responder = self._responder(auth_client, ca['id'], 'cache-resp.example.com')
+            assert self._assign(auth_client, ca['id'], responder['id']).status_code == 200
+            db.session.expire_all()
+            assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 0
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            responder_cert = x509.load_pem_x509_certificate(responder['pem'].encode())
+            assert self._responder_id(der) == TestResponderIdRfc6960._key_hash(responder_cert)
+            assert _cache_entries(ca['id'], serial)
+
+            r = auth_client.delete(f"/api/v2/cas/{ca['id']}/ocsp-responder")
+            assert r.status_code in (200, 204), r.data
+            db.session.expire_all()
+            assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 0
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            assert self._responder_id(der) == TestResponderIdRfc6960._key_hash(ca_cert)
+
+    def test_request_already_carrying_nocheck_signs_once(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Nocheck CSR CA')
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            csr = (
+                x509.CertificateSigningRequestBuilder()
+                .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'csr-resp.example.com')]))
+                .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]), critical=False)
+                .add_extension(x509.OCSPNoCheck(), critical=False)
+                .sign(key, hashes.SHA256())
+            )
+            r = auth_client.post('/api/v2/csrs/upload',
+                                 data=json.dumps({'pem': csr.public_bytes(serialization.Encoding.PEM).decode()}),
+                                 content_type='application/json')
+            assert r.status_code in (200, 201), r.data
+            csr_id = json.loads(r.data)['data']['id']
+            r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign',
+                                 data=json.dumps({'ca_id': ca['id'], 'validity_days': 30}),
+                                 content_type='application/json')
+            assert r.status_code == 200, r.data
+            issued = x509.load_pem_x509_certificate(json.loads(r.data)['data']['pem'].encode())
+            nocheck = [e for e in issued.extensions if e.oid == x509.oid.ExtensionOID.OCSP_NO_CHECK]
+            assert len(nocheck) == 1
+            eku = issued.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+            assert x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING in eku
+
+    def test_a_responder_without_a_certificate_is_refused(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='No Cert Responder CA')
+            ca_obj = _ca_model(ca)
+            r = auth_client.post('/api/v2/csrs', data=json.dumps({'cn': 'pending-resp.example.com', 'key_type': 'RSA 2048'}),
+                                 content_type='application/json')
+            pending = json.loads(r.data)['data']
+            row = _cert_model(pending)
+            row.caref = ca_obj.refid   # a key, a link to the CA, no certificate
+            db.session.commit()
+            assert row.prv and not row.crt
+            r = self._assign(auth_client, ca['id'], pending['id'])
+            assert r.status_code == 400, r.data
+            assert 'no certificate' in json.loads(r.data)['message'].lower()
+            assert SystemConfig.query.filter_by(key=f"ocsp_responder_cert_{ca['id']}").first() is None
+
+    def test_a_revoked_certificate_is_refused_as_responder(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Revoked Assign CA')
+            responder = self._responder(auth_client, ca['id'], 'revoked-assign.example.com')
+            r = auth_client.post(f"/api/v2/certificates/{responder['id']}/revoke",
+                                 data=json.dumps({'reason': 'unspecified'}), content_type='application/json')
+            assert r.status_code == 200
+            r = self._assign(auth_client, ca['id'], responder['id'])
+            assert r.status_code == 400, r.data
+            r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+            assert responder['id'] not in {c['id'] for c in json.loads(r.data)['data']}

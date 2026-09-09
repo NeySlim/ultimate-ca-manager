@@ -12,6 +12,8 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, no_content_response
 from utils.datetime_utils import utc_isoformat
 from services.audit_service import AuditService
+from services.ocsp_service import OCSPService
+from utils.cert_status import holds_certificate
 from models import CA, Certificate, SystemConfig, db
 from cryptography import x509
 from cryptography.x509.oid import ExtensionOID
@@ -75,6 +77,13 @@ def set_ocsp_responder(ca_id):
     if not cert.prv:
         return error_response('Certificate must have a private key', 400)
 
+    # No certificate yet (a pending request) cannot sign anything: accepted
+    # here, it was then ignored at answer time (#347 review)
+    if not cert.crt:
+        return error_response('Certificate has no certificate yet', 400)
+    if cert.revoked:
+        return error_response('Certificate is revoked', 400)
+
     if cert.crt:
         try:
             crt_pem = base64.b64decode(cert.crt).decode('utf-8')
@@ -109,6 +118,8 @@ def set_ocsp_responder(ca_id):
             config = SystemConfig(key=f'ocsp_responder_cert_{ca_id}', value=str(cert_id))
             db.session.add(config)
         db.session.commit()
+        # The responses cached so far were signed by the previous identity
+        OCSPService.invalidate_ca_cache(ca_id)
 
         AuditService.log_action(
             'ocsp_responder_assigned',
@@ -137,6 +148,7 @@ def delete_ocsp_responder(ca_id):
         if config:
             db.session.delete(config)
             db.session.commit()
+            OCSPService.invalidate_ca_cache(ca_id)
 
             AuditService.log_action(
                 'ocsp_responder_removed',
@@ -165,7 +177,7 @@ def list_eligible_ocsp_responders(ca_id):
     now = datetime.utcnow()
     certs = Certificate.query.filter(
         Certificate.caref == ca.refid,
-        Certificate.crt.isnot(None),
+        holds_certificate(),
         Certificate.prv.isnot(None),
         Certificate.revoked == False
     ).all()
