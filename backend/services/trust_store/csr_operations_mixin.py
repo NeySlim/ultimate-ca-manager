@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import List, Optional, Tuple
 
 from cryptography import x509
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
@@ -745,6 +746,7 @@ class CSROperationsMixin:
                     builder = builder.add_extension(
                         x509.ExtendedKeyUsage(safe_ekus), extension.critical
                     )
+                    builder = add_ocsp_nocheck_if_responder(builder, safe_ekus)
                 continue
             builder = builder.add_extension(extension.value, extension.critical)
 
@@ -852,6 +854,7 @@ class CSROperationsMixin:
                 builder = builder.add_extension(
                     x509.ExtendedKeyUsage(merged), critical=False
                 )
+                builder = add_ocsp_nocheck_if_responder(builder, merged)
         elif not csr_has_eku:
             base_eku = _default_ekus_for_cert_type(cert_type)
             # Renewal at par applies to a CSR that requests nothing as well:
@@ -879,6 +882,7 @@ class CSROperationsMixin:
                     x509.ExtendedKeyUsage(merged),
                     critical=False,
                 )
+                builder = add_ocsp_nocheck_if_responder(builder, merged)
         elif extra_oids:
             # Re-merging the CSR's original EKUs must not resurrect the
             # sensitive ones the copy loop above just dropped
@@ -901,6 +905,8 @@ class CSROperationsMixin:
             new_builder = new_builder.add_extension(
                 x509.ExtendedKeyUsage(merged), critical=existing_eku.critical
             )
+            if not any(e.oid == ExtensionOID.OCSP_NO_CHECK for e in new_builder._extensions):
+                new_builder = add_ocsp_nocheck_if_responder(new_builder, merged)
             builder = new_builder
 
         if not issuing_ca:

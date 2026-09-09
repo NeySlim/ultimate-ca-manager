@@ -1,5 +1,7 @@
 """Tests for the OCSP responder service (previously 0 coverage)."""
 import base64
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -690,3 +692,232 @@ class TestCleanup:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestResponderIdRfc6960:
+    """RFC 6960 §4.2.1: byKey is the SHA-1 of the responder's own public key.
+
+    A delegated responder's AKI is its issuer's key hash, so publishing the
+    AKI there makes every client that recomputes the hash reject the
+    signature (#347)."""
+
+    @staticmethod
+    def _responder_id_by_key(der):
+        parsed = asn1_ocsp.OCSPResponse.load(der)
+        rdata = parsed['response_bytes']['response'].parsed['tbs_response_data']
+        rid = rdata['responder_id']
+        assert rid.name == 'by_key', rid.name
+        return rid.chosen.native
+
+    @staticmethod
+    def _key_hash(cert):
+        """SHA-1 of the subjectPublicKey BIT STRING, RFC 5280 method 1."""
+        spki = cert.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        from asn1crypto import keys as asn1_keys
+        loaded = asn1_keys.PublicKeyInfo.load(spki)
+        return hashlib.sha1(loaded['public_key'].contents[1:]).digest()
+
+    @staticmethod
+    def _aki(cert):
+        ext = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value
+        return ext.key_identifier
+
+    def test_ca_signed_response_uses_the_ca_key_hash(self, app, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='ResponderID CA')
+            cert = create_cert(cn='responder-id.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            serial = int(_cert_model(cert).serial_number, 16)
+
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            assert self._responder_id_by_key(der) == self._key_hash(ca_cert)
+
+    def test_delegated_response_uses_the_responder_key_hash(self, app, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='ResponderID Delegated CA')
+            cert = create_cert(cn='responder-id-deleg.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            responder_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            responder_cert = _delegated_certificate(ca_cert, ca_key, responder_key)
+            _configure_delegated_responder(ca_obj, _cert_model(cert), responder_cert, responder_key)
+            serial = int(_cert_model(cert).serial_number, 16)
+
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            responder_id = self._responder_id_by_key(der)
+            assert responder_id == self._key_hash(responder_cert)
+            # The responder's AKI is the CA's key hash: publishing it there is
+            # exactly what breaks client-side verification
+            assert responder_id != self._key_hash(ca_cert)
+
+    def test_multi_response_uses_the_same_responder_id(self, app, create_ca, create_cert):
+        """The multi-CertID response is assembled by hand, so it carries its
+        own copy of the rule and has to agree with the single one."""
+        with app.app_context():
+            ca = create_ca(cn='ResponderID Multi CA')
+            first = create_cert(cn='multi-a.example.com', ca_id=ca['id'])
+            second = create_cert(cn='multi-b.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            ids = [
+                _cert_id(_load_x509(_cert_model(c)), ca_cert, hashes.SHA1())
+                for c in (first, second)
+            ]
+            request_der = _build_asn1_request(ids)
+            parsed = OCSPService().parse_request_details(request_der)
+            assert parsed is not None and len(parsed.requests) == 2
+
+            der, statuses = OCSPService().generate_multi_response(
+                ca=ca_obj, request_items=parsed.requests
+            )
+            assert len(statuses) == 2
+            assert self._responder_id_by_key(der) == self._key_hash(ca_cert)
+
+    def test_multi_response_delegated_uses_the_responder_key_hash(self, app, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='ResponderID Multi Delegated CA')
+            first = create_cert(cn='multi-deleg-a.example.com', ca_id=ca['id'])
+            second = create_cert(cn='multi-deleg-b.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            responder_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            responder_cert = _delegated_certificate(ca_cert, ca_key, responder_key)
+            _configure_delegated_responder(ca_obj, _cert_model(first), responder_cert, responder_key)
+            ids = [
+                _cert_id(_load_x509(_cert_model(c)), ca_cert, hashes.SHA1())
+                for c in (first, second)
+            ]
+            parsed = OCSPService().parse_request_details(_build_asn1_request(ids))
+            der, _ = OCSPService().generate_multi_response(
+                ca=ca_obj, request_items=parsed.requests
+            )
+            responder_id = self._responder_id_by_key(der)
+            assert responder_id == self._key_hash(responder_cert)
+            assert responder_id != self._key_hash(ca_cert)
+
+
+class TestDelegatedResponderIssuance:
+    """A certificate issued for the responder role must be usable as one.
+
+    UCM's responder refuses a certificate without id-pkix-ocsp-nocheck and
+    keeps signing with the CA key, so a certificate issued without it made
+    the configured responder silently inert: the responses carried the CA's
+    identity, which is the responder certificate's AKI (#347)."""
+
+    @staticmethod
+    def _issue(auth_client, ca_id, cn, **extra):
+        payload = {'cn': cn, 'ca_id': ca_id, 'validity_days': 60,
+                   'key_type': 'RSA 2048', 'cert_type': 'server'}
+        payload.update(extra)
+        r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        return json.loads(r.data)['data']
+
+    @staticmethod
+    def _x509(cert_dict):
+        return x509.load_pem_x509_certificate(cert_dict['pem'].encode())
+
+    def test_ocsp_signing_certificate_carries_nocheck(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Responder Issuance CA')
+            cert = self._issue(auth_client, ca['id'], 'responder-issued.example.com',
+                               extra_ekus=['1.3.6.1.5.5.7.3.9'])
+            parsed = self._x509(cert)
+            eku = parsed.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+            assert x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING in eku
+            parsed.extensions.get_extension_for_class(x509.OCSPNoCheck)  # raises if absent
+
+    def test_a_plain_certificate_does_not_carry_nocheck(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Plain Issuance CA')
+            cert = self._issue(auth_client, ca['id'], 'plain-issued.example.com')
+            with pytest.raises(x509.ExtensionNotFound):
+                self._x509(cert).extensions.get_extension_for_class(x509.OCSPNoCheck)
+
+    def test_such_a_certificate_is_offered_and_accepted(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Responder Config CA')
+            cert = self._issue(auth_client, ca['id'], 'responder-config.example.com',
+                               extra_ekus=['1.3.6.1.5.5.7.3.9'])
+            r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+            assert cert['id'] in {c['id'] for c in json.loads(r.data)['data']}
+            r = auth_client.post(f"/api/v2/cas/{ca['id']}/ocsp-responder",
+                                 data=json.dumps({'certificate_id': cert['id']}),
+                                 content_type='application/json')
+            assert r.status_code == 200, r.data
+
+    def test_a_certificate_without_nocheck_is_refused_not_ignored(self, app, auth_client, create_ca):
+        """It used to be accepted and then ignored at answer time."""
+        with app.app_context():
+            ca = create_ca(cn='Responder Refusal CA')
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            now = datetime.now(timezone.utc)
+            bare = (
+                x509.CertificateBuilder()
+                .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'No nocheck')]))
+                .issuer_name(ca_cert.subject).public_key(key.public_key())
+                .serial_number(x509.random_serial_number())
+                .not_valid_before(now - timedelta(minutes=5))
+                .not_valid_after(now + timedelta(days=30))
+                .add_extension(
+                    x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]),
+                    critical=False)
+                .sign(ca_key, hashes.SHA256())
+            )
+            row = Certificate(
+                refid='no-nocheck-responder', descr='No nocheck',
+                caref=ca_obj.refid,
+                crt=base64.b64encode(bare.public_bytes(serialization.Encoding.PEM)).decode(),
+                prv=base64.b64encode(key.private_bytes(
+                    serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                    serialization.NoEncryption())).decode(),
+                serial_number=str(bare.serial_number),
+            )
+            db.session.add(row)
+            db.session.commit()
+
+            r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+            assert row.id not in {c['id'] for c in json.loads(r.data)['data']}
+            r = auth_client.post(f"/api/v2/cas/{ca['id']}/ocsp-responder",
+                                 data=json.dumps({'certificate_id': row.id}),
+                                 content_type='application/json')
+            assert r.status_code == 400, r.data
+            assert 'nocheck' in json.loads(r.data)['message'].lower()
+
+    def test_a_configured_responder_actually_signs(self, app, auth_client, create_ca, create_cert):
+        """End of the chain: responderID is the responder's key hash, which
+        is what a client recomputes to verify the signature."""
+        with app.app_context():
+            ca = create_ca(cn='Responder Signs CA')
+            leaf = create_cert(cn='signed-by-responder.example.com', ca_id=ca['id'])
+            responder = self._issue(auth_client, ca['id'], 'active-responder.example.com',
+                                    extra_ekus=['1.3.6.1.5.5.7.3.9'])
+            r = auth_client.post(f"/api/v2/cas/{ca['id']}/ocsp-responder",
+                                 data=json.dumps({'certificate_id': responder['id']}),
+                                 content_type='application/json')
+            assert r.status_code == 200, r.data
+
+            ca_obj = _ca_model(ca)
+            serial = int(_cert_model(leaf).serial_number, 16)
+            der, status = OCSPService().generate_response(ca_obj, serial)
+            assert status == 'good'
+            resp = ocsp.load_der_ocsp_response(der)
+            responder_cert = self._x509(responder)
+            # responderID is the responder's own key hash, not the CA's
+            assert resp.responder_key_hash == TestResponderIdRfc6960._key_hash(responder_cert)
+            assert resp.responder_key_hash != TestResponderIdRfc6960._key_hash(_load_x509(ca_obj))
+            # and the response carries the responder certificate, as RFC 6960 asks
+            assert any(c.serial_number == responder_cert.serial_number
+                       for c in resp.certificates)

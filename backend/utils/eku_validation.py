@@ -113,3 +113,19 @@ def merge_eku_lists(
             seen.add(key)
             out.append(oid)
     return out
+
+
+def add_ocsp_nocheck_if_responder(builder, ekus):
+    """Add id-pkix-ocsp-nocheck when the certificate signs OCSP responses.
+
+    RFC 6960 §4.2.2.2.1: a delegated responder certificate carries this
+    extension so clients do not try to check its own revocation status,
+    which would loop. UCM's responder refuses a certificate without it, so
+    a certificate issued for that role and missing the extension is simply
+    ignored at answer time and the CA keeps signing the responses itself,
+    with its own identity in responderID (#347).
+    """
+    from cryptography import x509 as _x509
+    if _x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in (ekus or []):
+        return builder
+    return builder.add_extension(_x509.OCSPNoCheck(), critical=False)

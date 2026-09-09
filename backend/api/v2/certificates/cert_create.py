@@ -10,6 +10,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response
 from utils.dn_validation import validate_dn_field
 from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.leaf_key_usage import key_usage_for_key
 from models import Certificate, CertificateTemplate, CA, db
 from services.trust_store.constants import HASH_ALGORITHMS
@@ -367,6 +368,7 @@ def create_certificate():
         # EKU is SEQUENCE SIZE (1..MAX) — omit the extension entirely when empty
         if eku_oids:
             builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
+        builder = add_ocsp_nocheck_if_responder(builder, eku_oids)
 
         # Subject Alternative Names
         san_list = []

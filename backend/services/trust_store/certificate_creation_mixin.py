@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now, cert_not_before
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import key_usage_for_key
 from .constants import HASH_ALGORITHMS
@@ -113,6 +114,7 @@ class CertificateCreationMixin:
         builder = builder.add_extension(usage, critical=True)
         if ekus:
             builder = builder.add_extension(x509.ExtendedKeyUsage(ekus), critical=False)
+        builder = add_ocsp_nocheck_if_responder(builder, ekus)
 
         # Subject Alternative Names
         san_list = []
