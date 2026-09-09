@@ -108,34 +108,7 @@ export default function CertificatesPage() {
   const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
 
-  // Load data - reload when filters or sort change
-  useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), JSON.stringify(filterTemplate), sortBy, sortOrder, searchValue])
-
-  // Reload when floating window actions change data
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.detail?.type === 'certificate') loadData()
-    }
-    window.addEventListener('ucm:data-changed', handler)
-    return () => window.removeEventListener('ucm:data-changed', handler)
-  }, [])
-
-  // Handle re-key prefill from CSRs page navigation
-  useEffect(() => {
-    if (location.state?.prefill && location.state?.source === 'rekey') {
-      if (canWrite('certificates')) {
-        setIssueInitialData(location.state.prefill)
-        setShowIssueModal(true)
-      }
-      // Clear navigation state to prevent re-triggering on refresh
-      navigate(location.pathname, { replace: true, state: {} })
-    }
-  }, [location.state])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -166,23 +139,58 @@ export default function CertificatesPage() {
         certificatesService.getStats()
       ])
       let certs = certsRes.data || []
-      
-      // Handle orphan filter client-side (no CA or CA not in our list)
-      if (filterStatus.includes('orphan') && cas.length > 0) {
-        const caRefIds = new Set(cas.map(ca => ca.refid))
+      const caList = casRes.data || []
+
+      // Handle orphan filter client-side (no CA or CA not in our list).
+      // The CAs just fetched, not the ones in state: on the first load that
+      // state is still empty and the filter would silently do nothing.
+      if (filterStatus.includes('orphan') && caList.length > 0) {
+        const caRefIds = new Set(caList.map(ca => ca.refid))
         certs = certs.filter(c => c.caref && !caRefIds.has(c.caref))
       }
       
       setCertificates(certs)
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
-      setCas(casRes.data || [])
+      setCas(caList)
       setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 })
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
       setLoading(false)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), JSON.stringify(filterTemplate), sortBy, sortOrder, searchValue, showError, t])
+
+  // Load data - reload when filters or sort change
+  useEffect(() => {
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadData])
+
+  // Reload when an action elsewhere changes the data (floating detail window).
+  // loadData must be in the dependencies: a listener registered once keeps the
+  // loader captured at mount, which reloads with the filters of that moment
+  // and empties the active filter of everything set since (#345).
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail?.type === 'certificate') loadData()
+    }
+    window.addEventListener('ucm:data-changed', handler)
+    return () => window.removeEventListener('ucm:data-changed', handler)
+  }, [loadData])
+
+  // Handle re-key prefill from CSRs page navigation
+  useEffect(() => {
+    if (location.state?.prefill && location.state?.source === 'rekey') {
+      if (canWrite('certificates')) {
+        setIssueInitialData(location.state.prefill)
+        setShowIssueModal(true)
+      }
+      // Clear navigation state to prevent re-triggering on refresh
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state])
+
 
   // Load cert details — floating window on desktop, slide-over on mobile
   const handleSelectCert = useCallback(async (cert) => {

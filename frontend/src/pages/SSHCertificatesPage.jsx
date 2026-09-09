@@ -104,11 +104,7 @@ export default function SSHCertificatesPage() {
 
   // ============= DATA LOADING =============
 
-  useEffect(() => {
-    loadData()
-  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA), searchValue])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const params = {
@@ -137,16 +133,24 @@ export default function SSHCertificatesPage() {
     } finally {
       setLoading(false)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA), searchValue, showError, t])
 
-  // Reload on external data changes
+  useEffect(() => {
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadData])
+
+  // Reload on external data changes. loadData must be in the dependencies,
+  // otherwise the listener keeps the loader captured at mount and reloads
+  // without the filters set since (#345).
   useEffect(() => {
     const handler = (e) => {
       if (e.detail?.type === 'ssh-certificate') loadData()
     }
     window.addEventListener('ucm:data-changed', handler)
     return () => window.removeEventListener('ucm:data-changed', handler)
-  }, [])
+  }, [loadData])
 
   // Deep-link URL handling
   useEffect(() => {
