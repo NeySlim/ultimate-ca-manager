@@ -1089,6 +1089,22 @@ class TestStatusFilterBuckets:
         r = auth_client.get(f'{BASE}?per_page=200&status=revoked&search=bucket-revoked')
         assert cert['id'] in {c['id'] for c in json.loads(r.data)['data']}
 
+    def test_certificate_without_validity_dates_counts_as_valid(self, app, auth_client, create_ca):
+        """Its row says valid, so the filter and the counters must agree:
+        otherwise it belongs to no bucket and no filter can reach it."""
+        cert = self._mk(auth_client, create_ca, 'bucket-nodate.example.com', 200)
+        with app.app_context():
+            from models import db as _db, Certificate as _Cert
+            row = _db.session.get(_Cert, cert['id'])
+            row.valid_to = None
+            row.valid_from = None
+            _db.session.commit()
+
+        r = auth_client.get(f'{BASE}/{cert["id"]}')
+        assert json.loads(r.data)['data']['status'] == 'valid'
+        r = auth_client.get(f'{BASE}?per_page=200&status=valid&search=bucket-nodate')
+        assert cert['id'] in {c['id'] for c in json.loads(r.data)['data']}
+
     def test_every_certificate_falls_in_exactly_one_bucket(self, auth_client, create_ca):
         self._mk(auth_client, create_ca, 'bucket-one.example.com', 5)
         self._mk(auth_client, create_ca, 'bucket-two.example.com', 400)

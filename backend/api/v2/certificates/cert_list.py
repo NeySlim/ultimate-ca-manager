@@ -80,7 +80,10 @@ def list_certificates():
                 status_conditions.append(
                     and_(
                         Certificate.revoked == False,
-                        Certificate.valid_to > expiry_threshold,
+                        or_(
+                            Certificate.valid_to.is_(None),
+                            Certificate.valid_to > expiry_threshold,
+                        ),
                     )
                 )
             elif status == 'expired':

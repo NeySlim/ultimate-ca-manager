@@ -491,6 +491,17 @@ class TestRevocationHardening:
             serial = _serial_int(sub['id'])
             assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'keyCompromise'}).status_code == 200
 
+            # A CA awaiting its external certificate (crt = '') has to
+            # survive the round trip: the column is NOT NULL, and a restore
+            # that wrote NULL there aborted before reaching anything else
+            pending = CA(
+                refid='backup-pending-ca', descr='Backup Pending CA', crt='',
+                csr='-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----\n',
+                serial=0,
+            )
+            db.session.add(pending)
+            db.session.commit()
+
             password = 'BackupPass!2026x'
             blob = BackupService().create_backup(password)
 
@@ -519,6 +530,13 @@ class TestRevocationHardening:
                 'validity_days': 30, 'key_type': 'RSA 2048', 'cert_type': 'server',
             })
             assert r.status_code == 400, r.data
+
+            # The pending CA came back pending, with its request
+            restored_pending = CA.query.filter_by(refid='backup-pending-ca').first()
+            assert restored_pending is not None
+            assert restored_pending.crt == ''
+            assert restored_pending.is_pending is True
+            assert 'CERTIFICATE REQUEST' in (restored_pending.csr or '')
 
     def test_revocation_uses_the_current_certificate_serial(self, app, auth_client, create_ca):
         """A stale serial_number column must not send the wrong serial to the CRL."""

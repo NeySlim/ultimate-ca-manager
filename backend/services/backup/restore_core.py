@@ -235,7 +235,14 @@ class RestoreCoreMixin:
 
             if existing:
                 existing.descr = ca_data.get('descr')
-                existing.crt = base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None
+                # '' is the sentinel for a CA awaiting its external
+                # certificate (migration 079) and the column is NOT NULL:
+                # writing None there aborted the whole restore
+                existing.crt = (
+                    base64.b64encode(ca_data['certificate_pem'].encode()).decode()
+                    if ca_data.get('certificate_pem') else ''
+                )
+                existing.csr = ca_data.get('csr_pem') or existing.csr
                 prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
                 if prv_b64:
                     from security.encryption import encrypt_private_key
@@ -256,7 +263,11 @@ class RestoreCoreMixin:
                     issuer=ca_data.get('issuer'),
                     serial=ca_data.get('serial'),
                     caref=ca_data.get('caref'),
-                    crt=base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None,
+                    crt=(
+                        base64.b64encode(ca_data['certificate_pem'].encode()).decode()
+                        if ca_data.get('certificate_pem') else ''
+                    ),
+                    csr=ca_data.get('csr_pem'),
                     prv=prv_b64,
                     serial_number=ca_data.get('serial_number'),
                     ski=ca_data.get('ski'),

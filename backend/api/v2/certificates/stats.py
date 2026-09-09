@@ -7,6 +7,7 @@ Certificates Stats Routes
 from datetime import timedelta
 from flask import request
 from auth.unified import require_auth
+from sqlalchemy import or_
 from models import Certificate, db
 from services.compliance_service import calculate_compliance_score
 from utils.response import success_response
@@ -36,10 +37,16 @@ def get_certificate_stats():
         Certificate.valid_to > now,
         Certificate.revoked == False
     ).count()
+    # Same bucket as the list filter and the row status: not revoked, not
+    # expiring, not expired. A certificate with no validity date counts as
+    # valid, as its row does, instead of falling outside every bucket.
     valid = base_query.filter(
-        Certificate.valid_to > now,
-        Certificate.revoked == False
-    ).count() - expiring  # Don't double-count expiring as valid
+        Certificate.revoked == False,
+        or_(
+            Certificate.valid_to.is_(None),
+            Certificate.valid_to > expiry_threshold,
+        ),
+    ).count()
 
     # Distinct issuance sources actually present, so the list "source" filter
     # can offer exactly the values that exist (NULL is surfaced as 'manual').

@@ -162,6 +162,9 @@ class ExportCoreMixin:
                 'revoke_reason': ca.revoke_reason,
                 'invalidity_at': ca.invalidity_at.isoformat() if ca.invalidity_at else None,
                 'certificate_pem': base64.b64decode(ca.crt).decode() if ca.crt else None,
+                # A CA awaiting its external certificate keeps its request:
+                # without it the restored CA can never be completed (#298)
+                'csr_pem': ca.csr,
                 'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
             }
 
