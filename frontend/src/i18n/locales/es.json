@@ -2280,6 +2280,7 @@
     "backup": "Respaldo y restauración",
     "backupFrequency": "Frecuencia de respaldo",
     "backupPassword": "Contraseña de la copia de seguridad",
+    "backupPasswordTooRepetitive": "La contraseña repite demasiado pocos caracteres: {{distinct}} distintos, se necesitan al menos {{required}}",
     "backupSubtitle": "Opciones de copia de seguridad y recuperación de datos",
     "baseUrl": "URL base",
     "baseUrlHelper": "URL HTTPS canónica de la GUI de administración y de la API. Los nombres de host e IP que no coincidan se redirigen aquí.",

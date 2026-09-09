@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from models import db, User, CA, Certificate
+from utils.datetime_utils import utc_now
 from models.acme_models import AcmeAccount
 from config.settings import Config
 from services.file_regen_service import mirror_private_key
@@ -65,12 +66,14 @@ class RestoreCoreMixin:
             'acme_domains': 0,
             'acme_local_domains': 0,
             'https_server': 0,
+            'revoked_serials': 0,
         }
 
         # Core restores
         self._restore_users(backup_data, results)
         self._restore_cas(backup_data, results, master_key)
         self._restore_certificates(backup_data, results, master_key)
+        self._restore_revoked_serials(backup_data, results)
         self._restore_acme_accounts(backup_data, results)
         self._restore_acme_eab_credentials(backup_data, results)
         self._restore_settings(backup_data, results)
@@ -158,6 +161,65 @@ class RestoreCoreMixin:
                 db.session.add(new_user)
             results['users'] += 1
 
+    @staticmethod
+    def _apply_ca_revocation(ca, ca_data: Dict) -> None:
+        """Carry the CA's revocation state back (#343): a restore that drops
+        it brings a revoked CA back as active and able to sign again."""
+        from datetime import datetime as _dt
+
+        def _dt_or_none(val):
+            if not val:
+                return None
+            try:
+                return _dt.fromisoformat(str(val).replace('Z', '+00:00'))
+            except Exception:
+                return None
+
+        ca.revoked = bool(ca_data.get('revoked', False))
+        ca.revoked_at = _dt_or_none(ca_data.get('revoked_at'))
+        ca.revoke_reason = ca_data.get('revoke_reason')
+        ca.invalidity_at = _dt_or_none(ca_data.get('invalidity_at'))
+
+    def _restore_revoked_serials(self, backup_data: Dict, results: Dict) -> None:
+        """Restore the persistent revocation records (#343)."""
+        from datetime import datetime as _dt
+        from models.revoked_serial import RevokedSerial
+
+        def _dt_or_none(val):
+            if not val:
+                return None
+            try:
+                return _dt.fromisoformat(str(val).replace('Z', '+00:00'))
+            except Exception:
+                return None
+
+        results.setdefault('revoked_serials', 0)
+        for rs_data in backup_data.get('revoked_serials', []):
+            caref = rs_data.get('caref')
+            serial = rs_data.get('serial_number')
+            if not caref or not serial:
+                continue
+            existing = RevokedSerial.query.filter_by(
+                caref=caref, serial_number=serial
+            ).first()
+            valid_to = _dt_or_none(rs_data.get('valid_to')) or utc_now()
+            if existing:
+                existing.revoked_at = _dt_or_none(rs_data.get('revoked_at')) or existing.revoked_at
+                existing.revoke_reason = rs_data.get('revoke_reason')
+                existing.invalidity_at = _dt_or_none(rs_data.get('invalidity_at'))
+                existing.valid_to = valid_to
+            else:
+                db.session.add(RevokedSerial(
+                    caref=caref,
+                    serial_number=serial,
+                    revoked_at=_dt_or_none(rs_data.get('revoked_at')) or utc_now(),
+                    revoke_reason=rs_data.get('revoke_reason'),
+                    invalidity_at=_dt_or_none(rs_data.get('invalidity_at')),
+                    valid_to=valid_to,
+                    certificate_id=None,
+                ))
+            results['revoked_serials'] += 1
+
     def _restore_cas(self, backup_data: Dict, results: Dict, master_key: bytes) -> None:
         """Restore certificate authorities from backup data"""
         for ca_data in backup_data.get('certificate_authorities', []):
@@ -179,6 +241,9 @@ class RestoreCoreMixin:
                     from security.encryption import encrypt_private_key
                     prv_b64 = encrypt_private_key(prv_b64)
                 existing.prv = prv_b64
+                existing.serial_number = ca_data.get('serial_number') or existing.serial_number
+                existing.ski = ca_data.get('ski') or existing.ski
+                self._apply_ca_revocation(existing, ca_data)
             else:
                 prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
                 if prv_b64:
@@ -192,8 +257,11 @@ class RestoreCoreMixin:
                     serial=ca_data.get('serial'),
                     caref=ca_data.get('caref'),
                     crt=base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None,
-                    prv=prv_b64
+                    prv=prv_b64,
+                    serial_number=ca_data.get('serial_number'),
+                    ski=ca_data.get('ski'),
                 )
+                self._apply_ca_revocation(new_ca, ca_data)
                 db.session.add(new_ca)
             results['cas'] += 1
 

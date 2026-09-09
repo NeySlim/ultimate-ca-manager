@@ -7,7 +7,7 @@ from flask import request, send_file
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from services.audit_service import AuditService
-from services.backup_service import BackupService
+from services.backup_service import BackupService, BackupPasswordError
 from pathlib import Path
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -162,10 +162,14 @@ def create_backup():
         if not password:
             return error_response("Password required for encryption", 400)
 
-        if len(password) < 12:
-            return error_response("Password must be at least 12 characters", 400)
-
         service = BackupService()
+        try:
+            # The rules live in the service; the route no longer keeps its own
+            # partial copy of them, which said nothing about the others (#346)
+            service._validate_password(password)
+        except BackupPasswordError as exc:
+            return error_response(str(exc), 400)
+
         backup_bytes = service.create_backup(password)
 
         backup_dir = _backup_root()
@@ -203,6 +207,8 @@ def create_backup():
             },
         )
 
+    except BackupPasswordError as exc:
+        return error_response(str(exc), 400)
     except ValueError as exc:
         logger.warning("Backup validation error: %s", exc)
         return error_response("Invalid backup parameters", 400)

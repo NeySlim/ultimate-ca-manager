@@ -476,3 +476,136 @@ class TestIssuerResolution:
             assert 'could not be regenerated' in text
             for leak in ('Errno', '/opt/', 'Permission denied', 'root.crl'):
                 assert leak not in text, text
+
+
+class TestRevocationHardening:
+    """Third review: backup carries the revocation, revocation follows the
+    certificate the CA holds now, and the chain walk has no way around it."""
+
+    def test_backup_and_restore_keep_the_revocation(self, app, auth_client, create_ca):
+        with app.app_context():
+            from services.backup_service import BackupService
+            from models import RevokedSerial
+            root = create_ca(cn='Backup Revoke Root')
+            sub = _intermediate(auth_client, root, 'Backup Revoke Sub CA')
+            serial = _serial_int(sub['id'])
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'keyCompromise'}).status_code == 200
+
+            password = 'BackupPass!2026x'
+            blob = BackupService().create_backup(password)
+
+            # The instance loses the revocation: the CA row goes back to
+            # active and the persistent record is dropped
+            db.session.expire_all()
+            row = db.session.get(CA, sub['id'])
+            row.revoked, row.revoked_at, row.revoke_reason = False, None, None
+            RevokedSerial.query.filter_by(caref=root['refid'], serial_number=str(serial)).delete()
+            db.session.commit()
+            assert db.session.get(CA, sub['id']).is_revoked is False
+            assert _ocsp_status(root['id'], serial)[0] == 'good'
+
+            result = BackupService().restore_backup(blob, password)
+            assert result.get('revoked_serials', 0) >= 1, result
+            db.session.expire_all()
+            restored = db.session.get(CA, sub['id'])
+            assert restored.revoked is True
+            assert restored.revoke_reason == 'keyCompromise'
+            assert restored.revoked_in_chain is True
+            assert RevokedSerial.query.filter_by(
+                caref=root['refid'], serial_number=str(serial)).first() is not None
+            assert _ocsp_status(root['id'], serial)[0] == 'revoked'
+            r = _post(auth_client, '/api/v2/certificates', {
+                'cn': 'after-restore.example.com', 'ca_id': sub['id'],
+                'validity_days': 30, 'key_type': 'RSA 2048', 'cert_type': 'server',
+            })
+            assert r.status_code == 400, r.data
+
+    def test_revocation_uses_the_current_certificate_serial(self, app, auth_client, create_ca):
+        """A stale serial_number column must not send the wrong serial to the CRL."""
+        with app.app_context():
+            from models import RevokedSerial
+            root = create_ca(cn='Stale Serial Root')
+            sub = _intermediate(auth_client, root, 'Stale Serial Sub CA')
+            real_serial = _serial_int(sub['id'])
+            row = db.session.get(CA, sub['id'])
+            row.serial_number = '999999999999'  # what a previous certificate had
+            db.session.commit()
+
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'superseded'}).status_code == 200
+            db.session.expire_all()
+            assert db.session.get(CA, sub['id']).serial_number == str(real_serial)
+            assert RevokedSerial.query.filter_by(
+                caref=root['refid'], serial_number=str(real_serial)).first() is not None
+            assert RevokedSerial.query.filter_by(
+                caref=root['refid'], serial_number='999999999999').first() is None
+            assert real_serial in _crl_serials(root['id'])
+            assert _ocsp_status(root['id'], real_serial)[0] == 'revoked'
+
+    def test_revocation_goes_to_the_signing_parent_not_the_recorded_one(self, app, auth_client, create_ca):
+        with app.app_context():
+            from models import RevokedSerial
+            real = create_ca(cn='Signing Parent Root')
+            other = create_ca(cn='Recorded Parent Root')
+            sub = _intermediate(auth_client, real, 'Wrong Parent Sub CA')
+            serial = _serial_int(sub['id'])
+            row = db.session.get(CA, sub['id'])
+            row.caref = other['refid']  # e.g. left over from a cross-sign
+            db.session.commit()
+
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'cACompromise'}).status_code == 200
+            db.session.expire_all()
+            assert RevokedSerial.query.filter_by(
+                caref=real['refid'], serial_number=str(serial)).first() is not None
+            assert RevokedSerial.query.filter_by(
+                caref=other['refid'], serial_number=str(serial)).first() is None
+            assert _ocsp_status(real['id'], serial)[0] == 'revoked'
+
+    def test_self_issued_subordinate_is_not_taken_for_a_root(self, app, auth_client, create_ca):
+        """A sub-CA whose subject equals its issuer still has a parent."""
+        with app.app_context():
+            root = create_ca(cn='Self Issued Root')
+            sub = _intermediate(auth_client, root, 'Self Issued Sub CA')
+            row = db.session.get(CA, sub['id'])
+            row.issuer = row.subject  # a self-issued cross-certificate looks like this
+            db.session.commit()
+            db.session.expire_all()
+            row = db.session.get(CA, sub['id'])
+            assert row.is_root is True  # by DN alone
+            assert row.issuing_ca() is not None  # but its signature says otherwise
+            assert row.issuing_ca().id == root['id']
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'keyCompromise'}).status_code == 200
+            db.session.expire_all()
+            assert db.session.get(CA, sub['id']).revoked_in_chain is True
+
+    def test_chain_loop_is_treated_as_revoked(self, app, auth_client, create_ca):
+        with app.app_context():
+            root = create_ca(cn='Loop Root')
+            sub = _intermediate(auth_client, root, 'Loop Sub CA')
+            # A repaired-wrong hierarchy that points back at itself
+            row = db.session.get(CA, root['id'])
+            row.caref = db.session.get(CA, sub['id']).refid
+            row.issuer = db.session.get(CA, sub['id']).subject
+            db.session.commit()
+            db.session.expire_all()
+            assert db.session.get(CA, sub['id']).revoked_in_chain in (True, False)  # must not hang
+
+    def test_dsa_issuer_is_verified_not_dismissed(self, app):
+        with app.app_context():
+            from datetime import datetime, timedelta, timezone
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric import dsa
+            from utils.cert_issuer import certificate_signed_by, is_self_signed
+
+            key = dsa.generate_private_key(key_size=2048)
+            name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, 'DSA Root')])
+            now = datetime.now(timezone.utc)
+            cert = (
+                x509.CertificateBuilder()
+                .subject_name(name).issuer_name(name).public_key(key.public_key())
+                .serial_number(x509.random_serial_number())
+                .not_valid_before(now - timedelta(days=1))
+                .not_valid_after(now + timedelta(days=30))
+                .sign(key, hashes.SHA256())
+            )
+            assert certificate_signed_by(cert, cert) is True
+            assert is_self_signed(cert) is True

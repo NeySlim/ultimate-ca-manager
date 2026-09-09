@@ -7,6 +7,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- A backup no longer loses revocations. The certificate authority records carried no revocation state and the persistent revocation list was not exported at all, so restoring a backup brought a revoked intermediate CA back as active, answering `good` over OCSP and free to sign again; the same list is what keeps a deleted certificate's revocation on the CRL, and those entries were lost too. Both are exported and restored, and a restore reports how many revocation records it brought back (follow-up to #343)
+- Revoking a certificate authority now publishes the certificate it holds, under the authority that signed it. The revocation used the stored serial number and the recorded parent, both of which can name a previous certificate after a renewal or a cross-signature: the wrong serial reached the parent's CRL while the certificate in use kept answering `good`, or the revocation was recorded under a CA that never signed it (follow-up to #343)
+- Three ways around the signing block on a revoked chain are closed: a certificate authority signed with a DSA key is now verified instead of being treated as unrelated to its issuer, a subordinate whose subject equals its issuer is no longer taken for a root and cut off from the chain above it, and a chain that loops or runs deeper than 64 levels is refused instead of being reported as not revoked (follow-up to #343)
+- The certificate list filters no longer disagree with the counters above them. The list counted a certificate about to expire as valid while the page hid it again after pagination, so a page of expiring certificates under the Valid filter came back empty with a non-zero total, and the Orphan filter emptied the list entirely. The filters now form the same buckets as the counters, valid, expiring, expired and revoked never overlapping, and the list shows what the server selected (follow-up to #345)
+- An on-demand backup no longer refuses a password with "Invalid backup parameters". The refusal came from an undocumented rule requiring eight distinct characters, which a password like a repeated pattern fails even at sixteen characters, while the dialog's strength meter called it strong. The exact reason is now returned and shown under the field, the dialog applies the same rule as the server before submitting, and the rule accepts six distinct characters once the password reaches sixteen (#346, reported by @kiar1404-de)
+
 ## [2.226] - 2026-09-09
 
 ### Added

@@ -98,6 +98,31 @@ const SSO_PROVIDER_ICONS = {
   saml: Shield,
 }
 
+
+// Backup password rules, mirrored from the server (services/backup):
+// at least 12 characters, and at least 8 distinct ones, relaxed to 6 for a
+// password of 16 characters or more. The dialog used to check only the
+// length, so a password the strength meter called strong was refused by the
+// server with a message that named no rule (#346).
+const BACKUP_PASSWORD_MIN_LENGTH = 12
+const BACKUP_PASSWORD_MIN_DISTINCT = 8
+const BACKUP_PASSWORD_LONG_LENGTH = 16
+const BACKUP_PASSWORD_MIN_DISTINCT_LONG = 6
+
+export function backupPasswordProblem(password, t) {
+  if (!password || password.length < BACKUP_PASSWORD_MIN_LENGTH) {
+    return t('settings.passwordMinLength')
+  }
+  const distinct = new Set(password).size
+  const required = password.length >= BACKUP_PASSWORD_LONG_LENGTH
+    ? BACKUP_PASSWORD_MIN_DISTINCT_LONG
+    : BACKUP_PASSWORD_MIN_DISTINCT
+  if (distinct < required) {
+    return t('settings.backupPasswordTooRepetitive', { distinct, required })
+  }
+  return null
+}
+
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -1192,8 +1217,9 @@ export default function SettingsPage() {
   }
 
   const handleBackup = async () => {
-    if (!backupPassword || backupPassword.length < 12) {
-      showError(t('settings.passwordMinLength'))
+    const problem = backupPasswordProblem(backupPassword, t)
+    if (problem) {
+      showError(problem)
       return
     }
     
@@ -1727,6 +1753,7 @@ export default function SettingsPage() {
             onChange={(e) => setBackupPassword(e.target.value)}
             placeholder={t('settings.min12Characters')}
             helperText={t('settings.encryptionPasswordHelper')}
+            error={backupPassword ? backupPasswordProblem(backupPassword, t) : null}
             autoFocus
             showStrength
           />
@@ -1736,7 +1763,7 @@ export default function SettingsPage() {
             </Button>
             <Button 
               onClick={handleBackup} 
-              disabled={backupLoading || !backupPassword || backupPassword.length < 12}
+              disabled={backupLoading || !!backupPasswordProblem(backupPassword, t)}
             >
               {backupLoading ? t('settings.creating') : t('settings.createAndDownload')}
             </Button>

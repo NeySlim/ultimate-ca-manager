@@ -2280,6 +2280,7 @@
     "backup": "Sicherung & Wiederherstellung",
     "backupFrequency": "Sicherungshäufigkeit",
     "backupPassword": "Sicherungspasswort",
+    "backupPasswordTooRepetitive": "Das Passwort wiederholt zu wenige Zeichen: {{distinct}} verschiedene, mindestens {{required}} erforderlich",
     "backupSubtitle": "Datensicherungs- und Wiederherstellungsoptionen",
     "baseUrl": "Basis-URL",
     "baseUrlHelper": "Kanonische HTTPS-URL für Admin-GUI und API. Nicht übereinstimmende Hostnamen und IPs werden hierhin umgeleitet.",

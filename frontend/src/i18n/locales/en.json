@@ -2281,6 +2281,7 @@
     "backup": "Backup & Restore",
     "backupFrequency": "Backup Frequency",
     "backupPassword": "Backup Password",
+    "backupPasswordTooRepetitive": "Password repeats too few characters: {{distinct}} distinct, at least {{required}} needed",
     "backupSubtitle": "Backup and data recovery options",
     "baseUrl": "Base URL",
     "baseUrlHelper": "Canonical HTTPS URL for the admin GUI and API. Non-matching hostnames and IPs redirect here.",

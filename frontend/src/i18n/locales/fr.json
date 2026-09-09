@@ -2648,6 +2648,7 @@
     "restoreWarning": "Ceci REMPLACE toutes les données actuelles — utilisateurs, clés privées et secrets stockés compris — par le contenu de la sauvegarde, et est irréversible. Ne restaurez qu'une sauvegarde que vous avez créée vous-même : une sauvegarde dont un attaquant contrôle le mot de passe peut implanter un compte administrateur persistant.",
     "file": "Fichier",
     "backupPassword": "Mot de passe de la sauvegarde",
+    "backupPasswordTooRepetitive": "Le mot de passe répète trop peu de caractères : {{distinct}} distincts, il en faut au moins {{required}}",
     "enterBackupPassword": "Entrez le mot de passe utilisé pour créer la sauvegarde",
     "restoring": "Restauration en cours...",
     "auditTitle": "Paramètres du journal d'audit",

@@ -44,6 +44,14 @@ from .restore_policies import RestorePoliciesMixin
 from .restore_extended import RestoreExtendedMixin
 
 
+
+class BackupPasswordError(ValueError):
+    """A backup password refused by the strength rules (#346).
+
+    Its message names the rule that was hit and is safe to return to the
+    caller, unlike the other ValueErrors raised while building a backup.
+    """
+
 class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                    RestoreCoreMixin, RestoreRbacMixin, RestoreAuthMixin,
                    RestoreNotificationsMixin, RestorePoliciesMixin, RestoreExtendedMixin):
@@ -161,6 +169,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             'users': _safe(self._export_users, include.get('users', True)),
             'certificate_authorities': _safe(self._export_cas, include.get('cas', True)),
             'certificates': _safe(self._export_certificates, include.get('certificates', True)),
+            'revoked_serials': _safe(self._export_revoked_serials, include.get('certificates', True)),
             'acme_accounts': _safe(self._export_acme_accounts, include.get('acme_accounts', True)),
             'acme_eab_credentials': _safe(self._export_acme_eab_credentials, include.get('acme_eab_credentials', True)),
             'groups': _safe(self._export_groups, include.get('groups', True)),
@@ -285,15 +294,40 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         )
         return kdf.derive(password.encode())
 
-    def _validate_password(self, password: str):
-        """Validate backup password strength"""
-        if len(password) < 12:
-            raise ValueError("Backup password must be at least 12 characters")
+    # A backup file is offline data: the password is the only thing between a
+    # stolen file and every private key in it, so a trivially repeated
+    # password is refused. The floor scales with length, since a longer
+    # password compensates for a smaller alphabet (#346).
+    MIN_PASSWORD_LENGTH = 12
+    MIN_DISTINCT_CHARS = 8
+    LONG_PASSWORD_LENGTH = 16
+    MIN_DISTINCT_CHARS_LONG = 6
 
-        # Check entropy (basic)
-        unique_chars = len(set(password))
-        if unique_chars < 8:
-            raise ValueError("Backup password is too simple")
+    def _validate_password(self, password: str):
+        """Validate backup password strength.
+
+        Raises BackupPasswordError, whose message is meant to be shown to
+        the operator: a generic refusal left them guessing which rule they
+        had hit, with the strength meter calling the password strong (#346).
+        """
+        if len(password) < self.MIN_PASSWORD_LENGTH:
+            raise BackupPasswordError(
+                f"Backup password must be at least {self.MIN_PASSWORD_LENGTH} characters"
+            )
+
+        distinct = len(set(password))
+        required = (
+            self.MIN_DISTINCT_CHARS_LONG
+            if len(password) >= self.LONG_PASSWORD_LENGTH
+            else self.MIN_DISTINCT_CHARS
+        )
+        if distinct < required:
+            raise BackupPasswordError(
+                f"Backup password repeats too few characters: it uses {distinct} "
+                f"distinct characters and needs at least {required} "
+                f"(a password of {self.LONG_PASSWORD_LENGTH} characters or more "
+                f"needs {self.MIN_DISTINCT_CHARS_LONG})"
+            )
 
     def _derive_master_key(self, password: str) -> tuple:
         """Legacy v1 PBKDF2 derivation (kept for backward-compat restore)"""

@@ -67,23 +67,32 @@ class CAOperationsMixin:
             raise ValueError("CA is already revoked")
         if ca.is_pending or not ca.crt:
             raise ValueError("CA is awaiting its certificate")
-        if ca.is_root or not ca.caref:
-            raise ValueError(
-                "A root CA cannot be revoked: relying parties remove it from their trust stores"
-            )
-        parent = CA.query.filter_by(refid=ca.caref).first()
-        if not parent:
+        # The issuer whose key actually signed the certificate the CA holds
+        # now: caref can point at the CA that signed a previous certificate
+        # (renewal, cross-sign), and the revocation must reach the issuer
+        # whose CRL and OCSP answer for this certificate (#343 review)
+        parent = ca.issuing_ca()
+        if parent is None:
+            if ca.is_root:
+                raise ValueError(
+                    "A root CA cannot be revoked: relying parties remove it from their trust stores"
+                )
             raise ValueError(
                 "The issuing CA is not held in UCM: revoke this CA at that root "
                 "(its CRL can then be served from UCM)"
             )
 
-        # The serial as the certificate carries it: the stored column may be
-        # empty on an imported CA
+        # The serial of the certificate the CA holds now, never the stored
+        # column: after a renewal that column can still name the previous
+        # certificate, and publishing that serial revokes the wrong one
         cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
         serial_decimal = str(cert.serial_number)
-        if not ca.serial_number:
-            ca.serial_number = serial_decimal
+        ca.serial_number = serial_decimal
+        if ca.caref != parent.refid:
+            logger.info(
+                "CA %s is signed by %s, not by its recorded parent; revoking under the signer",
+                ca.descr, parent.descr,
+            )
 
         now = utc_now()
         ca.revoked = True
@@ -93,7 +102,7 @@ class CAOperationsMixin:
         valid_to = ca.valid_to or cert.not_valid_after_utc.replace(tzinfo=None)
 
         existing = RevokedSerial.query.filter_by(
-            caref=parent.refid, serial_number=ca.serial_number
+            caref=parent.refid, serial_number=serial_decimal
         ).first()
         if existing:
             existing.revoked_at = now
@@ -103,7 +112,7 @@ class CAOperationsMixin:
         else:
             db.session.add(RevokedSerial(
                 caref=parent.refid,
-                serial_number=ca.serial_number,
+                serial_number=serial_decimal,
                 revoked_at=now,
                 revoke_reason=reason,
                 invalidity_at=invalidity_at,
@@ -154,7 +163,7 @@ class CAOperationsMixin:
                 f"revocation; relying parties learn it through OCSP only."
             )
         from services.ocsp_service import OCSPService
-        OCSPService.invalidate_cached_responses(ca.serial_number, ca_id=parent.id)
+        OCSPService.invalidate_cached_responses(serial_decimal, ca_id=parent.id)
         return ca, warnings
     """CA certificate operations"""
 

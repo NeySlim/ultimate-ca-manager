@@ -365,12 +365,13 @@ export default function CertificatesPage() {
       isOrphan: cert.caref && !caRefIds.has(cert.caref)
     }))
     
-    if (filterStatus.length > 0) {
-      result = result.filter(c => filterStatus.includes(c.status))
-    }
-    
+    // No second pass on the status here: the server already applied the
+    // filter, over the whole set rather than the current page. Re-filtering
+    // dropped rows the server had counted (a page of expiring certificates
+    // under the Valid filter came back empty) and emptied the list entirely
+    // for Orphan, which is not a status any row carries (#345 review).
     return result
-  }, [certificates, cas, filterStatus, filterCA])
+  }, [certificates, cas])
 
   // Count orphans for stats
   const orphanCount = useMemo(() => {

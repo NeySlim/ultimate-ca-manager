@@ -2280,6 +2280,7 @@
     "backup": "备份与恢复",
     "backupFrequency": "备份频率",
     "backupPassword": "备份密码",
+    "backupPasswordTooRepetitive": "密码使用的字符种类过少：{{distinct}} 种，至少需要 {{required}} 种",
     "backupSubtitle": "数据备份和恢复选项",
     "baseUrl": "基础 URL",
     "baseUrlHelper": "用于IP/别名主机名的图形界面、API、跨域及重定向目标…",

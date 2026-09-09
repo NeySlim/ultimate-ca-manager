@@ -72,11 +72,21 @@ def list_certificates():
             if status == 'revoked':
                 status_conditions.append(Certificate.revoked == True)
             elif status == 'valid':
+                # Same buckets as the stats endpoint and the row status:
+                # valid / expiring / expired / revoked never overlap. Counting
+                # the expiring ones as valid here filled pages with rows the
+                # list then had to hide, down to an empty page (#345 review)
+                expiry_threshold = utc_now() + timedelta(days=30)
                 status_conditions.append(
-                    and_(Certificate.revoked == False, Certificate.valid_to > utc_now())
+                    and_(
+                        Certificate.revoked == False,
+                        Certificate.valid_to > expiry_threshold,
+                    )
                 )
             elif status == 'expired':
-                status_conditions.append(Certificate.valid_to <= utc_now())
+                status_conditions.append(
+                    and_(Certificate.revoked == False, Certificate.valid_to <= utc_now())
+                )
             elif status == 'expiring':
                 expiry_threshold = utc_now() + timedelta(days=30)
                 status_conditions.append(

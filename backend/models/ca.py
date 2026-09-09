@@ -2,8 +2,11 @@
 CA Model - Certificate Authority
 """
 import json
+import logging
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
+
+logger = logging.getLogger(__name__)
 
 
 class CA(db.Model):
@@ -199,15 +202,21 @@ class CA(db.Model):
         caref until chain repair); a candidate counts only if this
         certificate's signature verifies with its key. Two CAs can carry
         the same DN, and a decoy root imported under the parent's name must
-        not stand in for it (#343 review)."""
-        if self.is_root or not self.crt:
+        not stand in for it (#343 review). A certificate whose subject
+        equals its issuer is a root only when its own key signed it: a
+        self-issued cross-certificate still has an issuer above it."""
+        if not self.crt:
             return None
         import base64
         from cryptography import x509
-        from utils.cert_issuer import authority_key_identifier_hex, certificate_signed_by
+        from utils.cert_issuer import (
+            authority_key_identifier_hex, certificate_signed_by, is_self_signed,
+        )
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
         except Exception:
+            return None
+        if is_self_signed(cert):
             return None
 
         candidates, seen = [], set()
@@ -231,7 +240,13 @@ class CA(db.Model):
                 issuer_cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt))
             except Exception:
                 continue
-            if certificate_signed_by(cert, issuer_cert):
+            try:
+                signed = certificate_signed_by(cert, issuer_cert)
+            except Exception:
+                # Key type this cannot verify: keep the named issuer rather
+                # than dropping the CA out of its chain
+                signed = candidate.subject == self.issuer
+            if signed:
                 return candidate
         return None
 
@@ -267,18 +282,39 @@ class CA(db.Model):
         """Revoked flag, or a revocation the parent still holds for this serial."""
         return bool(self.revoked) or self.persisted_revocation() is not None
 
+    # A chain longer than this is either a loop or a hierarchy no relying
+    # party would accept; walking it is refused rather than cut short.
+    MAX_CHAIN_DEPTH = 64
+
     @property
     def revoked_in_chain(self) -> bool:
         """Whether this CA or one of its ancestors held in UCM is revoked.
 
         A revoked ancestor breaks path validation for everything below it,
-        so a CA under one must not issue either (#343)."""
-        ca, depth = self, 0
-        while ca is not None and depth < 16:
+        so a CA under one must not issue either (#343). A chain that does
+        not end within MAX_CHAIN_DEPTH is reported as revoked: stopping the
+        walk and answering "not revoked" would let a loop, or a hierarchy
+        deep enough to hide the revoked ancestor, sign again (#343 review)."""
+        ca, depth, seen = self, 0, set()
+        while ca is not None:
             if ca.is_revoked:
                 return True
-            ca = ca.issuing_ca()
+            if ca.id is not None:
+                if ca.id in seen:
+                    logger.warning(
+                        "CA chain of %s loops at CA %s; treating it as revoked",
+                        self.descr, ca.descr,
+                    )
+                    return True
+                seen.add(ca.id)
             depth += 1
+            if depth > CA.MAX_CHAIN_DEPTH:
+                logger.warning(
+                    "CA chain of %s exceeds %s levels; treating it as revoked",
+                    self.descr, CA.MAX_CHAIN_DEPTH,
+                )
+                return True
+            ca = ca.issuing_ca()
         return False
     
     @property

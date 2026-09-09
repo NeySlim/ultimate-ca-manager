@@ -1045,3 +1045,59 @@ class TestRevokedSerialPersistence:
                 pass  # CRL gen may fail if CA key isn't available in test
             rs_after = RevokedSerial.query.filter_by(serial_number=old_serial).first()
             assert rs_after is None  # purged because valid_to < now
+
+
+class TestStatusFilterBuckets:
+    """The list filter buckets match the stats endpoint and the row status,
+    so a page is never filled with rows the caller asked to exclude (#345 review)."""
+
+    @staticmethod
+    def _mk(auth_client, create_ca, cn, days):
+        ca = create_ca(cn=f'Bucket CA {cn}')
+        r = auth_client.post(f'{BASE}',
+                             data=json.dumps({'cn': cn, 'ca_id': ca['id'], 'validity_days': days,
+                                              'key_type': 'RSA 2048', 'cert_type': 'server'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        return json.loads(r.data)['data']
+
+    def test_valid_excludes_expiring(self, auth_client, create_ca):
+        soon = self._mk(auth_client, create_ca, 'bucket-expiring.example.com', 10)
+        later = self._mk(auth_client, create_ca, 'bucket-valid.example.com', 200)
+        assert soon['status'] == 'expiring'
+        assert later['status'] == 'valid'
+
+        r = auth_client.get(f'{BASE}?per_page=200&status=valid&search=bucket-')
+        ids = {c['id'] for c in json.loads(r.data)['data']}
+        assert later['id'] in ids
+        assert soon['id'] not in ids
+
+        r = auth_client.get(f'{BASE}?per_page=200&status=expiring&search=bucket-')
+        ids = {c['id'] for c in json.loads(r.data)['data']}
+        assert soon['id'] in ids
+        assert later['id'] not in ids
+
+    def test_expired_excludes_revoked(self, auth_client, create_ca):
+        cert = self._mk(auth_client, create_ca, 'bucket-revoked.example.com', 200)
+        r = auth_client.post(f'{BASE}/{cert["id"]}/revoke',
+                             data=json.dumps({'reason': 'unspecified'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+
+        r = auth_client.get(f'{BASE}?per_page=200&status=expired&search=bucket-revoked')
+        assert cert['id'] not in {c['id'] for c in json.loads(r.data)['data']}
+        r = auth_client.get(f'{BASE}?per_page=200&status=revoked&search=bucket-revoked')
+        assert cert['id'] in {c['id'] for c in json.loads(r.data)['data']}
+
+    def test_every_certificate_falls_in_exactly_one_bucket(self, auth_client, create_ca):
+        self._mk(auth_client, create_ca, 'bucket-one.example.com', 5)
+        self._mk(auth_client, create_ca, 'bucket-two.example.com', 400)
+        seen = {}
+        for status in ('valid', 'expiring', 'expired', 'revoked'):
+            r = auth_client.get(f'{BASE}?per_page=500&status={status}')
+            for c in json.loads(r.data)['data']:
+                assert c['id'] not in seen, (c['id'], status, seen.get(c['id']))
+                seen[c['id']] = status
+        r = auth_client.get(f'{BASE}?per_page=500')
+        total = json.loads(r.data)['meta']['total']
+        assert len(seen) == total, (len(seen), total)

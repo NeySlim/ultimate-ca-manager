@@ -2280,6 +2280,7 @@
     "backup": "バックアップと復元",
     "backupFrequency": "バックアップ頻度",
     "backupPassword": "バックアップパスワード",
+    "backupPasswordTooRepetitive": "パスワードの文字の種類が少なすぎます：{{distinct}} 種類、少なくとも {{required}} 種類が必要です",
     "backupSubtitle": "データバックアップと復元オプション",
     "baseUrl": "ベースURL",
     "baseUrlHelper": "管理GUIとAPIの正規HTTPS URL。一致しないホスト名やIPはここにリダイレクトされます。",

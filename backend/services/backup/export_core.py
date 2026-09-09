@@ -149,6 +149,18 @@ class ExportCoreMixin:
                 'cps_uri': ca.cps_uri,
                 'cps_oid': ca.cps_oid,
                 'imported_from': ca.imported_from,
+                'serial_number': ca.serial_number,
+                'ski': ca.ski,
+                'offline': bool(ca.offline),
+                'offline_reason': ca.offline_reason,
+                'offline_mode': ca.offline_mode,
+                # Revocation state (#343): without it a restore brings a
+                # revoked CA back as active, answering good over OCSP and
+                # free to sign again
+                'revoked': bool(ca.revoked),
+                'revoked_at': ca.revoked_at.isoformat() if ca.revoked_at else None,
+                'revoke_reason': ca.revoke_reason,
+                'invalidity_at': ca.invalidity_at.isoformat() if ca.invalidity_at else None,
                 'certificate_pem': base64.b64decode(ca.crt).decode() if ca.crt else None,
                 'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
             }
@@ -165,6 +177,30 @@ class ExportCoreMixin:
             cas.append(ca_data)
 
         return cas
+
+    def _export_revoked_serials(self, include: bool) -> List[Dict[str, Any]]:
+        """Export the persistent revocation records (#343).
+
+        These outlive the certificate and the CA rows: they are what the CRL
+        builder and the OCSP responder answer from once the revoked object
+        is gone, and what keeps a re-imported CA revoked. A backup without
+        them silently un-revokes everything they covered."""
+        if not include:
+            return []
+
+        from models.revoked_serial import RevokedSerial
+        return [
+            {
+                'caref': rs.caref,
+                'serial_number': rs.serial_number,
+                'revoked_at': rs.revoked_at.isoformat() if rs.revoked_at else None,
+                'revoke_reason': rs.revoke_reason,
+                'invalidity_at': rs.invalidity_at.isoformat() if rs.invalidity_at else None,
+                'valid_to': rs.valid_to.isoformat() if rs.valid_to else None,
+                'certificate_id': rs.certificate_id,
+            }
+            for rs in RevokedSerial.query.all()
+        ]
 
     def _export_certificates(self, include: bool) -> List[Dict[str, Any]]:
         """Export certificates with encrypted private keys"""
