@@ -1117,3 +1117,76 @@ class TestStatusFilterBuckets:
         r = auth_client.get(f'{BASE}?per_page=500')
         total = json.loads(r.data)['meta']['total']
         assert len(seen) == total, (len(seen), total)
+
+
+class TestOrphanFilter:
+    """Orphans are selected over the whole set, not on the page received
+    (#345 review): the filter and the counter must agree at any page size."""
+
+    @staticmethod
+    def _orphan(app, auth_client, create_ca, cn):
+        """A certificate left pointing at a CA this instance does not hold.
+
+        Deleting the CA through the ORM clears the link instead of leaving it
+        dangling, and a certificate with no link at all is not an orphan; the
+        state the filter targets is a reference that resolves to nothing,
+        which is what a partial import or an out-of-band deletion leaves."""
+        ca = create_ca(cn=f'Orphan CA {cn}')
+        r = auth_client.post(BASE,
+                             data=json.dumps({'cn': cn, 'ca_id': ca['id'], 'validity_days': 200,
+                                              'key_type': 'RSA 2048', 'cert_type': 'server'}),
+                             content_type='application/json')
+        assert r.status_code in (200, 201), r.data
+        cert = json.loads(r.data)['data']
+        with app.app_context():
+            from models import db as _db, Certificate as _Cert
+            row = _db.session.get(_Cert, cert['id'])
+            row.caref = f'missing-ca-{cert["id"]}'
+            _db.session.commit()
+        return cert
+
+    def test_orphan_is_found_beyond_the_first_page(self, app, auth_client, create_ca):
+        orphan = self._orphan(app, auth_client, create_ca, 'orphan-page2.example.com')
+        # A page size of one puts the orphan far from the first page in any order
+        r = auth_client.get(f'{BASE}?per_page=1&page=1&status=orphan')
+        body = json.loads(r.data)
+        assert body['meta']['total'] >= 1
+        r = auth_client.get(f'{BASE}?per_page=500&status=orphan')
+        ids = {c['id'] for c in json.loads(r.data)['data']}
+        assert orphan['id'] in ids
+
+    def test_orphan_count_matches_the_filter(self, app, auth_client, create_ca):
+        self._orphan(app, auth_client, create_ca, 'orphan-count.example.com')
+        stats = json.loads(auth_client.get(f'{BASE}/stats').data)['data']
+        r = auth_client.get(f'{BASE}?per_page=500&status=orphan')
+        assert stats['orphan'] == json.loads(r.data)['meta']['total']
+        assert stats['orphan'] >= 1
+
+    def test_certificate_without_a_ca_link_is_not_orphan(self, app, auth_client, create_ca):
+        """No link at all is not the same as a broken one: a certificate
+        issued outside this instance keeps showing under its own status."""
+        ca = create_ca(cn='No link CA')
+        r = auth_client.post(BASE,
+                             data=json.dumps({'cn': 'no-link.example.com', 'ca_id': ca['id'],
+                                              'validity_days': 200, 'key_type': 'RSA 2048',
+                                              'cert_type': 'server'}),
+                             content_type='application/json')
+        cert = json.loads(r.data)['data']
+        with app.app_context():
+            from models import db as _db, Certificate as _Cert
+            row = _db.session.get(_Cert, cert['id'])
+            row.caref = None
+            _db.session.commit()
+        r = auth_client.get(f'{BASE}?per_page=500&status=orphan')
+        assert cert['id'] not in {c['id'] for c in json.loads(r.data)['data']}
+
+    def test_certificate_with_a_live_ca_is_not_orphan(self, auth_client, create_ca):
+        ca = create_ca(cn='Live CA orphan check')
+        r = auth_client.post(BASE,
+                             data=json.dumps({'cn': 'not-orphan.example.com', 'ca_id': ca['id'],
+                                              'validity_days': 200, 'key_type': 'RSA 2048',
+                                              'cert_type': 'server'}),
+                             content_type='application/json')
+        cert = json.loads(r.data)['data']
+        r = auth_client.get(f'{BASE}?per_page=500&status=orphan')
+        assert cert['id'] not in {c['id'] for c in json.loads(r.data)['data']}

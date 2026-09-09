@@ -110,11 +110,15 @@ const BACKUP_PASSWORD_LONG_LENGTH = 16
 const BACKUP_PASSWORD_MIN_DISTINCT_LONG = 6
 
 export function backupPasswordProblem(password, t) {
-  if (!password || password.length < BACKUP_PASSWORD_MIN_LENGTH) {
+  // Count characters the way the server does. A string's length counts UTF-16
+  // units, so an emoji counts twice here and once there: a password the dialog
+  // accepted came back refused by the API (#346 review).
+  const characters = password ? [...password] : []
+  if (characters.length < BACKUP_PASSWORD_MIN_LENGTH) {
     return t('settings.passwordMinLength')
   }
-  const distinct = new Set(password).size
-  const required = password.length >= BACKUP_PASSWORD_LONG_LENGTH
+  const distinct = new Set(characters).size
+  const required = characters.length >= BACKUP_PASSWORD_LONG_LENGTH
     ? BACKUP_PASSWORD_MIN_DISTINCT_LONG
     : BACKUP_PASSWORD_MIN_DISTINCT
   if (distinct < required) {

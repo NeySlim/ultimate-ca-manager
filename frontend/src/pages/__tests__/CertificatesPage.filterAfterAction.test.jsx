@@ -114,3 +114,24 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(lastParams().source).toEqual(['import'])
   })
 })
+
+describe('backupPasswordProblem — counts characters like the server (#346 review)', () => {
+  const t = (key, opts) => (opts ? `${key}:${opts.distinct}/${opts.required}` : key)
+
+  it('counts code points, not UTF-16 units', async () => {
+    const { backupPasswordProblem } = await import('../SettingsPage')
+    // 6 emoji: 12 UTF-16 units but 6 characters, which the server refuses
+    expect(backupPasswordProblem('\u{1F510}'.repeat(6), t)).toBe('settings.passwordMinLength')
+    // 12 distinct characters, emoji included
+    expect(backupPasswordProblem('\u{1F510}a\u{1F511}b\u{1F5DD}c\u{1F512}d\u{1F513}e\u{1F6E1}f', t)).toBeNull()
+  })
+
+  it('applies the distinct-character floor, relaxed once long', () => {
+    return import('../SettingsPage').then(({ backupPasswordProblem }) => {
+      expect(backupPasswordProblem('abcabcabcabc', t)).toContain('backupPasswordTooRepetitive')
+      expect(backupPasswordProblem('Start.01Start.01', t)).toBeNull()
+      expect(backupPasswordProblem('aaaaaaaaaaaaaaaa', t)).toContain('backupPasswordTooRepetitive')
+      expect(backupPasswordProblem('short', t)).toBe('settings.passwordMinLength')
+    })
+  })
+})

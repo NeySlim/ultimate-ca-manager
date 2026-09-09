@@ -63,7 +63,7 @@ export default function CertificatesPage() {
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [certStats, setCertStats] = useState({ valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 })
+  const [certStats, setCertStats] = useState({ valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
   
   // Selection
   const [selectedCert, setSelectedCert] = useState(null)
@@ -119,7 +119,9 @@ export default function CertificatesPage() {
         sort_by: sortBy,
         sort_order: sortOrder
       }
-      if (filterStatus.length > 0 && !filterStatus.includes('orphan')) {
+      if (filterStatus.length > 0) {
+        // orphan included: the server selects it over the whole set, so it
+        // pages like any other status (#345 review)
         params.status = filterStatus
       }
       if (filterCA.length > 0) {
@@ -138,21 +140,13 @@ export default function CertificatesPage() {
         casService.getAll(),
         certificatesService.getStats()
       ])
-      let certs = certsRes.data || []
+      const certs = certsRes.data || []
       const caList = casRes.data || []
 
-      // Handle orphan filter client-side (no CA or CA not in our list).
-      // The CAs just fetched, not the ones in state: on the first load that
-      // state is still empty and the filter would silently do nothing.
-      if (filterStatus.includes('orphan') && caList.length > 0) {
-        const caRefIds = new Set(caList.map(ca => ca.refid))
-        certs = certs.filter(c => c.caref && !caRefIds.has(c.caref))
-      }
-      
       setCertificates(certs)
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(caList)
-      setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 })
+      setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
@@ -373,11 +367,9 @@ export default function CertificatesPage() {
     return result
   }, [certificates, cas])
 
-  // Count orphans for stats
-  const orphanCount = useMemo(() => {
-    const caRefIds = new Set(cas.map(ca => ca.refid))
-    return certificates.filter(c => c.caref && !caRefIds.has(c.caref)).length
-  }, [certificates, cas])
+  // Orphan count from the stats endpoint, over the whole set: counting the
+  // rows on screen made the card follow the current page (#345 review)
+  const orphanCount = certStats.orphan || 0
 
   // Stats - from backend API for accurate counts
   // Each stat is clickable to filter the table

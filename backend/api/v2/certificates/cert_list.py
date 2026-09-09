@@ -90,6 +90,18 @@ def list_certificates():
                 status_conditions.append(
                     and_(Certificate.revoked == False, Certificate.valid_to <= utc_now())
                 )
+            elif status == 'orphan':
+                # Issued by a CA this instance no longer holds. Selected here
+                # rather than on the page just received: filtering the page
+                # showed nothing whenever the orphans sat further down (#345
+                # review)
+                known_refs = db.session.query(CA.refid).filter(CA.refid.isnot(None))
+                status_conditions.append(
+                    and_(
+                        Certificate.caref.isnot(None),
+                        Certificate.caref.notin_(known_refs),
+                    )
+                )
             elif status == 'expiring':
                 expiry_threshold = utc_now() + timedelta(days=30)
                 status_conditions.append(

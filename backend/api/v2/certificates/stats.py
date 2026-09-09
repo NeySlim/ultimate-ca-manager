@@ -8,7 +8,7 @@ from datetime import timedelta
 from flask import request
 from auth.unified import require_auth
 from sqlalchemy import or_
-from models import Certificate, db
+from models import Certificate, CA, db
 from services.compliance_service import calculate_compliance_score
 from utils.response import success_response
 from utils.datetime_utils import utc_now
@@ -48,6 +48,14 @@ def get_certificate_stats():
         ),
     ).count()
 
+    # Certificates whose issuing CA is gone: counted over the whole set, like
+    # every other card, instead of over the page on screen (#345 review)
+    known_refs = db.session.query(CA.refid).filter(CA.refid.isnot(None))
+    orphan = base_query.filter(
+        Certificate.caref.isnot(None),
+        Certificate.caref.notin_(known_refs),
+    ).count()
+
     # Distinct issuance sources actually present, so the list "source" filter
     # can offer exactly the values that exist (NULL is surfaced as 'manual').
     source_rows = base_query.with_entities(Certificate.source).distinct().all()
@@ -59,6 +67,7 @@ def get_certificate_stats():
         'expiring': expiring,
         'expired': expired,
         'revoked': revoked,
+        'orphan': orphan,
         'sources': sources
     })
 
