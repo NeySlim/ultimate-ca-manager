@@ -653,4 +653,4 @@ def tsa_ca_certificate_path_ready() -> bool:
     if not refid:
         return False
     ca = CA.query.filter_by(refid=refid).first()
-    return bool(ca and ca.crt and ca.prv and not ca.offline)
+    return bool(ca and ca.crt and ca.prv and not ca.offline and not ca.revoked_in_chain)

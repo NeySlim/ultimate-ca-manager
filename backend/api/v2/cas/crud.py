@@ -358,6 +358,8 @@ def create_ca():
                 return error_response('Parent CA has no private key', 400)
             if not parent_ca.crt:
                 return error_response('Parent CA is awaiting its certificate', 400)
+            if parent_ca.revoked_in_chain:
+                return error_response('Parent CA is revoked and can no longer sign', 400)
             # Check parent CA is not expired
             parent_cert = x509.load_pem_x509_certificate(
                 base64.b64decode(parent_ca.crt), default_backend()
@@ -858,6 +860,65 @@ def delete_ca(ca_id):
         db.session.rollback()
         logger.error(f"Failed to delete CA: {e}")
         return error_response('Failed to delete CA', 500)
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/revoke', methods=['POST'])
+@require_auth(['write:cas'])
+def revoke_ca(ca_id):
+    """Revoke an intermediate CA from its parent (#343).
+
+    Body (JSON): ``{reason: <RFC 5280 reason name>, invalidity_date?: ISO 8601}``.
+    The serial is published on the parent's CRL and answered ``revoked`` by
+    the parent's OCSP responder; the CA can no longer sign. Permanent.
+    """
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now, to_naive_utc
+    from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+
+    ca = db.session.get(CA, ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    if ca.revoked:
+        return error_response('CA is already revoked', 409)
+
+    data = request.get_json(silent=True) or {}
+    reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
+    if reason is None:
+        return error_response(invalid_reason_message(data.get('reason')), 400)
+
+    invalidity_at = None
+    invalidity_raw = data.get('invalidity_date') or data.get('invalidity_at')
+    if invalidity_raw:
+        try:
+            raw = str(invalidity_raw).strip().replace('Z', '+00:00')
+            invalidity_at = to_naive_utc(datetime.fromisoformat(raw))
+        except (ValueError, TypeError, OverflowError) as e:
+            return error_response(f'Invalid invalidity_date: {e}', 400)
+        if invalidity_at > utc_now() + timedelta(minutes=5):
+            return error_response('invalidity_date cannot be in the future', 400)
+
+    username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+    try:
+        ca = CAService.revoke_ca(
+            ca_id, reason=reason, username=username, invalidity_at=invalidity_at
+        )
+    except ValueError as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to revoke CA {ca_id}: {e}", exc_info=True)
+        return error_response('Failed to revoke CA', 500)
+
+    # Snapshot before emit — subscribers may commit and expire the instance
+    ca_dict = ca.to_dict()
+    from services.webhook_service import emit_ca_updated
+    emit_ca_updated(ca_dict, actor=username, changes={'revoked': True, 'reason': reason})
+    try:
+        on_ca_updated(ca.id, ca_dict.get('descr'), {'revoked': True, 'reason': reason})
+    except Exception:
+        pass
+    return success_response(data=ca_dict, message='CA revoked')
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/offline', methods=['POST'])

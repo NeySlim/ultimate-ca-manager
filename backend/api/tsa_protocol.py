@@ -121,8 +121,11 @@ def timestamp_request():
                 return response
 
             # Offline CAs must not sign (consistent with CSR/CRL signing paths)
-            if ca.offline:
-                logger.warning(f"TSA request refused: CA '{ca.descr}' is offline")
+            if ca.offline or ca.revoked_in_chain:
+                logger.warning(
+                    f"TSA request refused: CA '{ca.descr}' is "
+                    f"{'offline' if ca.offline else 'revoked'}"
+                )
                 response = make_response('TSA temporarily unavailable', 503)
                 response.headers['Content-Type'] = 'text/plain'
                 return response

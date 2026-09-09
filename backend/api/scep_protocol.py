@@ -122,6 +122,9 @@ def get_scep_service(profile_slug=None):
     if ca.offline:
         return _reject(f"CA {ca.descr!r} is offline; restore it before using it for SCEP")
 
+    if ca.revoked_in_chain:
+        return _reject(f"CA {ca.descr!r} is revoked and can no longer sign")
+
     # SCEP enrollment decrypts the client's PKCS#7 envelope with the CA's
     # RSA private key (RFC 8894 §3.4). HSM-resident signing keys do not
     # expose decryption in the current providers, so SCEP is not supported

@@ -7,6 +7,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Added
+- An intermediate CA can be revoked from its parent. UCM had no CA revocation at all: only end-entity certificates could be revoked, and the documentation listed "take offline" or "delete" as the ways to retire a CA, so a compromised or decommissioned intermediate never reached the parent's CRL or OCSP responder. **Revoke CA** on an intermediate (`POST /api/v2/cas/<id>/revoke`, `write:cas`) takes the RFC 5280 reason codes and optional invalidity date already used for certificates; the serial is recorded in the parent's persistent revocation list, the parent's CRL is regenerated at once and its OCSP responder answers `revoked` with the reason. The revoked CA, and every CA below it, can no longer sign anything (issue form, CSRs, renewals, sub-CAs, ACME, EST, SCEP, WSTEP, TSA, OCSP responder certificates), while its own CRL keeps being served until the CA is deleted, and deleting it keeps the entry on the parent's CRL until the certificate's original expiry. Revocation is permanent, as for certificates. A root CA is not revocable (self-signed: relying parties remove it from their trust stores), nor is a CA whose issuer is not held in UCM: that one is revoked at its root, whose CRL UCM can already serve. The CA list gains a Revoked status and filter, and the audit log records `ca_revoked` (#343, reported by @j2r2k2)
+
+### Fixed
+- The OCSP responder answered `unknown` for the certificate of an intermediate CA. The status lookup only searched the end-entity certificates issued by the CA named in the request, while the certificate of a sub-CA is stored with the CA itself, so a client validating a chain got no answer for the intermediate. The responder now recognises the certificates of the CAs signed by the requested issuer and answers `good` while they are valid, `revoked` once the sub-CA is revoked (#344, reported by @j2r2k2)
+
 ## [2.225] - 2026-09-09
 
 ### Added

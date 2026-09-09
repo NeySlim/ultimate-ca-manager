@@ -20,6 +20,7 @@ export default {
           { label: 'Importer une CA', text: 'Importer un certificat de CA existant (avec ou sans clé privée)' },
           { label: 'Exporter', text: 'PEM, DER ou PKCS#12 (P12/PFX) avec protection par mot de passe' },
           { label: 'Renouveler la CA', text: 'Réémettre le certificat de la CA avec une nouvelle période de validité' },
+          { label: 'Révoquer', text: 'Révoquer une CA intermédiaire auprès de sa CA parente : publiée dans la CRL et l\'OCSP du parent, et la CA ne peut plus signer (définitif)' },
           { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
         ]
       },
@@ -178,6 +179,22 @@ Le renouvellement réémet le certificat de la CA avec :
 - Nouveau numéro de série
 
 Les certificats existants signés par la CA restent valides.
+
+## Révoquer une CA intermédiaire
+
+Une CA intermédiaire dont la clé est compromise ou qui est mise hors service est révoquée auprès de sa CA parente, comme un certificat :
+
+1. Sélectionnez la CA intermédiaire et cliquez sur **Révoquer la CA**
+2. Choisissez la raison RFC 5280 (compromission de clé, compromission de CA, cessation d'activité, ...)
+3. Confirmez : la révocation est définitive
+
+Ce qui se passe ensuite :
+- Le numéro de série de la CA est publié dans la **CRL de la CA parente** (régénérée immédiatement) et le **répondeur OCSP** du parent répond \`revoked\` avec la raison
+- La CA révoquée **ne peut plus rien signer** : certificats, CSR, renouvellements, sous-CA, et les CA situées en dessous non plus
+- Les certificats qu'elle a émis ne sont plus approuvés par les clients qui valident la chaîne ; sa propre CRL et son OCSP continuent d'être servis jusqu'à la suppression de la CA
+- Supprimer la CA révoquée conserve son entrée dans la CRL du parent jusqu'à l'expiration initiale du certificat
+
+> ⚠ Une CA racine ne peut pas être révoquée depuis UCM (auto-signée : les parties utilisatrices la retirent de leurs magasins de confiance), et une intermédiaire signée par une racine externe est révoquée auprès de cette racine. Sa CRL peut ensuite être servie depuis UCM (voir Mode hors ligne).
 
 ## Supprimer une CA
 

@@ -28,7 +28,7 @@ def _scep_ca_usable(ca):
     """Whether api/scep_protocol.get_scep_service would accept *ca*: it
     refuses a CA without private key or certificate, an offline CA, and an
     HSM-backed CA (SCEP needs RSA envelope decryption)."""
-    return bool(ca.has_private_key and ca.crt and not ca.offline and not ca.uses_hsm)
+    return bool(ca.has_private_key and ca.crt and not ca.offline and not ca.revoked and not ca.uses_hsm)
 
 
 def _scep_global_ca(value):

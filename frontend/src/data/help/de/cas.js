@@ -20,6 +20,7 @@ export default {
           { label: 'CA importieren', text: 'Vorhandenes CA-Zertifikat importieren (mit oder ohne privaten Schlüssel)' },
           { label: 'Exportieren', text: 'PEM, DER oder PKCS#12 (P12/PFX) mit Passwortschutz' },
           { label: 'CA erneuern', text: 'Das CA-Zertifikat mit einer neuen Gültigkeitsdauer erneut ausstellen' },
+          { label: 'Widerrufen', text: 'Eine Intermediate-CA bei ihrer übergeordneten CA widerrufen: Veröffentlichung in CRL und OCSP der übergeordneten CA, und die CA kann nicht mehr signieren (dauerhaft)' },
           { label: 'Kettenreparatur', text: 'Unterbrochene Eltern-Kind-Beziehungen automatisch reparieren' },
         ]
       },
@@ -177,6 +178,22 @@ Die Erneuerung stellt das CA-Zertifikat mit folgenden Eigenschaften erneut aus:
 - Neue Seriennummer
 
 Vorhandene von der CA signierte Zertifikate bleiben gültig.
+
+## Eine Intermediate-CA widerrufen
+
+Eine Intermediate-CA, deren Schlüssel kompromittiert ist oder die außer Betrieb genommen wird, wird bei ihrer übergeordneten CA widerrufen, wie ein Zertifikat:
+
+1. Wählen Sie die Intermediate-CA aus und klicken Sie auf **CA widerrufen**
+2. Wählen Sie den Grund nach RFC 5280 (Schlüsselkompromittierung, CA-Kompromittierung, Betriebseinstellung, ...)
+3. Bestätigen Sie: Der Widerruf ist dauerhaft
+
+Was danach passiert:
+- Die Seriennummer der CA wird in der **CRL der übergeordneten CA** veröffentlicht (sofort neu erzeugt) und der **OCSP-Responder** der übergeordneten CA antwortet mit \`revoked\` und dem Grund
+- Die widerrufene CA **kann nichts mehr signieren**: Zertifikate, CSRs, Erneuerungen, Sub-CAs, und ebenso wenig die CAs unterhalb von ihr
+- Von ihr ausgestellte Zertifikate werden von Clients, die die Kette validieren, nicht mehr als vertrauenswürdig eingestuft; ihre eigene CRL und ihr OCSP werden weiter ausgeliefert, bis die CA gelöscht wird
+- Das Löschen der widerrufenen CA behält ihren Eintrag in der CRL der übergeordneten CA bis zum ursprünglichen Ablauf des Zertifikats bei
+
+> ⚠ Eine Root-CA kann in UCM nicht widerrufen werden (selbstsigniert: die vertrauenden Parteien entfernen sie aus ihren Trust Stores), und eine von einer externen Root signierte Intermediate wird bei dieser Root widerrufen. Ihre CRL kann dann von UCM ausgeliefert werden (siehe Offline-Modus).
 
 ## Eine CA löschen
 

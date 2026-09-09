@@ -163,7 +163,7 @@ class CRLGenerationMixin:
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
 
         from services.hsm.ca_key_loader import get_ca_signing_key
-        ca_private_key = get_ca_signing_key(ca)
+        ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
         # Purge stale revocation records (expired certs no longer need CRL entries).
         # Gated by 'crl_auto_purge_stale_serials' setting — defaults to off so
@@ -291,7 +291,7 @@ class CRLGenerationMixin:
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
 
         from services.hsm.ca_key_loader import get_ca_signing_key
-        ca_private_key = get_ca_signing_key(ca)
+        ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
         from models import RevokedSerial
 

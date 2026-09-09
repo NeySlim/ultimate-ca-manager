@@ -204,6 +204,8 @@ def renew_ca_csr(ca_id):
         return error_response('CA has no private key', 400)
     if ca.offline:
         return error_response('CA is offline; restore it before renewing', 409)
+    if ca.revoked:
+        return error_response('CA is revoked; a revoked CA is not renewed', 409)
 
     data = request.get_json(silent=True) or {}
     digest = data.get('digest')

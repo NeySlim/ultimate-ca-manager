@@ -173,6 +173,22 @@ Renewing re-issues the CA certificate with:
 
 Existing certificates signed by the CA remain valid.
 
+## Revoking an Intermediate CA
+
+An intermediate CA whose key is compromised or that is decommissioned is revoked from its parent, like a certificate:
+
+1. Select the intermediate CA and click **Revoke CA**
+2. Choose the RFC 5280 reason (key compromise, CA compromise, cessation of operation, ...)
+3. Confirm: the revocation is permanent
+
+What happens next:
+- The CA's serial is published on the **parent CA's CRL** (regenerated immediately) and the parent's **OCSP responder** answers \`revoked\` with the reason
+- The revoked CA **can no longer sign** anything: certificates, CSRs, renewals, sub-CAs, and neither can the CAs below it
+- Certificates it issued are no longer trusted by clients that validate the chain; its own CRL and OCSP keep being served until the CA is deleted
+- Deleting the revoked CA keeps its entry on the parent's CRL until the certificate's original expiry
+
+> ⚠ A root CA cannot be revoked from UCM (self-signed: relying parties remove it from their trust stores), and an intermediate signed by an external root is revoked at that root. Its CRL can then be served from UCM (see Offline Mode).
+
 ## Deleting a CA
 
 > ⚠ Deleting a CA removes it from UCM but does NOT revoke certificates it has issued. Revoke certificates first if needed.

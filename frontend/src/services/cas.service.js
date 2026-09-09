@@ -52,6 +52,14 @@ export const casService = {
    * - mode 'password_protected': returns JSON (CA payload)
    * - mode 'file_exported': returns a Blob (encrypted .key file to save locally)
    */
+  // Revoke an intermediate CA from its parent (#343): RFC 5280 reason name,
+  // optional invalidity date (ISO 8601)
+  async revoke(id, { reason = 'unspecified', invalidityDate = null } = {}) {
+    const body = { reason }
+    if (invalidityDate) body.invalidity_date = invalidityDate
+    return apiClient.post(`/cas/${id}/revoke`, body)
+  },
+
   async takeOffline(id, { password, mode = 'password_protected' } = {}) {
     if (mode === 'file_exported') {
       return apiClient.post(

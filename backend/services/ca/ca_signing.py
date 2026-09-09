@@ -29,11 +29,13 @@ class CASigningMixin:
 
     @staticmethod
     def _check_ca_offline(ca: CA) -> None:
-        """Raise CAOfflineError if the CA cannot sign (offline or pending)."""
+        """Raise CAOfflineError if the CA cannot sign (offline, revoked or pending)."""
         if ca.offline:
             raise CAOfflineError(
                 f"CA '{ca.descr}' is offline: {ca.offline_reason or 'no reason provided'}"
             )
+        if ca.revoked_in_chain:
+            raise CAOfflineError(f"CA '{ca.descr}' is revoked and can no longer sign")
         if ca.is_pending:
             raise CAOfflineError(
                 f"CA '{ca.descr}' is awaiting its certificate and cannot sign"

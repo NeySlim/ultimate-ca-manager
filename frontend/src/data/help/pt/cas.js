@@ -20,6 +20,7 @@ export default {
           { label: 'Importar CA', text: 'Importar certificado de CA existente (com ou sem chave privada)' },
           { label: 'Exportar', text: 'PEM, DER ou PKCS#12 (P12/PFX) com proteção por senha' },
           { label: 'Renovar CA', text: 'Reemitir o certificado da CA com um novo período de validade' },
+          { label: 'Revogar', text: 'Revogar uma CA intermediária a partir da sua CA pai: publicada na CRL e no OCSP da CA pai, e a CA não pode mais assinar (permanente)' },
           { label: 'Reparo de Cadeia', text: 'Corrigir relações pai-filho quebradas automaticamente' },
         ]
       },
@@ -177,6 +178,22 @@ A renovação reemite o certificado da CA com:
 - Novo número de série
 
 Os certificados existentes assinados pela CA permanecem válidos.
+
+## Revogando uma CA Intermediária
+
+Uma CA intermediária cuja chave foi comprometida ou que foi desativada é revogada a partir da sua CA pai, como um certificado:
+
+1. Selecione a CA intermediária e clique em **Revogar CA**
+2. Escolha o motivo RFC 5280 (chave comprometida, CA comprometida, cessação de atividade, ...)
+3. Confirme: a revogação é permanente
+
+O que acontece em seguida:
+- O número de série da CA é publicado na **CRL da CA pai** (regenerada imediatamente) e o **respondedor OCSP** da CA pai responde \`revoked\` com o motivo
+- A CA revogada **não pode mais assinar** nada: certificados, CSRs, renovações, sub-CAs, e as CAs abaixo dela também não
+- Os certificados que ela emitiu deixam de ser confiáveis para os clientes que validam a cadeia; sua própria CRL e seu OCSP continuam sendo servidos até que a CA seja excluída
+- Excluir a CA revogada mantém sua entrada na CRL da CA pai até a expiração original do certificado
+
+> ⚠ Uma CA raiz não pode ser revogada a partir do UCM (autoassinada: as partes confiantes a removem de seus armazenamentos de confiança), e uma intermediária assinada por uma raiz externa é revogada nessa raiz. Sua CRL pode então ser servida a partir do UCM (veja Modo offline).
 
 ## Excluindo uma CA
 

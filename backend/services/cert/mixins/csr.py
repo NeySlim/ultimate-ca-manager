@@ -238,6 +238,9 @@ class CSRMixin:
         if ca.offline:
             raise ValueError("CA is offline")
 
+        if ca.revoked_in_chain:
+            raise ValueError("CA is revoked and can no longer sign")
+
         # Load CA cert and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())

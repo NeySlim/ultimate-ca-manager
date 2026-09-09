@@ -14,6 +14,109 @@ logger = logging.getLogger(__name__)
 
 
 class CAOperationsMixin:
+
+    @staticmethod
+    def revoke_ca(
+        ca_id: int,
+        reason: str = 'unspecified',
+        username: str = 'system',
+        invalidity_at=None,
+    ) -> CA:
+        """Revoke an intermediate CA from its parent (#343).
+
+        The serial goes to the parent's revoked_serials, which its CRL and
+        OCSP responder already consult, so relying parties see the
+        revocation through the parent; the CA itself is marked revoked and
+        every issuance path refuses it (get_ca_signing_key). Permanent, as
+        for certificates. A root CA is not revocable here (self-signed:
+        relying parties drop it from their trust stores), nor is a CA whose
+        issuer is not held in UCM (revoke it at that root).
+        """
+        import base64
+        from datetime import timedelta
+        from cryptography import x509
+        from models import RevokedSerial
+        from utils.datetime_utils import utc_now
+
+        ca = db.session.get(CA, ca_id)
+        if not ca:
+            raise ValueError("CA not found")
+        if ca.revoked:
+            raise ValueError("CA is already revoked")
+        if ca.is_pending or not ca.crt:
+            raise ValueError("CA is awaiting its certificate")
+        if ca.is_root or not ca.caref:
+            raise ValueError(
+                "A root CA cannot be revoked: relying parties remove it from their trust stores"
+            )
+        parent = CA.query.filter_by(refid=ca.caref).first()
+        if not parent:
+            raise ValueError(
+                "The issuing CA is not held in UCM: revoke this CA at that root "
+                "(its CRL can then be served from UCM)"
+            )
+
+        # The serial as the certificate carries it: the stored column may be
+        # empty on an imported CA
+        cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+        serial_decimal = str(cert.serial_number)
+        if not ca.serial_number:
+            ca.serial_number = serial_decimal
+
+        now = utc_now()
+        ca.revoked = True
+        ca.revoked_at = now
+        ca.revoke_reason = reason
+        ca.invalidity_at = invalidity_at
+        valid_to = ca.valid_to or cert.not_valid_after_utc.replace(tzinfo=None)
+
+        existing = RevokedSerial.query.filter_by(
+            caref=parent.refid, serial_number=ca.serial_number
+        ).first()
+        if existing:
+            existing.revoked_at = now
+            existing.revoke_reason = reason
+            existing.invalidity_at = invalidity_at
+            existing.valid_to = valid_to
+        else:
+            db.session.add(RevokedSerial(
+                caref=parent.refid,
+                serial_number=ca.serial_number,
+                revoked_at=now,
+                revoke_reason=reason,
+                invalidity_at=invalidity_at,
+                valid_to=valid_to,
+                certificate_id=None,
+            ))
+
+        try:
+            db.session.commit()
+        except Exception as _commit_err:
+            db.session.rollback()
+            logger.error(f"Revocation failed for CA {ca_id}: {_commit_err}", exc_info=True)
+            raise RuntimeError(f"Revocation failed for CA {ca_id}: {_commit_err}") from _commit_err
+
+        from services.audit_service import AuditService
+        AuditService.log_ca(
+            'ca_revoked', ca,
+            f'Revoked CA: {ca.descr} - Reason: {reason} (issuer: {parent.descr})',
+            username=username,
+        )
+
+        # The parent publishes the revocation: CRL now, OCSP on next answer
+        if parent.cdp_enabled:
+            from services.crl_service import CRLService
+            try:
+                CRLService.generate_crl(parent.id, username=username)
+            except Exception as e:
+                AuditService.log_ca(
+                    'crl_auto_generation_failed', parent,
+                    f'Failed to auto-generate CRL after revoking CA {ca.descr}: {e}',
+                    success=False,
+                )
+        from services.ocsp_service import OCSPService
+        OCSPService.invalidate_cached_responses(ca.serial_number, ca_id=parent.id)
+        return ca
     """CA certificate operations"""
 
     @staticmethod

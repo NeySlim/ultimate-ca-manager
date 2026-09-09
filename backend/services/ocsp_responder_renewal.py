@@ -168,7 +168,7 @@ def run_ocsp_responder_renewal():
             continue
 
         ca = db.session.get(CA, ca_id)
-        if not ca or not ca.crt or not ca.has_private_key or ca.offline:
+        if not ca or not ca.crt or not ca.has_private_key or ca.offline or ca.revoked_in_chain:
             logger.warning(
                 "OCSP responder renewal: CA %s unavailable for cert %s; skipping",
                 ca_id, cert_id,

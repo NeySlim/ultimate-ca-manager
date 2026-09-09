@@ -70,6 +70,7 @@ export const helpContent = {
           { label: 'Import CA', text: 'Import existing CA certificate (with or without private key)' },
           { label: 'Export', text: 'PEM, DER, or PKCS#12 (P12/PFX) with password protection' },
           { label: 'Renew CA', text: 'Re-issue the CA certificate with a new validity period' },
+          { label: 'Revoke', text: 'Revoke an intermediate CA from its parent: published on the parent\'s CRL and OCSP, and the CA can no longer sign (permanent)' },
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
         ]
       },

@@ -756,6 +756,8 @@ def sign_csr(csr_id):
             f"CA is offline: {ca.offline_reason or 'no reason provided'}",
             400
         )
+    if ca.revoked_in_chain:
+        return error_response('CA is revoked and can no longer sign', 400)
 
     # Clamp validity to CA expiration
     try:

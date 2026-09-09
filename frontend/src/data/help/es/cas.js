@@ -20,6 +20,7 @@ export default {
           { label: 'Importar CA', text: 'Importa un certificado CA existente (con o sin clave privada)' },
           { label: 'Exportar', text: 'PEM, DER o PKCS#12 (P12/PFX) con protección por contraseña' },
           { label: 'Renovar CA', text: 'Reemite el certificado CA con un nuevo período de validez' },
+          { label: 'Revocar', text: 'Revoca una CA intermedia desde su CA padre: se publica en la CRL y el OCSP del padre, y la CA ya no puede firmar (permanente)' },
           { label: 'Reparar cadena', text: 'Corrige automáticamente las relaciones padre-hijo rotas' },
         ]
       },
@@ -177,6 +178,22 @@ La renovación reemite el certificado CA con:
 - Nuevo número de serie
 
 Los certificados existentes firmados por la CA permanecen válidos.
+
+## Revocar una CA intermedia
+
+Una CA intermedia cuya clave está comprometida o que se retira del servicio se revoca desde su CA padre, como un certificado:
+
+1. Selecciona la CA intermedia y haz clic en **Revocar CA**
+2. Elige el motivo RFC 5280 (compromiso de clave, compromiso de CA, cese de operación, ...)
+3. Confirma: la revocación es permanente
+
+Qué ocurre a continuación:
+- El número de serie de la CA se publica en la **CRL de la CA padre** (regenerada inmediatamente) y el **respondedor OCSP** del padre responde \`revoked\` con el motivo
+- La CA revocada **ya no puede firmar** nada: certificados, CSRs, renovaciones, sub-CAs, y tampoco pueden hacerlo las CAs situadas por debajo
+- Los certificados que emitió dejan de ser de confianza para los clientes que validan la cadena; su propia CRL y OCSP se siguen sirviendo hasta que se elimine la CA
+- Eliminar la CA revocada conserva su entrada en la CRL del padre hasta la expiración original del certificado
+
+> ⚠ Una CA raíz no puede revocarse desde UCM (autofirmada: las partes que confían en ella la retiran de sus almacenes de confianza), y una intermedia firmada por una raíz externa se revoca en esa raíz. Su CRL puede entonces servirse desde UCM (ver Modo sin conexión).
 
 ## Eliminar una CA
 

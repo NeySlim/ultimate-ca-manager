@@ -95,6 +95,14 @@ class CA(db.Model):
     offline = db.Column(db.Boolean, default=False)
     offline_reason = db.Column(db.String(1024), nullable=True)
     offline_mode = db.Column(db.String(32), nullable=True)
+
+    # Revocation of an intermediate CA by its parent (#343): the parent's CRL
+    # and OCSP carry the serial through revoked_serials; these columns hold
+    # the state shown on the CA and the reason it was revoked for
+    revoked = db.Column(db.Boolean, default=False)
+    revoked_at = db.Column(db.DateTime, nullable=True)
+    revoke_reason = db.Column(db.String(100), nullable=True)
+    invalidity_at = db.Column(db.DateTime, nullable=True)
     
     # Relationships
     certificates = db.relationship("Certificate", back_populates="ca", lazy="dynamic")
@@ -182,6 +190,22 @@ class CA(db.Model):
     def is_root(self) -> bool:
         """Check if this is a root CA (self-signed)"""
         return self.subject == self.issuer if self.subject and self.issuer else False
+
+    @property
+    def revoked_in_chain(self) -> bool:
+        """Whether this CA or one of its ancestors held in UCM is revoked.
+
+        A revoked ancestor breaks path validation for everything below it,
+        so a CA under one must not issue either (#343)."""
+        ca, depth = self, 0
+        while ca is not None and depth < 16:
+            if ca.revoked:
+                return True
+            if not ca.caref:
+                return False
+            ca = CA.query.filter_by(refid=ca.caref).first()
+            depth += 1
+        return False
     
     @property
     def key_type(self) -> str:
@@ -329,6 +353,8 @@ class CA(db.Model):
         status = "Active"
         if self.is_pending:
             status = "Pending"
+        elif self.revoked:
+            status = "Revoked"
         elif self.valid_to:
             if self.valid_to < utc_now():
                 status = "Expired"
@@ -377,7 +403,12 @@ class CA(db.Model):
             "locality": self.locality,
             "is_root": self.is_root,
             "type": ca_type,  # "Root CA" or "Intermediate"
-            "status": status,  # "Pending", "Active" or "Expired"
+            "status": status,  # "Pending", "Revoked", "Active" or "Expired"
+            # Revocation by the parent CA (#343)
+            "revoked": bool(self.revoked),
+            "revoked_at": utc_isoformat(self.revoked_at),
+            "revoke_reason": self.revoke_reason,
+            "invalidity_at": utc_isoformat(self.invalidity_at),
             # External-CSR lifecycle (#298)
             "pending": self.is_pending,
             "has_csr": bool(self.csr),

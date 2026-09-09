@@ -88,6 +88,9 @@ def create_certificate():
     if ca.offline:
         return error_response('CA is offline; restore it before issuing', 400)
 
+    if ca.revoked_in_chain:
+        return error_response('CA is revoked and can no longer issue certificates', 400)
+
     # Policy evaluation — check if approval is required (admins bypass)
     try:
         user_role = getattr(g.current_user, 'role', None) if hasattr(g, 'current_user') else None

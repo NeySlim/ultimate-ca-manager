@@ -60,6 +60,7 @@ export function CADetails({
 
   // Determine status
   const getStatus = () => {
+    if (ca.revoked || ca.status === 'Revoked') return 'revoked'
     if (ca.status === 'Expired') return 'expired'
     if (ca.days_remaining !== null && ca.days_remaining <= 30) return 'expiring'
     return 'valid'
@@ -69,7 +70,8 @@ export function CADetails({
   const statusConfig = {
     valid: { variant: 'success', label: t('common.active') },
     expiring: { variant: 'warning', label: t('common.detailsExpiring') },
-    expired: { variant: 'danger', label: t('common.expired') }
+    expired: { variant: 'danger', label: t('common.expired') },
+    revoked: { variant: 'danger', label: t('common.revoked') }
   }
 
   return (
@@ -175,6 +177,16 @@ export function CADetails({
           <span className="text-2xs text-text-secondary">{ca.key_type || t('common.na')}</span>
           <span className="text-2xs text-text-tertiary">•</span>
           <span className="text-2xs text-text-secondary">{ca.certs || 0} {t('common.certificatesShort')}</span>
+        </div>
+      )}
+
+      {/* Revoked by the parent CA (#343) */}
+      {ca.revoked && (
+        <div className="rounded-lg px-3 py-2 bg-status-danger/20 border border-status-danger/40 text-xs text-text-secondary">
+          {t('cas.revokedBanner', {
+            date: ca.revoked_at ? formatDate(ca.revoked_at) : '-',
+            reason: t(`revocation.reasons.${ca.revoke_reason || 'unspecified'}`),
+          })}
         </div>
       )}
 

@@ -1089,6 +1089,8 @@ class SCEPService:
             raise ValueError(
                 f"CA is offline: {self.ca.offline_reason or 'no reason provided'}"
             )
+        if self.ca.revoked_in_chain:
+            raise ValueError("CA is revoked and can no longer sign")
 
         cert_refid = str(uuid.uuid4())
         public_key = csr.public_key()

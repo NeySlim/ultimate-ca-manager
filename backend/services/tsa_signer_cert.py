@@ -148,6 +148,8 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
         raise TsaSignerIssueError('CA is awaiting its certificate', 400)
     if ca.offline:
         raise TsaSignerIssueError('CA is offline; restore it before issuing', 400)
+    if ca.revoked_in_chain:
+        raise TsaSignerIssueError('CA is revoked and can no longer issue certificates', 400)
 
     if cn is not None and not isinstance(cn, str):
         raise TsaSignerIssueError('cn must be a string', 400)

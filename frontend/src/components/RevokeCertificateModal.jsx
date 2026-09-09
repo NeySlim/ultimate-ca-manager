@@ -7,7 +7,8 @@
  * is one-way (except a certificate hold), so the choice cannot be redone.
  *
  * Props: open, onClose, onConfirm(reason), certificate ({ name, source }),
- * loading, count (bulk: number of certificates the reason applies to).
+ * loading, count (bulk: number of certificates the reason applies to),
+ * title / warning (overrides, used when revoking an intermediate CA, #343).
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,7 +28,7 @@ export const REVOCATION_REASONS = [
   'aACompromise',
 ]
 
-export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, loading = false, count = 1 }) {
+export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, loading = false, count = 1, title, warning }) {
   const { t } = useTranslation()
   const [reason, setReason] = useState('unspecified')
 
@@ -39,7 +40,7 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
   const name = certificate?.name || certificate?.common_name || certificate?.cn || certificate?.descr || ''
 
   return (
-    <Modal open={open} onClose={onClose} title={t('revocation.title')} size="sm">
+    <Modal open={open} onClose={onClose} title={title || t('revocation.title')} size="sm">
       <form
         onSubmit={(e) => { e.preventDefault(); if (!loading) onConfirm(reason) }}
         className="p-4 space-y-4"
@@ -49,7 +50,7 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
           <Warning size={16} className="mt-0.5 shrink-0 text-status-warning" />
           <div className="space-y-1">
             {name && <div className="font-medium text-text-primary truncate">{name}</div>}
-            <div>{t('certificates.revokeWarning')}</div>
+            <div>{warning || t('certificates.revokeWarning')}</div>
             {certificate?.source === 'msca' && <div>{t('certificates.revokeMscaWarning')}</div>}
           </div>
         </div>

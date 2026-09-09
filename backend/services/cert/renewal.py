@@ -298,6 +298,8 @@ def renew_certificate_in_place(
         raise RenewalError('Issuing CA is awaiting its certificate', 400)
     if ca.offline:
         raise RenewalError('CA is offline; restore it before renewing', 400)
+    if ca.revoked_in_chain:
+        raise RenewalError('CA is revoked and can no longer renew certificates', 400)
 
     orig_cert = x509.load_pem_x509_certificate(
         base64.b64decode(cert.crt), default_backend()

@@ -90,6 +90,30 @@ class _HsmPrivateKeyWrapper:
         return self._public_key
 
 # Map revoke_reason strings to X.509 ReasonFlags
+def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]:
+    """The CA signed by *issuer* whose certificate carries *cert_serial*.
+
+    The serial_number column is filled at creation since 2.226; older rows
+    (and imports) may have it empty, so the children's certificates are
+    parsed when the column does not match."""
+    child = CA.query.filter(
+        CA.caref == issuer.refid,
+        CA.serial_number.in_(variants),
+    ).first()
+    if child is not None:
+        return child
+    for candidate in CA.query.filter(CA.caref == issuer.refid).all():
+        if not candidate.crt:
+            continue
+        try:
+            cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt))
+        except Exception:
+            continue
+        if cert.serial_number == cert_serial:
+            return candidate
+    return None
+
+
 def _build_unknown_certificate(serial: int, issuer: x509.Certificate) -> x509.Certificate:
     """Build a transient certificate so older cryptography can encode UNKNOWN."""
     key = ec.generate_private_key(ec.SECP256R1())
@@ -500,6 +524,23 @@ class OCSPService:
                     certificate.revoke_reason, x509.ReasonFlags.unspecified
                 ),
             )
+        if not certificate:
+            # The certificate of a CA signed by this issuer lives in the CA
+            # table, not with the end-entity certificates (#344): answer for
+            # it too, revoked when its parent revoked it (#343), else good
+            # unless a persistent or external revocation record says otherwise.
+            child_ca = _child_ca_for_serial(ca, cert_serial, variants)
+            if child_ca is not None:
+                if child_ca.revoked:
+                    return (
+                        child_ca,
+                        'revoked',
+                        child_ca.revoked_at or utc_now(),
+                        _REASON_MAP.get(
+                            child_ca.revoke_reason, x509.ReasonFlags.unspecified
+                        ),
+                    )
+                certificate = child_ca
         if not certificate:
             # Fallback: check the persistent revocation table for deleted certs
             rs = RevokedSerial.query.filter(

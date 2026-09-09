@@ -128,12 +128,18 @@ export function FloatingDetailWindow({ windowInfo }) {
   const handleRevokeConfirm = async (reason) => {
     setRevokeOpen(false)
     try {
-      await certificatesService.revoke(windowInfo.entityId, reason)
-      showSuccess(t('certificates.revoked', 'Certificate revoked'))
+      if (windowInfo.type === 'ca') {
+        // Intermediate CA revoked from its parent (#343)
+        await casService.revoke(windowInfo.entityId, { reason })
+        showSuccess(t('cas.revokeSuccess', 'CA revoked'))
+      } else {
+        await certificatesService.revoke(windowInfo.entityId, reason)
+        showSuccess(t('certificates.revoked', 'Certificate revoked'))
+      }
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
     } catch (err) {
-      showError(err.message || t('certificates.revokeFailed', 'Revoke failed'))
+      showError(err.message || (windowInfo.type === 'ca' ? t('cas.revokeFailed', 'Failed to revoke CA') : t('certificates.revokeFailed', 'Revoke failed')))
     }
   }
 
@@ -254,7 +260,10 @@ export function FloatingDetailWindow({ windowInfo }) {
     onLint: (isCert || isUserCert) ? () => setLintOpen(true) : null,
     onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
     onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
-    onRevoke: (isCert || isUserCert) && canWrite(resource) && !data.revoked ? handleRevoke : null,
+    onRevoke: ((isCert || isUserCert) && canWrite(resource) && !data.revoked)
+      // A CA is revoked by its parent, so it needs one held in UCM (#343)
+      || (isCA && canWrite('cas') && !data.revoked && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
+      ? handleRevoke : null,
     onUnhold: isCert && canWrite('certificates') && data.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold') ? handleUnhold : null,
     onOffline: isCA && canWrite('cas') && !data.offline && !data.pending ? handleOffline : null,
     onRestore: isCA && canWrite('cas') && data.offline ? handleRestore : null,
@@ -321,12 +330,14 @@ export function FloatingDetailWindow({ windowInfo }) {
       />
     )}
 
-    {(isCert || isUserCert) && (
+    {(isCert || isUserCert || isCA) && (
       <RevokeCertificateModal
         open={revokeOpen}
         onClose={() => setRevokeOpen(false)}
         onConfirm={handleRevokeConfirm}
         certificate={data}
+        title={isCA ? t('cas.revoke', 'Revoke CA') : undefined}
+        warning={isCA ? t('cas.revokeWarning') : undefined}
       />
     )}
     {(isCert || isUserCert) && data && (
@@ -487,7 +498,7 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
       {onRevoke && (
         <button onClick={onRevoke} className={cn(btnBase, 'text-text-secondary hover:text-status-warning hover:bg-status-warning-op10')}>
           <X size={14} weight="bold" />
-          {t('common.revoke', 'Revoke')}
+          {entityType === 'ca' ? t('cas.revoke', 'Revoke CA') : t('common.revoke', 'Revoke')}
         </button>
       )}
 

@@ -129,6 +129,8 @@ def _issue_approved_certificate(approval):
         raise ValueError("CA is awaiting its certificate")
     if ca.offline:
         raise ValueError("CA is offline; restore it before issuing")
+    if ca.revoked_in_chain:
+        raise ValueError("CA is revoked and can no longer issue certificates")
 
     # Load CA cert and key
     ca_cert_pem = base64.b64decode(ca.crt)

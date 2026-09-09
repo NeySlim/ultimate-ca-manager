@@ -32,7 +32,7 @@ from utils.key_codec import load_pem_bytes
 logger = logging.getLogger(__name__)
 
 
-def get_ca_signing_key(ca):
+def get_ca_signing_key(ca, *, allow_revoked: bool = False):
     """Return a signing key usable with ``cryptography``'s builders.
 
     For HSM-backed CAs returns an :class:`HsmRSAPrivateKey` /
@@ -40,10 +40,18 @@ def get_ca_signing_key(ca):
     ``RSAPrivateKey`` / ``EllipticCurvePrivateKey`` decoded from
     ``ca.prv``.
 
-    Raises :class:`ValueError` if neither key source is available.
+    Raises :class:`ValueError` if neither key source is available, or when
+    the CA (or an ancestor) is revoked (#343): every issuance path loads the
+    key here, so a revoked CA signs nothing new. Serving its existing CRL
+    stays possible with ``allow_revoked=True``.
     """
     if ca is None:
         raise ValueError("CA is required")
+
+    if not allow_revoked and getattr(ca, 'revoked_in_chain', False):
+        raise ValueError(
+            f"CA '{getattr(ca, 'descr', ca)}' is revoked and can no longer sign"
+        )
 
     if getattr(ca, 'hsm_key_id', None):
         return load_hsm_private_key(ca.hsm_key_id)

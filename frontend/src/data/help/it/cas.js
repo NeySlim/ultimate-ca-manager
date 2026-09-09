@@ -20,6 +20,7 @@ export default {
           { label: 'Importa CA', text: 'Importa un certificato CA esistente (con o senza chiave privata)' },
           { label: 'Esporta', text: 'PEM, DER o PKCS#12 (P12/PFX) con protezione password' },
           { label: 'Rinnova CA', text: 'Riemetti il certificato CA con un nuovo periodo di validità' },
+          { label: 'Revoca', text: 'Revoca una CA intermedia dalla sua CA padre: pubblicata nella CRL e nell\'OCSP del padre, e la CA non può più firmare (permanente)' },
           { label: 'Ripara catena', text: 'Correggi automaticamente le relazioni padre-figlio interrotte' },
         ]
       },
@@ -177,6 +178,22 @@ Il rinnovo riemette il certificato CA con:
 - Nuovo numero di serie
 
 I certificati esistenti firmati dalla CA rimangono validi.
+
+## Revoca di una CA intermedia
+
+Una CA intermedia la cui chiave è compromessa o che viene dismessa si revoca presso la sua CA padre, come un certificato:
+
+1. Seleziona la CA intermedia e clicca **Revoca CA**
+2. Scegli il motivo RFC 5280 (compromissione della chiave, compromissione della CA, cessazione dell'attività, ...)
+3. Conferma: la revoca è permanente
+
+Cosa succede dopo:
+- Il numero di serie della CA viene pubblicato nella **CRL della CA padre** (rigenerata immediatamente) e il **responder OCSP** del padre risponde \`revoked\` con il motivo
+- La CA revocata **non può più firmare** nulla: certificati, CSR, rinnovi, sub-CA, e nemmeno le CA sotto di essa
+- I certificati che ha emesso non sono più considerati attendibili dai client che validano la catena; la sua CRL e il suo OCSP continuano a essere serviti finché la CA non viene eliminata
+- L'eliminazione della CA revocata mantiene la sua voce nella CRL del padre fino alla scadenza originale del certificato
+
+> ⚠ Una CA root non può essere revocata da UCM (autofirmata: le relying party la rimuovono dai loro trust store), e un'intermedia firmata da una root esterna si revoca presso quella root. La sua CRL può poi essere servita da UCM (vedi Modalità offline).
 
 ## Eliminazione di una CA
 

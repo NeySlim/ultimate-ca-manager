@@ -364,6 +364,7 @@ export default function CAsPage() {
       options: [
         { value: 'Active', label: t('common.active') },
         { value: 'Expired', label: t('common.expired') },
+        { value: 'Revoked', label: t('common.revoked') },
         { value: 'Pending', label: t('cas.awaitingCertificate') },
       ]
     }
@@ -480,6 +481,7 @@ export default function CAsPage() {
                     options={[
                       { value: 'Active', label: t('common.active') },
                       { value: 'Expired', label: t('common.expired') },
+                      { value: 'Revoked', label: t('common.revoked') },
                       { value: 'Pending', label: t('cas.awaitingCertificate') },
                     ]}
                   />

@@ -22,11 +22,11 @@ export function formatExpiry(date, t) {
 }
 
 export function getStatusBadgeClass(status) {
-  return status === 'Active' ? 'status-badge-success' : status === 'Expired' ? 'status-badge-danger' : 'status-badge-warning'
+  return status === 'Active' ? 'status-badge-success' : (status === 'Expired' || status === 'Revoked') ? 'status-badge-danger' : 'status-badge-warning'
 }
 
 export function getStatusDotClass(status) {
-  return status === 'Active' ? 'bg-status-success' : status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
+  return status === 'Active' ? 'bg-status-success' : (status === 'Expired' || status === 'Revoked') ? 'bg-status-danger' : 'bg-status-warning'
 }
 
 // =============================================================================
