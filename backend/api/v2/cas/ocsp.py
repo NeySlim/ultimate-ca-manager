@@ -74,41 +74,12 @@ def set_ocsp_responder(ca_id):
     if cert.caref != ca.refid:
         return error_response('Certificate must be issued by this CA', 400)
 
-    if not cert.prv:
-        return error_response('Certificate must have a private key', 400)
-
-    # No certificate yet (a pending request) cannot sign anything: accepted
-    # here, it was then ignored at answer time (#347 review)
-    if not cert.crt:
-        return error_response('Certificate has no certificate yet', 400)
-    if cert.revoked:
-        return error_response('Certificate is revoked', 400)
-
-    if cert.crt:
-        try:
-            crt_pem = base64.b64decode(cert.crt).decode('utf-8')
-            x509_cert = x509.load_pem_x509_certificate(crt_pem.encode(), default_backend())
-            try:
-                eku = x509_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
-                if x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in eku.value:
-                    return error_response('Certificate must have OCSPSigning EKU', 400)
-            except x509.ExtensionNotFound:
-                return error_response('Certificate must have OCSPSigning EKU', 400)
-            # Refused here rather than ignored at answer time: without this
-            # extension the responder falls back to the CA key and the
-            # responses carry the CA's identity, not the one just configured
-            try:
-                x509_cert.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)
-            except x509.ExtensionNotFound:
-                return error_response(
-                    'Certificate must carry the id-pkix-ocsp-nocheck extension '
-                    '(RFC 6960): issue a new OCSP responder certificate, which '
-                    'now includes it',
-                    400,
-                )
-        except Exception as e:
-            logger.error(f"Failed to validate OCSP responder cert: {e}")
-            return error_response('Failed to validate certificate', 500)
+    # The rule the responder applies at answer time, applied here first: a
+    # certificate accepted and then refused silently left the CA signing
+    # under the operator's nose (#347 review)
+    reason = OCSPService().check_delegated_responder(ca, cert)
+    if reason:
+        return error_response(f'Certificate cannot serve as OCSP responder: {reason}', 400)
 
     try:
         config = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{ca_id}').first()
@@ -183,31 +154,16 @@ def list_eligible_ocsp_responders(ca_id):
     ).all()
 
     eligible = []
+    checker = OCSPService()
     for cert in certs:
-        if cert.valid_to and cert.valid_to < now:
+        # Offered only if the responder would actually sign with it
+        if checker.check_delegated_responder(ca, cert):
             continue
-        try:
-            crt_pem = base64.b64decode(cert.crt).decode('utf-8')
-            x509_cert = x509.load_pem_x509_certificate(crt_pem.encode(), default_backend())
-            eku = x509_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
-            if x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING in eku.value:
-                # The responder refuses a certificate without
-                # id-pkix-ocsp-nocheck and answers with the CA's own identity
-                # instead. Offering one here let an operator configure a
-                # responder that silently never signs anything (#347).
-                try:
-                    x509_cert.extensions.get_extension_for_oid(
-                        ExtensionOID.OCSP_NO_CHECK
-                    )
-                except x509.ExtensionNotFound:
-                    continue
-                eligible.append({
-                    'id': cert.id,
-                    'common_name': cert.common_name,
-                    'serial_number': cert.serial_number,
-                    'valid_to': utc_isoformat(cert.valid_to)
-                })
-        except (x509.ExtensionNotFound, Exception):
-            continue
+        eligible.append({
+            'id': cert.id,
+            'common_name': cert.common_name,
+            'serial_number': cert.serial_number,
+            'valid_to': utc_isoformat(cert.valid_to)
+        })
 
     return success_response(data=eligible)

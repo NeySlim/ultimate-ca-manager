@@ -305,6 +305,10 @@ def unhold_certificate(cert_id):
         if cert.serial_number:
             OCSPService.invalidate_cached_responses(
                 cert.serial_number, ca_id=ca.id if ca else None)
+        # A delegated responder coming off hold signs again: the answers the
+        # CA signed meanwhile carry the wrong identity (#347 review)
+        for responder_ca_id in OCSPService.responder_cas_for_certificate(cert_id):
+            OCSPService.invalidate_ca_cache(responder_ca_id)
 
         # Propagate the unhold to the Windows CA if this cert came from an MS CA
         # with an admin channel (certutil unrevoke only lifts a certificateHold).

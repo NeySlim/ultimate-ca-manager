@@ -1055,3 +1055,100 @@ class TestDelegatedResponderLifecycle:
             assert r.status_code == 400, r.data
             r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
             assert responder['id'] not in {c['id'] for c in json.loads(r.data)['data']}
+
+
+class TestDelegatedResponderStrictness:
+    """Third review of #347: the assignment applies the runtime rule in full,
+    and a responder coming off hold takes the cache with it."""
+
+    @staticmethod
+    def _store(ca_obj, cert, key, refid):
+        row = Certificate(
+            refid=refid, descr=refid, caref=ca_obj.refid,
+            crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+            prv=base64.b64encode(key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption())).decode(),
+            serial_number=str(cert.serial_number),
+        )
+        db.session.add(row); db.session.commit()
+        return row
+
+    @staticmethod
+    def _assign(auth_client, ca_id, cert_id):
+        return auth_client.post(f'/api/v2/cas/{ca_id}/ocsp-responder',
+                                data=json.dumps({'certificate_id': cert_id}),
+                                content_type='application/json')
+
+    @staticmethod
+    def _full_responder(ca_cert, signer_key, key, **kw):
+        cert = _delegated_certificate(ca_cert, signer_key, key, **kw)
+        return cert
+
+    def test_expired_future_and_foreign_signed_are_refused_at_assignment(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Strict Assign CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            now = datetime.now(timezone.utc)
+            cases = {
+                'expired': dict(not_before=now - timedelta(days=60), not_after=now - timedelta(days=1)),
+                'not yet valid': dict(not_before=now + timedelta(days=1), not_after=now + timedelta(days=30)),
+                'foreign signature': dict(signer_key=rsa.generate_private_key(public_exponent=65537, key_size=2048)),
+            }
+            for label, kw in cases.items():
+                key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                cert = _delegated_certificate(ca_cert, ca_key, key, **kw)
+                row = self._store(ca_obj, cert, key, f'strict-{label.replace(" ", "-")}')
+                r = self._assign(auth_client, ca['id'], row.id)
+                assert r.status_code == 400, (label, r.data)
+                assert SystemConfig.query.filter_by(key=f"ocsp_responder_cert_{ca['id']}").first() is None, label
+                r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+                assert row.id not in {c['id'] for c in json.loads(r.data)['data']}, label
+
+    def test_assignment_and_runtime_apply_the_same_rule(self, app, auth_client, create_ca):
+        """Whatever the assignment accepts, the responder uses; whatever it
+        refuses, the responder would have refused too."""
+        with app.app_context():
+            ca = create_ca(cn='Same Rule CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            good = _delegated_certificate(ca_cert, ca_key, key)
+            row = self._store(ca_obj, good, key, 'same-rule-good')
+            assert OCSPService().check_delegated_responder(ca_obj, row) is None
+            assert self._assign(auth_client, ca['id'], row.id).status_code == 200
+            resp_cert, resp_key = OCSPService()._get_delegated_responder(ca_obj)
+            assert resp_cert is not None and resp_cert.serial_number == good.serial_number
+
+    def test_unhold_of_a_responder_drops_the_ca_signed_answers(self, app, auth_client, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='Unhold Responder CA')
+            leaf = create_cert(cn='leaf-unhold.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            r = auth_client.post('/api/v2/certificates', data=json.dumps({
+                'cn': 'unhold-resp.example.com', 'ca_id': ca['id'], 'validity_days': 60,
+                'key_type': 'RSA 2048', 'cert_type': 'server', 'extra_ekus': ['1.3.6.1.5.5.7.3.9']}),
+                content_type='application/json')
+            responder = json.loads(r.data)['data']
+            responder_cert = x509.load_pem_x509_certificate(responder['pem'].encode())
+            assert self._assign(auth_client, ca['id'], responder['id']).status_code == 200
+            serial = int(_cert_model(leaf).serial_number, 16)
+
+            # On hold: the CA signs, and that answer is cached
+            r = auth_client.post(f"/api/v2/certificates/{responder['id']}/revoke",
+                                 data=json.dumps({'reason': 'certificateHold'}), content_type='application/json')
+            assert r.status_code == 200, r.data
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            assert ocsp.load_der_ocsp_response(der).responder_key_hash == TestResponderIdRfc6960._key_hash(ca_cert)
+            assert _cache_entries(ca['id'], serial)
+
+            # Off hold: the responder signs again, and the CA-signed answer is gone
+            r = auth_client.post(f"/api/v2/certificates/{responder['id']}/unhold")
+            assert r.status_code == 200, r.data
+            db.session.expire_all()
+            assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 0
+            der, _ = OCSPService().generate_response(ca_obj, serial)
+            assert ocsp.load_der_ocsp_response(der).responder_key_hash == TestResponderIdRfc6960._key_hash(responder_cert)

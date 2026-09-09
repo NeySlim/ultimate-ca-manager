@@ -334,108 +334,91 @@ class OCSPService:
         except Exception:
             return None
     
+    def check_delegated_responder(self, ca: CA, responder_record) -> Optional[str]:
+        """Why *responder_record* cannot sign OCSP responses for *ca*, or None.
+
+        The single rule for a delegated responder (RFC 6960 §4.2.2.2): issued
+        by this CA and verifiably signed by it, currently valid, not revoked,
+        holding its key, carrying the OCSPSigning EKU and id-pkix-ocsp-nocheck.
+        The responder applies it at answer time; the assignment and the list
+        of eligible certificates apply the same one, so a certificate the
+        responder would refuse is never offered or accepted only to be ignored
+        (#347 review).
+        """
+        if not responder_record:
+            return 'certificate not found'
+        if not responder_record.crt:
+            return 'certificate has no certificate yet'
+        if not responder_record.prv:
+            return 'certificate has no private key'
+        if responder_record.revoked:
+            return 'certificate is revoked'
+        resp_cert = self._load_cert(responder_record)
+        if not resp_cert:
+            return 'certificate could not be parsed'
+        try:
+            ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt), self.backend)
+        except Exception:
+            return 'CA certificate could not be parsed'
+        if resp_cert.issuer != ca_cert.subject:
+            return 'certificate was not issued by this CA'
+        if not self._certificate_is_currently_valid(resp_cert):
+            return 'certificate is expired or not yet valid'
+        try:
+            self._verify_certificate_signature(resp_cert, ca_cert)
+        except Exception:
+            return 'certificate signature does not verify against this CA'
+        try:
+            eku = resp_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
+        except x509.ExtensionNotFound:
+            return 'certificate has no Extended Key Usage'
+        if x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in eku.value:
+            return 'certificate lacks the OCSPSigning Extended Key Usage'
+        # RFC 6960 §4.2.2.2.1: without it clients would check the responder's
+        # own revocation status and loop; UCM refuses to sign with such a
+        # certificate rather than produce answers clients reject
+        try:
+            resp_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.OCSP_NO_CHECK)
+        except x509.ExtensionNotFound:
+            return 'certificate lacks the id-pkix-ocsp-nocheck extension (RFC 6960)'
+        return None
+
     def _get_delegated_responder(self, ca: CA):
+        """The configured delegated responder as (cert, key), or (None, None).
+
+        A configured certificate that fails check_delegated_responder is
+        refused with a warning and the CA signs itself.
         """
-        Check if CA has a delegated OCSP responder certificate (RFC 5019/6960).
-        
-        A delegated responder is a certificate issued by the CA with:
-        - id-kp-OCSPSigning EKU (OID 1.3.6.1.5.5.7.3.9)
-        - The OCSP No Check extension (OID 1.3.6.1.5.5.7.48.1.5)
-        
-        Returns (responder_cert, responder_key) or (None, None) if not configured.
-        """
-        # Check if delegated responder is configured for this CA
         config_row = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{ca.id}').first()
         responder_cert_id = config_row.value if config_row else ''
         if not responder_cert_id:
             return None, None
-        
+
         try:
             responder_record = db.session.get(Certificate, int(responder_cert_id))
-            if not responder_record or not responder_record.crt or not responder_record.prv:
-                logger.warning(f"Delegated OCSP responder cert {responder_cert_id} not found or incomplete")
-                return None, None
-            # A revoked responder must not sign: its answers would be signed
-            # by a key relying parties are told to distrust (#347 review)
-            if responder_record.revoked:
+            reason = self.check_delegated_responder(ca, responder_record)
+            if reason:
                 logger.warning(
-                    f"Delegated OCSP responder cert {responder_cert_id} is revoked; refusing to use it"
+                    f"Delegated OCSP responder cert {responder_cert_id} for CA {ca.id} "
+                    f"refused: {reason}; signing with the CA key"
                 )
                 return None, None
-            
-            # Verify the responder is currently valid and was directly issued
-            # by the CA it is configured to answer for (RFC 6960 §4.2.2.2).
             resp_cert = self._load_cert(responder_record)
-            if not resp_cert:
-                logger.warning(
-                    f"Delegated responder cert {responder_cert_id} could not be parsed"
-                )
-                return None, None
-            ca_cert = x509.load_pem_x509_certificate(
-                base64.b64decode(ca.crt), self.backend
-            )
-            if resp_cert.issuer != ca_cert.subject:
-                logger.warning(
-                    f"Delegated responder cert {responder_cert_id} issuer does not "
-                    f"match CA {ca.id} subject"
-                )
-                return None, None
-            if not self._certificate_is_currently_valid(resp_cert):
-                logger.warning(
-                    f"Delegated responder cert {responder_cert_id} is expired or "
-                    f"not yet valid"
-                )
-                return None, None
-            try:
-                self._verify_certificate_signature(resp_cert, ca_cert)
-            except Exception as e:
-                logger.warning(
-                    f"Delegated responder cert {responder_cert_id} signature is "
-                    f"not valid for CA {ca.id}: {e}"
-                )
-                return None, None
 
-            try:
-                eku = resp_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage)
-                if x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in eku.value:
-                    logger.warning(f"Delegated responder cert {responder_cert_id} missing OCSPSigning EKU")
-                    return None, None
-            except x509.ExtensionNotFound:
-                logger.warning(f"Delegated responder cert {responder_cert_id} has no EKU extension")
-                return None, None
-
-            # RFC 6960 §4.2.2.2.1: a delegated responder cert SHOULD include
-            # the id-pkix-ocsp-nocheck extension so clients know not to
-            # check its revocation status (which would loop). We refuse to
-            # use a responder cert without it — clients will reject the
-            # response anyway and fall through to the CA-signed path is
-            # preferable to silently producing unverifiable responses.
-            try:
-                resp_cert.extensions.get_extension_for_oid(
-                    x509.ObjectIdentifier('1.3.6.1.5.5.7.48.1.5')
-                )
-            except x509.ExtensionNotFound:
-                logger.warning(
-                    f"Delegated responder cert {responder_cert_id} missing "
-                    f"id-pkix-ocsp-nocheck extension; refusing to use it"
-                )
-                return None, None
-            
-            # Load responder private key
             try:
                 from security.encryption import decrypt_private_key
                 prv_decrypted = decrypt_private_key(responder_record.prv)
             except ImportError:
                 prv_decrypted = responder_record.prv
-            
+
             resp_key_pem = base64.b64decode(prv_decrypted).decode('utf-8')
             resp_key = serialization.load_pem_private_key(
                 resp_key_pem.encode(), password=None, backend=self.backend
             )
-            
+
             logger.debug(f"Using delegated OCSP responder for CA {ca.descr}")
             return resp_cert, resp_key
-            
+
         except Exception as e:
             logger.error(f"Failed to load delegated OCSP responder: {e}")
             return None, None

@@ -779,6 +779,22 @@ class TestRenewCertificate:
 # Import certificate
 # ============================================================================
 
+
+def _all_ids(auth_client, path):
+    """Every id, following the pages: the lists cap per_page at 100, so a
+    single call compares truncated sets and proves nothing."""
+    ids, page = set(), 1
+    while True:
+        sep = '&' if '?' in path else '?'
+        body = json.loads(auth_client.get(f'{path}{sep}per_page=100&page={page}').data)
+        rows = body.get('data') or []
+        ids |= {c['id'] for c in rows}
+        total = (body.get('meta') or {}).get('total', len(ids))
+        if len(ids) >= total or not rows:
+            return ids
+        page += 1
+
+
 class TestImportCertificate:
     """Tests for POST /api/v2/certificates/import"""
 
@@ -1110,13 +1126,10 @@ class TestStatusFilterBuckets:
         self._mk(auth_client, create_ca, 'bucket-two.example.com', 400)
         seen = {}
         for status in ('valid', 'expiring', 'expired', 'revoked'):
-            r = auth_client.get(f'{BASE}?per_page=500&status={status}')
-            for c in json.loads(r.data)['data']:
-                assert c['id'] not in seen, (c['id'], status, seen.get(c['id']))
-                seen[c['id']] = status
-        r = auth_client.get(f'{BASE}?per_page=500')
-        total = json.loads(r.data)['meta']['total']
-        assert len(seen) == total, (len(seen), total)
+            for cid in _all_ids(auth_client, f'{BASE}?status={status}'):
+                assert cid not in seen, (cid, status, seen.get(cid))
+                seen[cid] = status
+        assert seen.keys() == _all_ids(auth_client, BASE)
 
 
 class TestOrphanFilter:
@@ -1288,18 +1301,7 @@ class TestEmptyCertificateSentinel:
 
     @staticmethod
     def _all_ids(auth_client, path):
-        """Every id, following the pages: both lists cap per_page at 100, so
-        a single call compares truncated sets and proves nothing."""
-        ids, page = set(), 1
-        while True:
-            sep = '&' if '?' in path else '?'
-            body = json.loads(auth_client.get(f'{path}{sep}per_page=100&page={page}').data)
-            rows = body.get('data') or []
-            ids |= {c['id'] for c in rows}
-            total = (body.get('meta') or {}).get('total', len(ids))
-            if len(ids) >= total or not rows:
-                return ids
-            page += 1
+        return _all_ids(auth_client, path)
 
     def test_the_two_lists_partition_the_records(self, app, auth_client):
         """No record falls in both lists, and none falls in neither."""
