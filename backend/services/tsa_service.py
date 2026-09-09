@@ -494,6 +494,16 @@ def _load_signer_certificate(refid: str):
             f'configured TSA signer certificate {refid!r} is revoked',
             reason='revoked',
         )
+    # A revoked issuing CA (or ancestor) breaks the signer's chain (#343):
+    # new timestamps would carry a chain relying parties reject
+    from models import CA
+    issuing_ca = CA.query.filter_by(refid=record.caref).first() if record.caref else None
+    if issuing_ca is not None and issuing_ca.revoked_in_chain:
+        raise TSAConfigurationError(
+            f'configured TSA signer certificate {refid!r} was issued by a revoked CA '
+            f'({issuing_ca.descr})',
+            reason='revoked',
+        )
     if not record.crt or not record.prv:
         raise TSAConfigurationError(
             f'configured TSA signer certificate {refid!r} has no private key '

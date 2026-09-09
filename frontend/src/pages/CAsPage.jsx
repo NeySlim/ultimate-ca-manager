@@ -415,6 +415,7 @@ export default function CAsPage() {
             canDelete={canDelete}
             onExport={(format, options) => handleExport(selectedCA, format, options)}
             onDelete={() => handleDelete(selectedCA.id)}
+            onChanged={(updated) => setSelectedCA(prev => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev))}
             t={t}
           />
         ) : null}

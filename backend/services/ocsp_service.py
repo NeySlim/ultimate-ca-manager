@@ -541,14 +541,16 @@ class OCSPService:
                         ),
                     )
                 certificate = child_ca
-        if not certificate:
-            # Fallback: check the persistent revocation table for deleted certs
+        if certificate is None or isinstance(certificate, CA):
+            # Persistent revocation table: deleted certificates, and a CA
+            # deleted after its revocation and imported again (its row is
+            # new, the parent's record is not)
             rs = RevokedSerial.query.filter(
                 RevokedSerial.caref == ca.refid,
                 RevokedSerial.serial_number.in_(variants),
             ).first()
             if rs:
-                return None, 'revoked', rs.revoked_at or utc_now(), _REASON_MAP.get(
+                return certificate, 'revoked', rs.revoked_at or utc_now(), _REASON_MAP.get(
                     rs.revoke_reason, x509.ReasonFlags.unspecified
                 )
         # Externally-signed CRL uploaded for a key-less/offline CA (#302):

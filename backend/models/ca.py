@@ -191,6 +191,51 @@ class CA(db.Model):
         """Check if this is a root CA (self-signed)"""
         return self.subject == self.issuer if self.subject and self.issuer else False
 
+    def issuing_ca(self):
+        """The CA held in UCM that issued this one: by caref, else by issuer
+        DN (an imported intermediate has no caref until chain repair)."""
+        if self.is_root:
+            return None
+        if self.caref:
+            parent = CA.query.filter_by(refid=self.caref).first()
+            if parent is not None:
+                return parent
+        if self.issuer:
+            return CA.query.filter(CA.subject == self.issuer, CA.id != self.id).first()
+        return None
+
+    def persisted_revocation(self):
+        """The parent's revoked_serials row for this CA's certificate, or None.
+
+        The record outlives the CA row (#343): a CA deleted after its
+        revocation and imported again must not come back as good, so the
+        record, not the row's flag, is what the signing guard and the OCSP
+        responder trust."""
+        if not self.crt:
+            return None
+        parent = self.issuing_ca()
+        if parent is None:
+            return None
+        from models.revoked_serial import RevokedSerial
+        from utils.serial_format import serial_to_int, serial_variants
+        serial = serial_to_int(self.serial_number) if self.serial_number else None
+        if serial is None:
+            try:
+                import base64
+                from cryptography import x509
+                serial = x509.load_pem_x509_certificate(base64.b64decode(self.crt)).serial_number
+            except Exception:
+                return None
+        return RevokedSerial.query.filter(
+            RevokedSerial.caref == parent.refid,
+            RevokedSerial.serial_number.in_(serial_variants(serial)),
+        ).first()
+
+    @property
+    def is_revoked(self) -> bool:
+        """Revoked flag, or a revocation the parent still holds for this serial."""
+        return bool(self.revoked) or self.persisted_revocation() is not None
+
     @property
     def revoked_in_chain(self) -> bool:
         """Whether this CA or one of its ancestors held in UCM is revoked.
@@ -199,11 +244,9 @@ class CA(db.Model):
         so a CA under one must not issue either (#343)."""
         ca, depth = self, 0
         while ca is not None and depth < 16:
-            if ca.revoked:
+            if ca.is_revoked:
                 return True
-            if not ca.caref:
-                return False
-            ca = CA.query.filter_by(refid=ca.caref).first()
+            ca = ca.issuing_ca()
             depth += 1
         return False
     

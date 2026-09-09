@@ -25,6 +25,7 @@ except ImportError:
     def encrypt_private_key(data):
         return data
 from services.audit_service import AuditService
+from services.ca_service import CAService
 from services.notification_service import NotificationService
 from models import CA, db
 
@@ -139,6 +140,8 @@ def import_ca():
             valid_to=cert_info['valid_to'],
             imported_from='manual'
         )
+        # Deleted after its revocation and imported again: still revoked (#343)
+        CAService.apply_persisted_revocation(ca)
 
         db.session.add(ca)
         ok, err = safe_commit(logger, "Failed to import CA")

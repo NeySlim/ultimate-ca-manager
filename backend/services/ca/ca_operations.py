@@ -16,12 +16,29 @@ logger = logging.getLogger(__name__)
 class CAOperationsMixin:
 
     @staticmethod
+    def apply_persisted_revocation(ca: CA) -> bool:
+        """Mark *ca* revoked from the record its parent still holds (#343).
+
+        Called when a CA row is created from an imported certificate: a CA
+        deleted after its revocation and imported again keeps its revoked
+        state instead of coming back as active. No commit; returns whether
+        a record applied."""
+        record = ca.persisted_revocation()
+        if record is None:
+            return False
+        ca.revoked = True
+        ca.revoked_at = record.revoked_at
+        ca.revoke_reason = record.revoke_reason
+        ca.invalidity_at = record.invalidity_at
+        return True
+
+    @staticmethod
     def revoke_ca(
         ca_id: int,
         reason: str = 'unspecified',
         username: str = 'system',
         invalidity_at=None,
-    ) -> CA:
+    ):
         """Revoke an intermediate CA from its parent (#343).
 
         The serial goes to the parent's revoked_serials, which its CRL and
@@ -31,6 +48,11 @@ class CAOperationsMixin:
         for certificates. A root CA is not revocable here (self-signed:
         relying parties drop it from their trust stores), nor is a CA whose
         issuer is not held in UCM (revoke it at that root).
+
+        Returns (ca, warnings): the revocation is recorded even when the
+        parent's CRL could not be regenerated (offline or key-less parent),
+        and the caller must surface that, since the CRL served until the
+        next successful generation does not carry the serial yet.
         """
         import base64
         from datetime import timedelta
@@ -104,19 +126,33 @@ class CAOperationsMixin:
         )
 
         # The parent publishes the revocation: CRL now, OCSP on next answer
+        warnings = []
         if parent.cdp_enabled:
             from services.crl_service import CRLService
             try:
                 CRLService.generate_crl(parent.id, username=username)
             except Exception as e:
+                logger.warning(
+                    f"CRL of CA {parent.descr} not regenerated after revoking CA {ca.descr}: {e}"
+                )
                 AuditService.log_ca(
                     'crl_auto_generation_failed', parent,
                     f'Failed to auto-generate CRL after revoking CA {ca.descr}: {e}',
                     success=False,
                 )
+                warnings.append(
+                    f"The CRL of the parent CA '{parent.descr}' could not be regenerated "
+                    f"({e}): the CRL currently served does not list this CA yet. "
+                    f"Regenerate it once the parent can sign again."
+                )
+        else:
+            warnings.append(
+                f"CDP is disabled on the parent CA '{parent.descr}': no CRL publishes this "
+                f"revocation; relying parties learn it through OCSP only."
+            )
         from services.ocsp_service import OCSPService
         OCSPService.invalidate_cached_responses(ca.serial_number, ca_id=parent.id)
-        return ca
+        return ca, warnings
     """CA certificate operations"""
 
     @staticmethod

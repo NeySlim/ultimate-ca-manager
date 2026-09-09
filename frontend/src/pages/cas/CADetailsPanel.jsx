@@ -23,7 +23,7 @@ import { useNotification } from '../../contexts/NotificationContext'
 // CA DETAILS PANEL
 // =============================================================================
 
-export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
+export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, onChanged, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const [showOfflineModal, setShowOfflineModal] = useState(false)
   const [showRestoreModal, setShowRestoreModal] = useState(false)
@@ -31,7 +31,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
   const [showUploadCertModal, setShowUploadCertModal] = useState(false)
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const [revoking, setRevoking] = useState(false)
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showWarning } = useNotification()
 
   const isExternal = ca.imported_from === 'external_csr'
   const isRoot = ca.type === 'root' || ca.is_root
@@ -41,9 +41,14 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t 
   const handleRevoke = async (reason) => {
     setRevoking(true)
     try {
-      await casService.revoke(ca.id, { reason })
+      const res = await casService.revoke(ca.id, { reason })
+      const updated = res?.data || res
       showSuccess(t('cas.revokeSuccess'))
+      // The parent could not publish the revocation (offline parent, CDP off)
+      for (const w of updated?.warnings || []) showWarning(w)
       setShowRevokeModal(false)
+      // The list reloads on the event; the panel shows this CA's new state now
+      if (updated?.id) onChanged?.(updated)
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
     } catch (err) {
       showError(err?.message || t('cas.revokeFailed'))

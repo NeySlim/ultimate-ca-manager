@@ -228,3 +228,160 @@ class TestRevokeIntermediateCa:
             rows = {c['id']: c for c in _json(r)['data']}
             assert rows[sub['id']]['status'] == 'Revoked'
             assert rows[sub['id']]['revoked'] is True
+
+
+class TestRevocationReviewFollowUps:
+    """Review of the first cut: a re-imported CA keeps its revocation, an
+    unpublished CRL is reported, a malformed body revokes nothing, and a
+    dedicated TSA signer under a revoked CA is refused."""
+
+    def test_reimported_ca_stays_revoked(self, app, auth_client, create_ca):
+        with app.app_context():
+            from utils.key_codec import load_pem_bytes
+            root = create_ca(cn='Reimport Root')
+            sub = _intermediate(auth_client, root, 'Reimport Sub CA')
+            serial = _serial_int(sub['id'])
+            record = db.session.get(CA, sub['id'])
+            cert_pem = base64.b64decode(record.crt)
+            key_pem = load_pem_bytes(record.prv, context='test')
+
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'keyCompromise'}).status_code == 200
+            assert auth_client.delete(f'{CAS}/{sub["id"]}').status_code in (200, 204)
+
+            r = auth_client.post(f'{CAS}/import',
+                                 data={'pem_content': (cert_pem + key_pem).decode(), 'name': 'Reimported Sub CA'},
+                                 content_type='multipart/form-data')
+            assert r.status_code in (200, 201), r.data
+            imported = _json(r)['data']
+            assert imported['refid'] != sub['refid']
+            assert imported['revoked'] is True
+            assert imported['status'] == 'Revoked'
+            assert imported['revoke_reason'] == 'keyCompromise'
+
+            db.session.expire_all()
+            new_ca = db.session.get(CA, imported['id'])
+            assert new_ca.has_private_key
+            assert new_ca.revoked_in_chain is True
+
+            status, resp = _ocsp_status(root['id'], serial)
+            assert status == 'revoked'
+            assert resp.certificate_status == ocsp.OCSPCertStatus.REVOKED
+
+            r = _post(auth_client, '/api/v2/certificates', {
+                'cn': 'after-reimport.example.com', 'ca_id': imported['id'],
+                'validity_days': 30, 'key_type': 'RSA 2048', 'cert_type': 'server',
+            })
+            assert r.status_code == 400, r.data
+            assert 'revoked' in _json(r)['message'].lower()
+
+    def test_record_wins_over_a_cleared_flag(self, app, auth_client, create_ca):
+        """Even a row whose flag was cleared by hand stays revoked: the
+        parent's record is the source of truth for OCSP and signing."""
+        with app.app_context():
+            root = create_ca(cn='Flag Root')
+            sub = _intermediate(auth_client, root, 'Flag Sub CA')
+            serial = _serial_int(sub['id'])
+            assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'superseded'}).status_code == 200
+            record = db.session.get(CA, sub['id'])
+            record.revoked = False
+            db.session.commit()
+            db.session.expire_all()
+            assert db.session.get(CA, sub['id']).is_revoked is True
+            assert db.session.get(CA, sub['id']).revoked_in_chain is True
+            status, _ = _ocsp_status(root['id'], serial)
+            assert status == 'revoked'
+
+    def test_unpublished_crl_is_reported(self, app, auth_client, create_ca, monkeypatch):
+        with app.app_context():
+            root = create_ca(cn='Unpublished Root')
+            r = auth_client.patch(f'{CAS}/{root["id"]}', data=json.dumps({'cdp_enabled': True}),
+                                  content_type='application/json')
+            assert r.status_code == 200, r.data
+            sub = _intermediate(auth_client, root, 'Unpublished Sub CA')
+
+            def _fail(*a, **k):
+                raise RuntimeError('CA is offline; restore it before generating a CRL')
+            monkeypatch.setattr(CRLService, 'generate_crl', staticmethod(_fail))
+
+            r = _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'cACompromise'})
+            assert r.status_code == 200, r.data
+            body = _json(r)
+            assert body['data']['revoked'] is True
+            assert body['data']['warnings'], body
+            assert 'could not be regenerated' in body['data']['warnings'][0]
+            assert 'not fully published' in body['message']
+            # The record is there for the next successful CRL
+            rs = RevokedSerial.query.filter_by(caref=root['refid'], serial_number=str(_serial_int(sub['id']))).first()
+            assert rs is not None
+
+    def test_cdp_disabled_parent_is_reported(self, app, auth_client, create_ca):
+        with app.app_context():
+            root = create_ca(cn='NoCDP Root')
+            r = auth_client.patch(f'{CAS}/{root["id"]}', data=json.dumps({'cdp_enabled': False}),
+                                  content_type='application/json')
+            assert r.status_code == 200, r.data
+            sub = _intermediate(auth_client, root, 'NoCDP Sub CA')
+            r = _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'unspecified'})
+            assert r.status_code == 200, r.data
+            assert any('CDP is disabled' in w for w in _json(r)['data']['warnings'])
+
+    def test_published_revocation_has_no_warning(self, app, auth_client, create_ca):
+        with app.app_context():
+            root = create_ca(cn='Published Root')
+            r = auth_client.patch(f'{CAS}/{root["id"]}', data=json.dumps({'cdp_enabled': True}),
+                                  content_type='application/json')
+            assert r.status_code == 200, r.data
+            sub = _intermediate(auth_client, root, 'Published Sub CA')
+            r = _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'unspecified'})
+            assert r.status_code == 200, r.data
+            assert _json(r)['data']['warnings'] == []
+            assert _json(r)['message'] == 'CA revoked'
+
+    def test_malformed_body_revokes_nothing(self, app, auth_client, create_ca):
+        with app.app_context():
+            root = create_ca(cn='Malformed Root')
+            sub = _intermediate(auth_client, root, 'Malformed Sub CA')
+            r = auth_client.post(f'{CAS}/{sub["id"]}/revoke', data='{"reason":', content_type='application/json')
+            assert r.status_code == 400, r.data
+            r = auth_client.post(f'{CAS}/{sub["id"]}/revoke', data='[1, 2]', content_type='application/json')
+            assert r.status_code == 400, r.data
+            assert _json(auth_client.get(f'{CAS}/{sub["id"]}'))['data']['revoked'] is False
+            # An empty body still means "unspecified"
+            r = auth_client.post(f'{CAS}/{sub["id"]}/revoke')
+            assert r.status_code == 200, r.data
+            assert _json(r)['data']['revoke_reason'] == 'unspecified'
+
+    def test_dedicated_tsa_signer_refused_under_revoked_ca(self, app, auth_client, create_ca):
+        with app.app_context():
+            from models import SystemConfig
+            from services.tsa_signer_cert import issue_tsa_signer_certificate
+            from services.tsa_service import (
+                SIGNER_CONFIG_KEY, TSAConfigurationError, load_configured_signer,
+            )
+            root = create_ca(cn='TSA Signer Root')
+            sub = _intermediate(auth_client, root, 'TSA Signer Sub CA')
+            signer = issue_tsa_signer_certificate(ca=db.session.get(CA, sub['id']), cn='tsa-signer.example.com')
+            cfg = SystemConfig.query.filter_by(key=SIGNER_CONFIG_KEY).first()
+            previous = cfg.value if cfg else None
+            if cfg is None:
+                cfg = SystemConfig(key=SIGNER_CONFIG_KEY, value=signer.refid)
+                db.session.add(cfg)
+            else:
+                cfg.value = signer.refid
+            db.session.commit()
+            try:
+                assert load_configured_signer() is not None
+                assert _post(auth_client, f'{CAS}/{sub["id"]}/revoke', {'reason': 'keyCompromise'}).status_code == 200
+                db.session.expire_all()
+                with pytest.raises(TSAConfigurationError) as exc:
+                    load_configured_signer()
+                assert exc.value.reason == 'revoked'
+                assert 'revoked CA' in str(exc.value)
+            finally:
+                cfg = SystemConfig.query.filter_by(key=SIGNER_CONFIG_KEY).first()
+                if cfg is not None:
+                    if previous:
+                        cfg.value = previous
+                    else:
+                        db.session.delete(cfg)
+                    db.session.commit()

@@ -17,6 +17,7 @@ from services.import_service import (
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
+from services.ca_service import CAService
 try:
     from security.encryption import encrypt_private_key
     HAS_ENCRYPTION = True
@@ -128,6 +129,7 @@ def import_certificate():
                 existing_ca.valid_from = cert_info['valid_from']
                 existing_ca.valid_to = cert_info['valid_to']
                 existing_ca.ski = cert_info.get('ski')
+                CAService.apply_persisted_revocation(existing_ca)
 
                 ok, err = safe_commit(logger, "Failed to update CA")
                 if not ok:
@@ -161,6 +163,8 @@ def import_certificate():
                 valid_to=cert_info['valid_to'],
                 imported_from='manual'
             )
+            # Deleted after its revocation and imported again: still revoked (#343)
+            CAService.apply_persisted_revocation(ca)
 
             db.session.add(ca)
             ok, err = safe_commit(logger, "Failed to import CA")

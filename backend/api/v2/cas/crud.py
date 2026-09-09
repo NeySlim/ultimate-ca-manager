@@ -881,7 +881,14 @@ def revoke_ca(ca_id):
     if ca.revoked:
         return error_response('CA is already revoked', 409)
 
-    data = request.get_json(silent=True) or {}
+    # A malformed body must not become an "unspecified" revocation
+    data = request.get_json(silent=True)
+    if data is None:
+        if request.get_data(cache=True).strip():
+            return error_response('Invalid JSON body', 400)
+        data = {}
+    if not isinstance(data, dict):
+        return error_response('JSON body must be an object', 400)
     reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
     if reason is None:
         return error_response(invalid_reason_message(data.get('reason')), 400)
@@ -899,7 +906,7 @@ def revoke_ca(ca_id):
 
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
     try:
-        ca = CAService.revoke_ca(
+        ca, warnings = CAService.revoke_ca(
             ca_id, reason=reason, username=username, invalidity_at=invalidity_at
         )
     except ValueError as e:
@@ -918,7 +925,10 @@ def revoke_ca(ca_id):
         on_ca_updated(ca.id, ca_dict.get('descr'), {'revoked': True, 'reason': reason})
     except Exception:
         pass
-    return success_response(data=ca_dict, message='CA revoked')
+    message = 'CA revoked'
+    if warnings:
+        message = 'CA revoked, but not fully published: ' + ' '.join(warnings)
+    return success_response(data={**ca_dict, 'warnings': warnings}, message=message)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/offline', methods=['POST'])

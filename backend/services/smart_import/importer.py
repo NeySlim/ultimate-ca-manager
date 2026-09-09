@@ -317,6 +317,9 @@ class SmartImporter:
                 imported_from="smart_import",
                 created_by=username
             )
+            # Deleted after its revocation and imported again: still revoked (#343)
+            from services.ca_service import CAService
+            CAService.apply_persisted_revocation(ca)
             
             db.session.add(ca)
             db.session.flush()

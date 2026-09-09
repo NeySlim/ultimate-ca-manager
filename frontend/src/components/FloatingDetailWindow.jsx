@@ -65,7 +65,7 @@ const ENTITY_CONFIG = {
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
   const { closeWindow, focusWindow, sameWindow } = useWindowManager()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   const [data, setData] = useState(windowInfo.data?.fullData || null)
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
@@ -130,8 +130,10 @@ export function FloatingDetailWindow({ windowInfo }) {
     try {
       if (windowInfo.type === 'ca') {
         // Intermediate CA revoked from its parent (#343)
-        await casService.revoke(windowInfo.entityId, { reason })
+        const res = await casService.revoke(windowInfo.entityId, { reason })
         showSuccess(t('cas.revokeSuccess', 'CA revoked'))
+        // The parent could not publish the revocation (offline parent, CDP off)
+        for (const w of (res?.data || res)?.warnings || []) showWarning(w)
       } else {
         await certificatesService.revoke(windowInfo.entityId, reason)
         showSuccess(t('certificates.revoked', 'Certificate revoked'))
