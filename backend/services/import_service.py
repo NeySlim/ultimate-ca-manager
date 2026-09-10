@@ -235,13 +235,66 @@ def _record_identity(record):
     return stored_cert, None
 
 
+def _issuer_identity(cert, parents_by_name):
+    """What identifies the authority that signed *cert* beyond its name, or None.
+
+    ('key', SPKI) of the CA known to UCM whose key verifies the signature;
+    else ('aki', key identifier) when the certificate names its issuer's key.
+    Two parents may share a name and differ by key (#347 review).
+    """
+    from utils.cert_issuer import certificate_signed_by
+    name = cert.issuer.rfc4514_string()
+    if name not in parents_by_name:
+        from models import CA
+        parents = []
+        for parent in CA.query.filter_by(subject=name).all():
+            if not parent.crt:
+                continue
+            try:
+                parents.append(x509.load_pem_x509_certificate(base64.b64decode(parent.crt), default_backend()))
+            except Exception:
+                continue
+        parents_by_name[name] = parents
+    for parent_cert in parents_by_name[name]:
+        try:
+            if certificate_signed_by(cert, parent_cert):
+                return ('key', _spki(parent_cert.public_key()))
+        except Exception:
+            continue
+    try:
+        aki = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value.key_identifier
+    except x509.ExtensionNotFound:
+        aki = None
+    return ('aki', aki) if aki else None
+
+
+def _same_issuer(stored_cert, cert, parents_by_name):
+    """Whether *stored_cert* and *cert* were issued by the same authority.
+
+    Same name first; then, when both can be told beyond the name, the same
+    key. A certificate that verifies against a parent known to UCM and one
+    that verifies against none were signed by different keys. When neither
+    says more than the name, the name is all there is: same issuer.
+    """
+    if stored_cert.issuer != cert.issuer:
+        return False
+    stored_id = _issuer_identity(stored_cert, parents_by_name)
+    new_id = _issuer_identity(cert, parents_by_name)
+    if stored_id is None or new_id is None:
+        return True
+    if stored_id[0] == new_id[0]:
+        return stored_id[1] == new_id[1]
+    return False
+
+
 def _select_existing(candidates, cert, kind):
     """Among *candidates*, the records sharing the certificate's names, the
     one the certificate belongs to; None when there is none (#347 review).
 
     The record holding the certificate's key wins: the very same certificate
-    first, then the one whose certificate has the same issuer (a cross-signed
-    CA holds the same key under several issuers), then the single record
+    first, then the one whose certificate has the same issuer, name and key
+    of the issuer (a cross-signed CA holds the same key under several
+    issuers, and two issuers may share a name), then the single record
     holding the key. A renewed certificate thus lands on its own record, not
     on a homonym that happened to come first. Without a key link a single
     candidate is the record being re-keyed; several cannot be told apart,
@@ -251,13 +304,14 @@ def _select_existing(candidates, cert, kind):
     if not candidates:
         return None
     wanted = _spki(cert.public_key())
+    parents_by_name = {}
     same_key, same_issuer, exact = [], [], []
     for record in candidates:
         stored_cert, spki = _record_identity(record)
         if spki != wanted:
             continue
         same_key.append(record)
-        if stored_cert is None or stored_cert.issuer != cert.issuer:
+        if stored_cert is None or not _same_issuer(stored_cert, cert, parents_by_name):
             continue
         same_issuer.append(record)
         if stored_cert.serial_number == cert.serial_number:
@@ -266,6 +320,11 @@ def _select_existing(candidates, cert, kind):
         return exact[0]
     if len(same_issuer) == 1:
         return same_issuer[0]
+    if same_issuer:
+        raise AmbiguousImportTarget(
+            f"{len(same_issuer)} existing {kind}s share this subject, hold this "
+            f"certificate's key and were issued under the same issuer name, which "
+            f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
         return same_key[0]
     if same_key:

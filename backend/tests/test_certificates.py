@@ -1574,7 +1574,7 @@ class TestHomonymsOnReimport:
     key links it to one of them, instead of updating whichever came first."""
 
     @staticmethod
-    def _cert(cn, key, *, issuer=None, signer=None, ca=False):
+    def _cert(cn, key, *, issuer=None, signer=None, ca=False, aki=False):
         from datetime import datetime, timedelta, timezone
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes
@@ -1586,6 +1586,9 @@ class TestHomonymsOnReimport:
              .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30)))
         if ca:
             b = b.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        if aki:
+            b = b.add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(
+                (signer or key).public_key()), critical=False)
         return b.sign(signer or key, hashes.SHA256())
 
     @staticmethod
@@ -1763,3 +1766,46 @@ class TestHomonymsOnReimport:
             row = db.session.get(CA, id2)
             assert row.crt and not row.is_pending
             assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == signed.serial_number
+
+    def test_homonymous_parents_are_told_apart_by_their_key(self, app, auth_client):
+        """Eleventh review of #347: two parents with one name and two keys
+        cross-sign the same CA; the authority key identifier, or the signature
+        against the parents known to UCM, says which record a renewal is for."""
+        from cryptography import x509
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        from models import CA
+        gen = lambda: rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = lambda cn: x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        key = gen()
+        # (a) the certificates carry an AKI; the parents are unknown to UCM
+        p1, p2 = gen(), gen()
+        cross = lambda signer: self._cert('Twice Cross Signed CA', key, issuer=name('Homonym Parent 347'), signer=signer, ca=True, aki=True)
+        id1, crt1 = self._store(app, CA, cross(p1), key, serial=0)
+        id2, crt2 = self._store(app, CA, cross(p2), key, serial=0)
+        r = self._import(auth_client, cross(p2), '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['id'] == id2
+        assert self._state(app, CA, id1) == (crt1, True)
+        assert self._state(app, CA, id2)[0] != crt2
+        # (b) no AKI; the parents are known to UCM, the signature tells them apart
+        q1, q2 = gen(), gen()
+        self._store(app, CA, self._cert('Homonym Parent 347b', q1, ca=True), q1, serial=0)
+        self._store(app, CA, self._cert('Homonym Parent 347b', q2, ca=True), q2, serial=0)
+        cross_b = lambda signer: self._cert('Twice Cross Signed CA b', key, issuer=name('Homonym Parent 347b'), signer=signer, ca=True)
+        id3, crt3 = self._store(app, CA, cross_b(q1), key, serial=0)
+        id4, crt4 = self._store(app, CA, cross_b(q2), key, serial=0)
+        r = self._import(auth_client, cross_b(q2), '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['id'] == id4
+        assert self._state(app, CA, id3) == (crt3, True)
+        assert self._state(app, CA, id4)[0] != crt4
+        # (c) neither an AKI nor a known parent: refused, with an accurate reason
+        s1, s2 = gen(), gen()
+        cross_c = lambda signer: self._cert('Twice Cross Signed CA c', key, issuer=name('Unknown Parent 347'), signer=signer, ca=True)
+        id5, crt5 = self._store(app, CA, cross_c(s1), key, serial=0)
+        id6, crt6 = self._store(app, CA, cross_c(s2), key, serial=0)
+        r = self._import(auth_client, cross_c(s2), '/api/v2/cas/import')
+        assert r.status_code == 409, r.data
+        assert 'same issuer name' in json.loads(r.data)['message']
+        assert self._state(app, CA, id5) == (crt5, True) and self._state(app, CA, id6) == (crt6, True)
