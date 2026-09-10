@@ -1809,3 +1809,40 @@ class TestHomonymsOnReimport:
         assert r.status_code == 409, r.data
         assert 'same issuer name' in json.loads(r.data)['message']
         assert self._state(app, CA, id5) == (crt5, True) and self._state(app, CA, id6) == (crt6, True)
+
+    def test_a_known_issuer_key_is_not_matched_by_an_unverifiable_one(self, app, auth_client):
+        """Twelfth review of #347: a certificate that verifies against a parent
+        known to UCM and one that verifies against none were signed by
+        different keys, whatever the name says and whether or not the
+        unverifiable one carries an authority key identifier."""
+        from cryptography import x509
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        from models import CA
+        gen = lambda: rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = lambda cn: x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        key, known, unknown, other = gen(), gen(), gen(), gen()
+        self._store(app, CA, self._cert('Known Parent 347', known, ca=True), known, serial=0)
+        under = lambda parent_cn, signer, **kw: self._cert('Under Known Parent CA', key, issuer=name(parent_cn), signer=signer, ca=True, **kw)
+        # Two records hold the key: one signed by the known parent, one under another name
+        id1, crt1 = self._store(app, CA, under('Known Parent 347', known), key, serial=0)
+        id2, crt2 = self._store(app, CA, under('Other Parent 347', other), key, serial=0)
+        for label, stranger in (('no AKI', under('Known Parent 347', unknown)),
+                                ('with AKI', under('Known Parent 347', unknown, aki=True))):
+            # The known parent's name, an unknown key: it belongs to neither record
+            r = self._import(auth_client, stranger, '/api/v2/cas/import')
+            assert r.status_code == 409, (label, r.data)
+            assert "none under this certificate's issuer" in json.loads(r.data)['message'], label
+            assert self._state(app, CA, id1) == (crt1, True), label
+            assert self._state(app, CA, id2) == (crt2, True), label
+        # The reverse: the stored certificate is the unverifiable one, the new one verifies
+        id3, crt3 = self._store(app, CA, self._cert('Reverse CA', key, issuer=name('Known Parent 347'), signer=unknown, ca=True), key, serial=0)
+        id4, crt4 = self._store(app, CA, self._cert('Reverse CA', key, issuer=name('Other Parent 347'), signer=other, ca=True), key, serial=0)
+        r = self._import(auth_client, self._cert('Reverse CA', key, issuer=name('Known Parent 347'), signer=known, ca=True), '/api/v2/cas/import')
+        assert r.status_code == 409, r.data
+        assert self._state(app, CA, id3) == (crt3, True) and self._state(app, CA, id4) == (crt4, True)
+        # And a renewal really signed by the known parent lands on its record
+        r = self._import(auth_client, under('Known Parent 347', known), '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['id'] == id1
+        assert self._state(app, CA, id2) == (crt2, True)

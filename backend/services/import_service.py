@@ -271,20 +271,23 @@ def _issuer_identity(cert, parents_by_name):
 def _same_issuer(stored_cert, cert, parents_by_name):
     """Whether *stored_cert* and *cert* were issued by the same authority.
 
-    Same name first; then, when both can be told beyond the name, the same
-    key. A certificate that verifies against a parent known to UCM and one
-    that verifies against none were signed by different keys. When neither
-    says more than the name, the name is all there is: same issuer.
+    Same name first. Then, when either certificate verifies against a parent
+    known to UCM, the other must verify against that same parent: every
+    known parent was tried on both, so a certificate that verifies against
+    none, whether it carries an authority key identifier or not, was signed
+    by a different key. When neither verifies against a known parent, two
+    authority key identifiers are compared; when one or both certificates
+    carry none, the name is all there is: same issuer.
     """
     if stored_cert.issuer != cert.issuer:
         return False
     stored_id = _issuer_identity(stored_cert, parents_by_name)
     new_id = _issuer_identity(cert, parents_by_name)
+    if (stored_id is not None and stored_id[0] == 'key') or (new_id is not None and new_id[0] == 'key'):
+        return stored_id == new_id
     if stored_id is None or new_id is None:
         return True
-    if stored_id[0] == new_id[0]:
-        return stored_id[1] == new_id[1]
-    return False
+    return stored_id[1] == new_id[1]
 
 
 def _select_existing(candidates, cert, kind):
