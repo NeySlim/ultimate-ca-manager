@@ -812,6 +812,15 @@
     "templateOverridesHint": "Diverges from template '{{name}}' on: {{fields}}"
   },
   "cas": {
+    "chainRevoked": "Revoked upstream",
+    "chainRevokedBanner": "A CA above this one is revoked: this CA can no longer sign certificates or CRLs, and neither can the CAs below it.",
+    "revokeWarnings": {
+      "parent_crl_not_regenerated": "The parent CA's CRL could not be regenerated: the CRL currently served does not list this CA yet. Check the parent CA and regenerate its CRL.",
+      "parent_cdp_disabled": "CDP is disabled on the parent CA: no CRL publishes this revocation, relying parties learn it through OCSP only."
+    },
+    "certificateOnly": "Certificate only",
+    "certificateOnlyBanner": "This CA holds only its certificate, no private key: it cannot sign certificates or CRLs, nor be taken offline. Import its private key to let it sign.",
+    "importPrivateKey": "Import private key",
     "parentCA": "Parent CA",
     "hierarchy": "Hierarchy",
     "hierarchyView": "Hierarchical view",
@@ -3309,6 +3318,7 @@
     "invalidFormat": "Invalid format"
   },
   "revocation": {
+    "reasonHelpNoHold": "The reason is published on the parent's CRL and cannot be changed; a CA revocation is permanent.",
     "title": "Revoke certificate",
     "reasonLabel": "Revocation reason",
     "reasonHelp": "Recorded on the certificate and published on the CRL (RFC 5280 reason code). Revocation cannot be undone, except a certificate hold.",

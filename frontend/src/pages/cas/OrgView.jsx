@@ -4,7 +4,7 @@
 import { CaretRight } from '@phosphor-icons/react'
 import { CATypeIcon } from '../../components'
 import { cn } from '../../lib/utils'
-import { CAInfoLine, StatusBadge, TypeBadge, HsmBadge, OfflineBadge } from './CAListUtils'
+import { CAInfoLine, StatusBadge, TypeBadge, HsmBadge, OfflineBadge, CertificateOnlyBadge, ChainRevokedBadge } from './CAListUtils'
 
 // =============================================================================
 // VIEW A: ORGANIGRAMME — Root = big card, children nested inside
@@ -92,6 +92,8 @@ function OrgRootCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMobi
           </div>
           <TypeBadge type="root" isMobile={isMobile} t={t} />
           <HsmBadge ca={ca} t={t} />
+          <CertificateOnlyBadge ca={ca} t={t} />
+          <ChainRevokedBadge ca={ca} t={t} />
           <StatusBadge status={ca.status} offline={ca.offline} />
           <OfflineBadge ca={ca} t={t} />
         </div>
@@ -169,6 +171,8 @@ function OrgChildCard({ ca, selectedId, expandedNodes, onToggle, onSelect, isMob
           </div>
           <TypeBadge type="intermediate" isMobile={isMobile} t={t} />
           <HsmBadge ca={ca} t={t} />
+          <CertificateOnlyBadge ca={ca} t={t} />
+          <ChainRevokedBadge ca={ca} t={t} />
           <StatusBadge status={ca.status} offline={ca.offline} />
           <OfflineBadge ca={ca} t={t} />
         </div>

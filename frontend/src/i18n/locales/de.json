@@ -812,6 +812,15 @@
     "templateOverridesHint": "Weicht von Vorlage '{{name}}' ab in: {{fields}}"
   },
   "cas": {
+    "chainRevoked": "Übergeordnet gesperrt",
+    "chainRevokedBanner": "Eine übergeordnete CA ist gesperrt: Diese CA und die CAs darunter können keine Zertifikate oder CRLs mehr signieren.",
+    "revokeWarnings": {
+      "parent_crl_not_regenerated": "Die CRL der übergeordneten CA konnte nicht neu erzeugt werden: Die derzeit ausgelieferte CRL führt diese CA noch nicht auf. Prüfen Sie die übergeordnete CA und erzeugen Sie ihre CRL neu.",
+      "parent_cdp_disabled": "CDP ist auf der übergeordneten CA deaktiviert: Keine CRL veröffentlicht diese Sperrung, Clients erfahren sie nur über OCSP."
+    },
+    "certificateOnly": "Nur Zertifikat",
+    "certificateOnlyBanner": "Diese CA besitzt nur ihr Zertifikat, keinen privaten Schlüssel: Sie kann weder Zertifikate noch CRLs signieren und nicht offline genommen werden. Importieren Sie ihren privaten Schlüssel, damit sie signieren kann.",
+    "importPrivateKey": "Privaten Schlüssel importieren",
     "parentCA": "Übergeordnete CA",
     "hierarchy": "Hierarchie",
     "hierarchyView": "Hierarchische Ansicht",
@@ -3306,6 +3315,7 @@
     "invalidFormat": "Ungültiges Format"
   },
   "revocation": {
+    "reasonHelpNoHold": "Der Grund wird in der CRL der übergeordneten CA veröffentlicht und kann nicht geändert werden; die Sperrung einer CA ist endgültig.",
     "title": "Zertifikat widerrufen",
     "reasonLabel": "Widerrufsgrund",
     "reasonHelp": "Wird am Zertifikat gespeichert und in der CRL veröffentlicht (RFC-5280-Grundcode). Ein Widerruf ist unumkehrbar, außer bei einer Sperre.",

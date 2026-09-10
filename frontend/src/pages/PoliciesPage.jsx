@@ -17,6 +17,7 @@ import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
+import { signingCas } from '../lib/caSelection'
 
 // Policy type options — labels resolved via t() inside component
 const POLICY_TYPES = [
@@ -588,7 +589,7 @@ export default function PoliciesPage() {
                 onChange={(val) => setFormData(p => ({ ...p, ca_id: val ? parseInt(val, 10) : null }))}
                 options={[
                   { value: '', label: t('policies.allCAs') },
-                  ...cas.map(ca => ({ value: ca.id.toString(), label: ca.common_name })),
+                  ...signingCas(cas).map(ca => ({ value: ca.id.toString(), label: ca.common_name })),
                 ]}
               />
               <Input

@@ -3,6 +3,7 @@ MS-XCEP Management Routes v2.0
 /api/v2/xcep/* - XCEP (Certificate Enrollment Policy) configuration
 """
 
+from utils.signing_ca import signing_ca_problem
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -73,6 +74,8 @@ def update_xcep_config():
             ca = db.session.get(CA, data['ca_id'])
             if not ca:
                 return error_response('CA not found', 404)
+            if signing_ca_problem(ca):
+                return error_response(signing_ca_problem(ca), 400)
             set_config('xcep_ca_refid', ca.refid)
         else:
             set_config('xcep_ca_refid', '')

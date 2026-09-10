@@ -22,6 +22,7 @@ export default {
           { label: 'Renovar CA', text: 'Reemite el certificado CA con un nuevo período de validez' },
           { label: 'Revocar', text: 'Revoca una CA intermedia desde su CA padre: se publica en la CRL y el OCSP del padre, y la CA ya no puede firmar (permanente)' },
           { label: 'Reparar cadena', text: 'Corrige automáticamente las relaciones padre-hijo rotas' },
+          { label: 'Importar clave privada', text: 'Adjuntar la clave privada de una CA que solo tiene su certificado (firmado a partir de una solicitud externa) para que pueda firmar' },
         ]
       },
       {

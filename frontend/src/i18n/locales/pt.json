@@ -812,6 +812,15 @@
     "templateOverridesHint": "Diverge do modelo '{{name}}' em: {{fields}}"
   },
   "cas": {
+    "chainRevoked": "Revogada a montante",
+    "chainRevokedBanner": "Uma CA acima desta está revogada: esta CA já não pode assinar certificados nem CRLs, nem as CAs abaixo dela.",
+    "revokeWarnings": {
+      "parent_crl_not_regenerated": "A CRL da CA pai não pôde ser regenerada: a CRL atualmente servida ainda não lista esta CA. Verifique a CA pai e regenere a sua CRL.",
+      "parent_cdp_disabled": "O CDP está desativado na CA pai: nenhuma CRL publica esta revogação, os clientes só a conhecem via OCSP."
+    },
+    "certificateOnly": "Apenas certificado",
+    "certificateOnlyBanner": "Esta CA possui apenas o seu certificado, sem chave privada: não pode assinar certificados nem CRLs, nem ser colocada offline. Importe a sua chave privada para que possa assinar.",
+    "importPrivateKey": "Importar chave privada",
     "parentCA": "CA pai",
     "hierarchy": "Hierarquia",
     "hierarchyView": "Vista hierárquica",
@@ -3306,6 +3315,7 @@
     "invalidFormat": "Formato inválido"
   },
   "revocation": {
+    "reasonHelpNoHold": "O motivo é publicado na CRL da CA pai e não pode ser alterado; a revogação de uma CA é permanente.",
     "title": "Revogar certificado",
     "reasonLabel": "Motivo da revogação",
     "reasonHelp": "Registado no certificado e publicado na CRL (código de motivo RFC 5280). A revogação é irreversível, exceto a suspensão.",

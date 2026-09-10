@@ -2,7 +2,7 @@
  * CAs Page — detail panel for selected CA (mobile slide-over)
  */
 import { useState } from 'react'
-import { Download, Trash, Certificate, Clock, ShieldWarning, ShieldCheck, PushPin, FileArrowDown, UploadSimple, ArrowsClockwise, Prohibit } from '@phosphor-icons/react'
+import { Download, Trash, Certificate, Clock, ShieldWarning, ShieldCheck, PushPin, FileArrowDown, UploadSimple, ArrowsClockwise, Prohibit, Key } from '@phosphor-icons/react'
 import {
   Badge, Button,
   CompactSection, CompactGrid, CompactField, CompactStats,
@@ -15,6 +15,7 @@ import { RevokeCertificateModal } from '../../components/RevokeCertificateModal'
 import { ManageTemplatePinsModal } from '../../components/cas/ManageTemplatePinsModal'
 import { CACrlSection } from '../../components/cas/CACrlSection'
 import { UploadCACertModal } from './UploadCACertModal'
+import { ImportCaKeyModal } from '../../components/cas/ImportCaKeyModal'
 import { casService } from '../../services'
 import { formatDate, downloadBlob } from '../../lib/utils'
 import { useNotification } from '../../contexts/NotificationContext'
@@ -30,13 +31,14 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
   const [showPinsModal, setShowPinsModal] = useState(false)
   const [showUploadCertModal, setShowUploadCertModal] = useState(false)
   const [showRevokeModal, setShowRevokeModal] = useState(false)
+  const [showImportKeyModal, setShowImportKeyModal] = useState(false)
   const [revoking, setRevoking] = useState(false)
   const { showSuccess, showError, showWarning } = useNotification()
 
   const isExternal = ca.imported_from === 'external_csr'
   const isRoot = ca.type === 'root' || ca.is_root
   // Revocation is done by the parent CA, so it needs one held in UCM (#343)
-  const canRevoke = canWrite('cas') && !isRoot && !!ca.parent_id && !ca.pending && !ca.revoked
+  const canRevoke = canWrite('cas') && !isRoot && !!ca.parent_id && !ca.pending && !ca.revoked && !ca.revoked_in_chain
 
   const handleRevoke = async (reason) => {
     setRevoking(true)
@@ -45,7 +47,9 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
       const updated = res?.data || res
       showSuccess(t('cas.revokeSuccess'))
       // The parent could not publish the revocation (offline parent, CDP off)
-      for (const w of updated?.warnings || []) showWarning(w)
+      const codes = updated?.warning_codes || []
+      if (codes.length) codes.forEach(code => showWarning(t(`cas.revokeWarnings.${code}`)))
+      else for (const w of updated?.warnings || []) showWarning(w)
       setShowRevokeModal(false)
       // The list reloads on the event; the panel shows this CA's new state now
       if (updated?.id) onChanged?.(updated)
@@ -147,6 +151,33 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
         </div>
       )}
 
+      {/* A CA above this one is revoked (#343) */}
+      {ca.revoked_in_chain && !ca.revoked && (
+        <div className="rounded-lg px-3 py-2 bg-status-danger/15 border border-status-danger/40">
+          <div className="flex items-center gap-2 text-status-danger">
+            <Prohibit size={16} />
+            <span className="text-xs font-medium">{t('cas.chainRevoked')}</span>
+          </div>
+          <p className="text-xs text-text-secondary mt-1">{t('cas.chainRevokedBanner')}</p>
+        </div>
+      )}
+
+      {/* Certificate only: the key stayed where the request was made (#348) */}
+      {ca.certificate_only && !ca.pending && (
+        <div className="rounded-lg px-3 py-2 bg-status-warning/15 border border-status-warning/40">
+          <div className="flex items-center gap-2 text-status-warning">
+            <Key size={16} />
+            <span className="text-xs font-medium">{t('cas.certificateOnly')}</span>
+          </div>
+          <p className="text-xs text-text-secondary mt-1">{t('cas.certificateOnlyBanner')}</p>
+          {canWrite('cas') && (
+            <Button type="button" size="xs" variant="secondary" className="mt-2" onClick={() => setShowImportKeyModal(true)}>
+              <UploadSimple size={14} /> {t('cas.importPrivateKey')}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Offline banner */}
       {ca.offline && (
         <div className="rounded-lg px-3 py-2 bg-status-warning/20 border border-status-warning/40">
@@ -203,7 +234,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
             <UploadSimple size={14} /> {t('cas.uploadCertificate')}
           </Button>
         )}
-        {canWrite('cas') && !ca.offline && !ca.pending && (
+        {canWrite('cas') && !ca.offline && !ca.pending && !ca.revoked && ca.has_private_key && !ca.uses_hsm && (
           <Button
             type="button"
             size="xs"
@@ -295,6 +326,14 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
       ca={ca}
     />
 
+    <ImportCaKeyModal
+      open={showImportKeyModal}
+      onClose={() => setShowImportKeyModal(false)}
+      ca={ca}
+      onSuccess={(updated) => { if (updated?.id) onChanged?.(updated) }}
+      t={t}
+    />
+
     <RevokeCertificateModal
 
       open={showRevokeModal}
@@ -308,6 +347,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
       loading={revoking}
 
       title={t('cas.revoke')}
+      allowHold={false}
 
       warning={t('cas.revokeWarning')}
 

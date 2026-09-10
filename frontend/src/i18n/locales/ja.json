@@ -812,6 +812,15 @@
     "templateOverridesHint": "テンプレート '{{name}}' との相違: {{fields}}"
   },
   "cas": {
+    "chainRevoked": "上位で失効",
+    "chainRevokedBanner": "この CA の上位の CA が失効しています。この CA とその下位の CA は証明書や CRL に署名できません。",
+    "revokeWarnings": {
+      "parent_crl_not_regenerated": "親 CA の CRL を再生成できませんでした。現在配信中の CRL にはこの CA がまだ含まれていません。親 CA を確認し、CRL を再生成してください。",
+      "parent_cdp_disabled": "親 CA で CDP が無効です。この失効を公開する CRL がなく、クライアントは OCSP でのみ知ることができます。"
+    },
+    "certificateOnly": "証明書のみ",
+    "certificateOnlyBanner": "この CA は証明書のみを保持し、秘密鍵がありません。証明書や CRL に署名することも、オフラインにすることもできません。署名できるようにするには秘密鍵をインポートしてください。",
+    "importPrivateKey": "秘密鍵をインポート",
     "parentCA": "親CA",
     "hierarchy": "階層",
     "hierarchyView": "階層ビュー",
@@ -3306,6 +3315,7 @@
     "invalidFormat": "形式が無効です"
   },
   "revocation": {
+    "reasonHelpNoHold": "理由は親 CA の CRL に公開され、変更できません。CA の失効は恒久的です。",
     "title": "証明書を失効",
     "reasonLabel": "失効理由",
     "reasonHelp": "証明書に記録され、CRL に公開されます（RFC 5280 の理由コード）。失効は一時停止を除いて取り消せません。",

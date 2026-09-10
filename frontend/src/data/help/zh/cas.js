@@ -22,6 +22,7 @@ export default {
           { label: '续期 CA', text: '使用新的有效期重新签发 CA 证书' },
           { label: '吊销', text: '从父 CA 吊销中间 CA：发布到父 CA 的 CRL 和 OCSP，该 CA 将无法再签名（永久）' },
           { label: '链修复', text: '自动修复损坏的父子关系' },
+          { label: '导入私钥', text: '为仅持有证书的 CA（由外部请求签发）附加私钥，使其能够签名' },
         ]
       },
       {

@@ -46,6 +46,7 @@ export function CADetails({
   ca,
   onExport,
   onDelete,
+  onImportKey,
   canWrite = false,
   canDelete = false,
   showActions = true,
@@ -187,6 +188,25 @@ export function CADetails({
             date: ca.revoked_at ? formatDate(ca.revoked_at) : '-',
             reason: t(`revocation.reasons.${ca.revoke_reason || 'unspecified'}`),
           })}
+        </div>
+      )}
+
+      {/* A CA above this one is revoked (#343) */}
+      {ca.revoked_in_chain && !ca.revoked && (
+        <div className="rounded-lg px-3 py-2 bg-status-danger/15 border border-status-danger/40 text-xs text-text-secondary">
+          {t('cas.chainRevokedBanner')}
+        </div>
+      )}
+
+      {/* Certificate only: the key stayed where the request was made (#348) */}
+      {ca.certificate_only && !ca.pending && (
+        <div className="rounded-lg px-3 py-2 bg-status-warning/15 border border-status-warning/40 text-xs text-text-secondary flex items-start gap-2 flex-wrap">
+          <span className="flex-1 min-w-[12rem]">{t('cas.certificateOnlyBanner')}</span>
+          {onImportKey && (
+            <Button type="button" size="xs" variant="secondary" onClick={onImportKey}>
+              <Key size={12} /> {t('cas.importPrivateKey')}
+            </Button>
+          )}
         </div>
       )}
 

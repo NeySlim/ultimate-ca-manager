@@ -4,7 +4,7 @@
  * DESKTOP: Dense table with hover rows, inline slide-over details
  * MOBILE: Card-style list with full-screen details, swipe gestures
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
@@ -108,7 +108,11 @@ export default function CertificatesPage() {
   const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
 
+  const requestSeq = useRef(0)
   const loadData = useCallback(async () => {
+    // A reload started earlier must not overwrite a later one (filter changed
+    // while an action's reload was in flight)
+    const seq = ++requestSeq.current
     try {
       setLoading(true)
       
@@ -144,13 +148,18 @@ export default function CertificatesPage() {
       const caList = casRes.data || []
 
       setCertificates(certs)
-      setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
+      if (seq !== requestSeq.current) return
+      const totalCount = certsRes.meta?.total || certsRes.pagination?.total || certs.length
+      setTotal(totalCount)
+      // The last row of the last page went away: stay on a page that exists
+      const lastPage = Math.max(1, Math.ceil(totalCount / perPage))
+      if (page > lastPage) setPage(lastPage)
       setCas(caList)
       setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, orphan: 0, total: 0 })
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.certificates'))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), JSON.stringify(filterTemplate), sortBy, sortOrder, searchValue, showError, t])

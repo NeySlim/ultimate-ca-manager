@@ -534,7 +534,10 @@ class CACreationMixin:
         #    before anything else so a certificate for the wrong CA can never
         #    be attached, whatever else it looks like.
         try:
-            private_key = get_ca_signing_key(ca)
+            # The key proves possession, it issues nothing: a CA under a revoked
+            # ancestor must still be able to install a certificate from a healthy
+            # issuer, the one way out of a revoked chain (review of #343)
+            private_key = get_ca_signing_key(ca, allow_revoked=True)
         except Exception as e:
             logger.error(f"Cannot load signing key for CA {ca.id}: {e}", exc_info=True)
             raise ValueError("CA private key is not available")
@@ -679,7 +682,7 @@ class CACreationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         from utils.ca_profile import KU_NAME_TO_ATTR
 
-        private_key = get_ca_signing_key(ca)
+        private_key = get_ca_signing_key(ca, allow_revoked=True)  # a CSR issues nothing
 
         subject = None
         key_usage = None

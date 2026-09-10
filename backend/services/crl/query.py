@@ -37,6 +37,15 @@ class CRLQueryMixin:
             Certificate.valid_to > now
         ).all()
 
+        # A revoked child CA is listed from its own row too: its record under
+        # this CA can be missing (a backup restored without certificates),
+        # and OCSP already answers revoked from the flag (review of #343)
+        live_cas = CA.query.filter(
+            CA.caref == ca.refid,
+            CA.revoked == True,
+            CA.valid_to > now
+        ).all()
+        live_certs = live_certs + live_cas
         # Collect serials that have a live certificate row
         live_serials = {c.serial_number for c in live_certs}
 

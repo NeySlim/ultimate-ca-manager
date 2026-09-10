@@ -3,6 +3,7 @@ SCEP Management Routes v2.0
 /api/scep/* - SCEP configuration and requests
 """
 
+from utils.signing_ca import signing_ca_problem
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -389,6 +390,8 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             ca = db.session.get(CA, data['ca_id'])
         if not ca:
             return False, 'CA not found'
+        if signing_ca_problem(ca):
+            return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
         if not ca.has_private_key:
             return False, 'Selected CA has no private key'
         if ca.uses_hsm:

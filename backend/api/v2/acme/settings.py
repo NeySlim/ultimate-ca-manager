@@ -181,6 +181,16 @@ def update_acme_settings():
         if not ca_id_cfg:
             ca_id_cfg = SystemConfig(key='acme.issuing_ca_id', description='ACME issuing CA refid')
             db.session.add(ca_id_cfg)
+        if data['issuing_ca_id']:
+            # The CA must be able to sign now, not fail every order later
+            from models import CA
+            from utils.signing_ca import signing_ca_problem
+            chosen = CA.query.filter_by(refid=str(data['issuing_ca_id'])).first()
+            if chosen is None and str(data['issuing_ca_id']).isdigit():
+                chosen = db.session.get(CA, int(data['issuing_ca_id']))
+            problem = signing_ca_problem(chosen)
+            if problem:
+                return error_response(problem, 400)
         ca_id_cfg.value = data['issuing_ca_id'] if data['issuing_ca_id'] else ''
 
     # Update revoke on renewal

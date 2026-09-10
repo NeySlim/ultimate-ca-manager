@@ -4,6 +4,7 @@ import { Button, Select, Input, DatePicker, EkuMultiSelect } from '../../compone
 import { templatesService, ekuService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { useNotification } from '../../contexts'
+import { signingCas } from '../../lib/caSelection'
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -380,7 +381,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           value={formData.ca_id}
           onChange={(val) => update('ca_id', val)}
           placeholder={t('certificates.selectCA')}
-          options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
+          options={signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
         />
         <div>
           <Select

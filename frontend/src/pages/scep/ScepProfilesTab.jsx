@@ -5,6 +5,7 @@ import { Button, Input, Select, Card, Badge, Modal, EmptyState, HelpCard } from 
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { scepService } from '../../services'
 import { useNotification } from '../../contexts'
+import { signingCas } from '../../lib/caSelection'
 
 const EMPTY_FORM = {
   name: '', url_slug: '', description: '', ca_id: '',
@@ -244,7 +245,7 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
             value={formData.ca_id}
             onChange={(val) => update('ca_id', val)}
             placeholder={t('certificates.selectCA')}
-            options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
+            options={signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
           />
           <Select
             label={t('scep.profileTemplate')}

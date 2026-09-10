@@ -22,6 +22,7 @@ export default {
           { label: 'CA erneuern', text: 'Das CA-Zertifikat mit einer neuen Gültigkeitsdauer erneut ausstellen' },
           { label: 'Widerrufen', text: 'Eine Intermediate-CA bei ihrer übergeordneten CA widerrufen: Veröffentlichung in CRL und OCSP der übergeordneten CA, und die CA kann nicht mehr signieren (dauerhaft)' },
           { label: 'Kettenreparatur', text: 'Unterbrochene Eltern-Kind-Beziehungen automatisch reparieren' },
+          { label: 'Privaten Schlüssel importieren', text: 'Den privaten Schlüssel einer CA anhängen, die nur ihr Zertifikat besitzt (aus einer externen Anfrage signiert), damit sie signieren kann' },
         ]
       },
       {

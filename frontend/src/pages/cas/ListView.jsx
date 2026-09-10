@@ -4,7 +4,7 @@
 import { TreeStructure } from '@phosphor-icons/react'
 import { CATypeIcon } from '../../components'
 import { cn } from '../../lib/utils'
-import { CAInfoLine, TypeBadge, HsmBadge, StatusBadge, OfflineBadge } from './CAListUtils'
+import { CAInfoLine, TypeBadge, HsmBadge, StatusBadge, OfflineBadge, CertificateOnlyBadge, ChainRevokedBadge } from './CAListUtils'
 
 // =============================================================================
 // VIEW C: LIST — Flat card rows
@@ -46,6 +46,8 @@ export function ListView({ cas, allCAs, selectedId, onSelect, isMobile, t }) {
                 </span>
                 <TypeBadge type={ca.type} isMobile={isMobile} t={t} />
                 <HsmBadge ca={ca} t={t} />
+          <CertificateOnlyBadge ca={ca} t={t} />
+          <ChainRevokedBadge ca={ca} t={t} />
                 <StatusBadge status={ca.status} offline={ca.offline} />
                 <OfflineBadge ca={ca} t={t} />
               </div>

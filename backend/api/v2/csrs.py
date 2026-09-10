@@ -795,6 +795,9 @@ def sign_csr(csr_id):
         )
         
         msg = 'CSR signed as Intermediate CA' if is_ca_result else 'CSR signed successfully'
+        if is_ca_result and not signed_result.has_private_key:
+            # The request came from elsewhere: the key stayed there (#348)
+            msg += '; the CA holds no private key (certificate only), import its key to let it sign'
         return success_response(
             data=signed_result.to_dict(),
             message=msg

@@ -28,7 +28,7 @@ export const REVOCATION_REASONS = [
   'aACompromise',
 ]
 
-export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, loading = false, count = 1, title, warning }) {
+export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, loading = false, count = 1, title, warning, allowHold = true }) {
   const { t } = useTranslation()
   const [reason, setReason] = useState('unspecified')
 
@@ -66,13 +66,13 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
             className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-sm text-text-primary"
             data-testid="revoke-reason"
           >
-            {REVOCATION_REASONS.map(r => (
+            {REVOCATION_REASONS.filter(r => allowHold || r !== 'certificateHold').map(r => (
               <option key={r} value={r}>{t(`revocation.reasons.${r}`)}</option>
             ))}
           </select>
           <p className="text-xs text-text-tertiary">{t(`revocation.hints.${reason}`)}</p>
           <p className="text-xs text-text-tertiary">
-            {count > 1 ? t('revocation.bulkReasonHelp') : t('revocation.reasonHelp')}
+            {count > 1 ? t('revocation.bulkReasonHelp') : (allowHold ? t('revocation.reasonHelp') : t('revocation.reasonHelpNoHold'))}
           </p>
         </div>
 

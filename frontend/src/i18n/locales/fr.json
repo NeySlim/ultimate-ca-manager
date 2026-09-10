@@ -692,6 +692,15 @@
     "samlValidationFailed": "L'authentification SAML a échoué"
   },
   "cas": {
+    "chainRevoked": "Révoquée en amont",
+    "chainRevokedBanner": "Une CA au-dessus de celle-ci est révoquée : cette CA ne peut plus signer de certificats ni de CRL, ni les CA en dessous d'elle.",
+    "revokeWarnings": {
+      "parent_crl_not_regenerated": "La CRL de la CA parente n'a pas pu être régénérée : la CRL servie actuellement ne liste pas encore cette CA. Vérifiez la CA parente et régénérez sa CRL.",
+      "parent_cdp_disabled": "Le CDP est désactivé sur la CA parente : aucune CRL ne publie cette révocation, les clients ne l'apprennent que par OCSP."
+    },
+    "certificateOnly": "Certificat seul",
+    "certificateOnlyBanner": "Cette CA ne détient que son certificat, pas de clé privée : elle ne peut ni signer de certificats ou de CRL, ni être mise hors ligne. Importez sa clé privée pour lui permettre de signer.",
+    "importPrivateKey": "Importer la clé privée",
     "parentCA": "AC parente",
     "hierarchy": "Hiérarchie",
     "hierarchyView": "Vue hiérarchique",
@@ -1785,6 +1794,7 @@
     "expiresInDays": "Expire dans {{count}} jours"
   },
   "revocation": {
+    "reasonHelpNoHold": "Le motif est publié dans la CRL du parent et ne peut plus être modifié ; la révocation d'une CA est définitive.",
     "title": "Révoquer le certificat",
     "reasonLabel": "Motif de révocation",
     "reasonHelp": "Enregistré sur le certificat et publié dans la CRL (code de motif RFC 5280). Une révocation est irréversible, sauf la suspension.",

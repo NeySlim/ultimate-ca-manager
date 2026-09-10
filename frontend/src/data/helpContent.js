@@ -72,6 +72,7 @@ export const helpContent = {
           { label: 'Renew CA', text: 'Re-issue the CA certificate with a new validity period' },
           { label: 'Revoke', text: 'Revoke an intermediate CA from its parent: published on the parent\'s CRL and OCSP, and the CA can no longer sign (permanent)' },
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
+          { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate (signed from an external request), so it can sign' },
         ]
       },
       {

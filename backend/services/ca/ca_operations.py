@@ -49,7 +49,8 @@ class CAOperationsMixin:
         relying parties drop it from their trust stores), nor is a CA whose
         issuer is not held in UCM (revoke it at that root).
 
-        Returns (ca, warnings): the revocation is recorded even when the
+        Returns (ca, warnings), the codes of the warnings being left on
+        ``ca.revocation_warning_codes``: the revocation is recorded even when the
         parent's CRL could not be regenerated (offline or key-less parent),
         and the caller must surface that, since the CRL served until the
         next successful generation does not carry the serial yet.
@@ -63,7 +64,19 @@ class CAOperationsMixin:
         ca = db.session.get(CA, ca_id)
         if not ca:
             raise ValueError("CA not found")
-        if ca.revoked:
+        if reason in ('certificateHold', 'certificate_hold'):
+            # No route lifts a hold on a CA, and the parent's CRL would carry
+            # a "hold" that never ends: CA revocation is permanent
+            raise ValueError("A CA cannot be put on hold: CA revocation is permanent")
+        if ca.is_revoked:
+            # The parent's record is authoritative: a row whose flag was lost
+            # (restore, import before its parent) gets it back rather than a
+            # second revocation with a later date (RFC 5280 §5.3)
+            if not ca.revoked and CAOperationsMixin.apply_persisted_revocation(ca):
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
             raise ValueError("CA is already revoked")
         if ca.is_pending or not ca.crt:
             raise ValueError("CA is awaiting its certificate")
@@ -76,6 +89,13 @@ class CAOperationsMixin:
             if ca.is_root:
                 raise ValueError(
                     "A root CA cannot be revoked: relying parties remove it from their trust stores"
+                )
+            recorded = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
+            if recorded is not None:
+                raise ValueError(
+                    f"The recorded issuing CA '{recorded.descr}' did not sign the certificate "
+                    f"this CA holds now (the issuer was re-keyed or replaced): import the "
+                    f"issuer's current certificate, or revoke this CA at that issuer"
                 )
             raise ValueError(
                 "The issuing CA is not held in UCM: revoke this CA at that root "
@@ -99,7 +119,10 @@ class CAOperationsMixin:
         ca.revoked_at = now
         ca.revoke_reason = reason
         ca.invalidity_at = invalidity_at
-        valid_to = ca.valid_to or cert.not_valid_after_utc.replace(tzinfo=None)
+        # From the certificate itself, as the serial is: the column can lag
+        # behind it, and the CRL keeps the entry until this date
+        valid_to = cert.not_valid_after_utc.replace(tzinfo=None)
+        ca.valid_to = valid_to
 
         existing = RevokedSerial.query.filter_by(
             caref=parent.refid, serial_number=serial_decimal
@@ -134,8 +157,10 @@ class CAOperationsMixin:
             username=username,
         )
 
-        # The parent publishes the revocation: CRL now, OCSP on next answer
+        # The parent publishes the revocation: CRL now, OCSP on next answer.
+        # Each warning comes with a code the UI can translate
         warnings = []
+        warning_codes = []
         if parent.cdp_enabled:
             from services.crl_service import CRLService
             try:
@@ -157,13 +182,16 @@ class CAOperationsMixin:
                     f"CA (offline, key unavailable) and regenerate its CRL; details are in "
                     f"the server log."
                 )
+                warning_codes.append('parent_crl_not_regenerated')
         else:
             warnings.append(
                 f"CDP is disabled on the parent CA '{parent.descr}': no CRL publishes this "
                 f"revocation; relying parties learn it through OCSP only."
             )
+            warning_codes.append('parent_cdp_disabled')
         from services.ocsp_service import OCSPService
         OCSPService.invalidate_cached_responses(serial_decimal, ca_id=parent.id)
+        ca.revocation_warning_codes = warning_codes
         return ca, warnings
     """CA certificate operations"""
 

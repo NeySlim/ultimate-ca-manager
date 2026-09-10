@@ -812,6 +812,15 @@
     "templateOverridesHint": "与模板 '{{name}}' 的差异项：{{fields}}"
   },
   "cas": {
+    "chainRevoked": "上游已吊销",
+    "chainRevokedBanner": "此 CA 的上级 CA 已吊销：此 CA 及其下级 CA 无法再签发证书或 CRL。",
+    "revokeWarnings": {
+      "parent_crl_not_regenerated": "无法重新生成父 CA 的 CRL：当前提供的 CRL 尚未列出此 CA。请检查父 CA 并重新生成其 CRL。",
+      "parent_cdp_disabled": "父 CA 已禁用 CDP：没有 CRL 发布此吊销，依赖方只能通过 OCSP 获知。"
+    },
+    "certificateOnly": "仅证书",
+    "certificateOnlyBanner": "此 CA 仅持有其证书，没有私钥：无法签发证书或 CRL，也无法转为离线。导入其私钥后即可签名。",
+    "importPrivateKey": "导入私钥",
     "parentCA": "父CA",
     "hierarchy": "层级",
     "hierarchyView": "层级视图",
@@ -3306,6 +3315,7 @@
     "invalidFormat": "格式无效"
   },
   "revocation": {
+    "reasonHelpNoHold": "原因将发布在父 CA 的 CRL 中且无法更改；CA 的吊销是永久性的。",
     "title": "吊销证书",
     "reasonLabel": "吊销原因",
     "reasonHelp": "记录在证书上并发布到 CRL（RFC 5280 原因代码）。除证书挂起外，吊销无法撤销。",

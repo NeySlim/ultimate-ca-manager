@@ -3,6 +3,7 @@ TSA Management Routes v2.0
 /api/v2/tsa/* - TSA configuration and statistics
 """
 
+from utils.signing_ca import signing_ca_problem
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -205,6 +206,8 @@ def update_tsa_config():
         set_config('tsa_ca_refid', data['ca_refid'] or '')
     elif 'ca_id' in data:
         ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
+        if data['ca_id'] and signing_ca_problem(ca):
+            return error_response(signing_ca_problem(ca), 400)
         set_config('tsa_ca_refid', ca.refid if ca else '')
     if policy_oid is not None:
         set_config('tsa_policy_oid', policy_oid)

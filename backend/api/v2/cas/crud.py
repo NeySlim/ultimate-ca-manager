@@ -911,7 +911,8 @@ def revoke_ca(ca_id):
         )
     except ValueError as e:
         db.session.rollback()
-        return error_response(str(e), 400)
+        # A CA already revoked, by its flag or by the parent's record, is a conflict, not a bad request
+        return error_response(str(e), 409 if 'already revoked' in str(e) else 400)
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to revoke CA {ca_id}: {e}", exc_info=True)
@@ -928,7 +929,9 @@ def revoke_ca(ca_id):
     message = 'CA revoked'
     if warnings:
         message = 'CA revoked, but not fully published: ' + ' '.join(warnings)
-    return success_response(data={**ca_dict, 'warnings': warnings}, message=message)
+    return success_response(data={**ca_dict, 'warnings': warnings,
+                                  'warning_codes': list(getattr(ca, 'revocation_warning_codes', []) or [])},
+                            message=message)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/offline', methods=['POST'])
@@ -963,6 +966,11 @@ def take_ca_offline(ca_id):
 
     if ca.offline:
         return error_response('CA is already offline', 409)
+
+    if ca.is_revoked:
+        # Offline would hide the revocation in the tree; a revoked CA has
+        # nothing left to protect from use (review of #343)
+        return error_response('A revoked CA is not taken offline: it stays visibly revoked', 409)
 
     if ca.is_pending:
         return error_response(

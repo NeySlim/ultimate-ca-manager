@@ -24,6 +24,7 @@ import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
 import { getSanValidationError } from '../lib/sanValidate'
 import { VALIDITY } from '../constants/config'
+import { signingCas } from '../lib/caSelection'
 export default function CSRsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -864,7 +865,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             <>
               <Select
                 label={t('common.certificateAuthority')}
-                options={cas.map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
+                options={signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
                 value={signCA}
                 onChange={setSignCA}
                 placeholder={t('csrs.selectCA')}

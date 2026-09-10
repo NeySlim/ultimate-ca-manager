@@ -4,7 +4,7 @@
 import { Certificate, ShieldCheck } from '@phosphor-icons/react'
 import { CATypeIcon } from '../../components'
 import { cn } from '../../lib/utils'
-import { formatExpiry, StatusBadge, HsmBadge, OfflineBadge } from './CAListUtils'
+import { formatExpiry, StatusBadge, HsmBadge, OfflineBadge, CertificateOnlyBadge, ChainRevokedBadge } from './CAListUtils'
 
 // =============================================================================
 // VIEW B: COLUMNS — One column per Root CA
@@ -100,6 +100,8 @@ function ColumnHeader({ ca, selectedId, onSelect, isMobile, t }) {
           {ca.name || ca.common_name}
         </span>
         <HsmBadge ca={ca} t={t} />
+          <CertificateOnlyBadge ca={ca} t={t} />
+          <ChainRevokedBadge ca={ca} t={t} />
         <StatusBadge status={ca.status} offline={ca.offline} />
         <OfflineBadge ca={ca} t={t} />
       </div>
@@ -146,6 +148,8 @@ function ColumnChildCard({ ca, selectedId, onSelect, isMobile, t, isOrphan, dept
             {ca.name || ca.common_name}
           </span>
           <HsmBadge ca={ca} t={t} />
+          <CertificateOnlyBadge ca={ca} t={t} />
+          <ChainRevokedBadge ca={ca} t={t} />
           <StatusBadge status={ca.status} offline={ca.offline} />
         <OfflineBadge ca={ca} t={t} />
         </div>

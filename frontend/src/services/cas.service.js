@@ -60,6 +60,10 @@ export const casService = {
     return apiClient.post(`/cas/${id}/revoke`, body)
   },
 
+  async uploadKey(id, keyPem, passphrase = null) {
+    return apiClient.post(`/cas/${id}/key`, { key: keyPem, passphrase })
+  },
+
   async takeOffline(id, { password, mode = 'password_protected' } = {}) {
     if (mode === 'file_exported') {
       return apiClient.post(

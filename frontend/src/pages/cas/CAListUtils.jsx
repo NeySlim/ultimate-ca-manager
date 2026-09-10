@@ -67,9 +67,16 @@ export function CAInfoLine({ ca, isMobile, t }) {
 /** Status pill badge. Hidden when CA is offline (OfflineBadge takes over). */
 export function StatusBadge({ status, offline = false }) {
   const { t } = useTranslation()
-  if (offline) return null
+  // A revoked CA stays visibly revoked even when offline
+  if (offline && status !== 'Revoked') return null
   // 'Pending' = external-CSR CA awaiting its certificate (#298)
-  const label = status === 'Pending' ? t('cas.awaitingCertificate') : status
+  const labels = {
+    Pending: t('cas.awaitingCertificate'),
+    Active: t('common.active'),
+    Expired: t('common.expired'),
+    Revoked: t('common.revoked'),
+  }
+  const label = labels[status] || status
   return (
     <span className={cn(
       'shrink-0 px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',
@@ -103,6 +110,32 @@ export function HsmBadge({ ca, t }) {
       title={tip || t('cas.detail.hsmBacked')}
     >
       HSM
+    </span>
+  )
+}
+
+/** Chain badge — a CA above this one is revoked (#343) */
+export function ChainRevokedBadge({ ca, t }) {
+  if (!ca?.revoked_in_chain || ca?.revoked) return null
+  return (
+    <span
+      className="shrink-0 px-1.5 py-0.5 rounded-md text-2xs font-semibold badge-bg-red"
+      title={t('cas.chainRevokedBanner')}
+    >
+      {t('cas.chainRevoked')}
+    </span>
+  )
+}
+
+/** Certificate-only badge — the CA holds no private key (#348) */
+export function CertificateOnlyBadge({ ca, t }) {
+  if (!ca?.certificate_only || ca?.pending) return null
+  return (
+    <span
+      className="shrink-0 px-1.5 py-0.5 rounded-md text-2xs font-semibold badge-bg-amber"
+      title={t('cas.certificateOnlyBanner')}
+    >
+      {t('cas.certificateOnly')}
     </span>
   )
 }

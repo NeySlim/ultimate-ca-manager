@@ -4,7 +4,7 @@
  *
  * CRUD + Issue page for SSH certificates (sign public key or generate key pair)
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
@@ -104,7 +104,11 @@ export default function SSHCertificatesPage() {
 
   // ============= DATA LOADING =============
 
+  const requestSeq = useRef(0)
   const loadData = useCallback(async () => {
+    // A reload started earlier must not overwrite a later one (filter changed
+    // while an action's reload was in flight)
+    const seq = ++requestSeq.current
     try {
       setLoading(true)
       const params = {
@@ -127,11 +131,16 @@ export default function SSHCertificatesPage() {
       setCertificates(certsRes.data || [])
       setCas(casRes.data || [])
       setCertStats(statsRes.data?.certificates || { valid: 0, expired: 0, revoked: 0, total: 0 })
-      setTotal(certsRes.meta?.total || certsRes.pagination?.total || (certsRes.data || []).length)
+      if (seq !== requestSeq.current) return
+      const totalCount = certsRes.meta?.total || certsRes.pagination?.total || (certsRes.data || []).length
+      setTotal(totalCount)
+      // The last row of the last page went away: stay on a page that exists
+      const lastPage = Math.max(1, Math.ceil(totalCount / perPage))
+      if (page > lastPage) setPage(lastPage)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.sshCertificates'))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA), searchValue, showError, t])

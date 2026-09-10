@@ -15,6 +15,7 @@ import { casService, hsmService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useWebSocket } from '../../hooks'
 import { extractData, cn, downloadBlob } from '../../lib/utils'
+import { signingCas } from '../../lib/caSelection'
 
 const ROOT_KEY_USAGE = ['keyCertSign', 'cRLSign']
 const INTERMEDIATE_KEY_USAGE = ['digitalSignature', 'keyCertSign', 'cRLSign']
@@ -543,7 +544,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           {createFormType === 'intermediate' && (
             <Select
               label={t('cas.parentCA')}
-              options={cas.map(ca => ({
+              options={signingCas(cas).map(ca => ({
                 value: ca.id.toString(),
                 label: ca.name || ca.descr || ca.common_name
               }))}

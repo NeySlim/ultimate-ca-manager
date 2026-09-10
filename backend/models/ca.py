@@ -460,10 +460,17 @@ class CA(db.Model):
         
         # Determine status: pending (awaiting external certificate) wins,
         # otherwise derived from expiry
+        # The parent's record is authoritative (#343): a row whose flag was
+        # lost still reads as revoked, with the record's date and reason
+        record = None if self.revoked else (self.persisted_revocation() if self.crt else None)
+        revoked = bool(self.revoked) or record is not None
+        revoked_at = self.revoked_at if self.revoked else (record.revoked_at if record else None)
+        revoke_reason = self.revoke_reason if self.revoked else (record.revoke_reason if record else None)
+        invalidity_at = self.invalidity_at if self.revoked else (record.invalidity_at if record else None)
         status = "Active"
         if self.is_pending:
             status = "Pending"
-        elif self.revoked:
+        elif revoked:
             status = "Revoked"
         elif self.valid_to:
             if self.valid_to < utc_now():
@@ -504,6 +511,9 @@ class CA(db.Model):
             "created_at": utc_isoformat(self.created_at),
             "created_by": self.created_by,
             "has_private_key": self.has_private_key,
+            # Holds its certificate but no key (signed from an external request):
+            # cannot sign, publish a CRL or go offline until a key is imported (#348)
+            "certificate_only": bool(self.crt) and not self.has_private_key,
             # Computed properties for display
             "common_name": self.common_name,
             "organization": self.organization,
@@ -515,10 +525,13 @@ class CA(db.Model):
             "type": ca_type,  # "Root CA" or "Intermediate"
             "status": status,  # "Pending", "Revoked", "Active" or "Expired"
             # Revocation by the parent CA (#343)
-            "revoked": bool(self.revoked),
-            "revoked_at": utc_isoformat(self.revoked_at),
-            "revoke_reason": self.revoke_reason,
-            "invalidity_at": utc_isoformat(self.invalidity_at),
+            "revoked": revoked,
+            "revoked_at": utc_isoformat(revoked_at),
+            "revoke_reason": revoke_reason,
+            "invalidity_at": utc_isoformat(invalidity_at),
+            # A CA above this one is revoked: this CA can no longer sign
+            # either, whatever its own state says (#343)
+            "revoked_in_chain": (not revoked) and bool(self.crt) and self.revoked_in_chain,
             # External-CSR lifecycle (#298)
             "pending": self.is_pending,
             "has_csr": bool(self.csr),

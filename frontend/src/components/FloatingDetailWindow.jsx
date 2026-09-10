@@ -23,6 +23,7 @@ import { LoadingSpinner } from './LoadingSpinner'
 import { ExportModal } from './ExportModal'
 import { RevokeCertificateModal } from './RevokeCertificateModal'
 import { TakeOfflineModal } from './cas/TakeOfflineModal'
+import { ImportCaKeyModal } from './cas/ImportCaKeyModal'
 import { RestoreModal } from './cas/RestoreModal'
 import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
 import { cn, downloadBlob } from '../lib/utils'
@@ -71,6 +72,7 @@ export function FloatingDetailWindow({ windowInfo }) {
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
   const [minimized, setMinimized] = useState(false)
   const [offlineModalOpen, setOfflineModalOpen] = useState(false)
+  const [importKeyOpen, setImportKeyOpen] = useState(false)
   const [restoreModalOpen, setRestoreModalOpen] = useState(false)
   const [uploadCertOpen, setUploadCertOpen] = useState(false)
   const [lintOpen, setLintOpen] = useState(false)
@@ -133,7 +135,10 @@ export function FloatingDetailWindow({ windowInfo }) {
         const res = await casService.revoke(windowInfo.entityId, { reason })
         showSuccess(t('cas.revokeSuccess', 'CA revoked'))
         // The parent could not publish the revocation (offline parent, CDP off)
-        for (const w of (res?.data || res)?.warnings || []) showWarning(w)
+        const revoked = res?.data || res
+        const codes = revoked?.warning_codes || []
+        if (codes.length) codes.forEach(code => showWarning(t(`cas.revokeWarnings.${code}`)))
+        else for (const w of revoked?.warnings || []) showWarning(w)
       } else {
         await certificatesService.revoke(windowInfo.entityId, reason)
         showSuccess(t('certificates.revoked', 'Certificate revoked'))
@@ -209,6 +214,11 @@ export function FloatingDetailWindow({ windowInfo }) {
     closeWindow(windowInfo.id)
   }
 
+  const handleKeyImported = (updated) => {
+    if (updated?.id) setData(updated)
+    window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
+  }
+
   const handleRestoreSuccess = () => {
     closeWindow(windowInfo.id)
   }
@@ -264,10 +274,11 @@ export function FloatingDetailWindow({ windowInfo }) {
     onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
     onRevoke: ((isCert || isUserCert) && canWrite(resource) && !data.revoked)
       // A CA is revoked by its parent, so it needs one held in UCM (#343)
-      || (isCA && canWrite('cas') && !data.revoked && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
+      || (isCA && canWrite('cas') && !data.revoked && !data.revoked_in_chain && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
       ? handleRevoke : null,
     onUnhold: isCert && canWrite('certificates') && data.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold') ? handleUnhold : null,
-    onOffline: isCA && canWrite('cas') && !data.offline && !data.pending ? handleOffline : null,
+    // Offline needs the key in UCM's own store, and a revoked CA stays visibly revoked (#348, review)
+    onOffline: isCA && canWrite('cas') && !data.offline && !data.pending && !data.revoked && data.has_private_key && !data.uses_hsm ? handleOffline : null,
     onRestore: isCA && canWrite('cas') && data.offline ? handleRestore : null,
     onManagePins: isCA && canWrite('cas') && !data.pending ? handleManagePins : null,
     // External-CSR CA lifecycle (#298)
@@ -276,7 +287,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     onUploadCertificate: isCA && canWrite('cas') && data.imported_from === 'external_csr'
       && (data.pending || data.has_csr) && !data.offline ? () => setUploadCertOpen(true) : null,
     onRenewCsr: isCA && canWrite('cas') && data.imported_from === 'external_csr'
-      && !data.pending && !data.offline ? handleRenewCsr : null,
+      && !data.pending && !data.offline && !data.revoked ? handleRenewCsr : null,
     onDelete: canDelete(resource) ? handleDelete : null,
     t,
   } : null
@@ -313,6 +324,7 @@ export function FloatingDetailWindow({ windowInfo }) {
               canDelete={canDelete}
               onExport={handleExport}
               onDelete={handleDelete}
+              onImportKey={isCA && canWrite('cas') && data?.certificate_only && !data?.pending ? () => setImportKeyOpen(true) : null}
             />
           </div>
         </>
@@ -334,6 +346,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 
     {(isCert || isUserCert || isCA) && (
       <RevokeCertificateModal
+        allowHold={!isCA}
         open={revokeOpen}
         onClose={() => setRevokeOpen(false)}
         onConfirm={handleRevokeConfirm}
@@ -353,6 +366,13 @@ export function FloatingDetailWindow({ windowInfo }) {
 
     {isCA && data && (
       <>
+        <ImportCaKeyModal
+          open={importKeyOpen}
+          onClose={() => setImportKeyOpen(false)}
+          ca={data}
+          onSuccess={handleKeyImported}
+          t={t}
+        />
         <TakeOfflineModal
           open={offlineModalOpen}
           onClose={() => setOfflineModalOpen(false)}
@@ -380,7 +400,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 /**
  * DetailContent — Renders the appropriate detail view based on entity type
  */
-function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete }) {
+function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete, onImportKey }) {
   if (type === 'certificate' || type === 'user_certificate') {
     return (
       <CertificateDetails
@@ -404,6 +424,7 @@ function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete }) 
         canDelete={canDelete('cas')}
         onExport={onExport}
         onDelete={onDelete}
+        onImportKey={onImportKey}
       />
     )
   }

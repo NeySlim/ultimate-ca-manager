@@ -5,8 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import { 
-  Certificate, UploadSimple, Clock, Plus, Crown, ShieldCheck, Columns, SquaresFour, List
-} from '@phosphor-icons/react'
+  Certificate, UploadSimple, Clock, Plus, Crown, ShieldCheck, Columns, SquaresFour, List, Prohibit } from '@phosphor-icons/react'
 import {
   Button, LoadingSpinner, MultiSelectFilter
 } from '../components'
@@ -328,6 +327,7 @@ export default function CAsPage() {
     const activeCount = cas.filter(c => c.status === 'Active').length
     const expiredCount = cas.filter(c => c.status === 'Expired').length
     const pendingCount = cas.filter(c => c.status === 'Pending').length
+    const revokedCount = cas.filter(c => c.status === 'Revoked').length
 
     return [
       { icon: Crown, label: t('common.rootCA'), value: rootCount, variant: 'warning' },
@@ -336,6 +336,9 @@ export default function CAsPage() {
       { icon: Clock, label: t('common.expired'), value: expiredCount, variant: 'danger' },
       ...(pendingCount > 0
         ? [{ icon: Clock, label: t('cas.awaitingCertificate'), value: pendingCount, variant: 'warning' }]
+        : []),
+      ...(revokedCount > 0
+        ? [{ icon: Prohibit, label: t('common.revoked'), value: revokedCount, variant: 'danger' }]
         : [])
     ]
   }, [cas, t])
