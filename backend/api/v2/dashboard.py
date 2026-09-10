@@ -129,8 +129,9 @@ def get_dashboard_stats():
     certs = issued_certificates()
 
     expired = certs.filter(expired_condition(now)).count()
-    # A window over the valid ones, not a bucket of its own: a certificate
-    # about to expire is still usable (see utils/cert_status)
+    # One slice of the partition next to valid, expired and revoked: the four
+    # add up to the total, valid excluding the expiring ones (see
+    # utils/cert_status; the Prometheus metrics answer the other way round)
     expiring_soon = certs.filter(expiring_condition(now)).count()
     revoked = certs.filter(revoked_condition()).count()
     total_certs = certs.count()

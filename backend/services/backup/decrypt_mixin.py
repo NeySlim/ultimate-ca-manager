@@ -26,6 +26,11 @@ from utils.datetime_utils import utc_now
 logger = logging.getLogger(__name__)
 
 
+class BackupDecryptionError(ValueError):
+    """The backup could not be decrypted: wrong password or corrupted file.
+    Distinct from other ValueErrors so the operator is told which."""
+
+
 class DecryptMixin:
     def _decrypt_v1(self, backup_bytes: bytes, password: str) -> Tuple[bytes, Dict[str, Any]]:
         """Decrypt legacy v1 format: [salt(32)][nonce(12)][ciphertext+tag]"""
@@ -41,7 +46,7 @@ class DecryptMixin:
             ciphertext = encrypted_data[self.NONCE_SIZE:]
             plaintext = AESGCM(master_key).decrypt(nonce, ciphertext, None)
         except Exception:
-            raise ValueError("Decryption failed - wrong password or corrupted file")
+            raise BackupDecryptionError("Decryption failed - wrong password or corrupted file")
 
         try:
             backup_data = json.loads(plaintext.decode())
@@ -107,7 +112,7 @@ class DecryptMixin:
             # v2 uses magic bytes as AAD to authenticate the container
             plaintext = AESGCM(master_key).decrypt(nonce, ciphertext, self.MAGIC)
         except Exception:
-            raise ValueError("Decryption failed - wrong password or corrupted file")
+            raise BackupDecryptionError("Decryption failed - wrong password or corrupted file")
 
         # Decompress if gzipped
         if flags & self.FLAG_GZIP:

@@ -188,3 +188,14 @@ def run_scheduled_backup():
         _record_last_run(now)
     except Exception as e:
         logger.error(f"Scheduled backup failed: {e}", exc_info=True)
+        # A failure that only a log line reports is a backup nobody has:
+        # the audit trail records it, as the successes are recorded
+        try:
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='system_backup', resource_type='system',
+                resource_name='scheduled', details=f'Scheduled backup failed: {e}',
+                success=False, username='system',
+            )
+        except Exception:
+            pass

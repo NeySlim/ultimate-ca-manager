@@ -234,6 +234,7 @@ class ExportCoreMixin:
                 'revoked': bool(cert.revoked),
                 'revoked_at': cert.revoked_at.isoformat() if cert.revoked_at else None,
                 'revoke_reason': cert.revoke_reason,
+                'invalidity_at': cert.invalidity_at.isoformat() if cert.invalidity_at else None,
                 'archived': bool(cert.archived),
                 'imported_from': cert.imported_from,
                 'created_at': cert.created_at.isoformat() if cert.created_at else None,

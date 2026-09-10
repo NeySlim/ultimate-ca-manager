@@ -33,7 +33,7 @@ def create_backup():
     import secrets
 
     try:
-        from services.backup_service import BackupService
+        from services.backup_service import BackupService, BackupPasswordError
         data = request.json or {}
         password = data.get('password')
         generated_password = False
@@ -42,8 +42,12 @@ def create_backup():
         if not password:
             password = secrets.token_urlsafe(16)  # 128-bit entropy
             generated_password = True
-        elif len(password) < 8:
-            return error_response('Password must be at least 8 characters', 400)
+        else:
+            # The same rule as the system backup route (#346)
+            try:
+                BackupService.validate_password(password)
+            except BackupPasswordError as e:
+                return error_response(str(e), 400)
 
         service = BackupService()
         backup_bytes = service.create_backup(password)
@@ -106,7 +110,7 @@ def restore_backup():
         return error_response('Backup password required', 400)
 
     try:
-        from services.backup_service import BackupService
+        from services.backup_service import BackupService, BackupPasswordError
         from utils.file_validation import validate_upload, BACKUP_EXTENSIONS
 
         # Read + size-cap the upload as bytes (restore_backup expects bytes, not

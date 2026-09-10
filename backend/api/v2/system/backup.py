@@ -2,6 +2,7 @@
 System Backup Operations
 """
 
+from services.backup.decrypt_mixin import BackupDecryptionError
 from . import bp
 from flask import request, send_file
 from auth.unified import require_auth
@@ -537,6 +538,9 @@ def restore_backup():
             data=results,
         )
 
+    except BackupDecryptionError:
+        logger.warning("Restore refused: the backup could not be decrypted")
+        return error_response("Wrong backup password, or the file is not a valid backup", 400)
     except ValueError as exc:
         logger.warning("Restore validation error: %s", exc)
         return error_response("Invalid restore parameters", 400)

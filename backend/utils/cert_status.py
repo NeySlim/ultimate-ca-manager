@@ -5,10 +5,11 @@ Two views coexist, on purpose:
 - The certificates page **partitions**: valid, expiring, expired, revoked,
   no overlap. Every card is a filter, so a count and the list behind it have
   to agree exactly (``api/v2/certificates/stats.py`` and ``cert_list.py``).
-- The dashboard and the Prometheus metrics report the **lifecycle state**,
-  valid, expired or revoked, and publish "expiring within N days" as a
-  window over the valid ones. A certificate about to expire is still valid,
-  which is what an operator watches for.
+- The Prometheus metrics report the **lifecycle state**, valid, expired or
+  revoked, and publish "expiring within N days" as a window over the valid
+  ones: a certificate about to expire is still valid, which is what an
+  operator watches for. The dashboard partitions like the certificates
+  page, its status chart linking each slice to the matching filter.
 
 What both share is the set they count: rows that actually hold a
 certificate. A row holding only a signing request is a pending request,

@@ -175,10 +175,51 @@ class RestoreCoreMixin:
             except Exception:
                 return None
 
+        if 'revoked' not in ca_data:
+            # A backup written before the fields existed says nothing about
+            # revocation: the record keeps its state, and the parent's
+            # revoked_serials entry keeps saying revoked (review of #347)
+            return
         ca.revoked = bool(ca_data.get('revoked', False))
         ca.revoked_at = _dt_or_none(ca_data.get('revoked_at'))
         ca.revoke_reason = ca_data.get('revoke_reason')
         ca.invalidity_at = _dt_or_none(ca_data.get('invalidity_at'))
+
+    @staticmethod
+    def _apply_ca_fields(ca, ca_data: Dict) -> None:
+        """Apply the exported settings a restore used to drop: validity dates,
+        origin, CDP/OCSP/AIA/CPS publication settings and the offline state.
+        Fields absent from an older backup leave the record as it is."""
+        from datetime import datetime as _dt
+
+        def _dt_or_none(val):
+            if not val:
+                return None
+            try:
+                return _dt.fromisoformat(str(val).replace('Z', '+00:00'))
+            except Exception:
+                return None
+
+        if 'valid_from' in ca_data:
+            ca.valid_from = _dt_or_none(ca_data.get('valid_from'))
+        if 'valid_to' in ca_data:
+            ca.valid_to = _dt_or_none(ca_data.get('valid_to'))
+        for column in ('imported_from', 'created_by', 'cdp_enabled', 'cdp_url', 'ocsp_enabled',
+                       'ocsp_url', 'aia_ca_issuers_enabled', 'aia_ca_issuers_url', 'cps_enabled',
+                       'cps_uri', 'cps_oid', 'path_length'):
+            if column in ca_data and hasattr(ca, column):
+                setattr(ca, column, ca_data.get(column))
+        for column, setter in (('cdp_urls', 'set_cdp_urls'), ('ocsp_urls', 'set_ocsp_urls'),
+                               ('aia_ca_issuers_urls', 'set_aia_urls')):
+            if column in ca_data and isinstance(ca_data.get(column), list):
+                getattr(ca, setter)(ca_data[column])
+        if 'offline' in ca_data:
+            # An offline CA restored as online would hold a passphrase
+            # protected key it cannot use and could neither take offline nor
+            # bring back (review of #347)
+            ca.offline = bool(ca_data.get('offline', False))
+            ca.offline_mode = ca_data.get('offline_mode')
+            ca.offline_reason = ca_data.get('offline_reason')
 
     def _restore_revoked_serials(self, backup_data: Dict, results: Dict) -> None:
         """Restore the persistent revocation records (#343)."""
@@ -194,10 +235,19 @@ class RestoreCoreMixin:
                 return None
 
         results.setdefault('revoked_serials', 0)
+        results.setdefault('revoked_serials_skipped', 0)
+        # A record whose CA is neither in the database nor in the backup
+        # would fail the foreign key on PostgreSQL and abort the whole restore
+        known = {ca.refid for ca in CA.query.with_entities(CA.refid).all()}
+        known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for rs_data in backup_data.get('revoked_serials', []):
             caref = rs_data.get('caref')
             serial = rs_data.get('serial_number')
             if not caref or not serial:
+                continue
+            if caref not in known:
+                logger.warning(f"Revoked serial {serial} skipped: CA {caref} is unknown")
+                results['revoked_serials_skipped'] += 1
                 continue
             existing = RevokedSerial.query.filter_by(
                 caref=caref, serial_number=serial
@@ -250,6 +300,7 @@ class RestoreCoreMixin:
                 existing.prv = prv_b64
                 existing.serial_number = ca_data.get('serial_number') or existing.serial_number
                 existing.ski = ca_data.get('ski') or existing.ski
+                self._apply_ca_fields(existing, ca_data)
                 self._apply_ca_revocation(existing, ca_data)
             else:
                 prv_b64 = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
@@ -272,6 +323,7 @@ class RestoreCoreMixin:
                     serial_number=ca_data.get('serial_number'),
                     ski=ca_data.get('ski'),
                 )
+                self._apply_ca_fields(new_ca, ca_data)
                 self._apply_ca_revocation(new_ca, ca_data)
                 db.session.add(new_ca)
             results['cas'] += 1
@@ -313,6 +365,8 @@ class RestoreCoreMixin:
                 existing.revoked = bool(cert_data.get('revoked', False))
                 existing.revoked_at = _parse_dt(cert_data.get('revoked_at'))
                 existing.revoke_reason = cert_data.get('revoke_reason')
+                if 'invalidity_at' in cert_data:
+                    existing.invalidity_at = _parse_dt(cert_data.get('invalidity_at'))
                 existing.archived = bool(cert_data.get('archived', False))
             else:
                 new_cert = Certificate(
@@ -336,6 +390,7 @@ class RestoreCoreMixin:
                     revoked=bool(cert_data.get('revoked', False)),
                     revoked_at=_parse_dt(cert_data.get('revoked_at')),
                     revoke_reason=cert_data.get('revoke_reason'),
+                    invalidity_at=_parse_dt(cert_data.get('invalidity_at')),
                     archived=bool(cert_data.get('archived', False)),
                     imported_from=cert_data.get('imported_from'),
                     created_by=cert_data.get('created_by'),

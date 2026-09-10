@@ -303,6 +303,13 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
     LONG_PASSWORD_LENGTH = 16
     MIN_DISTINCT_CHARS_LONG = 6
 
+    @classmethod
+    def validate_password(cls, password: str) -> None:
+        """The backup password rule, for every place that accepts one (the
+        backup routes, the scheduled backup setting): raises
+        BackupPasswordError with the reason."""
+        cls._validate_password(cls, password)
+
     def _validate_password(self, password: str):
         """Validate backup password strength.
 

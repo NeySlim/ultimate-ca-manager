@@ -313,6 +313,13 @@ def update_general_settings():
             # Backup password is used for unattended scheduled backups, so it
             # must be stored — but encrypted at rest, never plaintext.
             if key == 'backup_password' and value:
+                # The rule the backup itself applies: a password refused at
+                # backup time would fail every scheduled backup in silence
+                from services.backup_service import BackupService, BackupPasswordError
+                try:
+                    BackupService.validate_password(value)
+                except BackupPasswordError as e:
+                    return error_response(str(e), 400)
                 from utils.encryption import encrypt_if_needed
                 value = encrypt_if_needed(value)
             set_config(key, value)
