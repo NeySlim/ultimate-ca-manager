@@ -9,6 +9,35 @@ from utils.datetime_utils import utc_now, utc_isoformat
 logger = logging.getLogger(__name__)
 
 
+def _request_cache(name):
+    """A dict living for the current request, or None outside one: the chain
+    walks (issuer by signature, parent's revocation record) are repeated for
+    every CA of a list and for every level of every chain (review of #348)."""
+    try:
+        from flask import g, has_request_context
+        if has_request_context():
+            cache = getattr(g, name, None)
+            if cache is None:
+                cache = {}
+                setattr(g, name, cache)
+            return cache
+    except Exception:
+        pass
+    return None
+
+
+def clear_request_caches():
+    """Forget the cached chain walks (after a revocation in the same request)."""
+    try:
+        from flask import g, has_request_context
+        if has_request_context():
+            for name in ('_ucm_issuing_ca', '_ucm_persisted_revocation'):
+                if hasattr(g, name):
+                    delattr(g, name)
+    except Exception:
+        pass
+
+
 class CA(db.Model):
     """Certificate Authority model"""
     __tablename__ = "certificate_authorities"
@@ -195,6 +224,16 @@ class CA(db.Model):
         return self.subject == self.issuer if self.subject and self.issuer else False
 
     def issuing_ca(self):
+        cache = _request_cache('_ucm_issuing_ca')
+        key = (self.id, hash(self.crt or ''))
+        if cache is not None and key in cache:
+            return cache[key]
+        value = self._issuing_ca_uncached()
+        if cache is not None and self.id is not None:
+            cache[key] = value
+        return value
+
+    def _issuing_ca_uncached(self):
         """The CA held in UCM whose key signed this certificate, or None.
 
         Candidates come from caref, then from the AKI (a CA whose SKI
@@ -251,6 +290,16 @@ class CA(db.Model):
         return None
 
     def persisted_revocation(self):
+        cache = _request_cache('_ucm_persisted_revocation')
+        key = (self.id, hash(self.crt or ''))
+        if cache is not None and key in cache:
+            return cache[key]
+        value = self._persisted_revocation_uncached()
+        if cache is not None and self.id is not None:
+            cache[key] = value
+        return value
+
+    def _persisted_revocation_uncached(self):
         """The parent's revoked_serials row for this CA's certificate, or None.
 
         The record outlives the CA row (#343): a CA deleted after its
@@ -513,7 +562,7 @@ class CA(db.Model):
             "has_private_key": self.has_private_key,
             # Holds its certificate but no key (signed from an external request):
             # cannot sign, publish a CRL or go offline until a key is imported (#348)
-            "certificate_only": bool(self.crt) and not self.has_private_key,
+            "certificate_only": bool(self.crt) and not self.has_private_key and not self.offline,
             # Computed properties for display
             "common_name": self.common_name,
             "organization": self.organization,

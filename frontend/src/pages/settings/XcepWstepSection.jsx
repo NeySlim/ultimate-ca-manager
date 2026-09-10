@@ -8,7 +8,7 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { xcepWstepService, casService, adConnectorService, kerberosService, templatesService } from '../../services'
 import { useNotification } from '../../contexts'
 import CopyableUrl from './CopyableUrl'
-import { signingCas } from '../../lib/caSelection'
+import { pickerCas } from '../../lib/caSelection'
 
 const EMPTY_XCEP = { enabled: false, ca_id: null, username: '', password_set: false }
 const EMPTY_WSTEP = { enabled: false, ca_id: null, username: '', password_set: false, validity_days: 365 }
@@ -118,7 +118,7 @@ export default function XcepWstepSection() {
 
   useEffect(() => { loadAll() }, [loadAll])
 
-  const caOptions = signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))
+  const caOptions = pickerCas(cas, xcep?.ca_id, wstep?.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))
 
   const handleXcepSave = async () => {
     setXcepSaving(true)

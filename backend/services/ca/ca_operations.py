@@ -150,6 +150,8 @@ class CAOperationsMixin:
             logger.error(f"Revocation failed for CA {ca_id}: {_commit_err}", exc_info=True)
             raise RuntimeError(f"Revocation failed for CA {ca_id}: {_commit_err}") from _commit_err
 
+        from models.ca import clear_request_caches
+        clear_request_caches()
         from services.audit_service import AuditService
         AuditService.log_ca(
             'ca_revoked', ca,

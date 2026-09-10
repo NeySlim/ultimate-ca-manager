@@ -47,6 +47,12 @@ def import_ca_private_key(ca_id):
         return error_response('A pending CA already holds its own key; install its certificate instead', 409)
     if ca.hsm_key_id:
         return error_response('CA key lives in an HSM', 400)
+    if ca.offline:
+        # The key of an offline CA comes back through its restore flow (with
+        # the exported key file or the password), never through an import
+        # that would leave the CA marked offline with a usable key
+        return error_response('CA is offline: restore it with its exported key file or password '
+                              'instead of importing a key', 409)
     if ca.prv:
         return error_response('CA already has a private key', 400)
 
@@ -99,4 +105,8 @@ def import_ca_private_key(ca_id):
     ca_dict = ca.to_dict()
     from services.webhook_service import emit_ca_updated
     emit_ca_updated(ca_dict, actor=username, changes={'private_key': 'imported'})
-    return success_response(data=ca_dict, message=f'Private key imported; CA "{ca_dict["descr"]}" can now sign')
+    from utils.signing_ca import signing_ca_problem
+    problem = signing_ca_problem(ca)
+    message = (f'Private key imported; the CA still cannot sign: {problem}' if problem
+               else f'Private key imported; CA "{ca_dict["descr"]}" can now sign')
+    return success_response(data=ca_dict, message=message)

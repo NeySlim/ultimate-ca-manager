@@ -145,3 +145,81 @@ class TestExternalCaUnderRevokedAncestor:
         assert r.status_code == 200, r.data
         body = json.loads(auth_client.get(f"/api/v2/cas/{ext['id']}").data)['data']
         assert body['revoked_in_chain'] is False
+
+
+class TestReviewOfTheReviewFixes:
+    def test_settings_refuse_a_changed_ca_but_keep_a_saved_one(self, app, auth_client, create_ca):
+        root = create_ca(cn='Settings Root')
+        sub = _sub_api(auth_client, root, 'Settings Sub')
+        # TSA by refid (the form the UI sends)
+        with app.app_context():
+            sub_refid = db.session.get(CA, sub['id']).refid
+        r = auth_client.patch('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.put('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid}), content_type='application/json')
+        assert r.status_code == 200, r.data
+        assert _revoke(auth_client, sub['id']).status_code == 200
+        # Re-saving the unchanged CA with another setting is not refused
+        r = auth_client.patch('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid, 'enabled': False}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.put('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid, 'enabled': False}), content_type='application/json')
+        assert r.status_code == 200, r.data
+        # Choosing it afresh is
+        other = create_ca(cn='Settings Other Root')
+        with app.app_context():
+            other_refid = db.session.get(CA, other['id']).refid
+        r = auth_client.patch('/api/v2/tsa/config', data=json.dumps({'ca_refid': other_refid}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.put('/api/v2/tsa/config', data=json.dumps({'ca_refid': other_refid}), content_type='application/json')
+        assert r.status_code == 200
+        r = auth_client.patch('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.put('/api/v2/tsa/config', data=json.dumps({'ca_refid': sub_refid}), content_type='application/json')
+        assert r.status_code == 400 and 'revoked' in json.loads(r.data)['message']
+        # WSTEP refuses a revoked CA too
+        r = auth_client.patch('/api/v2/wstep/config', data=json.dumps({'ca_id': sub['id']}), content_type='application/json')
+        if r.status_code == 405:
+            r = auth_client.put('/api/v2/wstep/config', data=json.dumps({'ca_id': sub['id']}), content_type='application/json')
+        assert r.status_code == 400, r.data
+
+    def test_chain_message_differs_from_own_revocation(self, app, auth_client, create_ca):
+        from utils.signing_ca import signing_ca_problem
+        root = create_ca(cn='Msg Root')
+        sub = _sub_api(auth_client, root, 'Msg Sub')
+        grand = _sub_api(auth_client, sub, 'Msg Grand')
+        assert _revoke(auth_client, sub['id']).status_code == 200
+        with app.app_context():
+            assert signing_ca_problem(db.session.get(CA, sub['id'])) == 'CA is revoked'
+            assert 'above' in signing_ca_problem(db.session.get(CA, grand['id']))
+
+    def test_request_cache_does_not_hide_a_revocation_made_in_the_request(self, app, auth_client, create_ca):
+        root = create_ca(cn='Cache Root')
+        sub = _sub_api(auth_client, root, 'Cache Sub')
+        r = _revoke(auth_client, sub['id'])
+        body = json.loads(r.data)['data']
+        assert body['revoked'] is True and body['status'] == 'Revoked'
+        listed = next(c for c in json.loads(auth_client.get('/api/v2/cas?per_page=300').data)['data'] if c['id'] == sub['id'])
+        assert listed['status'] == 'Revoked'
+
+    def test_delta_crl_lists_a_revoked_child_ca_from_its_row(self, app, auth_client, create_ca):
+        root = create_ca(cn='Delta Root')
+        with app.app_context():
+            row = db.session.get(CA, root['id'])
+            row.cdp_enabled = True; row.delta_crl_enabled = True; db.session.commit()
+            from services.crl_service import CRLService
+            CRLService.generate_crl(root['id'])
+        sub = _sub_api(auth_client, root, 'Delta Sub')
+        assert _revoke(auth_client, sub['id']).status_code == 200
+        with app.app_context():
+            row = db.session.get(CA, sub['id'])
+            RevokedSerial.query.filter_by(serial_number=row.serial_number).delete()
+            # The revocation regenerated the base CRL: a delta carries what came
+            # after it, so the row's revocation is dated after that base
+            from models.crl import CRLMetadata
+            base = CRLMetadata.query.filter_by(ca_id=root['id'], is_delta=False).order_by(CRLMetadata.crl_number.desc()).first()
+            row.revoked_at = base.this_update + timedelta(seconds=5)
+            db.session.commit()
+            from services.crl_service import CRLService
+            delta = CRLService.generate_delta_crl(root['id'])
+            crl = x509.load_pem_x509_crl(delta.crl_pem.encode())
+            assert any(rc.serial_number == int(row.serial_number) for rc in crl)

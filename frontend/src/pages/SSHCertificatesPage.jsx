@@ -128,10 +128,10 @@ export default function SSHCertificatesPage() {
         sshCertificatesService.getStats(),
       ])
 
+      if (seq !== requestSeq.current) return
       setCertificates(certsRes.data || [])
       setCas(casRes.data || [])
       setCertStats(statsRes.data?.certificates || { valid: 0, expired: 0, revoked: 0, total: 0 })
-      if (seq !== requestSeq.current) return
       const totalCount = certsRes.meta?.total || certsRes.pagination?.total || (certsRes.data || []).length
       setTotal(totalCount)
       // The last row of the last page went away: stay on a page that exists

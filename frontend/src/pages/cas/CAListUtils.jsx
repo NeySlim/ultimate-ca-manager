@@ -5,6 +5,7 @@ import { Certificate, Clock } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../lib/utils'
 import { getAppTimezone } from '../../stores/timezoneStore'
+import { needsKeyImport } from '../../lib/caSelection'
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -129,7 +130,7 @@ export function ChainRevokedBadge({ ca, t }) {
 
 /** Certificate-only badge — the CA holds no private key (#348) */
 export function CertificateOnlyBadge({ ca, t }) {
-  if (!ca?.certificate_only || ca?.pending) return null
+  if (!needsKeyImport(ca)) return null
   return (
     <span
       className="shrink-0 px-1.5 py-0.5 rounded-md text-2xs font-semibold badge-bg-amber"

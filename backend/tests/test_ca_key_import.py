@@ -120,3 +120,27 @@ class TestCaKeyImport:
         r = _post(auth_client, sub_id, {'key': _pem(win_key)})
         assert r.status_code == 200, r.data
         assert json.loads(r.data)['data']['certificate_only'] is False
+
+
+class TestCaKeyImportReview:
+    """Review of the #348 fix: offline CAs, accurate message, banner scope."""
+
+    def test_offline_ca_refuses_a_key_import(self, app, auth_client, create_ca):
+        ca = create_ca(cn='Offline Then Key CA')
+        r = auth_client.post(f"/api/v2/cas/{ca['id']}/offline", data=json.dumps({'password': 'Correct-Horse-9-Battery', 'mode': 'file_exported'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        body = json.loads(auth_client.get(f"/api/v2/cas/{ca['id']}").data)['data']
+        assert body['offline'] is True and body['has_private_key'] is False
+        assert body['certificate_only'] is False, 'an offline CA is not a certificate-only one'
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        r = _post(auth_client, ca['id'], {'key': _pem(key)})
+        assert r.status_code == 409 and 'offline' in json.loads(r.data)['message']
+
+    def test_message_says_when_the_ca_still_cannot_sign(self, app, auth_client):
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        ca_id = _keyless_ca(app, key, 'Revoked Keyless CA', revoked=True, revoke_reason='keyCompromise',
+                            revoked_at=datetime.now(timezone.utc).replace(tzinfo=None))
+        r = _post(auth_client, ca_id, {'key': _pem(key)})
+        assert r.status_code == 200, r.data
+        assert 'still cannot sign' in json.loads(r.data)['message']

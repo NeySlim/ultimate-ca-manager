@@ -18,7 +18,7 @@ import { tsaService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { signingCas } from '../lib/caSelection'
+import { pickerCas } from '../lib/caSelection'
 
 export default function TSAPage() {
   const { t } = useTranslation()
@@ -216,7 +216,7 @@ export default function TSAPage() {
             <Select
               label={t('tsa.signingCA')}
               placeholder={t('tsa.selectCA')}
-              options={signingCas(cas).map(ca => ({ value: ca.refid || ca.id.toString(), label: ca.name || ca.subject }))}
+              options={pickerCas(cas, config.ca_refid).map(ca => ({ value: ca.refid || ca.id.toString(), label: ca.name || ca.subject }))}
               value={config.ca_refid || ''}
               onChange={(val) => setConfig({ ...config, ca_refid: val })}
               disabled={!config.enabled}
@@ -367,7 +367,7 @@ export default function TSAPage() {
               <p className="text-xs text-text-secondary">{t('tsa.signerGenerateModalDesc')}</p>
               <Select
                 label={t('tsa.signingCA')}
-                options={signingCas(cas).map(ca => ({
+                options={pickerCas(cas, genForm.ca_refid).map(ca => ({
                   value: ca.refid || ca.id.toString(),
                   label: ca.name || ca.subject,
                 }))}

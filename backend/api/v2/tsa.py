@@ -202,13 +202,20 @@ def update_tsa_config():
             'tsa_require_dedicated_cert',
             'true' if data['require_dedicated_cert'] else 'false',
         )
-    if 'ca_refid' in data:
-        set_config('tsa_ca_refid', data['ca_refid'] or '')
-    elif 'ca_id' in data:
-        ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
-        if data['ca_id'] and signing_ca_problem(ca):
-            return error_response(signing_ca_problem(ca), 400)
-        set_config('tsa_ca_refid', ca.refid if ca else '')
+    if 'ca_refid' in data or 'ca_id' in data:
+        # Either form names the signing CA; a CA that cannot sign is refused
+        # when it is chosen (a saved setting is not re-judged on every save)
+        if 'ca_refid' in data:
+            new_refid = data['ca_refid'] or ''
+            ca = CA.query.filter_by(refid=new_refid).first() if new_refid else None
+        else:
+            ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
+            new_refid = ca.refid if ca else ''
+        if new_refid and new_refid != get_config('tsa_ca_refid', ''):
+            problem = signing_ca_problem(ca)
+            if problem:
+                return error_response(problem, 400)
+        set_config('tsa_ca_refid', new_refid)
     if policy_oid is not None:
         set_config('tsa_policy_oid', policy_oid)
 

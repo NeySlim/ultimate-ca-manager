@@ -29,7 +29,7 @@ export default function CSRsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const navigate = useNavigate()
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   // Direct private-key export is the admin-only read:private_keys scope,
   // as on the certificates page
@@ -201,8 +201,10 @@ export default function CSRsPage() {
         return
       }
       try {
-        await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType, signExtraEkus)
+        const signed = await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType, signExtraEkus)
         showSuccess(t('messages.success.other.signed'))
+        // A CA signed from an external request holds no key (#348)
+        if ((signed?.data || signed)?.certificate_only) showWarning(t('cas.certificateOnlyBanner'))
         closeModal('sign')
         loadData()
         setSelectedCSR(null)

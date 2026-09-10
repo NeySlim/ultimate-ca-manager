@@ -35,6 +35,7 @@ import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { CertificateExtensions } from './CertificateExtensions'
 import { CACrlSection } from './cas/CACrlSection'
 import { cn } from '../lib/utils'
+import { needsKeyImport } from '../lib/caSelection'
 
 // Format date helper - delegates to shared util
 function formatDate(dateStr) {
@@ -199,7 +200,7 @@ export function CADetails({
       )}
 
       {/* Certificate only: the key stayed where the request was made (#348) */}
-      {ca.certificate_only && !ca.pending && (
+      {needsKeyImport(ca) && (
         <div className="rounded-lg px-3 py-2 bg-status-warning/15 border border-status-warning/40 text-xs text-text-secondary flex items-start gap-2 flex-wrap">
           <span className="flex-1 min-w-[12rem]">{t('cas.certificateOnlyBanner')}</span>
           {onImportKey && (

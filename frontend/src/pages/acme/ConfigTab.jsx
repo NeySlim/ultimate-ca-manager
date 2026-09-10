@@ -9,7 +9,7 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { MARKDOWN_ELEMENT_CLASSES } from '../../lib/ui'
 import ProfilesEditor from './ProfilesEditor'
-import { signingCas } from '../../lib/caSelection'
+import { pickerCas } from '../../lib/caSelection'
 
 /** Render a markdown ToS preview.
  *
@@ -112,7 +112,7 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
             onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
             disabled={!acmeSettings.enabled || !canWrite}
             placeholder={t('common.acmeSelectCA')}
-            options={signingCas(cas).map(ca => ({ 
+            options={pickerCas(cas, acmeSettings.issuing_ca_id).map(ca => ({ 
               value: ca.id.toString(), 
               label: ca.name || ca.common_name 
             }))}

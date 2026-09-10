@@ -189,7 +189,7 @@ def update_acme_settings():
             if chosen is None and str(data['issuing_ca_id']).isdigit():
                 chosen = db.session.get(CA, int(data['issuing_ca_id']))
             problem = signing_ca_problem(chosen)
-            if problem:
+            if problem and str(data['issuing_ca_id']) != (ca_id_cfg.value or ''):
                 return error_response(problem, 400)
         ca_id_cfg.value = data['issuing_ca_id'] if data['issuing_ca_id'] else ''
 

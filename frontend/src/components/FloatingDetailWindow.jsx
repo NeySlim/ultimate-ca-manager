@@ -24,6 +24,7 @@ import { ExportModal } from './ExportModal'
 import { RevokeCertificateModal } from './RevokeCertificateModal'
 import { TakeOfflineModal } from './cas/TakeOfflineModal'
 import { ImportCaKeyModal } from './cas/ImportCaKeyModal'
+import { needsKeyImport } from '../lib/caSelection'
 import { RestoreModal } from './cas/RestoreModal'
 import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
 import { cn, downloadBlob } from '../lib/utils'
@@ -324,7 +325,7 @@ export function FloatingDetailWindow({ windowInfo }) {
               canDelete={canDelete}
               onExport={handleExport}
               onDelete={handleDelete}
-              onImportKey={isCA && canWrite('cas') && data?.certificate_only && !data?.pending ? () => setImportKeyOpen(true) : null}
+              onImportKey={isCA && canWrite('cas') && needsKeyImport(data) ? () => setImportKeyOpen(true) : null}
             />
           </div>
         </>

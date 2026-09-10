@@ -19,6 +19,7 @@ import { ImportCaKeyModal } from '../../components/cas/ImportCaKeyModal'
 import { casService } from '../../services'
 import { formatDate, downloadBlob } from '../../lib/utils'
 import { useNotification } from '../../contexts/NotificationContext'
+import { needsKeyImport } from '../../lib/caSelection'
 
 // =============================================================================
 // CA DETAILS PANEL
@@ -163,7 +164,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
       )}
 
       {/* Certificate only: the key stayed where the request was made (#348) */}
-      {ca.certificate_only && !ca.pending && (
+      {needsKeyImport(ca) && (
         <div className="rounded-lg px-3 py-2 bg-status-warning/15 border border-status-warning/40">
           <div className="flex items-center gap-2 text-status-warning">
             <Key size={16} />
@@ -330,7 +331,10 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
       open={showImportKeyModal}
       onClose={() => setShowImportKeyModal(false)}
       ca={ca}
-      onSuccess={(updated) => { if (updated?.id) onChanged?.(updated) }}
+      onSuccess={(updated) => {
+        if (updated?.id) onChanged?.(updated)
+        window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
+      }}
       t={t}
     />
 

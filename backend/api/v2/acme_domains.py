@@ -2,6 +2,7 @@
 ACME Domains API Routes
 Manages domain-to-DNS-provider mappings for ACME Proxy functionality.
 """
+from utils.signing_ca import signing_ca_problem
 import json
 import logging
 from flask import Blueprint, request, g
@@ -73,10 +74,9 @@ def create_domain():
         ca = db.session.get(CA, issuing_ca_id)
         if not ca:
             return error_response('Issuing CA not found', 404)
-        if not ca.has_private_key:
-            return error_response('Selected CA has no private key', 400)
-        if not ca.crt:
-            return error_response('Selected CA is awaiting its certificate', 400)
+        problem = signing_ca_problem(ca)
+        if problem:
+            return error_response(f'Selected CA cannot sign: {problem}', 400)
     
     # Create domain
     domain = AcmeDomain(
@@ -138,10 +138,9 @@ def update_domain(domain_id):
             ca = db.session.get(CA, data['issuing_ca_id'])
             if not ca:
                 return error_response('Issuing CA not found', 404)
-            if not ca.has_private_key:
-                return error_response('Selected CA has no private key', 400)
-            if not ca.crt:
-                return error_response('Selected CA is awaiting its certificate', 400)
+            problem = signing_ca_problem(ca)
+            if problem and str(data['issuing_ca_id']) != str(domain.issuing_ca_id or ''):
+                return error_response(f'Selected CA cannot sign: {problem}', 400)
             domain.issuing_ca_id = data['issuing_ca_id']
         else:
             domain.issuing_ca_id = None

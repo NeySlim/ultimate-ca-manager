@@ -12,8 +12,10 @@ def signing_ca_problem(ca):
         return 'CA not found'
     if ca.is_pending or not ca.crt:
         return 'CA is awaiting its certificate'
-    if ca.revoked_in_chain:
+    if ca.is_revoked:
         return 'CA is revoked'
+    if ca.revoked_in_chain:
+        return 'A CA above this one is revoked'
     if ca.offline:
         return 'CA is offline'
     if not ca.has_private_key:

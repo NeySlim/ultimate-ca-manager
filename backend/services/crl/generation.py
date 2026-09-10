@@ -305,6 +305,13 @@ class CRLGenerationMixin:
             Certificate.revoked_at > base_crl.this_update,
             Certificate.valid_to > now
         ).all()
+        # A revoked child CA, from its row, as the full CRL lists it
+        revoked_certs = revoked_certs + CA.query.filter(
+            CA.caref == ca.refid,
+            CA.revoked == True,
+            CA.revoked_at > base_crl.this_update,
+            CA.valid_to > now,
+        ).all()
 
         # Also include orphaned RevokedSerial entries revoked after the base CRL.
         # Uses the same filter as the full CRL so a serial superseded by an

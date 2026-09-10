@@ -3,6 +3,7 @@ MS-WSTEP Management Routes v2.0
 /api/v2/wstep/* - WSTEP (certificate enrollment) configuration
 """
 
+from utils.signing_ca import signing_ca_problem
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -75,14 +76,20 @@ def update_wstep_config():
         set_config('wstep_enabled', 'true' if data['enabled'] else 'false')
     if 'ca_refid' in data:
         if data['ca_refid']:
-            if not CA.query.filter_by(refid=data['ca_refid']).first():
+            ca = CA.query.filter_by(refid=data['ca_refid']).first()
+            if not ca:
                 return error_response('CA not found', 404)
+            # WSTEP issues: the CA must be able to sign when it is chosen
+            if ca.refid != get_config('wstep_ca_refid', '') and signing_ca_problem(ca):
+                return error_response(signing_ca_problem(ca), 400)
         set_config('wstep_ca_refid', data['ca_refid'] or '')
     if 'ca_id' in data:
         if data['ca_id']:
             ca = db.session.get(CA, data['ca_id'])
             if not ca:
                 return error_response('CA not found', 404)
+            if ca.refid != get_config('wstep_ca_refid', '') and signing_ca_problem(ca):
+                return error_response(signing_ca_problem(ca), 400)
             set_config('wstep_ca_refid', ca.refid)
         else:
             set_config('wstep_ca_refid', '')

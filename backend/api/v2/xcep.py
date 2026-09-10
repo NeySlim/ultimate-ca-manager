@@ -74,7 +74,7 @@ def update_xcep_config():
             ca = db.session.get(CA, data['ca_id'])
             if not ca:
                 return error_response('CA not found', 404)
-            if signing_ca_problem(ca):
+            if ca.refid != get_config('xcep_ca_refid', '') and signing_ca_problem(ca):
                 return error_response(signing_ca_problem(ca), 400)
             set_config('xcep_ca_refid', ca.refid)
         else:

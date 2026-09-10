@@ -19,7 +19,7 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import MappingEditor from './settings/MappingEditor'
-import { signingCas } from '../lib/caSelection'
+import { pickerCas } from '../lib/caSelection'
 
 export default function ESTPage() {
   const { t } = useTranslation()
@@ -188,7 +188,7 @@ export default function ESTPage() {
             <Select
               label={t('common.issuingCA')}
               placeholder={t('common.acmeSelectCA')}
-              options={signingCas(cas).map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject }))}
+              options={pickerCas(cas, config.ca_id).map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject }))}
               value={config.ca_id?.toString() || ''}
               onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
               disabled={!config.enabled}
