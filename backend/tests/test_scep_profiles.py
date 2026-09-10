@@ -315,3 +315,21 @@ class TestScepProfileTemplateIssuance:
         # serverAuth + clientAuth, and crucially NOT anyExtendedKeyUsage / absent
         assert oids == {'1.3.6.1.5.5.7.3.1', '1.3.6.1.5.5.7.3.2'}
         assert '2.5.29.37.0' not in oids
+
+
+class TestScepResponderTemplate:
+    """Self-review of #347: a SCEP template whose EKUs include OCSPSigning
+    issues a certificate carrying id-pkix-ocsp-nocheck, like every other path."""
+
+    _issue_via_service = TestScepProfileTemplateIssuance._issue_via_service
+
+    def test_template_with_ocsp_signing_gets_nocheck(self, app, auth_client, create_ca):
+        from cryptography import x509
+        from cryptography.x509.oid import ExtensionOID, ExtendedKeyUsageOID
+        ca = create_ca(cn='SCEP Responder Template CA')
+        tpl = _create_template(auth_client, name='scep-ocsp-responder-tpl',
+                               extensions_template={'extended_key_usage': ['OCSPSigning']})
+        cert = self._issue_via_service(app, ca['id'], tpl['id'])
+        eku = cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+        assert ExtendedKeyUsageOID.OCSP_SIGNING in eku
+        cert.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)

@@ -198,3 +198,23 @@ class TestApprovalHonorsTemplate:
                 }))
             with pytest.raises(ValueError, match='Template 999999 not found'):
                 _issue_approved_certificate(approval)
+
+
+class TestApprovalResponderTemplate:
+    """Self-review of #347: a certificate issued through an approval with a
+    template whose EKUs include OCSPSigning carries id-pkix-ocsp-nocheck."""
+
+    def test_approved_issuance_gets_nocheck(self, app, create_ca):
+        from cryptography.x509.oid import ExtensionOID
+        ca = create_ca(cn='ApprResp CA')
+        tpl_id = _mk_template(app, key_type='RSA-2048', extensions_template=json.dumps({
+            'key_usage': ['digitalSignature'],
+            'extended_key_usage': ['OCSPSigning'],
+        }))
+        cert, _ = _issue_from_request(app, create_ca, {
+            'cn': 'appr-responder.test', 'ca_id': ca['id'],
+            'cert_type': 'custom', 'template_id': tpl_id,
+        })
+        eku = cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+        assert ExtendedKeyUsageOID.OCSP_SIGNING in eku
+        cert.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)

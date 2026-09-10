@@ -24,6 +24,7 @@ from config.settings import Config
 from models import CA, Certificate, SCEPRequest, db
 from services.crl_service import CRLService
 from utils.dn_parse import subject_common_name
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
@@ -1229,10 +1230,12 @@ class SCEPService:
             if tpl_err:
                 raise ValueError(f"Invalid template EKUs: {tpl_err}")
             if tpl_oids:
+                tpl_eku_oids = to_object_identifiers(tpl_oids)
                 builder = builder.add_extension(
-                    x509.ExtendedKeyUsage(to_object_identifiers(tpl_oids)),
+                    x509.ExtendedKeyUsage(tpl_eku_oids),
                     critical=False,
                 )
+                builder = add_ocsp_nocheck_if_responder(builder, tpl_eku_oids)
 
         try:
             for ext in csr.extensions:
@@ -1280,6 +1283,7 @@ class SCEPService:
                     builder = builder.add_extension(
                         x509.ExtendedKeyUsage(safe_ekus), critical=False
                     )
+                    builder = add_ocsp_nocheck_if_responder(builder, safe_ekus)
                 # All other extensions (BasicConstraints, NameConstraints,
                 # PolicyConstraints, AuthorityInfoAccess, custom OIDs, ...)
                 # from the CSR are silently dropped — they MUST be set by us

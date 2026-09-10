@@ -20,6 +20,7 @@ from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
 from services.template_service import compute_template_overrides
 from utils.key_codec import private_key_to_pem
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 logger = logging.getLogger(__name__)
 
@@ -279,6 +280,7 @@ def _issue_approved_certificate(approval):
     )
     if base_ekus:
         builder = builder.add_extension(x509.ExtendedKeyUsage(base_ekus), critical=False)
+        builder = add_ocsp_nocheck_if_responder(builder, base_ekus)
     
     # SANs
     from ipaddress import ip_address

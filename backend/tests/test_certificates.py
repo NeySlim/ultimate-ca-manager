@@ -1846,3 +1846,50 @@ class TestHomonymsOnReimport:
         assert r.status_code == 200, r.data
         assert json.loads(r.data)['data']['id'] == id1
         assert self._state(app, CA, id2) == (crt2, True)
+
+
+class TestRenewalAddsNocheck:
+    """Self-review of #347: renewing a certificate that carries the OCSPSigning
+    EKU but no id-pkix-ocsp-nocheck (issued before 2.227) adds it."""
+
+    def test_renew_adds_nocheck_to_an_old_responder(self, app, auth_client, create_ca):
+        import base64
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
+        from datetime import datetime, timedelta, timezone
+        from security.encryption import encrypt_private_key
+        ca = create_ca(cn='Old Responder Renew CA')
+        with app.app_context():
+            from models import CA, Certificate, db
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_obj = db.session.get(CA, ca['id'])
+            ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca_obj.crt))
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            now = datetime.now(timezone.utc)
+            old = (x509.CertificateBuilder()
+                   .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'old-resp.example.com')]))
+                   .issuer_name(ca_cert.subject).public_key(key.public_key())
+                   .serial_number(x509.random_serial_number())
+                   .not_valid_before(now - timedelta(days=80)).not_valid_after(now + timedelta(days=10))
+                   .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.OCSP_SIGNING]), critical=False)
+                   .sign(get_ca_signing_key(ca_obj), hashes.SHA256()))
+            kpem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                     serialization.NoEncryption())
+            row = Certificate(refid='old-resp-renew', descr='old-resp.example.com', caref=ca_obj.refid,
+                              crt=base64.b64encode(old.public_bytes(serialization.Encoding.PEM)).decode(),
+                              prv=encrypt_private_key(base64.b64encode(kpem).decode()),
+                              serial_number=str(old.serial_number),
+                              subject=old.subject.rfc4514_string(), issuer=old.issuer.rfc4514_string(),
+                              valid_from=old.not_valid_before_utc.replace(tzinfo=None),
+                              valid_to=old.not_valid_after_utc.replace(tzinfo=None))
+            db.session.add(row); db.session.commit(); cert_id = row.id
+        r = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            from models import Certificate, db
+            renewed = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(Certificate, cert_id).crt))
+            assert renewed.serial_number != old.serial_number
+            renewed.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)   # present now
+            assert ExtendedKeyUsageOID.OCSP_SIGNING in renewed.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value

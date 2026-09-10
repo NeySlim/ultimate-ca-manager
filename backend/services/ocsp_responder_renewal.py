@@ -20,6 +20,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ed448, ed25519
 from cryptography.x509.oid import ExtensionOID
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 from models import CA, AuditLog, Certificate, SystemConfig, db
 from utils.datetime_utils import cert_not_before, utc_now
@@ -91,6 +92,13 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         if ext.oid == ExtensionOID.AUTHORITY_KEY_IDENTIFIER:
             continue
         builder = builder.add_extension(ext.value, critical=ext.critical)
+    # A responder issued before id-pkix-ocsp-nocheck was emitted gets it on
+    # renewal (idempotent when the old certificate already carries it)
+    try:
+        old_ekus = list(old_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value)
+    except x509.ExtensionNotFound:
+        old_ekus = []
+    builder = add_ocsp_nocheck_if_responder(builder, old_ekus)
     builder = builder.add_extension(
         x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key()),
         critical=False,

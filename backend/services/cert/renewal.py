@@ -47,6 +47,7 @@ from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils.key_codec import private_key_to_pem
+from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 logger = logging.getLogger(__name__)
 
@@ -377,6 +378,13 @@ def renew_certificate_in_place(
         except Exception:
             # Skip extensions that can't be copied
             pass
+    # A responder certificate issued before id-pkix-ocsp-nocheck was emitted
+    # gets it on renewal (idempotent when the original already carries it)
+    try:
+        orig_ekus = list(orig_cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value)
+    except x509.ExtensionNotFound:
+        orig_ekus = []
+    builder = add_ocsp_nocheck_if_responder(builder, orig_ekus)
 
     builder = builder.add_extension(
         x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False

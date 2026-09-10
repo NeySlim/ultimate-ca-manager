@@ -164,3 +164,64 @@ class TestOcspResponderRenewal:
         stats = _run(app)
         assert stats['renewed'] == 0
         assert int(_binding_value(app, ca['id'])) == cert_id
+
+
+class TestNocheckOnRenewal:
+    """Self-review of #347: a responder issued before id-pkix-ocsp-nocheck was
+    emitted gets the extension when the auto-renewal re-issues it."""
+
+    @staticmethod
+    def _strip_nocheck(app, cert_id):
+        """Rewrite the stored certificate without id-pkix-ocsp-nocheck, as one
+        issued before 2.227, same key, signed by its CA."""
+        import base64
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.x509.oid import ExtensionOID
+        with app.app_context():
+            from models import Certificate, CA, db
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            row = db.session.get(Certificate, cert_id)
+            old = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+            ca = CA.query.filter_by(refid=row.caref).first()
+            ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+            b = (x509.CertificateBuilder().subject_name(old.subject).issuer_name(ca_cert.subject)
+                 .public_key(old.public_key()).serial_number(x509.random_serial_number())
+                 .not_valid_before(old.not_valid_before_utc).not_valid_after(old.not_valid_after_utc))
+            for ext in old.extensions:
+                if ext.oid == ExtensionOID.OCSP_NO_CHECK:
+                    continue
+                b = b.add_extension(ext.value, critical=ext.critical)
+            stripped = b.sign(get_ca_signing_key(ca), hashes.SHA256())
+            row.crt = base64.b64encode(stripped.public_bytes(serialization.Encoding.PEM)).decode()
+            row.serial_number = str(stripped.serial_number)
+            db.session.commit()
+            return stripped.serial_number
+
+    @staticmethod
+    def _has_nocheck(app, cert_id):
+        import base64
+        from cryptography import x509
+        from cryptography.x509.oid import ExtensionOID
+        with app.app_context():
+            from models import Certificate, db
+            cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(Certificate, cert_id).crt))
+            try:
+                cert.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)
+                return True
+            except x509.ExtensionNotFound:
+                return False
+
+    def test_renewal_adds_the_missing_nocheck(self, app, auth_client, create_ca):
+        from datetime import datetime, timedelta, timezone
+        ca = create_ca(cn='Nocheck Renewal CA')
+        cert_id = _issue_responder_cert(auth_client, ca['id'], 'old-responder.example.com')
+        self._strip_nocheck(app, cert_id)
+        assert self._has_nocheck(app, cert_id) is False
+        _bind_responder(app, ca['id'], cert_id)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        _set_cert_window(app, cert_id, now - timedelta(days=80), now + timedelta(days=10))
+        _run(app)
+        new_id = int(_binding_value(app, ca['id']))
+        assert new_id != cert_id
+        assert self._has_nocheck(app, new_id) is True
