@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { FloppyDisk } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { Input, Select, Button } from '../../components'
+import { pickerCas } from '../../lib/caSelection'
 
 export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
   const { t } = useTranslation()
@@ -14,7 +15,8 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
     auto_approve: domain?.auto_approve ?? false,
   })
 
-  const signingCas = (cas || []).filter(ca => ca.has_private_key)
+  // Only CAs able to sign now, plus the saved one so an existing domain keeps showing its CA
+  const signingCas = pickerCas(cas, formData.issuing_ca_id)
 
   const handleSubmit = (e) => {
     e.preventDefault()

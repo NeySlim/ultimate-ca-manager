@@ -34,4 +34,4 @@ export const pickerCas = (cas, ...selected) => {
  * not one (#348).
  */
 export const needsKeyImport = (ca) => !!ca?.certificate_only && !ca?.pending && !ca?.offline
-  && (ca?.imported_from === 'csr_signed' || !!ca?.parent_id)
+  && (ca?.imported_from === 'csr_signed' || ca?.is_root === false || ca?.type === 'intermediate')

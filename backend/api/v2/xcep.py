@@ -66,8 +66,11 @@ def update_xcep_config():
         set_config('xcep_enabled', 'true' if data['enabled'] else 'false')
     if 'ca_refid' in data:
         if data['ca_refid']:
-            if not CA.query.filter_by(refid=data['ca_refid']).first():
+            ca = CA.query.filter_by(refid=data['ca_refid']).first()
+            if not ca:
                 return error_response('CA not found', 404)
+            if ca.refid != get_config('xcep_ca_refid', '') and signing_ca_problem(ca):
+                return error_response(signing_ca_problem(ca), 400)
         set_config('xcep_ca_refid', data['ca_refid'] or '')
     if 'ca_id' in data:
         if data['ca_id']:

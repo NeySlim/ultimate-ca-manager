@@ -877,6 +877,14 @@ def create_app(config_name=None):
         app.logger.warning(f"Rate limiter not loaded: {e}")
     
     # Security headers and cleanup
+    @app.teardown_request
+    def _drop_ca_chain_caches(_exc=None):
+        # The chain walks cached on g for one request must not outlive it:
+        # g is app-context scoped, and a request served inside an outer app
+        # context (test harness, scripts) would otherwise reuse them
+        from models.ca import clear_request_caches
+        clear_request_caches()
+
     @app.after_request
     def add_security_headers(response):
         """Add security headers and fix deprecated headers"""

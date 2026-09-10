@@ -223,3 +223,31 @@ class TestReviewOfTheReviewFixes:
             delta = CRLService.generate_delta_crl(root['id'])
             crl = x509.load_pem_x509_crl(delta.crl_pem.encode())
             assert any(rc.serial_number == int(row.serial_number) for rc in crl)
+
+
+class TestSecondPass:
+    def test_est_and_xcep_refid_branches_refuse_a_revoked_ca(self, app, auth_client, create_ca):
+        root = create_ca(cn='Refid Root')
+        sub = _sub_api(auth_client, root, 'Refid Sub')
+        assert _revoke(auth_client, sub['id']).status_code == 200
+        with app.app_context():
+            refid = db.session.get(CA, sub['id']).refid
+        for path in ('/api/v2/est/config', '/api/v2/xcep/config'):
+            r = auth_client.put(path, data=json.dumps({'ca_refid': refid}), content_type='application/json')
+            if r.status_code == 405:
+                r = auth_client.patch(path, data=json.dumps({'ca_refid': refid}), content_type='application/json')
+            assert r.status_code == 400 and 'revoked' in json.loads(r.data)['message'], (path, r.data)
+
+    def test_caches_do_not_outlive_a_request_inside_an_outer_app_context(self, app, auth_client, create_ca):
+        root = create_ca(cn='Outer Ctx Root')
+        sub = _sub_api(auth_client, root, 'Outer Ctx Sub')
+        with app.app_context():
+            body = json.loads(auth_client.get(f"/api/v2/cas/{sub['id']}").data)['data']
+            assert body['status'] == 'Active'
+            row = db.session.get(CA, sub['id']); parent = db.session.get(CA, root['id'])
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.session.add(RevokedSerial(caref=parent.refid, serial_number=row.serial_number, revoked_at=now,
+                                         revoke_reason='keyCompromise', valid_to=now + timedelta(days=30)))
+            db.session.commit()
+            body = json.loads(auth_client.get(f"/api/v2/cas/{sub['id']}").data)['data']
+            assert body['status'] == 'Revoked' and body['revoked'] is True

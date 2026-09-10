@@ -390,7 +390,8 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             ca = db.session.get(CA, data['ca_id'])
         if not ca:
             return False, 'CA not found'
-        if signing_ca_problem(ca):
+        saved = ScepProfile.query.get(profile_id) if profile_id else None
+        if not (saved is not None and saved.ca_refid == ca.refid) and signing_ca_problem(ca):
             return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
         if not ca.has_private_key:
             return False, 'Selected CA has no private key'
