@@ -151,6 +151,7 @@ class PolicyEvaluationService:
         
         # Check if any name matches the pattern
         for name in names:
+            name = str(name)
             if dns_pattern == '*.':
                 # Wildcard policy: matches if name starts with *.
                 if name.startswith('*.'):

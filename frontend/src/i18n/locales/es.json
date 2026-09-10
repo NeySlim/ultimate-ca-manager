@@ -3677,6 +3677,7 @@
     "approveRequest": "Aprobar solicitud",
     "approved": "Aprobadas",
     "approvedSuccess": "Solicitud aprobada",
+    "issuanceFailed": "Certificado no emitido, la solicitud sigue pendiente: {{reason}}",
     "certificateId": "ID de certificado",
     "comment": "Comentario",
     "commentPlaceholder": "Comentario opcional...",

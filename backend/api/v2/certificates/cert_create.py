@@ -100,16 +100,24 @@ def create_certificate():
     if ca.revoked_in_chain:
         return error_response('CA is revoked and can no longer issue certificates', 400)
 
-    # Policy evaluation — check if approval is required (admins bypass)
+    # Policy evaluation — check if approval is required (admins bypass).
+    # Fail closed: an error while evaluating the policies must never turn
+    # into an issuance without approval. A malformed `san` was enough to
+    # raise inside the evaluation and skip the approval workflow.
+    raw_san = data.get('san', [])
+    if isinstance(raw_san, str):
+        raw_san = [s.strip() for s in raw_san.split(',') if s.strip()]
+    if not isinstance(raw_san, list) or not all(isinstance(s, str) for s in raw_san):
+        return error_response('san must be a list of names', 400)
     try:
         user_role = getattr(g.current_user, 'role', None) if hasattr(g, 'current_user') else None
         if user_role != 'admin':
             from services.policy_service import PolicyEvaluationService
-            san_list = data.get('san', [])
-            if isinstance(san_list, str):
-                san_list = [s.strip() for s in san_list.split(',') if s.strip()]
+            san_list = [s.strip() for s in raw_san if s.strip()]
             # The issue form sends san_dns; a dns_pattern policy must see it (#335)
-            san_list = list(san_list) + [s for s in (data.get('san_dns') or []) if s not in san_list]
+            san_list = san_list + [
+                s for s in (san_buckets.get('san_dns') or []) if s not in san_list
+            ]
             policy = PolicyEvaluationService.check_approval_required(
                 ca_id=ca.id,
                 template_id=data.get('template_id'),
@@ -137,7 +145,10 @@ def create_certificate():
                     message='Certificate request submitted for approval'
                 )
     except Exception as e:
-        logger.warning(f"Policy evaluation failed (non-blocking): {e}")
+        logger.error(f"Policy evaluation failed; refusing to issue: {e}", exc_info=True)
+        return error_response(
+            'Policy evaluation failed; the certificate was not issued', 500
+        )
 
     try:
         # Load CA certificate and key

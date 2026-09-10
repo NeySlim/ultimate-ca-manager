@@ -3751,6 +3751,7 @@
     "approveConfirm": "Approuver la demande #{{id}} ?",
     "rejectConfirm": "Rejeter la demande #{{id}} ?",
     "approvedSuccess": "Demande approuvée",
+    "issuanceFailed": "Certificat non émis, la demande reste en attente : {{reason}}",
     "rejectedSuccess": "Demande rejetée",
     "actionFailed": "Échec de l'action",
     "noRequests": "Aucune demande d'approbation",

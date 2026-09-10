@@ -3677,6 +3677,7 @@
     "approveRequest": "批准请求",
     "approved": "已批准",
     "approvedSuccess": "请求已批准",
+    "issuanceFailed": "证书未签发，请求仍处于待处理状态：{{reason}}",
     "certificateId": "证书 ID",
     "comment": "备注",
     "commentPlaceholder": "可选备注...",

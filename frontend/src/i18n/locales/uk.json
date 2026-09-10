@@ -3677,6 +3677,7 @@
     "approveRequest": "Затвердити запит",
     "approved": "Затверджені",
     "approvedSuccess": "Запит затверджено",
+    "issuanceFailed": "Сертифікат не видано, запит залишається в очікуванні: {{reason}}",
     "certificateId": "ID сертифіката",
     "comment": "Коментар",
     "commentPlaceholder": "Необов'язковий коментар...",

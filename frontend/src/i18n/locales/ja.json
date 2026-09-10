@@ -3677,6 +3677,7 @@
     "approveRequest": "リクエストを承認",
     "approved": "承認済み",
     "approvedSuccess": "リクエストが承認されました",
+    "issuanceFailed": "証明書は発行されず、リクエストは保留のままです: {{reason}}",
     "certificateId": "証明書ID",
     "comment": "コメント",
     "commentPlaceholder": "任意のコメント...",

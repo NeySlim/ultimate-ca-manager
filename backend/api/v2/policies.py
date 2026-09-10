@@ -408,7 +408,10 @@ def _issue_approved_certificate(approval):
     approval.certificate_id = db_cert.id
     ok, _err = safe_commit(logger, "Failed to link approval to certificate")
     if not ok:
-        return _err
+        # The caller (approve_request) treats any exception as a failed
+        # issuance; returning the Flask error tuple here used to land it in
+        # the JSON response as `certificate`
+        raise RuntimeError('Failed to link approval to certificate')
     
     logger.info(f"Certificate CN={data['cn']} issued via approval #{approval.id}")
     
@@ -706,16 +709,15 @@ def approve_request(request_id):
             issue_error = (f'Policy violation: {e}' if isinstance(e, PolicyViolation)
                            else 'Certificate issuance failed. Check server logs.')
             db.session.rollback()
-            # Re-fetch + re-record the vote without issuance so the
-            # approver's action is not lost.
-            approval = ApprovalRequest.query.with_for_update().filter_by(id=request_id).first()
-            if approval and approval.status == 'pending':
-                approval.add_approval(
-                    user_id=user_id,
-                    username=username,
-                    action='approve',
-                    comment=data.get('comment'),
-                )
+            # The rollback discarded the vote along with the failed
+            # issuance, and that is the point: the request stays pending so
+            # the approver can approve again once the cause (CA offline, HSM
+            # unreachable, policy rule) is dealt with. Re-recording the vote
+            # used to flip the request to `approved` with no certificate and
+            # no way to ever issue it.
+            approval = ApprovalRequest.query.filter_by(id=request_id).first()
+            if approval is None:
+                return error_response('Approval request not found', 404)
 
     ok, _err = safe_commit(logger, "Failed to approve request")
     if not ok:

@@ -3739,6 +3739,7 @@
     "approveConfirm": "Approve request #{{id}}?",
     "rejectConfirm": "Reject request #{{id}}?",
     "approvedSuccess": "Request approved",
+    "issuanceFailed": "Certificate not issued, the request stays pending: {{reason}}",
     "rejectedSuccess": "Request rejected",
     "actionFailed": "Action failed",
     "noRequests": "No approval requests",

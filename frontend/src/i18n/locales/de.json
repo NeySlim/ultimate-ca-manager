@@ -3677,6 +3677,7 @@
     "approveRequest": "Anfrage genehmigen",
     "approved": "Genehmigt",
     "approvedSuccess": "Anfrage genehmigt",
+    "issuanceFailed": "Zertifikat nicht ausgestellt, die Anfrage bleibt ausstehend: {{reason}}",
     "certificateId": "Zertifikat-ID",
     "comment": "Kommentar",
     "commentPlaceholder": "Optionaler Kommentar...",

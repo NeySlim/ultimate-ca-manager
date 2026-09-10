@@ -208,6 +208,9 @@ export default function ApprovalsPage() {
         const result = await approvalsService.approve(req.id, comment || undefined)
         if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
+        } else if (result?.data?.certificate_issued === false) {
+          // The vote was not kept: the request stays pending for a retry
+          showError(t('approvals.issuanceFailed', { reason: result.data.issue_error || '' }))
         } else {
           showSuccess(t('approvals.approvedSuccess'))
         }
