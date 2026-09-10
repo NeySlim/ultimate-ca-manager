@@ -330,9 +330,13 @@ def renew_certificate_in_place(
 
     now = utc_now()
     ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
-    if ca_not_after <= now:
-        # Without this the clamp below would produce an already-expired cert.
-        raise RenewalError('Issuing CA certificate has expired', 400)
+    from utils.ca_signing_window import check_issuer_window
+    try:
+        # Expired (the clamp below would yield an already-expired cert) or
+        # not yet valid: same rule as every issuance path
+        check_issuer_window(ca_cert, now)
+    except ValueError as e:
+        raise RenewalError(str(e), 400) from e
 
     orig_pub_key = orig_cert.public_key()
     new_key = _generate_matching_key(orig_pub_key) if rekey else None

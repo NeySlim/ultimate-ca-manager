@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now, cert_not_before
+from utils.ca_signing_window import check_issuer_window, clamp_not_after
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import constrain_builder_key_usage
 from .constants import HASH_ALGORITHMS
@@ -682,6 +683,11 @@ class CSROperationsMixin:
             ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of
         )
 
+        # The CA can only vouch inside its own validity window, and the leaf
+        # never outlives it (RFC 5280 §6.1) -- checked here for every caller
+        # of this trunk rather than by each of them
+        check_issuer_window(ca_cert)
+
         # Build certificate from CSR
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
@@ -690,7 +696,7 @@ class CSROperationsMixin:
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.not_valid_before(cert_not_before())
         builder = builder.not_valid_after(
-            utc_now() + timedelta(days=validity_days)
+            clamp_not_after(utc_now() + timedelta(days=validity_days), ca_cert)
         )
 
         # Copy only extensions appropriate for the requested certificate role.

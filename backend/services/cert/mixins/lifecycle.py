@@ -112,10 +112,16 @@ class LifecycleMixin:
 
         if not ca.crt:
             raise ValueError("CA is awaiting its certificate - cannot sign certificates")
+        if ca.offline:
+            raise ValueError("CA is offline; restore it before issuing")
+        if ca.revoked_in_chain:
+            raise ValueError("CA is revoked and can no longer sign")
 
         # Load CA certificate
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
+        from utils.ca_signing_window import check_issuer_window
+        check_issuer_window(ca_cert)
 
         # Load CA signing key (local or HSM-backed)
         from services.hsm.ca_key_loader import get_ca_signing_key

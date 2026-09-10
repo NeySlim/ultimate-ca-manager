@@ -55,6 +55,10 @@ class CertificateCreationMixin:
         # Generate private key for certificate
         private_key = KeyOperationsMixin.generate_private_key(key_type)
 
+        # Same issuer-window rule as the CSR trunk (RFC 5280 §6.1)
+        from utils.ca_signing_window import check_issuer_window, clamp_not_after
+        check_issuer_window(ca_cert)
+
         # Build certificate
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
@@ -63,7 +67,7 @@ class CertificateCreationMixin:
         builder = builder.serial_number(x509.random_serial_number())
         builder = builder.not_valid_before(cert_not_before())
         builder = builder.not_valid_after(
-            utc_now() + timedelta(days=validity_days)
+            clamp_not_after(utc_now() + timedelta(days=validity_days), ca_cert)
         )
 
         # Basic Constraints

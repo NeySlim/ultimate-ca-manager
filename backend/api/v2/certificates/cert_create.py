@@ -154,6 +154,11 @@ def create_certificate():
         # Load CA certificate and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
+        from utils.ca_signing_window import check_issuer_window
+        try:
+            check_issuer_window(ca_cert)
+        except ValueError as e:
+            return error_response(str(e), 400)
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_key = get_ca_signing_key(ca)
 

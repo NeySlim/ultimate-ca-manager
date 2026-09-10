@@ -1095,6 +1095,8 @@ class SCEPService:
             )
         if self.ca.revoked_in_chain:
             raise ValueError("CA is revoked and can no longer sign")
+        from utils.ca_signing_window import check_issuer_window
+        check_issuer_window(self.ca_cert)
 
         cert_refid = str(uuid.uuid4())
         public_key = csr.public_key()
