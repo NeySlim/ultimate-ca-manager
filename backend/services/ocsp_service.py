@@ -374,6 +374,15 @@ class OCSPService:
             return 'certificate has no Extended Key Usage'
         if x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING not in eku.value:
             return 'certificate lacks the OCSPSigning Extended Key Usage'
+        # RFC 5280 §4.2.1.3: a Key Usage extension that omits digitalSignature
+        # forbids signing anything but certificates and CRLs, OCSP responses
+        # included; clients that honour it reject the signature (#347 review)
+        try:
+            key_usage = resp_cert.extensions.get_extension_for_class(x509.KeyUsage).value
+        except x509.ExtensionNotFound:
+            key_usage = None
+        if key_usage is not None and not key_usage.digital_signature:
+            return 'certificate Key Usage does not permit digitalSignature'
         # RFC 6960 §4.2.2.2.1: without it clients would check the responder's
         # own revocation status and loop; UCM refuses to sign with such a
         # certificate rather than produce answers clients reject

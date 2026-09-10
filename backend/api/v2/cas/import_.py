@@ -120,18 +120,28 @@ def import_ca():
                 # key cannot be reached rather than kept or dropped on a guess
                 bound = hsm_key_binding_matches(existing_ca.hsm_key_id, cert)
                 if bound is None:
+                    db.session.rollback()
                     return error_response(
                         'Cannot verify the HSM key bound to this CA against the new '
                         'certificate; the HSM key is unreachable', 409)
                 if bound is False:
                     existing_ca.hsm_key_id = None
                     key_dropped = True
-            elif stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}") is False:
+            elif existing_ca.prv:
                 # The new certificate is not the stored key's: keeping the key
                 # would leave a pair that signs nothing verifiable (re-keyed
-                # certificate imported without its key, #347 review)
-                existing_ca.prv = None
-                key_dropped = True
+                # certificate imported without its key, #347 review). A key
+                # that cannot be read is not shown to be foreign: the update
+                # is refused rather than the key dropped on a read error
+                matches = stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}")
+                if matches is None:
+                    db.session.rollback()
+                    return error_response(
+                        'Cannot verify the stored private key against the new '
+                        'certificate; the stored key could not be read', 409)
+                if matches is False:
+                    existing_ca.prv = None
+                    key_dropped = True
             existing_ca.issuer = cert_info['issuer']
             existing_ca.valid_from = cert_info['valid_from']
             existing_ca.valid_to = cert_info['valid_to']

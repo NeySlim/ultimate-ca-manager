@@ -1514,3 +1514,55 @@ class TestEd25519KeyImport:
         assert r.status_code == 200, r.data
         loaded = serialization.load_pem_private_key(r.data, password=None)
         assert isinstance(loaded, ed25519.Ed25519PrivateKey)
+
+
+class TestUnreadableStoredKeyRefusesUpdate:
+    """Seventh review of #347: a stored key that cannot be read has not been
+    shown to be another certificate's; the update is refused and the key kept,
+    as for an HSM key that cannot be reached."""
+
+    _pair = staticmethod(TestUpdateExistingKeepsOnlyAMatchingKey._pair)
+    _import = TestUpdateExistingKeepsOnlyAMatchingKey._import
+
+    @staticmethod
+    def _corrupt(app, model, row_id):
+        import base64
+        with app.app_context():
+            from models import db
+            row = db.session.get(model, row_id)
+            row.prv = base64.b64encode(b'not a private key at all').decode()
+            db.session.commit()
+            return row.prv, row.crt
+
+    @staticmethod
+    def _row(app, model, row_id):
+        with app.app_context():
+            from models import db
+            row = db.session.get(model, row_id)
+            return row.prv, row.crt
+
+    def test_certificate_update_is_refused_and_nothing_changes(self, app, auth_client):
+        from models import Certificate
+        cpem, kpem, _ = self._pair('unreadable-key.example.com')
+        r = self._import(auth_client, cpem + kpem)
+        assert r.status_code in (200, 201), r.data
+        first = json.loads(r.data)['data']
+        before = self._corrupt(app, Certificate, first['id'])
+        cpem2, _, _ = self._pair('unreadable-key.example.com')
+        r = self._import(auth_client, cpem2)
+        assert r.status_code == 409, r.data
+        assert 'could not be read' in json.loads(r.data)['message']
+        assert self._row(app, Certificate, first['id']) == before
+
+    def test_ca_update_is_refused_and_nothing_changes(self, app, auth_client):
+        from models import CA
+        cpem, kpem, _ = self._pair('Unreadable Key CA', ca=True)
+        r = self._import(auth_client, cpem + kpem, '/api/v2/cas/import')
+        assert r.status_code in (200, 201), r.data
+        first = json.loads(r.data)['data']
+        before = self._corrupt(app, CA, first['id'])
+        cpem2, _, _ = self._pair('Unreadable Key CA', ca=True)
+        r = self._import(auth_client, cpem2, '/api/v2/cas/import')
+        assert r.status_code == 409, r.data
+        assert 'could not be read' in json.loads(r.data)['message']
+        assert self._row(app, CA, first['id']) == before

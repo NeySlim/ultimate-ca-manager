@@ -141,17 +141,27 @@ def import_certificate():
                     # key cannot be reached rather than kept or dropped on a guess
                     bound = hsm_key_binding_matches(existing_ca.hsm_key_id, cert)
                     if bound is None:
+                        db.session.rollback()
                         return error_response(
                             'Cannot verify the HSM key bound to this CA against the new '
                             'certificate; the HSM key is unreachable', 409)
                     if bound is False:
                         existing_ca.hsm_key_id = None
                         key_dropped = True
-                elif stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}") is False:
+                elif existing_ca.prv:
                     # A re-keyed certificate imported without its key: the
-                    # stored key is not this certificate's (#347 review)
-                    existing_ca.prv = None
-                    key_dropped = True
+                    # stored key is not this certificate's (#347 review). A
+                    # key that cannot be read is not shown to be foreign: the
+                    # update is refused rather than the key dropped
+                    matches = stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}")
+                    if matches is None:
+                        db.session.rollback()
+                        return error_response(
+                            'Cannot verify the stored private key against the new '
+                            'certificate; the stored key could not be read', 409)
+                    if matches is False:
+                        existing_ca.prv = None
+                        key_dropped = True
                 existing_ca.issuer = cert_info['issuer']
                 existing_ca.valid_from = cert_info['valid_from']
                 existing_ca.valid_to = cert_info['valid_to']
@@ -252,9 +262,16 @@ def import_certificate():
             key_dropped = False
             if key_pem:
                 existing_cert.prv = encrypted_prv
-            elif stored_private_key_matches(existing_cert.prv, cert, context=f"certificate {existing_cert.id}") is False:
-                existing_cert.prv = None
-                key_dropped = True
+            elif existing_cert.prv:
+                matches = stored_private_key_matches(existing_cert.prv, cert, context=f"certificate {existing_cert.id}")
+                if matches is None:
+                    db.session.rollback()
+                    return error_response(
+                        'Cannot verify the stored private key against the new '
+                        'certificate; the stored key could not be read', 409)
+                if matches is False:
+                    existing_cert.prv = None
+                    key_dropped = True
             existing_cert.valid_from = cert_info['valid_from']
             existing_cert.valid_to = cert_info['valid_to']
             existing_cert.aki = cert_info.get('aki')

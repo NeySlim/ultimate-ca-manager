@@ -5,8 +5,13 @@ decoy root imported under a parent's name, a re-keyed root), so anything
 that resolves "the CA that issued this certificate" must check the
 signature with the candidate's key, not the name (#343 review).
 """
+import logging
+
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, padding, rsa
+
+
+logger = logging.getLogger(__name__)
 
 
 class UnsupportedIssuerKey(Exception):
@@ -95,9 +100,11 @@ def private_key_matches(private_key, cert: x509.Certificate) -> bool:
 def stored_private_key_matches(prv_column, cert: x509.Certificate, *, context: str = 'record'):
     """Whether the key stored in *prv_column* is *cert*'s key.
 
-    None when the column holds no key. A stored key that cannot be loaded
-    counts as not matching: keeping it next to a certificate it may not
-    belong to is the failure this guards against (#347 review).
+    True or False when the stored key can be read and compared. None when
+    there is nothing to compare: the column holds no key, or the key cannot
+    be read (corrupt, or encrypted with a key this instance no longer has).
+    An unreadable key has not been shown to be another certificate's, so
+    the caller refuses to decide rather than drop it (#347 review).
     """
     if not prv_column:
         return None
@@ -107,7 +114,9 @@ def stored_private_key_matches(prv_column, cert: x509.Certificate, *, context: s
         pem = load_pem_bytes(prv_column, context=context)
         key = serialization.load_pem_private_key(pem, password=None)
     except Exception:
-        return False
+        logger.warning(f"Stored private key of {context} could not be read; "
+                       "it cannot be compared with the certificate")
+        return None
     return private_key_matches(key, cert)
 
 

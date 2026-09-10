@@ -70,10 +70,10 @@ def _request_extension(oid, critical):
 
 def _delegated_certificate(
     ca_cert, ca_key, responder_key, *, issuer=None, signer_key=None,
-    not_before=None, not_after=None,
+    not_before=None, not_after=None, key_usage=None,
 ):
     now = datetime.now(timezone.utc)
-    return (
+    builder = (
         x509.CertificateBuilder()
         .subject_name(x509.Name([
             x509.NameAttribute(x509.NameOID.COMMON_NAME, 'OCSP Responder')
@@ -88,8 +88,10 @@ def _delegated_certificate(
             critical=False,
         )
         .add_extension(x509.OCSPNoCheck(), critical=False)
-        .sign(signer_key or ca_key, hashes.SHA256())
     )
+    if key_usage is not None:
+        builder = builder.add_extension(key_usage, critical=True)
+    return builder.sign(signer_key or ca_key, hashes.SHA256())
 
 
 def _configure_delegated_responder(ca_obj, cert_obj, responder_cert, responder_key):
@@ -1310,3 +1312,63 @@ class TestDsaResponder:
             resp2 = ocsp.load_der_ocsp_response(der2)
             assert resp2.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL
             key.public_key().verify(resp2.signature, resp2.tbs_response_bytes, hashes.SHA256())
+
+
+def _key_usage(digital_signature):
+    return x509.KeyUsage(
+        digital_signature=digital_signature, content_commitment=False, key_encipherment=True,
+        data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False,
+        encipher_only=False, decipher_only=False)
+
+
+class TestResponderKeyUsage:
+    """Seventh review of #347: a Key Usage extension that omits
+    digitalSignature forbids signing OCSP responses (RFC 5280 §4.2.1.3)."""
+
+    @staticmethod
+    def _store(ca_obj, cert, key, refid):
+        row = Certificate(
+            refid=refid, descr=refid, caref=ca_obj.refid,
+            crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+            prv=base64.b64encode(key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption())).decode(),
+            serial_number=str(cert.serial_number),
+        )
+        db.session.add(row); db.session.commit()
+        return row
+
+    def test_key_usage_without_digital_signature_is_refused_everywhere(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='KU Responder CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            bad = _delegated_certificate(ca_cert, ca_key, key, key_usage=_key_usage(False))
+            row = self._store(ca_obj, bad, key, 'ku-no-digital-signature')
+            reason = OCSPService().check_delegated_responder(ca_obj, row)
+            assert reason and 'digitalSignature' in reason, reason
+            r = auth_client.post(f"/api/v2/cas/{ca['id']}/ocsp-responder",
+                                 data=json.dumps({'certificate_id': row.id}), content_type='application/json')
+            assert r.status_code == 400, r.data
+            assert 'digitalSignature' in json.loads(r.data)['message']
+            assert SystemConfig.query.filter_by(key=f"ocsp_responder_cert_{ca['id']}").first() is None
+            r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+            assert row.id not in {c['id'] for c in json.loads(r.data)['data']}
+            # The responder never signs with it either
+            assert OCSPService()._get_delegated_responder(ca_obj) == (None, None)
+
+    def test_key_usage_with_digital_signature_or_absent_is_accepted(self, app, auth_client, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='KU OK Responder CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            for label, ku in (('with-ds', _key_usage(True)), ('no-ku', None)):
+                key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                cert = _delegated_certificate(ca_cert, ca_key, key, key_usage=ku)
+                row = self._store(ca_obj, cert, key, f'ku-{label}')
+                assert OCSPService().check_delegated_responder(ca_obj, row) is None, label
+                r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+                assert row.id in {c['id'] for c in json.loads(r.data)['data']}, label
