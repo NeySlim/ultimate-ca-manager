@@ -112,8 +112,10 @@ _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
 # that reached this trunk through ACME, EST or WSTEP choose the revocation
 # endpoints of its own certificate, or carry a szOID_NTDS_CA_SECURITY_EXT of
 # its choosing -- the strong-mapping bypass KB5014754 closes. The SCEP
-# builder has always applied the same allow-list; sub-CA CSRs (an operator
-# holding write:cas signs those deliberately) keep the wider behaviour.
+# builder applies a stricter list of the same kind (SAN, KU and EKU only);
+# sub-CA CSRs (an operator holding write:cas signs those deliberately) keep
+# the wider behaviour. The CA-only constraints of
+# _LEAF_CA_ONLY_EXTENSION_OIDS are among what a leaf never gets from its CSR.
 _LEAF_CSR_COPYABLE_EXTENSION_OIDS = frozenset({
     ExtensionOID.SUBJECT_ALTERNATIVE_NAME,
     ExtensionOID.KEY_USAGE,
@@ -725,8 +727,6 @@ class CSROperationsMixin:
         for extension in csr.extensions:
             if extension.oid in skip_from_csr:
                 continue
-            if not issuing_ca and extension.oid in _LEAF_CA_ONLY_EXTENSION_OIDS:
-                continue
             if not issuing_ca and extension.oid not in _LEAF_CSR_COPYABLE_EXTENSION_OIDS:
                 logger.info(
                     "sign_csr: ignoring CSR extension %s -- not one a leaf "
@@ -778,6 +778,15 @@ class CSROperationsMixin:
             ):
                 # Already added next to the OCSPSigning EKU above: a request
                 # built the right way carries it too (#347 review)
+                continue
+            if extension.oid == ExtensionOID.TLS_FEATURE:
+                # A requested Must-Staple (status_request) joins whatever
+                # TLS features the CSR asked for, instead of the CSR's own
+                # feature list silently displacing it below.
+                features = list(extension.value)
+                if ocsp_must_staple and x509.TLSFeatureType.status_request not in features:
+                    features.append(x509.TLSFeatureType.status_request)
+                builder = builder.add_extension(x509.TLSFeature(features), extension.critical)
                 continue
             if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
@@ -1032,7 +1041,8 @@ class CSROperationsMixin:
             critical=False
         )
 
-        # OCSP Must-Staple (a CSR that already asked for it was copied above)
+        # OCSP Must-Staple (a CSR carrying TLSFeature had status_request
+        # merged into it in the copy loop above)
         if ocsp_must_staple and not any(
             e.oid == ExtensionOID.TLS_FEATURE for e in builder._extensions
         ):

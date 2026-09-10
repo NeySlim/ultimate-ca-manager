@@ -63,7 +63,7 @@ def _test_ca():
 
 
 def _hostile_csr(common_name='device.example.test', *, with_template=False,
-                 with_tls_feature=False, ku_critical=False):
+                 with_tls_feature=False, ku_critical=False, tls_features=None):
     """A CSR carrying every extension an enrollee must not be able to set."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     builder = x509.CertificateSigningRequestBuilder().subject_name(
@@ -112,9 +112,10 @@ def _hostile_csr(common_name='device.example.test', *, with_template=False,
         builder = builder.add_extension(
             _certificate_template_extension(TEMPLATE_OID), critical=False
         )
-    if with_tls_feature:
+    if with_tls_feature or tls_features:
         builder = builder.add_extension(
-            x509.TLSFeature([x509.TLSFeatureType.status_request]), critical=False
+            x509.TLSFeature(tls_features or [x509.TLSFeatureType.status_request]),
+            critical=False,
         )
     return builder.sign(key, hashes.SHA256()), key
 
@@ -207,6 +208,16 @@ class TestLeafCsrAllowList:
         assert [e for e in cert.extensions if e.oid == ExtensionOID.TLS_FEATURE]
         assert len([e for e in cert.extensions if e.oid == ExtensionOID.TLS_FEATURE]) == 1
 
+    def test_must_staple_joins_a_csr_that_asked_for_another_tls_feature(self, app):
+        ca_cert, ca_key = _test_ca()
+        csr, _ = _hostile_csr(tls_features=[x509.TLSFeatureType.status_request_v2])
+        cert = _sign(app, csr, ca_cert, ca_key, ocsp_must_staple=True)
+        features = [e for e in cert.extensions if e.oid == ExtensionOID.TLS_FEATURE]
+        assert len(features) == 1
+        assert set(features[0].value) == {
+            x509.TLSFeatureType.status_request, x509.TLSFeatureType.status_request_v2,
+        }
+
     def test_leaf_key_usage_is_critical_even_when_the_csr_said_otherwise(self, app):
         ca_cert, ca_key = _test_ca()
         csr, _ = _hostile_csr(ku_critical=False)
@@ -241,9 +252,26 @@ class TestLeafCsrAllowList:
         assert _has(cert, ExtensionOID.NAME_CONSTRAINTS)
 
 
+CA_CDP = 'http://ca.example.test/crl/{ca_refid}.crl'
+CA_OCSP = 'http://ca.example.test/ocsp'
+
+
+def _publish_endpoints(app, ca_id):
+    """Give the CA row CRL and OCSP endpoints so the leaf must carry them."""
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        ca.cdp_enabled = True
+        ca.set_cdp_urls([CA_CDP])
+        ca.ocsp_enabled = True
+        ca.set_ocsp_urls([CA_OCSP])
+        db.session.commit()
+        return CA_CDP.replace('{ca_refid}', ca.url_ref)
+
+
 class TestProtocolPathsReachTheAllowList:
 
     def test_est_enrollee_cannot_choose_its_revocation_endpoints(self, client, app, est_config):
+        expected_cdp = _publish_endpoints(app, est_config['id'])
         csr, _ = _hostile_csr('est-device.example.test')
         response = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
         assert response.status_code == 200, response.data
@@ -251,14 +279,13 @@ class TestProtocolPathsReachTheAllowList:
         leaf = [c for c in certs if not c.extensions.get_extension_for_oid(
             ExtensionOID.BASIC_CONSTRAINTS).value.ca][0]
         assert not _has(leaf, _SID_SECURITY_EXT_OID)
-        if _has(leaf, ExtensionOID.CRL_DISTRIBUTION_POINTS):
-            assert ATTACKER_CDP not in _cdp_urls(leaf)
-        if _has(leaf, ExtensionOID.AUTHORITY_INFORMATION_ACCESS):
-            assert ATTACKER_OCSP not in _aia_urls(leaf)
+        assert _cdp_urls(leaf) == [expected_cdp]
+        assert _aia_urls(leaf) == [CA_OCSP]
 
     def test_wstep_username_password_enrollee_cannot_inject_a_sid(self, app, create_ca):
         from services.wstep import wstep_service
         ca_data = create_ca(cn='Allow-list WSTEP CA')
+        expected_cdp = _publish_endpoints(app, ca_data['id'])
         csr, _ = _hostile_csr('wstep-device.example.test')
         with app.app_context():
             ca = db.session.get(CA, ca_data['id'])
@@ -268,5 +295,5 @@ class TestProtocolPathsReachTheAllowList:
         assert error is None, error
         leaf = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         assert not _has(leaf, _SID_SECURITY_EXT_OID)
-        if _has(leaf, ExtensionOID.CRL_DISTRIBUTION_POINTS):
-            assert ATTACKER_CDP not in _cdp_urls(leaf)
+        assert _cdp_urls(leaf) == [expected_cdp]
+        assert _aia_urls(leaf) == [CA_OCSP]
