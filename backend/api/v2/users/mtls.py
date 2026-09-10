@@ -144,10 +144,21 @@ def create_user_mtls_certificate(user_id):
         ca_id = data.get('ca_id')
         validity_days = data.get('validity_days', 365)
 
-        # Find CA
+        try:
+            validity_days = int(validity_days)
+        except (TypeError, ValueError):
+            return error_response('validity_days must be an integer between 1 and 3650', 400)
+        if not 1 <= validity_days <= 3650:
+            return error_response('validity_days must be an integer between 1 and 3650', 400)
+
+        # Find CA: a numeric id or a refid, never compared against the
+        # wrong column type (PostgreSQL refuses a string against an integer)
         ca = None
         if ca_id:
-            ca = CA.query.filter((CA.refid == ca_id) | (CA.id == ca_id)).first()
+            if isinstance(ca_id, int) or str(ca_id).isdigit():
+                ca = db.session.get(CA, int(ca_id))
+            if ca is None:
+                ca = CA.query.filter_by(refid=str(ca_id)).first()
         if not ca:
             config = SystemConfig.query.filter_by(key='mtls_trusted_ca').first()
             if config:
@@ -162,7 +173,7 @@ def create_user_mtls_certificate(user_id):
                 dn={'commonName': name},
                 cert_type='usr_cert',
                 key_type='2048',
-                validity_days=int(validity_days),
+                validity_days=validity_days,
                 username=target_user.username,
             )
 
@@ -208,6 +219,9 @@ def create_user_mtls_certificate(user_id):
             resp['cert_id'] = result.id
             return created_response(data=resp, message='Certificate generated')
 
+        except ValueError as e:
+            logger.warning(f"mTLS cert generation refused for user {user_id}: {e}")
+            return error_response(str(e), 400)
         except Exception as e:
             logger.error(f"Failed to generate mTLS cert for user {user_id}: {e}")
             return error_response('Failed to generate certificate', 500)

@@ -26,11 +26,68 @@ from services.cert_service import CertificateService
 from services.certificate_parser import CertificateParser
 from utils import trusted_proxy
 from utils.key_codec import load_pem_bytes
+from utils.serial_format import serial_variants
 from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 
 logger = logging.getLogger(__name__)
+
+
+def _certificate_row_for(auth_cert):
+    """The Certificate row an mTLS enrolment is bound to, or None.
+
+    An enrolment used to be resolved by serial number alone, so any
+    authenticated user could enrol a forged certificate bearing another
+    record's serial (or that record's own public certificate) and export the
+    victim's private key inside a PKCS#12. The row must now be the very
+    certificate that was enrolled: byte-identical to the stored PEM when the
+    enrolment kept one, else matching its SHA-256 fingerprint, else (older
+    enrolments that stored neither) sharing serial AND issuer.
+    """
+    raw = (auth_cert.cert_serial or '').strip()
+    variants = set()
+    for base in (10, 16):
+        try:
+            variants |= serial_variants(int(raw, base))
+        except ValueError:
+            continue
+    if not variants:
+        return None
+    candidates = Certificate.query.filter(
+        Certificate.serial_number.in_(variants)
+    ).all()
+
+    enrolled_der = None
+    if auth_cert.cert_pem:
+        try:
+            enrolled_der = cx509.load_pem_x509_certificate(
+                bytes(auth_cert.cert_pem), default_backend()
+            ).public_bytes(serialization.Encoding.DER)
+        except Exception:
+            enrolled_der = None
+    fingerprint = (auth_cert.cert_fingerprint or '').strip().upper()
+
+    for row in candidates:
+        if not row.crt:
+            continue
+        try:
+            row_der = cx509.load_pem_x509_certificate(
+                base64.b64decode(row.crt), default_backend()
+            ).public_bytes(serialization.Encoding.DER)
+        except Exception:
+            continue
+        if enrolled_der is not None:
+            if row_der == enrolled_der:
+                return row
+            continue
+        if fingerprint:
+            if hashlib.sha256(row_der).hexdigest().upper() == fingerprint:
+                return row
+            continue
+        if auth_cert.cert_issuer and row.issuer == auth_cert.cert_issuer:
+            return row
+    return None
 
 bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
 
@@ -214,7 +271,12 @@ def create_mtls_certificate():
             400,
         )
 
-    validity_days = min(max(int(data.get('validity_days', 365)), 1), 3650)
+    try:
+        validity_days = int(data.get('validity_days', 365))
+    except (TypeError, ValueError):
+        return error_response('validity_days must be an integer between 1 and 3650', 400)
+    if not 1 <= validity_days <= 3650:
+        return error_response('validity_days must be an integer between 1 and 3650', 400)
     cert_name = data.get('name', f'{user.username} mTLS')
 
     # Sanitize organization field
@@ -242,13 +304,18 @@ def create_mtls_certificate():
             cert_obj.prv, context=f"mTLS certificate {cert_obj.id}"
         ).decode('utf-8') if cert_obj.prv else ''
 
-        # Enroll in auth_certificates for auto-login
+        # Enroll in auth_certificates for auto-login, keeping the certificate
+        # itself so the export is bound to it (see _certificate_row_for)
         auth_cert = AuthCertificate(
             user_id=user.id,
             cert_serial=cert_obj.serial_number or '',
             cert_subject=cert_obj.subject or '',
             cert_issuer=cert_obj.issuer or '',
-            cert_fingerprint='',
+            cert_fingerprint=hashlib.sha256(
+                cx509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+                .public_bytes(serialization.Encoding.DER)
+            ).hexdigest().upper() if cert_pem else '',
+            cert_pem=cert_pem.encode('utf-8') if cert_pem else None,
             name=cert_name,
             valid_from=cert_obj.valid_from,
             valid_until=cert_obj.valid_to,
@@ -281,6 +348,11 @@ def create_mtls_certificate():
             'status': 'valid',
         }, message='mTLS certificate created')
 
+    except ValueError as e:
+        # A refusal by the issuance service (CA offline, expired, without a
+        # key...) is the caller's to act on, not a server fault
+        logger.warning(f'mTLS cert creation refused: {e}')
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f'mTLS cert creation error: {e}', exc_info=True)
         return error_response('Failed to create certificate', 500)
@@ -353,10 +425,9 @@ def download_mtls_certificate(cert_id):
     if not auth_cert:
         return error_response('Certificate not found', 404)
 
-    # Find the actual Certificate row by serial
-    cert = Certificate.query.filter(
-        Certificate.serial_number == auth_cert.cert_serial
-    ).first()
+    # The row must be the certificate that was enrolled, not merely one
+    # sharing its serial (see _certificate_row_for)
+    cert = _certificate_row_for(auth_cert)
     if not cert or not cert.crt:
         return error_response('Certificate data not available', 404)
 
@@ -575,6 +646,18 @@ def enroll_import_certificate():
             return error_response('This certificate is already enrolled to your account', 409)
         return error_response('This certificate is already enrolled to another user', 409)
 
+    # Importing a certificate whose private key UCM already holds would bind
+    # that key to the importer's account (PKCS#12 export). A public
+    # certificate proves nothing about who holds the key: only the record's
+    # creator, or an administrator, may enrol it.
+    if (existing_cert is not None and existing_cert.prv
+            and user.role != 'admin'
+            and existing_cert.created_by != user.username):
+        return error_response(
+            'This certificate is held by another account; ask an administrator to assign it',
+            403,
+        )
+
     cn = ''
     for attr in cert_obj.subject:
         if attr.oid == cx509.oid.NameOID.COMMON_NAME:
@@ -623,6 +706,7 @@ def enroll_import_certificate():
         cert_serial=serial,
         cert_subject=subject_dn,
         cert_issuer=issuer_dn,
+        cert_fingerprint=fingerprint,
         cert_pem=pem_str.encode('utf-8'),  # LargeBinary column
         name=cert_name,
         valid_from=valid_from,
@@ -720,7 +804,7 @@ def assign_certificate():
             return error_response('Target user not found', 404)
         enroll_user_id = target.id
         enroll_username = target.username
-    elif user.role not in ('admin', 'operator'):
+    elif user.role != 'admin':
         if certificate.created_by != user.username:
             return error_response('Not authorized to assign this certificate', 403)
 
