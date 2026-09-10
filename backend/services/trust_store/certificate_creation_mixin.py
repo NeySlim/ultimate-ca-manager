@@ -20,6 +20,9 @@ from .key_operations_mixin import KeyOperationsMixin
 from utils.key_codec import private_key_to_pem
 
 
+from utils.signing_hash import signing_hash_for
+
+
 class CertificateCreationMixin:
     """End-entity X.509 certificate creation mixin"""
 
@@ -222,7 +225,7 @@ class CertificateCreationMixin:
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
             private_key=ca_private_key,
-            algorithm=hash_algo,
+            algorithm=signing_hash_for(ca_private_key, hash_algo),
             backend=default_backend()
         )
 

@@ -55,7 +55,7 @@ def hsm_ca(app, request):
         provider_id = provider.id
         hsm_key_id = hsm_key.id
 
-    def fake_sign(key_id, data, algo=None):
+    def fake_sign(key_id, data, algo=None, hash_algorithm=None):
         return real_key.sign(data, padding.PKCS1v15(), hashes.SHA256())
 
     p1 = patch('services.hsm.HsmService.sign', side_effect=fake_sign)

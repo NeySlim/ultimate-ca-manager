@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 _MS_CERTIFICATE_TEMPLATE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.21.7')
 
 
+from utils.signing_hash import signing_hash_for
+
+
 def _certificate_template_extension(template_oid, major=100, minor=0):
     """Build the Microsoft CertificateTemplateOID extension (MS-CRTD):
     ``SEQUENCE { templateID OBJECT IDENTIFIER, major INTEGER, minor
@@ -1029,7 +1032,7 @@ class CSROperationsMixin:
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
             private_key=ca_private_key,
-            algorithm=hash_algo,
+            algorithm=signing_hash_for(ca_private_key, hash_algo),
             backend=default_backend()
         )
 

@@ -63,6 +63,9 @@ MAX_RENEWAL_DAYS = 3650
 DEFAULT_RENEWAL_DAYS = 365
 
 
+from utils.signing_hash import signing_hash_for
+
+
 class RenewalError(Exception):
     """Renewal could not be completed.
 
@@ -405,7 +408,7 @@ def renew_certificate_in_place(
     except Exception:
         pass
 
-    new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
+    new_cert = builder.sign(ca_key, signing_hash_for(ca_key), default_backend())
 
     new_cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     new_key_pem = None

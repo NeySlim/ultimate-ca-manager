@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
+from utils.signing_hash import signing_hash_for
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_issued
@@ -489,7 +490,7 @@ def create_certificate():
         sign_hash = hashes.SHA256()
         if template and template.digest:
             sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
-        new_cert = builder.sign(ca_key, sign_hash, default_backend())
+        new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
 
         # Serialize
         cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')

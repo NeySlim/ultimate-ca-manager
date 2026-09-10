@@ -449,15 +449,43 @@ class HsmService:
             logger.exception(f"Failed to get public key: {key.label}")
             raise HsmOperationError(f"Failed to get public key: {str(e)}")
     
+    _signing_hash_cache: dict = {}
+
     @classmethod
-    def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None) -> bytes:
+    def signing_hash(cls, key_id: int, key_algorithm: Optional[str], requested: str = 'sha256') -> str:
+        """The digest the key's provider signs with when *requested* is asked
+        for. Providers that hash with any digest return the request; those
+        that bind the digest to the key (curve-matched ECDSA, a KMS key
+        version) return that one. Cached per key and request."""
+        cache_key = (key_id, requested)
+        if cache_key in cls._signing_hash_cache:
+            return cls._signing_hash_cache[cache_key]
+        key = db.session.get(HsmKey, key_id)
+        if not key:
+            raise ValueError(f"Key not found: {key_id}")
+        try:
+            hsm = cls._get_provider_instance(key.provider)
+            name = hsm.hash_for_key(key.key_identifier, key_algorithm or key.algorithm, requested) or requested
+        except Exception as e:
+            # An unreachable or unavailable provider cannot bind anything:
+            # the request stands, and signing itself will say what is wrong
+            logger.debug(f"Signing digest for HSM key {key_id} left as requested: {e}")
+            return requested
+        cls._signing_hash_cache[cache_key] = name
+        return name
+
+    @classmethod
+    def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None,
+             hash_algorithm: Optional[str] = None) -> bytes:
         """
         Sign data using HSM key.
         
         Args:
             key_id: Key ID
             data: Data to sign
-            algorithm: Signature algorithm (optional, uses default for key type)
+            algorithm: Key algorithm (optional, uses default for key type)
+            hash_algorithm: Digest to sign with ('sha256', 'sha384', 'sha512'),
+                the one the signature's AlgorithmIdentifier names
             
         Returns:
             Signature bytes
@@ -473,7 +501,8 @@ class HsmService:
         try:
             hsm = cls._get_provider_instance(provider)
             with hsm:
-                signature = hsm.sign(key.key_identifier, data, algorithm)
+                signature = hsm.sign(key.key_identifier, data, algorithm,
+                                     hash_algorithm=hash_algorithm)
             
             logger.debug(f"Signed data with HSM key: {key.label}")
             return signature

@@ -19,6 +19,9 @@ from .query import CRLQueryMixin
 logger = logging.getLogger(__name__)
 
 
+from utils.signing_hash import signing_hash_for
+
+
 def _authority_key_identifier_for_crl(ca_cert: x509.Certificate) -> x509.AuthorityKeyIdentifier:
     """RFC 5280 §5.2.1 — CRL AKI must identify the signing CA key (its SKI)."""
     return authority_key_identifier_from_issuer(ca_cert)
@@ -219,7 +222,7 @@ class CRLGenerationMixin:
         # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
         builder = _add_freshest_crl(builder, ca)
 
-        crl = builder.sign(ca_private_key, _crl_signature_hash(ca), default_backend())
+        crl = builder.sign(ca_private_key, signing_hash_for(ca_private_key, _crl_signature_hash(ca)), default_backend())
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)
@@ -353,7 +356,7 @@ class CRLGenerationMixin:
             _authority_key_identifier_for_crl(ca_cert), critical=False
         )
 
-        crl = builder.sign(ca_private_key, _crl_signature_hash(ca), default_backend())
+        crl = builder.sign(ca_private_key, signing_hash_for(ca_private_key, _crl_signature_hash(ca)), default_backend())
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)

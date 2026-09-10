@@ -33,6 +33,9 @@ bp = Blueprint('policies_pro', __name__)
 _MAX_VALIDITY_DAYS = 3650
 
 
+from utils.signing_hash import signing_hash_for
+
+
 def _user_can_act_on_approval(user, approval):
     """RBAC + group-membership check for approve/reject.
 
@@ -347,7 +350,7 @@ def _issue_approved_certificate(approval):
     sign_hash = hashes.SHA256()
     if template and template.digest:
         sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
-    new_cert = builder.sign(ca_key, sign_hash, default_backend())
+    new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = private_key_to_pem(new_key).decode('utf-8')
     

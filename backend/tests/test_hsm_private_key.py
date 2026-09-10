@@ -69,7 +69,7 @@ class TestHsmRSAPrivateKey:
             w = HsmRSAPrivateKey(99, real.public_key(), 'RSA-2048')
             sig = w.sign(b'tbs-bytes', padding.PKCS1v15(), hashes.SHA256())
             assert sig == b'\x01' * 256
-            mock_sign.assert_called_once_with(99, b'tbs-bytes', 'RSA-2048')
+            mock_sign.assert_called_once_with(99, b'tbs-bytes', 'RSA-2048', hash_algorithm='sha256')
 
     def test_certificate_builder_sign_calls_hsm(self):
         """End-to-end: builder.sign(wrapper, SHA256) must end up at HsmService.sign."""
@@ -78,7 +78,7 @@ class TestHsmRSAPrivateKey:
 
         captured = {}
 
-        def fake_sign(key_id, data, algo):
+        def fake_sign(key_id, data, algo, hash_algorithm=None):
             captured['key_id'] = key_id
             captured['algo'] = algo
             captured['data_len'] = len(data)
@@ -142,13 +142,13 @@ class TestHsmECPrivateKey:
             w = HsmECPrivateKey(11, real.public_key(), 'EC-P256')
             sig = w.sign(b'tbs', ec.ECDSA(hashes.SHA256()))
             assert sig
-            mock_sign.assert_called_once_with(11, b'tbs', 'EC-P256')
+            mock_sign.assert_called_once_with(11, b'tbs', 'EC-P256', hash_algorithm='sha256')
 
     def test_builder_sign_round_trip(self):
         from services.hsm.hsm_private_key import HsmECPrivateKey
         real = ec.generate_private_key(ec.SECP256R1())
 
-        def fake_sign(key_id, data, algo):
+        def fake_sign(key_id, data, algo, hash_algorithm=None):
             return real.sign(data, ec.ECDSA(hashes.SHA256()))
 
         with patch('services.hsm.HsmService.sign', side_effect=fake_sign):

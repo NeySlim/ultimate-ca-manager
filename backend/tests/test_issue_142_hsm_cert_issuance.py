@@ -73,7 +73,7 @@ def hsm_provider_and_key(app, request):
 
 
 def _patch_hsm_sign(real_key, pub_pem):
-    def fake_sign(key_id, data, algo=None):
+    def fake_sign(key_id, data, algo=None, hash_algorithm=None):
         return real_key.sign(data, padding.PKCS1v15(), hashes.SHA256())
 
     return [

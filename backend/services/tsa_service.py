@@ -45,6 +45,9 @@ HASH_CLASSES = {
 }
 
 
+from utils.signing_hash import signing_hash_for
+
+
 class TSAConfigurationError(ValueError):
     """Raised when the TSA signing certificate is not RFC 3161 compliant.
 
@@ -264,6 +267,10 @@ class TSAService:
             message_imprint_hash if message_imprint_hash in HASH_CLASSES else 'sha256'
         )
         signature_hash = HASH_CLASSES[signature_hash_name]()
+        # An HSM-resident signer may bind the digest to its key: the CMS digest
+        # algorithm and the signature then follow it (self-review of #347)
+        signature_hash = signing_hash_for(self.tsa_key, signature_hash)
+        signature_hash_name = signature_hash.name
 
         # Compute digest of TSTInfo content with the CMS signature digest.
         content_digest = hashlib.new(signature_hash_name, tst_info_der).digest()

@@ -58,6 +58,9 @@ from services.scep.response_builder import (
 logger = logging.getLogger(__name__)
 
 
+from utils.signing_hash import signing_hash_for
+
+
 def _scep_allow_no_challenge() -> bool:
     """Opt-in to allow SCEP auto-approval without a challenge password.
 
@@ -1365,7 +1368,7 @@ class SCEPService:
                 critical=False,
             )
 
-        cert = builder.sign(self.ca_key, hashes.SHA256(), default_backend())
+        cert = builder.sign(self.ca_key, signing_hash_for(self.ca_key), default_backend())
         cert_pem = cert.public_bytes(serialization.Encoding.PEM)
 
         # Extract SANs

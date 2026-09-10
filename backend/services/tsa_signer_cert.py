@@ -57,6 +57,9 @@ except ImportError:  # encryption module unavailable — store as-is
         return data
 
 
+from utils.signing_hash import signing_hash_for
+
+
 class TsaSignerIssueError(Exception):
     """Issuance was refused. ``status`` is the HTTP status the API should surface."""
 
@@ -235,7 +238,7 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
             sign_hash = ca_sig_hash
     except Exception:
         pass
-    new_cert = builder.sign(ca_key, sign_hash, default_backend())
+    new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = private_key_to_pem(new_key).decode('utf-8')

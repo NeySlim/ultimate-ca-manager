@@ -137,12 +137,20 @@ class BaseHsmProvider(ABC):
         """
         pass
     
+    def hash_for_key(self, key_identifier: str, key_algorithm: Optional[str],
+                     requested: str = 'sha256') -> str:
+        """The digest this provider signs with for the key when *requested*
+        is asked for. A provider that hashes with any digest returns the
+        request; one that binds the digest to the key overrides this."""
+        return requested
+
     @abstractmethod
     def sign(
         self,
         key_identifier: str,
         data: bytes,
-        algorithm: Optional[str] = None
+        algorithm: Optional[str] = None,
+        hash_algorithm: Optional[str] = None
     ) -> bytes:
         """
         Sign data using HSM key.
@@ -150,7 +158,10 @@ class BaseHsmProvider(ABC):
         Args:
             key_identifier: HSM-internal key identifier
             data: Data to sign (or hash of data)
-            algorithm: Signature algorithm (SHA256withRSA, SHA384withECDSA, etc.)
+            algorithm: Key algorithm (RSA-2048, EC-P384, ...)
+            hash_algorithm: Digest to sign with ('sha256', 'sha384', 'sha512');
+                it is what the signature's AlgorithmIdentifier will name, so
+                a provider that can hash with it must
             
         Returns:
             Signature bytes

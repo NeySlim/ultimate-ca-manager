@@ -49,6 +49,16 @@ _HASH_NAME = {
     'sha384': 'sha384',
     'sha512': 'sha512',
 }
+_HASH_CLASS = {'sha256': hashes.SHA256, 'sha384': hashes.SHA384, 'sha512': hashes.SHA512}
+
+
+def _bound_signing_hash(hsm_key_id: int, key_algorithm: str, requested):
+    """The digest the provider signs with for this key when *requested* is
+    asked for: the request itself for providers that hash with any digest,
+    the key-bound one for those that do not (self-review of #347)."""
+    from services.hsm import HsmService
+    name = HsmService.signing_hash(hsm_key_id, key_algorithm, getattr(requested, 'name', 'sha256'))
+    return _HASH_CLASS.get(name, hashes.SHA256)()
 
 
 def _hash_name(algorithm) -> Optional[str]:
@@ -97,14 +107,15 @@ class HsmRSAPrivateKey:
                 type(padding_alg).__name__,
             )
 
-        if algorithm is not None and not isinstance(algorithm, hashes.SHA256):
-            logger.warning(
-                "HSM RSA sign requested with %s; provider may select a "
-                "different hash based on the key algorithm.",
-                getattr(algorithm, 'name', type(algorithm).__name__),
-            )
+        # The digest cryptography asked for is what the AlgorithmIdentifier
+        # will name: the provider must hash with it, not with a digest of its
+        # own choosing (self-review of #347)
+        return HsmService.sign(self._hsm_key_id, data, self._key_algorithm,
+                               hash_algorithm=_hash_name(algorithm) or 'sha256')
 
-        return HsmService.sign(self._hsm_key_id, data, self._key_algorithm)
+    def signing_hash(self, requested):
+        """The digest the provider will sign with when *requested* is asked for."""
+        return _bound_signing_hash(self._hsm_key_id, self._key_algorithm, requested)
 
     # --- minimal stubs so private_bytes() failures are explicit --------
 
@@ -149,26 +160,26 @@ class HsmECPrivateKey:
     def sign(self, data: bytes, signature_algorithm) -> bytes:
         """Sign ``data`` via HSM.
 
-        ``cryptography`` calls this with TBS bytes and an
-        ``ec.ECDSA(hashes.SHA256())`` instance.
+        ``cryptography`` calls this with TBS bytes and an ``ec.ECDSA(digest)``
+        instance; the digest is what the signature's AlgorithmIdentifier will
+        name, so the provider hashes with it (self-review of #347).
         """
         from services.hsm import HsmService
 
+        hash_name = 'sha256'
         if not isinstance(signature_algorithm, ec.ECDSA):
             logger.warning(
                 "HSM EC sign called with %s — expected ec.ECDSA",
                 type(signature_algorithm).__name__,
             )
         else:
-            inner = signature_algorithm.algorithm
-            if not isinstance(inner, hashes.SHA256):
-                logger.warning(
-                    "HSM EC sign requested with hash %s; provider may select "
-                    "a different hash based on the key algorithm.",
-                    getattr(inner, 'name', type(inner).__name__),
-                )
+            hash_name = _hash_name(signature_algorithm.algorithm) or 'sha256'
+        return HsmService.sign(self._hsm_key_id, data, self._key_algorithm,
+                               hash_algorithm=hash_name)
 
-        return HsmService.sign(self._hsm_key_id, data, self._key_algorithm)
+    def signing_hash(self, requested):
+        """The digest the provider will sign with when *requested* is asked for."""
+        return _bound_signing_hash(self._hsm_key_id, self._key_algorithm, requested)
 
     def exchange(self, *args, **kwargs):
         raise NotImplementedError("HSM EC exchange not implemented")

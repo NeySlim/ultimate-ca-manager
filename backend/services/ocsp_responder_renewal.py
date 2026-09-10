@@ -33,6 +33,9 @@ RESPONDER_KEY_PREFIX = 'ocsp_responder_cert_'
 DEFAULT_RENEW_DAYS = 30
 
 
+from utils.signing_hash import signing_hash_for
+
+
 def _get_config(key, default=None):
     row = SystemConfig.query.filter_by(key=key).first()
     return row.value if row else default
@@ -105,10 +108,7 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         critical=False,
     )
 
-    if isinstance(ca_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
-        new_cert = builder.sign(ca_key, None, default_backend())
-    else:
-        new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
+    new_cert = builder.sign(ca_key, signing_hash_for(ca_key), default_backend())
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode()
 

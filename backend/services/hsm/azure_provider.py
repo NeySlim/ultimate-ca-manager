@@ -397,11 +397,21 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         except AzureError as e:
             raise HsmOperationError(f"Failed to get public key: {str(e)}")
     
+    _EC_CURVE_HASH = {'EC-P256': 'sha256', 'EC-P384': 'sha384', 'EC-P521': 'sha512'}
+
+    def hash_for_key(self, key_identifier, key_algorithm, requested='sha256'):
+        """Key Vault signs ECDSA only with the curve's digest (ES256 for P-256,
+        ES384 for P-384, ES512 for P-521); RSA keys sign with any digest."""
+        if key_algorithm in self._EC_CURVE_HASH:
+            return self._EC_CURVE_HASH[key_algorithm]
+        return requested
+
     def sign(
         self,
         key_identifier: str,
         data: bytes,
-        algorithm: Optional[str] = None
+        algorithm: Optional[str] = None,
+        hash_algorithm: Optional[str] = None
     ) -> bytes:
         """Sign data using Azure Key Vault key"""
         if not self._key_client:
@@ -414,8 +424,13 @@ class AzureKeyVaultProvider(BaseHsmProvider):
             # Get key to determine algorithm
             key = self._key_client.get_key(key_name)
             
-            # Determine signature algorithm
-            if algorithm and algorithm in SIGN_ALGORITHMS:
+            # Determine signature algorithm: for RSA the digest the caller
+            # declares, for EC the curve's own (Key Vault accepts no other)
+            rsa_by_digest = {'sha256': 'rs256', 'sha384': 'rs384', 'sha512': 'rs512'}
+            if (hash_algorithm in rsa_by_digest
+                    and key.key_type in (KeyType.rsa, KeyType.rsa_hsm)):
+                sign_alg = getattr(SignatureAlgorithm, rsa_by_digest[hash_algorithm])
+            elif algorithm and algorithm in SIGN_ALGORITHMS:
                 sign_alg = SIGN_ALGORITHMS[algorithm]
             else:
                 # Default based on key type

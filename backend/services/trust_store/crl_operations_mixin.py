@@ -12,6 +12,9 @@ from utils.datetime_utils import utc_now
 from .constants import HASH_ALGORITHMS
 
 
+from utils.signing_hash import signing_hash_for
+
+
 class CRLOperationsMixin:
     """CRL operations mixin"""
 
@@ -44,7 +47,7 @@ class CRLOperationsMixin:
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         crl = builder.sign(
             private_key=ca_private_key,
-            algorithm=hash_algo,
+            algorithm=signing_hash_for(ca_private_key, hash_algo),
             backend=default_backend()
         )
 

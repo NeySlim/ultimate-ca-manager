@@ -22,6 +22,9 @@ from .constraints_mixin import ConstraintsMixin
 from utils.key_codec import private_key_to_pem
 
 
+from utils.signing_hash import signing_hash_for
+
+
 class CACertificateCreationMixin:
     """CA X.509 certificate creation mixin"""
 
@@ -225,7 +228,7 @@ class CACertificateCreationMixin:
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
             private_key=issuer_private_key,
-            algorithm=hash_algo,
+            algorithm=signing_hash_for(issuer_private_key, hash_algo),
             backend=default_backend()
         )
 

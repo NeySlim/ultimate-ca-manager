@@ -42,6 +42,9 @@ _HASH_ALGORITHMS = {
 }
 
 
+from utils.signing_hash import signing_hash_for
+
+
 @dataclass(frozen=True)
 class OCSPRequestItem:
     """One RFC 6960 CertID from an OCSP request list."""
@@ -606,15 +609,13 @@ class OCSPService:
     def _sign_response_data(signing_key, response_data_der: bytes):
         public_key = signing_key.public_key()
         if isinstance(public_key, rsa.RSAPublicKey):
-            signature = signing_key.sign(
-                response_data_der, padding.PKCS1v15(), hashes.SHA256()
-            )
-            return signature, 'sha256_rsa'
+            digest = signing_hash_for(signing_key)
+            signature = signing_key.sign(response_data_der, padding.PKCS1v15(), digest)
+            return signature, f'{digest.name}_rsa'
         if isinstance(public_key, ec.EllipticCurvePublicKey):
-            signature = signing_key.sign(
-                response_data_der, ec.ECDSA(hashes.SHA256())
-            )
-            return signature, 'sha256_ecdsa'
+            digest = signing_hash_for(signing_key)
+            signature = signing_key.sign(response_data_der, ec.ECDSA(digest))
+            return signature, f'{digest.name}_ecdsa'
         if isinstance(public_key, ed25519.Ed25519PublicKey):
             return signing_key.sign(response_data_der), 'ed25519'
         if isinstance(public_key, ed448.Ed448PublicKey):
@@ -890,13 +891,7 @@ class OCSPService:
             # Ed25519/Ed448 take no digest choice; the multi-response path
             # already knew that, this one handed them SHA-256 and every answer
             # from such a responder came back as an error (#347 review)
-            signing_public = signing_key.public_key()
-            sign_algorithm = (
-                None
-                if isinstance(signing_public, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey))
-                else hashes.SHA256()
-            )
-            response = builder.sign(signing_key, sign_algorithm)
+            response = builder.sign(signing_key, signing_hash_for(signing_key))
             response_der = response.public_bytes(serialization.Encoding.DER)
             
             # Cache response — key includes the hash algorithm because a SHA-1

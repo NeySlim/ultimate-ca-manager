@@ -80,8 +80,9 @@ def hsm_provider_and_key(app, request):
 
 def _patch_hsm(real_key, pub_pem):
     """Patch HsmService.sign + get_public_key so they use ``real_key``."""
-    def fake_sign(key_id, data, algo=None):
-        return real_key.sign(data, padding.PKCS1v15(), hashes.SHA256())
+    def fake_sign(key_id, data, algo=None, hash_algorithm=None):
+        digest = {'sha384': hashes.SHA384, 'sha512': hashes.SHA512}.get(hash_algorithm, hashes.SHA256)()
+        return real_key.sign(data, padding.PKCS1v15(), digest)
 
     return [
         patch('services.hsm.HsmService.sign', side_effect=fake_sign),
@@ -201,7 +202,7 @@ class TestCreateInternalCaWithNewHsmKey:
                 db.session.commit()
                 return new_hsm_key
 
-            def fake_sign(key_id, data, algo=None):
+            def fake_sign(key_id, data, algo=None, hash_algorithm=None):
                 return real.sign(data, padding.PKCS1v15(), hashes.SHA256())
 
             with patch('services.hsm.HsmService.generate_key',

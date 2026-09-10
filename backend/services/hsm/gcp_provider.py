@@ -359,11 +359,34 @@ class GcpKmsProvider(BaseHsmProvider):
         except gcp_exceptions.GoogleAPIError as e:
             raise HsmOperationError(f"Failed to get public key: {str(e)}")
     
+    @staticmethod
+    def _digest_of_version(version) -> str:
+        """The digest a KMS key version signs with, from its algorithm name
+        (RSA_SIGN_PKCS1_3072_SHA256 signs with SHA-256, not SHA-384)."""
+        algorithm = getattr(version, 'algorithm', None)
+        name = getattr(algorithm, 'name', '') or str(algorithm or '')
+        for digest in ('sha512', 'sha384', 'sha256'):
+            if digest.upper() in name.upper():
+                return digest
+        return 'sha256'
+
+    def hash_for_key(self, key_identifier, key_algorithm, requested='sha256'):
+        """KMS binds the digest to the key version: the signature must name
+        that digest whatever was requested."""
+        if not self._client:
+            self.connect()
+        crypto_key = self._client.get_crypto_key(name=key_identifier)
+        if not crypto_key.primary:
+            raise HsmOperationError("Key has no primary version")
+        version_name = f"{key_identifier}/cryptoKeyVersions/{crypto_key.primary.name.split('/')[-1]}"
+        return self._digest_of_version(self._client.get_crypto_key_version(name=version_name))
+
     def sign(
         self,
         key_identifier: str,
         data: bytes,
-        algorithm: Optional[str] = None
+        algorithm: Optional[str] = None,
+        hash_algorithm: Optional[str] = None
     ) -> bytes:
         """Sign data using GCP KMS key"""
         if not self._client:
@@ -379,16 +402,10 @@ class GcpKmsProvider(BaseHsmProvider):
             
             # Get version to determine algorithm
             version = self._client.get_crypto_key_version(name=version_name)
-            version_algorithm = GCP_ALGORITHM_NAMES.get(version.algorithm, '')
-            
-            # Hash the data
+            # Hash the data with the digest the key version is bound to
             import hashlib
-            if 'P256' in version_algorithm or '2048' in version_algorithm:
-                digest = {'sha256': hashlib.sha256(data).digest()}
-            elif 'P384' in version_algorithm or '3072' in version_algorithm:
-                digest = {'sha384': hashlib.sha384(data).digest()}
-            else:
-                digest = {'sha512': hashlib.sha512(data).digest()}
+            digest_name = self._digest_of_version(version)
+            digest = {digest_name: hashlib.new(digest_name, data).digest()}
             
             # Sign
             response = self._client.asymmetric_sign(

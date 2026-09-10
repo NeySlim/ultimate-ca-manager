@@ -433,7 +433,8 @@ class Pkcs11Provider(BaseHsmProvider):
         self,
         key_identifier: str,
         data: bytes,
-        algorithm: Optional[str] = None
+        algorithm: Optional[str] = None,
+        hash_algorithm: Optional[str] = None
     ) -> bytes:
         """Sign data using HSM key"""
         if not self._session:
@@ -454,10 +455,18 @@ class Pkcs11Provider(BaseHsmProvider):
             if not priv_key:
                 raise HsmKeyNotFoundError(f"Private key not found: {key_identifier}")
             
-            # Determine mechanism
+            # Determine mechanism: the digest the caller declares in the
+            # signature first, the key-size default otherwise
             key_type = priv_key[Attribute.KEY_TYPE]
-            
-            if algorithm:
+            by_digest = {
+                KeyType.RSA: {'sha256': Mechanism.SHA256_RSA_PKCS, 'sha384': Mechanism.SHA384_RSA_PKCS,
+                              'sha512': Mechanism.SHA512_RSA_PKCS},
+                KeyType.EC: {'sha256': Mechanism.ECDSA_SHA256, 'sha384': Mechanism.ECDSA_SHA384,
+                             'sha512': Mechanism.ECDSA_SHA512},
+            }
+            if hash_algorithm and key_type in by_digest and hash_algorithm in by_digest[key_type]:
+                mechanism = by_digest[key_type][hash_algorithm]
+            elif algorithm:
                 mechanism = SIGN_MECHANISMS.get(algorithm)
             else:
                 # Default mechanism based on key type

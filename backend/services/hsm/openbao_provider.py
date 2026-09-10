@@ -57,6 +57,8 @@ SIGN_HASH_ALGORITHM = {
 }
 
 # Signature algorithm name for Transit API
+TRANSIT_HASH = {'sha256': 'sha2-256', 'sha384': 'sha2-384', 'sha512': 'sha2-512'}
+
 SIGN_ALGORITHM = {
     'RSA-2048': 'pkcs1v15',
     'RSA-3072': 'pkcs1v15',
@@ -348,7 +350,8 @@ class OpenBaoProvider(BaseHsmProvider):
         self,
         key_identifier: str,
         data: bytes,
-        algorithm: Optional[str] = None
+        algorithm: Optional[str] = None,
+        hash_algorithm: Optional[str] = None
     ) -> bytes:
         # Determine hash algorithm from key type if not specified
         hash_alg = None
@@ -369,6 +372,12 @@ class OpenBaoProvider(BaseHsmProvider):
             if ucm_alg:
                 hash_alg = SIGN_HASH_ALGORITHM.get(ucm_alg, 'sha2-256')
                 sig_alg = SIGN_ALGORITHM.get(ucm_alg)
+
+        # The digest the caller declares in the signature wins over the
+        # key-size default: a certificate saying sha256WithRSA must have been
+        # hashed with SHA-256, whatever the key size (self-review of #347)
+        if hash_algorithm in TRANSIT_HASH:
+            hash_alg = TRANSIT_HASH[hash_algorithm]
 
         payload = {
             'input': base64.b64encode(data).decode('ascii'),
