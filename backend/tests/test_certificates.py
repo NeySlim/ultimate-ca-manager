@@ -1893,3 +1893,94 @@ class TestRenewalAddsNocheck:
             assert renewed.serial_number != old.serial_number
             renewed.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)   # present now
             assert ExtendedKeyUsageOID.OCSP_SIGNING in renewed.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+
+
+class TestCaImportIdentityColumns:
+    """Self-review of #347: both import routes keep a CA's serial_number and
+    SKI in step with its certificate, on creation and on re-import, and a
+    re-import into a serial the parent already revoked comes back revoked."""
+
+    @staticmethod
+    def _ca_cert(cn, key, *, issuer=None, signer=None):
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.x509.oid import NameOID
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        now = datetime.now(timezone.utc)
+        return (x509.CertificateBuilder().subject_name(name).issuer_name(issuer or name)
+                .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+                .sign(signer or key, hashes.SHA256()))
+
+    @staticmethod
+    def _import(auth_client, path, cert, key=None):
+        from cryptography.hazmat.primitives import serialization
+        pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+        if key is not None:
+            pem += key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                     serialization.NoEncryption()).decode()
+        return auth_client.post(path, data={'pem_content': pem}, content_type='multipart/form-data')
+
+    @staticmethod
+    def _row(app, ca_id):
+        with app.app_context():
+            from models import db, CA
+            db.session.expire_all()
+            row = db.session.get(CA, ca_id)
+            return row.serial_number, row.ski, row.revoked
+
+    @pytest.mark.parametrize('path', ['/api/v2/cas/import', f'{BASE}/import'])
+    def test_serial_number_and_ski_follow_the_certificate(self, app, auth_client, path):
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from services.import_service import extract_cert_info
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        cn = f"Identity Columns CA {path.split('/')[3]}"
+        first = self._ca_cert(cn, key)
+        r = self._import(auth_client, path, first, key)
+        assert r.status_code in (200, 201), r.data
+        ca_id = json.loads(r.data)['data']['id']
+        expected_ski = extract_cert_info(first)['ski']
+        assert expected_ski
+        assert self._row(app, ca_id) == (str(first.serial_number), expected_ski, False)
+        renewed = self._ca_cert(cn, key)
+        r = self._import(auth_client, path, renewed)
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['id'] == ca_id
+        assert self._row(app, ca_id) == (str(renewed.serial_number), expected_ski, False)
+
+    def test_reimport_into_a_serial_the_parent_revoked_is_revoked(self, app, auth_client, create_ca):
+        import base64
+        from datetime import datetime, timezone
+        from cryptography import x509
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        parent = create_ca(cn='Persisted Revocation Parent')
+        with app.app_context():
+            from models import db, CA
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            parent_obj = db.session.get(CA, parent['id'])
+            parent_key = get_ca_signing_key(parent_obj)
+            parent_name = x509.load_pem_x509_certificate(base64.b64decode(parent_obj.crt)).subject
+            parent_refid = parent_obj.refid
+        sub_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        old = self._ca_cert('Persisted Revocation Sub CA', sub_key, issuer=parent_name, signer=parent_key)
+        new = self._ca_cert('Persisted Revocation Sub CA', sub_key, issuer=parent_name, signer=parent_key)
+        with app.app_context():
+            from models import db
+            from models.revoked_serial import RevokedSerial
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.session.add(RevokedSerial(caref=parent_refid, serial_number=str(new.serial_number),
+                                         revoked_at=now, revoke_reason='keyCompromise',
+                                         valid_to=new.not_valid_after_utc.replace(tzinfo=None)))
+            db.session.commit()
+        r = self._import(auth_client, '/api/v2/cas/import', old, sub_key)
+        assert r.status_code in (200, 201), r.data
+        ca_id = json.loads(r.data)['data']['id']
+        assert self._row(app, ca_id)[2] is False
+        r = self._import(auth_client, '/api/v2/cas/import', new)
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == ca_id and body['data']['revoked'] is True
+        assert self._row(app, ca_id) == (str(new.serial_number), self._row(app, ca_id)[1], True)

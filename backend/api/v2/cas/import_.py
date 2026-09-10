@@ -167,6 +167,11 @@ def import_ca():
             existing_ca.issuer = cert_info['issuer']
             existing_ca.valid_from = cert_info['valid_from']
             existing_ca.valid_to = cert_info['valid_to']
+            existing_ca.ski = cert_info.get('ski')
+            existing_ca.serial_number = str(cert.serial_number)
+            # Deleted after its revocation and imported again, or renewed into
+            # a serial its parent already revoked: still revoked (#343)
+            CAService.apply_persisted_revocation(existing_ca)
 
             ok, err = safe_commit(logger, "Failed to update CA")
             if not ok:
@@ -196,6 +201,7 @@ def import_ca():
             subject=cert_info['subject'],
             issuer=cert_info['issuer'],
             ski=cert_info.get('ski'),
+            serial_number=str(cert.serial_number),
             valid_from=cert_info['valid_from'],
             valid_to=cert_info['valid_to'],
             imported_from='manual'
