@@ -7,6 +7,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Security
+- Development dependency vitest updated to 4.1.11: its mocker could read arbitrary files through a redirect mock (GHSA-82fw-gwwq-j7x9, test tooling only, not shipped in the application)
+
 ## [2.227] - 2026-09-10
 
 ### Added
